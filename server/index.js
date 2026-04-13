@@ -1011,6 +1011,60 @@ function isPostedToday(postedOn) {
   return postedOn.trim().toLowerCase() === "posted today";
 }
 
+function parsePostingDateToEpochSeconds(postingDate, referenceEpoch = nowEpochSeconds()) {
+  const raw = String(postingDate ?? "").trim();
+  if (!raw) return null;
+
+  const normalizedLower = raw.toLowerCase();
+  if (normalizedLower === "posted today" || normalizedLower === "today") {
+    return Number(referenceEpoch);
+  }
+  if (normalizedLower === "posted yesterday" || normalizedLower === "yesterday") {
+    return Number(referenceEpoch) - 24 * 60 * 60;
+  }
+
+  const daysAgoMatch = normalizedLower.match(/^(\d+)\s+day(?:s)?\s+ago$/i);
+  if (daysAgoMatch?.[1]) {
+    return Number(referenceEpoch) - Number(daysAgoMatch[1]) * 24 * 60 * 60;
+  }
+
+  const hoursAgoMatch = normalizedLower.match(/^(\d+)\s+hour(?:s)?\s+ago$/i);
+  if (hoursAgoMatch?.[1]) {
+    return Number(referenceEpoch) - Number(hoursAgoMatch[1]) * 60 * 60;
+  }
+
+  let normalized = raw
+    .replace(/^posted\s+/i, "")
+    .replace(/\b(\d{1,2})(st|nd|rd|th)\b/gi, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (/^\d{10,13}$/.test(normalized)) {
+    const numericEpoch = Number(normalized.length === 13 ? Math.floor(Number(normalized) / 1000) : normalized);
+    if (Number.isFinite(numericEpoch) && numericEpoch > 0) {
+      return numericEpoch;
+    }
+  }
+
+  const parsedMs = Date.parse(normalized);
+  if (Number.isFinite(parsedMs)) return Math.floor(parsedMs / 1000);
+
+  normalized = normalized.replace(/,\s*/g, " ").trim();
+  const fallbackParsedMs = Date.parse(normalized);
+  if (Number.isFinite(fallbackParsedMs)) return Math.floor(fallbackParsedMs / 1000);
+
+  return null;
+}
+
+function shouldStorePostingByDate(postingDate, referenceEpoch = nowEpochSeconds()) {
+  const raw = String(postingDate ?? "").trim();
+  if (!raw) return true;
+
+  const parsedEpoch = parsePostingDateToEpochSeconds(raw, referenceEpoch);
+  if (!parsedEpoch) return false;
+  return parsedEpoch >= Number(referenceEpoch) - POSTING_TTL_SECONDS;
+}
+
 function buildJobUrl(companyBaseUrl, externalPath) {
   if (typeof externalPath !== "string" || !externalPath.trim()) return "";
   const normalizedPath = externalPath.startsWith("/") ? externalPath : `/${externalPath}`;
@@ -4363,7 +4417,56 @@ async function pruneExpiredPostings(referenceEpoch = nowEpochSeconds()) {
   return Number(result?.changes || 0);
 }
 
+async function prunePostingsOutsideDateWindow(referenceEpoch = nowEpochSeconds()) {
+  const rows = await db.all(
+    `
+      SELECT id, posting_date
+      FROM Postings
+      WHERE posting_date IS NOT NULL
+        AND TRIM(posting_date) <> '';
+    `
+  );
+  if (!Array.isArray(rows) || rows.length === 0) return 0;
+
+  const idsToDelete = [];
+  for (const row of rows) {
+    const postingId = Number(row?.id || 0);
+    if (!Number.isFinite(postingId) || postingId <= 0) continue;
+    if (shouldStorePostingByDate(row?.posting_date, referenceEpoch)) continue;
+    idsToDelete.push(postingId);
+  }
+
+  if (idsToDelete.length === 0) return 0;
+
+  let totalDeleted = 0;
+  await db.exec("BEGIN TRANSACTION;");
+  try {
+    const chunkSize = 800;
+    for (let offset = 0; offset < idsToDelete.length; offset += chunkSize) {
+      const chunk = idsToDelete.slice(offset, offset + chunkSize);
+      if (chunk.length === 0) continue;
+      const placeholders = chunk.map(() => "?").join(", ");
+      const result = await db.run(
+        `
+          DELETE FROM Postings
+          WHERE id IN (${placeholders});
+        `,
+        chunk
+      );
+      totalDeleted += Number(result?.changes || 0);
+    }
+
+    await db.exec("COMMIT;");
+  } catch (error) {
+    await db.exec("ROLLBACK;");
+    throw error;
+  }
+
+  return totalDeleted;
+}
+
 async function runWorkdaySyncInternal() {
+  const syncReferenceEpoch = nowEpochSeconds();
   syncStatus.running = true;
   syncStatus.started_at = new Date().toISOString();
   syncStatus.progress = { current: 0, total: 0, company_name: "", total_collected: 0 };
@@ -4373,11 +4476,13 @@ async function runWorkdaySyncInternal() {
     const companies = await getCompaniesForSync();
     shuffleArrayInPlace(companies);
     syncStatus.progress.total = companies.length;
-    let totalPruned = await pruneExpiredPostings();
+    let totalPruned = await pruneExpiredPostings(syncReferenceEpoch);
+    let postingDatePruned = await prunePostingsOutsideDateWindow(syncReferenceEpoch);
     const nextPostingLocationByJobUrl = new Map();
 
     const dedupedPostings = new Map();
     const errors = [];
+    let excludedByPostingDate = 0;
 
     for (let i = 0; i < companies.length; i += 1) {
       const company = companies[i];
@@ -4385,6 +4490,10 @@ async function runWorkdaySyncInternal() {
         const postings = await collectPostingsForCompany(company);
         const uniqueCompanyPostings = [];
         for (const posting of postings) {
+          if (!shouldStorePostingByDate(posting?.posting_date, syncReferenceEpoch)) {
+            excludedByPostingDate += 1;
+            continue;
+          }
           if (dedupedPostings.has(posting.job_posting_url)) continue;
           dedupedPostings.set(posting.job_posting_url, posting);
           const location = String(posting?.location || "").trim();
@@ -4394,7 +4503,7 @@ async function runWorkdaySyncInternal() {
           }
           uniqueCompanyPostings.push(posting);
         }
-        await upsertPostings(uniqueCompanyPostings, nowEpochSeconds());
+        await upsertPostings(uniqueCompanyPostings, syncReferenceEpoch);
       } catch (error) {
         errors.push({
           company_name: company.company_name,
@@ -4410,7 +4519,8 @@ async function runWorkdaySyncInternal() {
       }
     }
 
-    totalPruned += await pruneExpiredPostings();
+    totalPruned += await pruneExpiredPostings(syncReferenceEpoch);
+    postingDatePruned += await prunePostingsOutsideDateWindow(syncReferenceEpoch);
     postingLocationByJobUrl = nextPostingLocationByJobUrl;
 
     syncStatus.last_sync_at = new Date().toISOString();
@@ -4419,6 +4529,8 @@ async function runWorkdaySyncInternal() {
       total_postings_stored: dedupedPostings.size,
       failed_companies: errors.length,
       expired_pruned: totalPruned,
+      posting_date_pruned: postingDatePruned,
+      excluded_during_sync_by_posting_date: excludedByPostingDate,
       errors: errors.slice(0, 30)
     };
   } catch (error) {
