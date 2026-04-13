@@ -1,5 +1,7 @@
 # OpenJobSlots
 
+# NOTE: The repo was recreated. All Stars are gone
+
 OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. **It pulls jobs that were posted in the last 24 hours** or that has no posted date. 
 
 ![Web UI Screenshot](README-Images/webui.png)
