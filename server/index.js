@@ -40,6 +40,7 @@ const APPLICANTPRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLYTOJOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const THEAPPLICANTMANAGER_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const ZOHO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ASHBY_QUERY = `
   query ApiJobBoardWithTeams($organizationHostedJobsPageName: String!) {
     jobBoard: jobBoardWithTeams(
@@ -338,7 +339,8 @@ const ATS_FILTER_OPTIONS = new Set([
   "applicantpro",
   "applytojob",
   "icims",
-  "theapplicantmanager"
+  "theapplicantmanager",
+  "zoho"
 ]);
 const POSTING_SORT_OPTIONS = new Set(["recent", "company_asc"]);
 const MCP_SETTINGS_DEFAULTS = {
@@ -817,6 +819,7 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes(".applytojob.com/apply")) return "applytojob";
   if (url.includes(".icims.com/jobs/")) return "icims";
   if (url.includes("theapplicantmanager.com/jobs")) return "theapplicantmanager";
+  if (url.includes(".zohorecruit.com/jobs/careers")) return "zoho";
   return "";
 }
 
@@ -834,6 +837,9 @@ function normalizeAtsFilterValue(value) {
   if (normalized === "icimscom" || normalized === "icims.com") return "icims";
   if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
     return "theapplicantmanager";
+  }
+  if (normalized === "zohorecruit" || normalized === "zohorecruit.com" || normalized === "zohorecruitcom") {
+    return "zoho";
   }
   return normalized;
 }
@@ -1185,6 +1191,9 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
     if (parsed.hostname.endsWith("theapplicantmanager.com")) {
       return postingLocationByJobUrl.get(url) || null;
     }
+    if (parsed.hostname.endsWith(".zohorecruit.com")) {
+      return postingLocationByJobUrl.get(url) || null;
+    }
     return null;
   } catch {
     return null;
@@ -1358,6 +1367,30 @@ function parseIcimsCompany(urlString) {
     subdomainLower: subdomain.toLowerCase(),
     origin: `${parsed.protocol}//${parsed.host}`,
     searchUrl: searchUrl.toString()
+  };
+}
+
+function parseZohoCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".zohorecruit.com")) return null;
+
+  const [subdomain = ""] = host.split(".");
+  if (!subdomain) return null;
+
+  const careersUrl = new URL(parsed.toString());
+  careersUrl.pathname = "/jobs/Careers";
+  careersUrl.search = "";
+  careersUrl.hash = "";
+
+  return {
+    host,
+    subdomain,
+    subdomainLower: subdomain.toLowerCase(),
+    origin: `${parsed.protocol}//${parsed.host}`,
+    careersUrl: careersUrl.toString()
   };
 }
 
@@ -1914,6 +1947,107 @@ function cleanIcimsText(value) {
     .replace(/\s+/g, " ")
     .replace(/\s*,\s*/g, ", ")
     .trim();
+}
+
+function extractZohoHiddenInputValue(pageHtml, inputId) {
+  const source = String(pageHtml || "");
+  const tagMatch = source.match(
+    new RegExp(`<input[^>]*\\bid=["']${String(inputId || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]*>`, "is")
+  );
+  if (!tagMatch?.[0]) return "";
+
+  const valueMatch = tagMatch[0].match(/\bvalue=["']([\s\S]*?)["']/i);
+  return String(valueMatch?.[1] || "").trim();
+}
+
+function cleanZohoText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractZohoListUrl(pageHtml, fallbackUrl) {
+  const metaPayload = extractZohoHiddenInputValue(pageHtml, "meta");
+  if (metaPayload) {
+    try {
+      const metaData = JSON.parse(decodeHtmlEntities(metaPayload));
+      const listUrl = String(metaData?.list_url || "").trim();
+      if (listUrl) return listUrl;
+    } catch {
+      // Continue to fallback extraction paths.
+    }
+  }
+
+  const ogMatch = String(pageHtml || "").match(
+    /<meta[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i
+  );
+  const ogUrl = String(ogMatch?.[1] || "").trim();
+  if (ogUrl) return decodeHtmlEntities(ogUrl);
+
+  const parsed = parseUrl(fallbackUrl);
+  if (parsed?.protocol && parsed?.host) {
+    return `${parsed.protocol}//${parsed.host}/jobs/Careers`;
+  }
+  return String(fallbackUrl || "").trim();
+}
+
+function buildZohoJobUrl(listUrl, jobId) {
+  const parsed = parseUrl(listUrl);
+  if (!parsed?.protocol || !parsed?.host) return String(listUrl || "").trim();
+
+  let normalizedPath = String(parsed.pathname || "").replace(/\/+$/, "");
+  if (!normalizedPath) normalizedPath = "/jobs/Careers";
+  if (!normalizedPath.toLowerCase().includes("/jobs/careers")) {
+    normalizedPath = "/jobs/Careers";
+  }
+
+  return `${parsed.protocol}//${parsed.host}${normalizedPath}/${encodeURIComponent(String(jobId || "").trim())}`;
+}
+
+function parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const rawJobsPayload = extractZohoHiddenInputValue(pageHtml, "jobs");
+  if (!rawJobsPayload) return [];
+
+  let jobs = [];
+  try {
+    const parsed = JSON.parse(decodeHtmlEntities(rawJobsPayload));
+    if (Array.isArray(parsed)) {
+      jobs = parsed;
+    }
+  } catch {
+    return [];
+  }
+
+  const listUrl = extractZohoListUrl(pageHtml, config?.careersUrl || config?.origin || "");
+  const postings = [];
+  const seenIds = new Set();
+
+  for (const job of jobs) {
+    if (!job || typeof job !== "object") continue;
+    if (job?.Publish === false) continue;
+
+    const jobId = String(job?.id || "").trim();
+    if (!jobId || seenIds.has(jobId)) continue;
+
+    const title = cleanZohoText(job?.Posting_Title) || cleanZohoText(job?.Job_Opening_Name) || "Untitled Position";
+    const city = cleanZohoText(job?.City);
+    const state = cleanZohoText(job?.State);
+    const country = cleanZohoText(job?.Country);
+    const location = [city, state, country].filter(Boolean).join(", ") || null;
+    const postingDate = cleanZohoText(job?.Date_Opened);
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: buildZohoJobUrl(listUrl, jobId),
+      posting_date: postingDate || null,
+      location,
+      department: cleanZohoText(job?.Industry) || null
+    });
+    seenIds.add(jobId);
+  }
+
+  return postings;
 }
 
 function ensureIcimsIframeUrl(urlString) {
@@ -2501,6 +2635,22 @@ async function fetchIcimsPage(urlString) {
   return res.text();
 }
 
+async function fetchZohoCareersPage(urlString) {
+  const res = await fetchWithAtsRateLimit("zoho", ZOHO_RATE_LIMIT_WAIT_MS, urlString, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Zoho Recruit page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  return res.text();
+}
+
 function buildUltiProSearchPayload(top, skip) {
   return {
     opportunitySearch: {
@@ -2894,6 +3044,16 @@ async function collectPostingsForIcimsCompany(company) {
   return collected;
 }
 
+async function collectPostingsForZohoCompany(company) {
+  const config = parseZohoCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
+  const pageHtml = await fetchZohoCareersPage(config.careersUrl);
+  return parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml);
+}
+
 async function collectPostingsForRecruiteeCompany(company) {
   const config = parseRecruiteeCompany(company.url_string);
   if (!config) return [];
@@ -3102,6 +3262,9 @@ async function collectPostingsForCompany(company) {
   }
   if (atsName === "icims" || atsName === "icims.com" || atsName === "icimscom") {
     return collectPostingsForIcimsCompany(company);
+  }
+  if (atsName === "zoho" || atsName === "zohorecruit" || atsName === "zohorecruit.com" || atsName === "zohorecruitcom") {
+    return collectPostingsForZohoCompany(company);
   }
   if (atsName === "recruiteecom" || atsName === "recruitee.com" || atsName === "recruitee") {
     return collectPostingsForRecruiteeCompany(company);
@@ -4400,7 +4563,7 @@ async function getCompaniesForSync() {
     `
       SELECT id, company_name, url_string, ATS_name
       FROM companies
-      WHERE LOWER(TRIM(ATS_name)) IN ('workday', 'ashbyhq', 'greenhouseio', 'greenhouse.io', 'greenhouse', 'leverco', 'lever.co', 'lever', 'jobvite', 'jobvite.com', 'jobvitecom', 'applicantpro', 'applicantpro.com', 'applicantprocom', 'applytojob', 'applytojob.com', 'applytojobcom', 'theapplicantmanager', 'theapplicantmanager.com', 'theapplicantmanagercom', 'icims', 'icims.com', 'icimscom', 'recruiteecom', 'recruitee.com', 'recruitee', 'ultipro', 'ukg', 'taleo', 'taleo.net', 'taleonet')
+      WHERE LOWER(TRIM(ATS_name)) IN ('workday', 'ashbyhq', 'greenhouseio', 'greenhouse.io', 'greenhouse', 'leverco', 'lever.co', 'lever', 'jobvite', 'jobvite.com', 'jobvitecom', 'applicantpro', 'applicantpro.com', 'applicantprocom', 'applytojob', 'applytojob.com', 'applytojobcom', 'theapplicantmanager', 'theapplicantmanager.com', 'theapplicantmanagercom', 'icims', 'icims.com', 'icimscom', 'zoho', 'zohorecruit', 'zohorecruit.com', 'zohorecruitcom', 'recruiteecom', 'recruitee.com', 'recruitee', 'ultipro', 'ukg', 'taleo', 'taleo.net', 'taleonet')
       ORDER BY ATS_name ASC, company_name ASC;
     `
   );
@@ -4684,6 +4847,7 @@ function createServer() {
       { value: "applytojob", label: "ApplyToJob" },
       { value: "theapplicantmanager", label: "The Applicant Manager" },
       { value: "icims", label: "iCIMS" },
+      { value: "zoho", label: "Zoho Recruit" },
       { value: "recruitee", label: "Recruitee" },
       { value: "ultipro", label: "UltiPro" },
       { value: "taleo", label: "Taleo" }

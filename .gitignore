@@ -61,5 +61,5 @@ public/static/
 
 # Extra
 /db_*
-jobs.db-shm
-jobs.db-wal
+*.db-shm
+*.db-wal
