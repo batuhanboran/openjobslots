@@ -6,7 +6,7 @@ OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. *
 [![OpenJobSlots Discussion](https://img.youtube.com/vi/5sVIhhwx3Yk/0.jpg)](https://www.youtube.com/watch?v=5sVIhhwx3Yk)
 
 ## Diagram
-![Web UI Screenshot](README-Images/webui.png)
+![Web UI Screenshot](README-Images/OpenJobSlots_Diagram.png)
 
 ## Features
 
@@ -31,23 +31,34 @@ It combines:
 
 Current sync support includes:
 
-- `workday`
-- `ashby` / `ashbyhq`
-- `greenhouse` / `greenhouse.io`
-- `lever` / `lever.co`
-- `jobvite` / `jobvite.com`
-- `applicantpro` / `applicantpro.com`
-- `applytojob` / `applytojob.com`
-- `theapplicantmanager` / `theapplicantmanager.com`
-- `icims` / `icims.com`
-- `recruitee` / `recruitee.com`
-- `ultipro` / `ukg`
-- `taleo` / `taleo.net`
+- `Workday`
+- `Ashby` / `ashbyhq`
+- `Greenhouse` / `greenhouse.io`
+- `Lever` / `lever.co`
+- `Jobvite` / `jobvite.com`
+- `Applicantpro` / `applicantpro.com`
+- `Applytojob` / `applytojob.com`
+- `Theapplicantmanager` / `theapplicantmanager.com`
+- `Icims` / `icims.com`
+- `Recruitee` / `recruitee.com`
+- `Ultipro` / `ukg`
+- `Taleo` / `taleo.net`
+- `ApplicantAI`
+- `Career Plug`
+- `Career Puck`
+- `Fountain`
+- `getro`
+- `HRM Direct`
+- `Talent Lyft`
+- `Talexio`
+- `Team Tailor`
+- `manatal`
+- `Zoho`
 
 <br>
 <img src="README-Images/ATS_list.png" alt="Applications" width="70%" />
 
-About **+7748** companies in total. All gathered from search engine data like Google and DuckDuckGo. 
+About **+10500+** companies in total. All gathered from search engine data like Google and DuckDuckGo. 
 <br>
 <img src="README-Images/company_amount.png" alt="Applications" width="25%" />
 <br>
