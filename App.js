@@ -490,36 +490,38 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
 
       {open ? (
         <View style={styles.dropdownPanel}>
-          <Pressable
-            onPress={() => {
-              onSelectValue("all");
-              setOpen(false);
-            }}
-            style={[styles.dropdownOption, selected === "all" ? styles.dropdownOptionSelected : null]}
-          >
-            <Text style={[styles.dropdownOptionLabel, selected === "all" ? styles.dropdownOptionLabelSelected : null]}>
-              {anyLabel}
-            </Text>
-          </Pressable>
+          <ScrollView style={styles.dropdownOptionsScroll}>
+            <Pressable
+              onPress={() => {
+                onSelectValue("all");
+                setOpen(false);
+              }}
+              style={[styles.dropdownOption, selected === "all" ? styles.dropdownOptionSelected : null]}
+            >
+              <Text style={[styles.dropdownOptionLabel, selected === "all" ? styles.dropdownOptionLabelSelected : null]}>
+                {anyLabel}
+              </Text>
+            </Pressable>
 
-          {normalizedOptions.map((option) => {
-            const value = String(option?.value || "");
-            const isSelected = selected === value;
-            return (
-              <Pressable
-                key={value}
-                onPress={() => {
-                  onSelectValue(value || "all");
-                  setOpen(false);
-                }}
-                style={[styles.dropdownOption, isSelected ? styles.dropdownOptionSelected : null]}
-              >
-                <Text style={[styles.dropdownOptionLabel, isSelected ? styles.dropdownOptionLabelSelected : null]}>
-                  {option?.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+            {normalizedOptions.map((option) => {
+              const value = String(option?.value || "");
+              const isSelected = selected === value;
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => {
+                    onSelectValue(value || "all");
+                    setOpen(false);
+                  }}
+                  style={[styles.dropdownOption, isSelected ? styles.dropdownOptionSelected : null]}
+                >
+                  <Text style={[styles.dropdownOptionLabel, isSelected ? styles.dropdownOptionLabelSelected : null]}>
+                    {option?.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
       ) : null}
     </View>
@@ -544,7 +546,8 @@ export default function App() {
     industries: [],
     states: [],
     counties: [],
-    remote: "all"
+    remote: "all",
+    hide_no_date: false
   });
   const [postingFilterOptions, setPostingFilterOptions] = useState({
     ats: DEFAULT_ATS_FILTER_OPTIONS,
@@ -1035,7 +1038,8 @@ export default function App() {
       industries: [],
       states: [],
       counties: [],
-      remote: "all"
+      remote: "all",
+      hide_no_date: false
     });
   }, []);
 
@@ -1298,6 +1302,18 @@ export default function App() {
                   </Pressable>
                 );
               })}
+            </View>
+            <View style={styles.remoteNoDateToggleRow}>
+              <Text style={styles.remoteNoDateToggleLabel}>Hide postings with no date</Text>
+              <Switch
+                value={Boolean(postingsFilters.hide_no_date)}
+                onValueChange={(value) =>
+                  setPostingsFilters((prev) => ({
+                    ...prev,
+                    hide_no_date: value
+                  }))
+                }
+              />
             </View>
           </View>
         </View>
@@ -2081,6 +2097,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     flexWrap: "wrap"
+  },
+  remoteNoDateToggleRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#dbe2ea",
+    borderRadius: 10,
+    backgroundColor: "#f8fafc",
+    paddingVertical: 9,
+    paddingHorizontal: 12
+  },
+  remoteNoDateToggleLabel: {
+    flex: 1,
+    marginRight: 10,
+    color: "#334e68",
+    fontSize: 12,
+    fontWeight: "600"
   },
   remoteFilterChip: {
     borderWidth: 1,

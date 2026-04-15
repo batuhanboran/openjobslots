@@ -52,6 +52,9 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   if (remote && remote !== "all") {
     params.set("remote", remote);
   }
+  if (filters?.hide_no_date) {
+    params.set("hide_no_date", "1");
+  }
 
   return request(`/postings?${params.toString()}`);
 }
