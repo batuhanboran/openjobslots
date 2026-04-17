@@ -72,9 +72,14 @@ const DEFAULT_ATS_FILTER_OPTIONS = [
   { value: "lever", label: "Lever" },
   { value: "jobvite", label: "Jobvite" },
   { value: "applicantpro", label: "ApplicantPro" },
+  { value: "bamboohr", label: "BambooHR" },
   { value: "applytojob", label: "ApplyToJob" },
   { value: "theapplicantmanager", label: "The Applicant Manager" },
   { value: "icims", label: "iCIMS" },
+  { value: "gem", label: "Gem" },
+  { value: "jobaps", label: "JobAps" },
+  { value: "talentreef", label: "TalentReef" },
+  { value: "saphrcloud", label: "SAP HR Cloud" },
   { value: "recruitee", label: "Recruitee" },
   { value: "ultipro", label: "UltiPro" },
   { value: "taleo", label: "Taleo" }
@@ -86,9 +91,14 @@ const ATS_LABEL_BY_VALUE = {
   lever: "Lever",
   jobvite: "Jobvite",
   applicantpro: "ApplicantPro",
+  bamboohr: "BambooHR",
   applytojob: "ApplyToJob",
   theapplicantmanager: "The Applicant Manager",
   icims: "iCIMS",
+  gem: "Gem",
+  jobaps: "JobAps",
+  talentreef: "TalentReef",
+  saphrcloud: "SAP HR Cloud",
   recruitee: "Recruitee",
   ultipro: "UltiPro",
   taleo: "Taleo"
@@ -102,11 +112,30 @@ function normalizeAtsValue(value) {
   if (normalized === "leverco" || normalized === "lever.co") return "lever";
   if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
   if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
+  if (normalized === "bamboohrcom" || normalized === "bamboohr.com") return "bamboohr";
   if (normalized === "applytojobcom" || normalized === "applytojob.com") return "applytojob";
   if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
     return "theapplicantmanager";
   }
   if (normalized === "icimscom" || normalized === "icims.com") return "icims";
+  if (normalized === "jobs.gem.com" || normalized === "gem.com" || normalized === "gemcom") return "gem";
+  if (normalized === "jobapscloud.com" || normalized === "jobapscloudcom") return "jobaps";
+  if (
+    normalized === "jobappnetwork.com" ||
+    normalized === "jobappnetworkcom" ||
+    normalized === "apply.jobappnetwork.com" ||
+    normalized === "applyjobappnetworkcom"
+  ) {
+    return "talentreef";
+  }
+  if (
+    normalized === "saphrcloud.com" ||
+    normalized === "saphrcloudcom" ||
+    normalized === "jobs.hr.cloud.sap" ||
+    normalized === "jobshrcloudsap"
+  ) {
+    return "saphrcloud";
+  }
   if (normalized === "recruiteecom" || normalized === "recruitee.com") return "recruitee";
   if (normalized === "ukg") return "ultipro";
   if (normalized === "taleonet" || normalized === "taleo.net") return "taleo";
@@ -618,9 +647,16 @@ export default function App() {
       ? new Date(status.last_sync_at).toLocaleString()
       : "No sync has run yet.";
     const summary = status.last_sync_summary || {};
-    const base = `Last sync: ${syncTime} | Companies: ${status.company_count || 0} | Stored today: ${status.posting_count || 0} | Failed companies: ${summary.failed_companies || 0}`;
+    const excludedByDate = Number(summary.excluded_during_sync_by_posting_date || 0);
+    const base = `Last sync: ${syncTime} | Companies: ${status.company_count || 0} | Stored today: ${status.posting_count || 0} | Failed companies: ${summary.failed_companies || 0} | Excluded by 24h: ${excludedByDate}`;
     if (status.running && status.progress) {
-      return `${base} | Syncing ${status.progress.current}/${status.progress.total}: ${status.progress.company_name || ""} (collected ${status.progress.total_collected || 0})`;
+      const collectedCount = Number(status.progress.total_collected || 0);
+      const storedCount = Number(status.posting_count || 0);
+      const liveSyncHint =
+        collectedCount > 0 && storedCount === 0
+          ? " | Sync is collecting postings; visible results appear as batches are saved."
+          : "";
+      return `${base} | Syncing ${status.progress.current}/${status.progress.total}: ${status.progress.company_name || ""} (collected ${collectedCount})${liveSyncHint}`;
     }
     return base;
   }, [status]);

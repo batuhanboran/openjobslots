@@ -2,6 +2,10 @@
 
 OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. **It pulls jobs that were posted in the last 24 hours** or that has no posted date. 
 
+Over **31000+** companies from multiple ATSs all sourced into 1 location!
+
+Over **500000+** fresh jobs on average **DAILY**!
+
 ## Youtube Video
 [![OpenJobSlots Discussion](https://img.youtube.com/vi/5sVIhhwx3Yk/0.jpg)](https://www.youtube.com/watch?v=5sVIhhwx3Yk)
 
@@ -43,22 +47,30 @@ Current sync support includes:
 - `Recruitee` / `recruitee.com`
 - `Ultipro` / `ukg`
 - `Taleo` / `taleo.net`
+- `BreezyHR`
 - `ApplicantAI`
 - `Career Plug`
 - `Career Puck`
 - `Fountain`
-- `getro`
+- `Getro`
 - `HRM Direct`
 - `Talent Lyft`
 - `Talexio`
 - `Team Tailor`
-- `manatal`
+- `Talent Reef`
+- `Manatal`
 - `Zoho`
+- `BambooHR`
+- `Gem`
+- `Jobaps`
+- `Join`
+- `Saphrcloud`
+
 
 <br>
 <img src="README-Images/ATS_list.png" alt="Applications" width="70%" />
 
-About **+10500+** companies in total. All gathered from search engine data like Google and DuckDuckGo. 
+OVER **31000+** companies in total. All gathered from search engine data like Google and DuckDuckGo and also using subdomain searching techniques and directory searching techniques. 
 <br>
 <img src="README-Images/company_amount.png" alt="Applications" width="25%" />
 <br>
