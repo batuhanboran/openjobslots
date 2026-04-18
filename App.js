@@ -326,8 +326,9 @@ function toFormMcpSettings(value) {
         : source.max_applications_per_run
     ),
     preferred_search: String(source.preferred_search || ""),
-    preferred_remote:
-      source.preferred_remote === "remote" || source.preferred_remote === "non_remote" ? source.preferred_remote : "all",
+    preferred_remote: ["remote", "hybrid", "non_remote"].includes(source.preferred_remote)
+      ? source.preferred_remote
+      : "all",
     preferred_industries: Array.isArray(source.preferred_industries) ? source.preferred_industries.filter(Boolean) : [],
     preferred_states: Array.isArray(source.preferred_states) ? source.preferred_states.filter(Boolean) : [],
     preferred_counties: Array.isArray(source.preferred_counties) ? source.preferred_counties.filter(Boolean) : [],
@@ -351,8 +352,9 @@ function toApiMcpSettings(value) {
     require_final_approval: Boolean(source.require_final_approval),
     max_applications_per_run: maxApplications,
     preferred_search: String(source.preferred_search || "").trim(),
-    preferred_remote:
-      source.preferred_remote === "remote" || source.preferred_remote === "non_remote" ? source.preferred_remote : "all",
+    preferred_remote: ["remote", "hybrid", "non_remote"].includes(source.preferred_remote)
+      ? source.preferred_remote
+      : "all",
     preferred_industries: Array.isArray(source.preferred_industries) ? source.preferred_industries.filter(Boolean) : [],
     preferred_states: Array.isArray(source.preferred_states) ? source.preferred_states.filter(Boolean) : [],
     preferred_counties: Array.isArray(source.preferred_counties) ? source.preferred_counties.filter(Boolean) : [],
@@ -669,7 +671,8 @@ export default function App() {
   const remoteFilterOptions = useMemo(
     () => [
       { value: "all", label: "All Locations" },
-      { value: "remote", label: "Remote / Hybrid Only" },
+      { value: "remote", label: "Remote Only" },
+      { value: "hybrid", label: "Hybrid Only" },
       { value: "non_remote", label: "On-Site / Unknown" }
     ],
     []

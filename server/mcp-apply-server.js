@@ -256,7 +256,7 @@ function normalizeBoolean(value, defaultValue = false) {
 
 function normalizeRemoteFilter(value) {
   const normalized = normalizeLikeText(value);
-  if (normalized === "remote" || normalized === "non_remote") return normalized;
+  if (normalized === "remote" || normalized === "hybrid" || normalized === "non_remote") return normalized;
   return "all";
 }
 
@@ -407,23 +407,23 @@ function rowMatchesLocationFilters(locationText, selectedStateCodes, countyFilte
   return true;
 }
 
-function isRemoteLocation(locationText) {
+function classifyLocationWorkMode(locationText) {
   const normalized = normalizeLikeText(locationText);
-  if (!normalized) return false;
-  return (
-    normalized.includes("remote") ||
-    normalized.includes("work from home") ||
-    normalized.includes("wfh") ||
-    normalized.includes("hybrid")
-  );
+  if (!normalized) return "non_remote";
+  const hasHybrid = normalized.includes("hybrid");
+  const hasRemote = normalized.includes("remote") || normalized.includes("work from home") || normalized.includes("wfh");
+  if (hasHybrid) return "hybrid";
+  if (hasRemote) return "remote";
+  return "non_remote";
 }
 
 function rowMatchesRemoteFilter(locationText, remoteFilter) {
   const normalized = normalizeRemoteFilter(remoteFilter);
   if (normalized === "all") return true;
-  const isRemote = isRemoteLocation(locationText);
-  if (normalized === "remote") return isRemote;
-  if (normalized === "non_remote") return !isRemote;
+  const mode = classifyLocationWorkMode(locationText);
+  if (normalized === "remote") return mode === "remote";
+  if (normalized === "hybrid") return mode === "hybrid";
+  if (normalized === "non_remote") return mode === "non_remote";
   return true;
 }
 
@@ -1409,7 +1409,7 @@ async function main() {
         industries: z.array(z.string()).optional(),
         states: z.array(z.string()).optional(),
         counties: z.array(z.string()).optional(),
-        remote: z.enum(["all", "remote", "non_remote"]).optional(),
+        remote: z.enum(["all", "remote", "hybrid", "non_remote"]).optional(),
         include_applied: z.boolean().optional(),
         limit: z.number().int().positive().max(2000).optional()
       }

@@ -345,7 +345,7 @@ const APPLICATION_STATUS_OPTIONS = new Set([
   "withdrawn",
   "denied"
 ]);
-const MCP_REMOTE_OPTIONS = new Set(["all", "remote", "non_remote"]);
+const MCP_REMOTE_OPTIONS = new Set(["all", "remote", "hybrid", "non_remote"]);
 const ATS_FILTER_OPTIONS = new Set([
   "workday",
   "ashby",
@@ -503,15 +503,14 @@ function hasStateLikeMatch(locationText, stateCode) {
   return normalizeLikeText(locationText).includes(stateName);
 }
 
-function isRemoteLocation(locationText) {
+function classifyLocationWorkMode(locationText) {
   const normalized = normalizeLikeText(locationText);
-  if (!normalized) return false;
-  return (
-    normalized.includes("remote") ||
-    normalized.includes("work from home") ||
-    normalized.includes("wfh") ||
-    normalized.includes("hybrid")
-  );
+  if (!normalized) return "non_remote";
+  const hasHybrid = normalized.includes("hybrid");
+  const hasRemote = normalized.includes("remote") || normalized.includes("work from home") || normalized.includes("wfh");
+  if (hasHybrid) return "hybrid";
+  if (hasRemote) return "remote";
+  return "non_remote";
 }
 
 async function buildIndustryMatchersByKey(industryKeys) {
@@ -824,9 +823,10 @@ function rowMatchesLocationFilters(locationText, selectedStateCodes, countyFilte
 function rowMatchesRemoteFilter(locationText, remoteFilter) {
   const normalized = normalizeRemoteFilter(remoteFilter);
   if (!normalized || normalized === "all") return true;
-  const isRemote = isRemoteLocation(locationText);
-  if (normalized === "remote") return isRemote;
-  if (normalized === "non_remote") return !isRemote;
+  const mode = classifyLocationWorkMode(locationText);
+  if (normalized === "remote") return mode === "remote";
+  if (normalized === "hybrid") return mode === "hybrid";
+  if (normalized === "non_remote") return mode === "non_remote";
   return true;
 }
 
@@ -834,7 +834,7 @@ function normalizeRemoteFilter(value) {
   const normalized = String(value || "all")
     .trim()
     .toLowerCase();
-  if (normalized === "remote" || normalized === "non_remote") return normalized;
+  if (normalized === "remote" || normalized === "hybrid" || normalized === "non_remote") return normalized;
   return "all";
 }
 
