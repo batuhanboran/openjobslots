@@ -22,7 +22,7 @@ It combines:
 
 
 - Pulls jobs from **multiple ATS** providers into one local database.
-- Filters postings by **search text, ATS, industry, state, county, and remote mode**.
+- Filters postings by **search text, ATS, industry, region (AMER/EMEA/APAC), country, state, county, and remote mode**.
 - Tracks **applied/ignored** posting state and application lifecycle status.
 <br>
 <img src="README-Images/apply_or_ignore.png" alt="Applications" width="25%" />

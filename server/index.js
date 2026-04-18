@@ -103,6 +103,12 @@ let wordIndustryCoverageCache = null;
 let phraseNgramIndustryCoverageCache = null;
 let syncPromise = null;
 let postingLocationByJobUrl = new Map();
+let postingLocationGeoFilterOptionsCache = {
+  mapRef: null,
+  countries: [],
+  regions: []
+};
+const locationGeoInferenceCache = new Map();
 const atsRateLimitStateByKey = new Map();
 let atsRequestQueueConcurrency = ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT;
 const syncStatus = {
@@ -337,6 +343,168 @@ const STATE_CODE_TO_NAME = {
   WY: "wyoming",
   DC: "district of columbia"
 };
+const LOCATION_REGION_OPTIONS = Object.freeze([
+  { value: "AMER", label: "AMER (Americas)" },
+  { value: "EMEA", label: "EMEA (Europe, Middle East, Africa)" },
+  { value: "APAC", label: "APAC (Asia-Pacific)" }
+]);
+const LOCATION_REGION_VALUES = new Set(LOCATION_REGION_OPTIONS.map((option) => option.value));
+const LOCATION_NON_COUNTRY_TERMS = new Set([
+  "remote",
+  "hybrid",
+  "onsite",
+  "on site",
+  "worldwide",
+  "global",
+  "international",
+  "amer",
+  "americas",
+  "north america",
+  "south america",
+  "latin america",
+  "latam",
+  "emea",
+  "europe",
+  "middle east",
+  "africa",
+  "apac",
+  "asia",
+  "asia pacific"
+]);
+const REGION_HINTS_BY_VALUE = Object.freeze({
+  AMER: [
+    "amer",
+    "americas",
+    "north america",
+    "south america",
+    "latin america",
+    "latam",
+    "caribbean"
+  ],
+  EMEA: ["emea", "europe", "middle east", "africa"],
+  APAC: ["apac", "asia pacific", "asia", "oceania"]
+});
+const COUNTRY_DEFINITIONS = Object.freeze([
+  {
+    code: "US",
+    label: "United States",
+    region: "AMER",
+    aliases: ["us", "usa", "u.s.", "u.s.a.", "united states of america"]
+  },
+  { code: "CA", label: "Canada", region: "AMER", aliases: ["can"] },
+  { code: "MX", label: "Mexico", region: "AMER", aliases: ["mex"] },
+  { code: "BR", label: "Brazil", region: "AMER", aliases: ["brasil"] },
+  { code: "AR", label: "Argentina", region: "AMER", aliases: [] },
+  { code: "CL", label: "Chile", region: "AMER", aliases: [] },
+  { code: "CO", label: "Colombia", region: "AMER", aliases: [] },
+  { code: "PE", label: "Peru", region: "AMER", aliases: [] },
+  { code: "UY", label: "Uruguay", region: "AMER", aliases: [] },
+  { code: "PY", label: "Paraguay", region: "AMER", aliases: [] },
+  { code: "BO", label: "Bolivia", region: "AMER", aliases: [] },
+  { code: "EC", label: "Ecuador", region: "AMER", aliases: [] },
+  { code: "VE", label: "Venezuela", region: "AMER", aliases: [] },
+  { code: "CR", label: "Costa Rica", region: "AMER", aliases: [] },
+  { code: "PA", label: "Panama", region: "AMER", aliases: [] },
+  { code: "GT", label: "Guatemala", region: "AMER", aliases: [] },
+  { code: "SV", label: "El Salvador", region: "AMER", aliases: [] },
+  { code: "HN", label: "Honduras", region: "AMER", aliases: [] },
+  { code: "NI", label: "Nicaragua", region: "AMER", aliases: [] },
+  { code: "DO", label: "Dominican Republic", region: "AMER", aliases: [] },
+  { code: "PR", label: "Puerto Rico", region: "AMER", aliases: [] },
+  { code: "JM", label: "Jamaica", region: "AMER", aliases: [] },
+  { code: "TT", label: "Trinidad and Tobago", region: "AMER", aliases: ["trinidad"] },
+  { code: "BS", label: "Bahamas", region: "AMER", aliases: [] },
+  { code: "BB", label: "Barbados", region: "AMER", aliases: [] },
+  { code: "GB", label: "United Kingdom", region: "EMEA", aliases: ["uk", "u.k.", "great britain", "britain", "england", "scotland", "wales", "northern ireland"] },
+  { code: "IE", label: "Ireland", region: "EMEA", aliases: ["republic of ireland"] },
+  { code: "FR", label: "France", region: "EMEA", aliases: [] },
+  { code: "DE", label: "Germany", region: "EMEA", aliases: ["deutschland"] },
+  { code: "ES", label: "Spain", region: "EMEA", aliases: [] },
+  { code: "PT", label: "Portugal", region: "EMEA", aliases: [] },
+  { code: "IT", label: "Italy", region: "EMEA", aliases: [] },
+  { code: "NL", label: "Netherlands", region: "EMEA", aliases: ["holland"] },
+  { code: "BE", label: "Belgium", region: "EMEA", aliases: [] },
+  { code: "LU", label: "Luxembourg", region: "EMEA", aliases: [] },
+  { code: "CH", label: "Switzerland", region: "EMEA", aliases: [] },
+  { code: "AT", label: "Austria", region: "EMEA", aliases: [] },
+  { code: "SE", label: "Sweden", region: "EMEA", aliases: [] },
+  { code: "NO", label: "Norway", region: "EMEA", aliases: [] },
+  { code: "DK", label: "Denmark", region: "EMEA", aliases: [] },
+  { code: "FI", label: "Finland", region: "EMEA", aliases: [] },
+  { code: "IS", label: "Iceland", region: "EMEA", aliases: [] },
+  { code: "PL", label: "Poland", region: "EMEA", aliases: [] },
+  { code: "CZ", label: "Czechia", region: "EMEA", aliases: ["czech republic"] },
+  { code: "SK", label: "Slovakia", region: "EMEA", aliases: [] },
+  { code: "HU", label: "Hungary", region: "EMEA", aliases: [] },
+  { code: "RO", label: "Romania", region: "EMEA", aliases: [] },
+  { code: "BG", label: "Bulgaria", region: "EMEA", aliases: [] },
+  { code: "HR", label: "Croatia", region: "EMEA", aliases: [] },
+  { code: "SI", label: "Slovenia", region: "EMEA", aliases: [] },
+  { code: "RS", label: "Serbia", region: "EMEA", aliases: [] },
+  { code: "BA", label: "Bosnia and Herzegovina", region: "EMEA", aliases: ["bosnia"] },
+  { code: "ME", label: "Montenegro", region: "EMEA", aliases: [] },
+  { code: "AL", label: "Albania", region: "EMEA", aliases: [] },
+  { code: "MK", label: "North Macedonia", region: "EMEA", aliases: ["macedonia"] },
+  { code: "GR", label: "Greece", region: "EMEA", aliases: [] },
+  { code: "CY", label: "Cyprus", region: "EMEA", aliases: [] },
+  { code: "MT", label: "Malta", region: "EMEA", aliases: [] },
+  { code: "EE", label: "Estonia", region: "EMEA", aliases: [] },
+  { code: "LV", label: "Latvia", region: "EMEA", aliases: [] },
+  { code: "LT", label: "Lithuania", region: "EMEA", aliases: [] },
+  { code: "UA", label: "Ukraine", region: "EMEA", aliases: [] },
+  { code: "BY", label: "Belarus", region: "EMEA", aliases: [] },
+  { code: "MD", label: "Moldova", region: "EMEA", aliases: [] },
+  { code: "RU", label: "Russia", region: "EMEA", aliases: ["russian federation"] },
+  { code: "TR", label: "Turkey", region: "EMEA", aliases: ["turkiye"] },
+  { code: "AE", label: "United Arab Emirates", region: "EMEA", aliases: ["uae", "u.a.e."] },
+  { code: "SA", label: "Saudi Arabia", region: "EMEA", aliases: ["ksa"] },
+  { code: "QA", label: "Qatar", region: "EMEA", aliases: [] },
+  { code: "KW", label: "Kuwait", region: "EMEA", aliases: [] },
+  { code: "BH", label: "Bahrain", region: "EMEA", aliases: [] },
+  { code: "OM", label: "Oman", region: "EMEA", aliases: [] },
+  { code: "IL", label: "Israel", region: "EMEA", aliases: [] },
+  { code: "JO", label: "Jordan", region: "EMEA", aliases: [] },
+  { code: "LB", label: "Lebanon", region: "EMEA", aliases: [] },
+  { code: "EG", label: "Egypt", region: "EMEA", aliases: [] },
+  { code: "MA", label: "Morocco", region: "EMEA", aliases: [] },
+  { code: "DZ", label: "Algeria", region: "EMEA", aliases: [] },
+  { code: "TN", label: "Tunisia", region: "EMEA", aliases: [] },
+  { code: "ZA", label: "South Africa", region: "EMEA", aliases: [] },
+  { code: "NG", label: "Nigeria", region: "EMEA", aliases: [] },
+  { code: "KE", label: "Kenya", region: "EMEA", aliases: [] },
+  { code: "GH", label: "Ghana", region: "EMEA", aliases: [] },
+  { code: "ET", label: "Ethiopia", region: "EMEA", aliases: [] },
+  { code: "UG", label: "Uganda", region: "EMEA", aliases: [] },
+  { code: "TZ", label: "Tanzania", region: "EMEA", aliases: [] },
+  { code: "SN", label: "Senegal", region: "EMEA", aliases: [] },
+  { code: "CI", label: "Cote d Ivoire", region: "EMEA", aliases: ["cote d'ivoire", "ivory coast"] },
+  { code: "CM", label: "Cameroon", region: "EMEA", aliases: [] },
+  { code: "IN", label: "India", region: "APAC", aliases: [] },
+  { code: "CN", label: "China", region: "APAC", aliases: ["prc", "people s republic of china"] },
+  { code: "JP", label: "Japan", region: "APAC", aliases: [] },
+  { code: "KR", label: "South Korea", region: "APAC", aliases: ["korea", "republic of korea", "korea south"] },
+  { code: "SG", label: "Singapore", region: "APAC", aliases: [] },
+  { code: "MY", label: "Malaysia", region: "APAC", aliases: [] },
+  { code: "TH", label: "Thailand", region: "APAC", aliases: [] },
+  { code: "VN", label: "Vietnam", region: "APAC", aliases: ["viet nam"] },
+  { code: "ID", label: "Indonesia", region: "APAC", aliases: [] },
+  { code: "PH", label: "Philippines", region: "APAC", aliases: [] },
+  { code: "AU", label: "Australia", region: "APAC", aliases: [] },
+  { code: "NZ", label: "New Zealand", region: "APAC", aliases: [] },
+  { code: "HK", label: "Hong Kong", region: "APAC", aliases: ["hong kong sar"] },
+  { code: "TW", label: "Taiwan", region: "APAC", aliases: [] },
+  { code: "PK", label: "Pakistan", region: "APAC", aliases: [] },
+  { code: "BD", label: "Bangladesh", region: "APAC", aliases: [] },
+  { code: "LK", label: "Sri Lanka", region: "APAC", aliases: [] },
+  { code: "NP", label: "Nepal", region: "APAC", aliases: [] },
+  { code: "MM", label: "Myanmar", region: "APAC", aliases: ["burma"] },
+  { code: "KH", label: "Cambodia", region: "APAC", aliases: [] },
+  { code: "LA", label: "Laos", region: "APAC", aliases: ["lao pdr"] },
+  { code: "BN", label: "Brunei", region: "APAC", aliases: ["brunei darussalam"] },
+  { code: "MN", label: "Mongolia", region: "APAC", aliases: [] }
+]);
+const US_STATE_NAMES = new Set(Object.values(STATE_CODE_TO_NAME).map((name) => normalizeGeoText(name)));
+const LOCATION_GEO_INFERENCE_CACHE_LIMIT = 30000;
 const APPLICATION_STATUS_OPTIONS = new Set([
   "applied",
   "interview scheduled",
@@ -392,6 +560,8 @@ const MCP_SETTINGS_DEFAULTS = {
   preferred_search: "",
   preferred_remote: "all",
   preferred_industries: [],
+  preferred_regions: [],
+  preferred_countries: [],
   preferred_states: [],
   preferred_counties: [],
   instructions_for_agent: ""
@@ -437,6 +607,311 @@ function parseJsonArray(value) {
 
 function escapeRegExp(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeGeoText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function containsGeoPhrase(normalizedGeoTextValue, phrase) {
+  const haystack = String(normalizedGeoTextValue || "").trim();
+  const needle = normalizeGeoText(phrase);
+  if (!haystack || !needle) return false;
+  return ` ${haystack} `.includes(` ${needle} `);
+}
+
+function toTitleCaseWords(value) {
+  const source = normalizeGeoText(value);
+  if (!source) return "";
+  return source
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function buildCountryLookupMaps() {
+  const byCode = new Map();
+  const aliasToCode = new Map();
+  const aliasesByCode = new Map();
+
+  for (const item of COUNTRY_DEFINITIONS) {
+    const code = String(item?.code || "")
+      .trim()
+      .toUpperCase();
+    if (!code) continue;
+
+    const label = String(item?.label || code).trim();
+    const region = String(item?.region || "")
+      .trim()
+      .toUpperCase();
+    const aliasValues = [label, ...(Array.isArray(item?.aliases) ? item.aliases : [])];
+    const aliasSet = new Set();
+    for (const aliasValue of aliasValues) {
+      const normalizedAlias = normalizeGeoText(aliasValue);
+      if (!normalizedAlias) continue;
+      if (!aliasToCode.has(normalizedAlias)) {
+        aliasToCode.set(normalizedAlias, code);
+      }
+      aliasSet.add(normalizedAlias);
+    }
+
+    byCode.set(code, { code, label, region });
+    aliasesByCode.set(code, aliasSet);
+  }
+
+  return { byCode, aliasToCode, aliasesByCode };
+}
+
+const {
+  byCode: COUNTRY_BY_CODE,
+  aliasToCode: COUNTRY_ALIAS_TO_CODE,
+  aliasesByCode: COUNTRY_ALIASES_BY_CODE
+} = buildCountryLookupMaps();
+
+function parseRegionFilters(values) {
+  const normalized = normalizeStringArray(values)
+    .map((value) => String(value || "").trim().toUpperCase())
+    .filter((value) => LOCATION_REGION_VALUES.has(value));
+  return Array.from(new Set(normalized));
+}
+
+function normalizeCountryLikePart(value) {
+  return normalizeGeoText(value)
+    .replace(/\b(country|republic|federation|state)\b/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function isLikelyCountryLikePart(value) {
+  const candidate = normalizeCountryLikePart(value);
+  if (!candidate) return false;
+  if (candidate.length < 3 || candidate.length > 40) return false;
+  if (candidate.split(" ").length > 4) return false;
+  if (/\d/.test(candidate)) return false;
+  if (LOCATION_NON_COUNTRY_TERMS.has(candidate)) return false;
+  if (US_STATE_NAMES.has(candidate)) return false;
+  if (/^[a-z]{2}$/.test(candidate)) return false;
+  return true;
+}
+
+function splitLocationIntoCountryCandidateSegments(locationText) {
+  return String(locationText || "")
+    .split(/[,/|;]+|\s+-\s+/)
+    .map((segment) => String(segment || "").trim())
+    .filter(Boolean);
+}
+
+function collectCountryCandidates(locationText) {
+  const segments = splitLocationIntoCountryCandidateSegments(locationText);
+  if (segments.length === 0) return [];
+
+  const candidates = [];
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const normalizedSegment = normalizeCountryLikePart(segments[index]);
+    if (!normalizedSegment) continue;
+    candidates.push(normalizedSegment);
+
+    const words = normalizedSegment.split(" ").filter(Boolean);
+    const maxWords = Math.min(words.length, 4);
+    for (let size = maxWords; size >= 1; size -= 1) {
+      const suffix = words.slice(words.length - size).join(" ");
+      if (suffix) candidates.push(suffix);
+    }
+  }
+
+  return Array.from(new Set(candidates));
+}
+
+function inferRegionFromNormalizedGeoText(normalizedGeoTextValue, countryCode = "") {
+  for (const region of ["AMER", "EMEA", "APAC"]) {
+    const hints = REGION_HINTS_BY_VALUE[region] || [];
+    const hasHint = hints.some((hint) => containsGeoPhrase(normalizedGeoTextValue, hint));
+    if (hasHint) return region;
+  }
+
+  const explicitCountryCode = String(countryCode || "").trim().toUpperCase();
+  if (explicitCountryCode) {
+    return String(COUNTRY_BY_CODE.get(explicitCountryCode)?.region || "").trim().toUpperCase();
+  }
+
+  return "";
+}
+
+function inferRegionFromLocationText(locationText, countryCode = "") {
+  return inferRegionFromNormalizedGeoText(normalizeGeoText(locationText), countryCode);
+}
+
+function inferLocationGeoUncached(locationText) {
+  const location = String(locationText || "").trim();
+  const normalizedGeoLocation = normalizeGeoText(location);
+  if (!location || !normalizedGeoLocation) {
+    return {
+      countryCode: "",
+      countryValue: "",
+      countryLabel: "",
+      countryLikePart: "",
+      region: ""
+    };
+  }
+
+  const countryCandidates = collectCountryCandidates(location);
+  for (const candidate of countryCandidates) {
+    const countryCode = COUNTRY_ALIAS_TO_CODE.get(candidate);
+    if (!countryCode) continue;
+    const country = COUNTRY_BY_CODE.get(countryCode);
+    const region =
+      inferRegionFromNormalizedGeoText(normalizedGeoLocation, countryCode) ||
+      String(country?.region || "").trim().toUpperCase();
+    return {
+      countryCode,
+      countryValue: countryCode,
+      countryLabel: String(country?.label || countryCode),
+      countryLikePart: normalizeGeoText(country?.label || candidate),
+      region
+    };
+  }
+
+  const segments = splitLocationIntoCountryCandidateSegments(location);
+  let fallbackCountryLikePart = "";
+  if (segments.length >= 2) {
+    for (let index = segments.length - 1; index >= 1; index -= 1) {
+      const candidate = normalizeCountryLikePart(segments[index]);
+      if (!isLikelyCountryLikePart(candidate)) continue;
+      fallbackCountryLikePart = candidate;
+      break;
+    }
+  }
+
+  const region = inferRegionFromNormalizedGeoText(normalizedGeoLocation);
+  return {
+    countryCode: "",
+    countryValue: fallbackCountryLikePart ? `RAW:${fallbackCountryLikePart}` : "",
+    countryLabel: fallbackCountryLikePart ? toTitleCaseWords(fallbackCountryLikePart) : "",
+    countryLikePart: fallbackCountryLikePart,
+    region
+  };
+}
+
+function inferLocationGeo(locationText) {
+  const location = String(locationText || "").trim();
+  if (!location) {
+    return {
+      countryCode: "",
+      countryValue: "",
+      countryLabel: "",
+      countryLikePart: "",
+      region: ""
+    };
+  }
+
+  const cached = locationGeoInferenceCache.get(location);
+  if (cached) return cached;
+
+  const inferred = inferLocationGeoUncached(location);
+  if (locationGeoInferenceCache.size >= LOCATION_GEO_INFERENCE_CACHE_LIMIT) {
+    locationGeoInferenceCache.clear();
+  }
+  locationGeoInferenceCache.set(location, inferred);
+  return inferred;
+}
+
+function parseCountryFilters(values) {
+  const parsed = [];
+  const seen = new Set();
+  for (const rawValue of normalizeStringArray(values)) {
+    const value = String(rawValue || "").trim();
+    if (!value) continue;
+
+    let nextFilter = null;
+    if (/^raw:/i.test(value)) {
+      const rawLikePart = normalizeCountryLikePart(value.slice(4));
+      if (isLikelyCountryLikePart(rawLikePart)) {
+        nextFilter = {
+          type: "raw",
+          rawLikePart,
+          value: `RAW:${rawLikePart}`
+        };
+      }
+    } else {
+      const asCode = value.toUpperCase();
+      if (COUNTRY_BY_CODE.has(asCode)) {
+        nextFilter = {
+          type: "code",
+          code: asCode,
+          value: asCode
+        };
+      } else {
+        const aliasCountryCode = COUNTRY_ALIAS_TO_CODE.get(normalizeCountryLikePart(value));
+        if (aliasCountryCode) {
+          nextFilter = {
+            type: "code",
+            code: aliasCountryCode,
+            value: aliasCountryCode
+          };
+        } else {
+          const rawLikePart = normalizeCountryLikePart(value);
+          if (isLikelyCountryLikePart(rawLikePart)) {
+            nextFilter = {
+              type: "raw",
+              rawLikePart,
+              value: `RAW:${rawLikePart}`
+            };
+          }
+        }
+      }
+    }
+
+    if (!nextFilter) continue;
+    if (seen.has(nextFilter.value)) continue;
+    seen.add(nextFilter.value);
+    parsed.push(nextFilter);
+  }
+  return parsed;
+}
+
+function getPostingLocationGeoFilterOptions() {
+  if (postingLocationGeoFilterOptionsCache.mapRef === postingLocationByJobUrl) {
+    return postingLocationGeoFilterOptionsCache;
+  }
+
+  const countriesByValue = new Map();
+  const presentRegions = new Set();
+  for (const location of postingLocationByJobUrl.values()) {
+    const inferred = inferLocationGeo(location);
+    if (inferred.countryValue && inferred.countryLabel) {
+      const existing = countriesByValue.get(inferred.countryValue);
+      if (!existing) {
+        countriesByValue.set(inferred.countryValue, {
+          value: inferred.countryValue,
+          label: inferred.countryLabel,
+          region: inferred.region || ""
+        });
+      } else if (!existing.region && inferred.region) {
+        existing.region = inferred.region;
+      }
+    }
+    if (inferred.region) presentRegions.add(inferred.region);
+  }
+
+  const countries = Array.from(countriesByValue.values()).sort((a, b) =>
+    String(a?.label || "").localeCompare(String(b?.label || ""))
+  );
+  const regions = LOCATION_REGION_OPTIONS.filter(
+    (option) => presentRegions.size === 0 || presentRegions.has(option.value)
+  ).map((option) => ({ ...option }));
+
+  postingLocationGeoFilterOptionsCache = {
+    mapRef: postingLocationByJobUrl,
+    countries,
+    regions
+  };
+  return postingLocationGeoFilterOptionsCache;
 }
 
 function createLikeParts(value) {
@@ -782,14 +1257,24 @@ function rowMatchesIndustryLikeParts(positionName, selectedIndustryKeys, industr
 
   return false;
 }
-function rowMatchesLocationFilters(locationText, selectedStateCodes, countyFilters) {
+function rowMatchesLocationFilters(
+  locationText,
+  selectedStateCodes,
+  countyFilters,
+  countryFilters = [],
+  selectedRegions = []
+) {
   const stateCodes = Array.isArray(selectedStateCodes) ? selectedStateCodes : [];
   const counties = Array.isArray(countyFilters) ? countyFilters : [];
-  if (stateCodes.length === 0 && counties.length === 0) return true;
+  const countries = Array.isArray(countryFilters) ? countryFilters : [];
+  const regions = Array.isArray(selectedRegions) ? selectedRegions : [];
+  if (stateCodes.length === 0 && counties.length === 0 && countries.length === 0 && regions.length === 0) return true;
 
   const location = String(locationText || "").trim();
   if (!location) return false;
   const normalizedLocation = normalizeLikeText(location);
+  const normalizedGeoLocation = normalizeGeoText(location);
+  const inferredGeo = inferLocationGeo(location);
 
   if (stateCodes.length > 0) {
     const hasSelectedState = stateCodes.some((stateCode) => hasStateLikeMatch(location, stateCode));
@@ -815,6 +1300,33 @@ function rowMatchesLocationFilters(locationText, selectedStateCodes, countyFilte
     });
 
     if (!matchesCounty) return false;
+  }
+
+  if (countries.length > 0) {
+    const matchesCountry = countries.some((countryFilter) => {
+      if (countryFilter?.type === "code") {
+        const selectedCountryCode = String(countryFilter?.code || "").trim().toUpperCase();
+        if (!selectedCountryCode) return false;
+        if (inferredGeo.countryCode && inferredGeo.countryCode === selectedCountryCode) {
+          return true;
+        }
+
+        const aliases = COUNTRY_ALIASES_BY_CODE.get(selectedCountryCode);
+        if (!(aliases instanceof Set)) return false;
+        return Array.from(aliases).some((alias) => containsGeoPhrase(normalizedGeoLocation, alias));
+      }
+
+      const rawLikePart = String(countryFilter?.rawLikePart || "").trim();
+      if (!rawLikePart) return false;
+      return containsGeoPhrase(normalizedGeoLocation, rawLikePart);
+    });
+
+    if (!matchesCountry) return false;
+  }
+
+  if (regions.length > 0) {
+    const region = inferredGeo.region || inferRegionFromNormalizedGeoText(normalizedGeoLocation, inferredGeo.countryCode);
+    if (!region || !regions.includes(region)) return false;
   }
 
   return true;
@@ -1076,6 +1588,8 @@ function normalizeMcpSettingsInput(value = {}) {
     preferred_search: String(source.preferred_search ?? MCP_SETTINGS_DEFAULTS.preferred_search).trim(),
     preferred_remote: normalizeMcpRemotePreference(source.preferred_remote),
     preferred_industries: parseJsonArray(source.preferred_industries),
+    preferred_regions: parseRegionFilters(parseJsonArray(source.preferred_regions)),
+    preferred_countries: parseCountryFilters(parseJsonArray(source.preferred_countries)).map((filter) => filter.value),
     preferred_states: parseJsonArray(source.preferred_states).map((state) => state.toUpperCase()),
     preferred_counties: parseJsonArray(source.preferred_counties),
     instructions_for_agent: String(source.instructions_for_agent ?? MCP_SETTINGS_DEFAULTS.instructions_for_agent).trim()
@@ -6356,6 +6870,8 @@ async function ensureApplicationsTable() {
       preferred_search TEXT NOT NULL DEFAULT '',
       preferred_remote TEXT NOT NULL DEFAULT 'all',
       preferred_industries TEXT NOT NULL DEFAULT '[]',
+      preferred_regions TEXT NOT NULL DEFAULT '[]',
+      preferred_countries TEXT NOT NULL DEFAULT '[]',
       preferred_states TEXT NOT NULL DEFAULT '[]',
       preferred_counties TEXT NOT NULL DEFAULT '[]',
       instructions_for_agent TEXT NOT NULL DEFAULT '',
@@ -6379,10 +6895,12 @@ async function ensureApplicationsTable() {
         preferred_search,
         preferred_remote,
         preferred_industries,
+        preferred_regions,
+        preferred_countries,
         preferred_states,
         preferred_counties,
         instructions_for_agent
-      ) VALUES (1, 0, ?, '', '', '', 1, 1, 10, '', 'all', '[]', '[]', '[]', '')
+      ) VALUES (1, 0, ?, '', '', '', 1, 1, 10, '', 'all', '[]', '[]', '[]', '[]', '[]', '')
       ON CONFLICT(id) DO NOTHING;
     `,
     [MCP_SETTINGS_DEFAULTS.preferred_agent_name]
@@ -6420,6 +6938,18 @@ async function ensureApplicationsTable() {
     await db.exec(`
       ALTER TABLE McpSettings
       ADD COLUMN agent_login_password TEXT NOT NULL DEFAULT '';
+    `);
+  }
+  if (!mcpSettingsColumnNames.has("preferred_regions")) {
+    await db.exec(`
+      ALTER TABLE McpSettings
+      ADD COLUMN preferred_regions TEXT NOT NULL DEFAULT '[]';
+    `);
+  }
+  if (!mcpSettingsColumnNames.has("preferred_countries")) {
+    await db.exec(`
+      ALTER TABLE McpSettings
+      ADD COLUMN preferred_countries TEXT NOT NULL DEFAULT '[]';
     `);
   }
 }
@@ -6624,6 +7154,8 @@ async function getMcpSettings() {
     preferred_search: row?.preferred_search,
     preferred_remote: row?.preferred_remote,
     preferred_industries: parseJsonArray(row?.preferred_industries),
+    preferred_regions: parseJsonArray(row?.preferred_regions),
+    preferred_countries: parseJsonArray(row?.preferred_countries),
     preferred_states: parseJsonArray(row?.preferred_states),
     preferred_counties: parseJsonArray(row?.preferred_counties),
     instructions_for_agent: row?.instructions_for_agent
@@ -6650,11 +7182,13 @@ async function upsertMcpSettings(input) {
         preferred_search,
         preferred_remote,
         preferred_industries,
+        preferred_regions,
+        preferred_countries,
         preferred_states,
         preferred_counties,
         instructions_for_agent,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         enabled = excluded.enabled,
         preferred_agent_name = excluded.preferred_agent_name,
@@ -6668,6 +7202,8 @@ async function upsertMcpSettings(input) {
         preferred_search = excluded.preferred_search,
         preferred_remote = excluded.preferred_remote,
         preferred_industries = excluded.preferred_industries,
+        preferred_regions = excluded.preferred_regions,
+        preferred_countries = excluded.preferred_countries,
         preferred_states = excluded.preferred_states,
         preferred_counties = excluded.preferred_counties,
         instructions_for_agent = excluded.instructions_for_agent,
@@ -6687,6 +7223,8 @@ async function upsertMcpSettings(input) {
       normalized.preferred_search,
       normalized.preferred_remote,
       JSON.stringify(normalized.preferred_industries || []),
+      JSON.stringify(normalized.preferred_regions || []),
+      JSON.stringify(normalized.preferred_countries || []),
       JSON.stringify(normalized.preferred_states || []),
       JSON.stringify(normalized.preferred_counties || []),
       normalized.instructions_for_agent
@@ -6861,6 +7399,8 @@ async function listPostingsWithFilters(options = {}) {
   const industryKeys = normalizeStringArray(options?.industries).map((key) => normalizeLikeText(key));
   const stateCodes = normalizeStringArray(options?.states).map((state) => state.toUpperCase());
   const countyFilters = parseCountyFilters(normalizeStringArray(options?.counties));
+  const countryFilters = parseCountryFilters(normalizeStringArray(options?.countries));
+  const regionFilters = parseRegionFilters(normalizeStringArray(options?.regions));
   const remoteFilter = normalizeRemoteFilter(options?.remote);
   const hideNoDate = normalizeBoolean(options?.hide_no_date, false);
   const includeApplied = normalizeBoolean(options?.include_applied, true);
@@ -6870,6 +7410,8 @@ async function listPostingsWithFilters(options = {}) {
     industryKeys.length > 0 ||
     stateCodes.length > 0 ||
     countyFilters.length > 0 ||
+    countryFilters.length > 0 ||
+    regionFilters.length > 0 ||
     remoteFilter !== "all";
 
   let rows = [];
@@ -6961,7 +7503,13 @@ async function listPostingsWithFilters(options = {}) {
       );
       if (!matchesIndustry) return false;
 
-      const matchesLocation = rowMatchesLocationFilters(row?.location, stateCodes, countyFilters);
+      const matchesLocation = rowMatchesLocationFilters(
+        row?.location,
+        stateCodes,
+        countyFilters,
+        countryFilters,
+        regionFilters
+      );
       if (!matchesLocation) return false;
 
       const matchesRemote = rowMatchesRemoteFilter(row?.location, remoteFilter);
@@ -6997,6 +7545,8 @@ async function listPostingsWithFilters(options = {}) {
       counties: countyFilters.map((filter) =>
         filter?.stateCode ? `${filter.stateCode}|${filter.countyLikePart}` : filter.countyLikePart
       ),
+      countries: countryFilters.map((filter) => filter.value),
+      regions: regionFilters,
       remote: remoteFilter,
       hide_no_date: hideNoDate,
       include_ignored: includeIgnored
@@ -7962,10 +8512,14 @@ function createServer() {
       counties = [];
     }
 
+    const locationGeoOptions = getPostingLocationGeoFilterOptions();
+
     res.json({
       ats,
       sort_options,
       industries,
+      regions: Array.isArray(locationGeoOptions?.regions) ? locationGeoOptions.regions : [],
+      countries: Array.isArray(locationGeoOptions?.countries) ? locationGeoOptions.countries : [],
       states,
       counties
     });
@@ -8077,6 +8631,8 @@ function createServer() {
     const overrideIndustries = parseCsvParam(req.query.industries);
     const overrideStates = parseCsvParam(req.query.states);
     const overrideCounties = parseCsvParam(req.query.counties);
+    const overrideCountries = parseCsvParam(req.query.countries);
+    const overrideRegions = parseCsvParam(req.query.regions);
     const overrideRemote = normalizeRemoteFilter(req.query.remote);
     const includeApplied = normalizeBoolean(req.query.include_applied, false);
 
@@ -8107,6 +8663,18 @@ function createServer() {
         : useSettings
           ? normalizeStringArray(settings?.preferred_counties)
           : [];
+    const countries =
+      overrideCountries.length > 0
+        ? overrideCountries
+        : useSettings
+          ? normalizeStringArray(settings?.preferred_countries)
+          : [];
+    const regions =
+      overrideRegions.length > 0
+        ? overrideRegions
+        : useSettings
+          ? normalizeStringArray(settings?.preferred_regions)
+          : [];
     const remote = req.query.remote ? overrideRemote : useSettings ? settings?.preferred_remote : "all";
 
     const result = await listPostingsWithFilters({
@@ -8117,6 +8685,8 @@ function createServer() {
       industries,
       states,
       counties,
+      countries,
+      regions,
       remote,
       include_applied: includeApplied
     });
@@ -8363,6 +8933,8 @@ function createServer() {
       industries: parseCsvParam(req.query.industries),
       states: parseCsvParam(req.query.states),
       counties: parseCsvParam(req.query.counties),
+      countries: parseCsvParam(req.query.countries),
+      regions: parseCsvParam(req.query.regions),
       remote: req.query.remote,
       hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
       include_applied: normalizeBoolean(req.query.include_applied, true),

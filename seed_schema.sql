@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS McpSettings (
       preferred_search TEXT NOT NULL DEFAULT '',
       preferred_remote TEXT NOT NULL DEFAULT 'all',
       preferred_industries TEXT NOT NULL DEFAULT '[]',
+      preferred_regions TEXT NOT NULL DEFAULT '[]',
+      preferred_countries TEXT NOT NULL DEFAULT '[]',
       preferred_states TEXT NOT NULL DEFAULT '[]',
       preferred_counties TEXT NOT NULL DEFAULT '[]',
       instructions_for_agent TEXT NOT NULL DEFAULT '',

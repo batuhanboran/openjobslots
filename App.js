@@ -297,6 +297,8 @@ function createDefaultMcpSettings() {
     preferred_search: "",
     preferred_remote: "all",
     preferred_industries: [],
+    preferred_regions: [],
+    preferred_countries: [],
     preferred_states: [],
     preferred_counties: [],
     instructions_for_agent: ""
@@ -330,6 +332,8 @@ function toFormMcpSettings(value) {
       ? source.preferred_remote
       : "all",
     preferred_industries: Array.isArray(source.preferred_industries) ? source.preferred_industries.filter(Boolean) : [],
+    preferred_regions: Array.isArray(source.preferred_regions) ? source.preferred_regions.filter(Boolean) : [],
+    preferred_countries: Array.isArray(source.preferred_countries) ? source.preferred_countries.filter(Boolean) : [],
     preferred_states: Array.isArray(source.preferred_states) ? source.preferred_states.filter(Boolean) : [],
     preferred_counties: Array.isArray(source.preferred_counties) ? source.preferred_counties.filter(Boolean) : [],
     instructions_for_agent: String(source.instructions_for_agent || "")
@@ -356,6 +360,8 @@ function toApiMcpSettings(value) {
       ? source.preferred_remote
       : "all",
     preferred_industries: Array.isArray(source.preferred_industries) ? source.preferred_industries.filter(Boolean) : [],
+    preferred_regions: Array.isArray(source.preferred_regions) ? source.preferred_regions.filter(Boolean) : [],
+    preferred_countries: Array.isArray(source.preferred_countries) ? source.preferred_countries.filter(Boolean) : [],
     preferred_states: Array.isArray(source.preferred_states) ? source.preferred_states.filter(Boolean) : [],
     preferred_counties: Array.isArray(source.preferred_counties) ? source.preferred_counties.filter(Boolean) : [],
     instructions_for_agent: String(source.instructions_for_agent || "").trim()
@@ -615,6 +621,8 @@ export default function App() {
   const [postingsFilters, setPostingsFilters] = useState({
     ats: "all",
     industries: [],
+    regions: [],
+    countries: [],
     states: [],
     counties: [],
     remote: "all",
@@ -623,6 +631,8 @@ export default function App() {
   const [postingFilterOptions, setPostingFilterOptions] = useState({
     ats: DEFAULT_ATS_FILTER_OPTIONS,
     industries: [],
+    regions: [],
+    countries: [],
     states: [],
     counties: []
   });
@@ -677,11 +687,35 @@ export default function App() {
     ],
     []
   );
+  const countryRegionByValue = useMemo(
+    () =>
+      new Map(
+        (postingFilterOptions.countries || []).map((country) => [
+          String(country?.value || ""),
+          String(country?.region || "")
+        ])
+      ),
+    [postingFilterOptions.countries]
+  );
+  const visibleCountryOptions = useMemo(() => {
+    const selectedRegions = postingsFilters.regions || [];
+    if (selectedRegions.length === 0) return postingFilterOptions.countries || [];
+    return (postingFilterOptions.countries || []).filter(
+      (country) => selectedRegions.includes(String(country?.region || ""))
+    );
+  }, [postingFilterOptions.countries, postingsFilters.regions]);
   const visibleCountyOptions = useMemo(() => {
     const selectedStates = postingsFilters.states || [];
     if (selectedStates.length === 0) return postingFilterOptions.counties || [];
     return (postingFilterOptions.counties || []).filter((county) => selectedStates.includes(county?.state));
   }, [postingFilterOptions.counties, postingsFilters.states]);
+  const visibleMcpCountryOptions = useMemo(() => {
+    const selectedRegions = mcpSettings.preferred_regions || [];
+    if (selectedRegions.length === 0) return postingFilterOptions.countries || [];
+    return (postingFilterOptions.countries || []).filter(
+      (country) => selectedRegions.includes(String(country?.region || ""))
+    );
+  }, [mcpSettings.preferred_regions, postingFilterOptions.countries]);
   const visibleMcpCountyOptions = useMemo(() => {
     const selectedStates = mcpSettings.preferred_states || [];
     if (selectedStates.length === 0) return postingFilterOptions.counties || [];
@@ -757,6 +791,8 @@ export default function App() {
       setPostingFilterOptions({
         ats: mergeAtsFilterOptions(response?.ats),
         industries: Array.isArray(response?.industries) ? response.industries : [],
+        regions: Array.isArray(response?.regions) ? response.regions : [],
+        countries: Array.isArray(response?.countries) ? response.countries : [],
         states: Array.isArray(response?.states) ? response.states : [],
         counties: Array.isArray(response?.counties) ? response.counties : []
       });
@@ -1169,6 +1205,48 @@ export default function App() {
     });
   }, []);
 
+  const toggleRegionFilter = useCallback(
+    (value) => {
+      setPostingsFilters((prev) => {
+        const nextRegions = new Set(prev.regions || []);
+        if (nextRegions.has(value)) {
+          nextRegions.delete(value);
+        } else {
+          nextRegions.add(value);
+        }
+
+        const nextRegionValues = Array.from(nextRegions);
+        const nextCountries = (prev.countries || []).filter((countryValue) => {
+          if (nextRegionValues.length === 0) return true;
+          const countryRegion = countryRegionByValue.get(String(countryValue || ""));
+          return countryRegion && nextRegionValues.includes(countryRegion);
+        });
+
+        return {
+          ...prev,
+          regions: nextRegionValues,
+          countries: nextCountries
+        };
+      });
+    },
+    [countryRegionByValue]
+  );
+
+  const toggleCountryFilter = useCallback((value) => {
+    setPostingsFilters((prev) => {
+      const next = new Set(prev.countries || []);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return {
+        ...prev,
+        countries: Array.from(next)
+      };
+    });
+  }, []);
+
   const toggleStateFilter = useCallback((value) => {
     setPostingsFilters((prev) => {
       const nextStates = new Set(prev.states);
@@ -1211,6 +1289,8 @@ export default function App() {
     setPostingsFilters({
       ats: "all",
       industries: [],
+      regions: [],
+      countries: [],
       states: [],
       counties: [],
       remote: "all",
@@ -1229,6 +1309,48 @@ export default function App() {
       return {
         ...prev,
         preferred_industries: Array.from(next)
+      };
+    });
+  }, []);
+
+  const toggleMcpRegionPreference = useCallback(
+    (value) => {
+      setMcpSettings((prev) => {
+        const nextRegions = new Set(prev.preferred_regions || []);
+        if (nextRegions.has(value)) {
+          nextRegions.delete(value);
+        } else {
+          nextRegions.add(value);
+        }
+
+        const nextRegionValues = Array.from(nextRegions);
+        const nextCountries = (prev.preferred_countries || []).filter((countryValue) => {
+          if (nextRegionValues.length === 0) return true;
+          const countryRegion = countryRegionByValue.get(String(countryValue || ""));
+          return countryRegion && nextRegionValues.includes(countryRegion);
+        });
+
+        return {
+          ...prev,
+          preferred_regions: nextRegionValues,
+          preferred_countries: nextCountries
+        };
+      });
+    },
+    [countryRegionByValue]
+  );
+
+  const toggleMcpCountryPreference = useCallback((value) => {
+    setMcpSettings((prev) => {
+      const next = new Set(prev.preferred_countries || []);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return {
+        ...prev,
+        preferred_countries: Array.from(next)
       };
     });
   }, []);
@@ -1400,99 +1522,135 @@ export default function App() {
 
       {postingsFilterPanelOpen ? (
         <View style={styles.postingsFiltersPanel}>
-          {postingFilterOptionsLoading ? (
-            <Text style={styles.small}>Loading filter options...</Text>
-          ) : (
-            <>
-              <SingleSelectDropdown
-                label="ATS"
-                options={postingFilterOptions.ats}
-                selectedValue={postingsFilters.ats}
-                onSelectValue={setAtsFilter}
-                anyLabel="All ATS"
-              />
+          <ScrollView
+            style={styles.postingsFiltersPanelScroll}
+            contentContainerStyle={styles.postingsFiltersPanelContent}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            {postingFilterOptionsLoading ? (
+              <Text style={styles.small}>Loading filter options...</Text>
+            ) : (
+              <>
+                <SingleSelectDropdown
+                  label="ATS"
+                  options={postingFilterOptions.ats}
+                  selectedValue={postingsFilters.ats}
+                  onSelectValue={setAtsFilter}
+                  anyLabel="All ATS"
+                />
 
-              <MultiSelectDropdown
-                label="Industries"
-                options={postingFilterOptions.industries}
-                selectedValues={postingsFilters.industries}
-                onToggleValue={toggleIndustryFilter}
-                onClear={() =>
-                  setPostingsFilters((prev) => ({
-                    ...prev,
-                    industries: []
-                  }))
-                }
-                emptyText="No industries available."
-              />
+                <MultiSelectDropdown
+                  label="Industries"
+                  options={postingFilterOptions.industries}
+                  selectedValues={postingsFilters.industries}
+                  onToggleValue={toggleIndustryFilter}
+                  onClear={() =>
+                    setPostingsFilters((prev) => ({
+                      ...prev,
+                      industries: []
+                    }))
+                  }
+                  emptyText="No industries available."
+                />
 
-              <MultiSelectDropdown
-                label="States"
-                options={postingFilterOptions.states}
-                selectedValues={postingsFilters.states}
-                onToggleValue={toggleStateFilter}
-                onClear={() =>
-                  setPostingsFilters((prev) => ({
-                    ...prev,
-                    states: [],
-                    counties: []
-                  }))
-                }
-                emptyText="No states available."
-              />
+                <MultiSelectDropdown
+                  label="Regions"
+                  options={postingFilterOptions.regions}
+                  selectedValues={postingsFilters.regions}
+                  onToggleValue={toggleRegionFilter}
+                  onClear={() =>
+                    setPostingsFilters((prev) => ({
+                      ...prev,
+                      regions: [],
+                      countries: []
+                    }))
+                  }
+                  emptyText="No regions available."
+                />
 
-              <MultiSelectDropdown
-                label="Counties"
-                options={visibleCountyOptions}
-                selectedValues={postingsFilters.counties}
-                onToggleValue={toggleCountyFilter}
-                onClear={() =>
-                  setPostingsFilters((prev) => ({
-                    ...prev,
-                    counties: []
-                  }))
-                }
-                emptyText="No counties match selected states."
-              />
-            </>
-          )}
+                <MultiSelectDropdown
+                  label="Countries"
+                  options={visibleCountryOptions}
+                  selectedValues={postingsFilters.countries}
+                  onToggleValue={toggleCountryFilter}
+                  onClear={() =>
+                    setPostingsFilters((prev) => ({
+                      ...prev,
+                      countries: []
+                    }))
+                  }
+                  emptyText="No countries match selected regions."
+                />
 
-          <View style={styles.remoteFilterGroup}>
-            <Text style={styles.fieldLabel}>Remote Filter</Text>
-            <View style={styles.remoteFilterChipsRow}>
-              {remoteFilterOptions.map((option) => {
-                const selected = postingsFilters.remote === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() =>
-                      setPostingsFilters((prev) => ({
-                        ...prev,
-                        remote: option.value
-                      }))
-                    }
-                    style={[styles.remoteFilterChip, selected ? styles.remoteFilterChipActive : null]}
-                  >
-                    <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                <MultiSelectDropdown
+                  label="States"
+                  options={postingFilterOptions.states}
+                  selectedValues={postingsFilters.states}
+                  onToggleValue={toggleStateFilter}
+                  onClear={() =>
+                    setPostingsFilters((prev) => ({
+                      ...prev,
+                      states: [],
+                      counties: []
+                    }))
+                  }
+                  emptyText="No states available."
+                />
+
+                <MultiSelectDropdown
+                  label="Counties"
+                  options={visibleCountyOptions}
+                  selectedValues={postingsFilters.counties}
+                  onToggleValue={toggleCountyFilter}
+                  onClear={() =>
+                    setPostingsFilters((prev) => ({
+                      ...prev,
+                      counties: []
+                    }))
+                  }
+                  emptyText="No counties match selected states."
+                />
+              </>
+            )}
+
+            <View style={styles.remoteFilterGroup}>
+              <Text style={styles.fieldLabel}>Remote Filter</Text>
+              <View style={styles.remoteFilterChipsRow}>
+                {remoteFilterOptions.map((option) => {
+                  const selected = postingsFilters.remote === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() =>
+                        setPostingsFilters((prev) => ({
+                          ...prev,
+                          remote: option.value
+                        }))
+                      }
+                      style={[styles.remoteFilterChip, selected ? styles.remoteFilterChipActive : null]}
+                    >
+                      <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.remoteNoDateToggleRow}>
+                <Text style={styles.remoteNoDateToggleLabel}>Hide postings with no date</Text>
+                <Switch
+                  value={Boolean(postingsFilters.hide_no_date)}
+                  onValueChange={(value) =>
+                    setPostingsFilters((prev) => ({
+                      ...prev,
+                      hide_no_date: value
+                    }))
+                  }
+                />
+              </View>
             </View>
-            <View style={styles.remoteNoDateToggleRow}>
-              <Text style={styles.remoteNoDateToggleLabel}>Hide postings with no date</Text>
-              <Switch
-                value={Boolean(postingsFilters.hide_no_date)}
-                onValueChange={(value) =>
-                  setPostingsFilters((prev) => ({
-                    ...prev,
-                    hide_no_date: value
-                  }))
-                }
-              />
-            </View>
-          </View>
+          </ScrollView>
         </View>
       ) : null}
 
@@ -1960,6 +2118,35 @@ export default function App() {
           />
 
           <MultiSelectDropdown
+            label="Preferred Regions"
+            options={postingFilterOptions.regions}
+            selectedValues={mcpSettings.preferred_regions}
+            onToggleValue={toggleMcpRegionPreference}
+            onClear={() =>
+              setMcpSettings((prev) => ({
+                ...prev,
+                preferred_regions: [],
+                preferred_countries: []
+              }))
+            }
+            emptyText="No regions available."
+          />
+
+          <MultiSelectDropdown
+            label="Preferred Countries"
+            options={visibleMcpCountryOptions}
+            selectedValues={mcpSettings.preferred_countries}
+            onToggleValue={toggleMcpCountryPreference}
+            onClear={() =>
+              setMcpSettings((prev) => ({
+                ...prev,
+                preferred_countries: []
+              }))
+            }
+            emptyText="No countries match selected regions."
+          />
+
+          <MultiSelectDropdown
             label="Preferred States"
             options={postingFilterOptions.states}
             selectedValues={mcpSettings.preferred_states}
@@ -2212,6 +2399,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#ffffff",
     padding: 10
+  },
+  postingsFiltersPanelScroll: {
+    maxHeight: Platform.OS === "web" ? 420 : 360
+  },
+  postingsFiltersPanelContent: {
+    paddingBottom: 4
   },
   dropdownWrap: {
     marginBottom: 10
