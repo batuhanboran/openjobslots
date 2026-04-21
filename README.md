@@ -1,4 +1,4 @@
-# OpenJobSlots
+﻿# OpenJobSlots
 
 OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. **It pulls jobs that were posted in the last 24 hours** or that has no posted date. 
 
@@ -76,7 +76,24 @@ OVER **31000+** companies in total. All gathered from search engine data like Go
 <br>
 It pulls in new job data at random from companies and stores it in the database. If the posting has lasted longer than 24 hours in the database its no longer used/deleted. 
 
-## Requirements
+## Windows Installer Setup (Windows 10/11)
+Download the latest installer from the github releases page and run it. It will guide you through installation and setup.
+- https://github.com/batuhanboran/OpenJobSlots/releases/download/v1.0.0/openjobslots-1.0.0-x64.msi
+
+Choose the setup type during install:
+- `Typical`: Installs the standard OpenJobSlots app setup (Includes the backend service worker, recommended for most users).
+- `Complete`: Installs all available OpenJobSlots features. (Includes the backend service worker and MCP apply agent server, which may not be needed for all users).
+- `Custom`: Lets you choose exactly which features to install (for example, whether to include the backend service worker and MCP apply agent server).
+<img src="README-Images/windows_setup_type.png" alt="windows install setup types" width="70%" />
+
+Once the installation is complete, you can launch OpenJobSlots from the start menu. 
+
+## Docs
+- Docs: https://batuhanboran.github.io/OpenJobSlots
+
+## Source Installation Setup
+
+### Requirements
 
 - Node.js 18+ and npm
   - https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
@@ -85,14 +102,14 @@ It pulls in new job data at random from companies and stores it in the database.
 - For Android target: Android Studio/emulator or device
   - https://developer.android.com/studio
 
-## Installation
+### Installation
 
 ```powershell
 cd OpenJobSlots
 npm install
 ```
 
-## Quick Start (Web)
+### Quick Start (Web)
 
 Terminal 1:
 
@@ -116,7 +133,7 @@ Default API base URL behavior:
 - Android emulator: `http://10.0.2.2:8787`
 
 
-## You can run this Windows or Android as well!
+### You can run this Windows or Android as well!
 
 ```powershell
 npm run windows (For windows)

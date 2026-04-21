@@ -1,0 +1,18 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <AppSourceDir Condition="'$(AppSourceDir)' == ''">$(MSBuildThisFileDirectory)staging\$(Platform)\Release</AppSourceDir>
+    <BackendSourceDir Condition="'$(BackendSourceDir)' == ''">$(MSBuildThisFileDirectory)staging-backend\$(Platform)\Release</BackendSourceDir>
+    <McpSourceDir Condition="'$(McpSourceDir)' == ''">$(MSBuildThisFileDirectory)staging-mcp\$(Platform)\Release</McpSourceDir>
+    <MsiOutputName Condition="'$(MsiOutputName)' == ''">openjobslots-$(ProductVersion)-$(Platform)</MsiOutputName>
+    <OutputName>$(MsiOutputName)</OutputName>
+    <SuppressIces Condition="'$(SuppressIces)' == ''">ICE03</SuppressIces>
+    <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);AppSourceDir=$(AppSourceDir);BackendSourceDir=$(BackendSourceDir);McpSourceDir=$(McpSourceDir)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

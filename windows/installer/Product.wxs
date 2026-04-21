@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+    Name="OpenJobSlots"
+    Manufacturer="OpenJobSlots"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="{4A42A7C5-011D-4B3D-B795-BF86A9492338}"
+    Language="1033"
+    Scope="perMachine">
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="OpenJobSlots">
+        <Directory Id="BACKENDFOLDER" Name="backend" />
+        <Directory Id="MCPFOLDER" Name="mcp" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppProgramMenuDir" Name="OpenJobSlots" />
+    </StandardDirectory>
+
+    <Feature Id="ProductFeature" Title="OpenJobSlots" Level="1" Display="expand">
+      <Feature
+        Id="DesktopAppFeature"
+        Title="Desktop App (Required)"
+        Description="Installs the OpenJobSlots desktop application."
+        Level="1">
+        <ComponentGroupRef Id="AppFiles" />
+        <ComponentRef Id="StartMenuShortcutComponent" />
+        <ComponentRef Id="DesktopShortcutComponent" />
+      </Feature>
+
+      <Feature
+        Id="BackendServiceFeature"
+        Title="Backend Service Worker"
+        Description="Installs the local backend service and keeps it available in the background."
+        Level="1">
+        <ComponentGroupRef Id="BackendFiles" />
+        <ComponentRef Id="BackendAutoStartComponent" />
+
+        <Feature
+          Id="McpServiceFeature"
+          Title="MCP Apply Agent Server (AI Service Engine)"
+          Description="Installs the optional AI service engine used for MCP apply-agent workflows."
+          Level="200">
+          <ComponentGroupRef Id="McpFiles" />
+        </Feature>
+      </Feature>
+    </Feature>
+
+    <ui:WixUI Id="WixUI_Mondo" />
+    <WixVariable Id="WixUILicenseRtf" Value="OpenJobSlots_License.rtf" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AppSourceDir)\**" />
+    </ComponentGroup>
+
+    <ComponentGroup Id="BackendFiles" Directory="BACKENDFOLDER">
+      <Files Include="$(var.BackendSourceDir)\**" />
+    </ComponentGroup>
+
+    <ComponentGroup Id="McpFiles" Directory="MCPFOLDER">
+      <Files Include="$(var.McpSourceDir)\**" />
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="BackendAutoStartComponent" Guid="{F3A7AEB1-7A24-4F13-A881-71CCF2F96FA9}">
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\Microsoft\Windows\CurrentVersion\Run"
+          Name="OpenJobSlotsBackend"
+          Type="string"
+          Value="wscript.exe &quot;[BACKENDFOLDER]launch-backend.vbs&quot;"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="AppProgramMenuDir">
+      <Component Id="StartMenuShortcutComponent" Guid="{49F5F38E-521B-4E87-B510-B54EF2BB4F27}">
+        <Shortcut
+          Id="StartMenuShortcut"
+          Name="OpenJobSlots"
+          Description="Launch OpenJobSlots"
+          Target="[INSTALLFOLDER]openjobslots.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Advertise="no" />
+        <RemoveFolder Id="RemoveAppProgramMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\OpenJobSlots" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="{63E3611C-EBDB-430F-BACF-510AA4E5D10B}">
+        <Shortcut
+          Id="DesktopShortcut"
+          Name="OpenJobSlots"
+          Description="Launch OpenJobSlots"
+          Target="[INSTALLFOLDER]openjobslots.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Advertise="no" />
+        <RegistryValue Root="HKCU" Key="Software\OpenJobSlots" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Fragment>
+</Wix>

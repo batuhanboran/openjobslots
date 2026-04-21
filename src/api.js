@@ -110,7 +110,7 @@ export function deleteApplication(applicationId) {
 }
 
 export function fetchSyncStatus() {
-  return request("/sync/status");
+  return request(`/sync/status?_ts=${Date.now()}`);
 }
 
 export function triggerWorkdaySync(wait = false) {

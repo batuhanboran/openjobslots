@@ -26,10 +26,14 @@ yarn-error.log*
 *.swo
 
 # React Native for Windows
-windows/
-*.sln
-*.vcxproj*
-*.vcxproj.filters
+windows/x64/**
+windows/x86/**
+windows/ARM64/**
+windows/installer/dist/**
+windows/installer/staging/**
+windows/installer/staging-backend/**
+windows/installer/staging-mcp/**
+windows/installer/temp/**
 *.user
 *.psess
 *.vsp

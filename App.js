@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import NetInfo from "@react-native-community/netinfo";
 import {
   ActivityIndicator,
   FlatList,
@@ -106,6 +105,82 @@ const ATS_LABEL_BY_VALUE = {
   ultipro: "UltiPro",
   taleo: "Taleo"
 };
+
+let androidNetInfoModule;
+
+function getAndroidNetInfo() {
+  if (Platform.OS !== "android") return null;
+  if (androidNetInfoModule !== undefined) {
+    return androidNetInfoModule;
+  }
+  try {
+    androidNetInfoModule = require("@react-native-community/netinfo").default;
+  } catch {
+    androidNetInfoModule = null;
+  }
+  return androidNetInfoModule;
+}
+
+function sanitizeDisplayText(value, fallback = "") {
+  const source = String(value ?? "");
+  if (!source) return fallback;
+
+  let cleaned = "";
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+
+    // Drop surrogate pairs and lone surrogate code units to avoid unstable
+    // rendering behavior in some Windows/Hermes combinations.
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = source.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        index += 1;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      continue;
+    }
+
+    // Keep printable characters plus tab/newline/carriage return.
+    if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) {
+      continue;
+    }
+
+    cleaned += source[index];
+  }
+
+  return cleaned || fallback;
+}
+
+function formatApplicationDate(value) {
+  const epochSeconds = Number(value);
+  if (!Number.isFinite(epochSeconds) || epochSeconds <= 0) {
+    return "Unknown date";
+  }
+
+  const date = new Date(epochSeconds * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )}`;
+}
+
+function normalizeApplicationItem(item) {
+  const source = item && typeof item === "object" ? item : {};
+  return {
+    ...source,
+    id: Number(source.id || 0),
+    company_name: sanitizeDisplayText(source.company_name, ""),
+    position_name: sanitizeDisplayText(source.position_name, ""),
+    status: sanitizeDisplayText(source.status, "applied"),
+    applied_by_label: sanitizeDisplayText(source.applied_by_label, "")
+  };
+}
 
 function normalizeAtsValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -676,6 +751,10 @@ export default function App() {
   const searchRef = useRef("");
   const postingsFiltersRef = useRef(postingsFilters);
   const autoSyncInFlightRef = useRef(false);
+  const statusPollInFlightRef = useRef(false);
+  const postingsRefreshInFlightRef = useRef(false);
+  const lastPostingRefreshAtRef = useRef(0);
+  const wasSyncRunningRef = useRef(false);
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
   const remoteFilterOptions = useMemo(
@@ -775,6 +854,7 @@ export default function App() {
     try {
       const response = await fetchPostings(q, 1000, 0, filters);
       setPostings(response.items || []);
+      lastPostingRefreshAtRef.current = Date.now();
     } catch (e) {
       setError(String(e.message || e));
     } finally {
@@ -810,7 +890,8 @@ export default function App() {
     }
     try {
       const response = await fetchApplications(1000, 0);
-      setApplications(response?.items || []);
+      const items = Array.isArray(response?.items) ? response.items : [];
+      setApplications(items.map(normalizeApplicationItem).filter((item) => item.id > 0));
     } catch (e) {
       setError(String(e.message || e));
     } finally {
@@ -1146,7 +1227,9 @@ export default function App() {
       const item = response?.item;
       if (item) {
         setApplications((prev) =>
-          prev.map((application) => (application.id === applicationId ? { ...application, ...item } : application))
+          prev.map((application) =>
+            application.id === applicationId ? normalizeApplicationItem({ ...application, ...item }) : application
+          )
         );
       }
       setApplicationsNotice(`Updated application status to "${nextStatus}".`);
@@ -1453,6 +1536,8 @@ export default function App() {
 
       if (Platform.OS === "android" && syncSettings.wifiOnly) {
         try {
+          const NetInfo = getAndroidNetInfo();
+          if (!NetInfo) return;
           const networkState = await NetInfo.fetch();
           const networkType = String(networkState?.type || "").toLowerCase();
           if (networkType !== "wifi") return;
@@ -1474,20 +1559,37 @@ export default function App() {
 
   useEffect(() => {
     const id = setInterval(async () => {
-      const latest = await loadStatus();
-      if (latest) {
-        await loadPostings(searchRef.current, { silent: true, filters: postingsFiltersRef.current });
-      }
-    }, 5000);
-    return () => clearInterval(id);
-  }, [loadPostings, loadStatus]);
+      if (statusPollInFlightRef.current) return;
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      loadStatus();
-    }, 30000);
+      statusPollInFlightRef.current = true;
+      try {
+        const latest = await loadStatus();
+        if (!latest) return;
+
+        const isRunning = Boolean(latest.running);
+        const syncJustFinished = wasSyncRunningRef.current && !isRunning;
+        wasSyncRunningRef.current = isRunning;
+
+        if (activePage !== PAGE_KEYS.POSTINGS) return;
+        if (postingsRefreshInFlightRef.current) return;
+
+        const now = Date.now();
+        const minRefreshMs = isRunning ? 15000 : 60000;
+        const dueForRefresh = now - lastPostingRefreshAtRef.current >= minRefreshMs;
+        if (!dueForRefresh && !syncJustFinished) return;
+
+        postingsRefreshInFlightRef.current = true;
+        try {
+          await loadPostings(searchRef.current, { silent: true, filters: postingsFiltersRef.current });
+        } finally {
+          postingsRefreshInFlightRef.current = false;
+        }
+      } finally {
+        statusPollInFlightRef.current = false;
+      }
+    }, 3000);
     return () => clearInterval(id);
-  }, [loadStatus]);
+  }, [activePage, loadPostings, loadStatus]);
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.APPLICATIONS) return;
@@ -1702,16 +1804,18 @@ export default function App() {
           const statusMenuOpen = openApplicationStatusForId === application.id;
           const isUpdatingStatus = Boolean(updatingApplicationIds[application.id]);
           const isDeleting = Boolean(deletingApplicationIds[application.id]);
-          const appliedDate = application?.application_date
-            ? new Date(Number(application.application_date) * 1000).toLocaleString()
-            : "Unknown date";
+          const appliedDate = formatApplicationDate(application?.application_date);
+          const positionName = sanitizeDisplayText(application?.position_name, "Unknown position");
+          const companyName = sanitizeDisplayText(application?.company_name, "Unknown company");
+          const appliedByLabel = sanitizeDisplayText(application?.applied_by_label, "Manually applied by user");
+          const statusLabel = sanitizeDisplayText(application?.status, "applied");
 
           return (
             <View key={application.id} style={styles.applicationCard}>
-              <Text style={styles.position}>{application.position_name}</Text>
-              <Text style={styles.company}>{application.company_name || "Unknown company"}</Text>
+              <Text style={styles.position}>{positionName}</Text>
+              <Text style={styles.company}>{companyName}</Text>
               <Text style={styles.posted}>Applied: {appliedDate}</Text>
-              <Text style={styles.applicationAttribution}>{application.applied_by_label || "Manually applied by user"}</Text>
+              <Text style={styles.applicationAttribution}>{appliedByLabel}</Text>
 
               <View style={styles.applicationActionsRow}>
                 <View style={styles.applicationStatusWrap}>
@@ -1721,7 +1825,7 @@ export default function App() {
                     style={styles.applicationStatusBtn}
                   >
                     <Text style={styles.applicationStatusBtnText}>
-                      {isUpdatingStatus ? "Updating..." : `Status: ${application.status || "applied"}`}
+                      {isUpdatingStatus ? "Updating..." : `Status: ${statusLabel}`}
                     </Text>
                   </Pressable>
 
@@ -2960,3 +3064,4 @@ const styles = StyleSheet.create({
     color: "#ffffff"
   }
 });
+
