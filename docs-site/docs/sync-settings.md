@@ -23,6 +23,8 @@ Status text shows:
 - Excluded-by-24h count
 - Live progress while syncing
 
+![Sync status front end](/sync_status_front_end.png)
+
 ## Automatic sync controls
 
 ### Enable automatic sync
@@ -42,6 +44,8 @@ Status text shows:
 - Minimum: `60`
 - Maximum clamp: `86400` (24 hours)
 
+![Sync settings](/sync_settings_1.png)
+
 ## ATS request queue concurrency
 
 This controls backend ATS request parallelism.
@@ -51,6 +55,8 @@ This controls backend ATS request parallelism.
 - Higher values can increase throughput but can also increase `429` responses
 - Runtime changes apply after backend service restart
 
+![ATS request queue concurrency](/sync_settings_2.png)
+
 ## Blocked companies management
 
 Sync Settings includes blocked company management:
@@ -58,6 +64,8 @@ Sync Settings includes blocked company management:
 - Shows currently blocked company list
 - `Unblock` removes company from block list
 - Blocked companies are hidden from Postings and excluded from sync collection
+
+![Blocked companies list](/sync_settings_3.png)
 
 ## Save behavior
 
@@ -72,12 +80,3 @@ When you click `Save Sync Settings`:
 - Start at `3600` seconds interval.
 - Keep queue concurrency at `1-3` unless your network and ATS targets are stable.
 - Block repeat-noise companies to reduce daily review load.
-
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/sync-settings-page.png`
-- `README-Images/docs/sync-interval-and-wifi.png`
-- `README-Images/docs/sync-concurrency-help.png`
-- `README-Images/docs/sync-blocked-companies-list.png`

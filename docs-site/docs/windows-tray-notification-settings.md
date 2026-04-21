@@ -17,18 +17,14 @@ Tray behavior is controlled by:
 
 Tray support is installed with the `Backend Service Worker` MSI feature.
 
-At sign-in, installer startup registration launches:
-
-- `wscript.exe "...\\backend\\launch-backend.vbs"`
-
-This starts a hidden tray process that monitors backend and AI engine state.
-
 ## What the tray shows
 
 Tray tooltip/status includes both services:
 
 - Backend state (`running`, `disconnected`, `stopped`)
 - AI Service Engine state (`running`, `ready`, `stopped`, `not installed`)
+
+![Tray center](/tray_center_1.png)
 
 ## Tray menu actions
 
@@ -42,6 +38,8 @@ Right-click tray icon to access:
 - `Exit Tray`
 
 Double-clicking tray icon opens the desktop app.
+
+![Tray center settings](/tray_center_2.png)
 
 ## Runtime paths (per user)
 
@@ -61,12 +59,3 @@ Under `%LOCALAPPDATA%\\OpenJobSlots\\backend`:
 - If app data stops refreshing, try `Restart Backend` from tray.
 - If MCP tool calls fail and MCP is installed, try `Restart AI Service Engine`.
 - If tray is missing after install, verify Backend Service Worker feature is installed.
-
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/tray-icon.png`
-- `README-Images/docs/tray-context-menu.png`
-- `README-Images/docs/tray-status-tooltip.png`
-- `README-Images/docs/tray-log-location.png`

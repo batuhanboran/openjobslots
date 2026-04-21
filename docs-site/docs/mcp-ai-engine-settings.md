@@ -25,12 +25,16 @@ For MSI installs, MCP runtime is included when you choose:
 - `Dry run only (do not submit)`: records payload preview without committing applications.
 - `Require final user approval`: blocks commit unless explicit approval is provided.
 
+![MCP settings toggles](/MCP_settings_1.png)
+
 ## Agent identity and login fields
 
 - `Preferred agent label`
 - `Agent login email`
 - `Agent login password`
 - `MFA/login notes`
+
+![Agent identity fields](/MCP_settings_2.png)
 
 Use a dedicated mailbox account for automation workflows.
 
@@ -45,6 +49,8 @@ Use a dedicated mailbox account for automation workflows.
 - `Preferred States`
 - `Preferred Counties`
 - `Agent instructions`
+
+![Agent instructions](/MCP_settings_3.png)
 
 ## Save behavior
 
@@ -65,12 +71,3 @@ When MCP settings are saved:
 ## Security note
 
 MCP settings, including credentials, are stored in local SQLite fields by default. Use OS-level hardening if you need stronger controls.
-
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/mcp-settings-toggles.png`
-- `README-Images/docs/mcp-login-fields.png`
-- `README-Images/docs/mcp-targeting-filters.png`
-- `README-Images/docs/mcp-save-preview-count.png`

@@ -89,7 +89,7 @@ Choose the setup type during install:
 Once the installation is complete, you can launch OpenJobSlots from the start menu. 
 
 ## Docs
-- Docs: https://batuhanboran.github.io/OpenJobSlots
+- Docs: https://batuhanboran.github.io/OpenJobSlots/docs/intro
 
 ## Source Installation Setup
 

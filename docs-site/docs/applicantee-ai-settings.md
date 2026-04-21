@@ -23,17 +23,23 @@ This data is the reusable applicant context for manual and AI-assisted applicati
 - `Phone Number`
 - `Address`
 
+![Applicant information form](/Applicant_information_1.png)
+
 ### Public profiles
 
 - `LinkedIn URL`
 - `GitHub URL`
 - `Portfolio URL`
 
+![Portfolio URL field](/Applicant_information_2.png)
+
 ### Local document paths
 
 - `Resume File Path`
 - `Projects Portfolio File Path`
 - `Certifications Folder Path`
+
+![Certifications Folder Path](/Applicant_information_3.png)
 
 ### Optional profile attributes
 
@@ -44,6 +50,8 @@ This data is the reusable applicant context for manual and AI-assisted applicati
 - `Veteran Status`
 - `Disability Status`
 - `Education Level`
+
+![Education Level](/Applicant_information_4.png)
 
 ## Save behavior
 
@@ -65,11 +73,3 @@ Successful save shows:
 ## Related MCP usage
 
 When MCP tools request applicant context, this profile is returned alongside MCP settings.
-
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/applicantee-settings-form-top.png`
-- `README-Images/docs/applicantee-settings-document-paths.png`
-- `README-Images/docs/applicantee-settings-save-confirmation.png`

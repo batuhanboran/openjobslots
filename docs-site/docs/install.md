@@ -78,6 +78,8 @@ Open:
 
 - `http://localhost:8081`
 
+![MSI download page](/webui2.png)
+
 API defaults:
 
 - Web/Windows: `http://localhost:8787`
@@ -104,14 +106,4 @@ After launch, confirm backend health:
 
 You should receive a JSON response with `ok: true`.
 
-## Recommended screenshots to add
 
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/install-msi-download.png`
-- `README-Images/docs/install-first-launch.png`
-- `README-Images/docs/install-health-check.png`
-
-Then reference them in this page with paths like:
-
-- `![MSI download page](/docs/install-msi-download.png)`

@@ -69,11 +69,3 @@ You can also delete an entry from Applications.
 3. Save or ignore each posting.
 4. Block repeated low-value companies.
 5. Update application statuses as your pipeline changes.
-
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/apply-posting-card-menu.png`
-- `README-Images/docs/apply-status-menu.png`
-- `README-Images/docs/apply-blocked-company-warning.png`

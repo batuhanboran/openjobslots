@@ -11,7 +11,11 @@ Use either:
 - `Settings > Apps > Installed apps > OpenJobSlots > Uninstall`, or
 - `Control Panel > Programs and Features > OpenJobSlots > Uninstall`
 
-Follow the MSI uninstall wizard.
+![Windows uninstall process](/windows_uninstall_1.png)
+
+Accept the UAC prompt if needed and follow the MSI uninstall wizard. 
+
+![Windows uninstall process](/windows_uninstall_2.png)
 
 ## What uninstall removes
 
@@ -46,11 +50,3 @@ If you ran OpenJobSlots from source, stop running processes and remove project f
 1. Confirm `OpenJobSlots` no longer appears in Installed Apps.
 2. Confirm Start Menu shortcut is removed.
 3. Confirm `%LOCALAPPDATA%\\OpenJobSlots\\backend` is removed if you performed full cleanup.
-
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/uninstall-installed-apps.png`
-- `README-Images/docs/uninstall-confirmation.png`
-- `README-Images/docs/uninstall-localappdata-cleanup.png`

@@ -20,9 +20,13 @@ OpenJobSlots combines text search with structured filters.
 - Search box: `Search company or title`
 - Debounced request behavior (fast typing does not spam API calls)
 
+![Search company or title](/search_by_company_1.png)
+
 ### ATS filter
 
 - Single-select ATS picker (`All ATS` by default)
+
+![Search company or title](/filter_by_ats.png)
 
 ### Industry and location filters
 
@@ -37,6 +41,8 @@ Dependency behavior:
 - Region selections narrow country options.
 - State selections narrow county options.
 
+![Search company or title](/filter_by_options.png)
+
 ### Remote filter
 
 Values:
@@ -45,6 +51,8 @@ Values:
 - `Remote Only`
 - `Hybrid Only`
 - `On-Site / Unknown`
+
+![Search company or title](/filter_by_remote.png)
 
 ### Date quality toggle
 
@@ -78,11 +86,3 @@ The UI maps directly to `/postings` query params, including:
 - `remote`
 - `hide_no_date`
 
-## Recommended screenshots to add
-
-Add these files under `README-Images/docs/` when available:
-
-- `README-Images/docs/filter-panel-open.png`
-- `README-Images/docs/filter-remote-options.png`
-- `README-Images/docs/filter-region-country-dependency.png`
-- `README-Images/docs/filter-state-county-dependency.png`
