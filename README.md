@@ -2,7 +2,7 @@
 
 OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. **It pulls jobs that were posted in the last 24 hours** or that has no posted date. 
 
-Over **31000+** companies from multiple ATSs all sourced into 1 location!
+Over **37000+** companies from multiple ATSs all sourced into 1 location!
 
 Over **500000+** fresh jobs on average **DAILY**!
 
@@ -35,48 +35,66 @@ It combines:
 
 Current sync support includes:
 
-- `Workday`
-- `Ashby` / `ashbyhq`
-- `Greenhouse` / `greenhouse.io`
-- `Lever` / `lever.co`
-- `Jobvite` / `jobvite.com`
-- `Applicantpro` / `applicantpro.com`
-- `Applytojob` / `applytojob.com`
-- `Theapplicantmanager` / `theapplicantmanager.com`
-- `Icims` / `icims.com`
-- `Recruitee` / `recruitee.com`
-- `Ultipro` / `ukg`
-- `Taleo` / `taleo.net`
-- `BreezyHR`
+- `ADP MyJobs`
+- `ADP Workforce Now`
 - `ApplicantAI`
-- `Career Plug`
-- `Career Puck`
-- `Fountain`
-- `Getro`
-- `HRM Direct`
-- `Talent Lyft`
-- `Talexio`
-- `Team Tailor`
-- `Talent Reef`
-- `Manatal`
-- `Zoho`
+- `ApplicantPro`
+- `ApplyToJob`
+- `Ashby`
 - `BambooHR`
+- `BrassRing`
+- `BreezyHR`
+- `CareerPlug`
+- `CareerPuck`
+- `CareersPage`
+- `Dayforce`
+- `Eightfold`
+- `Fountain`
+- `Freshteam`
 - `Gem`
-- `Jobaps`
-- `Join`
-- `Saphrcloud`
+- `Getro`
+- `Greenhouse`
+- `Hirebridge`
+- `HRMDirect`
+- `iCIMS`
+- `JobAps`
+- `Jobvite`
+- `JOIN`
+- `Lever`
+- `Loxo`
+- `Manatal`
+- `Oracle Cloud`
+- `PageUp`
+- `Paylocity`
+- `PeopleForce`
+- `PinpointHQ`
+- `RecruitCRM`
+- `Recruitee`
+- `Rippling`
+- `SageHR`
+- `SAP HR Cloud`
+- `Simplicant`
+- `Talentlyft`
+- `TalentReef`
+- `Taleo`
+- `Talexio`
+- `Teamtailor`
+- `The Applicant Manager`
+- `UltiPro`
+- `Workday`
+- `Zoho`
 
 
 <br>
 <img src="README-Images/ATS_list.png" alt="Applications" width="70%" />
 
-OVER **31000+** companies in total. All gathered from search engine data like Google and DuckDuckGo and also using subdomain searching techniques and directory searching techniques. 
+OVER **37000+** companies in total. All gathered from search engine data like Google and DuckDuckGo and also using subdomain searching techniques and directory searching techniques. 
 <br>
 <img src="README-Images/company_amount.png" alt="Applications" width="25%" />
 <br>
 It pulls in new job data at random from companies and stores it in the database. If the posting has lasted longer than 24 hours in the database its no longer used/deleted. 
 
-## Windows Installer Setup (Windows 10/11)
+## Windows Installer Setup (Windows 10/11) (Easiest Setup But Still WIP and may have some bugs)
 Download the latest installer from the github releases page and run it. It will guide you through installation and setup.
 - https://github.com/batuhanboran/OpenJobSlots/releases/download/v1.0.1/openjobslots-1.0.1-x64.msi
 
@@ -91,7 +109,7 @@ Once the installation is complete, you can launch OpenJobSlots from the start me
 ## Docs
 - Docs: https://batuhanboran.github.io/OpenJobSlots/docs/intro
 
-## Source Installation Setup
+## Source Installation Setup (Best Stability & Compatibility)
 
 ### Requirements
 

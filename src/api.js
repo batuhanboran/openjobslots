@@ -171,6 +171,13 @@ export function unblockCompany(payload) {
   });
 }
 
+export function migrateDatabaseSettings(payload) {
+  return request("/settings/migrate-db", {
+    method: "POST",
+    body: JSON.stringify(payload || {})
+  });
+}
+
 export function fetchMcpCandidates(filters = {}) {
   const params = new URLSearchParams();
   const limit = Number(filters?.limit || 0);

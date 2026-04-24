@@ -57,6 +57,12 @@ This controls backend ATS request parallelism.
 
 ![ATS request queue concurrency](/sync_settings_2.png)
 
+## Sync ATS Filters
+
+You can enable or disable specific ATSs for syncing.
+
+![Sync ATS filters](/sync_settings_4.png)
+
 ## Blocked companies management
 
 Sync Settings includes blocked company management:
@@ -66,6 +72,16 @@ Sync Settings includes blocked company management:
 - Blocked companies are hidden from Postings and excluded from sync collection
 
 ![Blocked companies list](/sync_settings_3.png)
+
+## Migration Tool Settings
+
+You can import selected data from another SQlite database file. This is useful for migrating data from another instance or restoring from a backup. You can migrate the following data types:
+- Personal Information
+- AI/MCP Settings
+- Blocked Companies
+- Applications
+
+![Migration Tool Settings](/sync_settings_5.png)
 
 ## Save behavior
 

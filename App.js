@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -29,6 +30,7 @@ import {
   fetchSyncServiceSettings,
   fetchSyncStatus,
   ignorePosting,
+  migrateDatabaseSettings,
   saveMcpSettings,
   savePersonalInformation,
   saveSyncServiceSettings,
@@ -68,42 +70,104 @@ const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const DEFAULT_ATS_FILTER_OPTIONS = [
-  { value: "workday", label: "Workday" },
-  { value: "ashby", label: "Ashby" },
-  { value: "greenhouse", label: "Greenhouse" },
-  { value: "lever", label: "Lever" },
-  { value: "jobvite", label: "Jobvite" },
+  { value: "adp_myjobs", label: "ADP MyJobs" },
+  { value: "adp_workforcenow", label: "ADP Workforce Now" },
+  { value: "applicantai", label: "ApplicantAI" },
   { value: "applicantpro", label: "ApplicantPro" },
-  { value: "bamboohr", label: "BambooHR" },
   { value: "applytojob", label: "ApplyToJob" },
-  { value: "theapplicantmanager", label: "The Applicant Manager" },
-  { value: "icims", label: "iCIMS" },
+  { value: "ashby", label: "Ashby" },
+  { value: "bamboohr", label: "BambooHR" },
+  { value: "brassring", label: "BrassRing" },
+  { value: "breezy", label: "BreezyHR" },
+  { value: "careerplug", label: "CareerPlug" },
+  { value: "careerpuck", label: "CareerPuck" },
+  { value: "careerspage", label: "CareersPage" },
+  { value: "dayforcehcm", label: "Dayforce" },
+  { value: "eightfold", label: "Eightfold" },
+  { value: "fountain", label: "Fountain" },
+  { value: "freshteam", label: "Freshteam" },
   { value: "gem", label: "Gem" },
+  { value: "getro", label: "Getro" },
+  { value: "greenhouse", label: "Greenhouse" },
+  { value: "hirebridge", label: "Hirebridge" },
+  { value: "hrmdirect", label: "HRMDirect" },
+  { value: "icims", label: "iCIMS" },
   { value: "jobaps", label: "JobAps" },
-  { value: "talentreef", label: "TalentReef" },
-  { value: "saphrcloud", label: "SAP HR Cloud" },
+  { value: "jobvite", label: "Jobvite" },
+  { value: "join", label: "JOIN" },
+  { value: "lever", label: "Lever" },
+  { value: "loxo", label: "Loxo" },
+  { value: "manatal", label: "Manatal" },
+  { value: "oracle", label: "Oracle" },
+  { value: "pageup", label: "PageUp" },
+  { value: "paylocity", label: "Paylocity" },
+  { value: "peopleforce", label: "PeopleForce" },
+  { value: "pinpointhq", label: "PinpointHQ" },
+  { value: "recruitcrm", label: "RecruitCRM" },
   { value: "recruitee", label: "Recruitee" },
+  { value: "rippling", label: "Rippling" },
+  { value: "sagehr", label: "SageHR" },
+  { value: "saphrcloud", label: "SAP HR Cloud" },
+  { value: "simplicant", label: "Simplicant" },
+  { value: "talentlyft", label: "Talentlyft" },
+  { value: "talentreef", label: "TalentReef" },
+  { value: "taleo", label: "Taleo" },
+  { value: "talexio", label: "Talexio" },
+  { value: "teamtailor", label: "Teamtailor" },
+  { value: "theapplicantmanager", label: "The Applicant Manager" },
   { value: "ultipro", label: "UltiPro" },
-  { value: "taleo", label: "Taleo" }
+  { value: "workday", label: "Workday" },
+  { value: "zoho", label: "Zoho Recruit" }
 ];
 const ATS_LABEL_BY_VALUE = {
-  workday: "Workday",
-  ashby: "Ashby",
-  greenhouse: "Greenhouse",
-  lever: "Lever",
-  jobvite: "Jobvite",
+  adp_myjobs: "ADP MyJobs",
+  adp_workforcenow: "ADP Workforce Now",
+  applicantai: "ApplicantAI",
   applicantpro: "ApplicantPro",
-  bamboohr: "BambooHR",
   applytojob: "ApplyToJob",
-  theapplicantmanager: "The Applicant Manager",
-  icims: "iCIMS",
+  ashby: "Ashby",
+  bamboohr: "BambooHR",
+  brassring: "BrassRing",
+  breezy: "BreezyHR",
+  careerplug: "CareerPlug",
+  careerpuck: "CareerPuck",
+  careerspage: "CareersPage",
+  dayforcehcm: "Dayforce",
+  eightfold: "Eightfold",
+  fountain: "Fountain",
+  freshteam: "Freshteam",
   gem: "Gem",
+  getro: "Getro",
+  greenhouse: "Greenhouse",
+  hirebridge: "Hirebridge",
+  hrmdirect: "HRMDirect",
+  icims: "iCIMS",
   jobaps: "JobAps",
-  talentreef: "TalentReef",
-  saphrcloud: "SAP HR Cloud",
+  jobvite: "Jobvite",
+  join: "JOIN",
+  lever: "Lever",
+  loxo: "Loxo",
+  manatal: "Manatal",
+  oracle: "Oracle",
+  pageup: "PageUp",
+  paylocity: "Paylocity",
+  peopleforce: "PeopleForce",
+  pinpointhq: "PinpointHQ",
+  recruitcrm: "RecruitCRM",
   recruitee: "Recruitee",
+  rippling: "Rippling",
+  sagehr: "SageHR",
+  saphrcloud: "SAP HR Cloud",
+  simplicant: "Simplicant",
+  talentlyft: "Talentlyft",
+  talentreef: "TalentReef",
+  taleo: "Taleo",
+  talexio: "Talexio",
+  teamtailor: "Teamtailor",
+  theapplicantmanager: "The Applicant Manager",
   ultipro: "UltiPro",
-  taleo: "Taleo"
+  workday: "Workday",
+  zoho: "Zoho Recruit"
 };
 
 let androidNetInfoModule;
@@ -188,9 +252,28 @@ function normalizeAtsValue(value) {
   if (normalized === "ashbyhq") return "ashby";
   if (normalized === "greenhouseio" || normalized === "greenhouse.io") return "greenhouse";
   if (normalized === "leverco" || normalized === "lever.co") return "lever";
+  if (normalized === "dayforce" || normalized === "dayforcehcm" || normalized === "dayforcehcm.com") {
+    return "dayforcehcm";
+  }
   if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
   if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
   if (normalized === "bamboohrcom" || normalized === "bamboohr.com") return "bamboohr";
+  if (normalized === "freshteamcom" || normalized === "freshteam.com") return "freshteam";
+  if (
+    normalized === "sagehr" ||
+    normalized === "sage.hr" ||
+    normalized === "talent.sage.hr" ||
+    normalized === "talentsagehr"
+  ) {
+    return "sagehr";
+  }
+  if (normalized === "peopleforceio" || normalized === "peopleforce.io") return "peopleforce";
+  if (normalized === "simplicantcom" || normalized === "simplicant.com") return "simplicant";
+  if (normalized === "pinpointhqcom" || normalized === "pinpointhq.com") return "pinpointhq";
+  if (normalized === "recruitcrmiocom" || normalized === "recruitcrm.io" || normalized === "recruitcrmio") return "recruitcrm";
+  if (normalized === "rippling.com" || normalized === "ripplingcom" || normalized === "ats.rippling.com" || normalized === "atsripplingcom") {
+    return "rippling";
+  }
   if (normalized === "applytojobcom" || normalized === "applytojob.com") return "applytojob";
   if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
     return "theapplicantmanager";
@@ -205,6 +288,39 @@ function normalizeAtsValue(value) {
     normalized === "applyjobappnetworkcom"
   ) {
     return "talentreef";
+  }
+  if (normalized === "adp_myjobs" || normalized === "adpmyjobs") return "adp_myjobs";
+  if (
+    normalized === "paylocity" ||
+    normalized === "paylocity.com" ||
+    normalized === "paylocitycom" ||
+    normalized === "recruiting.paylocity.com" ||
+    normalized === "recruitingpaylocitycom"
+  ) {
+    return "paylocity";
+  }
+  if (normalized === "eightfold" || normalized === "eightfold.ai" || normalized === "eightfoldai") {
+    return "eightfold";
+  }
+  if (
+    normalized === "oracle" ||
+    normalized === "oraclecloud" ||
+    normalized === "oraclecloud.com" ||
+    normalized === "oraclecloudcom"
+  ) {
+    return "oracle";
+  }
+  if (normalized === "careerspage" || normalized === "careerspage.io" || normalized === "careerspageio") {
+    return "careerspage";
+  }
+  if (
+    normalized === "hirebridge" ||
+    normalized === "hirebridge.com" ||
+    normalized === "hirebridgecom" ||
+    normalized === "recruit.hirebridge.com" ||
+    normalized === "recruithirebridgecom"
+  ) {
+    return "hirebridge";
   }
   if (
     normalized === "saphrcloud.com" ||
@@ -242,12 +358,12 @@ function mergeAtsFilterOptions(options) {
     if (!value) continue;
     const fallbackLabel = getAtsDisplayLabel(value);
     const label = String(option?.label || "").trim() || fallbackLabel;
-    byValue.set(value, { value, label });
+    byValue.set(value, { value, label, enabled: option?.enabled !== false });
   }
 
   for (const option of DEFAULT_ATS_FILTER_OPTIONS) {
     if (!byValue.has(option.value)) {
-      byValue.set(option.value, option);
+      byValue.set(option.value, { ...option, enabled: true });
     }
   }
 
@@ -283,9 +399,32 @@ function normalizeAtsRequestQueueConcurrency(value) {
   return parsed;
 }
 
+function normalizeSyncEnabledAts(value, fallback = DEFAULT_ATS_FILTER_OPTIONS.map((option) => option.value)) {
+  const allowed = new Set(DEFAULT_ATS_FILTER_OPTIONS.map((option) => option.value));
+  const source = Array.isArray(value) ? value : [];
+  const normalized = [];
+  for (const item of source) {
+    const atsValue = normalizeAtsValue(item);
+    if (!atsValue || !allowed.has(atsValue) || normalized.includes(atsValue)) continue;
+    normalized.push(atsValue);
+  }
+  if (normalized.length > 0) return normalized;
+
+  const fallbackList = Array.isArray(fallback) ? fallback : [];
+  const fallbackNormalized = [];
+  for (const item of fallbackList) {
+    const atsValue = normalizeAtsValue(item);
+    if (!atsValue || !allowed.has(atsValue) || fallbackNormalized.includes(atsValue)) continue;
+    fallbackNormalized.push(atsValue);
+  }
+  if (fallbackNormalized.length > 0) return fallbackNormalized;
+  return DEFAULT_ATS_FILTER_OPTIONS.map((option) => option.value);
+}
+
 function createDefaultSyncServiceSettings() {
   return {
     ats_request_queue_concurrency: String(DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY),
+    sync_enabled_ats: DEFAULT_ATS_FILTER_OPTIONS.map((option) => option.value),
     active_ats_request_queue_concurrency: String(DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY),
     min_ats_request_queue_concurrency: MIN_ATS_REQUEST_QUEUE_CONCURRENCY,
     max_ats_request_queue_concurrency: MAX_ATS_REQUEST_QUEUE_CONCURRENCY,
@@ -300,11 +439,13 @@ function toFormSyncServiceSettings(value) {
   const active = normalizeAtsRequestQueueConcurrency(
     source.active_ats_request_queue_concurrency ?? configured
   );
+  const syncEnabledAts = normalizeSyncEnabledAts(source.sync_enabled_ats, defaults.sync_enabled_ats);
   const minValue = normalizeAtsRequestQueueConcurrency(source.min_ats_request_queue_concurrency || defaults.min_ats_request_queue_concurrency);
   const maxValue = normalizeAtsRequestQueueConcurrency(source.max_ats_request_queue_concurrency || defaults.max_ats_request_queue_concurrency);
 
   return {
     ats_request_queue_concurrency: String(configured),
+    sync_enabled_ats: syncEnabledAts,
     active_ats_request_queue_concurrency: String(active),
     min_ats_request_queue_concurrency: Math.min(minValue, maxValue),
     max_ats_request_queue_concurrency: Math.max(minValue, maxValue),
@@ -658,17 +799,30 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
             {normalizedOptions.map((option) => {
               const value = String(option?.value || "");
               const isSelected = selected === value;
+              const isEnabled = option?.enabled !== false;
               return (
                 <Pressable
                   key={value}
                   onPress={() => {
+                    if (!isEnabled) return;
                     onSelectValue(value || "all");
                     setOpen(false);
                   }}
-                  style={[styles.dropdownOption, isSelected ? styles.dropdownOptionSelected : null]}
+                  style={[
+                    styles.dropdownOption,
+                    isSelected ? styles.dropdownOptionSelected : null,
+                    !isEnabled ? styles.dropdownOptionDisabled : null
+                  ]}
                 >
-                  <Text style={[styles.dropdownOptionLabel, isSelected ? styles.dropdownOptionLabelSelected : null]}>
+                  <Text
+                    style={[
+                      styles.dropdownOptionLabel,
+                      isSelected ? styles.dropdownOptionLabelSelected : null,
+                      !isEnabled ? styles.dropdownOptionLabelDisabled : null
+                    ]}
+                  >
                     {option?.label}
+                    {!isEnabled ? " (Sync off)" : ""}
                   </Text>
                 </Pressable>
               );
@@ -744,6 +898,16 @@ export default function App() {
   const [syncServiceSettingsLoading, setSyncServiceSettingsLoading] = useState(false);
   const [syncServiceSettingsSaving, setSyncServiceSettingsSaving] = useState(false);
   const [syncSettingsNotice, setSyncSettingsNotice] = useState("");
+  const [migrationSourceDbPath, setMigrationSourceDbPath] = useState("");
+  const [migrationSelection, setMigrationSelection] = useState({
+    personal_information: true,
+    mcp_settings: true,
+    blocked_companies: true,
+    applications: true
+  });
+  const [migrationRunning, setMigrationRunning] = useState(false);
+  const [migrationNotice, setMigrationNotice] = useState("");
+  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [mcpSettings, setMcpSettings] = useState(createDefaultMcpSettings);
   const [mcpSettingsLoading, setMcpSettingsLoading] = useState(false);
   const [mcpSettingsSaving, setMcpSettingsSaving] = useState(false);
@@ -820,6 +984,13 @@ export default function App() {
       ),
     [blockingCompanyNames]
   );
+  const syncAtsOptions = useMemo(() => {
+    const labelByValue = new Map((postingFilterOptions.ats || []).map((option) => [String(option?.value || ""), String(option?.label || "")]));
+    return DEFAULT_ATS_FILTER_OPTIONS.map((option) => ({
+      value: option.value,
+      label: labelByValue.get(option.value) || option.label
+    }));
+  }, [postingFilterOptions.ats]);
 
   const statusText = useMemo(() => {
     if (!status) return "No sync status yet.";
@@ -828,7 +999,9 @@ export default function App() {
       : "No sync has run yet.";
     const summary = status.last_sync_summary || {};
     const excludedByDate = Number(summary.excluded_during_sync_by_posting_date || 0);
-    const base = `Last sync: ${syncTime} | Companies: ${status.company_count || 0} | Stored today: ${status.posting_count || 0} | Failed companies: ${summary.failed_companies || 0} | Excluded by 24h: ${excludedByDate}`;
+    const syncEnabledCompanies = Number(summary.sync_enabled_company_count || status.sync_enabled_company_count || 0);
+    const excludedAtsCount = Number(summary.excluded_ats_count || status.excluded_ats_count || 0);
+    const base = `Last sync: ${syncTime} | Sync-enabled companies: ${syncEnabledCompanies} | Stored today: ${status.posting_count || 0} | Failed companies: ${summary.failed_companies || 0} | Excluded by 24h: ${excludedByDate} | Excluded ATS: ${excludedAtsCount}`;
     if (status.running && status.progress) {
       const collectedCount = Number(status.progress.total_collected || 0);
       const storedCount = Number(status.posting_count || 0);
@@ -840,6 +1013,19 @@ export default function App() {
     }
     return base;
   }, [status]);
+
+  useEffect(() => {
+    if (postingsFilters.ats === "all") return;
+    const selectedOption = (postingFilterOptions.ats || []).find(
+      (option) => String(option?.value || "") === postingsFilters.ats
+    );
+    if (selectedOption && selectedOption.enabled === false) {
+      setPostingsFilters((prev) => ({
+        ...prev,
+        ats: "all"
+      }));
+    }
+  }, [postingsFilters.ats, postingFilterOptions.ats]);
 
   const navigateToPage = useCallback((page) => {
     setActivePage(page);
@@ -1044,6 +1230,7 @@ export default function App() {
     const atsRequestQueueConcurrency = normalizeAtsRequestQueueConcurrency(
       syncServiceSettings.ats_request_queue_concurrency
     );
+    const syncEnabledAts = normalizeSyncEnabledAts(syncServiceSettings.sync_enabled_ats);
 
     setSyncSettings((prev) => ({
       ...prev,
@@ -1051,7 +1238,8 @@ export default function App() {
     }));
     setSyncServiceSettings((prev) => ({
       ...prev,
-      ats_request_queue_concurrency: String(atsRequestQueueConcurrency)
+      ats_request_queue_concurrency: String(atsRequestQueueConcurrency),
+      sync_enabled_ats: syncEnabledAts
     }));
 
     const intervalLabel = formatSyncIntervalLabel(syncIntervalSeconds);
@@ -1067,12 +1255,13 @@ export default function App() {
     setSyncServiceSettingsSaving(true);
     try {
       const response = await saveSyncServiceSettings({
-        ats_request_queue_concurrency: atsRequestQueueConcurrency
+        ats_request_queue_concurrency: atsRequestQueueConcurrency,
+        sync_enabled_ats: syncEnabledAts
       });
       const saved = toFormSyncServiceSettings(response?.item);
       setSyncServiceSettings(saved);
       setSyncSettingsNotice(
-        `${localSavedMessage} ATS request queue concurrency saved as ${saved.ats_request_queue_concurrency}. This will take effect next time you stop and restart the sync service.`
+        `${localSavedMessage} ATS request queue concurrency saved as ${saved.ats_request_queue_concurrency}. Sync-enabled ATS: ${saved.sync_enabled_ats.length}. This will take effect next time you stop and restart the sync service.`
       );
     } catch (e) {
       setError(String(e.message || e));
@@ -1082,7 +1271,74 @@ export default function App() {
     } finally {
       setSyncServiceSettingsSaving(false);
     }
-  }, [syncServiceSettings.ats_request_queue_concurrency, syncSettings]);
+  }, [syncServiceSettings.ats_request_queue_concurrency, syncServiceSettings.sync_enabled_ats, syncSettings]);
+
+  const handleMigrateFromDatabase = useCallback(async () => {
+    const sourceDbPath = String(migrationSourceDbPath || "").trim();
+    if (!sourceDbPath) {
+      setMigrationNotice("Please enter a source database path.");
+      return;
+    }
+    const selectedCount = Object.values(migrationSelection || {}).filter(Boolean).length;
+    if (selectedCount === 0) {
+      setMigrationNotice("Select at least one migration option.");
+      return;
+    }
+
+    setError("");
+      setMigrationNotice("");
+      setMigrationRunning(true);
+      try {
+      const response = await migrateDatabaseSettings({
+        source_db_path: sourceDbPath,
+        personal_information: migrationSelection.personal_information,
+        mcp_settings: migrationSelection.mcp_settings,
+        blocked_companies: migrationSelection.blocked_companies,
+        applications: migrationSelection.applications
+      });
+      const summary = response?.summary || {};
+
+      await Promise.all([
+        loadApplications({ silent: true }),
+        loadPersonalInformation({ silent: true }),
+        loadMcpSettings({ silent: true }),
+        loadSyncServiceSettings({ silent: true }),
+        loadBlockedCompanies({ silent: true })
+      ]);
+
+      const messageParts = ["Migration complete."];
+      if (summary?.selected?.personal_information) {
+        messageParts.push(`Personal info: ${summary.personal_information_copied ? "copied" : "not found"}`);
+      }
+      if (summary?.selected?.mcp_settings) {
+        messageParts.push(`AI/MCP: ${summary.mcp_settings_copied ? "copied" : "not found"}`);
+      }
+      if (summary?.selected?.blocked_companies) {
+        messageParts.push(`Blocked companies upserted: ${summary.blocked_companies_copied || 0}`);
+      }
+      if (summary?.selected?.applications) {
+        messageParts.push(`Applications inserted: ${summary.applications_inserted || 0}`);
+        messageParts.push(`Applications reused: ${summary.applications_reused || 0}`);
+        messageParts.push(
+          `Applications skipped (missing company): ${summary.applications_skipped_missing_company || 0}`
+        );
+      }
+      setMigrationNotice(messageParts.join(" | "));
+    } catch (e) {
+      setError(String(e.message || e));
+      setMigrationNotice("Migration failed.");
+    } finally {
+      setMigrationRunning(false);
+    }
+  }, [
+    migrationSelection,
+    migrationSourceDbPath,
+    loadApplications,
+    loadBlockedCompanies,
+    loadMcpSettings,
+    loadPersonalInformation,
+    loadSyncServiceSettings
+  ]);
 
   const handleSaveMcpSettings = useCallback(async () => {
     setError("");
@@ -2023,6 +2279,59 @@ export default function App() {
         </View>
 
         <View style={styles.formGroup}>
+          <Text style={styles.fieldLabel}>ATS included in sync</Text>
+          <Text style={styles.settingsInlineHint}>
+            Only selected ATS are synced. Excluded ATS stay visible in filters but are greyed out.
+          </Text>
+          <View style={styles.settingsInlineActionsRow}>
+            <Pressable
+              onPress={() =>
+                setSyncServiceSettings((prev) => ({
+                  ...prev,
+                  sync_enabled_ats: DEFAULT_ATS_FILTER_OPTIONS.map((option) => option.value)
+                }))
+              }
+              style={styles.settingsInlineActionBtn}
+            >
+              <Text style={styles.settingsInlineActionBtnText}>Enable All</Text>
+            </Pressable>
+          </View>
+          <View style={styles.settingsCheckboxList}>
+            {syncAtsOptions.map((option) => {
+              const checked = (syncServiceSettings.sync_enabled_ats || []).includes(option.value);
+              return (
+                <Pressable
+                  key={`sync-ats-${option.value}`}
+                  onPress={() =>
+                    setSyncServiceSettings((prev) => {
+                      const current = normalizeSyncEnabledAts(prev.sync_enabled_ats);
+                      if (current.includes(option.value)) {
+                        if (current.length <= 1) return prev;
+                        return {
+                          ...prev,
+                          sync_enabled_ats: current.filter((item) => item !== option.value)
+                        };
+                      }
+                      return {
+                        ...prev,
+                        sync_enabled_ats: normalizeSyncEnabledAts([...current, option.value])
+                      };
+                    })
+                  }
+                  style={styles.settingsCheckboxRow}
+                >
+                  <Text style={styles.settingsCheckboxIcon}>{checked ? "☑" : "☐"}</Text>
+                  <Text style={styles.settingsCheckboxLabel}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.settingsInlineHint}>
+            {syncServiceSettings.sync_enabled_ats.length} ATS currently enabled for sync.
+          </Text>
+        </View>
+
+        <View style={styles.formGroup}>
           <Text style={styles.fieldLabel}>Blocked companies</Text>
           <Text style={styles.settingsInlineHint}>
             Blocked companies are hidden from Postings and excluded from sync collection.
@@ -2050,6 +2359,19 @@ export default function App() {
           })}
         </View>
 
+        <View style={styles.formGroup}>
+          <Text style={styles.fieldLabel}>Migration tools</Text>
+          <Text style={styles.settingsInlineHint}>
+            Migration is intentionally separated into a modal to avoid accidental taps while saving sync settings.
+          </Text>
+          <Pressable
+            onPress={() => setMigrationModalOpen(true)}
+            style={styles.settingsSecondaryButton}
+          >
+            <Text style={styles.settingsSecondaryButtonText}>Open Migration Tools</Text>
+          </Pressable>
+        </View>
+
         {syncSettingsNotice ? <Text style={styles.settingsNotice}>{syncSettingsNotice}</Text> : null}
 
         <Pressable
@@ -2060,6 +2382,97 @@ export default function App() {
           <Text style={styles.settingsSaveButtonText}>{syncServiceSettingsSaving ? "Saving..." : "Save Sync Settings"}</Text>
         </Pressable>
       </View>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={migrationModalOpen}
+        onRequestClose={() => {
+          if (migrationRunning) return;
+          setMigrationModalOpen(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              if (migrationRunning) return;
+              setMigrationModalOpen(false);
+            }}
+          />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Migrate Settings And Applications</Text>
+              <Pressable
+                onPress={() => setMigrationModalOpen(false)}
+                disabled={migrationRunning}
+                style={[styles.modalCloseButton, migrationRunning ? styles.settingsSaveButtonDisabled : null]}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.settingsInlineHint}>
+              Imports selected data from another SQLite database file. The Companies table is never modified.
+            </Text>
+
+            <ScrollView
+              style={styles.modalBodyScroll}
+              contentContainerStyle={styles.modalBodyContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.settingsCheckboxList}>
+                {[
+                  { key: "personal_information", label: "Personal Information" },
+                  { key: "mcp_settings", label: "AI/MCP Settings" },
+                  { key: "blocked_companies", label: "Blocked Companies" },
+                  {
+                    key: "applications",
+                    label: "Applications (includes application_attribution and posting_application_state)"
+                  }
+                ].map((option) => {
+                  const checked = Boolean(migrationSelection[option.key]);
+                  return (
+                    <Pressable
+                      key={`migration-${option.key}`}
+                      onPress={() =>
+                        setMigrationSelection((prev) => ({
+                          ...prev,
+                          [option.key]: !checked
+                        }))
+                      }
+                      style={styles.settingsCheckboxRow}
+                    >
+                      <Text style={styles.settingsCheckboxIcon}>{checked ? "☑" : "☐"}</Text>
+                      <Text style={styles.settingsCheckboxLabel}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <TextInput
+                style={styles.textField}
+                value={migrationSourceDbPath}
+                onChangeText={setMigrationSourceDbPath}
+                placeholder="C:\\path\\to\\jobs.db"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              {migrationNotice ? <Text style={styles.settingsNotice}>{migrationNotice}</Text> : null}
+
+              <Pressable
+                onPress={handleMigrateFromDatabase}
+                disabled={migrationRunning}
+                style={[styles.settingsSaveButton, migrationRunning ? styles.settingsSaveButtonDisabled : null]}
+              >
+                <Text style={styles.settingsSaveButtonText}>
+                  {migrationRunning ? "Migrating..." : "Migrate From Database"}
+                </Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 
@@ -2593,6 +3006,10 @@ const styles = StyleSheet.create({
     borderColor: "#0b6e4f",
     backgroundColor: "#e8f6ef"
   },
+  dropdownOptionDisabled: {
+    borderColor: "#e4e7eb",
+    backgroundColor: "#f5f7fa"
+  },
   dropdownOptionLabel: {
     color: "#334e68",
     fontSize: 12
@@ -2600,6 +3017,9 @@ const styles = StyleSheet.create({
   dropdownOptionLabelSelected: {
     color: "#0b6e4f",
     fontWeight: "700"
+  },
+  dropdownOptionLabelDisabled: {
+    color: "#9aa5b1"
   },
   dropdownEmpty: {
     color: "#7a8798",
@@ -2990,6 +3410,115 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     color: "#52606d"
+  },
+  settingsSecondaryButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#dbe2ea",
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center"
+  },
+  settingsSecondaryButtonText: {
+    color: "#334e68",
+    fontWeight: "600"
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(16, 42, 67, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 14
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 700,
+    maxHeight: "86%",
+    borderWidth: 1,
+    borderColor: "#dbe2ea",
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    padding: 12
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#102a43"
+  },
+  modalCloseButton: {
+    borderWidth: 1,
+    borderColor: "#dbe2ea",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 10,
+    paddingVertical: 7
+  },
+  modalCloseButtonText: {
+    color: "#334e68",
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  modalBodyScroll: {
+    marginTop: 8
+  },
+  modalBodyContent: {
+    paddingBottom: 10
+  },
+  settingsInlineActionsRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    gap: 8
+  },
+  settingsInlineActionBtn: {
+    borderWidth: 1,
+    borderColor: "#dbe2ea",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    paddingVertical: 7,
+    paddingHorizontal: 10
+  },
+  settingsInlineActionBtnText: {
+    color: "#334e68",
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  settingsCheckboxList: {
+    marginTop: 8
+  },
+  settingsCheckboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#dbe2ea",
+    borderRadius: 10,
+    backgroundColor: "#f8fafc",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 6
+  },
+  settingsCheckboxIcon: {
+    width: 18,
+    fontSize: 14,
+    color: "#102a43",
+    fontWeight: "700"
+  },
+  settingsCheckboxLabel: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: 12,
+    color: "#334e68",
+    fontWeight: "600"
   },
   blockedCompanyRow: {
     marginTop: 8,

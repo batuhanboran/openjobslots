@@ -1,6 +1,9 @@
 const cors = require("cors");
 const express = require("express");
+const fs = require("fs");
 const path = require("path");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 
@@ -53,13 +56,39 @@ const HRMDIRECT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALENTLYFT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TEAMTAILOR_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const FRESHTEAM_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const SAGEHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const LOXO_RATE_LIMIT_WAIT_MS = 5 * 1000;
+const SIMPLICANT_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const PINPOINTHQ_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const RECRUITCRM_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const RIPPLING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const MANATAL_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GEM_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOBAPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALENTREEF_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const HIREBRIDGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const PAGEUP_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const PAYLOCITY_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const execFileAsync = promisify(execFile);
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
+const ORACLE_EXPAND_VALUE = [
+  "requisitionList.workLocation",
+  "requisitionList.otherWorkLocations",
+  "requisitionList.secondaryLocations",
+  "flexFieldsFacet.values",
+  "requisitionList.requisitionFlexFields"
+].join(",");
+const ORACLE_FACETS_VALUE =
+  "LOCATIONS;WORK_LOCATIONS;WORKPLACE_TYPES;TITLES;CATEGORIES;ORGANIZATIONS;POSTING_DATES;FLEX_FIELDS";
 const ASHBY_QUERY = `
   query ApiJobBoardWithTeams($organizationHostedJobsPageName: String!) {
     jobBoard: jobBoardWithTeams(
@@ -111,6 +140,7 @@ let postingLocationGeoFilterOptionsCache = {
 const locationGeoInferenceCache = new Map();
 const atsRateLimitStateByKey = new Map();
 let atsRequestQueueConcurrency = ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT;
+let syncEnabledAts = new Set();
 const syncStatus = {
   running: false,
   started_at: null,
@@ -534,18 +564,87 @@ const ATS_FILTER_OPTIONS = new Set([
   "bamboohr",
   "manatal",
   "careerpuck",
+  "dayforcehcm",
   "fountain",
   "getro",
   "hrmdirect",
   "talentlyft",
   "talexio",
   "teamtailor",
+  "freshteam",
+  "sagehr",
+  "loxo",
+  "peopleforce",
+  "simplicant",
+  "pinpointhq",
+  "recruitcrm",
+  "rippling",
   "gem",
   "jobaps",
   "join",
   "talentreef",
-  "saphrcloud"
+  "saphrcloud",
+  "adp_myjobs",
+  "adp_workforcenow",
+  "careerspage",
+  "oracle",
+  "paylocity",
+  "eightfold",
+  "hirebridge",
+  "pageup",
+  "brassring"
 ]);
+const ATS_FILTER_OPTION_ITEMS = Object.freeze([
+  { value: "workday", label: "Workday" },
+  { value: "ashby", label: "Ashby" },
+  { value: "greenhouse", label: "Greenhouse" },
+  { value: "lever", label: "Lever" },
+  { value: "jobvite", label: "Jobvite" },
+  { value: "applicantpro", label: "ApplicantPro" },
+  { value: "applytojob", label: "ApplyToJob" },
+  { value: "theapplicantmanager", label: "The Applicant Manager" },
+  { value: "breezy", label: "BreezyHR" },
+  { value: "icims", label: "iCIMS" },
+  { value: "zoho", label: "Zoho Recruit" },
+  { value: "applicantai", label: "ApplicantAI" },
+  { value: "gem", label: "Gem" },
+  { value: "jobaps", label: "JobAps" },
+  { value: "join", label: "JOIN" },
+  { value: "talentreef", label: "TalentReef" },
+  { value: "careerplug", label: "CareerPlug" },
+  { value: "bamboohr", label: "BambooHR" },
+  { value: "adp_myjobs", label: "ADP MyJobs" },
+  { value: "adp_workforcenow", label: "ADP Workforce Now" },
+  { value: "oracle", label: "Oracle" },
+  { value: "paylocity", label: "Paylocity" },
+  { value: "eightfold", label: "Eightfold" },
+  { value: "manatal", label: "Manatal" },
+  { value: "careerspage", label: "CareersPage" },
+  { value: "dayforcehcm", label: "Dayforce" },
+  { value: "pageup", label: "PageUp" },
+  { value: "hirebridge", label: "Hirebridge" },
+  { value: "brassring", label: "BrassRing" },
+  { value: "teamtailor", label: "Teamtailor" },
+  { value: "freshteam", label: "Freshteam" },
+  { value: "sagehr", label: "SageHR" },
+  { value: "loxo", label: "Loxo" },
+  { value: "peopleforce", label: "PeopleForce" },
+  { value: "simplicant", label: "Simplicant" },
+  { value: "pinpointhq", label: "PinpointHQ" },
+  { value: "recruitcrm", label: "RecruitCRM" },
+  { value: "rippling", label: "Rippling" },
+  { value: "careerpuck", label: "CareerPuck" },
+  { value: "fountain", label: "Fountain" },
+  { value: "getro", label: "Getro" },
+  { value: "hrmdirect", label: "HRMDirect" },
+  { value: "talentlyft", label: "Talentlyft" },
+  { value: "talexio", label: "Talexio" },
+  { value: "saphrcloud", label: "SAP HR Cloud" },
+  { value: "recruitee", label: "Recruitee" },
+  { value: "ultipro", label: "UltiPro" },
+  { value: "taleo", label: "Taleo" }
+]);
+const SYNC_DEFAULT_ENABLED_ATS = Object.freeze(ATS_FILTER_OPTION_ITEMS.map((item) => item.value));
 const POSTING_SORT_OPTIONS = new Set(["recent", "company_asc"]);
 const MCP_SETTINGS_DEFAULTS = {
   enabled: false,
@@ -567,7 +666,8 @@ const MCP_SETTINGS_DEFAULTS = {
   instructions_for_agent: ""
 };
 const SYNC_SERVICE_SETTINGS_DEFAULTS = {
-  ats_request_queue_concurrency: ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT
+  ats_request_queue_concurrency: ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT,
+  sync_enabled_ats: SYNC_DEFAULT_ENABLED_ATS
 };
 const PHRASE_NGRAM_INDUSTRY_COVERAGE_THRESHOLD = 2;
 const FALLBACK_WORD_INDUSTRY_COVERAGE_THRESHOLD = 2;
@@ -1372,6 +1472,8 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("applicantai.com/")) return "applicantai";
   if (url.includes(".bamboohr.com/careers")) return "bamboohr";
   if (url.includes("app.careerpuck.com/job-board/")) return "careerpuck";
+  if (url.includes("dayforcehcm.com/candidateportal/")) return "dayforcehcm";
+  if (url.includes("careers.dayforcehcm.com/")) return "dayforcehcm";
   if (url.includes("web.fountain.com/c/")) return "fountain";
   if (url.includes(".getro.com/jobs")) return "getro";
   if (url.includes(".hrmdirect.com/employment/job-opening.php")) return "hrmdirect";
@@ -1379,6 +1481,17 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes(".talexio.com/jobs")) return "talexio";
   if (url.includes(".teamtailor.com/jobs/")) return "teamtailor";
   if (url.endsWith(".teamtailor.com/jobs")) return "teamtailor";
+  if (url.includes(".freshteam.com/jobs/")) return "freshteam";
+  if (url.endsWith(".freshteam.com/jobs")) return "freshteam";
+  if (url.includes("talent.sage.hr/jobs/")) return "sagehr";
+  if (url.includes("www.talent.sage.hr/jobs/")) return "sagehr";
+  if (url.includes("app.loxo.co/job/")) return "loxo";
+  if (url.includes(".peopleforce.io/careers/")) return "peopleforce";
+  if (url.endsWith(".peopleforce.io/careers")) return "peopleforce";
+  if (url.includes(".simplicant.com/jobs/")) return "simplicant";
+  if (url.includes(".pinpointhq.com/") && url.includes("/postings/")) return "pinpointhq";
+  if (url.includes("recruitcrm.io/jobs/")) return "recruitcrm";
+  if (url.includes("ats.rippling.com/") && url.includes("/jobs")) return "rippling";
   if (url.includes(".careerplug.com/jobs/")) return "careerplug";
   if (url.endsWith(".careerplug.com/jobs")) return "careerplug";
   if (url.includes("jobs.gem.com/")) return "gem";
@@ -1387,6 +1500,34 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("apply.jobappnetwork.com/apply/")) return "talentreef";
   if (url.includes(".jobs.hr.cloud.sap/job/")) return "saphrcloud";
   if (url.includes(".jobs.hr.cloud.sap/search/")) return "saphrcloud";
+  if (url.includes("myjobs.adp.com/") && url.includes("/cx/job-details")) return "adp_myjobs";
+  if (url.includes("workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html")) return "adp_workforcenow";
+  if (url.includes("workforcenow.adp.com/jobs/apply/posting.html")) return "adp_workforcenow";
+  if (url.includes("careerspage.io/")) {
+    const parts = url.split("careerspage.io/")[1]?.split("/").filter(Boolean) || [];
+    if (parts.length >= 2) return "careerspage";
+  }
+  if (
+    url.includes(".oraclecloud.com/hcmui/candidateexperience/") &&
+    url.includes("/sites/") &&
+    (url.includes("/job/") || url.endsWith("/jobs") || url.includes("/jobs?"))
+  ) {
+    return "oracle";
+  }
+  if (url.includes("careers.pageuppeople.com/") && url.includes("/job/")) return "pageup";
+  if (url.includes("www.careers.pageuppeople.com/") && url.includes("/job/")) return "pageup";
+  if (url.includes("recruiting.paylocity.com/recruiting/jobs/details/")) return "paylocity";
+  if (
+    url.includes(".eightfold.ai/careers/job/") ||
+    url.includes(".eightfold.ai/careers/job?") ||
+    url.includes("eightfold.ai/careers/job/") ||
+    url.includes("eightfold.ai/careers/job?")
+  ) {
+    return "eightfold";
+  }
+  if (url.includes("recruit.hirebridge.com/v3/jobs/jobdetails.aspx")) return "hirebridge";
+  if (url.includes("recruit.hirebridge.com/v3/careercenter/v2/details.aspx")) return "hirebridge";
+  if (url.includes("sjobs.brassring.com/tgnewui/search/home/homewithpreload")) return "brassring";
   if (url.includes(".careers-page.com/jobs/")) return "manatal";
   if (url.includes(".careers-page.com/job/")) return "manatal";
   if (url.includes("www.careers-page.com/") && (url.includes("/job/") || url.includes("/jobs/"))) {
@@ -1436,6 +1577,9 @@ function normalizeAtsFilterValue(value) {
   if (normalized === "careerpuck.com" || normalized === "careerpuckcom") {
     return "careerpuck";
   }
+  if (normalized === "dayforcehcm" || normalized === "dayforce" || normalized === "dayforcehcm.com" || normalized === "dayforcehcmcom") {
+    return "dayforcehcm";
+  }
   if (normalized === "fountain.com" || normalized === "fountaincom") {
     return "fountain";
   }
@@ -1453,6 +1597,35 @@ function normalizeAtsFilterValue(value) {
   }
   if (normalized === "teamtailor.com" || normalized === "teamtailorcom") {
     return "teamtailor";
+  }
+  if (normalized === "freshteam.com" || normalized === "freshteamcom") {
+    return "freshteam";
+  }
+  if (
+    normalized === "sagehr" ||
+    normalized === "sage.hr" ||
+    normalized === "talent.sage.hr" ||
+    normalized === "talentsagehr"
+  ) {
+    return "sagehr";
+  }
+  if (normalized === "loxo.co" || normalized === "loxoco" || normalized === "app.loxo.co" || normalized === "apploxoco") {
+    return "loxo";
+  }
+  if (normalized === "peopleforce.io" || normalized === "peopleforceio") {
+    return "peopleforce";
+  }
+  if (normalized === "simplicant.com" || normalized === "simplicantcom") {
+    return "simplicant";
+  }
+  if (normalized === "pinpointhq.com" || normalized === "pinpointhqcom") {
+    return "pinpointhq";
+  }
+  if (normalized === "recruitcrm.io" || normalized === "recruitcrmiocom" || normalized === "recruitcrmio") {
+    return "recruitcrm";
+  }
+  if (normalized === "rippling.com" || normalized === "ripplingcom" || normalized === "ats.rippling.com" || normalized === "atsripplingcom" || normalized === "rippling") {
+    return "rippling";
   }
   if (normalized === "jobs.gem.com" || normalized === "gem.com" || normalized === "gemcom") {
     return "gem";
@@ -1479,6 +1652,68 @@ function normalizeAtsFilterValue(value) {
     normalized === "jobshrcloudsap"
   ) {
     return "saphrcloud";
+  }
+  if (normalized === "adp_myjobs" || normalized === "adpmyjobs") {
+    return "adp_myjobs";
+  }
+  if (
+    normalized === "adp_workforcenow" ||
+    normalized === "adpworkforcenow" ||
+    normalized === "workforcenow.adp.com" ||
+    normalized === "workforcenowadpcom"
+  ) {
+    return "adp_workforcenow";
+  }
+  if (normalized === "careerspage" || normalized === "careerspage.io" || normalized === "careerspageio") {
+    return "careerspage";
+  }
+  if (
+    normalized === "paylocity" ||
+    normalized === "paylocity.com" ||
+    normalized === "paylocitycom" ||
+    normalized === "recruiting.paylocity.com" ||
+    normalized === "recruitingpaylocitycom"
+  ) {
+    return "paylocity";
+  }
+  if (normalized === "eightfold" || normalized === "eightfold.ai" || normalized === "eightfoldai") {
+    return "eightfold";
+  }
+  if (
+    normalized === "pageup" ||
+    normalized === "pageuppeople" ||
+    normalized === "pageuppeople.com" ||
+    normalized === "pageuppeoplecom" ||
+    normalized === "careers.pageuppeople.com" ||
+    normalized === "careerspageuppeoplecom"
+  ) {
+    return "pageup";
+  }
+  if (
+    normalized === "oracle" ||
+    normalized === "oraclecloud" ||
+    normalized === "oraclecloud.com" ||
+    normalized === "oraclecloudcom"
+  ) {
+    return "oracle";
+  }
+  if (
+    normalized === "hirebridge" ||
+    normalized === "hirebridge.com" ||
+    normalized === "hirebridgecom" ||
+    normalized === "recruit.hirebridge.com" ||
+    normalized === "recruithirebridgecom"
+  ) {
+    return "hirebridge";
+  }
+  if (
+    normalized === "brassring" ||
+    normalized === "brassring.com" ||
+    normalized === "brassringcom" ||
+    normalized === "sjobs.brassring.com" ||
+    normalized === "sjobsbrassringcom"
+  ) {
+    return "brassring";
   }
   return normalized;
 }
@@ -1623,14 +1858,24 @@ function normalizeAtsRequestQueueConcurrency(value, fallbackValue = ATS_REQUEST_
   return Math.max(MIN_ATS_REQUEST_QUEUE_CONCURRENCY, Math.min(MAX_ATS_REQUEST_QUEUE_CONCURRENCY, parsed));
 }
 
+function normalizeSyncEnabledAts(value, fallbackValue = SYNC_DEFAULT_ENABLED_ATS) {
+  const fallback = normalizeAtsFilters(Array.isArray(fallbackValue) ? fallbackValue : SYNC_DEFAULT_ENABLED_ATS);
+  const normalized = normalizeAtsFilters(Array.isArray(value) ? value : parseJsonArray(value));
+  if (normalized.length > 0) return normalized;
+  if (fallback.length > 0) return fallback;
+  return Array.from(SYNC_DEFAULT_ENABLED_ATS);
+}
+
 function normalizeSyncServiceSettingsInput(value = {}, fallback = SYNC_SERVICE_SETTINGS_DEFAULTS) {
   const source = value && typeof value === "object" ? value : {};
   const fallbackConcurrency = normalizeAtsRequestQueueConcurrency(fallback?.ats_request_queue_concurrency);
+  const fallbackEnabledAts = normalizeSyncEnabledAts(fallback?.sync_enabled_ats);
   return {
     ats_request_queue_concurrency: normalizeAtsRequestQueueConcurrency(
       source.ats_request_queue_concurrency,
       fallbackConcurrency
-    )
+    ),
+    sync_enabled_ats: normalizeSyncEnabledAts(source.sync_enabled_ats, fallbackEnabledAts)
   };
 }
 
@@ -1853,6 +2098,9 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
     if (parsed.hostname === "app.careerpuck.com" || parsed.hostname === "www.app.careerpuck.com") {
       return postingLocationByJobUrl.get(url) || null;
     }
+    if (parsed.hostname === "careers.dayforcehcm.com" || parsed.hostname.endsWith(".dayforcehcm.com")) {
+      return postingLocationByJobUrl.get(url) || null;
+    }
     if (parsed.hostname === "web.fountain.com" || parsed.hostname === "www.web.fountain.com") {
       return postingLocationByJobUrl.get(url) || null;
     }
@@ -1871,6 +2119,15 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
     if (parsed.hostname.endsWith(".teamtailor.com")) {
       return postingLocationByJobUrl.get(url) || null;
     }
+    if (parsed.hostname.endsWith(".freshteam.com")) {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "talent.sage.hr" || parsed.hostname === "www.talent.sage.hr") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "app.loxo.co" || parsed.hostname === "www.app.loxo.co") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
     if (parsed.hostname === "jobs.gem.com" || parsed.hostname === "www.jobs.gem.com") {
       return postingLocationByJobUrl.get(url) || null;
     }
@@ -1884,6 +2141,37 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
       return postingLocationByJobUrl.get(url) || null;
     }
     if (parsed.hostname.endsWith(".jobs.hr.cloud.sap")) {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "myjobs.adp.com" || parsed.hostname === "www.myjobs.adp.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "workforcenow.adp.com" || parsed.hostname === "www.workforcenow.adp.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "careerspage.io" || parsed.hostname === "www.careerspage.io") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "recruiting.paylocity.com" || parsed.hostname === "www.recruiting.paylocity.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (
+      parsed.hostname === "eightfold.ai" ||
+      parsed.hostname === "www.eightfold.ai" ||
+      parsed.hostname.endsWith(".eightfold.ai")
+    ) {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "careers.pageuppeople.com" || parsed.hostname === "www.careers.pageuppeople.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname.endsWith(".oraclecloud.com") && parsed.pathname.toLowerCase().includes("/hcmui/candidateexperience/")) {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "recruit.hirebridge.com" || parsed.hostname === "www.recruit.hirebridge.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "sjobs.brassring.com" || parsed.hostname === "www.sjobs.brassring.com") {
       return postingLocationByJobUrl.get(url) || null;
     }
     return null;
@@ -2022,6 +2310,310 @@ function parseBambooHrCompany(urlString) {
     baseOrigin,
     boardUrl: `${baseOrigin}/careers`,
     apiUrl: `${baseOrigin}/careers/list`
+  };
+}
+
+function parseAdpMyjobsCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "myjobs.adp.com" && host !== "www.myjobs.adp.com") return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length === 0) return null;
+
+  const companyName = String(pathParts[0] || "").trim();
+  if (!companyName) return null;
+
+  return {
+    host,
+    companyName,
+    companyNameLower: companyName.toLowerCase(),
+    boardUrl: `https://myjobs.adp.com/${companyName}/cx/job-listing`,
+    careerSiteUrl: `https://myjobs.adp.com/public/staffing/v1/career-site/${encodeURIComponent(companyName)}`
+  };
+}
+
+function parseAdpWorkforcenowCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "workforcenow.adp.com" && host !== "www.workforcenow.adp.com") return null;
+
+  const cid = String(parsed.searchParams?.get("cid") || "").trim();
+  const ccId = String(parsed.searchParams?.get("ccId") || "").trim();
+  if (!cid || !ccId) return null;
+
+  const baseOrigin = "https://workforcenow.adp.com";
+  const boardUrl =
+    `${baseOrigin}/mascsr/default/mdf/recruitment/recruitment.html?` +
+    `cid=${encodeURIComponent(cid)}&ccId=${encodeURIComponent(ccId)}`;
+  const apiBase = `${baseOrigin}/mascsr/default/careercenter/public/events/staffing/v1`;
+
+  return {
+    host,
+    cid,
+    ccId,
+    boardUrl,
+    jobRequisitionsUrl: `${apiBase}/job-requisitions?cid=${encodeURIComponent(cid)}&ccId=${encodeURIComponent(ccId)}`,
+    contentLinksBaseUrl: `${apiBase}/content-links/career-center`
+  };
+}
+
+function parseCareerspageCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "careerspage.io" && host !== "www.careerspage.io") return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length === 0) return null;
+
+  const companySlug = String(pathParts[0] || "").trim();
+  if (!companySlug) return null;
+
+  return {
+    host,
+    companySlug,
+    companySlugLower: companySlug.toLowerCase(),
+    boardUrl: `https://careerspage.io/${companySlug}`
+  };
+}
+
+function parseOracleCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".oraclecloud.com")) return null;
+
+  const pathParts = String(parsed.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  const loweredPathParts = pathParts.map((part) => part.toLowerCase());
+
+  const candidateExperienceIndex = loweredPathParts.indexOf("candidateexperience");
+  if (candidateExperienceIndex < 0) return null;
+
+  let language = "en";
+  if (candidateExperienceIndex + 1 < pathParts.length) {
+    const maybeLanguage = String(pathParts[candidateExperienceIndex + 1] || "").trim();
+    if (maybeLanguage && maybeLanguage.toLowerCase() !== "sites") {
+      language = maybeLanguage;
+    }
+  }
+
+  let siteNumber = "";
+  const sitesIndex = loweredPathParts.indexOf("sites", candidateExperienceIndex + 1);
+  if (sitesIndex >= 0 && sitesIndex + 1 < pathParts.length) {
+    siteNumber = String(pathParts[sitesIndex + 1] || "").trim();
+  }
+  if (!siteNumber) {
+    siteNumber = String(parsed.searchParams?.get("siteNumber") || "").trim();
+  }
+  if (!siteNumber) {
+    siteNumber = "CX";
+  }
+
+  const safeLanguage = language.replace(/[^A-Za-z0-9_-]/g, "") || "en";
+  const safeSiteNumber = siteNumber.replace(/[^A-Za-z0-9_-]/g, "") || "CX";
+  const siteBaseUrl = `${parsed.protocol}//${parsed.host}`;
+  const boardUrl = `${siteBaseUrl}/hcmUI/CandidateExperience/${safeLanguage}/sites/${safeSiteNumber}/jobs`;
+  const apiUrl = `${siteBaseUrl}/hcmRestApi/resources/latest/recruitingCEJobRequisitions`;
+  const finder =
+    `findReqs;siteNumber=${safeSiteNumber},` +
+    `facetsList=${ORACLE_FACETS_VALUE},` +
+    "limit=25,sortBy=POSTING_DATES_DESC";
+
+  return {
+    host,
+    siteBaseUrl,
+    boardUrl,
+    apiUrl,
+    siteNumber: safeSiteNumber,
+    language: safeLanguage,
+    finder
+  };
+}
+
+function parsePaylocityCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "recruiting.paylocity.com" && host !== "www.recruiting.paylocity.com") return null;
+
+  const pathParts = String(parsed.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+
+  if (pathParts.length < 5) return null;
+  if (pathParts[0].toLowerCase() !== "recruiting" || pathParts[1].toLowerCase() !== "jobs") return null;
+
+  const listingSegment = String(pathParts[2] || "All")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "") || "All";
+  const companyId = String(pathParts[3] || "")
+    .trim()
+    .replace(/[^A-Za-z0-9-]/g, "");
+  const companySlug = String(pathParts[4] || "")
+    .trim()
+    .replace(/[^A-Za-z0-9-_.]/g, "");
+  if (!companyId || !companySlug) return null;
+
+  const siteBaseUrl = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    siteBaseUrl,
+    companyId,
+    companySlug,
+    boardUrl:
+      `${siteBaseUrl}/recruiting/jobs/${encodeURIComponent(listingSegment)}` +
+      `/${encodeURIComponent(companyId)}/${encodeURIComponent(companySlug)}`
+  };
+}
+
+function parseEightfoldCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!(host.endsWith(".eightfold.ai") || host === "eightfold.ai" || host === "www.eightfold.ai")) return null;
+
+  const pathParts = String(parsed.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length === 0 || pathParts[0].toLowerCase() !== "careers") return null;
+
+  const siteBaseUrl = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    siteBaseUrl,
+    boardUrl: `${siteBaseUrl}/careers`
+  };
+}
+
+function parsePageupCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "careers.pageuppeople.com" && host !== "www.careers.pageuppeople.com") return null;
+
+  const pathParts = String(parsed.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length === 0) return null;
+
+  const boardId = String(pathParts[0] || "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "");
+  if (!boardId) return null;
+
+  let routeType = "cw";
+  let locale = "en-us";
+  if (pathParts.length >= 3) {
+    const maybeRouteType = String(pathParts[1] || "").trim().toLowerCase();
+    const maybeLocale = String(pathParts[2] || "").trim().toLowerCase();
+    if (maybeRouteType === "cw" || maybeRouteType === "ci") {
+      routeType = maybeRouteType;
+    }
+    if (/^[a-z]{2}(?:-[a-z]{2})$/i.test(maybeLocale)) {
+      locale = maybeLocale;
+    }
+  }
+
+  const encodedBoardId = encodeURIComponent(boardId);
+  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    boardId,
+    routeType,
+    locale,
+    baseOrigin,
+    boardUrl: `${baseOrigin}/${encodedBoardId}`,
+    searchUrl: `${baseOrigin}/${encodedBoardId}/${routeType}/${locale}/search/`
+  };
+}
+
+function extractPageupRouteConfigFromUrl(urlString, fallbackRouteType = "cw", fallbackLocale = "en-us") {
+  const parsed = parseUrl(urlString);
+  const pathParts = String(parsed?.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+
+  let routeType = String(fallbackRouteType || "cw").trim().toLowerCase() || "cw";
+  let locale = String(fallbackLocale || "en-us").trim().toLowerCase() || "en-us";
+
+  if (pathParts.length >= 3) {
+    const maybeRouteType = String(pathParts[1] || "").trim().toLowerCase();
+    const maybeLocale = String(pathParts[2] || "").trim().toLowerCase();
+    if (maybeRouteType === "cw" || maybeRouteType === "ci") {
+      routeType = maybeRouteType;
+    }
+    if (/^[a-z]{2}(?:-[a-z]{2})$/i.test(maybeLocale)) {
+      locale = maybeLocale;
+    }
+  }
+
+  return {
+    routeType,
+    locale
+  };
+}
+
+function parseHirebridgeCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "recruit.hirebridge.com" && host !== "www.recruit.hirebridge.com") return null;
+
+  const cid = String(parsed.searchParams?.get("cid") || "").trim();
+  if (!cid) return null;
+
+  return {
+    host,
+    cid,
+    boardUrl: `https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=${encodeURIComponent(cid)}`,
+    detailsBaseUrl: "https://recruit.hirebridge.com/v3/CareerCenter/v2/details.aspx"
+  };
+}
+
+function parseBrassringCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "sjobs.brassring.com" && host !== "www.sjobs.brassring.com") return null;
+
+  const partnerId = String(parsed.searchParams?.get("partnerid") || "").trim();
+  const siteId = String(parsed.searchParams?.get("siteid") || "").trim();
+  if (!partnerId || !siteId) return null;
+
+  const boardUrl =
+    `https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=${encodeURIComponent(partnerId)}` +
+    `&siteid=${encodeURIComponent(siteId)}`;
+  return {
+    host,
+    partnerId,
+    siteId,
+    boardUrl,
+    apiUrl: "https://sjobs.brassring.com/TgNewUI/Search/Ajax/MatchedJobs"
   };
 }
 
@@ -2213,6 +2805,238 @@ function parseTeamtailorCompany(urlString) {
     subdomainLower: subdomain.toLowerCase(),
     baseOrigin,
     jobsUrl: `${baseOrigin}/jobs`
+  };
+}
+
+function parseFreshteamCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".freshteam.com")) return null;
+  if (host === "freshteam.com" || host === "www.freshteam.com" || host === "assets.freshteam.com") return null;
+
+  const [subdomain = ""] = host.split(".");
+  if (!subdomain) return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length > 0 && String(pathParts[0] || "").toLowerCase() !== "jobs") return null;
+
+  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    subdomain,
+    subdomainLower: subdomain.toLowerCase(),
+    baseOrigin,
+    jobsUrl: `${baseOrigin}/jobs`
+  };
+}
+
+function parseSagehrCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "talent.sage.hr" && host !== "www.talent.sage.hr") return null;
+
+  const pathParts = String(parsed.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length === 0) return null;
+
+  const companySlug = String(pathParts[0] || "").trim();
+  if (!companySlug) return null;
+  if (companySlug.toLowerCase() === "embed" || companySlug.toLowerCase() === "jobs") return null;
+
+  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    companySlug,
+    companySlugLower: companySlug.toLowerCase(),
+    baseOrigin,
+    boardUrl: `${baseOrigin}/${encodeURIComponent(companySlug)}/vacancies`
+  };
+}
+
+function parsePeopleforceCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".peopleforce.io")) return null;
+  if (host === "peopleforce.io" || host === "www.peopleforce.io") return null;
+
+  const [subdomain = ""] = host.split(".");
+  if (!subdomain) return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length > 0 && String(pathParts[0] || "").toLowerCase() !== "careers") return null;
+
+  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    subdomain,
+    subdomainLower: subdomain.toLowerCase(),
+    baseOrigin,
+    jobsUrl: `${baseOrigin}/careers`
+  };
+}
+
+function parseSimplicantCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".simplicant.com")) return null;
+  if (
+    host === "simplicant.com" ||
+    host === "www.simplicant.com" ||
+    host === "assets.simplicant.com" ||
+    host === "app.simplicant.com" ||
+    host === "jobs.simplicant.com"
+  ) {
+    return null;
+  }
+
+  const [subdomain = ""] = host.split(".");
+  if (!subdomain) return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length > 0 && !["jobs", "leads"].includes(String(pathParts[0] || "").toLowerCase())) return null;
+
+  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    subdomain,
+    subdomainLower: subdomain.toLowerCase(),
+    baseOrigin,
+    jobsUrl: `${baseOrigin}/`
+  };
+}
+
+function parseLoxoCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "app.loxo.co" && host !== "www.app.loxo.co") return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (pathParts.length === 0) return null;
+  if (String(pathParts[0] || "").toLowerCase() === "job") return null;
+
+  const companySlug = String(pathParts[0] || "").trim();
+  if (!companySlug) return null;
+
+  const boardUrl = new URL(`${parsed.protocol}//${parsed.host}/${companySlug}`);
+  boardUrl.search = "";
+  boardUrl.hash = "";
+
+  return {
+    host,
+    companySlug,
+    companySlugLower: companySlug.toLowerCase(),
+    baseOrigin: `${parsed.protocol}//${parsed.host}`,
+    boardUrl: boardUrl.toString()
+  };
+}
+
+function parsePinpointHqCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".pinpointhq.com")) return null;
+  if (host === "pinpointhq.com" || host === "www.pinpointhq.com") return null;
+
+  const [subdomain = ""] = host.split(".");
+  if (!subdomain) return null;
+
+  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+  return {
+    host,
+    subdomain,
+    subdomainLower: subdomain.toLowerCase(),
+    baseOrigin,
+    boardUrl: `${baseOrigin}/`,
+    apiUrl: `${baseOrigin}/postings.json`
+  };
+}
+
+function parseRecruitCrmCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "recruitcrm.io" && !host.endsWith(".recruitcrm.io")) return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+
+  let account = "";
+  if (pathParts.length >= 2 && String(pathParts[0] || "").toLowerCase() === "jobs") {
+    account = String(pathParts[1] || "").trim();
+  } else {
+    const queryAccount = String(parsed.searchParams?.get("account") || "").trim();
+    account = queryAccount;
+  }
+
+  if (!account) return null;
+
+  return {
+    host,
+    account,
+    accountLower: account.toLowerCase(),
+    publicJobsUrl: `https://recruitcrm.io/jobs/${encodeURIComponent(account)}`,
+    apiUrl:
+      `https://albatross.recruitcrm.io/v1/external-pages/jobs-by-account/get?account=${encodeURIComponent(account)}&batch=true`
+  };
+}
+
+function parseRipplingCompany(urlString) {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "ats.rippling.com") return null;
+
+  const pathParts = parsed.pathname
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+
+  let companySlug = "";
+  if (pathParts.length > 0) {
+    if (String(pathParts[0] || "").toLowerCase() === "api" && pathParts.length >= 5) {
+      companySlug = String(pathParts[4] || "").trim();
+    } else {
+      companySlug = String(pathParts[0] || "").trim();
+    }
+  }
+
+  if (!companySlug) return null;
+
+  return {
+    host,
+    companySlug,
+    companySlugLower: companySlug.toLowerCase(),
+    boardUrl: `https://ats.rippling.com/${companySlug}/jobs`,
+    apiUrl: `https://ats.rippling.com/api/v2/board/${companySlug}/jobs`
   };
 }
 
@@ -2991,6 +3815,456 @@ function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtm
   return postings;
 }
 
+function cleanFreshteamText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const cardPattern =
+    /<a[^>]*href=["'](\/jobs\/[^"'#?]+(?:\/[^"'#?]+)?)["'][^>]*class=["'][^"']*\bheading\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const titlePattern = /<div[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
+  const locationInfoPattern = /<div[^>]*class=["'][^"']*\blocation-info\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
+  const locationAttrPattern = /\bdata-portal-location=["']([^"']*)["']/i;
+  const remoteAttrPattern = /\bdata-portal-remote-location=(true|false)\b/i;
+
+  let cardMatch = cardPattern.exec(source);
+  while (cardMatch) {
+    const href = String(cardMatch[1] || "").trim();
+    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      cardMatch = cardPattern.exec(source);
+      continue;
+    }
+
+    const cardHtml = String(cardMatch[0] || "");
+    const bodyHtml = String(cardMatch[2] || "");
+    const title = cleanFreshteamText(bodyHtml.match(titlePattern)?.[1] || "") || "Untitled Position";
+    const location = cleanFreshteamText(cardHtml.match(locationAttrPattern)?.[1] || "");
+    const locationInfo = cleanFreshteamText(bodyHtml.match(locationInfoPattern)?.[1] || "");
+    const isRemoteRaw = String(cardHtml.match(remoteAttrPattern)?.[1] || "").trim().toLowerCase();
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: null,
+      location: location || locationInfo || null,
+      location_info: locationInfo || null,
+      is_remote: isRemoteRaw === "true" ? 1 : 0
+    });
+
+    seenUrls.add(absoluteUrl);
+    cardMatch = cardPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function cleanSagehrText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractSagehrCompanyNameFromHtml(pageHtml) {
+  const source = String(pageHtml || "");
+  const companyMatch = source.match(
+    /<div[^>]*class=['"][^'"]*\btitle-wrap\b[^'"]*['"][^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i
+  );
+  const fromTitleWrap = cleanSagehrText(companyMatch?.[1] || "");
+  if (fromTitleWrap) return fromTitleWrap;
+
+  const fallbackMatch = source.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  const fallback = cleanSagehrText(fallbackMatch?.[1] || "");
+  return fallback || "Unknown Company";
+}
+
+function parseSagehrPostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const jobPattern = /<div[^>]*class=['"][^'"]*\bjob\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/gi;
+  const linkPattern =
+    /<a[^>]*class=['"][^'"]*\btitle\b[^'"]*['"][^>]*href=['"]([^"']+)['"][^>]*>([\s\S]*?)<\/a>/i;
+  const locationPattern = /<div[^>]*class=['"][^'"]*\blocation\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/i;
+
+  let jobMatch = jobPattern.exec(source);
+  while (jobMatch) {
+    const jobHtml = String(jobMatch[1] || "");
+    const linkMatch = jobHtml.match(linkPattern);
+    const hrefRaw = cleanSagehrText(linkMatch?.[1] || "");
+    const href = decodeHtmlEntities(hrefRaw).replace(/\s+/g, "");
+    if (!href || !href.toLowerCase().includes("/jobs/")) {
+      jobMatch = jobPattern.exec(source);
+      continue;
+    }
+
+    let absoluteUrl = "";
+    try {
+      absoluteUrl = new URL(href, `${config.baseOrigin || ""}/`).toString();
+    } catch {
+      jobMatch = jobPattern.exec(source);
+      continue;
+    }
+
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      jobMatch = jobPattern.exec(source);
+      continue;
+    }
+
+    const title = cleanSagehrText(linkMatch?.[2] || "") || "Untitled Position";
+    const location = cleanSagehrText(jobHtml.match(locationPattern)?.[1] || "");
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: null,
+      location: location || null
+    });
+    seenUrls.add(absoluteUrl);
+    jobMatch = jobPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function cleanPeopleforceText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parsePeopleforcePostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const postingPattern =
+    /<a[^>]*class=["'][^"']*\bstretched-link\b[^"']*["'][^>]*href=["'](\/careers\/v\/[^"'#?]+)["'][^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class=["'][^"']*\bstretched-link\b|$)/gi;
+  const locationPattern =
+    /<div[^>]*class=["'][^"']*\btw-text-neutral-dark-80\b[^"']*\bsmall\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
+
+  let postingMatch = postingPattern.exec(source);
+  while (postingMatch) {
+    const href = String(postingMatch[1] || "").trim();
+    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      postingMatch = postingPattern.exec(source);
+      continue;
+    }
+
+    const title = cleanPeopleforceText(postingMatch[2] || "") || "Untitled Position";
+    const locationRaw = String(postingMatch[3] || "");
+    const location = cleanPeopleforceText(locationRaw.match(locationPattern)?.[1] || "");
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: null,
+      location: location || null
+    });
+
+    seenUrls.add(absoluteUrl);
+    postingMatch = postingPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function cleanSimplicantText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseSimplicantPostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const cardPattern =
+    /<a[^>]*class=["'][^"']*\blist-group-item\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const titlePattern = /<h3[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h3>/i;
+  const locationPattern = /<div[^>]*class=["'][^"']*\bjob-subtitle\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
+
+  let match = cardPattern.exec(source);
+  while (match) {
+    const href = cleanSimplicantText(match[1] || "");
+    if (!href || !href.includes("/jobs/") || !href.replace(/\/+$/, "").toLowerCase().endsWith("/detail")) {
+      match = cardPattern.exec(source);
+      continue;
+    }
+
+    const absoluteUrl = new URL(href, `${config.baseOrigin || ""}/`).toString();
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      match = cardPattern.exec(source);
+      continue;
+    }
+
+    const bodyHtml = String(match[2] || "");
+    const title = cleanSimplicantText(bodyHtml.match(titlePattern)?.[1] || "") || "Untitled Position";
+    const location = cleanSimplicantText(bodyHtml.match(locationPattern)?.[1] || "");
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: null,
+      location: location || null
+    });
+
+    seenUrls.add(absoluteUrl);
+    match = cardPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function cleanLoxoText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseLoxoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const cardPattern =
+    /<div[^>]*class=['"][^'"]*\bjobs-listing-card\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<div[^>]*class=['"][^'"]*\bdata-cell\b[^'"]*['"][^>]*>[\s\S]*?<div[^>]*class=['"][^'"]*\bjob-location\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/gi;
+  const hrefPattern = /<a[^>]*class=['"][^'"]*\bjob-title\b[^'"]*['"][^>]*href=['"]([^"']+)['"][^>]*>([\s\S]*?)<\/a>/i;
+  const datePattern = /<div[^>]*class=['"][^'"]*\bjob-date\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/i;
+
+  let match = cardPattern.exec(source);
+  while (match) {
+    const cardHtml = String(match[1] || "");
+    const locationHtml = String(match[2] || "");
+    const hrefMatch = cardHtml.match(hrefPattern);
+    const href = String(hrefMatch?.[1] || "").trim();
+    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      match = cardPattern.exec(source);
+      continue;
+    }
+
+    const title = cleanLoxoText(hrefMatch?.[2] || "") || "Untitled Position";
+    const postingDate = cleanLoxoText(cardHtml.match(datePattern)?.[1] || "");
+    const location = cleanLoxoText(locationHtml).replace(/\blocation_on\b/gi, "").trim();
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: postingDate || null,
+      location: location || null
+    });
+
+    seenUrls.add(absoluteUrl);
+    match = cardPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function cleanHirebridgeText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseHirebridgePostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const itemPattern = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+  const linkPattern =
+    /<a[^>]*href=["']([^"']*\/v3\/Jobs\/JobDetails\.aspx\?[^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
+  const departmentPattern = /<span[^>]*class=["'][^"']*\bdepartment\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i;
+
+  let itemMatch = itemPattern.exec(source);
+  while (itemMatch) {
+    const itemHtml = String(itemMatch[1] || "");
+    const linkMatch = itemHtml.match(linkPattern);
+    const hrefRaw = String(linkMatch?.[1] || "").trim();
+    const href = decodeHtmlEntities(hrefRaw).replace(/\s+/g, "");
+    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      itemMatch = itemPattern.exec(source);
+      continue;
+    }
+
+    const title = cleanHirebridgeText(linkMatch?.[2] || "") || "Untitled Position";
+    const department = cleanHirebridgeText(itemHtml.match(departmentPattern)?.[1] || "");
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: null,
+      location: department || null,
+      department: department || null
+    });
+
+    seenUrls.add(absoluteUrl);
+    itemMatch = itemPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function extractHirebridgeDatePostedFromDetailHtml(pageHtml) {
+  const source = String(pageHtml || "");
+  const patterns = [
+    /"datePosted"\s*:\s*"([^"]+)"/i,
+    /["']dateposted["']\s*:\s*["']([^"']+)["']/i,
+    /itemprop=["']datePosted["'][^>]*content=["']([^"']+)["']/i
+  ];
+
+  for (const pattern of patterns) {
+    const value = String(source.match(pattern)?.[1] || "").trim();
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function buildHirebridgeDetailsUrl(config, jobPostingUrl) {
+  const parsed = parseUrl(jobPostingUrl);
+  if (!parsed) return "";
+
+  const jid = String(parsed.searchParams?.get("jid") || "").trim();
+  const cid = String(parsed.searchParams?.get("cid") || config?.cid || "").trim();
+  if (!jid || !cid) return "";
+
+  return `${config.detailsBaseUrl}?cid=${encodeURIComponent(cid)}&jid=${encodeURIComponent(jid)}`;
+}
+
+function cleanPageupText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPageupCompanyNameFromTitle(pageHtml) {
+  const source = String(pageHtml || "");
+  const title = cleanPageupText(source.match(/<title>\s*([\s\S]*?)\s*<\/title>/i)?.[1] || "");
+  if (!title) return "Unknown Company";
+  const parts = title.split("|").map((part) => String(part || "").trim()).filter(Boolean);
+  if (parts.length > 1) {
+    return parts[parts.length - 1];
+  }
+  return title;
+}
+
+function extractPageupPostingDateFromListingRow(rowHtml) {
+  const source = String(rowHtml || "");
+  const patterns = [
+    /<span[^>]*class=['"][^'"]*\bposted-date\b[^'"]*['"][^>]*>[\s\S]*?<time[^>]*datetime=['"]([^'"]+)['"]/i,
+    /<span[^>]*class=['"][^'"]*\bopen-date\b[^'"]*['"][^>]*>[\s\S]*?<time[^>]*datetime=['"]([^'"]+)['"]/i,
+    /<span[^>]*class=['"][^'"]*\bposting-date\b[^'"]*['"][^>]*>[\s\S]*?<time[^>]*datetime=['"]([^'"]+)['"]/i
+  ];
+  for (const pattern of patterns) {
+    const value = cleanPageupText(source.match(pattern)?.[1] || "");
+    if (value) return value;
+  }
+  return "";
+}
+
+function extractPageupPostingDateFromDetailHtml(pageHtml) {
+  const source = String(pageHtml || "");
+  const patterns = [
+    /<span[^>]*class=['"][^'"]*\bopen-date\b[^'"]*['"][^>]*>\s*<time[^>]*datetime=['"]([^'"]+)['"]/i,
+    /<b>\s*Advertised:\s*<\/b>\s*<span[^>]*>\s*<time[^>]*datetime=['"]([^'"]+)['"]/i,
+    /<span[^>]*class=['"][^'"]*\bopen-date\b[^'"]*['"][^>]*>\s*<time[^>]*>([^<]+)<\/time>/i
+  ];
+  for (const pattern of patterns) {
+    const value = cleanPageupText(source.match(pattern)?.[1] || "");
+    if (value) return value;
+  }
+  return "";
+}
+
+function extractPageupPostingId(jobPostingUrl) {
+  const parsed = parseUrl(jobPostingUrl);
+  if (!parsed) return "";
+  const pathParts = String(parsed.pathname || "")
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  const loweredPathParts = pathParts.map((part) => part.toLowerCase());
+  const jobIndex = loweredPathParts.indexOf("job");
+  if (jobIndex >= 0 && pathParts[jobIndex + 1]) {
+    return String(pathParts[jobIndex + 1] || "").trim();
+  }
+  return "";
+}
+
+function parsePageupPostingsFromResults(companyNameForPostings, config, resultsHtml) {
+  const source = String(resultsHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const linkPattern =
+    /<a[^>]*class=['"][^'"]*\bjob-link\b[^'"]*['"][^>]*href=['"]([^"']+)['"][^>]*>([\s\S]*?)<\/a>/i;
+  const locationPattern = /<span[^>]*class=['"][^'"]*\blocation\b[^'"]*['"][^>]*>([\s\S]*?)<\/span>/i;
+
+  let rowMatch = rowPattern.exec(source);
+  while (rowMatch) {
+    const rowHtml = String(rowMatch[1] || "");
+    const linkMatch = rowHtml.match(linkPattern);
+    const hrefRaw = String(linkMatch?.[1] || "").trim();
+    const href = decodeHtmlEntities(hrefRaw).replace(/\s+/g, "");
+    if (!href) {
+      rowMatch = rowPattern.exec(source);
+      continue;
+    }
+
+    let absoluteUrl = "";
+    try {
+      absoluteUrl = new URL(href, `${config.baseOrigin || ""}/`).toString();
+    } catch {
+      rowMatch = rowPattern.exec(source);
+      continue;
+    }
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      rowMatch = rowPattern.exec(source);
+      continue;
+    }
+
+    const title = cleanPageupText(linkMatch?.[2] || "") || "Untitled Position";
+    const location = cleanPageupText(rowHtml.match(locationPattern)?.[1] || "");
+    const postingDate = extractPageupPostingDateFromListingRow(rowHtml);
+    const postingId = extractPageupPostingId(absoluteUrl);
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: postingDate || null,
+      location: location || null,
+      external_id: postingId || null
+    });
+
+    seenUrls.add(absoluteUrl);
+    rowMatch = rowPattern.exec(source);
+  }
+
+  return postings;
+}
+
 function cleanManatalText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
@@ -3238,6 +4512,406 @@ function parseManatalPostingsFromHtml(companyNameForPostings, config, pageHtml) 
   return postings;
 }
 
+function cleanCareerspageText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseCareerspagePostingsFromHtml(companyNameForPostings, config, pageHtml) {
+  const source = String(pageHtml || "");
+  const postings = [];
+  const seenUrls = new Set();
+
+  const jobItemPattern = /<div[^>]*class=['"][^'"]*\bjob-item\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
+  let itemMatch = jobItemPattern.exec(source);
+
+  while (itemMatch) {
+    const itemHtml = String(itemMatch[1] || "");
+    const hrefRaw = String(
+      itemHtml.match(/href=['"](https?:\/\/careerspage\.io\/[^'"?#]+\/[^'"?#]+)['"]/i)?.[1] || ""
+    ).trim();
+    if (!hrefRaw) {
+      itemMatch = jobItemPattern.exec(source);
+      continue;
+    }
+
+    const title = cleanCareerspageText(itemHtml.match(/<h3[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/h3>/i)?.[1] || "");
+    if (!title) {
+      itemMatch = jobItemPattern.exec(source);
+      continue;
+    }
+
+    let jobUrl = "";
+    try {
+      jobUrl = new URL(hrefRaw, `${String(config?.boardUrl || "").replace(/\/+$/, "")}/`).toString();
+    } catch {
+      itemMatch = jobItemPattern.exec(source);
+      continue;
+    }
+    if (!jobUrl || seenUrls.has(jobUrl)) {
+      itemMatch = jobItemPattern.exec(source);
+      continue;
+    }
+
+    const location = cleanCareerspageText(
+      itemHtml.match(/fa-location-arrow[^<]*<\/i>\s*<\/span>\s*<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] || ""
+    );
+    const employmentType = cleanCareerspageText(
+      itemHtml.match(/fa-business-time[^<]*<\/i>\s*<\/span>\s*<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] || ""
+    );
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: null,
+      location: location || null,
+      employment_type: employmentType || null
+    });
+    seenUrls.add(jobUrl);
+    itemMatch = jobItemPattern.exec(source);
+  }
+
+  return postings;
+}
+
+function cleanPaylocityText(value) {
+  return decodeHtmlEntities(String(value || ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPaylocityPageDataJson(pageHtml) {
+  const source = String(pageHtml || "");
+  const marker = "window.pageData =";
+  let startIndex = source.indexOf(marker);
+  if (startIndex < 0) return {};
+
+  startIndex = source.indexOf("{", startIndex);
+  if (startIndex < 0) return {};
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let stringChar = "";
+
+  for (let index = startIndex; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (char === "\\") {
+        escape = true;
+      } else if (char === stringChar) {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      inString = true;
+      stringChar = char;
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(source.slice(startIndex, index + 1));
+        } catch {
+          return {};
+        }
+      }
+    }
+  }
+
+  return {};
+}
+
+function parsePaylocityPostingsFromPageData(companyNameForPostings, config, pageData) {
+  const jobs = Array.isArray(pageData?.Jobs) ? pageData.Jobs : [];
+  const postings = [];
+  const seenIds = new Set();
+  const effectiveCompanyName =
+    cleanPaylocityText(companyNameForPostings) || `paylocity_${String(config?.companyId || "").toLowerCase()}`;
+
+  for (const job of jobs) {
+    if (!job || typeof job !== "object") continue;
+
+    const jobId = cleanPaylocityText(job?.JobId || "");
+    const normalizedJobId = jobId.toLowerCase();
+    if (!jobId || seenIds.has(normalizedJobId)) continue;
+
+    const jobLocation = job?.JobLocation && typeof job.JobLocation === "object" ? job.JobLocation : {};
+    const city = cleanPaylocityText(jobLocation?.City || "");
+    const state = cleanPaylocityText(jobLocation?.State || "");
+    const country = cleanPaylocityText(jobLocation?.Country || "");
+    const isRemote = Boolean(job?.IsRemote);
+
+    const locationParts = [city, state].filter(Boolean);
+    let location = locationParts.join(", ");
+    if (!location) location = cleanPaylocityText(job?.LocationName || "");
+    if (!location && isRemote) location = "Remote";
+    if (!location && country) location = country;
+
+    postings.push({
+      company_name: effectiveCompanyName,
+      position_name: cleanPaylocityText(job?.JobTitle || "") || "Untitled Position",
+      job_posting_url: `${String(config?.siteBaseUrl || "").replace(/\/+$/, "")}/Recruiting/Jobs/Details/${encodeURIComponent(jobId)}`,
+      posting_date: cleanPaylocityText(job?.PublishedDate || "") || null,
+      location: location || null,
+      department: cleanPaylocityText(job?.HiringDepartment || "") || null,
+      employment_type: isRemote ? "Remote" : null
+    });
+    seenIds.add(normalizedJobId);
+  }
+
+  return postings;
+}
+
+function cleanEightfoldText(value) {
+  return decodeHtmlEntities(String(value || ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractEightfoldDomainFromHtml(pageHtml) {
+  const source = String(pageHtml || "");
+  const match = source.match(/window\._EF_GROUP_ID\s*=\s*["']([^"']+)["']/i);
+  const value = cleanEightfoldText(match?.[1] || "");
+  return value || "";
+}
+
+function buildEightfoldApiUrl(config, domainValue) {
+  const siteBaseUrl = String(config?.siteBaseUrl || "").replace(/\/+$/, "");
+  const domain = cleanEightfoldText(domainValue || "");
+  if (!siteBaseUrl || !domain) return "";
+  return `${siteBaseUrl}/api/pcsx/search?domain=${encodeURIComponent(domain)}&query=&location=&start=0&`;
+}
+
+function parseEightfoldPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const data = responseJson?.data && typeof responseJson.data === "object" ? responseJson.data : {};
+  const positions = Array.isArray(data?.positions) ? data.positions : [];
+  const postings = [];
+  const seenIds = new Set();
+  const seenUrls = new Set();
+
+  const fallbackCompanyKey =
+    String(config?.host || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "board";
+  const effectiveCompanyName = cleanEightfoldText(companyNameForPostings) || `eightfold_${fallbackCompanyKey}`;
+
+  for (const position of positions) {
+    if (!position || typeof position !== "object") continue;
+
+    const positionId = cleanEightfoldText(position?.id || "");
+    const normalizedPositionId = positionId.toLowerCase();
+    if (!positionId || seenIds.has(normalizedPositionId)) continue;
+
+    const rawPositionUrl = cleanEightfoldText(position?.positionUrl || "");
+    let postingUrl = "";
+    if (rawPositionUrl) {
+      try {
+        postingUrl = new URL(rawPositionUrl, `${String(config?.siteBaseUrl || "").replace(/\/+$/, "")}/`).toString();
+      } catch {
+        postingUrl = "";
+      }
+    }
+    if (!postingUrl || seenUrls.has(postingUrl)) continue;
+
+    const locations = Array.isArray(position?.locations)
+      ? position.locations.map((item) => cleanEightfoldText(item || "")).filter(Boolean)
+      : [];
+    const fallbackLocation = cleanEightfoldText(position?.locations || "");
+    const workLocationOption = cleanEightfoldText(position?.workLocationOption || "");
+    let location = locations.length > 0 ? locations.join(", ") : fallbackLocation;
+    if (!location && /remote/i.test(workLocationOption)) {
+      location = "Remote";
+    }
+
+    const rawPostedTs = position?.postedTs;
+    let postingDate = "";
+    if (Number.isFinite(Number(rawPostedTs)) && Number(rawPostedTs) > 0) {
+      postingDate = String(Math.floor(Number(rawPostedTs)));
+    } else {
+      postingDate = cleanEightfoldText(rawPostedTs || "");
+    }
+
+    const department = Array.isArray(position?.department)
+      ? position.department.map((item) => cleanEightfoldText(item || "")).filter(Boolean).join(" / ")
+      : cleanEightfoldText(position?.department || "");
+    const externalId = cleanEightfoldText(position?.atsJobId || "");
+
+    postings.push({
+      company_name: effectiveCompanyName,
+      position_name: cleanEightfoldText(position?.name || "") || "Untitled Position",
+      job_posting_url: postingUrl,
+      posting_date: postingDate || null,
+      location: location || null,
+      department: department || null,
+      employment_type: workLocationOption || null,
+      external_id: externalId || null
+    });
+    seenIds.add(normalizedPositionId);
+    seenUrls.add(postingUrl);
+  }
+
+  return postings;
+}
+
+function cleanOracleText(value) {
+  return decodeHtmlEntities(String(value || ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractOracleCompanyNameFromFacetList(facets) {
+  if (!Array.isArray(facets)) return "";
+  for (const facet of facets) {
+    if (!facet || typeof facet !== "object") continue;
+    const companyName = cleanOracleText(facet?.Name || facet?.name || "");
+    if (companyName) return companyName;
+  }
+  return "";
+}
+
+function extractOracleCompanyNameFromItem(item) {
+  if (!item || typeof item !== "object") return "";
+
+  const direct = extractOracleCompanyNameFromFacetList(item.organizationsFacet);
+  if (direct) return direct;
+
+  const workLocationsFacet = Array.isArray(item.workLocationsFacet)
+    ? item.workLocationsFacet
+    : item.workLocationsFacet && typeof item.workLocationsFacet === "object"
+      ? [item.workLocationsFacet]
+      : [];
+  for (const workLocation of workLocationsFacet) {
+    if (!workLocation || typeof workLocation !== "object") continue;
+    const nested = extractOracleCompanyNameFromFacetList(workLocation.organizationsFacet);
+    if (nested) return nested;
+  }
+
+  return "";
+}
+
+function extractOracleCompanyNameFromResponse(responseJson) {
+  const items = Array.isArray(responseJson?.items) ? responseJson.items : [];
+  for (const item of items) {
+    const companyName = extractOracleCompanyNameFromItem(item);
+    if (companyName) return companyName;
+  }
+  return "";
+}
+
+function extractOracleLocationFromRequisition(item) {
+  const requisition = item && typeof item === "object" ? item : {};
+  const primaryLocation = cleanOracleText(requisition?.PrimaryLocation || requisition?.primaryLocation || "");
+  if (primaryLocation) return primaryLocation;
+
+  const workLocations = Array.isArray(requisition?.workLocation) ? requisition.workLocation : [];
+  const values = [];
+  const seen = new Set();
+
+  for (const workLocation of workLocations) {
+    const location = workLocation && typeof workLocation === "object" ? workLocation : {};
+    const city = cleanOracleText(location?.TownOrCity || location?.townOrCity || "");
+    const state = cleanOracleText(location?.Region2 || location?.region2 || "");
+    const country = cleanOracleText(location?.Country || location?.country || "");
+    const locationName = cleanOracleText(location?.LocationName || location?.locationName || "");
+    const label = [city, state, country].filter(Boolean).join(", ") || locationName;
+    const normalized = String(label || "").toLowerCase();
+    if (!label || seen.has(normalized)) continue;
+    seen.add(normalized);
+    values.push(label);
+  }
+
+  return values.length > 0 ? values.join(" / ") : null;
+}
+
+function buildOraclePostingUrl(config, requisitionId) {
+  const id = String(requisitionId || "").trim();
+  if (!id) return String(config?.boardUrl || "").trim();
+  return (
+    `${config.siteBaseUrl}/hcmUI/CandidateExperience/${encodeURIComponent(config.language)}` +
+    `/sites/${encodeURIComponent(config.siteNumber)}/job/${encodeURIComponent(id)}`
+  );
+}
+
+function parseOraclePostingsFromApi(companyNameForPostings, config, responseJson) {
+  const items = Array.isArray(responseJson?.items) ? responseJson.items : [];
+  const inferredCompanyName = extractOracleCompanyNameFromResponse(responseJson);
+  const effectiveCompanyName =
+    cleanOracleText(companyNameForPostings) ||
+    inferredCompanyName ||
+    `oracle_${String(config?.siteNumber || "cx").toLowerCase()}`;
+
+  const postings = [];
+  const seenIds = new Set();
+  const seenUrls = new Set();
+
+  for (const item of items) {
+    const container = item && typeof item === "object" ? item : {};
+    const requisitions = Array.isArray(container?.requisitionList) ? container.requisitionList : [];
+
+    for (const requisition of requisitions) {
+      const row = requisition && typeof requisition === "object" ? requisition : {};
+      const requisitionId = cleanOracleText(row?.Id || row?.id || "");
+      if (requisitionId && seenIds.has(requisitionId)) continue;
+
+      const postingDate = cleanOracleText(row?.PostedDate || row?.postDate || "");
+      if (!postingDate) continue;
+
+      const postingUrl = buildOraclePostingUrl(config, requisitionId);
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+
+      const departmentValues = [
+        cleanOracleText(row?.Department || row?.department || ""),
+        cleanOracleText(row?.JobFamily || row?.jobFamily || ""),
+        cleanOracleText(row?.Organization || row?.organization || ""),
+        cleanOracleText(row?.BusinessUnit || row?.businessUnit || "")
+      ].filter(Boolean);
+      const uniqueDepartments = Array.from(new Set(departmentValues.map((value) => value.toLowerCase()))).map(
+        (lowered) => departmentValues.find((value) => value.toLowerCase() === lowered) || lowered
+      );
+
+      const employmentTypeValues = [
+        cleanOracleText(row?.WorkerType || row?.workerType || ""),
+        cleanOracleText(row?.JobType || row?.jobType || ""),
+        cleanOracleText(row?.ContractType || row?.contractType || ""),
+        cleanOracleText(row?.WorkplaceType || row?.workplaceType || "")
+      ].filter(Boolean);
+      const uniqueEmploymentTypes = Array.from(
+        new Set(employmentTypeValues.map((value) => value.toLowerCase()))
+      ).map((lowered) => employmentTypeValues.find((value) => value.toLowerCase() === lowered) || lowered);
+
+      postings.push({
+        company_name: effectiveCompanyName,
+        position_name: cleanOracleText(row?.Title || row?.title || "") || "Untitled Position",
+        job_posting_url: postingUrl,
+        posting_date: postingDate,
+        location: extractOracleLocationFromRequisition(row),
+        department: uniqueDepartments.length > 0 ? uniqueDepartments.join(" / ") : null,
+        employment_type: uniqueEmploymentTypes.length > 0 ? uniqueEmploymentTypes.join(" / ") : null
+      });
+
+      seenUrls.add(postingUrl);
+      if (requisitionId) seenIds.add(requisitionId);
+    }
+  }
+
+  return postings;
+}
+
 function parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson) {
   const jobs = Array.isArray(responseJson?.jobs) ? responseJson.jobs : [];
   const postings = [];
@@ -3338,6 +5012,527 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
       location,
       department: String(item?.departmentLabel || item?.department || "").trim() || null,
       employment_type: String(item?.employmentStatusLabel || item?.employmentStatus || "").trim() || null
+    });
+    seenUrls.add(jobUrl);
+  }
+
+  return postings;
+}
+
+function extractAdpMyjobsLocationParts(locationItem) {
+  const item = locationItem && typeof locationItem === "object" ? locationItem : {};
+  const nameCode = item?.nameCode && typeof item.nameCode === "object" ? item.nameCode : {};
+  const locationName = String(nameCode?.longName || "").trim();
+  const address = item?.address && typeof item.address === "object" ? item.address : {};
+  const city = String(address?.cityName || "").trim();
+  const stateData =
+    address?.countrySubdivisionLevel1 && typeof address.countrySubdivisionLevel1 === "object"
+      ? address.countrySubdivisionLevel1
+      : {};
+  const state = String(stateData?.codeValue || stateData?.longName || "").trim();
+  const countryData = address?.country && typeof address.country === "object" ? address.country : {};
+  const country = String(countryData?.longName || countryData?.codeValue || "").trim();
+  const addressValue = [city, state, country].filter(Boolean).join(", ");
+  return {
+    locationName,
+    addressValue
+  };
+}
+
+function formatAdpMyjobsLocation(job) {
+  const item = job && typeof job === "object" ? job : {};
+  const values = [];
+  const seen = new Set();
+
+  for (const field of ["requisitionLocations", "workLocations", "postingLocations"]) {
+    const locations = Array.isArray(item?.[field]) ? item[field] : [];
+    for (const locationItem of locations) {
+      const { locationName, addressValue } = extractAdpMyjobsLocationParts(locationItem);
+      const label = locationName && addressValue ? `${locationName} - ${addressValue}` : locationName || addressValue;
+      const normalized = String(label || "").trim().toLowerCase();
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      values.push(String(label || "").trim());
+    }
+  }
+
+  return values.length > 0 ? values.join(" / ") : null;
+}
+
+function parseAdpMyjobsPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const jobs = Array.isArray(responseJson?.jobRequisitions) ? responseJson.jobRequisitions : [];
+  const postings = [];
+  const seenUrls = new Set();
+  const seenIds = new Set();
+
+  for (const row of jobs) {
+    const item = row && typeof row === "object" ? row : {};
+    const reqId = String(item?.reqId || "").trim();
+    if (reqId && seenIds.has(reqId)) continue;
+
+    const itemUrlRaw = String(item?.url || item?.jobUrl || "").trim();
+    const jobUrl = itemUrlRaw || (reqId ? `https://myjobs.adp.com/${config.companyName}/cx/job-details?reqId=${encodeURIComponent(reqId)}` : "");
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    const postingDate = String(item?.postingDate || "").trim() || null;
+    const departmentValues = Array.isArray(item?.organizationalUnits)
+      ? item.organizationalUnits
+          .map((unit) => String(unit?.nameCode?.longName || unit?.name || "").trim())
+          .filter(Boolean)
+      : [];
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: String(item?.publishedJobTitle || item?.jobTitle || "").trim() || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: postingDate,
+      location: formatAdpMyjobsLocation(item),
+      department: departmentValues.length > 0 ? departmentValues.join(" / ") : null,
+      employment_type: String(item?.type || "").trim() || null
+    });
+    seenUrls.add(jobUrl);
+    if (reqId) {
+      seenIds.add(reqId);
+    }
+  }
+
+  return postings;
+}
+
+function cleanAdpWorkforcenowText(value) {
+  let text = String(value || "");
+  try {
+    text = decodeURIComponent(text);
+  } catch {
+    // Keep undecoded value when malformed.
+  }
+  return decodeHtmlEntities(text.replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function slugToAdpWorkforcenowCompanyName(slug) {
+  const cleaned = String(slug || "").trim().replace(/^[-_]+|[-_]+$/g, "");
+  if (!cleaned) return "";
+  const normalized = cleaned
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .trim();
+  if (!normalized) return "";
+  return normalized
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => (part === part.toUpperCase() && part.length <= 5 ? part : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()))
+    .join(" ");
+}
+
+function extractAdpWorkforcenowCompanyName(contentLinksJson) {
+  const contentLinks = Array.isArray(contentLinksJson?.contentLinks) ? contentLinksJson.contentLinks : [];
+
+  const parseWelcomeName = (rawText) => {
+    const source = cleanAdpWorkforcenowText(rawText);
+    const patterns = [
+      /(?:career\s+center|career\s+portal|careers?)\s+for\s+(.{2,120}?)(?:[,.]|$)/i,
+      /\bfor\s+(.{2,120}?)\s+(?:career\s+center|career\s+portal|careers?\b)/i,
+      /welcome\s+to\s+(?:the\s+)?(.{2,120}?)\s+(?:career\s+center|career\s+portal|careers?\b|job\s+portal)/i,
+      /choose\s+a\s+career\s+at\s+(.{2,120}?)(?:[,.]|$)/i
+    ];
+    for (const pattern of patterns) {
+      const match = source.match(pattern);
+      if (!match?.[1]) continue;
+      let candidate = cleanAdpWorkforcenowText(match[1]);
+      candidate = candidate
+        .replace(/\b(career\s+center|career\s+portal|careers?\s+portal)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^[-:|,\s]+|[-:|,\s]+$/g, "");
+      candidate = candidate.split(/\b(choose\s+a\s+career\s+at|welcome\s+to|if\s+you\s+are|where\s+|our\s+|we\s+)/i)[0]?.trim() || "";
+      if (candidate && !["our", "you", "we"].includes(candidate.toLowerCase())) {
+        return candidate;
+      }
+    }
+    return "";
+  };
+
+  for (const item of contentLinks) {
+    const code = String(item?.linkTypeCode?.codeValue || "").trim();
+    if (code !== "WELCOME-TXT") continue;
+    const parsed = parseWelcomeName(String(item?.linkTypeCode?.longName || ""));
+    if (parsed) return parsed;
+  }
+
+  for (const item of contentLinks) {
+    const code = String(item?.linkTypeCode?.codeValue || "").trim();
+    if (code !== "LINKS-BRND") continue;
+    const links = Array.isArray(item?.contentBody?.links) ? item.contentBody.links : [];
+    for (const link of links) {
+      const title = cleanAdpWorkforcenowText(link?.title || "");
+      const href = cleanAdpWorkforcenowText(link?.href || "");
+      if (title && !["careers", "career", "home", "jobs", "apply"].includes(title.toLowerCase())) {
+        return title;
+      }
+      if (href && !href.includes("workforcenow.adp.com") && !href.includes("jobs/apply/posting.html")) {
+        const hrefWithScheme = href.includes("://") ? href : `https://${href}`;
+        const parsed = parseUrl(hrefWithScheme);
+        const host = String(parsed?.hostname || "").replace(/^www\./i, "").toLowerCase();
+        if (host) {
+          const derived = slugToAdpWorkforcenowCompanyName(host.split(".")[0] || "");
+          if (derived) return derived;
+        }
+      }
+    }
+  }
+
+  for (const item of contentLinks) {
+    const code = String(item?.linkTypeCode?.codeValue || "").trim();
+    if (code !== "IMG_LOGO") continue;
+    const body = item?.contentBody && typeof item.contentBody === "object" ? item.contentBody : {};
+    const links = Array.isArray(body?.links) ? body.links : [];
+    let logoTitle = "";
+    for (const link of links) {
+      logoTitle = cleanAdpWorkforcenowText(link?.title || "");
+      if (logoTitle) break;
+    }
+    if (!logoTitle) {
+      logoTitle = cleanAdpWorkforcenowText(body?.contentTitle || "");
+    }
+    logoTitle = logoTitle
+      .replace(/\.(png|jpg|jpeg|gif|svg|webp)$/i, "")
+      .replace(/\b(logo|careers?|career|center|portal|hris|adp|v\d+)\b/gi, " ")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^[-:|,\s]+|[-:|,\s]+$/g, "");
+    if (logoTitle.length >= 3) return logoTitle;
+  }
+
+  for (const item of contentLinks) {
+    const links = Array.isArray(item?.contentBody?.links) ? item.contentBody.links : [];
+    for (const link of links) {
+      const href = cleanAdpWorkforcenowText(link?.href || "");
+      if (!href.includes("jobs/apply/posting.html")) continue;
+      const parsed = parseUrl(href);
+      const clientSlug = String(parsed?.searchParams?.get("client") || "").trim();
+      const derived = slugToAdpWorkforcenowCompanyName(clientSlug);
+      if (derived) return derived;
+    }
+  }
+
+  return "";
+}
+
+function extractAdpWorkforcenowLocation(job) {
+  const item = job && typeof job === "object" ? job : {};
+  const values = [];
+  const seen = new Set();
+  const locations = Array.isArray(item?.requisitionLocations) ? item.requisitionLocations : [];
+  for (const locationItem of locations) {
+    const location = locationItem && typeof locationItem === "object" ? locationItem : {};
+    const nameCode = location?.nameCode && typeof location.nameCode === "object" ? location.nameCode : {};
+    const label = String(nameCode?.shortName || nameCode?.longName || "").trim();
+    const address = location?.address && typeof location.address === "object" ? location.address : {};
+    const city = String(address?.cityName || "").trim();
+    const stateData =
+      address?.countrySubdivisionLevel1 && typeof address.countrySubdivisionLevel1 === "object"
+        ? address.countrySubdivisionLevel1
+        : {};
+    const state = String(stateData?.codeValue || stateData?.longName || "").trim();
+    const countryData = address?.country && typeof address.country === "object" ? address.country : {};
+    const country = String(countryData?.codeValue || countryData?.longName || "").trim();
+    const addressLabel = [city, state, country].filter(Boolean).join(", ");
+    const combined = [label, addressLabel].filter(Boolean).join(" - ").trim();
+    const normalized = combined.toLowerCase();
+    if (!combined || seen.has(normalized)) continue;
+    seen.add(normalized);
+    values.push(combined);
+  }
+  return values.length > 0 ? values.join(" / ") : null;
+}
+
+function buildAdpWorkforcenowPostingUrl(item, config) {
+  const job = item && typeof item === "object" ? item : {};
+  const links = Array.isArray(job?.links) ? job.links : [];
+  for (const link of links) {
+    const href = String(link?.href || "").trim();
+    if (!href) continue;
+    const absolute = parseUrl(href) ? href : new URL(href, config.boardUrl).toString();
+    if (absolute) return absolute;
+  }
+  const itemId = String(job?.itemID || "").trim();
+  if (itemId) {
+    return `${config.boardUrl}&jobId=${encodeURIComponent(itemId)}`;
+  }
+  return config.boardUrl;
+}
+
+function parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const jobs = Array.isArray(responseJson?.jobRequisitions) ? responseJson.jobRequisitions : [];
+  const postings = [];
+  const seenUrls = new Set();
+  const seenIds = new Set();
+
+  for (const row of jobs) {
+    const item = row && typeof row === "object" ? row : {};
+    const itemId = String(item?.itemID || "").trim();
+    if (itemId && seenIds.has(itemId)) continue;
+
+    const jobUrl = buildAdpWorkforcenowPostingUrl(item, config);
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: String(item?.requisitionTitle || "").trim() || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: String(item?.postDate || "").trim() || null,
+      location: extractAdpWorkforcenowLocation(item),
+      employment_type: String(item?.workLevelCode?.shortName || "").trim() || null,
+      department: null
+    });
+    seenUrls.add(jobUrl);
+    if (itemId) seenIds.add(itemId);
+  }
+
+  return postings;
+}
+
+function cleanBrassringText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractBrassringHiddenInput(pageHtml, fieldName) {
+  const source = String(pageHtml || "");
+  const match = source.match(
+    new RegExp(`name=["']${String(fieldName || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]*value=["']([^"']*)["']`, "i")
+  );
+  return cleanBrassringText(match?.[1] || "");
+}
+
+function extractBrassringCompanyName(pageHtml) {
+  const source = decodeHtmlEntities(String(pageHtml || ""));
+  const partnerNameMatch = source.match(/["']PartnerName["']\s*:\s*["']([^"']+)["']/i);
+  if (partnerNameMatch?.[1]) return cleanBrassringText(partnerNameMatch[1]) || "Unknown Company";
+
+  const titleMatch = source.match(/Search\s+Jobs\s+at\s*\|\s*([^<\r\n]+)/i);
+  if (titleMatch?.[1]) return cleanBrassringText(titleMatch[1]) || "Unknown Company";
+
+  return "Unknown Company";
+}
+
+function extractBrassringQuestionValue(item, questionName) {
+  const questions = Array.isArray(item?.Questions) ? item.Questions : [];
+  const normalizedQuestionName = String(questionName || "").trim().toLowerCase();
+  for (const question of questions) {
+    if (!question || typeof question !== "object") continue;
+    const currentName = String(question?.QuestionName || "").trim().toLowerCase();
+    if (currentName !== normalizedQuestionName) continue;
+    return cleanBrassringText(question?.Value || "");
+  }
+  return "";
+}
+
+function extractBrassringLocation(item) {
+  const directLocation = extractBrassringQuestionValue(item, "location");
+  if (directLocation) return directLocation;
+
+  const city = extractBrassringQuestionValue(item, "city");
+  const state = extractBrassringQuestionValue(item, "state");
+  const country = extractBrassringQuestionValue(item, "country");
+  const combinedLocation = [city, state, country].filter(Boolean).join(", ");
+  if (combinedLocation) return combinedLocation;
+
+  const latitude = extractBrassringQuestionValue(item, "latitude");
+  const longitude = extractBrassringQuestionValue(item, "longitude");
+  if (latitude && longitude) return `${latitude},${longitude}`;
+  return null;
+}
+
+function buildBrassringPostingUrl(config, item) {
+  const itemUrl = cleanBrassringText(item?.Link || "");
+  if (itemUrl) return itemUrl;
+
+  const reqId = extractBrassringQuestionValue(item, "reqid");
+  if (!reqId) return config.boardUrl;
+  return (
+    "https://sjobs.brassring.com/TGnewUI/Search/home/HomeWithPreLoad?" +
+    `partnerid=${encodeURIComponent(config.partnerId)}&siteid=${encodeURIComponent(config.siteId)}` +
+    `&PageType=JobDetails&jobid=${encodeURIComponent(reqId)}`
+  );
+}
+
+function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const jobs = Array.isArray(responseJson?.Jobs?.Job) ? responseJson.Jobs.Job : [];
+  const postings = [];
+  const seenUrls = new Set();
+  const seenIds = new Set();
+
+  for (const row of jobs) {
+    const item = row && typeof row === "object" ? row : {};
+    const reqId = extractBrassringQuestionValue(item, "reqid");
+    if (reqId && seenIds.has(reqId)) continue;
+
+    const jobUrl = buildBrassringPostingUrl(config, item);
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: extractBrassringQuestionValue(item, "jobtitle") || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: extractBrassringQuestionValue(item, "lastupdated") || null,
+      location: extractBrassringLocation(item),
+      department: extractBrassringQuestionValue(item, "department") || null
+    });
+    seenUrls.add(jobUrl);
+    if (reqId) seenIds.add(reqId);
+  }
+
+  return postings;
+}
+
+function formatPinpointHqLocation(locationValue) {
+  const location = locationValue && typeof locationValue === "object" ? locationValue : {};
+  const city = String(location?.city || "").trim();
+  const province = String(location?.province || "").trim();
+  const countryOrName = String(location?.name || "").trim();
+  const parts = [city, province, countryOrName].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function parsePinpointHqPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const data = Array.isArray(responseJson?.data) ? responseJson.data : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const row of data) {
+    const item = row && typeof row === "object" ? row : {};
+    const itemUrlRaw = String(item?.url || "").trim();
+    const itemPathRaw = String(item?.path || "").trim();
+    const jobUrl = itemUrlRaw
+      ? itemUrlRaw
+      : itemPathRaw
+        ? new URL(itemPathRaw, `${config.baseOrigin || config.boardUrl || ""}/`).toString()
+        : "";
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    const postingDate =
+      String(item?.posted_at || item?.published_at || item?.created_at || item?.updated_at || item?.deadline_at || "").trim() ||
+      null;
+    const department = String(item?.job?.department?.name || "").trim() || null;
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: String(item?.title || "").trim() || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: postingDate,
+      location: formatPinpointHqLocation(item?.location),
+      department,
+      employment_type: String(item?.employment_type_text || item?.employment_type || "").trim() || null,
+      workplace_type: String(item?.workplace_type_text || item?.workplace_type || "").trim() || null
+    });
+    seenUrls.add(jobUrl);
+  }
+
+  return postings;
+}
+
+function formatRecruitCrmLocation(item) {
+  const city = String(item?.city || "").trim();
+  const locality = String(item?.locality || "").trim();
+  const postalCode = String(item?.postalcode || "").trim();
+  const parts = [city, locality, postalCode].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const data = responseJson?.data;
+  const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const row of jobs) {
+    const item = row && typeof row === "object" ? row : {};
+    const slug = String(item?.slug || "").trim();
+    const itemUrlRaw = String(item?.url || "").trim();
+    const itemUrl = itemUrlRaw || (slug ? `${config.publicJobsUrl}/${slug}` : "");
+    if (!itemUrl || seenUrls.has(itemUrl)) continue;
+
+    const postingDate =
+      String(
+        item?.posted_at ||
+          item?.published_at ||
+          item?.created_at ||
+          item?.updated_at ||
+          item?.createdon ||
+          item?.updatedon ||
+          ""
+      ).trim() || null;
+    const isRemote = String(item?.remote || "").trim() === "1";
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: String(item?.name || "").trim() || "Untitled Position",
+      job_posting_url: itemUrl,
+      posting_date: postingDate,
+      location: isRemote ? "Remote" : formatRecruitCrmLocation(item),
+      employment_type: String(item?.employment_type || "").trim() || null,
+      department: String(item?.department || "").trim() || null
+    });
+    seenUrls.add(itemUrl);
+  }
+
+  return postings;
+}
+
+function formatRipplingLocation(locationsValue) {
+  const locations = Array.isArray(locationsValue) ? locationsValue : [];
+  const values = [];
+  const seen = new Set();
+
+  for (const location of locations) {
+    const item = location && typeof location === "object" ? location : {};
+    const name = String(item?.name || "").trim();
+    const city = String(item?.city || "").trim();
+    const state = String(item?.state || item?.stateCode || "").trim();
+    const country = String(item?.country || "").trim();
+    const fallback = [city, state, country].filter(Boolean).join(", ");
+    const label = name || fallback;
+    const normalized = label.toLowerCase();
+    if (!label || seen.has(normalized)) continue;
+    seen.add(normalized);
+    values.push(label);
+  }
+
+  return values.length > 0 ? values.join(" / ") : null;
+}
+
+function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const items = Array.isArray(responseJson?.items) ? responseJson.items : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const row of items) {
+    const item = row && typeof row === "object" ? row : {};
+    const postingId = String(item?.id || "").trim();
+    const itemUrlRaw = String(item?.url || "").trim();
+    const jobUrl = itemUrlRaw || (postingId ? `${config.boardUrl}/${postingId}` : "");
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    const postingDate =
+      String(item?.postedAt || item?.createdAt || item?.updatedAt || item?.publishedAt || "").trim() || null;
+    const department = String(item?.department?.name || "").trim() || null;
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: String(item?.name || "").trim() || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: postingDate,
+      location: formatRipplingLocation(item?.locations),
+      department,
+      employment_type: String(item?.employmentType || item?.employment_type || "").trim() || null,
+      workplace_type: String(item?.workplaceType || item?.workplace_type || "").trim() || null,
+      language: String(item?.language || "").trim() || null
     });
     seenUrls.add(jobUrl);
   }
@@ -3468,6 +5663,62 @@ function parseSapHrCloudPostingsFromApi(companyNameForPostings, config, response
       company_name: companyNameForPostings,
       position_name:
         cleanSapHrCloudText(item?.unifiedStandardTitle || item?.title || item?.urlTitle || "") || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date: postingDate,
+      location,
+      department
+    });
+    seenUrls.add(jobUrl);
+  }
+
+  return postings;
+}
+
+function parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl = "") {
+  const sourceHtml = String(pageHtml || "");
+  if (!sourceHtml) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  const baseForUrls = String(finalUrl || config?.baseOrigin || "").trim() || String(config?.baseOrigin || "").trim();
+  if (!baseForUrls) return [];
+
+  const titleLinkPattern = /<a[^>]*class="[^"]*\bjobTitle-link\b[^"]*"[^>]*href="(?<href>[^"]+)"[^>]*>(?<title>[\s\S]*?)<\/a>/gi;
+
+  for (const match of sourceHtml.matchAll(titleLinkPattern)) {
+    const href = cleanSapHrCloudText(match?.groups?.href || "");
+    const title = cleanSapHrCloudText(match?.groups?.title || "") || "Untitled Position";
+    if (!href) continue;
+
+    let jobUrl = "";
+    try {
+      jobUrl = new URL(href, baseForUrls).toString();
+    } catch {
+      jobUrl = "";
+    }
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    const startIndex = Math.max(0, Number(match.index || 0) - 600);
+    const endIndex = Math.min(sourceHtml.length, Number(match.index || 0) + String(match[0] || "").length + 1500);
+    const context = sourceHtml.slice(startIndex, endIndex);
+
+    const locationMatch =
+      context.match(
+        /<(?:span|div)[^>]*class="[^"]*\bjobLocation\b[^"]*"[^>]*>(?<value>[\s\S]*?)<\/(?:span|div)>/i
+      ) ||
+      context.match(/<div[^>]*id="job-\d+-desktop-section-city-value"[^>]*>(?<value>[\s\S]*?)<\/div>/i);
+    const dateMatch = context.match(/<span[^>]*class="[^"]*\bjobDate\b[^"]*"[^>]*>(?<value>[\s\S]*?)<\/span>/i);
+    const departmentMatch = context.match(
+      /<span[^>]*class="[^"]*\bjobDepartment\b[^"]*"[^>]*>(?<value>[\s\S]*?)<\/span>/i
+    );
+
+    const location = cleanSapHrCloudText(locationMatch?.groups?.value || "") || null;
+    const postingDate = cleanSapHrCloudText(dateMatch?.groups?.value || "") || null;
+    const department = cleanSapHrCloudText(departmentMatch?.groups?.value || "") || null;
+
+    postings.push({
+      company_name: companyNameForPostings,
+      position_name: title,
       job_posting_url: jobUrl,
       posting_date: postingDate,
       location,
@@ -5323,6 +7574,329 @@ async function fetchManatalCareersPage(urlString) {
   };
 }
 
+async function fetchCareerspageBoardPage(urlString) {
+  const res = await fetchWithAtsRateLimit("careerspage", CAREERSPAGE_RATE_LIMIT_WAIT_MS, urlString, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`CareersPage request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || urlString || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "careerspage.io" && finalHost !== "www.careerspage.io") {
+    throw new Error(`CareersPage URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return { pageHtml: await res.text(), finalUrl };
+}
+
+async function fetchOracleJobRequisitionsPage(config, offset = 0, limit = 25) {
+  const safeOffset = Number.isFinite(Number(offset)) && Number(offset) >= 0 ? Math.floor(Number(offset)) : 0;
+  const safeLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.floor(Number(limit)) : 25;
+  const finder = String(config?.finder || "").replace(/limit=\d+/i, `limit=${safeLimit}`);
+  const url = new URL(String(config?.apiUrl || "").trim());
+  url.searchParams.set("onlyData", "true");
+  url.searchParams.set("expand", ORACLE_EXPAND_VALUE);
+  if (finder) {
+    url.searchParams.set("finder", finder);
+  }
+  url.searchParams.set("offset", String(safeOffset));
+  url.searchParams.set("limit", String(safeLimit));
+
+  const res = await fetchWithAtsRateLimit("oracle", ORACLE_RATE_LIMIT_WAIT_MS, url.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Oracle job requisitions request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || url.toString()).trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (!finalHost.endsWith(".oraclecloud.com")) {
+    throw new Error(`Oracle API URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return res.json();
+}
+
+async function fetchPaylocityBoardPage(config) {
+  const res = await fetchWithAtsRateLimit("paylocity", PAYLOCITY_RATE_LIMIT_WAIT_MS, config.boardUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Paylocity board request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.boardUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "recruiting.paylocity.com" && finalHost !== "www.recruiting.paylocity.com") {
+    throw new Error(`Paylocity URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return {
+    pageHtml: await res.text(),
+    finalUrl
+  };
+}
+
+async function fetchEightfoldCareersPage(config) {
+  const res = await fetchWithAtsRateLimit("eightfold", EIGHTFOLD_RATE_LIMIT_WAIT_MS, config.boardUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Eightfold careers page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.boardUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (!(finalHost.endsWith(".eightfold.ai") || finalHost === "eightfold.ai" || finalHost === "www.eightfold.ai")) {
+    throw new Error(`Eightfold URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return {
+    pageHtml: await res.text(),
+    finalUrl
+  };
+}
+
+async function fetchEightfoldJobsApi(config, domainValue) {
+  const apiUrl = buildEightfoldApiUrl(config, domainValue);
+  if (!apiUrl) {
+    throw new Error("Eightfold API URL could not be built from careers page metadata");
+  }
+
+  const res = await fetchWithAtsRateLimit("eightfold", EIGHTFOLD_RATE_LIMIT_WAIT_MS, apiUrl, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Eightfold jobs API request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || apiUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (!(finalHost.endsWith(".eightfold.ai") || finalHost === "eightfold.ai" || finalHost === "www.eightfold.ai")) {
+    throw new Error(`Eightfold API URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  const bodyText = await res.text();
+  let responseJson = {};
+  try {
+    responseJson = JSON.parse(bodyText);
+  } catch {
+    throw new Error(`Eightfold jobs API response was not JSON: ${bodyText.slice(0, 180)}`);
+  }
+
+  return {
+    responseJson,
+    finalUrl
+  };
+}
+
+async function fetchPageupBoardPage(config) {
+  const res = await fetchWithAtsRateLimit("pageup", PAGEUP_RATE_LIMIT_WAIT_MS, config.boardUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`PageUp board request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.boardUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
+    throw new Error(`PageUp URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return {
+    pageHtml: await res.text(),
+    finalUrl
+  };
+}
+
+async function fetchPageupSearchResults(config) {
+  const res = await fetchWithAtsRateLimit("pageup", PAGEUP_RATE_LIMIT_WAIT_MS, config.searchUrl, {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      Referer: String(config?.boardUrl || ""),
+      "X-Requested-With": "XMLHttpRequest",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`PageUp search request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.searchUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
+    throw new Error(`PageUp search URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  const bodyText = await res.text();
+  let responseJson = {};
+  try {
+    responseJson = JSON.parse(bodyText);
+  } catch {
+    throw new Error(`PageUp search response was not JSON: ${bodyText.slice(0, 180)}`);
+  }
+
+  return {
+    responseJson,
+    finalUrl
+  };
+}
+
+async function fetchPageupDetailsPage(jobPostingUrl) {
+  const res = await fetchWithAtsRateLimit("pageup", PAGEUP_RATE_LIMIT_WAIT_MS, jobPostingUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`PageUp details request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || jobPostingUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
+    throw new Error(`PageUp details URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return res.text();
+}
+
+async function fetchHirebridgeJobsPage(config) {
+  const res = await fetchWithAtsRateLimit("hirebridge", HIREBRIDGE_RATE_LIMIT_WAIT_MS, config.boardUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Hirebridge page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.boardUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "recruit.hirebridge.com" && finalHost !== "www.recruit.hirebridge.com") {
+    throw new Error(`Hirebridge URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return { pageHtml: await res.text(), finalUrl };
+}
+
+async function fetchHirebridgeDetailsPage(config, jobPostingUrl) {
+  const detailsUrl = buildHirebridgeDetailsUrl(config, jobPostingUrl);
+  if (!detailsUrl) return "";
+
+  const res = await fetchWithAtsRateLimit("hirebridge", HIREBRIDGE_RATE_LIMIT_WAIT_MS, detailsUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Hirebridge details request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || detailsUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "recruit.hirebridge.com" && finalHost !== "www.recruit.hirebridge.com") {
+    throw new Error(`Hirebridge details URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return res.text();
+}
+
 async function fetchManatalJobsApiPage(config, page = 1, pageSize = 50) {
   const jobsApiUrl = String(config?.jobsApiUrl || "").trim();
   if (!jobsApiUrl) {
@@ -5378,6 +7952,323 @@ async function fetchTeamtailorJobsPage(config) {
   return { pageHtml: await res.text(), finalUrl };
 }
 
+async function fetchFreshteamJobsPage(config) {
+  const res = await fetchWithAtsRateLimit("freshteam", FRESHTEAM_RATE_LIMIT_WAIT_MS, config.jobsUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Freshteam page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.jobsUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (!finalHost.endsWith(".freshteam.com")) {
+    throw new Error(`Freshteam URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return { pageHtml: await res.text(), finalUrl };
+}
+
+async function fetchSagehrJobsPage(config) {
+  const headers = {
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  };
+
+  const res = await fetchWithAtsRateLimit("sagehr", SAGEHR_RATE_LIMIT_WAIT_MS, config.boardUrl, {
+    method: "GET",
+    headers
+  });
+
+  let statusCode = Number(res.status || 0);
+  let finalUrl = String(res.url || config.boardUrl || "").trim();
+  let pageHtml = await res.text();
+
+  if (statusCode !== 200 || !pageHtml) {
+    try {
+      const { stdout } = await execFileAsync("curl", [
+        "-L",
+        "-sS",
+        "--max-time",
+        "45",
+        "-A",
+        headers["User-Agent"],
+        "-H",
+        `Accept: ${headers.Accept}`,
+        "-H",
+        `Accept-Language: ${headers["Accept-Language"]}`,
+        "-w",
+        "\n__STATUS__:%{http_code}\n__EFFECTIVE_URL__:%{url_effective}\n",
+        config.boardUrl
+      ]);
+      const output = String(stdout || "");
+      const statusMatch = output.match(/__STATUS__:(\d{3})/);
+      const urlMatch = output.match(/__EFFECTIVE_URL__:(.+)/);
+      const curlStatus = Number(statusMatch?.[1] || 0);
+      const curlUrl = String(urlMatch?.[1] || "").trim();
+      const body = output.replace(/\n__STATUS__:\d{3}\n__EFFECTIVE_URL__:.*\s*$/s, "");
+      if (curlStatus > 0) {
+        statusCode = curlStatus;
+        finalUrl = curlUrl || config.boardUrl;
+        pageHtml = body;
+      }
+    } catch {
+      // Keep fetch result when curl fallback is unavailable.
+    }
+  }
+
+  if (statusCode !== 200 && statusCode !== 403) {
+    throw new Error(`SageHR page request failed (${statusCode})`);
+  }
+
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "talent.sage.hr" && finalHost !== "www.talent.sage.hr") {
+    throw new Error(`SageHR URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  if (!String(pageHtml || "").trim()) {
+    throw new Error(`SageHR page response was empty (${statusCode})`);
+  }
+
+  const loweredPageHtml = String(pageHtml || "").toLowerCase();
+  const hasExpectedLayout =
+    loweredPageHtml.includes("title-wrap") ||
+    loweredPageHtml.includes("other-jobs");
+  if (statusCode === 403 && !hasExpectedLayout) {
+    throw new Error("SageHR page request failed (403)");
+  }
+
+  return { pageHtml, finalUrl };
+}
+
+async function fetchPeopleforceJobsPage(config) {
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache"
+  };
+
+  const res = await fetch(config.jobsUrl, {
+    method: "GET",
+    headers
+  });
+
+  let statusCode = Number(res.status || 0);
+  let finalUrl = String(res.url || config.jobsUrl || "").trim();
+  let pageHtml = statusCode === 200 ? await res.text() : "";
+
+  if (statusCode === 429) {
+    try {
+      const { stdout } = await execFileAsync("curl", [
+        "-L",
+        "-sS",
+        "--max-time",
+        "45",
+        "-A",
+        headers["User-Agent"],
+        "-H",
+        `Accept: ${headers.Accept}`,
+        "-H",
+        `Accept-Language: ${headers["Accept-Language"]}`,
+        "-w",
+        "\n__STATUS__:%{http_code}\n__EFFECTIVE_URL__:%{url_effective}\n",
+        config.jobsUrl
+      ]);
+      const output = String(stdout || "");
+      const statusMatch = output.match(/__STATUS__:(\d{3})/);
+      const urlMatch = output.match(/__EFFECTIVE_URL__:(.+)/);
+      const curlStatus = Number(statusMatch?.[1] || 0);
+      const curlUrl = String(urlMatch?.[1] || "").trim();
+      const body = output.replace(/\n__STATUS__:\d{3}\n__EFFECTIVE_URL__:.*\s*$/s, "").trim();
+      if (curlStatus > 0) {
+        statusCode = curlStatus;
+        finalUrl = curlUrl || config.jobsUrl;
+        pageHtml = curlStatus === 200 ? body : "";
+      }
+    } catch {
+      // Keep original 429 result when curl fallback is unavailable.
+    }
+  }
+
+  if (statusCode !== 200) {
+    throw new Error(`Peopleforce page request failed (${statusCode})`);
+  }
+
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (!finalHost.endsWith(".peopleforce.io") || finalHost === "peopleforce.io" || finalHost === "www.peopleforce.io") {
+    throw new Error(`Peopleforce URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  if (/\bclosed career site\b/i.test(pageHtml)) {
+    return { pageHtml: "", finalUrl };
+  }
+
+  return { pageHtml, finalUrl };
+}
+
+async function fetchSimplicantJobsPage(config) {
+  const res = await fetchWithAtsRateLimit("simplicant", SIMPLICANT_RATE_LIMIT_WAIT_MS, config.jobsUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Simplicant page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.jobsUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (
+    !finalHost.endsWith(".simplicant.com") ||
+    ["simplicant.com", "www.simplicant.com", "assets.simplicant.com", "app.simplicant.com", "jobs.simplicant.com"].includes(
+      finalHost
+    )
+  ) {
+    throw new Error(`Simplicant URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return { pageHtml: await res.text(), finalUrl };
+}
+
+async function fetchLoxoJobsPage(config) {
+  const headers = {
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  };
+
+  const doRequest = async () =>
+    fetch(config.boardUrl, {
+      method: "GET",
+      headers
+    });
+
+  let res = await doRequest();
+  if (Number(res.status || 0) === 429) {
+    await sleep(LOXO_RATE_LIMIT_WAIT_MS);
+    res = await doRequest();
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Loxo page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || config.boardUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "app.loxo.co" && finalHost !== "www.app.loxo.co") {
+    throw new Error(`Loxo URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return { pageHtml: await res.text(), finalUrl };
+}
+
+async function fetchPinpointHqJobBoard(config) {
+  const timestamp = Date.now().toString();
+  const queryGlue = String(config.apiUrl || "").includes("?") ? "&" : "?";
+  const requestUrl = `${config.apiUrl}${queryGlue}_=${encodeURIComponent(timestamp)}`;
+  const res = await fetchWithAtsRateLimit("pinpointhq", PINPOINTHQ_RATE_LIMIT_WAIT_MS, requestUrl, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`PinpointHQ API request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalUrl = String(res.url || requestUrl || "").trim();
+  const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
+  if (!finalHost.endsWith(".pinpointhq.com") || finalHost === "pinpointhq.com" || finalHost === "www.pinpointhq.com") {
+    throw new Error(`PinpointHQ URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return res.json();
+}
+
+async function fetchRecruitCrmJobsPage(config, limit = 100, offset = 0) {
+  const payload = {
+    limit,
+    offset,
+    search_data: "",
+    onlyJobs: true
+  };
+  const res = await fetchWithAtsRateLimit("recruitcrm", RECRUITCRM_RATE_LIMIT_WAIT_MS, config.apiUrl, {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": "application/json",
+      Origin: "https://recruitcrm.io",
+      Referer: config.publicJobsUrl,
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`RecruitCRM API request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  return res.json();
+}
+
+async function fetchRipplingJobsPage(config, page = 0, pageSize = 100) {
+  const res = await fetchWithAtsRateLimit("rippling", RIPPLING_RATE_LIMIT_WAIT_MS, config.apiUrl, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Rippling API request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  // Primary board API currently returns the first page without requiring params,
+  // but we still keep page/pageSize inputs for future compatibility.
+  const responseJson = await res.json();
+  if (page > 0 || pageSize !== 100) {
+    const pagedRes = await fetchWithAtsRateLimit(
+      "rippling",
+      RIPPLING_RATE_LIMIT_WAIT_MS,
+      `${config.apiUrl}?page=${encodeURIComponent(page)}&pageSize=${encodeURIComponent(pageSize)}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json, text/plain, */*"
+        }
+      }
+    );
+    if (!pagedRes.ok) {
+      return responseJson;
+    }
+    return pagedRes.json();
+  }
+
+  return responseJson;
+}
+
 async function fetchBambooHrJobBoard(config) {
   const res = await fetchWithAtsRateLimit("bamboohr", BAMBOOHR_RATE_LIMIT_WAIT_MS, config.apiUrl, {
     method: "GET",
@@ -5395,6 +8286,187 @@ async function fetchBambooHrJobBoard(config) {
   const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
   if (!finalHost.endsWith(".bamboohr.com") || finalHost === "bamboohr.com" || finalHost === "www.bamboohr.com") {
     throw new Error(`BambooHR URL redirected to unexpected host: ${finalUrl}`);
+  }
+
+  return res.json();
+}
+
+async function fetchAdpMyjobsCareerSite(config) {
+  const res = await fetchWithAtsRateLimit("adp_myjobs", ADP_MYJOBS_RATE_LIMIT_WAIT_MS, config.careerSiteUrl, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`ADP MyJobs career-site request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  return res.json();
+}
+
+async function fetchAdpWorkforcenowContentLinks(config) {
+  const url =
+    `${config.contentLinksBaseUrl}?cid=${encodeURIComponent(config.cid)}` +
+    `&timeStamp=${Date.now()}&ccId=${encodeURIComponent(config.ccId)}&locale=en_US&lang=en_US`;
+  const res = await fetchWithAtsRateLimit("adp_workforcenow", ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS, url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*"
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`ADP Workforce Now content-links request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+  return res.json();
+}
+
+async function fetchAdpWorkforcenowJobsPage(config) {
+  const res = await fetchWithAtsRateLimit(
+    "adp_workforcenow",
+    ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS,
+    config.jobRequisitionsUrl,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*"
+      }
+    }
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`ADP Workforce Now job-requisitions request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+  return res.json();
+}
+
+function extractCookieHeaderFromResponse(response) {
+  const setCookieValues =
+    typeof response?.headers?.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : String(response?.headers?.get("set-cookie") || "")
+          .split(/,(?=[^;]+=)/g)
+          .map((item) => item.trim())
+          .filter(Boolean);
+  const cookiePairs = [];
+  const seenNames = new Set();
+  for (const rawCookie of setCookieValues) {
+    const cookie = String(rawCookie || "").trim();
+    if (!cookie) continue;
+    const firstPart = cookie.split(";")[0]?.trim() || "";
+    if (!firstPart || !firstPart.includes("=")) continue;
+    const name = firstPart.split("=")[0]?.trim().toLowerCase();
+    if (!name || seenNames.has(name)) continue;
+    seenNames.add(name);
+    cookiePairs.push(firstPart);
+  }
+  return cookiePairs.join("; ");
+}
+
+async function fetchBrassringMatchedJobs(config) {
+  const boardRes = await fetchWithAtsRateLimit("brassring", BRASSRING_RATE_LIMIT_WAIT_MS, config.boardUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+  if (!boardRes.ok) {
+    const body = await boardRes.text();
+    throw new Error(`BrassRing board request failed (${boardRes.status}): ${body.slice(0, 180)}`);
+  }
+
+  const finalBoardUrl = String(boardRes.url || config.boardUrl || "").trim();
+  const finalHost = String(parseUrl(finalBoardUrl)?.hostname || "").toLowerCase();
+  if (finalHost !== "sjobs.brassring.com" && finalHost !== "www.sjobs.brassring.com") {
+    throw new Error(`BrassRing URL redirected to unexpected host: ${finalBoardUrl}`);
+  }
+
+  const pageHtml = await boardRes.text();
+  const requestVerificationToken = extractBrassringHiddenInput(pageHtml, "__RequestVerificationToken");
+  const encryptedSessionValue = extractBrassringHiddenInput(pageHtml, "CookieValue");
+  const rftHeaderValue = requestVerificationToken || extractBrassringHiddenInput(pageHtml, "hdRft");
+  const cookieHeader = extractCookieHeaderFromResponse(boardRes);
+  const companyName = extractBrassringCompanyName(pageHtml);
+
+  const payload = {
+    PartnerId: config.partnerId,
+    SiteId: config.siteId,
+    Keyword: "",
+    Location: "",
+    LocationCustomSolrFields: "Location",
+    FacetFilterFields: null,
+    TurnOffHttps: false,
+    Latitude: 0,
+    Longitude: 0,
+    PowerSearchOptions: { PowerSearchOption: [] },
+    encryptedsessionvalue: encryptedSessionValue
+  };
+
+  const headers = {
+    Accept: "application/json, text/javascript, */*; q=0.01",
+    "Content-Type": "application/json; charset=utf-8",
+    Origin: "https://sjobs.brassring.com",
+    Referer: config.boardUrl,
+    "X-Requested-With": "XMLHttpRequest",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  };
+  if (rftHeaderValue) headers.RFT = rftHeaderValue;
+  if (cookieHeader) headers.Cookie = cookieHeader;
+
+  const res = await fetchWithAtsRateLimit("brassring", BRASSRING_RATE_LIMIT_WAIT_MS, config.apiUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`BrassRing MatchedJobs request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const responseJson = await res.json();
+  return { responseJson, companyName };
+}
+
+async function fetchAdpMyjobsJobsPage(config, careerSiteJson, top = 100, skip = 0) {
+  const myJobsToken = String(careerSiteJson?.myJobsToken || "").trim();
+  const myadpUrl = String(careerSiteJson?.properties?.myadpUrl || "").trim().replace(/\/+$/, "");
+  if (!myJobsToken || !myadpUrl) {
+    return { count: 0, jobRequisitions: [] };
+  }
+
+  const params = new URLSearchParams({
+    $select:
+      "reqId,jobTitle,publishedJobTitle,type,jobDescription,jobQualifications,workLocations,workLevelCode,clientRequisitionID,postingDate,requisitionLocations,postingLocations,organizationalUnits",
+    $top: String(Math.max(1, Number(top || 100))),
+    $skip: String(Math.max(0, Number(skip || 0))),
+    $filter: "",
+    radius: "25",
+    tz: "America/Los_Angeles"
+  }).toString();
+  const apiUrl = `${myadpUrl}/myadp_prefix/mycareer/public/staffing/v1/job-requisitions/apply-custom-filters?${params}`;
+
+  const res = await fetchWithAtsRateLimit("adp_myjobs", ADP_MYJOBS_RATE_LIMIT_WAIT_MS, apiUrl, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      myjobstoken: myJobsToken,
+      rolecode: "manager",
+      Origin: "https://myjobs.adp.com",
+      Referer: config.boardUrl
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`ADP MyJobs jobs request failed (${res.status}): ${body.slice(0, 180)}`);
   }
 
   return res.json();
@@ -5598,6 +8670,27 @@ async function fetchSapHrCloudJobsPage(config, locale = "en_US", pageNumber = 0)
   }
 
   return res.json();
+}
+
+async function fetchSapHrCloudBoardPage(urlString) {
+  const res = await fetchWithAtsRateLimit("saphrcloud", SAPHRCLOUD_RATE_LIMIT_WAIT_MS, urlString, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`SAP HR Cloud page request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  return {
+    pageHtml: await res.text(),
+    finalUrl: String(res.url || urlString || "").trim()
+  };
 }
 
 function buildUltiProSearchPayload(top, skip) {
@@ -6123,6 +9216,146 @@ async function collectPostingsForBambooHrCompany(company) {
   return parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJson);
 }
 
+async function collectPostingsForAdpMyjobsCompany(company) {
+  const config = parseAdpMyjobsCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.companyNameLower;
+  const careerSiteJson = await fetchAdpMyjobsCareerSite(config);
+  const pageSize = 100;
+  const seenUrls = new Set();
+  const collected = [];
+
+  for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
+    const skip = page * pageSize;
+    const responseJson = await fetchAdpMyjobsJobsPage(config, careerSiteJson, pageSize, skip);
+    const batch = parseAdpMyjobsPostingsFromApi(companyNameForPostings, config, responseJson);
+
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      seenUrls.add(postingUrl);
+      collected.push(posting);
+    }
+
+    const totalCount = Number(responseJson?.count);
+    if (batch.length < pageSize) break;
+    if (Number.isFinite(totalCount) && totalCount >= 0 && skip + pageSize >= totalCount) break;
+  }
+
+  return collected;
+}
+
+async function collectPostingsForAdpWorkforcenowCompany(company) {
+  const config = parseAdpWorkforcenowCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const contentLinksJson = await fetchAdpWorkforcenowContentLinks(config);
+  const inferredCompanyName = extractAdpWorkforcenowCompanyName(contentLinksJson);
+  const companyNameForPostings = normalizedCompanyName || inferredCompanyName || config.ccId.toLowerCase();
+  const responseJson = await fetchAdpWorkforcenowJobsPage(config);
+  return parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson);
+}
+
+async function collectPostingsForPaylocityCompany(company) {
+  const config = parsePaylocityCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const { pageHtml, finalUrl } = await fetchPaylocityBoardPage(config);
+  const runtimeConfig = parsePaylocityCompany(finalUrl) || config;
+  const companyNameForPostings = normalizedCompanyName || `paylocity_${String(runtimeConfig.companyId || "").toLowerCase()}`;
+  const pageData = extractPaylocityPageDataJson(pageHtml);
+  const rawPostings = parsePaylocityPostingsFromPageData(companyNameForPostings, runtimeConfig, pageData);
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const posting of rawPostings) {
+    const postingUrl = String(posting?.job_posting_url || "").trim();
+    if (!postingUrl || seenUrls.has(postingUrl)) continue;
+    if (!String(posting?.posting_date || "").trim()) continue;
+    seenUrls.add(postingUrl);
+    collected.push(posting);
+  }
+
+  return collected;
+}
+
+async function collectPostingsForEightfoldCompany(company) {
+  const config = parseEightfoldCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const { pageHtml, finalUrl } = await fetchEightfoldCareersPage(config);
+  const runtimeConfig = parseEightfoldCompany(finalUrl) || config;
+  const domainValue = extractEightfoldDomainFromHtml(pageHtml);
+  if (!domainValue) {
+    throw new Error("Eightfold window._EF_GROUP_ID value not found in careers page");
+  }
+
+  const { responseJson } = await fetchEightfoldJobsApi(runtimeConfig, domainValue);
+  const fallbackCompanyName = `eightfold_${String(runtimeConfig.host || "").split(".")[0] || "board"}`;
+  const companyNameForPostings = normalizedCompanyName || fallbackCompanyName;
+  const rawPostings = parseEightfoldPostingsFromApi(companyNameForPostings, runtimeConfig, responseJson);
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const posting of rawPostings) {
+    const postingUrl = String(posting?.job_posting_url || "").trim();
+    if (!postingUrl || seenUrls.has(postingUrl)) continue;
+    if (!String(posting?.posting_date || "").trim()) continue;
+    seenUrls.add(postingUrl);
+    collected.push(posting);
+  }
+
+  return collected;
+}
+
+async function collectPostingsForOracleCompany(company) {
+  const config = parseOracleCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || "";
+  const pageSize = 25;
+  const seenUrls = new Set();
+  const collected = [];
+
+  for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
+    const offset = page * pageSize;
+    const responseJson = await fetchOracleJobRequisitionsPage(config, offset, pageSize);
+    const batch = parseOraclePostingsFromApi(companyNameForPostings, config, responseJson);
+
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      if (!String(posting?.posting_date || "").trim()) continue;
+      seenUrls.add(postingUrl);
+      collected.push(posting);
+    }
+
+    if (!Boolean(responseJson?.hasMore)) break;
+    if (batch.length === 0) break;
+  }
+
+  return collected;
+}
+
+async function collectPostingsForBrassringCompany(company) {
+  const config = parseBrassringCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const { responseJson, companyName } = await fetchBrassringMatchedJobs(config);
+  const companyNameForPostings =
+    normalizedCompanyName ||
+    String(companyName || "").trim() ||
+    `${String(config.partnerId || "").trim()}_${String(config.siteId || "").trim()}`;
+  return parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson);
+}
+
 async function collectPostingsForManatalCompany(company) {
   const config = parseManatalCompany(company.url_string);
   if (!config) return [];
@@ -6181,6 +9414,109 @@ async function collectPostingsForManatalCompany(company) {
   return collected;
 }
 
+async function collectPostingsForCareerspageCompany(company) {
+  const config = parseCareerspageCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
+  const { pageHtml } = await fetchCareerspageBoardPage(config.boardUrl);
+  return parseCareerspagePostingsFromHtml(companyNameForPostings, config, pageHtml);
+}
+
+async function collectPostingsForPageupCompany(company) {
+  const config = parsePageupCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const { pageHtml, finalUrl } = await fetchPageupBoardPage(config);
+  const finalParsed = parseUrl(finalUrl);
+  const baseOrigin = `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`;
+  const routeConfig = extractPageupRouteConfigFromUrl(finalUrl, config.routeType, config.locale);
+  const runtimeConfig = {
+    ...config,
+    baseOrigin,
+    boardUrl: finalUrl || config.boardUrl,
+    routeType: routeConfig.routeType,
+    locale: routeConfig.locale,
+    searchUrl: `${baseOrigin}/${encodeURIComponent(config.boardId)}/${routeConfig.routeType}/${routeConfig.locale}/search/`
+  };
+
+  const inferredCompanyName = extractPageupCompanyNameFromTitle(pageHtml);
+  const companyNameForPostings =
+    normalizedCompanyName ||
+    (inferredCompanyName !== "Unknown Company" ? inferredCompanyName : "") ||
+    `pageup_${String(config.boardId || "").toLowerCase()}`;
+  const { responseJson } = await fetchPageupSearchResults(runtimeConfig);
+  const resultsHtml = String(responseJson?.results || "");
+  const rawPostings = parsePageupPostingsFromResults(companyNameForPostings, runtimeConfig, resultsHtml);
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const posting of rawPostings) {
+    const postingUrl = String(posting?.job_posting_url || "").trim();
+    if (!postingUrl || seenUrls.has(postingUrl)) continue;
+
+    let postingDate = "";
+    try {
+      const detailsHtml = await fetchPageupDetailsPage(postingUrl);
+      postingDate = String(extractPageupPostingDateFromDetailHtml(detailsHtml) || "").trim();
+    } catch {
+      continue;
+    }
+    if (!postingDate) continue;
+
+    collected.push({
+      ...posting,
+      posting_date: postingDate
+    });
+    seenUrls.add(postingUrl);
+  }
+
+  return collected;
+}
+
+async function collectPostingsForHirebridgeCompany(company) {
+  const config = parseHirebridgeCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || `hirebridge_${config.cid}`;
+  const { pageHtml, finalUrl } = await fetchHirebridgeJobsPage(config);
+  const finalParsed = parseUrl(finalUrl);
+  const parseConfig = {
+    ...config,
+    baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
+    boardUrl: finalUrl || config.boardUrl
+  };
+
+  const rawPostings = parseHirebridgePostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const posting of rawPostings) {
+    const postingUrl = String(posting?.job_posting_url || "").trim();
+    if (!postingUrl || seenUrls.has(postingUrl)) continue;
+
+    let postingDate = "";
+    try {
+      const detailsHtml = await fetchHirebridgeDetailsPage(parseConfig, postingUrl);
+      postingDate = String(extractHirebridgeDatePostedFromDetailHtml(detailsHtml) || "").trim();
+    } catch {
+      continue;
+    }
+    if (!postingDate) continue;
+
+    collected.push({
+      ...posting,
+      posting_date: postingDate
+    });
+    seenUrls.add(postingUrl);
+  }
+
+  return collected;
+}
+
 async function collectPostingsForTeamtailorCompany(company) {
   const config = parseTeamtailorCompany(company.url_string);
   if (!config) return [];
@@ -6195,6 +9531,163 @@ async function collectPostingsForTeamtailorCompany(company) {
     jobsUrl: finalUrl || config.jobsUrl
   };
   return parseTeamtailorPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+}
+
+async function collectPostingsForFreshteamCompany(company) {
+  const config = parseFreshteamCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
+  const { pageHtml, finalUrl } = await fetchFreshteamJobsPage(config);
+  const finalParsed = parseUrl(finalUrl);
+  const parseConfig = {
+    ...config,
+    baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
+    jobsUrl: finalUrl || config.jobsUrl
+  };
+  return parseFreshteamPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+}
+
+async function collectPostingsForSagehrCompany(company) {
+  const config = parseSagehrCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const { pageHtml, finalUrl } = await fetchSagehrJobsPage(config);
+  const finalParsed = parseUrl(finalUrl);
+  const parseConfig = {
+    ...config,
+    baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
+    boardUrl: finalUrl || config.boardUrl
+  };
+  const inferredCompanyName = extractSagehrCompanyNameFromHtml(pageHtml);
+  const companyNameForPostings =
+    normalizedCompanyName ||
+    (inferredCompanyName !== "Unknown Company" ? inferredCompanyName : "") ||
+    `sagehr_${config.companySlugLower}`;
+
+  return parseSagehrPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+}
+
+async function collectPostingsForPeopleforceCompany(company) {
+  const config = parsePeopleforceCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
+  const { pageHtml, finalUrl } = await fetchPeopleforceJobsPage(config);
+  if (!pageHtml) return [];
+
+  const finalParsed = parseUrl(finalUrl);
+  const parseConfig = {
+    ...config,
+    baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
+    jobsUrl: finalUrl || config.jobsUrl
+  };
+  return parsePeopleforcePostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+}
+
+async function collectPostingsForSimplicantCompany(company) {
+  const config = parseSimplicantCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
+  const { pageHtml, finalUrl } = await fetchSimplicantJobsPage(config);
+  if (/page you were looking for could not be found/i.test(pageHtml)) return [];
+
+  const finalParsed = parseUrl(finalUrl);
+  const parseConfig = {
+    ...config,
+    baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
+    jobsUrl: finalUrl || config.jobsUrl
+  };
+  return parseSimplicantPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+}
+
+async function collectPostingsForLoxoCompany(company) {
+  const config = parseLoxoCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
+  const { pageHtml, finalUrl } = await fetchLoxoJobsPage(config);
+  const finalParsed = parseUrl(finalUrl);
+  const parseConfig = {
+    ...config,
+    baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
+    boardUrl: finalUrl || config.boardUrl
+  };
+  return parseLoxoPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
+}
+
+async function collectPostingsForPinpointHqCompany(company) {
+  const config = parsePinpointHqCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
+  const responseJson = await fetchPinpointHqJobBoard(config);
+  return parsePinpointHqPostingsFromApi(companyNameForPostings, config, responseJson);
+}
+
+async function collectPostingsForRecruitCrmCompany(company) {
+  const config = parseRecruitCrmCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.account;
+  const limit = 100;
+  const seenUrls = new Set();
+  const collected = [];
+
+  for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
+    const offset = page * limit;
+    const responseJson = await fetchRecruitCrmJobsPage(config, limit, offset);
+    const batch = parseRecruitCrmPostingsFromApi(companyNameForPostings, config, responseJson);
+
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      seenUrls.add(postingUrl);
+      collected.push(posting);
+    }
+
+    if (batch.length < limit) break;
+  }
+
+  return collected;
+}
+
+async function collectPostingsForRipplingCompany(company) {
+  const config = parseRipplingCompany(company.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.companySlug;
+  const pageSize = 100;
+  const seenUrls = new Set();
+  const collected = [];
+
+  for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
+    const responseJson = await fetchRipplingJobsPage(config, page, pageSize);
+    const batch = parseRipplingPostingsFromApi(companyNameForPostings, config, responseJson);
+
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      seenUrls.add(postingUrl);
+      collected.push(posting);
+    }
+
+    const totalPagesRaw = Number(responseJson?.totalPages);
+    const totalPages = Number.isFinite(totalPagesRaw) && totalPagesRaw > 0 ? totalPagesRaw : 1;
+    if (page + 1 >= totalPages) break;
+    if (batch.length < pageSize) break;
+  }
+
+  return collected;
 }
 
 async function collectPostingsForCareerpuckCompany(company) {
@@ -6325,53 +9818,8 @@ async function collectPostingsForSapHrCloudCompany(company) {
 
   const normalizedCompanyName = String(company?.company_name || "").trim();
   const companyNameForPostings = normalizedCompanyName || config.companyNameLower;
-  const localeCandidates = Array.from(
-    new Set([String(config.localeFromUrl || "").trim(), ...SAPHRCLOUD_LOCALE_CANDIDATES].filter(Boolean))
-  );
-
-  let lastShapeError = "";
-  for (const locale of localeCandidates) {
-    const collected = [];
-    const seenUrls = new Set();
-    let sawExpectedPayload = false;
-    let totalJobs = null;
-
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const responseJson = await fetchSapHrCloudJobsPage(config, locale, page);
-      const jobSearchResult = Array.isArray(responseJson?.jobSearchResult) ? responseJson.jobSearchResult : null;
-      if (!jobSearchResult) {
-        lastShapeError = `SAP HR Cloud response did not contain jobSearchResult list for locale ${locale}`;
-        break;
-      }
-
-      sawExpectedPayload = true;
-      const batch = parseSapHrCloudPostingsFromApi(companyNameForPostings, config, responseJson, locale);
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-
-      const totalRaw = Number(responseJson?.totalJobs);
-      if (Number.isFinite(totalRaw) && totalRaw >= 0) {
-        totalJobs = totalRaw;
-      }
-
-      if (jobSearchResult.length === 0) break;
-      if (Number.isFinite(totalJobs) && collected.length >= Number(totalJobs)) break;
-    }
-
-    if (sawExpectedPayload) {
-      return collected;
-    }
-  }
-
-  if (lastShapeError) {
-    throw new Error(lastShapeError);
-  }
-
-  return [];
+  const { pageHtml, finalUrl } = await fetchSapHrCloudBoardPage(company.url_string || config.boardUrl);
+  return parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl);
 }
 
 async function collectPostingsForRecruiteeCompany(company) {
@@ -6616,6 +10064,46 @@ async function collectPostingsForCompany(company) {
   if (atsName === "bamboohr" || atsName === "bamboohr.com" || atsName === "bamboohrcom") {
     return collectPostingsForBambooHrCompany(company);
   }
+  if (atsName === "adp_myjobs" || atsName === "adpmyjobs") {
+    return collectPostingsForAdpMyjobsCompany(company);
+  }
+  if (
+    atsName === "adp_workforcenow" ||
+    atsName === "adpworkforcenow" ||
+    atsName === "workforcenow.adp.com" ||
+    atsName === "workforcenowadpcom"
+  ) {
+    return collectPostingsForAdpWorkforcenowCompany(company);
+  }
+  if (
+    atsName === "paylocity" ||
+    atsName === "paylocity.com" ||
+    atsName === "paylocitycom" ||
+    atsName === "recruiting.paylocity.com" ||
+    atsName === "recruitingpaylocitycom"
+  ) {
+    return collectPostingsForPaylocityCompany(company);
+  }
+  if (atsName === "eightfold" || atsName === "eightfold.ai" || atsName === "eightfoldai") {
+    return collectPostingsForEightfoldCompany(company);
+  }
+  if (
+    atsName === "oracle" ||
+    atsName === "oraclecloud" ||
+    atsName === "oraclecloud.com" ||
+    atsName === "oraclecloudcom"
+  ) {
+    return collectPostingsForOracleCompany(company);
+  }
+  if (
+    atsName === "brassring" ||
+    atsName === "brassring.com" ||
+    atsName === "brassringcom" ||
+    atsName === "sjobs.brassring.com" ||
+    atsName === "sjobsbrassringcom"
+  ) {
+    return collectPostingsForBrassringCompany(company);
+  }
   if (
     atsName === "manatal" ||
     atsName === "manatal.com" ||
@@ -6625,8 +10113,59 @@ async function collectPostingsForCompany(company) {
   ) {
     return collectPostingsForManatalCompany(company);
   }
+  if (atsName === "careerspage" || atsName === "careerspage.io" || atsName === "careerspageio") {
+    return collectPostingsForCareerspageCompany(company);
+  }
+  if (
+    atsName === "pageup" ||
+    atsName === "pageuppeople" ||
+    atsName === "pageuppeople.com" ||
+    atsName === "pageuppeoplecom" ||
+    atsName === "careers.pageuppeople.com" ||
+    atsName === "careerspageuppeoplecom"
+  ) {
+    return collectPostingsForPageupCompany(company);
+  }
+  if (
+    atsName === "hirebridge" ||
+    atsName === "hirebridge.com" ||
+    atsName === "hirebridgecom" ||
+    atsName === "recruit.hirebridge.com" ||
+    atsName === "recruithirebridgecom"
+  ) {
+    return collectPostingsForHirebridgeCompany(company);
+  }
   if (atsName === "teamtailor" || atsName === "teamtailor.com" || atsName === "teamtailorcom") {
     return collectPostingsForTeamtailorCompany(company);
+  }
+  if (atsName === "freshteam" || atsName === "freshteam.com" || atsName === "freshteamcom") {
+    return collectPostingsForFreshteamCompany(company);
+  }
+  if (
+    atsName === "sagehr" ||
+    atsName === "sage.hr" ||
+    atsName === "talent.sage.hr" ||
+    atsName === "talentsagehr"
+  ) {
+    return collectPostingsForSagehrCompany(company);
+  }
+  if (atsName === "loxo" || atsName === "loxo.co" || atsName === "loxoco") {
+    return collectPostingsForLoxoCompany(company);
+  }
+  if (atsName === "peopleforce" || atsName === "peopleforce.io" || atsName === "peopleforceio") {
+    return collectPostingsForPeopleforceCompany(company);
+  }
+  if (atsName === "simplicant" || atsName === "simplicant.com" || atsName === "simplicantcom") {
+    return collectPostingsForSimplicantCompany(company);
+  }
+  if (atsName === "pinpointhq" || atsName === "pinpointhq.com" || atsName === "pinpointhqcom") {
+    return collectPostingsForPinpointHqCompany(company);
+  }
+  if (atsName === "recruitcrm" || atsName === "recruitcrm.io" || atsName === "recruitcrmiocom" || atsName === "recruitcrmio") {
+    return collectPostingsForRecruitCrmCompany(company);
+  }
+  if (atsName === "rippling" || atsName === "rippling.com" || atsName === "ripplingcom" || atsName === "ats.rippling.com" || atsName === "atsripplingcom") {
+    return collectPostingsForRipplingCompany(company);
   }
   if (atsName === "careerpuck" || atsName === "careerpuck.com" || atsName === "careerpuckcom") {
     return collectPostingsForCareerpuckCompany(company);
@@ -6959,20 +10498,36 @@ async function ensureSyncServiceSettingsTable() {
     CREATE TABLE IF NOT EXISTS SyncServiceSettings (
       id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
       ats_request_queue_concurrency INTEGER NOT NULL DEFAULT 1,
+      sync_enabled_ats TEXT NOT NULL DEFAULT '[]',
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  const syncSettingsColumns = await db.all(`PRAGMA table_info(SyncServiceSettings);`);
+  const syncSettingsColumnNames = new Set(
+    (Array.isArray(syncSettingsColumns) ? syncSettingsColumns : []).map((column) => String(column?.name || ""))
+  );
+  if (!syncSettingsColumnNames.has("sync_enabled_ats")) {
+    await db.exec(`
+      ALTER TABLE SyncServiceSettings
+      ADD COLUMN sync_enabled_ats TEXT NOT NULL DEFAULT '[]';
+    `);
+  }
 
   await db.run(
     `
       INSERT INTO SyncServiceSettings (
         id,
         ats_request_queue_concurrency,
+        sync_enabled_ats,
         updated_at
-      ) VALUES (1, ?, datetime('now'))
+      ) VALUES (1, ?, ?, datetime('now'))
       ON CONFLICT(id) DO NOTHING;
     `,
-    [SYNC_SERVICE_SETTINGS_DEFAULTS.ats_request_queue_concurrency]
+    [
+      SYNC_SERVICE_SETTINGS_DEFAULTS.ats_request_queue_concurrency,
+      JSON.stringify(SYNC_SERVICE_SETTINGS_DEFAULTS.sync_enabled_ats)
+    ]
   );
 }
 
@@ -7060,7 +10615,8 @@ async function getStoredSyncServiceSettings() {
   const row = await db.get(
     `
       SELECT
-        ats_request_queue_concurrency
+        ats_request_queue_concurrency,
+        sync_enabled_ats
       FROM SyncServiceSettings
       WHERE id = 1
       LIMIT 1;
@@ -7070,7 +10626,8 @@ async function getStoredSyncServiceSettings() {
   return normalizeSyncServiceSettingsInput(
     {
       ...SYNC_SERVICE_SETTINGS_DEFAULTS,
-      ats_request_queue_concurrency: row?.ats_request_queue_concurrency
+      ats_request_queue_concurrency: row?.ats_request_queue_concurrency,
+      sync_enabled_ats: row?.sync_enabled_ats
     },
     SYNC_SERVICE_SETTINGS_DEFAULTS
   );
@@ -7079,6 +10636,7 @@ async function getStoredSyncServiceSettings() {
 async function loadSyncServiceSettingsIntoRuntime() {
   const stored = await getStoredSyncServiceSettings();
   atsRequestQueueConcurrency = normalizeAtsRequestQueueConcurrency(stored?.ats_request_queue_concurrency);
+  syncEnabledAts = new Set(normalizeSyncEnabledAts(stored?.sync_enabled_ats));
   return stored;
 }
 
@@ -7102,15 +10660,18 @@ async function upsertSyncServiceSettings(input = {}) {
       INSERT INTO SyncServiceSettings (
         id,
         ats_request_queue_concurrency,
+        sync_enabled_ats,
         updated_at
-      ) VALUES (1, ?, datetime('now'))
+      ) VALUES (1, ?, ?, datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         ats_request_queue_concurrency = excluded.ats_request_queue_concurrency,
+        sync_enabled_ats = excluded.sync_enabled_ats,
         updated_at = datetime('now');
     `,
-    [normalized.ats_request_queue_concurrency]
+    [normalized.ats_request_queue_concurrency, JSON.stringify(normalized.sync_enabled_ats)]
   );
 
+  syncEnabledAts = new Set(normalized.sync_enabled_ats);
   return getSyncServiceSettings();
 }
 
@@ -8040,6 +11601,344 @@ async function getPersonalInformation() {
   return normalizePersonalInformationInput(row);
 }
 
+async function tableExists(databaseHandle, tableName) {
+  const row = await databaseHandle.get(
+    `
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND LOWER(name) = LOWER(?)
+      LIMIT 1;
+    `,
+    [String(tableName || "").trim()]
+  );
+  return Boolean(row?.name);
+}
+
+async function resolveCompanyIdByName(companyName) {
+  const normalized = normalizeLikeText(companyName);
+  if (!normalized) return null;
+  const row = await db.get(
+    `
+      SELECT id
+      FROM companies
+      WHERE LOWER(company_name) = ?
+      ORDER BY id ASC
+      LIMIT 1;
+    `,
+    [normalized]
+  );
+  return Number(row?.id || 0) || null;
+}
+
+function normalizeMigrationSelection(input = {}) {
+  const source = input && typeof input === "object" ? input : {};
+  return {
+    personal_information:
+      source.personal_information === undefined ? true : normalizeBoolean(source.personal_information, true),
+    mcp_settings: source.mcp_settings === undefined ? true : normalizeBoolean(source.mcp_settings, true),
+    blocked_companies:
+      source.blocked_companies === undefined ? true : normalizeBoolean(source.blocked_companies, true),
+    applications: source.applications === undefined ? true : normalizeBoolean(source.applications, true)
+  };
+}
+
+async function migrateSettingsAndApplicationsFromDatabase(rawSourceDbPath, selectionInput = {}) {
+  const sourceDbPath = String(rawSourceDbPath || "").trim();
+  if (!sourceDbPath) {
+    throw new Error("source_db_path is required");
+  }
+  const selection = normalizeMigrationSelection(selectionInput);
+  if (!selection.personal_information && !selection.mcp_settings && !selection.blocked_companies && !selection.applications) {
+    throw new Error("At least one migration option must be selected");
+  }
+
+  const resolvedSourcePath = path.resolve(sourceDbPath);
+  const resolvedTargetPath = path.resolve(DB_PATH);
+  if (!fs.existsSync(resolvedSourcePath)) {
+    throw new Error(`Source database not found at path: ${resolvedSourcePath}`);
+  }
+  if (resolvedSourcePath === resolvedTargetPath) {
+    throw new Error("Source database path is the same as the active database");
+  }
+
+  const summary = {
+    source_db_path: resolvedSourcePath,
+    target_db_path: resolvedTargetPath,
+    selected: selection,
+    personal_information_copied: false,
+    mcp_settings_copied: false,
+    blocked_companies_copied: 0,
+    applications_inserted: 0,
+    applications_reused: 0,
+    applications_skipped_missing_company: 0,
+    application_attribution_upserts: 0,
+    posting_application_state_upserts: 0
+  };
+
+  let sourceDb;
+  try {
+    sourceDb = await open({
+      filename: resolvedSourcePath,
+      driver: sqlite3.Database,
+      mode: sqlite3.OPEN_READONLY
+    });
+
+    if (selection.personal_information && (await tableExists(sourceDb, "PersonalInformation"))) {
+      const sourcePersonalInformation = await sourceDb.get(
+        `
+          SELECT *
+          FROM PersonalInformation
+          ORDER BY rowid DESC
+          LIMIT 1;
+        `
+      );
+      if (sourcePersonalInformation) {
+        await upsertPersonalInformation(sourcePersonalInformation);
+        summary.personal_information_copied = true;
+      }
+    }
+
+    if (selection.mcp_settings && (await tableExists(sourceDb, "McpSettings"))) {
+      const sourceMcpSettings = await sourceDb.get(
+        `
+          SELECT *
+          FROM McpSettings
+          WHERE id = 1
+          LIMIT 1;
+        `
+      );
+      if (sourceMcpSettings) {
+        await upsertMcpSettings(sourceMcpSettings);
+        summary.mcp_settings_copied = true;
+      }
+    }
+
+    if (selection.blocked_companies && (await tableExists(sourceDb, "blocked_companies"))) {
+      const sourceBlockedCompanies = await sourceDb.all(
+        `
+          SELECT normalized_company_name, company_name, blocked_at_epoch
+          FROM blocked_companies;
+        `
+      );
+      for (const item of sourceBlockedCompanies) {
+        const companyName = String(item?.company_name || "").trim();
+        const normalizedCompanyName =
+          String(item?.normalized_company_name || "").trim() || normalizeCompanyNameForBlockList(companyName);
+        if (!companyName || !normalizedCompanyName) continue;
+
+        await db.run(
+          `
+            INSERT INTO blocked_companies (
+              normalized_company_name,
+              company_name,
+              blocked_at_epoch
+            ) VALUES (?, ?, ?)
+            ON CONFLICT(normalized_company_name) DO UPDATE SET
+              company_name = excluded.company_name,
+              blocked_at_epoch = excluded.blocked_at_epoch;
+          `,
+          [normalizedCompanyName, companyName, parseNonNegativeInteger(item?.blocked_at_epoch) || nowEpochSeconds()]
+        );
+        summary.blocked_companies_copied += 1;
+      }
+    }
+
+    const hasApplications = selection.applications && (await tableExists(sourceDb, "applications"));
+    if (hasApplications) {
+      const hasSourceCompanies = await tableExists(sourceDb, "companies");
+      const hasSourceAttribution = await tableExists(sourceDb, "application_attribution");
+      const sourceApplications = await sourceDb.all(
+        `
+          SELECT
+            a.id AS source_application_id,
+            a.company_id AS source_company_id,
+            ${
+              hasSourceCompanies
+                ? "COALESCE(c.company_name, '')"
+                : "''"
+            } AS source_company_name,
+            a.position_name,
+            a.application_date,
+            a.status,
+            ${
+              hasSourceAttribution
+                ? "attr.applied_by_type"
+                : "NULL"
+            } AS applied_by_type,
+            ${
+              hasSourceAttribution
+                ? "attr.applied_by_label"
+                : "NULL"
+            } AS applied_by_label
+          FROM applications a
+          ${
+            hasSourceCompanies
+              ? "LEFT JOIN companies c ON c.id = a.company_id"
+              : ""
+          }
+          ${
+            hasSourceAttribution
+              ? "LEFT JOIN application_attribution attr ON attr.application_id = a.id"
+              : ""
+          }
+          ORDER BY a.application_date ASC, a.id ASC;
+        `
+      );
+
+      const sourceToTargetApplicationId = new Map();
+
+      await db.exec("BEGIN TRANSACTION;");
+      try {
+        for (const item of sourceApplications) {
+          const sourceCompanyName = String(item?.source_company_name || "").trim();
+          const targetCompanyId = await resolveCompanyIdByName(sourceCompanyName);
+          if (!targetCompanyId) {
+            summary.applications_skipped_missing_company += 1;
+            continue;
+          }
+
+          const positionName = String(item?.position_name || "").trim() || "Untitled Position";
+          const applicationDate = parseNonNegativeInteger(item?.application_date) || nowEpochSeconds();
+          const status = normalizeApplicationStatus(item?.status);
+
+          const existing = await db.get(
+            `
+              SELECT id
+              FROM applications
+              WHERE company_id = ?
+                AND LOWER(position_name) = LOWER(?)
+                AND application_date = ?
+                AND LOWER(COALESCE(status, '')) = LOWER(?)
+              LIMIT 1;
+            `,
+            [targetCompanyId, positionName, applicationDate, status]
+          );
+
+          let targetApplicationId = Number(existing?.id || 0);
+          if (!targetApplicationId) {
+            const inserted = await db.run(
+              `
+                INSERT INTO applications (
+                  company_id,
+                  position_name,
+                  application_date,
+                  status
+                ) VALUES (?, ?, ?, ?);
+              `,
+              [targetCompanyId, positionName, applicationDate, status]
+            );
+            targetApplicationId = Number(inserted?.lastID || 0);
+            summary.applications_inserted += 1;
+          } else {
+            summary.applications_reused += 1;
+          }
+
+          if (targetApplicationId) {
+            sourceToTargetApplicationId.set(Number(item?.source_application_id || 0), targetApplicationId);
+            const appliedByType = normalizeAppliedByType(item?.applied_by_type);
+            const appliedByLabel = normalizeAppliedByLabel(item?.applied_by_label, appliedByType);
+            await db.run(
+              `
+                INSERT INTO application_attribution (
+                  application_id,
+                  applied_by_type,
+                  applied_by_label,
+                  updated_at
+                ) VALUES (?, ?, ?, datetime('now'))
+                ON CONFLICT(application_id) DO UPDATE SET
+                  applied_by_type = excluded.applied_by_type,
+                  applied_by_label = excluded.applied_by_label,
+                  updated_at = datetime('now');
+              `,
+              [targetApplicationId, appliedByType, appliedByLabel]
+            );
+            summary.application_attribution_upserts += 1;
+          }
+        }
+
+        if (await tableExists(sourceDb, "posting_application_state")) {
+          const sourcePostingStateRows = await sourceDb.all(
+            `
+              SELECT
+                job_posting_url,
+                applied,
+                applied_by_type,
+                applied_by_label,
+                applied_at_epoch,
+                last_application_id,
+                ignored,
+                ignored_at_epoch,
+                ignored_by_label
+              FROM posting_application_state;
+            `
+          );
+          for (const row of sourcePostingStateRows) {
+            const jobPostingUrl = String(row?.job_posting_url || "").trim();
+            if (!jobPostingUrl) continue;
+
+            const appliedByType = normalizeAppliedByType(row?.applied_by_type);
+            const appliedByLabel = normalizeAppliedByLabel(row?.applied_by_label, appliedByType);
+            const ignoredByLabel = normalizeIgnoredByLabel(row?.ignored_by_label);
+            const sourceLastApplicationId = parseNonNegativeInteger(row?.last_application_id);
+            const mappedLastApplicationId = sourceToTargetApplicationId.get(sourceLastApplicationId) || null;
+
+            await db.run(
+              `
+                INSERT INTO posting_application_state (
+                  job_posting_url,
+                  applied,
+                  applied_by_type,
+                  applied_by_label,
+                  applied_at_epoch,
+                  last_application_id,
+                  ignored,
+                  ignored_at_epoch,
+                  ignored_by_label,
+                  updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(job_posting_url) DO UPDATE SET
+                  applied = excluded.applied,
+                  applied_by_type = excluded.applied_by_type,
+                  applied_by_label = excluded.applied_by_label,
+                  applied_at_epoch = excluded.applied_at_epoch,
+                  last_application_id = excluded.last_application_id,
+                  ignored = excluded.ignored,
+                  ignored_at_epoch = excluded.ignored_at_epoch,
+                  ignored_by_label = excluded.ignored_by_label,
+                  updated_at = datetime('now');
+              `,
+              [
+                jobPostingUrl,
+                normalizeBoolean(row?.applied, false) ? 1 : 0,
+                appliedByType,
+                appliedByLabel,
+                parseNonNegativeInteger(row?.applied_at_epoch) || null,
+                mappedLastApplicationId,
+                normalizeBoolean(row?.ignored, false) ? 1 : 0,
+                parseNonNegativeInteger(row?.ignored_at_epoch) || null,
+                ignoredByLabel
+              ]
+            );
+            summary.posting_application_state_upserts += 1;
+          }
+        }
+
+        await db.exec("COMMIT;");
+      } catch (error) {
+        await db.exec("ROLLBACK;");
+        throw error;
+      }
+    }
+  } finally {
+    if (sourceDb) {
+      await sourceDb.close();
+    }
+  }
+
+  return summary;
+}
+
 async function upsertPersonalInformation(value) {
   const normalized = normalizePersonalInformationInput(value);
   const values = PERSONAL_INFORMATION_FIELDS.map((field) => normalized[field]);
@@ -8085,20 +11984,59 @@ async function upsertPersonalInformation(value) {
   return normalized;
 }
 
+async function getSyncScopeStats() {
+  const rows = await db.all(
+    `
+      SELECT ATS_name
+      FROM companies
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM blocked_companies b
+        WHERE b.normalized_company_name = LOWER(TRIM(companies.company_name))
+      );
+    `
+  );
+
+  const enabledAts = new Set(normalizeSyncEnabledAts(Array.from(syncEnabledAts)));
+  let syncEnabledCompanyCount = 0;
+  for (const row of rows) {
+    const normalizedAts = normalizeAtsFilterValue(row?.ATS_name);
+    if (!ATS_FILTER_OPTIONS.has(normalizedAts)) continue;
+    if (enabledAts.has(normalizedAts)) {
+      syncEnabledCompanyCount += 1;
+    }
+  }
+
+  return {
+    sync_enabled_company_count: syncEnabledCompanyCount,
+    configured_enabled_ats_count: enabledAts.size,
+    excluded_ats_count: Math.max(0, ATS_FILTER_OPTION_ITEMS.length - enabledAts.size)
+  };
+}
+
 async function getCompaniesForSync() {
-  return db.all(
+  const rows = await db.all(
     `
       SELECT id, company_name, url_string, ATS_name
       FROM companies
-      WHERE LOWER(TRIM(ATS_name)) IN ('workday', 'ashbyhq', 'greenhouseio', 'greenhouse.io', 'greenhouse', 'leverco', 'lever.co', 'lever', 'jobvite', 'jobvite.com', 'jobvitecom', 'applicantpro', 'applicantpro.com', 'applicantprocom', 'applytojob', 'applytojob.com', 'applytojobcom', 'theapplicantmanager', 'theapplicantmanager.com', 'theapplicantmanagercom', 'breezy', 'breezyhr', 'breezy.hr', 'breezyhrcom', 'icims', 'icims.com', 'icimscom', 'zoho', 'zohorecruit', 'zohorecruit.com', 'zohorecruitcom', 'applicantai', 'applicantai.com', 'applicantaicom', 'gem', 'jobs.gem.com', 'gem.com', 'gemcom', 'jobaps', 'jobapscloud.com', 'jobapscloudcom', 'join', 'join.com', 'joincom', 'talentreef', 'jobappnetwork.com', 'jobappnetworkcom', 'apply.jobappnetwork.com', 'applyjobappnetworkcom', 'careerplug', 'careerplug.com', 'careerplugcom', 'bamboohr', 'bamboohr.com', 'bamboohrcom', 'manatal', 'manatal.com', 'manatalcom', 'careers-page.com', 'careerspagecom', 'teamtailor', 'teamtailor.com', 'teamtailorcom', 'careerpuck', 'careerpuck.com', 'careerpuckcom', 'fountain', 'fountain.com', 'fountaincom', 'getro', 'getro.com', 'getrocom', 'hrmdirect', 'hrmdirect.com', 'hrmdirectcom', 'talentlyft', 'talentlyft.com', 'talentlyftcom', 'talexio', 'talexio.com', 'talexiocom', 'saphrcloud', 'saphrcloud.com', 'saphrcloudcom', 'jobs.hr.cloud.sap', 'jobshrcloudsap', 'recruiteecom', 'recruitee.com', 'recruitee', 'ultipro', 'ukg', 'taleo', 'taleo.net', 'taleonet')
-        AND NOT EXISTS (
-          SELECT 1
-          FROM blocked_companies b
-          WHERE b.normalized_company_name = LOWER(TRIM(companies.company_name))
-        )
-      ORDER BY ATS_name ASC, company_name ASC;
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM blocked_companies b
+        WHERE b.normalized_company_name = LOWER(TRIM(companies.company_name))
+      );
     `
   );
+
+  const enabledAts = new Set(normalizeSyncEnabledAts(Array.from(syncEnabledAts)));
+  return rows
+    .filter((row) => enabledAts.has(normalizeAtsFilterValue(row?.ATS_name)))
+    .sort((a, b) => {
+      const aAts = String(a?.ATS_name || "");
+      const bAts = String(b?.ATS_name || "");
+      const atsCompare = aAts.localeCompare(bAts);
+      if (atsCompare !== 0) return atsCompare;
+      return String(a?.company_name || "").localeCompare(String(b?.company_name || ""));
+    });
 }
 
 async function upsertPostings(postings, lastSeenEpoch) {
@@ -8285,10 +12223,12 @@ async function runWorkdaySyncInternal() {
     totalPruned += await pruneExpiredPostings(syncReferenceEpoch);
     postingDatePruned += await prunePostingsOutsideDateWindow(syncReferenceEpoch);
     postingLocationByJobUrl = nextPostingLocationByJobUrl;
+    const syncScopeStats = await getSyncScopeStats();
 
     syncStatus.last_sync_at = new Date().toISOString();
     syncStatus.last_sync_summary = {
       total_companies: companies.length,
+      ...syncScopeStats,
       total_postings_stored: dedupedPostings.size,
       worker_concurrency: workerCount,
       ats_request_queue_concurrency: atsRequestQueueConcurrency,
@@ -8350,12 +12290,13 @@ function createServer() {
 
     if (shouldWait) {
       await promise;
-      const counts = await getCounts();
+      const [counts, syncScopeStats] = await Promise.all([getCounts(), getSyncScopeStats()]);
       return res.json({
         ok: true,
         started: !wasRunning,
         running: syncStatus.running,
         ...syncStatus,
+        ...syncScopeStats,
         ...counts
       });
     }
@@ -8377,9 +12318,10 @@ function createServer() {
   });
 
   app.get("/sync/status", async (_req, res) => {
-    const counts = await getCounts();
+    const [counts, syncScopeStats] = await Promise.all([getCounts(), getSyncScopeStats()]);
     res.json({
       ...syncStatus,
+      ...syncScopeStats,
       ...counts
     });
   });
@@ -8389,38 +12331,13 @@ function createServer() {
 
   app.get("/postings/filter-options", async (req, res) => {
     const selectedStates = parseCsvParam(req.query.states).map((state) => state.toUpperCase());
-    const ats = [
-      { value: "workday", label: "Workday" },
-      { value: "ashby", label: "Ashby" },
-      { value: "greenhouse", label: "Greenhouse" },
-      { value: "lever", label: "Lever" },
-      { value: "jobvite", label: "Jobvite" },
-      { value: "applicantpro", label: "ApplicantPro" },
-      { value: "applytojob", label: "ApplyToJob" },
-      { value: "theapplicantmanager", label: "The Applicant Manager" },
-      { value: "breezy", label: "BreezyHR" },
-      { value: "icims", label: "iCIMS" },
-      { value: "zoho", label: "Zoho Recruit" },
-      { value: "applicantai", label: "ApplicantAI" },
-      { value: "gem", label: "Gem" },
-      { value: "jobaps", label: "JobAps" },
-      { value: "join", label: "JOIN" },
-      { value: "talentreef", label: "TalentReef" },
-      { value: "careerplug", label: "CareerPlug" },
-      { value: "bamboohr", label: "BambooHR" },
-      { value: "manatal", label: "Manatal" },
-      { value: "teamtailor", label: "Teamtailor" },
-      { value: "careerpuck", label: "CareerPuck" },
-      { value: "fountain", label: "Fountain" },
-      { value: "getro", label: "Getro" },
-      { value: "hrmdirect", label: "HRMDirect" },
-      { value: "talentlyft", label: "Talentlyft" },
-      { value: "talexio", label: "Talexio" },
-      { value: "saphrcloud", label: "SAP HR Cloud" },
-      { value: "recruitee", label: "Recruitee" },
-      { value: "ultipro", label: "UltiPro" },
-      { value: "taleo", label: "Taleo" }
-    ];
+    const syncSettings = await getSyncServiceSettings();
+    const enabledAts = new Set(normalizeSyncEnabledAts(syncSettings?.sync_enabled_ats));
+    const ats = ATS_FILTER_OPTION_ITEMS.map((item) => ({
+      value: item.value,
+      label: item.label,
+      enabled: enabledAts.has(item.value)
+    }));
     const sort_options = [
       { value: "recent", label: "Most Recently Seen" },
       { value: "company_asc", label: "Company (A-Z)" }
@@ -8604,6 +12521,42 @@ function createServer() {
         deleted,
         items,
         count: items.length
+      });
+    } catch (error) {
+      res.status(400).json({
+        ok: false,
+        error: String(error?.message || error)
+      });
+    }
+  });
+
+  app.post("/settings/migrate-db", async (req, res) => {
+    try {
+      const summary = await migrateSettingsAndApplicationsFromDatabase(req.body?.source_db_path, {
+        personal_information: req.body?.personal_information,
+        mcp_settings: req.body?.mcp_settings,
+        blocked_companies: req.body?.blocked_companies,
+        applications: req.body?.applications
+      });
+      const [personalInformation, mcpSettings, syncServiceSettings, blockedCompanies, applications] =
+        await Promise.all([
+          getPersonalInformation(),
+          getMcpSettings(),
+          getSyncServiceSettings(),
+          listBlockedCompanies(),
+          listApplications({ limit: 50, offset: 0 })
+        ]);
+
+      res.json({
+        ok: true,
+        summary,
+        item: {
+          personal_information: personalInformation,
+          mcp_settings: mcpSettings,
+          sync_settings: syncServiceSettings,
+          blocked_companies_count: blockedCompanies.length,
+          applications_count: Number(applications?.count || 0)
+        }
       });
     } catch (error) {
       res.status(400).json({

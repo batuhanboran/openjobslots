@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS Postings (
 CREATE TABLE IF NOT EXISTS SyncServiceSettings (
   id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
   ats_request_queue_concurrency INTEGER NOT NULL DEFAULT 1,
+  sync_enabled_ats TEXT NOT NULL DEFAULT '[]',
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

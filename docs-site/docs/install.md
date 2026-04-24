@@ -4,7 +4,7 @@ title: Install (MSI and Source)
 description: Install OpenJobSlots using the Windows MSI installer or from source.
 ---
 
-## Option 1: Windows MSI installer (recommended)
+## Option 1: Windows MSI installer (Easiest Setup But Still WIP and may have some bugs)
 
 ### 1. Download installer
 
@@ -44,7 +44,7 @@ Feature payloads:
 
 If backend service worker is installed, the installer writes a startup entry that launches the backend tray process on sign-in.
 
-## Option 2: Run from source
+## Option 2: Run from source (Best Stability & Compatibility)
 
 ### Requirements
 

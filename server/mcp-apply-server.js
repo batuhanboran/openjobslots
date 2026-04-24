@@ -210,18 +210,56 @@ const MCP_SETTINGS_DEFAULTS = {
   instructions_for_agent: ""
 };
 const ATS_FILTER_OPTIONS = new Set([
-  "workday",
-  "ashby",
-  "greenhouse",
-  "lever",
-  "jobvite",
+  "adp_myjobs",
+  "adp_workforcenow",
+  "applicantai",
   "applicantpro",
   "applytojob",
-  "theapplicantmanager",
+  "ashby",
+  "bamboohr",
+  "brassring",
+  "breezy",
+  "careerplug",
+  "careerpuck",
+  "careerspage",
+  "dayforcehcm",
+  "eightfold",
+  "fountain",
+  "freshteam",
+  "gem",
+  "getro",
+  "greenhouse",
+  "hirebridge",
+  "hrmdirect",
+  "icims",
+  "jobaps",
+  "jobvite",
+  "join",
+  "lever",
+  "loxo",
+  "manatal",
+  "oracle",
+  "pageup",
+  "paylocity",
+  "peopleforce",
+  "pinpointhq",
+  "recruitcrm",
   "recruitee",
+  "rippling",
+  "sagehr",
+  "saphrcloud",
+  "simplicant",
+  "talentlyft",
+  "talentreef",
+  "taleo",
+  "talexio",
+  "teamtailor",
+  "theapplicantmanager",
   "ultipro",
-  "taleo"
+  "workday",
+  "zoho"
 ]);
+const MCP_ATS_FILTER_VALUES = Object.freeze(Array.from(ATS_FILTER_OPTIONS));
 const PHRASE_NGRAM_INDUSTRY_COVERAGE_THRESHOLD = 2;
 const FALLBACK_WORD_INDUSTRY_COVERAGE_THRESHOLD = 2;
 const MIN_INDUSTRY_FALLBACK_WORD_COUNT = 3;
@@ -275,7 +313,72 @@ function inferAtsFromJobPostingUrl(value) {
   if ((url.includes("jobs.jobvite.com/") || url.includes("careers.jobvite.com/")) && url.includes("/job/")) return "jobvite";
   if (url.includes(".applicantpro.com/jobs")) return "applicantpro";
   if (url.includes(".applytojob.com/apply")) return "applytojob";
+  if (url.includes(".icims.com/jobs/")) return "icims";
   if (url.includes("theapplicantmanager.com/jobs")) return "theapplicantmanager";
+  if (url.includes(".breezy.hr/p/")) return "breezy";
+  if (url.includes(".zohorecruit.com/jobs/careers")) return "zoho";
+  if (url.includes("applicantai.com/")) return "applicantai";
+  if (url.includes(".bamboohr.com/careers")) return "bamboohr";
+  if (url.includes("app.careerpuck.com/job-board/")) return "careerpuck";
+  if (url.includes("dayforcehcm.com/candidateportal/")) return "dayforcehcm";
+  if (url.includes("careers.dayforcehcm.com/")) return "dayforcehcm";
+  if (url.includes("web.fountain.com/c/")) return "fountain";
+  if (url.includes(".getro.com/jobs")) return "getro";
+  if (url.includes(".hrmdirect.com/employment/job-opening.php")) return "hrmdirect";
+  if (url.includes(".talentlyft.com/jobs/")) return "talentlyft";
+  if (url.includes(".talexio.com/jobs")) return "talexio";
+  if (url.includes(".teamtailor.com/jobs/")) return "teamtailor";
+  if (url.endsWith(".teamtailor.com/jobs")) return "teamtailor";
+  if (url.includes(".freshteam.com/jobs/")) return "freshteam";
+  if (url.endsWith(".freshteam.com/jobs")) return "freshteam";
+  if (url.includes("talent.sage.hr/jobs/")) return "sagehr";
+  if (url.includes("www.talent.sage.hr/jobs/")) return "sagehr";
+  if (url.includes("app.loxo.co/job/")) return "loxo";
+  if (url.includes(".peopleforce.io/careers/")) return "peopleforce";
+  if (url.endsWith(".peopleforce.io/careers")) return "peopleforce";
+  if (url.includes(".simplicant.com/jobs/")) return "simplicant";
+  if (url.includes(".pinpointhq.com/") && url.includes("/postings/")) return "pinpointhq";
+  if (url.includes("recruitcrm.io/jobs/")) return "recruitcrm";
+  if (url.includes("ats.rippling.com/") && url.includes("/jobs")) return "rippling";
+  if (url.includes(".careerplug.com/jobs/")) return "careerplug";
+  if (url.endsWith(".careerplug.com/jobs")) return "careerplug";
+  if (url.includes("jobs.gem.com/")) return "gem";
+  if (url.includes(".jobapscloud.com")) return "jobaps";
+  if (url.includes("join.com/companies/")) return "join";
+  if (url.includes("apply.jobappnetwork.com/apply/")) return "talentreef";
+  if (url.includes(".jobs.hr.cloud.sap/job/")) return "saphrcloud";
+  if (url.includes(".jobs.hr.cloud.sap/search/")) return "saphrcloud";
+  if (url.includes("myjobs.adp.com/") && url.includes("/cx/job-details")) return "adp_myjobs";
+  if (url.includes("workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html")) return "adp_workforcenow";
+  if (url.includes("workforcenow.adp.com/jobs/apply/posting.html")) return "adp_workforcenow";
+  if (url.includes("careerspage.io/")) {
+    const parts = url.split("careerspage.io/")[1]?.split("/").filter(Boolean) || [];
+    if (parts.length >= 2) return "careerspage";
+  }
+  if (
+    url.includes(".oraclecloud.com/hcmui/candidateexperience/") &&
+    url.includes("/sites/") &&
+    (url.includes("/job/") || url.endsWith("/jobs") || url.includes("/jobs?"))
+  ) {
+    return "oracle";
+  }
+  if (url.includes("careers.pageuppeople.com/") && url.includes("/job/")) return "pageup";
+  if (url.includes("www.careers.pageuppeople.com/") && url.includes("/job/")) return "pageup";
+  if (url.includes("recruiting.paylocity.com/recruiting/jobs/details/")) return "paylocity";
+  if (
+    url.includes(".eightfold.ai/careers/job/") ||
+    url.includes(".eightfold.ai/careers/job?") ||
+    url.includes("eightfold.ai/careers/job/") ||
+    url.includes("eightfold.ai/careers/job?")
+  ) {
+    return "eightfold";
+  }
+  if (url.includes("recruit.hirebridge.com/v3/jobs/jobdetails.aspx")) return "hirebridge";
+  if (url.includes("recruit.hirebridge.com/v3/careercenter/v2/details.aspx")) return "hirebridge";
+  if (url.includes("sjobs.brassring.com/tgnewui/search/home/homewithpreload")) return "brassring";
+  if (url.includes(".careers-page.com/jobs/")) return "manatal";
+  if (url.includes(".careers-page.com/job/")) return "manatal";
+  if (url.includes("www.careers-page.com/") && (url.includes("/job/") || url.includes("/jobs/"))) return "manatal";
   if (url.includes(".recruitee.com")) return "recruitee";
   if (url.includes("recruiting.ultipro.com/") && url.includes("/jobboard/")) return "ultipro";
   if (url.includes(".taleo.net/careersection/")) return "taleo";
@@ -290,11 +393,67 @@ function normalizeAtsFilters(value) {
       if (normalized === "ashbyhq") return "ashby";
       if (normalized === "greenhouseio" || normalized === "greenhouse.io") return "greenhouse";
       if (normalized === "leverco" || normalized === "lever.co") return "lever";
+      if (normalized === "dayforce" || normalized === "dayforcehcm" || normalized === "dayforcehcm.com") {
+        return "dayforcehcm";
+      }
       if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
       if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
       if (normalized === "applytojobcom" || normalized === "applytojob.com") return "applytojob";
       if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
         return "theapplicantmanager";
+      }
+      if (normalized === "breezyhr" || normalized === "breezy.hr" || normalized === "breezyhrcom") return "breezy";
+      if (normalized === "zohorecruit" || normalized === "zohorecruit.com" || normalized === "zohorecruitcom") return "zoho";
+      if (normalized === "applicantai.com" || normalized === "applicantaicom") return "applicantai";
+      if (normalized === "bamboohr.com" || normalized === "bamboohrcom") return "bamboohr";
+      if (normalized === "careerplug.com" || normalized === "careerplugcom") return "careerplug";
+      if (normalized === "manatal.com" || normalized === "manatalcom" || normalized === "careers-page.com" || normalized === "careerspagecom") {
+        return "manatal";
+      }
+      if (normalized === "careerpuck.com" || normalized === "careerpuckcom") return "careerpuck";
+      if (normalized === "fountain.com" || normalized === "fountaincom") return "fountain";
+      if (normalized === "getro.com" || normalized === "getrocom") return "getro";
+      if (normalized === "hrmdirect.com" || normalized === "hrmdirectcom") return "hrmdirect";
+      if (normalized === "talentlyft.com" || normalized === "talentlyftcom") return "talentlyft";
+      if (normalized === "talexio.com" || normalized === "talexiocom") return "talexio";
+      if (normalized === "teamtailor.com" || normalized === "teamtailorcom") return "teamtailor";
+      if (normalized === "freshteam.com" || normalized === "freshteamcom") return "freshteam";
+      if (normalized === "sagehr" || normalized === "sage.hr" || normalized === "talent.sage.hr" || normalized === "talentsagehr") return "sagehr";
+      if (normalized === "loxo.co" || normalized === "loxoco" || normalized === "app.loxo.co" || normalized === "apploxoco") return "loxo";
+      if (normalized === "peopleforce.io" || normalized === "peopleforceio") return "peopleforce";
+      if (normalized === "simplicant.com" || normalized === "simplicantcom") return "simplicant";
+      if (normalized === "pinpointhq.com" || normalized === "pinpointhqcom") return "pinpointhq";
+      if (normalized === "recruitcrm.io" || normalized === "recruitcrmiocom" || normalized === "recruitcrmio") return "recruitcrm";
+      if (normalized === "rippling.com" || normalized === "ripplingcom" || normalized === "ats.rippling.com" || normalized === "atsripplingcom" || normalized === "rippling") {
+        return "rippling";
+      }
+      if (normalized === "jobs.gem.com" || normalized === "gem.com" || normalized === "gemcom") return "gem";
+      if (normalized === "jobapscloud.com" || normalized === "jobapscloudcom") return "jobaps";
+      if (normalized === "join.com" || normalized === "joincom") return "join";
+      if (normalized === "jobappnetwork.com" || normalized === "jobappnetworkcom" || normalized === "apply.jobappnetwork.com" || normalized === "applyjobappnetworkcom") {
+        return "talentreef";
+      }
+      if (normalized === "saphrcloud" || normalized === "saphrcloud.com" || normalized === "saphrcloudcom" || normalized === "jobs.hr.cloud.sap" || normalized === "jobshrcloudsap") {
+        return "saphrcloud";
+      }
+      if (normalized === "adp_myjobs" || normalized === "adpmyjobs") return "adp_myjobs";
+      if (normalized === "adp_workforcenow" || normalized === "adpworkforcenow" || normalized === "workforcenow.adp.com" || normalized === "workforcenowadpcom") {
+        return "adp_workforcenow";
+      }
+      if (normalized === "careerspage" || normalized === "careerspage.io" || normalized === "careerspageio") return "careerspage";
+      if (normalized === "paylocity" || normalized === "paylocity.com" || normalized === "paylocitycom" || normalized === "recruiting.paylocity.com" || normalized === "recruitingpaylocitycom") {
+        return "paylocity";
+      }
+      if (normalized === "eightfold" || normalized === "eightfold.ai" || normalized === "eightfoldai") return "eightfold";
+      if (normalized === "pageup" || normalized === "pageuppeople" || normalized === "pageuppeople.com" || normalized === "pageuppeoplecom" || normalized === "careers.pageuppeople.com" || normalized === "careerspageuppeoplecom") {
+        return "pageup";
+      }
+      if (normalized === "oracle" || normalized === "oraclecloud" || normalized === "oraclecloud.com" || normalized === "oraclecloudcom") return "oracle";
+      if (normalized === "hirebridge" || normalized === "hirebridge.com" || normalized === "hirebridgecom" || normalized === "recruit.hirebridge.com" || normalized === "recruithirebridgecom") {
+        return "hirebridge";
+      }
+      if (normalized === "brassring" || normalized === "brassring.com" || normalized === "brassringcom" || normalized === "sjobs.brassring.com" || normalized === "sjobsbrassringcom") {
+        return "brassring";
       }
       if (normalized === "recruiteecom" || normalized === "recruitee.com") return "recruitee";
       if (normalized === "ukg") return "ultipro";
@@ -1376,34 +1535,8 @@ async function main() {
         search: z.string().optional(),
         ats: z
           .union([
-            z.enum([
-              "workday",
-              "ashby",
-              "greenhouse",
-              "lever",
-              "jobvite",
-              "applicantpro",
-              "applytojob",
-              "theapplicantmanager",
-              "recruitee",
-              "ultipro",
-              "taleo"
-            ]),
-            z.array(
-              z.enum([
-                "workday",
-                "ashby",
-                "greenhouse",
-                "lever",
-                "jobvite",
-                "applicantpro",
-                "applytojob",
-                "theapplicantmanager",
-                "recruitee",
-                "ultipro",
-                "taleo"
-              ])
-            )
+            z.enum(MCP_ATS_FILTER_VALUES),
+            z.array(z.enum(MCP_ATS_FILTER_VALUES))
           ])
           .optional(),
         industries: z.array(z.string()).optional(),
