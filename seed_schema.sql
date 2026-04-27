@@ -53,8 +53,12 @@ CREATE TABLE IF NOT EXISTS Postings (
       company_name TEXT NOT NULL,
       position_name TEXT NOT NULL,
       job_posting_url TEXT NOT NULL UNIQUE,
-      posting_date TEXT
-    , last_seen_epoch INTEGER);
+      posting_date TEXT,
+      first_seen_epoch INTEGER,
+      last_seen_epoch INTEGER,
+      hidden INTEGER NOT NULL DEFAULT 0,
+      hidden_at_epoch INTEGER
+    );
 
 -- SyncServiceSettings
 CREATE TABLE IF NOT EXISTS SyncServiceSettings (

@@ -10251,7 +10251,10 @@ async function createCanonicalPostingsTable() {
       position_name TEXT NOT NULL,
       job_posting_url TEXT NOT NULL UNIQUE,
       posting_date TEXT,
-      last_seen_epoch INTEGER
+      first_seen_epoch INTEGER,
+      last_seen_epoch INTEGER,
+      hidden INTEGER NOT NULL DEFAULT 0,
+      hidden_at_epoch INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_postings_company_name
@@ -10262,6 +10265,12 @@ async function createCanonicalPostingsTable() {
 
     CREATE INDEX IF NOT EXISTS idx_postings_last_seen_epoch
       ON Postings(last_seen_epoch);
+
+    CREATE INDEX IF NOT EXISTS idx_postings_first_seen_epoch
+      ON Postings(first_seen_epoch);
+
+    CREATE INDEX IF NOT EXISTS idx_postings_hidden_first_seen_epoch
+      ON Postings(hidden, first_seen_epoch);
   `);
 }
 
@@ -10298,6 +10307,26 @@ async function ensurePostingsTable() {
     await db.run(`UPDATE Postings SET last_seen_epoch = ? WHERE last_seen_epoch IS NULL;`, [nowEpochSeconds()]);
   }
 
+  if (!existingColumns.has("first_seen_epoch")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN first_seen_epoch INTEGER;`);
+  }
+  await db.run(
+    `
+      UPDATE Postings
+      SET first_seen_epoch = COALESCE(first_seen_epoch, last_seen_epoch, ?)
+      WHERE first_seen_epoch IS NULL;
+    `,
+    [nowEpochSeconds()]
+  );
+
+  if (!existingColumns.has("hidden")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`);
+  }
+
+  if (!existingColumns.has("hidden_at_epoch")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN hidden_at_epoch INTEGER;`);
+  }
+
   await db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_postings_job_posting_url
       ON Postings(job_posting_url);
@@ -10310,6 +10339,12 @@ async function ensurePostingsTable() {
 
     CREATE INDEX IF NOT EXISTS idx_postings_last_seen_epoch
       ON Postings(last_seen_epoch);
+
+    CREATE INDEX IF NOT EXISTS idx_postings_first_seen_epoch
+      ON Postings(first_seen_epoch);
+
+    CREATE INDEX IF NOT EXISTS idx_postings_hidden_first_seen_epoch
+      ON Postings(hidden, first_seen_epoch);
   `);
 }
 
@@ -10982,7 +11017,8 @@ async function listPostingsWithFilters(options = {}) {
         `
           SELECT id, company_name, position_name, job_posting_url, posting_date, last_seen_epoch
           FROM Postings
-          WHERE (? = 0 OR (posting_date IS NOT NULL AND TRIM(posting_date) <> ''))
+          WHERE COALESCE(hidden, 0) = 0
+            AND (? = 0 OR (posting_date IS NOT NULL AND TRIM(posting_date) <> ''))
             AND NOT EXISTS (
               SELECT 1
               FROM blocked_companies b
@@ -11005,7 +11041,8 @@ async function listPostingsWithFilters(options = {}) {
               OR
               (${includeIgnored ? 0 : 1} = 1 AND COALESCE(s.ignored, 0) = 1)
             )
-          WHERE (? = 0 OR (p.posting_date IS NOT NULL AND TRIM(p.posting_date) <> ''))
+          WHERE COALESCE(p.hidden, 0) = 0
+            AND (? = 0 OR (p.posting_date IS NOT NULL AND TRIM(p.posting_date) <> ''))
             AND NOT EXISTS (
               SELECT 1
               FROM blocked_companies b
@@ -11023,7 +11060,8 @@ async function listPostingsWithFilters(options = {}) {
       `
         SELECT id, company_name, position_name, job_posting_url, posting_date, last_seen_epoch
         FROM Postings
-        WHERE NOT EXISTS (
+        WHERE COALESCE(hidden, 0) = 0
+          AND NOT EXISTS (
           SELECT 1
           FROM blocked_companies b
           WHERE b.normalized_company_name = LOWER(TRIM(Postings.company_name))
@@ -12046,22 +12084,40 @@ async function upsertPostings(postings, lastSeenEpoch) {
   await db.exec("BEGIN TRANSACTION;");
   try {
     for (const posting of postings) {
+      const companyName = String(posting.company_name || "").trim();
+      const positionName = String(posting.position_name || "").trim() || "Untitled Position";
+      const jobPostingUrl = String(posting.job_posting_url || "").trim();
+      if (!jobPostingUrl) continue;
+      const postingDateRaw = String(posting.posting_date ?? "").trim();
+      const postingDate = postingDateRaw || null;
+
       await db.run(
         `
-          INSERT OR REPLACE INTO Postings (
+          INSERT INTO Postings (
             company_name,
             position_name,
             job_posting_url,
             posting_date,
+            first_seen_epoch,
+            hidden,
+            hidden_at_epoch,
             last_seen_epoch
           )
-          VALUES (?, ?, ?, ?, ?);
+          VALUES (?, ?, ?, ?, ?, 0, NULL, ?)
+          ON CONFLICT(job_posting_url) DO UPDATE SET
+            company_name = excluded.company_name,
+            position_name = excluded.position_name,
+            posting_date = COALESCE(excluded.posting_date, Postings.posting_date),
+            first_seen_epoch = COALESCE(Postings.first_seen_epoch, Postings.last_seen_epoch, excluded.first_seen_epoch),
+            last_seen_epoch = excluded.last_seen_epoch
+          WHERE COALESCE(Postings.hidden, 0) = 0;
         `,
         [
-          String(posting.company_name || "").trim(),
-          String(posting.position_name || "").trim() || "Untitled Position",
-          String(posting.job_posting_url || "").trim(),
-          posting.posting_date || null,
+          companyName,
+          positionName,
+          jobPostingUrl,
+          postingDate,
+          seenEpoch,
           seenEpoch
         ]
       );
@@ -12074,13 +12130,18 @@ async function upsertPostings(postings, lastSeenEpoch) {
 }
 
 async function pruneExpiredPostings(referenceEpoch = nowEpochSeconds()) {
-  const cutoffEpoch = Number(referenceEpoch) - POSTING_TTL_SECONDS;
+  const resolvedReferenceEpoch = Number(referenceEpoch || nowEpochSeconds());
+  const cutoffEpoch = resolvedReferenceEpoch - POSTING_TTL_SECONDS;
   const result = await db.run(
     `
-      DELETE FROM Postings
-      WHERE COALESCE(last_seen_epoch, 0) < ?;
+      UPDATE Postings
+      SET
+        hidden = 1,
+        hidden_at_epoch = COALESCE(hidden_at_epoch, ?)
+      WHERE COALESCE(hidden, 0) = 0
+        AND COALESCE(first_seen_epoch, last_seen_epoch, 0) < ?;
     `,
-    [cutoffEpoch]
+    [resolvedReferenceEpoch, cutoffEpoch]
   );
   return Number(result?.changes || 0);
 }
@@ -12090,38 +12151,43 @@ async function prunePostingsOutsideDateWindow(referenceEpoch = nowEpochSeconds()
     `
       SELECT id, posting_date
       FROM Postings
-      WHERE posting_date IS NOT NULL
+      WHERE COALESCE(hidden, 0) = 0
+        AND posting_date IS NOT NULL
         AND TRIM(posting_date) <> '';
     `
   );
   if (!Array.isArray(rows) || rows.length === 0) return 0;
 
-  const idsToDelete = [];
+  const idsToHide = [];
   for (const row of rows) {
     const postingId = Number(row?.id || 0);
     if (!Number.isFinite(postingId) || postingId <= 0) continue;
     if (shouldStorePostingByDate(row?.posting_date, referenceEpoch)) continue;
-    idsToDelete.push(postingId);
+    idsToHide.push(postingId);
   }
 
-  if (idsToDelete.length === 0) return 0;
+  if (idsToHide.length === 0) return 0;
 
-  let totalDeleted = 0;
+  let totalHidden = 0;
   await db.exec("BEGIN TRANSACTION;");
   try {
     const chunkSize = 800;
-    for (let offset = 0; offset < idsToDelete.length; offset += chunkSize) {
-      const chunk = idsToDelete.slice(offset, offset + chunkSize);
+    for (let offset = 0; offset < idsToHide.length; offset += chunkSize) {
+      const chunk = idsToHide.slice(offset, offset + chunkSize);
       if (chunk.length === 0) continue;
       const placeholders = chunk.map(() => "?").join(", ");
       const result = await db.run(
         `
-          DELETE FROM Postings
-          WHERE id IN (${placeholders});
+          UPDATE Postings
+          SET
+            hidden = 1,
+            hidden_at_epoch = COALESCE(hidden_at_epoch, ?)
+          WHERE COALESCE(hidden, 0) = 0
+            AND id IN (${placeholders});
         `,
-        chunk
+        [Number(referenceEpoch || nowEpochSeconds()), ...chunk]
       );
-      totalDeleted += Number(result?.changes || 0);
+      totalHidden += Number(result?.changes || 0);
     }
 
     await db.exec("COMMIT;");
@@ -12130,7 +12196,7 @@ async function prunePostingsOutsideDateWindow(referenceEpoch = nowEpochSeconds()
     throw error;
   }
 
-  return totalDeleted;
+  return totalHidden;
 }
 
 async function runWorkdaySyncInternal() {
@@ -12257,7 +12323,13 @@ function runWorkdaySync() {
 async function getCounts() {
   await pruneExpiredPostings();
   const companyRow = await db.get(`SELECT COUNT(*) AS count FROM companies;`);
-  const postingRow = await db.get(`SELECT COUNT(*) AS count FROM Postings;`);
+  const postingRow = await db.get(
+    `
+      SELECT COUNT(*) AS count
+      FROM Postings
+      WHERE COALESCE(hidden, 0) = 0;
+    `
+  );
   const byAtsRows = await db.all(`
     SELECT ATS_name, COUNT(*) AS count
     FROM companies
