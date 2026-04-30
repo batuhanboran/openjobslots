@@ -81,7 +81,7 @@
           Key="Software\Microsoft\Windows\CurrentVersion\Run"
           Name="OpenJobSlotsBackend"
           Type="string"
-          Value="wscript.exe &quot;[BACKENDFOLDER]launch-backend.vbs&quot;"
+          Value="&quot;[INSTALLFOLDER]openjobslots.exe&quot; --backend-startup"
           KeyPath="yes" />
       </Component>
     </DirectoryRef>

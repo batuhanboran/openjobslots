@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Continue"
+$ProgressPreference = "SilentlyContinue"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -11,6 +12,7 @@ $trayIconPath = Join-Path $scriptDir "tray.ico"
 $openJobSlotsExePath = Join-Path $projectInstallDir "openjobslots.exe"
 $backendSeedDatabasePath = Join-Path $scriptDir "jobs.db"
 $backendDataRoot = Join-Path $env:LOCALAPPDATA "OpenJobSlots\backend"
+$trayPidPath = Join-Path $backendDataRoot "tray.pid"
 $backendPidPath = Join-Path $backendDataRoot "backend.pid"
 $backendPort = 8787
 
@@ -26,6 +28,7 @@ $mutexName = "Local\OpenJobSlotsBackendTray"
 $script:backendManuallyStopped = $false
 $script:mcpManuallyStopped = $false
 $script:isExitingTray = $false
+$script:trayDisposed = $false
 $script:serverScriptPathLower = (Join-Path $scriptDir "server\index.js").ToLowerInvariant()
 $script:installDirLower = $projectInstallDir.ToLowerInvariant()
 $script:mcpScriptPathLower = $mcpScriptPath.ToLowerInvariant()
@@ -110,12 +113,23 @@ function Test-PidRunning {
 }
 
 function Test-BackendHealth {
+    $tcpClient = $null
     try {
-        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$backendPort/health" -UseBasicParsing -TimeoutSec 2
-        return $response.StatusCode -eq 200
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $iar = $tcpClient.BeginConnect("127.0.0.1", $backendPort, $null, $null)
+        if (-not $iar.AsyncWaitHandle.WaitOne(2000, $false)) {
+            return $false
+        }
+        $tcpClient.EndConnect($iar)
+        return $tcpClient.Connected
     }
     catch {
         return $false
+    }
+    finally {
+        if ($null -ne $tcpClient) {
+            $tcpClient.Close()
+        }
     }
 }
 
@@ -146,7 +160,7 @@ function Invoke-BackendLauncher {
     if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) { return }
     if (-not (Test-Path -LiteralPath $backendLauncherScriptPath -PathType Leaf)) { return }
 
-    & $nodePath $backendLauncherScriptPath | Out-Null
+    & $nodePath $backendLauncherScriptPath "--skip-tray" | Out-Null
 }
 
 function Stop-BackendProcess {
@@ -272,7 +286,6 @@ function Stop-McpProcess {
 
 function Stop-OpenJobSlotsAppProcess {
     Get-Process openjobslots -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    & taskkill /F /IM openjobslots.exe | Out-Null
 }
 
 function Ensure-BackendRunning {
@@ -353,6 +366,29 @@ function Update-StatusDisplaySafely {
     }
 }
 
+try {
+    $selfProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction Stop
+    if ($null -ne $selfProcess) {
+        $parentProcess = $null
+        try {
+            $parentProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($selfProcess.ParentProcessId)" -ErrorAction Stop
+        }
+        catch {
+        }
+
+        $parentName = if ($null -ne $parentProcess) { $parentProcess.Name } else { "Unknown" }
+        $parentCommandLine = if ($null -ne $parentProcess) { [string]$parentProcess.CommandLine } else { "" }
+        $hostArgs = [Environment]::GetCommandLineArgs() -join " "
+        $apartmentState = [Threading.Thread]::CurrentThread.ApartmentState
+
+        Write-TrayLog -Message "Tray launch context. PID=$PID Parent=$($selfProcess.ParentProcessId) ParentName=$parentName CommandLine=$($selfProcess.CommandLine)"
+        Write-TrayLog -Message "Tray launch parent command line: $parentCommandLine"
+        Write-TrayLog -Message "Tray host args: $hostArgs | ApartmentState=$apartmentState"
+    }
+}
+catch {
+}
+
 [bool]$createdNew = $false
 $mutex = $null
 try {
@@ -370,6 +406,8 @@ if (-not $createdNew) {
     }
     exit 0
 }
+
+Set-Content -LiteralPath $trayPidPath -Value "$PID`n" -Encoding ASCII
 
 $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
 if (Test-Path -LiteralPath $trayIconPath -PathType Leaf) {
@@ -453,6 +491,9 @@ $notifyIcon.add_DoubleClick({
 $healthTimer = New-Object System.Windows.Forms.Timer
 $healthTimer.Interval = 3000
 $healthTimer.add_Tick({
+    if ($script:trayDisposed -or $script:isExitingTray) {
+        return
+    }
     Update-StatusDisplaySafely
 })
 
@@ -463,6 +504,7 @@ try {
     [System.Windows.Forms.Application]::Run($applicationContext)
 }
 finally {
+    $script:trayDisposed = $true
     $healthTimer.Stop()
     if ($script:isExitingTray) {
         Stop-McpProcess
@@ -481,5 +523,6 @@ finally {
         }
         $mutex.Dispose()
     }
+    Remove-Item -LiteralPath $trayPidPath -Force -ErrorAction SilentlyContinue
     Write-TrayLog -Message "Tray process exited."
 }

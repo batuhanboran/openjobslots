@@ -166,14 +166,17 @@ $backendScriptSourceDir = Join-Path $projectRoot "scripts\windows\backend"
 $backendLauncherSourcePath = Join-Path $backendScriptSourceDir "launcher.js"
 $backendTrayScriptSourcePath = Join-Path $backendScriptSourceDir "backend-tray.ps1"
 $backendVbsSourcePath = Join-Path $backendScriptSourceDir "launch-backend.vbs"
+$backendTrayVbsSourcePath = Join-Path $backendScriptSourceDir "launch-tray.vbs"
 $backendTrayIconSourcePath = Join-Path $projectRoot "windows\openjobslots\openjobslots.ico"
 Assert-FileExists -Path $backendLauncherSourcePath -Description "Backend launcher script"
 Assert-FileExists -Path $backendTrayScriptSourcePath -Description "Backend tray script"
 Assert-FileExists -Path $backendVbsSourcePath -Description "Backend launcher VBS script"
+Assert-FileExists -Path $backendTrayVbsSourcePath -Description "Backend tray VBS script"
 Assert-FileExists -Path $backendTrayIconSourcePath -Description "Backend tray icon"
 Copy-Item -LiteralPath $backendLauncherSourcePath -Destination (Join-Path $backendStagingDir "launcher.js") -Force
 Copy-Item -LiteralPath $backendTrayScriptSourcePath -Destination (Join-Path $backendStagingDir "backend-tray.ps1") -Force
 Copy-Item -LiteralPath $backendVbsSourcePath -Destination (Join-Path $backendStagingDir "launch-backend.vbs") -Force
+Copy-Item -LiteralPath $backendTrayVbsSourcePath -Destination (Join-Path $backendStagingDir "launch-tray.vbs") -Force
 Copy-Item -LiteralPath $backendTrayIconSourcePath -Destination (Join-Path $backendStagingDir "tray.ico") -Force
 
 $mcpStagingDir = Join-Path $projectRoot "windows\installer\staging-mcp\$Arch\Release"

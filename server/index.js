@@ -9,6 +9,9 @@ const sqlite3 = require("sqlite3");
 
 const PORT = Number(process.env.PORT || 8787);
 const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "..", "jobs.db");
+const BACKEND_DATA_ROOT = path.dirname(DB_PATH);
+const BACKEND_LOG_DIRECTORY_PATH = path.join(BACKEND_DATA_ROOT, "logs");
+const FRONTEND_LOG_PATH = path.join(BACKEND_LOG_DIRECTORY_PATH, "frontend-client.log");
 const SYNC_INTERVAL_MS = Number(process.env.SYNC_INTERVAL_MS || 10 * 60 * 1000);
 const SYNC_WORKER_CONCURRENCY_RAW = Number(process.env.SYNC_WORKER_CONCURRENCY || 4);
 const SYNC_WORKER_CONCURRENCY =
@@ -78,6 +81,28 @@ const PAGEUP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const PAYLOCITY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const USAJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const SCHOOLSPRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const CALOPPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const STATEJOBSNY_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const HIBOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const GOVERNMENTJOBS_ESTIMATED_COMPANY_COUNT = 2400;
+const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
+const SMARTRECRUITERS_ESTIMATED_COMPANY_COUNT = 4000;
+const POLICEAPP_ESTIMATED_COMPANY_COUNT = 1166;
+const USAJOBS_ESTIMATED_COMPANY_COUNT = 26;
+const K12JOBSPOT_ESTIMATED_COMPANY_COUNT = 13000;
+const SCHOOLSPRING_ESTIMATED_COMPANY_COUNT = 16287;
+const CALCAREERS_ESTIMATED_COMPANY_COUNT = 297;
+const CALOPPS_ESTIMATED_COMPANY_COUNT = 254;
+const STATEJOBSNY_ESTIMATED_COMPANY_COUNT = 165;
+const SMARTRECRUITERS_INSERT_EVERY_N_TARGETS = 10;
 const execFileAsync = promisify(execFile);
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
 const ORACLE_EXPAND_VALUE = [
@@ -567,6 +592,15 @@ const ATS_FILTER_OPTIONS = new Set([
   "dayforcehcm",
   "fountain",
   "getro",
+  "governmentjobs",
+  "smartrecruiters",
+  "policeapp",
+  "usajobs",
+  "k12jobspot",
+  "schoolspring",
+  "calcareers",
+  "calopps",
+  "statejobsny",
   "hrmdirect",
   "talentlyft",
   "talexio",
@@ -593,6 +627,10 @@ const ATS_FILTER_OPTIONS = new Set([
   "hirebridge",
   "pageup",
   "brassring"
+  ,
+  "applitrack",
+  "hibob",
+  "isolvisolvedhire"
 ]);
 const ATS_FILTER_OPTION_ITEMS = Object.freeze([
   { value: "workday", label: "Workday" },
@@ -624,6 +662,9 @@ const ATS_FILTER_OPTION_ITEMS = Object.freeze([
   { value: "pageup", label: "PageUp" },
   { value: "hirebridge", label: "Hirebridge" },
   { value: "brassring", label: "BrassRing" },
+  { value: "applitrack", label: "Applitrack" },
+  { value: "hibob", label: "HiBob" },
+  { value: "isolvisolvedhire", label: "isolvedhire" },
   { value: "teamtailor", label: "Teamtailor" },
   { value: "freshteam", label: "Freshteam" },
   { value: "sagehr", label: "SageHR" },
@@ -636,6 +677,15 @@ const ATS_FILTER_OPTION_ITEMS = Object.freeze([
   { value: "careerpuck", label: "CareerPuck" },
   { value: "fountain", label: "Fountain" },
   { value: "getro", label: "Getro" },
+  { value: "governmentjobs", label: "GovernmentJobs" },
+  { value: "smartrecruiters", label: "SmartRecruiters" },
+  { value: "policeapp", label: "PoliceApp" },
+  { value: "usajobs", label: "USAJobs" },
+  { value: "k12jobspot", label: "K12JobSpot" },
+  { value: "schoolspring", label: "SchoolSpring" },
+  { value: "calcareers", label: "CalCareers" },
+  { value: "calopps", label: "CalOpps" },
+  { value: "statejobsny", label: "StateJobsNY" },
   { value: "hrmdirect", label: "HRMDirect" },
   { value: "talentlyft", label: "Talentlyft" },
   { value: "talexio", label: "Talexio" },
@@ -676,6 +726,79 @@ const MIN_INDUSTRY_PHRASE_NGRAM_COUNT = 2;
 
 function nowEpochSeconds() {
   return Math.floor(Date.now() / 1000);
+}
+
+function sanitizeFrontendText(value, fallback = "") {
+  const source = String(value ?? "");
+  if (!source) return fallback;
+
+  let cleaned = "";
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = source.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        index += 1;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      continue;
+    }
+
+    if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) {
+      continue;
+    }
+
+    cleaned += source[index];
+  }
+
+  return cleaned || fallback;
+}
+
+function sanitizeFrontendValue(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") return sanitizeFrontendText(value, "");
+  if (Array.isArray(value)) return value.map((item) => sanitizeFrontendValue(item));
+  if (typeof value === "object") {
+    const normalized = {};
+    for (const [key, entryValue] of Object.entries(value)) {
+      normalized[key] = sanitizeFrontendValue(entryValue);
+    }
+    return normalized;
+  }
+  return value;
+}
+
+function ensureFrontendLogDirectory() {
+  fs.mkdirSync(BACKEND_LOG_DIRECTORY_PATH, { recursive: true });
+}
+
+function normalizeFrontendLogLevel(value) {
+  const normalized = String(value || "info")
+    .trim()
+    .toLowerCase();
+  if (["debug", "info", "warn", "error", "fatal"].includes(normalized)) {
+    return normalized;
+  }
+  return "info";
+}
+
+function appendFrontendLogEntry(level, eventName, message, context) {
+  ensureFrontendLogDirectory();
+
+  const timestamp = new Date().toISOString();
+  const entry = {
+    timestamp,
+    level: normalizeFrontendLogLevel(level),
+    event: sanitizeFrontendText(eventName, "frontend_event"),
+    message: sanitizeFrontendText(message, ""),
+    context: sanitizeFrontendValue(context || {})
+  };
+
+  const line = `${JSON.stringify(entry)}\n`;
+  fs.appendFileSync(FRONTEND_LOG_PATH, line, "utf8");
 }
 
 function normalizeLikeText(value) {
@@ -1476,6 +1599,15 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("careers.dayforcehcm.com/")) return "dayforcehcm";
   if (url.includes("web.fountain.com/c/")) return "fountain";
   if (url.includes(".getro.com/jobs")) return "getro";
+  if (url.includes("governmentjobs.com/jobs/")) return "governmentjobs";
+  if (url.includes("jobs.smartrecruiters.com/")) return "smartrecruiters";
+  if (url.includes("policeapp.com/") && /\/\d+\/?$/.test(url)) return "policeapp";
+  if (url.includes("usajobs.gov/job/")) return "usajobs";
+  if (url.includes("k12jobspot.com/job/detail/")) return "k12jobspot";
+  if (url.includes("schoolspring.com/job.cfm?jid=")) return "schoolspring";
+  if (url.includes("calcareers.ca.gov/calhrpublic/jobs/jobposting.aspx?jobcontrolid=")) return "calcareers";
+  if (url.includes("calopps.org/") && url.includes("/job-")) return "calopps";
+  if (url.includes("statejobsny.com/public/vacancydetailsview.cfm?id=")) return "statejobsny";
   if (url.includes(".hrmdirect.com/employment/job-opening.php")) return "hrmdirect";
   if (url.includes(".talentlyft.com/jobs/")) return "talentlyft";
   if (url.includes(".talexio.com/jobs")) return "talexio";
@@ -1528,6 +1660,11 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("recruit.hirebridge.com/v3/jobs/jobdetails.aspx")) return "hirebridge";
   if (url.includes("recruit.hirebridge.com/v3/careercenter/v2/details.aspx")) return "hirebridge";
   if (url.includes("sjobs.brassring.com/tgnewui/search/home/homewithpreload")) return "brassring";
+  if (url.includes(".applitrack.com/") && (url.includes("/onlineapp/default.aspx") || url.includes("/jobpostings/output.asp") || url.includes("/default.aspx?jobid="))) {
+    return "applitrack";
+  }
+  if (url.includes(".careers.hibob.com/job/")) return "hibob";
+  if (url.includes(".isolvedhire.com/jobs/")) return "isolvisolvedhire";
   if (url.includes(".careers-page.com/jobs/")) return "manatal";
   if (url.includes(".careers-page.com/job/")) return "manatal";
   if (url.includes("www.careers-page.com/") && (url.includes("/job/") || url.includes("/jobs/"))) {
@@ -1546,6 +1683,17 @@ function normalizeAtsFilterValue(value) {
   if (normalized === "taleonet" || normalized === "taleo.net") return "taleo";
   if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
   if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
+  if (normalized === "hibob.com" || normalized === "hibobcom" || normalized === "hibob" || normalized === "careers.hibob.com" || normalized === "careershibobcom") {
+    return "hibob";
+  }
+  if (
+    normalized === "isolvisolvedhire" ||
+    normalized === "isolvedhire" ||
+    normalized === "isolvedhire.com" ||
+    normalized === "isolvedhirecom"
+  ) {
+    return "isolvisolvedhire";
+  }
   if (normalized === "applytojobcom" || normalized === "applytojob.com") return "applytojob";
   if (normalized === "icimscom" || normalized === "icims.com") return "icims";
   if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
@@ -1585,6 +1733,57 @@ function normalizeAtsFilterValue(value) {
   }
   if (normalized === "getro.com" || normalized === "getrocom") {
     return "getro";
+  }
+  if (normalized === "governmentjobs.com" || normalized === "governmentjobscom" || normalized === "governmentjobs") {
+    return "governmentjobs";
+  }
+  if (
+    normalized === "smartrecruiters.com" ||
+    normalized === "smartrecruiterscom" ||
+    normalized === "jobs.smartrecruiters.com" ||
+    normalized === "jobssmartrecruiterscom" ||
+    normalized === "smartrecruiters"
+  ) {
+    return "smartrecruiters";
+  }
+  if (normalized === "policeapp" || normalized === "policeapp.com" || normalized === "policeappcom" || normalized === "www.policeapp.com" || normalized === "wwwpoliceappcom") {
+    return "policeapp";
+  }
+  if (normalized === "usajobs" || normalized === "usajobs.gov" || normalized === "usajobsgov" || normalized === "www.usajobs.gov" || normalized === "wwwusajobsgov") {
+    return "usajobs";
+  }
+  if (normalized === "k12jobspot" || normalized === "k12jobspot.com" || normalized === "k12jobspotcom" || normalized === "www.k12jobspot.com" || normalized === "wwwk12jobspotcom" || normalized === "api.k12jobspot.com" || normalized === "apik12jobspotcom") {
+    return "k12jobspot";
+  }
+  if (normalized === "schoolspring" || normalized === "schoolspring.com" || normalized === "schoolspringcom" || normalized === "api.schoolspring.com" || normalized === "apischoolspringcom" || normalized === "www.schoolspring.com" || normalized === "wwwschoolspringcom") {
+    return "schoolspring";
+  }
+  if (
+    normalized === "calcareers" ||
+    normalized === "calcareers.ca.gov" ||
+    normalized === "calcareerscagov" ||
+    normalized === "www.calcareers.ca.gov" ||
+    normalized === "wwwcalcareerscagov"
+  ) {
+    return "calcareers";
+  }
+  if (
+    normalized === "calopps" ||
+    normalized === "calopps.org" ||
+    normalized === "caloppsorg" ||
+    normalized === "www.calopps.org" ||
+    normalized === "wwwcaloppsorg"
+  ) {
+    return "calopps";
+  }
+  if (
+    normalized === "statejobsny" ||
+    normalized === "statejobsny.com" ||
+    normalized === "statejobsnycom" ||
+    normalized === "www.statejobsny.com" ||
+    normalized === "wwwstatejobsnycom"
+  ) {
+    return "statejobsny";
   }
   if (normalized === "hrmdirect.com" || normalized === "hrmdirectcom") {
     return "hrmdirect";
@@ -1714,6 +1913,9 @@ function normalizeAtsFilterValue(value) {
     normalized === "sjobsbrassringcom"
   ) {
     return "brassring";
+  }
+  if (normalized === "applitrack.com" || normalized === "applitrackcom" || normalized === "applitrack") {
+    return "applitrack";
   }
   return normalized;
 }
@@ -2107,6 +2309,33 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
     if (parsed.hostname.endsWith(".getro.com")) {
       return postingLocationByJobUrl.get(url) || null;
     }
+    if (parsed.hostname === "www.governmentjobs.com" || parsed.hostname === "governmentjobs.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "jobs.smartrecruiters.com" || parsed.hostname === "www.jobs.smartrecruiters.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "www.policeapp.com" || parsed.hostname === "policeapp.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "www.usajobs.gov" || parsed.hostname === "usajobs.gov") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "www.k12jobspot.com" || parsed.hostname === "k12jobspot.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "www.schoolspring.com" || parsed.hostname === "schoolspring.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "calcareers.ca.gov" || parsed.hostname === "www.calcareers.ca.gov") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "calopps.org" || parsed.hostname === "www.calopps.org") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname === "statejobsny.com" || parsed.hostname === "www.statejobsny.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
     if (parsed.hostname.endsWith(".hrmdirect.com")) {
       return postingLocationByJobUrl.get(url) || null;
     }
@@ -2172,6 +2401,9 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
       return postingLocationByJobUrl.get(url) || null;
     }
     if (parsed.hostname === "sjobs.brassring.com" || parsed.hostname === "www.sjobs.brassring.com") {
+      return postingLocationByJobUrl.get(url) || null;
+    }
+    if (parsed.hostname.endsWith(".applitrack.com")) {
       return postingLocationByJobUrl.get(url) || null;
     }
     return null;
@@ -7993,38 +8225,7 @@ async function fetchSagehrJobsPage(config) {
   let finalUrl = String(res.url || config.boardUrl || "").trim();
   let pageHtml = await res.text();
 
-  if (statusCode !== 200 || !pageHtml) {
-    try {
-      const { stdout } = await execFileAsync("curl", [
-        "-L",
-        "-sS",
-        "--max-time",
-        "45",
-        "-A",
-        headers["User-Agent"],
-        "-H",
-        `Accept: ${headers.Accept}`,
-        "-H",
-        `Accept-Language: ${headers["Accept-Language"]}`,
-        "-w",
-        "\n__STATUS__:%{http_code}\n__EFFECTIVE_URL__:%{url_effective}\n",
-        config.boardUrl
-      ]);
-      const output = String(stdout || "");
-      const statusMatch = output.match(/__STATUS__:(\d{3})/);
-      const urlMatch = output.match(/__EFFECTIVE_URL__:(.+)/);
-      const curlStatus = Number(statusMatch?.[1] || 0);
-      const curlUrl = String(urlMatch?.[1] || "").trim();
-      const body = output.replace(/\n__STATUS__:\d{3}\n__EFFECTIVE_URL__:.*\s*$/s, "");
-      if (curlStatus > 0) {
-        statusCode = curlStatus;
-        finalUrl = curlUrl || config.boardUrl;
-        pageHtml = body;
-      }
-    } catch {
-      // Keep fetch result when curl fallback is unavailable.
-    }
-  }
+  // Disabled curl fallback to prevent external console process launches on Windows MSI runtime.
 
   if (statusCode !== 200 && statusCode !== 403) {
     throw new Error(`SageHR page request failed (${statusCode})`);
@@ -8069,38 +8270,7 @@ async function fetchPeopleforceJobsPage(config) {
   let finalUrl = String(res.url || config.jobsUrl || "").trim();
   let pageHtml = statusCode === 200 ? await res.text() : "";
 
-  if (statusCode === 429) {
-    try {
-      const { stdout } = await execFileAsync("curl", [
-        "-L",
-        "-sS",
-        "--max-time",
-        "45",
-        "-A",
-        headers["User-Agent"],
-        "-H",
-        `Accept: ${headers.Accept}`,
-        "-H",
-        `Accept-Language: ${headers["Accept-Language"]}`,
-        "-w",
-        "\n__STATUS__:%{http_code}\n__EFFECTIVE_URL__:%{url_effective}\n",
-        config.jobsUrl
-      ]);
-      const output = String(stdout || "");
-      const statusMatch = output.match(/__STATUS__:(\d{3})/);
-      const urlMatch = output.match(/__EFFECTIVE_URL__:(.+)/);
-      const curlStatus = Number(statusMatch?.[1] || 0);
-      const curlUrl = String(urlMatch?.[1] || "").trim();
-      const body = output.replace(/\n__STATUS__:\d{3}\n__EFFECTIVE_URL__:.*\s*$/s, "").trim();
-      if (curlStatus > 0) {
-        statusCode = curlStatus;
-        finalUrl = curlUrl || config.jobsUrl;
-        pageHtml = curlStatus === 200 ? body : "";
-      }
-    } catch {
-      // Keep original 429 result when curl fallback is unavailable.
-    }
-  }
+  // Disabled curl fallback to prevent external console process launches on Windows MSI runtime.
 
   if (statusCode !== 200) {
     throw new Error(`Peopleforce page request failed (${statusCode})`);
@@ -9356,6 +9526,288 @@ async function collectPostingsForBrassringCompany(company) {
   return parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson);
 }
 
+function normalizeApplitrackUrl(url) {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) throw new Error("Applitrack URL is required");
+
+  const parsed = parseUrl(normalizedUrl);
+  if (!parsed || !parsed.protocol || !parsed.host) {
+    throw new Error("Invalid Applitrack URL");
+  }
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".applitrack.com")) {
+    throw new Error(`Unexpected Applitrack host: ${parsed.host}`);
+  }
+
+  const base = `${parsed.protocol}//${parsed.host}`;
+  const pathValue = String(parsed.pathname || "/");
+  const rootPath = pathValue.endsWith("default.aspx")
+    ? pathValue.slice(0, -1 * "default.aspx".length)
+    : pathValue;
+  const normalizedRootPath = rootPath.endsWith("/") ? rootPath : `${rootPath}/`;
+  return `${base}${normalizedRootPath}`;
+}
+
+function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
+  const page = String(outputHtml || "").replace(/\\'/g, "'");
+  const postings = [];
+  const seenIds = new Set();
+  const applyPattern = /applyFor\(\s*'(?<job_id>\d+)'\s*,\s*'(?<category>[^']*)'\s*,\s*'(?<specialty>[^']*)'\s*\)/gi;
+  let match = applyPattern.exec(page);
+
+  while (match) {
+    const groups = match.groups || {};
+    const jobId = cleanSmartRecruitersText(groups.job_id);
+    if (!jobId || seenIds.has(jobId)) {
+      match = applyPattern.exec(page);
+      continue;
+    }
+
+    const category = cleanSmartRecruitersText(groups.category);
+    const specialty = cleanSmartRecruitersText(groups.specialty);
+    const title = [category, specialty].filter(Boolean).join(" - ") || `Job ${jobId}`;
+    const jobUrl = new URL(`default.aspx?JobID=${encodeURIComponent(jobId)}`, siteRoot).toString();
+
+    postings.push({
+      company_name: companyName,
+      position_name: title,
+      job_posting_url: jobUrl,
+      posting_date: null,
+      location: null
+    });
+    seenIds.add(jobId);
+    match = applyPattern.exec(page);
+  }
+
+  return postings;
+}
+
+async function collectPostingsForApplitrackCompany(company) {
+  const siteRoot = normalizeApplitrackUrl(company?.url_string);
+  const outputUrl = new URL("jobpostings/Output.asp?all=1", siteRoot).toString();
+  const res = await fetchWithAtsRateLimit("applitrack", APPLITRACK_RATE_LIMIT_WAIT_MS, outputUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Applitrack request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const pageHtml = await res.text();
+  const companyName = String(company?.company_name || "").trim() || "Unknown Company";
+  return parseApplitrackPostings(pageHtml, siteRoot, companyName);
+}
+
+function parseHibobCompany(url) {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) return null;
+
+  const parsed = parseUrl(normalizedUrl);
+  if (!parsed || !parsed.protocol || !parsed.host) return null;
+
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".careers.hibob.com")) return null;
+
+  const companySubdomain = host.replace(".careers.hibob.com", "").trim();
+  if (!companySubdomain) return null;
+
+  return {
+    baseOrigin: `${parsed.protocol}//${parsed.host}`,
+    apiUrl: `${parsed.protocol}//${parsed.host}/api/job-ad`,
+    companySubdomain
+  };
+}
+
+async function fetchHibobJobBoard(config, boardUrl) {
+  const boardResponse = await fetchWithAtsRateLimit("hibob", HIBOB_RATE_LIMIT_WAIT_MS, boardUrl, {
+    method: "GET",
+    headers: {
+      "User-Agent": DEFAULT_BROWSER_USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    }
+  });
+  if (!boardResponse.ok) {
+    const body = await boardResponse.text();
+    throw new Error(`HiBob board request failed (${boardResponse.status}): ${body.slice(0, 180)}`);
+  }
+
+  const apiResponse = await fetchWithAtsRateLimit("hibob", HIBOB_RATE_LIMIT_WAIT_MS, config.apiUrl, {
+    method: "GET",
+    headers: {
+      "User-Agent": DEFAULT_BROWSER_USER_AGENT,
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: boardUrl,
+      Origin: config.baseOrigin
+    }
+  });
+
+  if (!apiResponse.ok) {
+    const body = await apiResponse.text();
+    throw new Error(`HiBob API request failed (${apiResponse.status}): ${body.slice(0, 180)}`);
+  }
+  return apiResponse.json();
+}
+
+function parseHibobPostingsFromApi(companyName, config, responseJson) {
+  if (!responseJson || typeof responseJson !== "object") return [];
+  const postings = [];
+  const seenUrls = new Set();
+  const jobAds = Array.isArray(responseJson.jobAdDetails) ? responseJson.jobAdDetails : [];
+
+  for (const item of jobAds) {
+    if (!item || typeof item !== "object") continue;
+    const jobId = cleanText(item.id);
+    if (!jobId) continue;
+
+    const postingUrl = cleanText(item.jobUrl) || cleanText(item.absoluteUrl) || cleanText(item.url);
+    const urlValue = postingUrl || `${config.baseOrigin}/job/${jobId}`;
+    if (!urlValue || seenUrls.has(urlValue)) continue;
+
+    const title = cleanText(item.title) || "Untitled Position";
+    const location = cleanText(item.site) || cleanText(item.country) || null;
+    const postingDate = cleanText(item.publishedAt) || null;
+
+    postings.push({
+      company_name: companyName,
+      position_name: title,
+      job_posting_url: urlValue,
+      posting_date: postingDate,
+      location
+    });
+    seenUrls.add(urlValue);
+  }
+
+  return postings;
+}
+
+async function collectPostingsForHibobCompany(company) {
+  const config = parseHibobCompany(company?.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.companySubdomain;
+  const responseJson = await fetchHibobJobBoard(config, company.url_string);
+  return parseHibobPostingsFromApi(companyNameForPostings, config, responseJson);
+}
+
+function parseIsolvisolvedhireCompany(url) {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) return null;
+
+  const parsed = parseUrl(normalizedUrl);
+  if (!parsed || !parsed.protocol || !parsed.host) return null;
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".isolvedhire.com")) return null;
+
+  return {
+    baseOrigin: `${parsed.protocol}//${parsed.host}`,
+    boardUrl: normalizedUrl,
+    host
+  };
+}
+
+function extractIsolvisolvedhireDomainId(pageHtml) {
+  const page = String(pageHtml || "");
+  const routeDataMatch = page.match(/courierCurrentRouteData\s*=\s*(\{[\s\S]*?\});/i);
+  if (routeDataMatch) {
+    try {
+      const parsed = JSON.parse(routeDataMatch[1]);
+      const domainId = cleanText(parsed?.domain_id);
+      if (domainId) return domainId;
+    } catch {}
+  }
+
+  const directMatch = page.match(/"domain_id"\s*:\s*"?(?<id>\d+)"?/i);
+  if (directMatch?.groups?.id) return cleanText(directMatch.groups.id);
+  return "";
+}
+
+async function fetchIsolvisolvedhireJobBoard(config) {
+  const boardResponse = await fetchWithAtsRateLimit(
+    "isolvisolvedhire",
+    ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
+    config.boardUrl,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": DEFAULT_BROWSER_USER_AGENT,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }
+  );
+  if (!boardResponse.ok) {
+    const body = await boardResponse.text();
+    throw new Error(`isolvedhire board request failed (${boardResponse.status}): ${body.slice(0, 180)}`);
+  }
+  const boardHtml = await boardResponse.text();
+  const domainId = extractIsolvisolvedhireDomainId(boardHtml);
+  if (!domainId) throw new Error("isolvedhire domain_id not found in board HTML");
+
+  const apiUrl = `${config.baseOrigin}/core/jobs/${encodeURIComponent(domainId)}?getParams=%7B%7D`;
+  const apiResponse = await fetchWithAtsRateLimit(
+    "isolvisolvedhire",
+    ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
+    apiUrl,
+    {
+      method: "GET",
+      headers: {
+        "User-Agent": DEFAULT_BROWSER_USER_AGENT,
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        Referer: config.boardUrl,
+        Origin: config.baseOrigin
+      }
+    }
+  );
+  if (!apiResponse.ok) {
+    const body = await apiResponse.text();
+    throw new Error(`isolvedhire API request failed (${apiResponse.status}): ${body.slice(0, 180)}`);
+  }
+  return apiResponse.json();
+}
+
+function parseIsolvisolvedhirePostingsFromApi(companyName, responseJson) {
+  if (!responseJson || typeof responseJson !== "object") return [];
+  const jobs = Array.isArray(responseJson?.data?.jobs) ? responseJson.data.jobs : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const job of jobs) {
+    if (!job || typeof job !== "object") continue;
+    const postingUrl = cleanText(job.jobUrl) || "";
+    if (!postingUrl || seenUrls.has(postingUrl)) continue;
+
+    postings.push({
+      company_name: companyName,
+      position_name: cleanText(job.title) || "Untitled Position",
+      job_posting_url: postingUrl,
+      posting_date: cleanText(job.startDateRef) || null,
+      location: cleanText(job.jobLocation) || null
+    });
+    seenUrls.add(postingUrl);
+  }
+  return postings;
+}
+
+async function collectPostingsForIsolvisolvedhireCompany(company) {
+  const config = parseIsolvisolvedhireCompany(company?.url_string);
+  if (!config) return [];
+
+  const normalizedCompanyName = String(company?.company_name || "").trim();
+  const companyNameForPostings = normalizedCompanyName || config.host.split(".")[0];
+  const responseJson = await fetchIsolvisolvedhireJobBoard(config);
+  return parseIsolvisolvedhirePostingsFromApi(companyNameForPostings, responseJson);
+}
+
 async function collectPostingsForManatalCompany(company) {
   const config = parseManatalCompany(company.url_string);
   if (!config) return [];
@@ -9998,6 +10450,1073 @@ async function collectPostingsForTaleoCompany(company) {
   return postings;
 }
 
+function cleanGovernmentJobsText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractGovernmentJobsLastPage(viewHtml) {
+  const source = String(viewHtml || "");
+  const pageValues = [];
+  const pageRegex = /[?&]page=(\d+)/gi;
+  let match = pageRegex.exec(source);
+  while (match) {
+    const pageNumber = Number.parseInt(String(match[1] || "").trim(), 10);
+    if (Number.isFinite(pageNumber) && pageNumber > 0) {
+      pageValues.push(pageNumber);
+    }
+    match = pageRegex.exec(source);
+  }
+  return pageValues.length > 0 ? Math.max(...pageValues) : 1;
+}
+
+function extractGovernmentJobsViewHtmlFromResponse(response, bodyText) {
+  const contentType = String(response?.headers?.get("content-type") || "").toLowerCase();
+  const rawBody = String(bodyText || "");
+  if (!contentType.includes("application/json")) {
+    return rawBody;
+  }
+  try {
+    const parsed = JSON.parse(rawBody);
+    if (parsed && typeof parsed === "object") {
+      return String(parsed.view1 || "");
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function parseGovernmentJobsPostingsFromViewHtml(viewHtml) {
+  const source = String(viewHtml || "");
+  if (!source) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  const itemRegex = /<li[^>]*class=["'][^"']*\bjob-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+  const linkRegex =
+    /<a[^>]*class=["'][^"']*\bjob-details-link\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
+  const orgRegex = /<div[^>]*class=["'][^"']*\bjob-organization\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
+  const locationRegex = /<span[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i;
+
+  let itemMatch = itemRegex.exec(source);
+  while (itemMatch) {
+    const itemHtml = String(itemMatch[1] || "");
+    const linkMatch = linkRegex.exec(itemHtml);
+    if (!linkMatch) {
+      itemMatch = itemRegex.exec(source);
+      continue;
+    }
+
+    const href = cleanGovernmentJobsText(linkMatch[1]).replace(/\s+/g, "");
+    const jobPostingUrl = href ? new URL(href, "https://www.governmentjobs.com/").toString() : "";
+    if (!jobPostingUrl || !jobPostingUrl.toLowerCase().includes("governmentjobs.com/jobs/") || seenUrls.has(jobPostingUrl)) {
+      itemMatch = itemRegex.exec(source);
+      continue;
+    }
+
+    const companyName = cleanGovernmentJobsText((orgRegex.exec(itemHtml) || [])[1]) || "Unknown Company";
+    const positionName = cleanGovernmentJobsText(linkMatch[2]) || "Untitled Position";
+    const location = cleanGovernmentJobsText((locationRegex.exec(itemHtml) || [])[1]) || null;
+
+    postings.push({
+      company_name: companyName,
+      position_name: positionName,
+      job_posting_url: jobPostingUrl,
+      posting_date: "Posted Today",
+      location
+    });
+    seenUrls.add(jobPostingUrl);
+    itemMatch = itemRegex.exec(source);
+  }
+
+  return postings;
+}
+
+async function fetchGovernmentJobsViewHtml(url, params) {
+  const requestUrl = new URL(url);
+  for (const [key, value] of Object.entries(params || {})) {
+    requestUrl.searchParams.set(key, String(value));
+  }
+
+  const res = await fetchWithAtsRateLimit("governmentjobs", GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS, requestUrl.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "X-Requested-With": "XMLHttpRequest"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GovernmentJobs request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const text = await res.text();
+  return extractGovernmentJobsViewHtmlFromResponse(res, text);
+}
+
+async function collectPostingsForGovernmentJobsDynamic() {
+  const postings = [];
+  const seenUrls = new Set();
+  const timestamp = Date.now().toString();
+
+  const firstViewHtml = await fetchGovernmentJobsViewHtml("https://www.governmentjobs.com/jobs", {
+    keyword: "",
+    location: "",
+    daysposted: "1",
+    isFiltered: "true",
+    _: timestamp
+  });
+
+  const firstBatch = parseGovernmentJobsPostingsFromViewHtml(firstViewHtml);
+  for (const posting of firstBatch) {
+    if (seenUrls.has(posting.job_posting_url)) continue;
+    seenUrls.add(posting.job_posting_url);
+    postings.push(posting);
+  }
+
+  const lastPage = extractGovernmentJobsLastPage(firstViewHtml);
+  for (let page = 2; page <= lastPage; page += 1) {
+    const pageViewHtml = await fetchGovernmentJobsViewHtml("https://www.governmentjobs.com/jobs", {
+      page: String(page),
+      daysPosted: "1",
+      isTransfer: "False",
+      isPromotional: "False",
+      _: Date.now().toString()
+    });
+
+    const batch = parseGovernmentJobsPostingsFromViewHtml(pageViewHtml);
+    for (const posting of batch) {
+      if (seenUrls.has(posting.job_posting_url)) continue;
+      seenUrls.add(posting.job_posting_url);
+      postings.push(posting);
+    }
+  }
+
+  return postings;
+}
+
+function cleanSmartRecruitersText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildSmartRecruitersLocationLabel(locationObj, shortLocation) {
+  const shortValue = cleanSmartRecruitersText(shortLocation);
+  if (shortValue) return shortValue;
+
+  const locationData = locationObj && typeof locationObj === "object" ? locationObj : {};
+  const city = cleanSmartRecruitersText(locationData.city);
+  const region = cleanSmartRecruitersText(locationData.region);
+  const country = cleanSmartRecruitersText(locationData.country);
+  const parts = [city, region, country].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+async function collectPostingsForSmartRecruitersDynamic(limit = 100) {
+  const cappedLimit = Math.max(1, Math.min(100, Number(limit) || 100));
+  const endpoint = new URL("https://jobs.smartrecruiters.com/sr-jobs/search");
+  endpoint.searchParams.set("limit", String(cappedLimit));
+  endpoint.searchParams.set("_", String(Date.now()));
+
+  const res = await fetchWithAtsRateLimit(
+    "smartrecruiters",
+    SMARTRECRUITERS_RATE_LIMIT_WAIT_MS,
+    endpoint.toString(),
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`SmartRecruiters request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const payload = await res.json();
+  const contentItems = Array.isArray(payload?.content) ? payload.content : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const item of contentItems) {
+    if (!item || typeof item !== "object") continue;
+
+    const jobUrl = cleanSmartRecruitersText(item.applyUrl);
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    const company = item.company && typeof item.company === "object" ? item.company : {};
+    const companyName = cleanSmartRecruitersText(company.name) || "Unknown Company";
+    const title = cleanSmartRecruitersText(item.name) || "Untitled Position";
+    const location = buildSmartRecruitersLocationLabel(item.location, item.shortLocation);
+    const postedDate = cleanSmartRecruitersText(item.releasedDate) || null;
+
+    postings.push({
+      company_name: companyName,
+      position_name: title,
+      job_posting_url: jobUrl,
+      posting_date: postedDate,
+      location
+    });
+    seenUrls.add(jobUrl);
+  }
+
+  return postings;
+}
+
+function cleanPoliceappText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizePoliceappJobUrl(rawUrl, baseOrigin = "https://www.policeapp.com") {
+  let value = String(rawUrl || "").trim();
+  if (!value) return "";
+  if (value.startsWith("/")) {
+    value = new URL(value, `${baseOrigin}/`).toString();
+  } else if (!/^https?:\/\//i.test(value)) {
+    value = new URL(value, `${baseOrigin}/`).toString();
+  }
+  value = value.replace(
+    /^(https?:\/\/www\.policeapp\.com\/)jobs\/urlrewrite_jobpostings\//i,
+    "$1"
+  );
+  return value;
+}
+
+function parsePoliceappPostingsFromHtml(responseHtml) {
+  const source = String(responseHtml || "");
+  if (!source) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+
+  let linkMatch = linkRegex.exec(source);
+  while (linkMatch) {
+    const hrefRaw = cleanPoliceappText(linkMatch[1]);
+    const hrefLower = hrefRaw.toLowerCase();
+    if (!hrefLower || hrefLower.startsWith("javascript:") || hrefLower.startsWith("#")) {
+      linkMatch = linkRegex.exec(source);
+      continue;
+    }
+    if (!/\/\d+\/?$/.test(hrefLower)) {
+      linkMatch = linkRegex.exec(source);
+      continue;
+    }
+
+    const jobPostingUrl = normalizePoliceappJobUrl(hrefRaw);
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
+      linkMatch = linkRegex.exec(source);
+      continue;
+    }
+
+    const bodyText = cleanPoliceappText(linkMatch[2]);
+    const titlePart = bodyText.split(/deadline\s*:/i)[0].trim();
+    const positionName = titlePart || "Untitled Position";
+
+    const companyName = positionName.includes(" - ")
+      ? positionName.split(" - ", 1)[0].trim() || "Unknown Company"
+      : "Unknown Company";
+
+    postings.push({
+      company_name: companyName,
+      position_name: positionName,
+      job_posting_url: jobPostingUrl,
+      posting_date: "Posted Today",
+      location: null
+    });
+    seenUrls.add(jobPostingUrl);
+    linkMatch = linkRegex.exec(source);
+  }
+
+  return postings;
+}
+
+async function collectPostingsForPoliceappDynamic() {
+  const endpoint =
+    "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0";
+  const res = await fetchWithAtsRateLimit("policeapp", POLICEAPP_RATE_LIMIT_WAIT_MS, endpoint, {
+    method: "GET",
+    headers: {
+      Accept: "text/html, */*; q=0.01",
+      "Accept-Language": "en-US,en;q=0.9",
+      "X-Requested-With": "XMLHttpRequest"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`PoliceApp request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const html = await res.text();
+  return parsePoliceappPostingsFromHtml(html);
+}
+
+function cleanUsajobsText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractUsajobsOpenDate(dateDisplay) {
+  const raw = cleanUsajobsText(dateDisplay);
+  if (!raw) return null;
+  const match = raw.match(/open\s+(\d{2}\/\d{2}\/\d{4})\s+to/i);
+  return match?.[1] || null;
+}
+
+function parseUsajobsPostingsFromPayload(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  const jobs = Array.isArray(payload.Jobs) ? payload.Jobs : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const job of jobs) {
+    if (!job || typeof job !== "object") continue;
+
+    let jobPostingUrl = cleanUsajobsText(job.PositionURI);
+    if (!jobPostingUrl) {
+      const documentId = cleanUsajobsText(job.DocumentID);
+      if (documentId) {
+        jobPostingUrl = `https://www.usajobs.gov/job/${documentId}`;
+      }
+    }
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) continue;
+
+    const positionName = cleanUsajobsText(job.Title) || "Untitled Position";
+    const companyName = cleanUsajobsText(job.Agency) || "Unknown Agency";
+    const location = cleanUsajobsText(job.LocationName || job.Location) || null;
+    const postingDate = extractUsajobsOpenDate(job.DateDisplay);
+
+    postings.push({
+      company_name: companyName,
+      position_name: positionName,
+      job_posting_url: jobPostingUrl,
+      posting_date: postingDate,
+      location
+    });
+    seenUrls.add(jobPostingUrl);
+  }
+
+  return postings;
+}
+
+async function collectPostingsForUsajobsDynamic(maxPages = 2, resultsPerPage = 25) {
+  const executeUrl = "https://www.usajobs.gov/Search/ExecuteSearch";
+  const resultsUrl = "https://www.usajobs.gov/Search/Results?hiringPath=public&s=startdate&sd=desc&p=1";
+
+  const landingRes = await fetchWithAtsRateLimit("usajobs", USAJOBS_RATE_LIMIT_WAIT_MS, resultsUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    }
+  });
+
+  if (!landingRes.ok) {
+    const body = await landingRes.text();
+    throw new Error(`USAJobs landing request failed (${landingRes.status}): ${body.slice(0, 180)}`);
+  }
+  const landingHtml = await landingRes.text();
+  const tokenMatch = landingHtml.match(/<meta name="request-verification-token" content="([^"]+)"/i);
+  const requestVerificationToken = String(tokenMatch?.[1] || "").trim();
+  if (!requestVerificationToken) {
+    throw new Error("USAJobs RequestVerificationToken not found on landing page");
+  }
+
+  const collected = [];
+  const seenUrls = new Set();
+  let totalPages = 1;
+  const pageLimit = Math.max(1, Math.min(20, Number(maxPages) || 2));
+  const perPage = Math.max(1, Math.min(100, Number(resultsPerPage) || 25));
+
+  for (let page = 1; page <= pageLimit; page += 1) {
+    const requestBody = {
+      JobTitle: [],
+      GradeBucket: [],
+      JobCategoryCode: [],
+      JobCategoryFamily: [],
+      LocationName: [],
+      Department: [],
+      Agency: [],
+      PositionOfferingTypeCode: [],
+      TravelPercentage: [],
+      PositionScheduleTypeCode: [],
+      SecurityClearanceRequired: [],
+      PositionSensitivity: [],
+      JobGradeCode: [],
+      SortField: "startdate",
+      SortDirection: "desc",
+      Page: String(page),
+      ShowAllFilters: [],
+      HiringPath: ["public"],
+      SocTitle: [],
+      ResultsPerPage: perPage,
+      MCOTags: [],
+      CyberWorkRole: [],
+      CyberWorkGrouping: [],
+      JobType: []
+    };
+
+    const res = await fetchWithAtsRateLimit("usajobs", USAJOBS_RATE_LIMIT_WAIT_MS, executeUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Origin: "https://www.usajobs.gov",
+        Referer: resultsUrl,
+        RequestVerificationToken: requestVerificationToken
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`USAJobs search request failed (${res.status}): ${body.slice(0, 180)}`);
+    }
+
+    const payload = await res.json();
+    const numberOfPagesRaw = Number(payload?.Pager?.NumberOfPages);
+    if (Number.isFinite(numberOfPagesRaw) && numberOfPagesRaw > 0) {
+      totalPages = numberOfPagesRaw;
+    }
+
+    const batch = parseUsajobsPostingsFromPayload(payload);
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      collected.push(posting);
+      seenUrls.add(postingUrl);
+    }
+
+    if (page >= totalPages) break;
+  }
+
+  return collected;
+}
+
+function cleanK12jobspotText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseK12jobspotPostingsFromPayload(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const job of jobs) {
+    if (!job || typeof job !== "object") continue;
+    const jobId = cleanK12jobspotText(job.id);
+    if (!jobId) continue;
+
+    const jobPostingUrl = `https://www.k12jobspot.com/Job/Detail/${jobId}`;
+    if (seenUrls.has(jobPostingUrl)) continue;
+
+    const companyName = cleanK12jobspotText(job.hiringOrganization) || "Unknown Organization";
+    const positionName = cleanK12jobspotText(job.title) || "Untitled Position";
+    const locationObj = job.location && typeof job.location === "object" ? job.location : {};
+    const city = cleanK12jobspotText(locationObj.city);
+    const region = cleanK12jobspotText(locationObj.regionCode);
+    const postal = cleanK12jobspotText(locationObj.postalCode);
+    const locationParts = [city, region, postal].filter(Boolean);
+    const location = locationParts.length > 0 ? locationParts.join(", ") : null;
+    const postingDate = cleanK12jobspotText(job.postedDate) || null;
+
+    postings.push({
+      company_name: companyName,
+      position_name: positionName,
+      job_posting_url: jobPostingUrl,
+      posting_date: postingDate,
+      location
+    });
+    seenUrls.add(jobPostingUrl);
+  }
+
+  return postings;
+}
+
+async function fetchK12jobspotSearchPayload(pageStartIndex, pageEndIndex) {
+  const endpoint = "https://api.k12jobspot.com/api/Jobs/Search";
+  const requestBody = {
+    searchPhrase: "",
+    filters: [
+      { name: "positionAreas", filters: [] },
+      { name: "gradeLevels", filters: [] },
+      { name: "jobTypes", filters: [] }
+    ],
+    pageStartIndex,
+    pageEndIndex
+  };
+
+  const res = await fetchWithAtsRateLimit("k12jobspot", K12JOBSPOT_RATE_LIMIT_WAIT_MS, endpoint, {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Content-Type": "application/json",
+      Origin: "https://www.k12jobspot.com",
+      Referer: "https://www.k12jobspot.com/"
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`K12JobSpot request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+  return res.json();
+}
+
+async function collectPostingsForK12jobspotDynamic(pageWindowSize = 25) {
+  const windowSize = Math.max(1, Number(pageWindowSize) || 25);
+  const postings = [];
+  const seenUrls = new Set();
+  const referenceEpoch = nowEpochSeconds();
+  let pageStartIndex = 1;
+
+  while (true) {
+    const pageEndIndex = pageStartIndex + windowSize - 1;
+    const payload = await fetchK12jobspotSearchPayload(pageStartIndex, pageEndIndex);
+    const batch = parseK12jobspotPostingsFromPayload(payload);
+    if (batch.length === 0) break;
+
+    let hasWithin24h = false;
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      if (!shouldStorePostingByDate(posting?.posting_date, referenceEpoch)) continue;
+      hasWithin24h = true;
+      postings.push(posting);
+      seenUrls.add(postingUrl);
+    }
+
+    if (!hasWithin24h) break;
+    pageStartIndex = pageEndIndex + 1;
+  }
+
+  return postings;
+}
+
+function parseSchoolspringPostingsFromPayload(payload) {
+  const jobs = payload?.value?.jobsList;
+  if (!Array.isArray(jobs)) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  for (const job of jobs) {
+    const jobId = Number(job?.jobId || 0);
+    if (!Number.isFinite(jobId) || jobId <= 0) continue;
+    const jobPostingUrl = `https://www.schoolspring.com/job.cfm?jid=${jobId}`;
+    if (seenUrls.has(jobPostingUrl)) continue;
+    seenUrls.add(jobPostingUrl);
+
+    postings.push({
+      company_name: String(job?.employer || "").trim() || "Unknown Employer",
+      position_name: String(job?.title || "").trim() || "Untitled Position",
+      job_posting_url: jobPostingUrl,
+      posting_date: String(job?.displayDate || "").trim() || null,
+      location: String(job?.location || "").trim() || null
+    });
+  }
+  return postings;
+}
+
+async function fetchSchoolspringSearchPayload(page, size = 25) {
+  const endpoint = new URL("https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch");
+  endpoint.searchParams.set("domainName", "");
+  endpoint.searchParams.set("keyword", "");
+  endpoint.searchParams.set("location", "");
+  endpoint.searchParams.set("category", "");
+  endpoint.searchParams.set("gradelevel", "");
+  endpoint.searchParams.set("jobtype", "");
+  endpoint.searchParams.set("organization", "");
+  endpoint.searchParams.set("swLat", "");
+  endpoint.searchParams.set("swLon", "");
+  endpoint.searchParams.set("neLat", "");
+  endpoint.searchParams.set("neLon", "");
+  endpoint.searchParams.set("page", String(page));
+  endpoint.searchParams.set("size", String(size));
+  endpoint.searchParams.set("sortDateAscending", "false");
+
+  const res = await fetchWithAtsRateLimit("schoolspring", SCHOOLSPRING_RATE_LIMIT_WAIT_MS, endpoint.toString(), {
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      Origin: "https://www.schoolspring.com",
+      Referer: "https://www.schoolspring.com/"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`SchoolSpring request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+  return res.json();
+}
+
+async function collectPostingsForSchoolspringDynamic(pageSize = 25) {
+  const size = Math.max(1, Number(pageSize) || 25);
+  const postings = [];
+  const seenUrls = new Set();
+  const referenceEpoch = nowEpochSeconds();
+  let page = 1;
+
+  while (true) {
+    const payload = await fetchSchoolspringSearchPayload(page, size);
+    const batch = parseSchoolspringPostingsFromPayload(payload);
+    if (batch.length === 0) break;
+
+    let hasWithin24h = false;
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      if (!shouldStorePostingByDate(posting?.posting_date, referenceEpoch)) continue;
+      hasWithin24h = true;
+      postings.push(posting);
+      seenUrls.add(postingUrl);
+    }
+
+    if (!hasWithin24h) break;
+    page += 1;
+  }
+
+  return postings;
+}
+
+function cleanCalcareersText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractCalcareersHiddenInputs(htmlSource) {
+  const source = String(htmlSource || "");
+  const hidden = {};
+  const regex = /<input[^>]+type=["']hidden["'][^>]*>/gi;
+  let match = regex.exec(source);
+  while (match) {
+    const tag = String(match[0] || "");
+    const nameMatch = tag.match(/\bname=["']([^"']+)["']/i);
+    if (!nameMatch?.[1]) {
+      match = regex.exec(source);
+      continue;
+    }
+    const valueMatch = tag.match(/\bvalue=["']([^"']*)["']/i);
+    hidden[nameMatch[1]] = valueMatch?.[1] || "";
+    match = regex.exec(source);
+  }
+  return hidden;
+}
+
+function extractCalcareersPagerTargets(htmlSource) {
+  const source = String(htmlSource || "");
+  const targets = [];
+  const seen = new Set();
+  const regex = /__doPostBack\(&#39;([^']+btnPagerItem[^']*)&#39;,\s*&#39;[^']*&#39;\)/gi;
+  let match = regex.exec(source);
+  while (match) {
+    const target = String(match[1] || "").trim();
+    if (target && !seen.has(target)) {
+      seen.add(target);
+      targets.push(target);
+    }
+    match = regex.exec(source);
+  }
+  return targets;
+}
+
+function parseCalcareersPostingsFromHtml(htmlSource) {
+  const source = String(htmlSource || "");
+  if (!source) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  const cardRegex = new RegExp(
+    String.raw`Working Title:\s*</div>\s*<div class="col-xs-6 job-details">\s*<span[^>]*>(.*?)</span>` +
+      String.raw`[\s\S]*?Job Control:\s*</div>\s*<div class="col-xs-6 job-details">\s*(\d+)\s*</div>` +
+      String.raw`[\s\S]*?Department:\s*</div>\s*<div class="col-xs-6 job-details">\s*(.*?)\s*</div>` +
+      String.raw`[\s\S]*?Location:\s*</div>\s*<div class="col-xs-6 job-details">\s*(.*?)\s*</div>` +
+      String.raw`[\s\S]*?Publish Date:\s*</div>\s*<div class="col-xs-6 job-details">\s*<time[^>]*>\s*([^<]+)\s*</time>` +
+      String.raw`[\s\S]*?href="(https:\/\/www\.calcareers\.ca\.gov\/CalHrPublic\/Jobs\/JobPosting\.aspx\?JobControlId=\d+)"`,
+    "gi"
+  );
+
+  let match = cardRegex.exec(source);
+  while (match) {
+    const positionName = cleanCalcareersText(match[1]) || "Untitled Position";
+    const companyName = cleanCalcareersText(match[3]) || "Unknown Department";
+    const location = cleanCalcareersText(match[4]) || null;
+    const postingDate = cleanCalcareersText(match[5]) || null;
+    const jobPostingUrl = cleanCalcareersText(match[6]);
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
+      match = cardRegex.exec(source);
+      continue;
+    }
+    postings.push({
+      company_name: companyName,
+      position_name: positionName,
+      job_posting_url: jobPostingUrl,
+      posting_date: postingDate,
+      location
+    });
+    seenUrls.add(jobPostingUrl);
+    match = cardRegex.exec(source);
+  }
+
+  return postings;
+}
+
+function buildCalcareersPostPayload(hiddenFields, eventTarget) {
+  const payload = { ...(hiddenFields || {}) };
+  payload.__EVENTTARGET = eventTarget;
+  payload.__EVENTARGUMENT = "";
+  payload["ctl00$cphMainContent$txtKeyword"] = "";
+  payload["ctl00$cphMainContent$chkExactWordMatch"] = "on";
+  payload["ctl00$cphMainContent$hdnInit"] = "true";
+  payload["ctl00$ucUtilityHeader1$txtGoogleSiteSearch"] = payload["ctl00$ucUtilityHeader1$txtGoogleSiteSearch"] || "";
+  payload["ctl00$hdnShowHeaderPadding"] = payload["ctl00$hdnShowHeaderPadding"] || "1";
+  payload["ctl00$ucSessionTimeoutDialog$tmrCountdown"] = payload["ctl00$ucSessionTimeoutDialog$tmrCountdown"] || "1200";
+  return payload;
+}
+
+async function collectPostingsForCalcareersDynamic() {
+  const endpoint = "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx";
+  const headers = {
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Content-Type": "application/x-www-form-urlencoded",
+    Referer: endpoint
+  };
+  const referenceEpoch = nowEpochSeconds();
+  const postings = [];
+  const seenUrls = new Set();
+  const pendingTargets = [];
+  const visitedTargets = new Set();
+
+  const landing = await fetchWithAtsRateLimit("calcareers", CALCAREERS_RATE_LIMIT_WAIT_MS, endpoint, {
+    method: "GET",
+    headers
+  });
+  if (!landing.ok) {
+    const body = await landing.text();
+    throw new Error(`CalCareers landing request failed (${landing.status}): ${body.slice(0, 180)}`);
+  }
+
+  let hidden = extractCalcareersHiddenInputs(await landing.text());
+  let nextEventTarget = "ctl00$cphMainContent$btnSearch";
+  let rowCountApplied = false;
+
+  while (true) {
+    const payload = buildCalcareersPostPayload(hidden, nextEventTarget);
+    if (nextEventTarget === "ctl00$cphMainContent$ddlRowCount") {
+      payload["ctl00$cphMainContent$ddlRowCount"] = "100";
+    }
+
+    const res = await fetchWithAtsRateLimit("calcareers", CALCAREERS_RATE_LIMIT_WAIT_MS, endpoint, {
+      method: "POST",
+      headers,
+      body: new URLSearchParams(payload).toString()
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`CalCareers postback failed (${res.status}): ${body.slice(0, 180)}`);
+    }
+    const pageHtml = await res.text();
+    hidden = extractCalcareersHiddenInputs(pageHtml);
+
+    const batch = parseCalcareersPostingsFromHtml(pageHtml);
+    let hasWithin24h = false;
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      if (!shouldStorePostingByDate(posting?.posting_date, referenceEpoch)) continue;
+      postings.push(posting);
+      seenUrls.add(postingUrl);
+      hasWithin24h = true;
+    }
+
+    if (!rowCountApplied) {
+      rowCountApplied = true;
+      nextEventTarget = "ctl00$cphMainContent$ddlRowCount";
+      continue;
+    }
+
+    if (!hasWithin24h) break;
+
+    const pagerTargets = extractCalcareersPagerTargets(pageHtml);
+    for (const target of pagerTargets) {
+      if (visitedTargets.has(target)) continue;
+      if (!pendingTargets.includes(target)) {
+        pendingTargets.push(target);
+      }
+    }
+    while (pendingTargets.length > 0 && visitedTargets.has(pendingTargets[0])) {
+      pendingTargets.shift();
+    }
+    if (pendingTargets.length === 0) break;
+
+    nextEventTarget = pendingTargets.shift();
+    visitedTargets.add(nextEventTarget);
+  }
+
+  return postings;
+}
+
+function cleanCaloppsText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function inferCaloppsCompanyFromPath(pathValue) {
+  const path = String(pathValue || "").trim().replace(/^\/+|\/+$/g, "");
+  if (!path) return "Unknown Agency";
+  const firstSegment = path.split("/", 1)[0];
+  const company = firstSegment.replace(/-/g, " ").trim();
+  return company ? toTitleCase(company) : "Unknown Agency";
+}
+
+function parseCaloppsPostingsFromHtml(pageHtml, pageUrl) {
+  const source = String(pageHtml || "");
+  if (!source) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
+
+  let rowMatch = rowRegex.exec(source);
+  while (rowMatch) {
+    const rowHtml = String(rowMatch[1] || "");
+    if (!rowHtml.toLowerCase().includes("views-field-label")) {
+      rowMatch = rowRegex.exec(source);
+      continue;
+    }
+
+    const cells = [];
+    let cellMatch = cellRegex.exec(rowHtml);
+    while (cellMatch) {
+      cells.push(String(cellMatch[1] || ""));
+      cellMatch = cellRegex.exec(rowHtml);
+    }
+    if (cells.length < 5) {
+      rowMatch = rowRegex.exec(source);
+      continue;
+    }
+
+    const linkMatch = linkRegex.exec(cells[0]);
+    if (!linkMatch) {
+      rowMatch = rowRegex.exec(source);
+      continue;
+    }
+
+    const href = cleanCaloppsText(linkMatch[1]);
+    const jobPostingUrl = urljoin(pageUrl, href);
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
+      rowMatch = rowRegex.exec(source);
+      continue;
+    }
+
+    const title = cleanCaloppsText(linkMatch[2]) || "Untitled Position";
+    const region = cleanCaloppsText(cells[1]) || null;
+    const category = cleanCaloppsText(cells[2]) || null;
+    const jobType = cleanCaloppsText(cells[3]) || null;
+    const closeDate = cleanCaloppsText(cells[4]) || null;
+    const postingIdMatch = href.match(/\/job-(\d+)/i);
+    const postingId = postingIdMatch?.[1] || jobPostingUrl;
+
+    postings.push({
+      id: postingId,
+      company_name: inferCaloppsCompanyFromPath(href),
+      position_name: title,
+      job_posting_url: jobPostingUrl,
+      posting_date: new Date().toISOString(),
+      location: region,
+      category,
+      work_type: jobType,
+      close_date: closeDate
+    });
+    seenUrls.add(jobPostingUrl);
+
+    rowMatch = rowRegex.exec(source);
+  }
+
+  return postings;
+}
+
+function extractCaloppsNextPageUrl(pageHtml, pageUrl) {
+  const source = String(pageHtml || "");
+  const match = source.match(
+    /<li[^>]*class=["'][^"']*\bnext\b[^"']*["'][^>]*>\s*<a[^>]*href=["']([^"']+)["']/i
+  );
+  if (!match?.[1]) return null;
+  return urljoin(pageUrl, cleanCaloppsText(match[1]));
+}
+
+async function collectPostingsForCaloppsDynamic(maxPages = 25) {
+  let nextPageUrl = "https://www.calopps.org/job-search-list";
+  let pagesFetched = 0;
+  const pageLimit = Math.max(1, Math.min(100, Number(maxPages) || 25));
+  const postings = [];
+  const seenUrls = new Set();
+
+  while (nextPageUrl && pagesFetched < pageLimit) {
+    const res = await fetchWithAtsRateLimit("calopps", CALOPPS_RATE_LIMIT_WAIT_MS, nextPageUrl, {
+      method: "GET",
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`CalOpps request failed (${res.status}): ${body.slice(0, 180)}`);
+    }
+    const pageHtml = await res.text();
+    const batch = parseCaloppsPostingsFromHtml(pageHtml, nextPageUrl);
+    for (const posting of batch) {
+      const postingUrl = String(posting?.job_posting_url || "").trim();
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      postings.push(posting);
+      seenUrls.add(postingUrl);
+    }
+
+    pagesFetched += 1;
+    nextPageUrl = extractCaloppsNextPageUrl(pageHtml, nextPageUrl);
+  }
+
+  return postings;
+}
+
+function formatStatejobsnyDate(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const year = String(date.getUTCFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
+}
+
+function buildStatejobsnyWindowUrl() {
+  const baseUrl = new URL("https://www.statejobsny.com/public/vacancyTable.cfm");
+  const now = new Date();
+  const startUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
+  const endUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  baseUrl.searchParams.set("searchResults", "yes");
+  baseUrl.searchParams.set("minDate", formatStatejobsnyDate(startUtc));
+  baseUrl.searchParams.set("maxDate", formatStatejobsnyDate(endUtc));
+  return baseUrl.toString();
+}
+
+function cleanStatejobsnyText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseStatejobsnyPostingsFromHtml(pageHtml, pageUrl) {
+  const source = String(pageHtml || "");
+  if (!source) return [];
+
+  const postings = [];
+  const seenUrls = new Set();
+  const tbodyMatch = source.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  const tbodyHtml = tbodyMatch?.[1] || source;
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
+
+  let rowMatch = rowRegex.exec(tbodyHtml);
+  while (rowMatch) {
+    const rowHtml = String(rowMatch[1] || "");
+    const cells = [];
+    let cellMatch = cellRegex.exec(rowHtml);
+    while (cellMatch) {
+      cells.push(String(cellMatch[1] || ""));
+      cellMatch = cellRegex.exec(rowHtml);
+    }
+
+    if (cells.length < 7) {
+      rowMatch = rowRegex.exec(tbodyHtml);
+      continue;
+    }
+
+    const titleLink = linkRegex.exec(cells[1]);
+    if (!titleLink) {
+      rowMatch = rowRegex.exec(tbodyHtml);
+      continue;
+    }
+
+    const href = cleanStatejobsnyText(titleLink[1]);
+    const jobPostingUrl = urljoin(pageUrl, href);
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
+      rowMatch = rowRegex.exec(tbodyHtml);
+      continue;
+    }
+
+    const positionName = cleanStatejobsnyText(titleLink[2]) || "Untitled Position";
+    const companyName = cleanStatejobsnyText(cells[5]) || "Unknown Agency";
+    const location = cleanStatejobsnyText(cells[6]) || null;
+    const postingDate = cleanStatejobsnyText(cells[3]) || null;
+
+    postings.push({
+      company_name: companyName,
+      position_name: positionName,
+      job_posting_url: jobPostingUrl,
+      posting_date: postingDate,
+      location
+    });
+    seenUrls.add(jobPostingUrl);
+    rowMatch = rowRegex.exec(tbodyHtml);
+  }
+
+  return postings;
+}
+
+async function collectPostingsForStatejobsnyDynamic() {
+  const endpoint = buildStatejobsnyWindowUrl();
+  const res = await fetchWithAtsRateLimit("statejobsny", STATEJOBSNY_RATE_LIMIT_WAIT_MS, endpoint, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`StateJobsNY request failed (${res.status}): ${body.slice(0, 180)}`);
+  }
+
+  const pageHtml = await res.text();
+  return parseStatejobsnyPostingsFromHtml(pageHtml, endpoint);
+}
+
 async function collectPostingsForCompany(company) {
   const atsName = String(company?.ATS_name || "").trim().toLowerCase();
   if (atsName === "workday") {
@@ -10104,6 +11623,20 @@ async function collectPostingsForCompany(company) {
   ) {
     return collectPostingsForBrassringCompany(company);
   }
+  if (atsName === "applitrack" || atsName === "applitrack.com" || atsName === "applitrackcom") {
+    return collectPostingsForApplitrackCompany(company);
+  }
+  if (atsName === "hibob" || atsName === "hibob.com" || atsName === "hibobcom" || atsName === "careers.hibob.com" || atsName === "careershibobcom") {
+    return collectPostingsForHibobCompany(company);
+  }
+  if (
+    atsName === "isolvisolvedhire" ||
+    atsName === "isolvedhire" ||
+    atsName === "isolvedhire.com" ||
+    atsName === "isolvedhirecom"
+  ) {
+    return collectPostingsForIsolvisolvedhireCompany(company);
+  }
   if (
     atsName === "manatal" ||
     atsName === "manatal.com" ||
@@ -10175,6 +11708,57 @@ async function collectPostingsForCompany(company) {
   }
   if (atsName === "getro" || atsName === "getro.com" || atsName === "getrocom") {
     return collectPostingsForGetroCompany(company);
+  }
+  if (atsName === "governmentjobs" || atsName === "governmentjobs.com" || atsName === "governmentjobscom") {
+    return collectPostingsForGovernmentJobsDynamic();
+  }
+  if (
+    atsName === "smartrecruiters" ||
+    atsName === "smartrecruiters.com" ||
+    atsName === "smartrecruiterscom" ||
+    atsName === "jobs.smartrecruiters.com" ||
+    atsName === "jobssmartrecruiterscom"
+  ) {
+    return collectPostingsForSmartRecruitersDynamic();
+  }
+  if (atsName === "policeapp" || atsName === "policeapp.com" || atsName === "policeappcom" || atsName === "www.policeapp.com" || atsName === "wwwpoliceappcom") {
+    return collectPostingsForPoliceappDynamic();
+  }
+  if (atsName === "usajobs" || atsName === "usajobs.gov" || atsName === "usajobsgov" || atsName === "www.usajobs.gov" || atsName === "wwwusajobsgov") {
+    return collectPostingsForUsajobsDynamic();
+  }
+  if (atsName === "k12jobspot" || atsName === "k12jobspot.com" || atsName === "k12jobspotcom" || atsName === "www.k12jobspot.com" || atsName === "wwwk12jobspotcom" || atsName === "api.k12jobspot.com" || atsName === "apik12jobspotcom") {
+    return collectPostingsForK12jobspotDynamic();
+  }
+  if (atsName === "schoolspring" || atsName === "schoolspring.com" || atsName === "schoolspringcom" || atsName === "api.schoolspring.com" || atsName === "apischoolspringcom" || atsName === "www.schoolspring.com" || atsName === "wwwschoolspringcom") {
+    return collectPostingsForSchoolspringDynamic();
+  }
+  if (
+    atsName === "calcareers" ||
+    atsName === "calcareers.ca.gov" ||
+    atsName === "calcareerscagov" ||
+    atsName === "www.calcareers.ca.gov" ||
+    atsName === "wwwcalcareerscagov"
+  ) {
+    return collectPostingsForCalcareersDynamic();
+  }
+  if (
+    atsName === "calopps" ||
+    atsName === "calopps.org" ||
+    atsName === "caloppsorg" ||
+    atsName === "www.calopps.org" ||
+    atsName === "wwwcaloppsorg"
+  ) {
+    return collectPostingsForCaloppsDynamic();
+  }
+  if (
+    atsName === "statejobsny" ||
+    atsName === "statejobsny.com" ||
+    atsName === "statejobsnycom" ||
+    atsName === "www.statejobsny.com" ||
+    atsName === "wwwstatejobsnycom"
+  ) {
+    return collectPostingsForStatejobsnyDynamic();
   }
   if (atsName === "hrmdirect" || atsName === "hrmdirect.com" || atsName === "hrmdirectcom") {
     return collectPostingsForHrmDirectCompany(company);
@@ -12044,6 +13628,33 @@ async function getSyncScopeStats() {
       syncEnabledCompanyCount += 1;
     }
   }
+  if (enabledAts.has("governmentjobs")) {
+    syncEnabledCompanyCount += GOVERNMENTJOBS_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("smartrecruiters")) {
+    syncEnabledCompanyCount += SMARTRECRUITERS_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("policeapp")) {
+    syncEnabledCompanyCount += POLICEAPP_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("usajobs")) {
+    syncEnabledCompanyCount += USAJOBS_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("k12jobspot")) {
+    syncEnabledCompanyCount += K12JOBSPOT_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("schoolspring")) {
+    syncEnabledCompanyCount += SCHOOLSPRING_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("calcareers")) {
+    syncEnabledCompanyCount += CALCAREERS_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("calopps")) {
+    syncEnabledCompanyCount += CALOPPS_ESTIMATED_COMPANY_COUNT;
+  }
+  if (enabledAts.has("statejobsny")) {
+    syncEnabledCompanyCount += STATEJOBSNY_ESTIMATED_COMPANY_COUNT;
+  }
 
   return {
     sync_enabled_company_count: syncEnabledCompanyCount,
@@ -12208,8 +13819,117 @@ async function runWorkdaySyncInternal() {
 
   try {
     const companies = await getCompaniesForSync();
-    shuffleArrayInPlace(companies);
-    syncStatus.progress.total = companies.length;
+    const enabledAts = new Set(normalizeSyncEnabledAts(Array.from(syncEnabledAts)));
+    const shuffledCompanies = shuffleArrayInPlace([...companies]);
+    const syncTargets = [];
+    let smartRecruitersInserted = false;
+    let companyInsertionsSinceSmartRecruiters = 0;
+    for (const company of shuffledCompanies) {
+      syncTargets.push(company);
+      companyInsertionsSinceSmartRecruiters += 1;
+
+      if (
+        enabledAts.has("smartrecruiters") &&
+        companyInsertionsSinceSmartRecruiters >= SMARTRECRUITERS_INSERT_EVERY_N_TARGETS
+      ) {
+        syncTargets.push({
+          id: null,
+          company_name: "SmartRecruiters (dynamic)",
+          url_string: "https://jobs.smartrecruiters.com/sr-jobs/search",
+          ATS_name: "smartrecruiters"
+        });
+        smartRecruitersInserted = true;
+        companyInsertionsSinceSmartRecruiters = 0;
+      }
+    }
+
+    if (enabledAts.has("smartrecruiters") && companyInsertionsSinceSmartRecruiters > 0) {
+      syncTargets.push({
+        id: null,
+        company_name: "SmartRecruiters (dynamic)",
+        url_string: "https://jobs.smartrecruiters.com/sr-jobs/search",
+        ATS_name: "smartrecruiters"
+      });
+      smartRecruitersInserted = true;
+    }
+
+    if (enabledAts.has("smartrecruiters") && !smartRecruitersInserted) {
+      syncTargets.push({
+        id: null,
+        company_name: "SmartRecruiters (dynamic)",
+        url_string: "https://jobs.smartrecruiters.com/sr-jobs/search",
+        ATS_name: "smartrecruiters"
+      });
+    }
+
+    if (enabledAts.has("governmentjobs")) {
+      syncTargets.push({
+        id: null,
+        company_name: "GovernmentJobs (dynamic)",
+        url_string: "https://www.governmentjobs.com/jobs",
+        ATS_name: "governmentjobs"
+      });
+    }
+    if (enabledAts.has("policeapp")) {
+      syncTargets.push({
+        id: null,
+        company_name: "PoliceApp (dynamic)",
+        url_string:
+          "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0",
+        ATS_name: "policeapp"
+      });
+    }
+    if (enabledAts.has("usajobs")) {
+      syncTargets.push({
+        id: null,
+        company_name: "USAJobs (dynamic)",
+        url_string: "https://www.usajobs.gov/Search/ExecuteSearch",
+        ATS_name: "usajobs"
+      });
+    }
+    if (enabledAts.has("k12jobspot")) {
+      syncTargets.push({
+        id: null,
+        company_name: "K12JobSpot (dynamic)",
+        url_string: "https://api.k12jobspot.com/api/Jobs/Search",
+        ATS_name: "k12jobspot"
+      });
+    }
+    if (enabledAts.has("schoolspring")) {
+      syncTargets.push({
+        id: null,
+        company_name: "SchoolSpring (dynamic)",
+        url_string:
+          "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch?domainName=&keyword=&location=&category=&gradelevel=&jobtype=&organization=&swLat=&swLon=&neLat=&neLon=&page=1&size=25&sortDateAscending=false",
+        ATS_name: "schoolspring"
+      });
+    }
+    if (enabledAts.has("calcareers")) {
+      syncTargets.push({
+        id: null,
+        company_name: "CalCareers (dynamic)",
+        url_string: "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx",
+        ATS_name: "calcareers"
+      });
+    }
+    if (enabledAts.has("calopps")) {
+      syncTargets.push({
+        id: null,
+        company_name: "CalOpps (dynamic)",
+        url_string: "https://www.calopps.org/job-search-list",
+        ATS_name: "calopps"
+      });
+    }
+    if (enabledAts.has("statejobsny")) {
+      syncTargets.push({
+        id: null,
+        company_name: "StateJobsNY (dynamic)",
+        url_string: "https://www.statejobsny.com/public/vacancyTable.cfm",
+        ATS_name: "statejobsny"
+      });
+    }
+
+    syncStatus.progress.total = syncTargets.length;
     let totalPruned = await pruneExpiredPostings(syncReferenceEpoch);
     let postingDatePruned = await prunePostingsOutsideDateWindow(syncReferenceEpoch);
     const nextPostingLocationByJobUrl = new Map();
@@ -12220,7 +13940,7 @@ async function runWorkdaySyncInternal() {
     let excludedByPostingDate = 0;
     let nextCompanyIndex = 0;
     let completedCompanies = 0;
-    const workerCount = Math.min(SYNC_WORKER_CONCURRENCY, Math.max(1, companies.length));
+    const workerCount = Math.min(SYNC_WORKER_CONCURRENCY, Math.max(1, syncTargets.length));
     let flushPromise = Promise.resolve();
 
     const flushPendingPostings = async (force = false) => {
@@ -12240,11 +13960,17 @@ async function runWorkdaySyncInternal() {
     const runSyncWorker = async () => {
       while (true) {
         const currentIndex = nextCompanyIndex;
-        if (currentIndex >= companies.length) return;
+        if (currentIndex >= syncTargets.length) return;
         nextCompanyIndex += 1;
 
-        const company = companies[currentIndex];
+        const company = syncTargets[currentIndex];
         try {
+          const companyAts = normalizeAtsFilterValue(company?.ATS_name);
+          const currentlyEnabledAts = new Set(normalizeSyncEnabledAts(Array.from(syncEnabledAts)));
+          if (!currentlyEnabledAts.has(companyAts)) {
+            continue;
+          }
+
           const postings = await collectPostingsForCompany(company);
           for (const posting of postings) {
             if (!shouldStorePostingByDate(posting?.posting_date, syncReferenceEpoch)) {
@@ -12272,7 +13998,7 @@ async function runWorkdaySyncInternal() {
           completedCompanies += 1;
           syncStatus.progress = {
             current: completedCompanies,
-            total: companies.length,
+            total: syncTargets.length,
             company_name: `${company.company_name} (${company.ATS_name})`,
             total_collected: dedupedPostings.size
           };
@@ -12280,7 +14006,7 @@ async function runWorkdaySyncInternal() {
       }
     };
 
-    if (companies.length > 0) {
+    if (syncTargets.length > 0) {
       await Promise.all(Array.from({ length: workerCount }, () => runSyncWorker()));
     }
 
@@ -12293,7 +14019,7 @@ async function runWorkdaySyncInternal() {
 
     syncStatus.last_sync_at = new Date().toISOString();
     syncStatus.last_sync_summary = {
-      total_companies: companies.length,
+      total_companies: syncTargets.length,
       ...syncScopeStats,
       total_postings_stored: dedupedPostings.size,
       worker_concurrency: workerCount,
@@ -12354,6 +14080,23 @@ function createServer() {
   app.use(cors());
   app.use(express.json());
 
+  app.post("/frontend/log", async (req, res) => {
+    try {
+      appendFrontendLogEntry(
+        req.body?.level,
+        req.body?.event,
+        req.body?.message,
+        req.body?.context && typeof req.body.context === "object" ? req.body.context : {}
+      );
+      res.status(202).json({ ok: true });
+    } catch (error) {
+      res.status(400).json({
+        ok: false,
+        error: String(error?.message || error)
+      });
+    }
+  });
+
   const handleSyncRequest = async (req, res) => {
     const wait = String(req.query.wait || "").toLowerCase();
     const shouldWait = wait === "1" || wait === "true";
@@ -12391,11 +14134,12 @@ function createServer() {
 
   app.get("/sync/status", async (_req, res) => {
     const [counts, syncScopeStats] = await Promise.all([getCounts(), getSyncScopeStats()]);
-    res.json({
+    const payload = sanitizeFrontendValue({
       ...syncStatus,
       ...syncScopeStats,
       ...counts
     });
+    res.json(payload);
   });
 
   app.post("/sync/workday", handleSyncRequest);
@@ -12967,7 +14711,7 @@ function createServer() {
     });
 
     res.json({
-      items: result.items,
+      items: sanitizeFrontendValue(result.items),
       count: result.count,
       limit: result.limit,
       offset: result.offset

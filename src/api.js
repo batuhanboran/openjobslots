@@ -232,4 +232,15 @@ export function completeMcpApplication(payload) {
   });
 }
 
+export async function postFrontendLog(payload) {
+  try {
+    return await request("/frontend/log", {
+      method: "POST",
+      body: JSON.stringify(payload || {})
+    });
+  } catch {
+    return { ok: false };
+  }
+}
+
 export { API_BASE_URL };

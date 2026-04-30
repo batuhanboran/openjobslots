@@ -212,6 +212,7 @@ const MCP_SETTINGS_DEFAULTS = {
 const ATS_FILTER_OPTIONS = new Set([
   "adp_myjobs",
   "adp_workforcenow",
+  "applitrack",
   "applicantai",
   "applicantpro",
   "applytojob",
@@ -228,6 +229,17 @@ const ATS_FILTER_OPTIONS = new Set([
   "freshteam",
   "gem",
   "getro",
+  "governmentjobs",
+  "smartrecruiters",
+  "policeapp",
+  "usajobs",
+  "k12jobspot",
+  "schoolspring",
+  "calcareers",
+  "calopps",
+  "statejobsny",
+  "hibob",
+  "isolvisolvedhire",
   "greenhouse",
   "hirebridge",
   "hrmdirect",
@@ -312,6 +324,11 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("jobs.lever.co")) return "lever";
   if ((url.includes("jobs.jobvite.com/") || url.includes("careers.jobvite.com/")) && url.includes("/job/")) return "jobvite";
   if (url.includes(".applicantpro.com/jobs")) return "applicantpro";
+  if (url.includes(".applitrack.com/") && (url.includes("/onlineapp/default.aspx") || url.includes("/jobpostings/output.asp") || url.includes("/default.aspx?jobid="))) {
+    return "applitrack";
+  }
+  if (url.includes(".careers.hibob.com/job/")) return "hibob";
+  if (url.includes(".isolvedhire.com/jobs/")) return "isolvisolvedhire";
   if (url.includes(".applytojob.com/apply")) return "applytojob";
   if (url.includes(".icims.com/jobs/")) return "icims";
   if (url.includes("theapplicantmanager.com/jobs")) return "theapplicantmanager";
@@ -324,6 +341,15 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("careers.dayforcehcm.com/")) return "dayforcehcm";
   if (url.includes("web.fountain.com/c/")) return "fountain";
   if (url.includes(".getro.com/jobs")) return "getro";
+  if (url.includes("governmentjobs.com/jobs/")) return "governmentjobs";
+  if (url.includes("jobs.smartrecruiters.com/")) return "smartrecruiters";
+  if (url.includes("policeapp.com/") && /\/\d+\/?$/.test(url)) return "policeapp";
+  if (url.includes("usajobs.gov/job/")) return "usajobs";
+  if (url.includes("k12jobspot.com/job/detail/")) return "k12jobspot";
+  if (url.includes("schoolspring.com/job.cfm?jid=")) return "schoolspring";
+  if (url.includes("calcareers.ca.gov/calhrpublic/jobs/jobposting.aspx?jobcontrolid=")) return "calcareers";
+  if (url.includes("calopps.org/") && url.includes("/job-")) return "calopps";
+  if (url.includes("statejobsny.com/public/vacancydetailsview.cfm?id=")) return "statejobsny";
   if (url.includes(".hrmdirect.com/employment/job-opening.php")) return "hrmdirect";
   if (url.includes(".talentlyft.com/jobs/")) return "talentlyft";
   if (url.includes(".talexio.com/jobs")) return "talexio";
@@ -397,6 +423,15 @@ function normalizeAtsFilters(value) {
         return "dayforcehcm";
       }
       if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
+      if (normalized === "applitrackcom" || normalized === "applitrack.com" || normalized === "applitrack") {
+        return "applitrack";
+      }
+      if (normalized === "hibob.com" || normalized === "hibobcom" || normalized === "hibob" || normalized === "careers.hibob.com" || normalized === "careershibobcom") {
+        return "hibob";
+      }
+      if (normalized === "isolvisolvedhire" || normalized === "isolvedhire" || normalized === "isolvedhire.com" || normalized === "isolvedhirecom") {
+        return "isolvisolvedhire";
+      }
       if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
       if (normalized === "applytojobcom" || normalized === "applytojob.com") return "applytojob";
       if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
@@ -413,6 +448,57 @@ function normalizeAtsFilters(value) {
       if (normalized === "careerpuck.com" || normalized === "careerpuckcom") return "careerpuck";
       if (normalized === "fountain.com" || normalized === "fountaincom") return "fountain";
       if (normalized === "getro.com" || normalized === "getrocom") return "getro";
+      if (normalized === "governmentjobs.com" || normalized === "governmentjobscom" || normalized === "governmentjobs") {
+        return "governmentjobs";
+      }
+      if (normalized === "policeapp" || normalized === "policeapp.com" || normalized === "policeappcom" || normalized === "www.policeapp.com" || normalized === "wwwpoliceappcom") {
+        return "policeapp";
+      }
+      if (normalized === "usajobs" || normalized === "usajobs.gov" || normalized === "usajobsgov" || normalized === "www.usajobs.gov" || normalized === "wwwusajobsgov") {
+        return "usajobs";
+      }
+      if (normalized === "k12jobspot" || normalized === "k12jobspot.com" || normalized === "k12jobspotcom" || normalized === "www.k12jobspot.com" || normalized === "wwwk12jobspotcom" || normalized === "api.k12jobspot.com" || normalized === "apik12jobspotcom") {
+        return "k12jobspot";
+      }
+      if (normalized === "schoolspring" || normalized === "schoolspring.com" || normalized === "schoolspringcom" || normalized === "www.schoolspring.com" || normalized === "wwwschoolspringcom" || normalized === "api.schoolspring.com" || normalized === "apischoolspringcom") {
+        return "schoolspring";
+      }
+      if (
+        normalized === "calcareers" ||
+        normalized === "calcareers.ca.gov" ||
+        normalized === "calcareerscagov" ||
+        normalized === "www.calcareers.ca.gov" ||
+        normalized === "wwwcalcareerscagov"
+      ) {
+        return "calcareers";
+      }
+      if (
+        normalized === "calopps" ||
+        normalized === "calopps.org" ||
+        normalized === "caloppsorg" ||
+        normalized === "www.calopps.org" ||
+        normalized === "wwwcaloppsorg"
+      ) {
+        return "calopps";
+      }
+      if (
+        normalized === "statejobsny" ||
+        normalized === "statejobsny.com" ||
+        normalized === "statejobsnycom" ||
+        normalized === "www.statejobsny.com" ||
+        normalized === "wwwstatejobsnycom"
+      ) {
+        return "statejobsny";
+      }
+      if (
+        normalized === "smartrecruiters.com" ||
+        normalized === "smartrecruiterscom" ||
+        normalized === "jobs.smartrecruiters.com" ||
+        normalized === "jobssmartrecruiterscom" ||
+        normalized === "smartrecruiters"
+      ) {
+        return "smartrecruiters";
+      }
       if (normalized === "hrmdirect.com" || normalized === "hrmdirectcom") return "hrmdirect";
       if (normalized === "talentlyft.com" || normalized === "talentlyftcom") return "talentlyft";
       if (normalized === "talexio.com" || normalized === "talexiocom") return "talexio";

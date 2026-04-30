@@ -27,6 +27,7 @@ import {
   fetchPostingFilterOptions,
   fetchPersonalInformation,
   fetchPostings,
+  postFrontendLog,
   fetchSyncServiceSettings,
   fetchSyncStatus,
   ignorePosting,
@@ -64,6 +65,7 @@ const APPLICATION_STATUS_OPTIONS = [
   "denied"
 ];
 const DEFAULT_SYNC_INTERVAL_SECONDS = 3600;
+const FRONTEND_POSTINGS_FETCH_LIMIT = 500;
 const MIN_SYNC_INTERVAL_SECONDS = 60;
 const MAX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
 const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
@@ -73,6 +75,7 @@ const DEFAULT_ATS_FILTER_OPTIONS = [
   { value: "adp_myjobs", label: "ADP MyJobs" },
   { value: "adp_workforcenow", label: "ADP Workforce Now" },
   { value: "applicantai", label: "ApplicantAI" },
+  { value: "applitrack", label: "Applitrack" },
   { value: "applicantpro", label: "ApplicantPro" },
   { value: "applytojob", label: "ApplyToJob" },
   { value: "ashby", label: "Ashby" },
@@ -88,6 +91,17 @@ const DEFAULT_ATS_FILTER_OPTIONS = [
   { value: "freshteam", label: "Freshteam" },
   { value: "gem", label: "Gem" },
   { value: "getro", label: "Getro" },
+  { value: "governmentjobs", label: "GovernmentJobs" },
+  { value: "smartrecruiters", label: "SmartRecruiters" },
+  { value: "policeapp", label: "PoliceApp" },
+  { value: "usajobs", label: "USAJobs" },
+  { value: "k12jobspot", label: "K12JobSpot" },
+  { value: "schoolspring", label: "SchoolSpring" },
+  { value: "calcareers", label: "CalCareers" },
+  { value: "calopps", label: "CalOpps" },
+  { value: "statejobsny", label: "StateJobsNY" },
+  { value: "hibob", label: "HiBob" },
+  { value: "isolvisolvedhire", label: "isolvedhire" },
   { value: "greenhouse", label: "Greenhouse" },
   { value: "hirebridge", label: "Hirebridge" },
   { value: "hrmdirect", label: "HRMDirect" },
@@ -123,6 +137,7 @@ const ATS_LABEL_BY_VALUE = {
   adp_myjobs: "ADP MyJobs",
   adp_workforcenow: "ADP Workforce Now",
   applicantai: "ApplicantAI",
+  applitrack: "Applitrack",
   applicantpro: "ApplicantPro",
   applytojob: "ApplyToJob",
   ashby: "Ashby",
@@ -138,6 +153,17 @@ const ATS_LABEL_BY_VALUE = {
   freshteam: "Freshteam",
   gem: "Gem",
   getro: "Getro",
+  governmentjobs: "GovernmentJobs",
+  smartrecruiters: "SmartRecruiters",
+  policeapp: "PoliceApp",
+  usajobs: "USAJobs",
+  k12jobspot: "K12JobSpot",
+  schoolspring: "SchoolSpring",
+  calcareers: "CalCareers",
+  calopps: "CalOpps",
+  statejobsny: "StateJobsNY",
+  hibob: "HiBob",
+  isolvisolvedhire: "isolvedhire",
   greenhouse: "Greenhouse",
   hirebridge: "Hirebridge",
   hrmdirect: "HRMDirect",
@@ -217,6 +243,26 @@ function sanitizeDisplayText(value, fallback = "") {
   return cleaned || fallback;
 }
 
+function formatDateTimeSafe(value, fallback = "Unknown time") {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )}:${pad(date.getSeconds())}`;
+}
+
+function formatTimeSafe(value, fallback = "Unknown time") {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function formatApplicationDate(value) {
   const epochSeconds = Number(value);
   if (!Number.isFinite(epochSeconds) || epochSeconds <= 0) {
@@ -246,6 +292,36 @@ function normalizeApplicationItem(item) {
   };
 }
 
+function normalizePostingItem(item, index = 0) {
+  const source = item && typeof item === "object" ? item : {};
+  const urlValue = sanitizeDisplayText(source.job_posting_url, "").trim();
+  const companyName = sanitizeDisplayText(source.company_name, "");
+  const positionName = sanitizeDisplayText(source.position_name, "");
+  const fallbackCompanyPart = normalizeCompanyName(companyName) || "company";
+  const fallbackPositionPart =
+    String(positionName || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-") || "position";
+  return {
+    ...source,
+    company_name: companyName,
+    position_name: positionName,
+    location: sanitizeDisplayText(source.location, ""),
+    posting_date: sanitizeDisplayText(source.posting_date, ""),
+    ats: sanitizeDisplayText(source.ats, ""),
+    applied_by_label: sanitizeDisplayText(source.applied_by_label, ""),
+    ignored_by_label: sanitizeDisplayText(source.ignored_by_label, ""),
+    job_posting_url: urlValue,
+    _row_fallback_key: urlValue || `${fallbackCompanyPart}-${fallbackPositionPart}-${index}`
+  };
+}
+
+function normalizePostingItems(items) {
+  const source = Array.isArray(items) ? items : [];
+  return source.map((item, index) => normalizePostingItem(item, index));
+}
+
 function normalizeAtsValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return "";
@@ -256,9 +332,30 @@ function normalizeAtsValue(value) {
     return "dayforcehcm";
   }
   if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
+  if (normalized === "hibob.com" || normalized === "hibobcom" || normalized === "hibob" || normalized === "careers.hibob.com" || normalized === "careershibobcom") return "hibob";
+  if (normalized === "isolvisolvedhire" || normalized === "isolvedhire" || normalized === "isolvedhire.com" || normalized === "isolvedhirecom") {
+    return "isolvisolvedhire";
+  }
   if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
+  if (normalized === "applitrackcom" || normalized === "applitrack.com") return "applitrack";
   if (normalized === "bamboohrcom" || normalized === "bamboohr.com") return "bamboohr";
   if (normalized === "freshteamcom" || normalized === "freshteam.com") return "freshteam";
+  if (normalized === "governmentjobscom" || normalized === "governmentjobs.com") return "governmentjobs";
+  if (normalized === "policeappcom" || normalized === "policeapp.com" || normalized === "www.policeapp.com" || normalized === "policeapp") return "policeapp";
+  if (normalized === "usajobsgov" || normalized === "usajobs.gov" || normalized === "www.usajobs.gov" || normalized === "usajobs") return "usajobs";
+  if (normalized === "k12jobspotcom" || normalized === "k12jobspot.com" || normalized === "www.k12jobspot.com" || normalized === "api.k12jobspot.com" || normalized === "k12jobspot") return "k12jobspot";
+  if (normalized === "schoolspringcom" || normalized === "schoolspring.com" || normalized === "www.schoolspring.com" || normalized === "api.schoolspring.com" || normalized === "schoolspring") return "schoolspring";
+  if (normalized === "calcareers" || normalized === "calcareers.ca.gov" || normalized === "www.calcareers.ca.gov" || normalized === "calcareerscagov" || normalized === "wwwcalcareerscagov") return "calcareers";
+  if (normalized === "calopps" || normalized === "calopps.org" || normalized === "www.calopps.org" || normalized === "caloppsorg" || normalized === "wwwcaloppsorg") return "calopps";
+  if (normalized === "statejobsny" || normalized === "statejobsny.com" || normalized === "www.statejobsny.com" || normalized === "statejobsnycom" || normalized === "wwwstatejobsnycom") return "statejobsny";
+  if (
+    normalized === "smartrecruiterscom" ||
+    normalized === "smartrecruiters.com" ||
+    normalized === "jobs.smartrecruiters.com" ||
+    normalized === "jobssmartrecruiterscom"
+  ) {
+    return "smartrecruiters";
+  }
   if (
     normalized === "sagehr" ||
     normalized === "sage.hr" ||
@@ -595,15 +692,17 @@ function PostingCard({
   blockingCompanyNames
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const postingUrl = String(item?.job_posting_url || "").trim();
   const onOpenPosting = useCallback(async () => {
-    const supported = await Linking.canOpenURL(item.job_posting_url);
+    if (!postingUrl) return;
+    const supported = await Linking.canOpenURL(postingUrl);
     if (supported) {
-      await Linking.openURL(item.job_posting_url);
+      await Linking.openURL(postingUrl);
     }
-  }, [item.job_posting_url]);
+  }, [postingUrl]);
 
-  const isSaving = Boolean(savingApplicationIds?.[item.job_posting_url]);
-  const isIgnoring = Boolean(ignoringPostingIds?.[item.job_posting_url]);
+  const isSaving = Boolean(savingApplicationIds?.[postingUrl]);
+  const isIgnoring = Boolean(ignoringPostingIds?.[postingUrl]);
   const normalizedCompanyName = normalizeCompanyName(item?.company_name);
   const isCompanyBlocked = blockedCompanyNames?.has(normalizedCompanyName);
   const isBlockingCompany = blockingCompanyNames?.has(normalizedCompanyName);
@@ -612,21 +711,27 @@ function PostingCard({
   const ignoreDisabled = isIgnoring;
   const blockDisabled = isCompanyBlocked || isBlockingCompany;
   const atsLabel = getAtsDisplayLabel(item?.ats);
+  const positionName = sanitizeDisplayText(item?.position_name, "Unknown position");
+  const locationLabel = sanitizeDisplayText(item?.location, "Location unavailable");
+  const companyLabel = sanitizeDisplayText(item?.company_name, "Unknown company");
+  const postingDateLabel = sanitizeDisplayText(item?.posting_date, "Posting date unavailable");
+  const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
+  const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
 
   return (
     <View style={styles.card}>
       <View style={styles.postingCardTopRow}>
         <Pressable onPress={onOpenPosting} style={styles.postingCardMainPressArea}>
-          <Text style={styles.position}>{item.position_name}</Text>
-          <Text style={styles.location}>{item.location || "Location unavailable"}</Text>
-          <Text style={styles.company}>{item.company_name}</Text>
+          <Text style={styles.position}>{positionName}</Text>
+          <Text style={styles.location}>{locationLabel}</Text>
+          <Text style={styles.company}>{companyLabel}</Text>
           <Text style={styles.ats}>ATS: {atsLabel}</Text>
-          <Text style={styles.posted}>{item.posting_date || "Posting date unavailable"}</Text>
+          <Text style={styles.posted}>{postingDateLabel}</Text>
           {isApplied ? (
-            <Text style={styles.postingAppliedNotice}>{item.applied_by_label || "Application already tracked"}</Text>
+            <Text style={styles.postingAppliedNotice}>{appliedByLabel}</Text>
           ) : null}
           <Text numberOfLines={1} style={styles.url}>
-            {item.job_posting_url}
+            {postingUrlLabel}
           </Text>
         </Pressable>
 
@@ -921,8 +1026,58 @@ export default function App() {
   const wasSyncRunningRef = useRef(false);
   const postingsRequestSequenceRef = useRef(0);
   const applicationsRequestSequenceRef = useRef(0);
+  const frontendLogQueueRef = useRef([]);
+  const frontendLogFlushInFlightRef = useRef(false);
+  const lastFrontendLogFlushAtRef = useRef(0);
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
+  const flushFrontendLogs = useCallback(async () => {
+    if (frontendLogFlushInFlightRef.current) return;
+    if (frontendLogQueueRef.current.length === 0) return;
+
+    frontendLogFlushInFlightRef.current = true;
+    try {
+      while (frontendLogQueueRef.current.length > 0) {
+        const nextEntry = frontendLogQueueRef.current[0];
+        const response = await postFrontendLog(nextEntry);
+        if (!response?.ok) {
+          break;
+        }
+        frontendLogQueueRef.current.shift();
+      }
+    } finally {
+      frontendLogFlushInFlightRef.current = false;
+    }
+  }, []);
+
+  const queueFrontendLog = useCallback(
+    (level, eventName, message, context = {}) => {
+      const entry = {
+        level: sanitizeDisplayText(level, "info").toLowerCase(),
+        event: sanitizeDisplayText(eventName, "frontend_event"),
+        message: sanitizeDisplayText(message, ""),
+        context
+      };
+
+      frontendLogQueueRef.current.push(entry);
+      if (frontendLogQueueRef.current.length > 60) {
+        frontendLogQueueRef.current.shift();
+      }
+
+      const now = Date.now();
+      const shouldFlushImmediately =
+        entry.level === "error" ||
+        entry.level === "fatal" ||
+        frontendLogQueueRef.current.length <= 1 ||
+        now - lastFrontendLogFlushAtRef.current >= 1500;
+
+      if (shouldFlushImmediately) {
+        lastFrontendLogFlushAtRef.current = now;
+        void flushFrontendLogs();
+      }
+    },
+    [flushFrontendLogs]
+  );
   const remoteFilterOptions = useMemo(
     () => [
       { value: "all", label: "All Locations" },
@@ -995,21 +1150,25 @@ export default function App() {
   const statusText = useMemo(() => {
     if (!status) return "No sync status yet.";
     const syncTime = status.last_sync_at
-      ? new Date(status.last_sync_at).toLocaleString()
+      ? formatDateTimeSafe(status.last_sync_at, "Unknown sync time")
       : "No sync has run yet.";
     const summary = status.last_sync_summary || {};
-    const excludedByDate = Number(summary.excluded_during_sync_by_posting_date || 0);
-    const syncEnabledCompanies = Number(summary.sync_enabled_company_count || status.sync_enabled_company_count || 0);
-    const excludedAtsCount = Number(summary.excluded_ats_count || status.excluded_ats_count || 0);
-    const base = `Last sync: ${syncTime} | Sync-enabled companies: ${syncEnabledCompanies} | Stored today: ${status.posting_count || 0} | Failed companies: ${summary.failed_companies || 0} | Excluded by 24h: ${excludedByDate} | Excluded ATS: ${excludedAtsCount}`;
+    const excludedByDate = Number(
+      status.excluded_during_sync_by_posting_date ?? summary.excluded_during_sync_by_posting_date ?? 0
+    );
+    const syncEnabledCompanies = Number(status.sync_enabled_company_count ?? summary.sync_enabled_company_count ?? 0);
+    const excludedAtsCount = Number(status.excluded_ats_count ?? summary.excluded_ats_count ?? 0);
+    const failedCompanies = Number(status.failed_companies ?? summary.failed_companies ?? 0);
+    const base = `Last sync: ${syncTime} | Sync-enabled companies: ${syncEnabledCompanies} | Stored today: ${status.posting_count || 0} | Failed companies: ${failedCompanies} | Excluded by 24h: ${excludedByDate} | Excluded ATS: ${excludedAtsCount}`;
     if (status.running && status.progress) {
       const collectedCount = Number(status.progress.total_collected || 0);
       const storedCount = Number(status.posting_count || 0);
+      const syncingCompanyName = sanitizeDisplayText(status.progress.company_name, "");
       const liveSyncHint =
         collectedCount > 0 && storedCount === 0
           ? " | Sync is collecting postings; visible results appear as batches are saved."
           : "";
-      return `${base} | Syncing ${status.progress.current}/${status.progress.total}: ${status.progress.company_name || ""} (collected ${collectedCount})${liveSyncHint}`;
+      return `${base} | Syncing ${status.progress.current}/${status.progress.total}: ${syncingCompanyName} (collected ${collectedCount})${liveSyncHint}`;
     }
     return base;
   }, [status]);
@@ -1042,22 +1201,32 @@ export default function App() {
     }
     setError("");
     try {
-      const response = await fetchPostings(q, 1000, 0, filters);
+      const response = await fetchPostings(q, FRONTEND_POSTINGS_FETCH_LIMIT, 0, filters);
       if (requestSequence !== postingsRequestSequenceRef.current) {
         return;
       }
-      setPostings(response.items || []);
+      const normalizedItems = normalizePostingItems(response?.items);
+      setPostings(normalizedItems);
+      if (normalizedItems.length >= FRONTEND_POSTINGS_FETCH_LIMIT) {
+        queueFrontendLog("warn", "postings_limit_reached", "Postings payload reached frontend fetch limit.", {
+          limit: FRONTEND_POSTINGS_FETCH_LIMIT,
+          search: q
+        });
+      }
       lastPostingRefreshAtRef.current = Date.now();
     } catch (e) {
       if (requestSequence === postingsRequestSequenceRef.current) {
         setError(String(e.message || e));
+        queueFrontendLog("error", "load_postings_failed", String(e?.stack || e?.message || e), {
+          search: q
+        });
       }
     } finally {
       if (!silent && requestSequence === postingsRequestSequenceRef.current) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const loadPostingFilterOptions = useCallback(async () => {
     setPostingFilterOptionsLoading(true);
@@ -1117,9 +1286,10 @@ export default function App() {
       return response;
     } catch (e) {
       setError(String(e.message || e));
+      queueFrontendLog("error", "load_status_failed", String(e?.stack || e?.message || e), {});
       return null;
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const loadPersonalInformation = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -1250,7 +1420,12 @@ export default function App() {
           : "on any network"
         : "on any network (Wi-Fi-only applies on Android)";
     const statusLabel = syncSettings.autoSyncEnabled ? `enabled every ${intervalLabel} ${networkScope}` : "disabled";
-    const localSavedMessage = `Sync settings saved locally at ${new Date().toLocaleTimeString()}. Auto sync is ${statusLabel}.`;
+    const localSavedMessage = `Sync settings saved locally at ${formatTimeSafe(new Date())}. Auto sync is ${statusLabel}.`;
+
+    queueFrontendLog("info", "save_sync_settings_started", "Saving sync settings.", {
+      ats_request_queue_concurrency: atsRequestQueueConcurrency,
+      sync_enabled_ats_count: syncEnabledAts.length
+    });
 
     setSyncServiceSettingsSaving(true);
     try {
@@ -1260,18 +1435,31 @@ export default function App() {
       });
       const saved = toFormSyncServiceSettings(response?.item);
       setSyncServiceSettings(saved);
+      queueFrontendLog("info", "save_sync_settings_completed", "Sync settings saved successfully.", {
+        ats_request_queue_concurrency: saved.ats_request_queue_concurrency,
+        sync_enabled_ats_count: saved.sync_enabled_ats.length
+      });
       setSyncSettingsNotice(
         `${localSavedMessage} ATS request queue concurrency saved as ${saved.ats_request_queue_concurrency}. Sync-enabled ATS: ${saved.sync_enabled_ats.length}. This will take effect next time you stop and restart the sync service.`
       );
     } catch (e) {
       setError(String(e.message || e));
+      queueFrontendLog("error", "save_sync_settings_failed", String(e?.stack || e?.message || e), {
+        ats_request_queue_concurrency: atsRequestQueueConcurrency,
+        sync_enabled_ats_count: syncEnabledAts.length
+      });
       setSyncSettingsNotice(
         `${localSavedMessage} Unable to save ATS request queue concurrency on the server.`
       );
     } finally {
       setSyncServiceSettingsSaving(false);
     }
-  }, [syncServiceSettings.ats_request_queue_concurrency, syncServiceSettings.sync_enabled_ats, syncSettings]);
+  }, [
+    queueFrontendLog,
+    syncServiceSettings.ats_request_queue_concurrency,
+    syncServiceSettings.sync_enabled_ats,
+    syncSettings
+  ]);
 
   const handleMigrateFromDatabase = useCallback(async () => {
     const sourceDbPath = String(migrationSourceDbPath || "").trim();
@@ -1767,6 +1955,16 @@ export default function App() {
   }, [postingsFilters]);
 
   useEffect(() => {
+    if (Platform.OS !== "windows") return undefined;
+
+    const flushId = setInterval(() => {
+      void flushFrontendLogs();
+    }, 2500);
+
+    return () => clearInterval(flushId);
+  }, [flushFrontendLogs]);
+
+  useEffect(() => {
     const bootstrap = async () => {
       setInitializing(true);
       setError("");
@@ -1877,6 +2075,13 @@ export default function App() {
     if (activePage !== PAGE_KEYS.APPLICATIONS) return;
     loadApplications({ silent: false });
   }, [activePage, loadApplications]);
+
+  useEffect(() => {
+    if (activePage !== PAGE_KEYS.POSTINGS) return;
+    loadStatus();
+    loadSyncServiceSettings({ silent: true });
+    loadPostingFilterOptions();
+  }, [activePage, loadStatus, loadSyncServiceSettings, loadPostingFilterOptions]);
 
   const renderPostingsPage = () => (
     <>
@@ -2047,7 +2252,7 @@ export default function App() {
       ) : (
         <FlatList
           data={postings}
-          keyExtractor={(item) => item.job_posting_url}
+          keyExtractor={(item, index) => String(item?.job_posting_url || item?._row_fallback_key || `posting-${index}`)}
           renderItem={({ item }) => (
             <PostingCard
               item={item}

@@ -2,7 +2,7 @@
 
 OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. **It pulls jobs that were posted in the last 24 hours** or that has no posted date. 
 
-Over **37000+** companies from multiple ATSs all sourced into 1 location!
+Over **78000+** companies from multiple ATSs all sourced into 1 location!
 
 Over **500000+** fresh jobs on average **DAILY**!
 
@@ -83,12 +83,22 @@ Current sync support includes:
 - `UltiPro`
 - `Workday`
 - `Zoho`
-
+- `governmentjobs`
+- `smartrecruiters`
+- `hibob`
+- `isolvisolvedhire`
+- `policeapp`
+- `usajobs`
+- `k12jobspot`
+- `schoolspring`
+- `calcareers`
+- `calopps`
+- `statejobsny`
 
 <br>
 <img src="README-Images/ATS_list.png" alt="Applications" width="70%" />
 
-OVER **37000+** companies in total. All gathered from search engine data like Google and DuckDuckGo and also using subdomain searching techniques and directory searching techniques. 
+OVER **78000+** companies in total. All gathered from search engine data like Google and DuckDuckGo and also using subdomain searching techniques and directory searching techniques. 
 <br>
 <img src="README-Images/company_amount.png" alt="Applications" width="25%" />
 <br>
@@ -96,7 +106,7 @@ It pulls in new job data at random from companies and stores it in the database.
 
 ## Windows Installer Setup (Windows 10/11) (Easiest Setup But Still WIP and may have some bugs)
 Download the latest installer from the github releases page and run it. It will guide you through installation and setup.
-- https://github.com/batuhanboran/OpenJobSlots/releases/download/v1.0.4/openjobslots-1.0.1-x64.msi
+- https://github.com/batuhanboran/OpenJobSlots/releases/download/v1.0.5/openjobslots-1.0.5-x64.msi
 
 Choose the setup type during install:
 - `Typical`: Installs the standard OpenJobSlots app setup (Includes the backend service worker, recommended for most users).
