@@ -30,7 +30,10 @@ cd "$APP_DIR"
 LOCAL_SHA="$(git rev-parse HEAD)"
 log "checking $REMOTE/$BRANCH from $LOCAL_SHA"
 
-git fetch --prune "$REMOTE" "$BRANCH:refs/remotes/$REMOTE/$BRANCH"
+if ! git fetch --prune "$REMOTE" "$BRANCH:refs/remotes/$REMOTE/$BRANCH"; then
+  log "fetch failed; GitHub deploy key may not be registered yet"
+  exit 0
+fi
 REMOTE_SHA="$(git rev-parse "refs/remotes/$REMOTE/$BRANCH")"
 
 if [[ "$LOCAL_SHA" == "$REMOTE_SHA" && "$FORCE_DEPLOY" != "1" ]]; then
