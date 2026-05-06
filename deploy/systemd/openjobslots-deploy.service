@@ -1,0 +1,12 @@
+[Unit]
+Description=Deploy OpenJobSlots from GitHub main
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+Environment=APP_DIR=/root/OpenPostings
+Environment=REMOTE=origin
+Environment=BRANCH=main
+Environment=HEALTH_URL=http://127.0.0.1:8081/health
+ExecStart=/bin/bash /root/OpenPostings/scripts/deploy-ltx100.sh
