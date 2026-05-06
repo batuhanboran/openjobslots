@@ -1,0 +1,67 @@
+{
+  "ats_key": "adp_workforcenow",
+  "resolve_company_name": true,
+  "source_company_name": "Unknown Company",
+  "company": {
+    "company_name": "Unknown Company",
+    "company_url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc123&ccId=ACME-FOODS",
+    "ATS_name": "ADP Workforce Now"
+  },
+  "config": {
+    "cid": "abc123",
+    "ccId": "ACME-FOODS",
+    "boardUrl": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc123&ccId=ACME-FOODS"
+  },
+  "content_links_response": {
+    "contentLinks": [
+      {
+        "linkTypeCode": {
+          "codeValue": "WELCOME-TXT",
+          "longName": "Welcome to the Acme Foods career center."
+        }
+      }
+    ]
+  },
+  "raw_response": {
+    "jobRequisitions": [
+      {
+        "itemID": "REQ-1001",
+        "requisitionTitle": "Hybrid Payroll Analyst",
+        "postDate": "2026-05-06T08:00:00+03:00",
+        "workLevelCode": {
+          "shortName": "Hybrid"
+        },
+        "links": [
+          {
+            "href": "https://workforcenow.adp.com/jobs/apply/posting.html?client=ACME-FOODS&jobId=REQ-1001#apply"
+          }
+        ],
+        "requisitionLocations": [
+          {
+            "nameCode": {
+              "shortName": "Istanbul Office"
+            },
+            "address": {
+              "cityName": "Istanbul",
+              "country": {
+                "codeValue": "TR",
+                "longName": "Turkiye"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": [
+    {
+      "ats_key": "adp_workforcenow",
+      "company_name": "Acme Foods",
+      "position_name": "Hybrid Payroll Analyst",
+      "job_posting_url": "https://workforcenow.adp.com/jobs/apply/posting.html?client=ACME-FOODS&jobId=REQ-1001",
+      "country": "Turkey",
+      "remote_type": "hybrid",
+      "is_remote": true
+    }
+  ]
+}

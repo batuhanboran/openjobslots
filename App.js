@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
-  Image,
+  Animated,
   Linking,
   Modal,
   Platform,
@@ -16,7 +15,6 @@ import {
   View
 } from "react-native";
 import {
-  API_BASE_URL,
   blockCompany,
   createApplication,
   deleteApplication,
@@ -27,6 +25,7 @@ import {
   fetchPostingFilterOptions,
   fetchPersonalInformation,
   fetchPostings,
+  fetchSearchSuggestions,
   postFrontendLog,
   fetchSyncServiceSettings,
   fetchSyncStatus,
@@ -35,7 +34,8 @@ import {
   saveMcpSettings,
   savePersonalInformation,
   saveSyncServiceSettings,
-  triggerWorkdaySync,
+  startSync,
+  stopSync,
   unblockCompany,
   updateApplicationStatus
 } from "./src/api";
@@ -49,13 +49,12 @@ const PAGE_KEYS = {
 };
 
 const PAGE_TITLES = {
-  [PAGE_KEYS.POSTINGS]: "Postings",
+  [PAGE_KEYS.POSTINGS]: "Job slots",
   [PAGE_KEYS.APPLICATIONS]: "Applications",
   [PAGE_KEYS.SETTINGS_APPLICANTEE]: "Settings / Applicantee Information",
   [PAGE_KEYS.SETTINGS_SYNC]: "Settings / Sync Settings",
   [PAGE_KEYS.SETTINGS_MCP]: "Settings / MCP Settings"
 };
-
 const APPLICATION_STATUS_OPTIONS = [
   "applied",
   "interview scheduled",
@@ -71,6 +70,87 @@ const MAX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
 const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
+const OJS_COLORS = {
+  blue: "#4285f4",
+  red: "#ea4335",
+  yellow: "#fbbc05",
+  green: "#34a853",
+  ink: "#202124",
+  text: "#3c4043",
+  muted: "#5f6368",
+  border: "#dfe3ea",
+  softBorder: "#eef1f5",
+  bg: "#f8fafd",
+  surface: "#ffffff",
+  surfaceMuted: "#f5f8fc",
+  hover: "#f1f3f4",
+  pressed: "#e8f0fe",
+  focus: "#1a73e8",
+  success: "#188038",
+  successSoft: "#e6f4ea",
+  warning: "#b06000",
+  warningSoft: "#fff7e0",
+  danger: "#b3261e",
+  dangerSoft: "#fce8e6",
+  shadow: "#202124"
+};
+const WORDMARK_SEGMENTS = [
+  { text: "o", color: OJS_COLORS.blue },
+  { text: "p", color: OJS_COLORS.red },
+  { text: "e", color: OJS_COLORS.yellow },
+  { text: "n", color: OJS_COLORS.blue },
+  { text: "job", color: OJS_COLORS.green },
+  { text: "slots", color: OJS_COLORS.ink }
+];
+const WORLDWIDE_REGION_OPTIONS = [
+  { value: "Africa", label: "Africa" },
+  { value: "Americas", label: "Americas" },
+  { value: "Asia", label: "Asia" },
+  { value: "Europe", label: "Europe" },
+  { value: "Oceania", label: "Oceania" }
+];
+const REGION_GROUPS = {
+  africa: ["africa", "northern africa", "sub-saharan africa", "eastern africa", "middle africa", "southern africa", "western africa"],
+  americas: [
+    "americas",
+    "america",
+    "north america",
+    "south america",
+    "central america",
+    "latin america",
+    "caribbean"
+  ],
+  asia: ["asia", "east asia", "eastern asia", "south asia", "southern asia", "southeast asia", "south-eastern asia", "western asia", "central asia", "middle east"],
+  europe: ["europe", "northern europe", "southern europe", "western europe", "eastern europe", "european union"],
+  oceania: ["oceania", "australia", "australia and new zealand", "melanesia", "micronesia", "polynesia"]
+};
+function createDefaultPostingsFilters() {
+  return {
+    ats: "all",
+    industries: [],
+    regions: [],
+    countries: [],
+    states: [],
+    counties: [],
+    remote: "all",
+    hide_no_date: false
+  };
+}
+
+function getPostingsFiltersSignature(filters = {}) {
+  const normalizeArray = (value) => (Array.isArray(value) ? value.map(String).sort() : []);
+  return JSON.stringify({
+    ats: String(filters.ats || "all"),
+    industries: normalizeArray(filters.industries),
+    regions: normalizeArray(filters.regions),
+    countries: normalizeArray(filters.countries),
+    states: normalizeArray(filters.states),
+    counties: normalizeArray(filters.counties),
+    remote: String(filters.remote || "all"),
+    hide_no_date: Boolean(filters.hide_no_date)
+  });
+}
+
 const DEFAULT_ATS_FILTER_OPTIONS = [
   { value: "adp_myjobs", label: "ADP MyJobs" },
   { value: "adp_workforcenow", label: "ADP Workforce Now" },
@@ -243,6 +323,15 @@ function sanitizeDisplayText(value, fallback = "") {
   return cleaned || fallback;
 }
 
+function isSafeExternalHttpUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function formatDateTimeSafe(value, fallback = "Unknown time") {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -261,6 +350,53 @@ function formatTimeSafe(value, fallback = "Unknown time") {
   }
   const pad = (part) => String(part).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function formatNumberLabel(value, fallback = "0") {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return fallback;
+  return numberValue.toLocaleString();
+}
+
+function formatCompactNumberLabel(value, fallback = "0") {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return fallback;
+  const absValue = Math.abs(numberValue);
+  if (absValue >= 1_000_000) return `${(numberValue / 1_000_000).toFixed(absValue >= 10_000_000 ? 0 : 1)}M`;
+  if (absValue >= 1_000) return `${(numberValue / 1_000).toFixed(absValue >= 10_000 ? 0 : 1)}K`;
+  return formatNumberLabel(numberValue, fallback);
+}
+
+function formatEpochSeconds(value, fallback = "Not available") {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return fallback;
+  return formatDateTimeSafe(new Date(numberValue * 1000), fallback);
+}
+
+function toTestIdPart(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeRegionName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function regionMatchesSelection(region, selectedRegions) {
+  const normalizedRegion = normalizeRegionName(region);
+  if (!normalizedRegion) return false;
+  return (selectedRegions || []).some((selectedRegion) => {
+    const normalizedSelected = normalizeRegionName(selectedRegion);
+    if (!normalizedSelected) return false;
+    if (normalizedRegion === normalizedSelected) return true;
+    const selectedGroup = REGION_GROUPS[normalizedSelected] || [];
+    if (selectedGroup.includes(normalizedRegion)) return true;
+    const matchingGroup = Object.values(REGION_GROUPS).find((group) => group.includes(normalizedSelected));
+    return Array.isArray(matchingGroup) && matchingGroup.includes(normalizedRegion);
+  });
 }
 
 function formatApplicationDate(value) {
@@ -599,7 +735,7 @@ function toFormPersonalInformation(value) {
 function createDefaultMcpSettings() {
   return {
     enabled: false,
-    preferred_agent_name: "OpenPostings Agent",
+    preferred_agent_name: "openjobslots Agent",
     agent_login_email: "",
     agent_login_password: "",
     mfa_login_email: "",
@@ -660,7 +796,7 @@ function toApiMcpSettings(value) {
   const agentLoginEmail = String(source.agent_login_email || "").trim();
   return {
     enabled: Boolean(source.enabled),
-    preferred_agent_name: String(source.preferred_agent_name || "").trim() || "OpenPostings Agent",
+    preferred_agent_name: String(source.preferred_agent_name || "").trim() || "openjobslots Agent",
     agent_login_email: agentLoginEmail,
     agent_login_password: String(source.agent_login_password || ""),
     mfa_login_email: agentLoginEmail,
@@ -689,12 +825,13 @@ function PostingCard({
   savingApplicationIds,
   ignoringPostingIds,
   blockedCompanyNames,
-  blockingCompanyNames
+  blockingCompanyNames,
+  showAdminActions = false
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const postingUrl = String(item?.job_posting_url || "").trim();
   const onOpenPosting = useCallback(async () => {
-    if (!postingUrl) return;
+    if (!postingUrl || !isSafeExternalHttpUrl(postingUrl)) return;
     const supported = await Linking.canOpenURL(postingUrl);
     if (supported) {
       await Linking.openURL(postingUrl);
@@ -719,9 +856,15 @@ function PostingCard({
   const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
 
   return (
-    <View style={styles.card}>
+    <View style={styles.card} testID="posting-card">
       <View style={styles.postingCardTopRow}>
-        <Pressable onPress={onOpenPosting} style={styles.postingCardMainPressArea}>
+        <Pressable
+          onPress={onOpenPosting}
+          style={({ pressed }) => [styles.postingCardMainPressArea, pressed ? styles.postingCardMainPressAreaPressed : null]}
+          testID="posting-card-open"
+          accessibilityRole="link"
+          accessibilityLabel={`Open posting: ${positionName} at ${companyLabel}`}
+        >
           <Text style={styles.position}>{positionName}</Text>
           <Text style={styles.location}>{locationLabel}</Text>
           <Text style={styles.company}>{companyLabel}</Text>
@@ -735,13 +878,17 @@ function PostingCard({
           </Text>
         </Pressable>
 
-        <View style={styles.postingCardMenuAnchor}>
-          <Pressable
-            onPress={() => setMenuOpen((prev) => !prev)}
-            style={styles.postingCardMenuTrigger}
-          >
-            <Text style={styles.postingCardMenuTriggerText}>...</Text>
-          </Pressable>
+        {showAdminActions ? (
+          <View style={styles.postingCardMenuAnchor}>
+            <Pressable
+              onPress={() => setMenuOpen((prev) => !prev)}
+              style={({ pressed }) => [styles.postingCardMenuTrigger, pressed ? styles.buttonPressed : null]}
+              testID="posting-card-menu"
+              accessibilityRole="button"
+              accessibilityLabel="Open posting actions"
+            >
+              <Text style={styles.postingCardMenuTriggerText}>...</Text>
+            </Pressable>
 
           {menuOpen ? (
             <View style={styles.postingCardMenu}>
@@ -751,7 +898,14 @@ function PostingCard({
                   onTrackApplication(item);
                 }}
                 disabled={saveDisabled}
-                style={[styles.postingCardMenuItem, saveDisabled ? styles.postingCardMenuItemDisabled : null]}
+                style={({ pressed }) => [
+                  styles.postingCardMenuItem,
+                  saveDisabled ? styles.postingCardMenuItemDisabled : null,
+                  pressed ? styles.buttonPressed : null
+                ]}
+                testID="posting-card-save"
+                accessibilityRole="button"
+                accessibilityLabel="Save posting to applications"
               >
                 <Text style={styles.postingCardMenuItemText}>
                   {isSaving ? "Saving..." : isApplied ? "Already Applied" : "Save To Applications"}
@@ -764,7 +918,14 @@ function PostingCard({
                   onIgnorePosting(item);
                 }}
                 disabled={ignoreDisabled}
-                style={[styles.postingCardMenuItem, ignoreDisabled ? styles.postingCardMenuItemDisabled : null]}
+                style={({ pressed }) => [
+                  styles.postingCardMenuItem,
+                  ignoreDisabled ? styles.postingCardMenuItemDisabled : null,
+                  pressed ? styles.buttonPressed : null
+                ]}
+                testID="posting-card-ignore"
+                accessibilityRole="button"
+                accessibilityLabel="Ignore posting"
               >
                 <Text style={styles.postingCardMenuItemText}>{isIgnoring ? "Ignoring..." : "Ignore Job Posting"}</Text>
               </Pressable>
@@ -775,11 +936,15 @@ function PostingCard({
                   onBlockCompany(item);
                 }}
                 disabled={blockDisabled}
-                style={[
+                style={({ pressed }) => [
                   styles.postingCardMenuItem,
                   styles.postingCardMenuItemDestructive,
-                  blockDisabled ? styles.postingCardMenuItemDisabled : null
+                  blockDisabled ? styles.postingCardMenuItemDisabled : null,
+                  pressed ? styles.buttonPressed : null
                 ]}
+                testID="posting-card-block-company"
+                accessibilityRole="button"
+                accessibilityLabel="Block company"
               >
                 <Text style={[styles.postingCardMenuItemText, styles.postingCardMenuItemTextDestructive]}>
                   {isBlockingCompany ? "Blocking company..." : isCompanyBlocked ? "Company Blocked" : "Block Company"}
@@ -787,7 +952,8 @@ function PostingCard({
               </Pressable>
             </View>
           ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -795,8 +961,35 @@ function PostingCard({
 
 function DrawerItem({ label, selected, onPress }) {
   return (
-    <Pressable onPress={onPress} style={[styles.drawerItem, selected ? styles.drawerItemSelected : null]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.drawerItem,
+        selected ? styles.drawerItemSelected : null,
+        pressed ? styles.buttonPressed : null
+      ]}
+    >
       <Text style={[styles.drawerItemText, selected ? styles.drawerItemTextSelected : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function HeaderNavButton({ label, selected, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={0}
+      style={({ pressed }) => [
+        styles.headerNavButton,
+        selected ? styles.headerNavButtonActive : null,
+        pressed ? styles.buttonPressed : null
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+    >
+      <Text numberOfLines={1} style={[styles.headerNavButtonText, selected ? styles.headerNavButtonTextActive : null]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -808,12 +1001,18 @@ function MultiSelectDropdown({
   onToggleValue,
   onClear,
   emptyText,
+  helperText,
+  anyLabel = "Worldwide",
   maxVisibleOptions = 80
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selectedArray = Array.isArray(selectedValues) ? selectedValues : [];
   const normalizedOptions = Array.isArray(options) ? options : [];
+  const labelByValue = useMemo(
+    () => new Map(normalizedOptions.map((option) => [String(option?.value || ""), String(option?.label || option?.value || "")])),
+    [normalizedOptions]
+  );
 
   const filteredOptions = useMemo(() => {
     const needle = String(search || "").trim().toLowerCase();
@@ -824,27 +1023,58 @@ function MultiSelectDropdown({
   }, [maxVisibleOptions, normalizedOptions, search]);
 
   const selectedCount = selectedArray.length;
+  const selectedLabels = selectedArray.map((value) => labelByValue.get(String(value)) || String(value)).filter(Boolean);
+  const selectedSummary =
+    selectedLabels.length > 0
+      ? selectedLabels.length > 2
+        ? `${selectedLabels.slice(0, 2).join(", ")} +${selectedLabels.length - 2}`
+        : selectedLabels.join(", ")
+      : anyLabel;
+  const testIdPart = toTestIdPart(label);
 
   return (
-    <View style={styles.dropdownWrap}>
-      <Pressable onPress={() => setOpen((prev) => !prev)} style={styles.dropdownTrigger}>
+    <View style={styles.dropdownWrap} testID={`${testIdPart}-filter`}>
+      <Pressable
+        onPress={() => setOpen((prev) => !prev)}
+        style={({ pressed }) => [styles.dropdownTrigger, pressed ? styles.buttonPressed : null]}
+        testID={`${testIdPart}-filter-trigger`}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} filter`}
+      >
         <Text style={styles.dropdownTriggerLabel}>{label}</Text>
-        <Text style={styles.dropdownTriggerValue}>{selectedCount > 0 ? `${selectedCount} selected` : "Any"}</Text>
+        <Text style={styles.dropdownTriggerValue}>{selectedSummary}</Text>
       </Pressable>
 
       {open ? (
         <View style={styles.dropdownPanel}>
+          {helperText ? <Text style={styles.dropdownHelper}>{helperText}</Text> : null}
+          {selectedCount > 0 ? (
+            <View style={styles.dropdownSelectedChips}>
+              {selectedLabels.slice(0, 5).map((selectedLabel) => (
+                <Text key={`${label}-${selectedLabel}`} style={styles.dropdownSelectedChip}>
+                  {selectedLabel}
+                </Text>
+              ))}
+              {selectedLabels.length > 5 ? <Text style={styles.dropdownSelectedMore}>+{selectedLabels.length - 5}</Text> : null}
+            </View>
+          ) : null}
           <TextInput
             style={styles.dropdownSearch}
             value={search}
             onChangeText={setSearch}
             placeholder={`Search ${label.toLowerCase()}`}
             autoCapitalize="none"
+            testID={`${testIdPart}-filter-search`}
+            accessibilityLabel={`Search ${label}`}
           />
 
           <ScrollView style={styles.dropdownOptionsScroll}>
             {filteredOptions.length === 0 ? (
-              <Text style={styles.dropdownEmpty}>{emptyText || "No matches."}</Text>
+              <Text style={styles.dropdownEmpty}>
+                {normalizedOptions.length === 0
+                  ? emptyText || `${label} are not indexed yet. Worldwide search is still active.`
+                  : `No ${label.toLowerCase()} match "${search}".`}
+              </Text>
             ) : (
               filteredOptions.map((option) => {
                 const value = String(option?.value || "");
@@ -853,7 +1083,14 @@ function MultiSelectDropdown({
                   <Pressable
                     key={value}
                     onPress={() => onToggleValue(value)}
-                    style={[styles.dropdownOption, isSelected ? styles.dropdownOptionSelected : null]}
+                    style={({ pressed }) => [
+                      styles.dropdownOption,
+                      isSelected ? styles.dropdownOptionSelected : null,
+                      pressed ? styles.buttonPressed : null
+                    ]}
+                    testID={`${testIdPart}-filter-option-${toTestIdPart(value || option?.label)}`}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isSelected }}
                   >
                     <Text style={[styles.dropdownOptionLabel, isSelected ? styles.dropdownOptionLabelSelected : null]}>
                       {option?.label}
@@ -863,8 +1100,16 @@ function MultiSelectDropdown({
               })
             )}
           </ScrollView>
+          <Text style={styles.dropdownOptionCount}>
+            Showing {filteredOptions.length} of {normalizedOptions.length} {label.toLowerCase()}.
+          </Text>
 
-          <Pressable onPress={onClear} style={styles.dropdownClearBtn}>
+          <Pressable
+            onPress={onClear}
+            style={({ pressed }) => [styles.dropdownClearBtn, pressed ? styles.buttonPressed : null]}
+            testID={`${testIdPart}-filter-clear`}
+            accessibilityRole="button"
+          >
             <Text style={styles.dropdownClearBtnText}>Clear {label}</Text>
           </Pressable>
         </View>
@@ -878,10 +1123,17 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
   const normalizedOptions = Array.isArray(options) ? options : [];
   const selected = String(selectedValue || "all");
   const selectedOption = normalizedOptions.find((option) => String(option?.value || "") === selected);
+  const testIdPart = toTestIdPart(label);
 
   return (
-    <View style={styles.dropdownWrap}>
-      <Pressable onPress={() => setOpen((prev) => !prev)} style={styles.dropdownTrigger}>
+    <View style={styles.dropdownWrap} testID={`${testIdPart}-filter`}>
+      <Pressable
+        onPress={() => setOpen((prev) => !prev)}
+        style={({ pressed }) => [styles.dropdownTrigger, pressed ? styles.buttonPressed : null]}
+        testID={`${testIdPart}-filter-trigger`}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} filter`}
+      >
         <Text style={styles.dropdownTriggerLabel}>{label}</Text>
         <Text style={styles.dropdownTriggerValue}>{selectedOption?.label || anyLabel}</Text>
       </Pressable>
@@ -894,7 +1146,14 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
                 onSelectValue("all");
                 setOpen(false);
               }}
-              style={[styles.dropdownOption, selected === "all" ? styles.dropdownOptionSelected : null]}
+              style={({ pressed }) => [
+                styles.dropdownOption,
+                selected === "all" ? styles.dropdownOptionSelected : null,
+                pressed ? styles.buttonPressed : null
+              ]}
+              testID={`${testIdPart}-filter-option-all`}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected === "all" }}
             >
               <Text style={[styles.dropdownOptionLabel, selected === "all" ? styles.dropdownOptionLabelSelected : null]}>
                 {anyLabel}
@@ -913,11 +1172,15 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
                     onSelectValue(value || "all");
                     setOpen(false);
                   }}
-                  style={[
+                  style={({ pressed }) => [
                     styles.dropdownOption,
                     isSelected ? styles.dropdownOptionSelected : null,
-                    !isEnabled ? styles.dropdownOptionDisabled : null
+                    !isEnabled ? styles.dropdownOptionDisabled : null,
+                    pressed && isEnabled ? styles.buttonPressed : null
                   ]}
+                  testID={`${testIdPart}-filter-option-${toTestIdPart(value || option?.label)}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: isSelected, disabled: !isEnabled }}
                 >
                   <Text
                     style={[
@@ -952,16 +1215,7 @@ export default function App() {
   const [activePage, setActivePage] = useState(PAGE_KEYS.POSTINGS);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [postingsFilters, setPostingsFilters] = useState({
-    ats: "all",
-    industries: [],
-    regions: [],
-    countries: [],
-    states: [],
-    counties: [],
-    remote: "all",
-    hide_no_date: false
-  });
+  const [postingsFilters, setPostingsFilters] = useState(createDefaultPostingsFilters);
   const [postingFilterOptions, setPostingFilterOptions] = useState({
     ats: DEFAULT_ATS_FILTER_OPTIONS,
     industries: [],
@@ -988,7 +1242,14 @@ export default function App() {
   const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncActionState, setSyncActionState] = useState("idle");
+  const [syncNotice, setSyncNotice] = useState("");
   const [error, setError] = useState("");
+  const [searchNotice, setSearchNotice] = useState("");
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const [coverageDetailsOpen, setCoverageDetailsOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const [personalInformation, setPersonalInformation] = useState(createEmptyPersonalInformation);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -1017,7 +1278,11 @@ export default function App() {
   const [mcpSettingsLoading, setMcpSettingsLoading] = useState(false);
   const [mcpSettingsSaving, setMcpSettingsSaving] = useState(false);
   const [mcpSettingsNotice, setMcpSettingsNotice] = useState("");
+  const searchInputRef = useRef(null);
+  const postingsListRef = useRef(null);
   const searchRef = useRef("");
+  const lastSearchSubmitRef = useRef({ value: "", at: 0 });
+  const suppressedSuggestionQueryRef = useRef("");
   const postingsFiltersRef = useRef(postingsFilters);
   const autoSyncInFlightRef = useRef(false);
   const statusPollInFlightRef = useRef(false);
@@ -1029,6 +1294,9 @@ export default function App() {
   const frontendLogQueueRef = useRef([]);
   const frontendLogFlushInFlightRef = useRef(false);
   const lastFrontendLogFlushAtRef = useRef(0);
+  const syncNoticeTimerRef = useRef(null);
+  const searchMotionRef = useRef(new Animated.Value(0));
+  const suggestionsMotionRef = useRef(new Animated.Value(0));
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
   const flushFrontendLogs = useCallback(async () => {
@@ -1097,11 +1365,32 @@ export default function App() {
       ),
     [postingFilterOptions.countries]
   );
+  const normalizedRegionOptions = useMemo(() => {
+    const byKey = new Map();
+    WORLDWIDE_REGION_OPTIONS.forEach((option) => {
+      byKey.set(normalizeRegionName(option.value), option);
+    });
+    (postingFilterOptions.regions || []).forEach((option) => {
+      const value = String(option?.value || option?.label || "").trim();
+      const label = String(option?.label || option?.value || "").trim();
+      if (!value || !label) return;
+      byKey.set(normalizeRegionName(value), { ...option, value, label });
+    });
+    (postingFilterOptions.countries || []).forEach((country) => {
+      const region = String(country?.region || "").trim();
+      if (!region) return;
+      const key = normalizeRegionName(region);
+      if (!byKey.has(key)) {
+        byKey.set(key, { value: region, label: region });
+      }
+    });
+    return Array.from(byKey.values());
+  }, [postingFilterOptions.countries, postingFilterOptions.regions]);
   const visibleCountryOptions = useMemo(() => {
     const selectedRegions = postingsFilters.regions || [];
     if (selectedRegions.length === 0) return postingFilterOptions.countries || [];
-    return (postingFilterOptions.countries || []).filter(
-      (country) => selectedRegions.includes(String(country?.region || ""))
+    return (postingFilterOptions.countries || []).filter((country) =>
+      regionMatchesSelection(country?.region, selectedRegions)
     );
   }, [postingFilterOptions.countries, postingsFilters.regions]);
   const visibleCountyOptions = useMemo(() => {
@@ -1112,8 +1401,8 @@ export default function App() {
   const visibleMcpCountryOptions = useMemo(() => {
     const selectedRegions = mcpSettings.preferred_regions || [];
     if (selectedRegions.length === 0) return postingFilterOptions.countries || [];
-    return (postingFilterOptions.countries || []).filter(
-      (country) => selectedRegions.includes(String(country?.region || ""))
+    return (postingFilterOptions.countries || []).filter((country) =>
+      regionMatchesSelection(country?.region, selectedRegions)
     );
   }, [mcpSettings.preferred_regions, postingFilterOptions.countries]);
   const visibleMcpCountyOptions = useMemo(() => {
@@ -1147,31 +1436,120 @@ export default function App() {
     }));
   }, [postingFilterOptions.ats]);
 
-  const statusText = useMemo(() => {
-    if (!status) return "No sync status yet.";
+  const syncStatusDetails = useMemo(() => {
+    if (!status) {
+      return {
+        summary: "Loading sync coverage.",
+        workerState: "Worker pending",
+        latestRunText: "No run recorded",
+        activeAts: [],
+        metrics: [],
+        healthNote: "",
+        lastError: ""
+      };
+    }
     const syncTime = status.last_sync_at
       ? formatDateTimeSafe(status.last_sync_at, "Unknown sync time")
-      : "No sync has run yet.";
+      : "No sync has run yet";
     const summary = status.last_sync_summary || {};
-    const excludedByDate = Number(
-      status.excluded_during_sync_by_posting_date ?? summary.excluded_during_sync_by_posting_date ?? 0
-    );
     const syncEnabledCompanies = Number(status.sync_enabled_company_count ?? summary.sync_enabled_company_count ?? 0);
-    const excludedAtsCount = Number(status.excluded_ats_count ?? summary.excluded_ats_count ?? 0);
     const failedCompanies = Number(status.failed_companies ?? summary.failed_companies ?? 0);
-    const base = `Last sync: ${syncTime} | Sync-enabled companies: ${syncEnabledCompanies} | Stored today: ${status.posting_count || 0} | Failed companies: ${failedCompanies} | Excluded by 24h: ${excludedByDate} | Excluded ATS: ${excludedAtsCount}`;
+    const worker = status.ingestion_worker || {};
+    const workerStatus = sanitizeDisplayText(worker.latest_status, worker.latest_run_id ? "unknown" : "not started");
+    const activeAts = Array.isArray(worker.active_ats) ? worker.active_ats.filter(Boolean) : [];
+    const latestRunText = worker.latest_run_id
+      ? `Run ${worker.latest_run_id} started ${formatEpochSeconds(worker.started_at_epoch)}`
+      : "No worker run recorded yet";
+    const workerState = workerStatus === "running" ? "Worker running" : `Worker ${workerStatus}`;
+    const failureCount = Number(worker.failure_count || 0) + failedCompanies;
+    const parserErrorCount = Number(worker.parser_error_count_24h || 0);
+    const metrics = [
+      { label: "Indexed slots", value: formatCompactNumberLabel(status.posting_count || 0) },
+      { label: "Seen in 24h", value: formatCompactNumberLabel(status.postings_seen_24h_count || 0) },
+      { label: "Sync companies", value: formatCompactNumberLabel(syncEnabledCompanies) },
+      { label: "Queue due", value: formatCompactNumberLabel(worker.queue_due_count || 0) },
+      { label: "Failures", value: formatCompactNumberLabel(failureCount) },
+      { label: "Parser errors", value: formatCompactNumberLabel(parserErrorCount) }
+    ];
+    const healthNote =
+      failureCount > 0 || parserErrorCount > 0
+        ? "A few sources need parser review. Results stay searchable while diagnostics are logged."
+        : "";
+    const base = `${workerState}. Last sync: ${syncTime}. ${latestRunText}.`;
     if (status.running && status.progress) {
       const collectedCount = Number(status.progress.total_collected || 0);
       const storedCount = Number(status.posting_count || 0);
       const syncingCompanyName = sanitizeDisplayText(status.progress.company_name, "");
       const liveSyncHint =
         collectedCount > 0 && storedCount === 0
-          ? " | Sync is collecting postings; visible results appear as batches are saved."
+          ? " Sync is collecting postings; visible results appear as batches are saved."
           : "";
-      return `${base} | Syncing ${status.progress.current}/${status.progress.total}: ${syncingCompanyName} (collected ${collectedCount})${liveSyncHint}`;
+      return {
+        summary: `${base} Syncing ${status.progress.current}/${status.progress.total}: ${syncingCompanyName} (collected ${collectedCount}).${liveSyncHint}`,
+        workerState,
+        latestRunText,
+        activeAts,
+        metrics,
+        healthNote,
+        lastError: sanitizeDisplayText(worker.last_error, "")
+      };
     }
-    return base;
+    return {
+      summary: base,
+      workerState,
+      latestRunText,
+      activeAts,
+      metrics,
+      healthNote,
+      lastError: sanitizeDisplayText(worker.last_error, "")
+    };
   }, [status]);
+
+  const hasActivePostingFilters = useMemo(() => {
+    return (
+      postingsFilters.ats !== "all" ||
+      (postingsFilters.industries || []).length > 0 ||
+      (postingsFilters.regions || []).length > 0 ||
+      (postingsFilters.countries || []).length > 0 ||
+      (postingsFilters.states || []).length > 0 ||
+      (postingsFilters.counties || []).length > 0 ||
+      postingsFilters.remote !== "all" ||
+      Boolean(postingsFilters.hide_no_date)
+    );
+  }, [postingsFilters]);
+
+  const searchShellCompact = Boolean(
+    String(search || "").trim() ||
+      hasActivePostingFilters ||
+      postingsFilterPanelOpen ||
+      searchSuggestionsOpen
+  );
+  const suggestionsVisible = searchSuggestionsOpen && searchSuggestions.length > 0;
+  const searchMotionStyle = {
+    opacity: searchMotionRef.current.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.96, 1]
+    }),
+    transform: [
+      {
+        translateY: searchMotionRef.current.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0]
+        })
+      }
+    ]
+  };
+  const suggestionsMotionStyle = {
+    opacity: suggestionsMotionRef.current,
+    transform: [
+      {
+        translateY: suggestionsMotionRef.current.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-6, 0]
+        })
+      }
+    ]
+  };
 
   useEffect(() => {
     if (postingsFilters.ats === "all") return;
@@ -1191,6 +1569,13 @@ export default function App() {
     setDrawerOpen(false);
   }, []);
 
+  const scrollPostingsToTop = useCallback(() => {
+    setTimeout(() => {
+      postingsListRef.current?.scrollTo?.({ y: 0, animated: true });
+      postingsListRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+    }, 0);
+  }, []);
+
   const loadPostings = useCallback(async (q, options = {}) => {
     const silent = Boolean(options.silent);
     const filters = options.filters || postingsFiltersRef.current;
@@ -1207,6 +1592,7 @@ export default function App() {
       }
       const normalizedItems = normalizePostingItems(response?.items);
       setPostings(normalizedItems);
+      setSearchNotice("");
       if (normalizedItems.length >= FRONTEND_POSTINGS_FETCH_LIMIT) {
         queueFrontendLog("warn", "postings_limit_reached", "Postings payload reached frontend fetch limit.", {
           limit: FRONTEND_POSTINGS_FETCH_LIMIT,
@@ -1216,9 +1602,14 @@ export default function App() {
       lastPostingRefreshAtRef.current = Date.now();
     } catch (e) {
       if (requestSequence === postingsRequestSequenceRef.current) {
-        setError(String(e.message || e));
+        if (e?.isTransientBusy) {
+          setSearchNotice("Showing the latest results while indexing catches up. Search will retry shortly.");
+        } else {
+          setError(String(e.message || e));
+        }
         queueFrontendLog("error", "load_postings_failed", String(e?.stack || e?.message || e), {
-          search: q
+          search: q,
+          transient_busy: Boolean(e?.isTransientBusy)
         });
       }
     } finally {
@@ -1263,14 +1654,18 @@ export default function App() {
       setApplications(items.map(normalizeApplicationItem).filter((item) => item.id > 0));
     } catch (e) {
       if (requestSequence === applicationsRequestSequenceRef.current) {
-        setError(String(e.message || e));
+        if (!silent) {
+          setError(String(e.message || e));
+        } else {
+          queueFrontendLog("warn", "load_applications_failed", String(e?.message || e), {});
+        }
       }
     } finally {
       if (!silent && requestSequence === applicationsRequestSequenceRef.current) {
         setApplicationsLoading(false);
       }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const handleOpenApplicationsPage = useCallback(() => {
     setActivePage(PAGE_KEYS.APPLICATIONS);
@@ -1282,7 +1677,16 @@ export default function App() {
     try {
       const response = await fetchSyncStatus();
       setStatus(response);
-      setSyncing(Boolean(response?.running));
+      const workerRunning = String(response?.ingestion_worker?.latest_status || "").toLowerCase() === "running";
+      const isStopping = Boolean(response?.stopping || response?.cancel_requested);
+      const isRunning = Boolean(response?.running || workerRunning);
+      setSyncing(isRunning);
+      setSyncActionState((prev) => {
+        if (isStopping) return "stopping";
+        if (isRunning) return "running";
+        if (prev === "queued" || prev === "running" || prev === "stopping") return "updated";
+        return prev;
+      });
       return response;
     } catch (e) {
       setError(String(e.message || e));
@@ -1300,13 +1704,17 @@ export default function App() {
       const response = await fetchPersonalInformation();
       setPersonalInformation(toFormPersonalInformation(response?.item));
     } catch (e) {
-      setError(String(e.message || e));
+      if (!silent) {
+        setError(String(e.message || e));
+      } else {
+        queueFrontendLog("warn", "load_personal_information_failed", String(e?.message || e), {});
+      }
     } finally {
       if (!silent) {
         setSettingsLoading(false);
       }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const loadMcpSettings = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -1317,13 +1725,17 @@ export default function App() {
       const response = await fetchMcpSettings();
       setMcpSettings(toFormMcpSettings(response?.item));
     } catch (e) {
-      setError(String(e.message || e));
+      if (!silent) {
+        setError(String(e.message || e));
+      } else {
+        queueFrontendLog("warn", "load_mcp_settings_failed", String(e?.message || e), {});
+      }
     } finally {
       if (!silent) {
         setMcpSettingsLoading(false);
       }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const loadSyncServiceSettings = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -1334,13 +1746,17 @@ export default function App() {
       const response = await fetchSyncServiceSettings();
       setSyncServiceSettings(toFormSyncServiceSettings(response?.item));
     } catch (e) {
-      setError(String(e.message || e));
+      if (!silent) {
+        setError(String(e.message || e));
+      } else {
+        queueFrontendLog("warn", "load_sync_service_settings_failed", String(e?.message || e), {});
+      }
     } finally {
       if (!silent) {
         setSyncServiceSettingsLoading(false);
       }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const loadBlockedCompanies = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -1351,23 +1767,153 @@ export default function App() {
       const response = await fetchBlockedCompanies();
       setBlockedCompanies(Array.isArray(response?.items) ? response.items : []);
     } catch (e) {
-      setError(String(e.message || e));
+      if (!silent) {
+        setError(String(e.message || e));
+      } else {
+        queueFrontendLog("warn", "load_blocked_companies_failed", String(e?.message || e), {});
+      }
     } finally {
       if (!silent) {
         setBlockedCompaniesLoading(false);
       }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const runSync = useCallback(async () => {
     setError("");
+    if (syncNoticeTimerRef.current) {
+      clearTimeout(syncNoticeTimerRef.current);
+      syncNoticeTimerRef.current = null;
+    }
     try {
-      await triggerWorkdaySync(false);
+      const shouldStop = syncing || syncActionState === "running" || syncActionState === "queued";
+      if (shouldStop) {
+        setSyncNotice("Stopping sync after the current write finishes.");
+        setSyncActionState("stopping");
+        await stopSync();
+      } else {
+        setSyncNotice("Sync queued. Results stay searchable while indexing runs.");
+        setSyncActionState("queued");
+        setSyncing(true);
+        const response = await startSync(false);
+        setSyncActionState(response?.started === false ? "running" : "queued");
+      }
       await loadStatus();
+      syncNoticeTimerRef.current = setTimeout(() => {
+        setSyncNotice("");
+        syncNoticeTimerRef.current = null;
+      }, 6000);
     } catch (e) {
+      setSyncing(false);
+      setSyncActionState("failed");
+      setSyncNotice("Sync control failed. Details were logged for debugging.");
       setError(String(e.message || e));
     }
-  }, [loadStatus]);
+  }, [loadStatus, syncActionState, syncing]);
+
+  const submitSearch = useCallback((value = searchRef.current) => {
+    const nextSearch = String(value || "").trim();
+    const now = Date.now();
+    const filters = postingsFiltersRef.current;
+    const filtersSignature = getPostingsFiltersSignature(filters);
+    const lastSubmit = lastSearchSubmitRef.current || { value: "", at: 0 };
+    const duplicateSubmit =
+      lastSubmit.value === nextSearch &&
+      lastSubmit.filtersSignature === filtersSignature &&
+      now - lastSubmit.at < 250;
+    lastSearchSubmitRef.current = { value: nextSearch, filtersSignature, at: now };
+    suppressedSuggestionQueryRef.current = nextSearch;
+    setSearch(nextSearch);
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+    scrollPostingsToTop();
+    if (!duplicateSubmit) {
+      void loadPostings(nextSearch, { filters });
+    }
+  }, [loadPostings, scrollPostingsToTop]);
+
+  const clearSearchAndSuggestions = useCallback(() => {
+    const filters = postingsFiltersRef.current;
+    lastSearchSubmitRef.current = {
+      value: "",
+      filtersSignature: getPostingsFiltersSignature(filters),
+      at: Date.now()
+    };
+    suppressedSuggestionQueryRef.current = "";
+    setSearch("");
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+    scrollPostingsToTop();
+    void loadPostings("", { filters });
+  }, [loadPostings, scrollPostingsToTop]);
+
+  const selectSearchSuggestion = useCallback((suggestion) => {
+    const value = String(suggestion?.value || suggestion?.label || "").trim();
+    if (!value) return;
+    submitSearch(value);
+  }, [submitSearch]);
+
+  const handleBrandHome = useCallback(() => {
+    const defaultFilters = createDefaultPostingsFilters();
+    setActivePage(PAGE_KEYS.POSTINGS);
+    setDrawerOpen(false);
+    setSearch("");
+    setPostingsFilters(defaultFilters);
+    setPostingsFilterPanelOpen(false);
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+    suppressedSuggestionQueryRef.current = "";
+    lastSearchSubmitRef.current = {
+      value: "",
+      filtersSignature: getPostingsFiltersSignature(defaultFilters),
+      at: Date.now()
+    };
+    scrollPostingsToTop();
+    void loadPostings("", { filters: defaultFilters });
+    setTimeout(() => searchInputRef.current?.focus?.(), 0);
+  }, [loadPostings, scrollPostingsToTop]);
+
+  const handleSearchChange = useCallback((value) => {
+    const nextValue = String(value || "");
+    if (suppressedSuggestionQueryRef.current !== nextValue.trim()) {
+      suppressedSuggestionQueryRef.current = "";
+    }
+    setSearch(nextValue);
+  }, []);
+
+  const focusSearch = useCallback(() => {
+    setActivePage(PAGE_KEYS.POSTINGS);
+    setDrawerOpen(false);
+    setTimeout(() => searchInputRef.current?.focus?.(), 0);
+  }, [queueFrontendLog]);
+
+  const handleSearchKeyPress = useCallback((event) => {
+    const key = event?.nativeEvent?.key;
+    if (key === "Escape") {
+      event?.preventDefault?.();
+      clearSearchAndSuggestions();
+      return;
+    }
+    if (key === "ArrowDown" && searchSuggestions.length > 0) {
+      setSearchSuggestionsOpen(true);
+      setActiveSuggestionIndex((prev) => Math.min(prev + 1, searchSuggestions.length - 1));
+      return;
+    }
+    if (key === "ArrowUp" && searchSuggestions.length > 0) {
+      setSearchSuggestionsOpen(true);
+      setActiveSuggestionIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (key === "Enter" && activeSuggestionIndex >= 0 && searchSuggestions[activeSuggestionIndex]) {
+      event?.preventDefault?.();
+      selectSearchSuggestion(searchSuggestions[activeSuggestionIndex]);
+      return;
+    }
+    if (key === "Enter") {
+      event?.preventDefault?.();
+      submitSearch(searchRef.current);
+    }
+  }, [activeSuggestionIndex, clearSearchAndSuggestions, searchSuggestions, selectSearchSuggestion, submitSearch]);
 
   const handleSaveApplicanteeInformation = useCallback(async () => {
     setError("");
@@ -1839,17 +2385,16 @@ export default function App() {
   }, []);
 
   const clearAllPostingFilters = useCallback(() => {
-    setPostingsFilters({
-      ats: "all",
-      industries: [],
-      regions: [],
-      countries: [],
-      states: [],
-      counties: [],
-      remote: "all",
-      hide_no_date: false
-    });
-  }, []);
+    const defaultFilters = createDefaultPostingsFilters();
+    setPostingsFilters(defaultFilters);
+    lastSearchSubmitRef.current = {
+      value: searchRef.current,
+      filtersSignature: getPostingsFiltersSignature(defaultFilters),
+      at: Date.now()
+    };
+    scrollPostingsToTop();
+    void loadPostings(searchRef.current, { filters: defaultFilters });
+  }, [loadPostings, scrollPostingsToTop]);
 
   const toggleMcpIndustryPreference = useCallback((value) => {
     setMcpSettings((prev) => {
@@ -1955,6 +2500,105 @@ export default function App() {
   }, [postingsFilters]);
 
   useEffect(() => {
+    Animated.timing(searchMotionRef.current, {
+      toValue: searchShellCompact ? 1 : 0,
+      duration: 240,
+      useNativeDriver: true
+    }).start();
+  }, [searchShellCompact]);
+
+  useEffect(() => {
+    Animated.timing(suggestionsMotionRef.current, {
+      toValue: suggestionsVisible ? 1 : 0,
+      duration: 160,
+      useNativeDriver: true
+    }).start();
+  }, [suggestionsVisible]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return undefined;
+
+    const handleGlobalKeyDown = (event) => {
+      const tagName = String(event?.target?.tagName || "").toLowerCase();
+      const isEditableTarget = tagName === "input" || tagName === "textarea" || Boolean(event?.target?.isContentEditable);
+      const targetTestId = String(event?.target?.getAttribute?.("data-testid") || "");
+      if (event.key === "Escape") {
+        if (drawerOpen) {
+          event.preventDefault();
+          setDrawerOpen(false);
+          return;
+        }
+        if (isEditableTarget && targetTestId !== "postings-search-input") {
+          return;
+        }
+        if (activePage === PAGE_KEYS.POSTINGS) {
+          event.preventDefault();
+          clearSearchAndSuggestions();
+          return;
+        }
+      }
+      if ((event.key === "k" || event.key === "K") && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        focusSearch();
+        return;
+      }
+      if (event.key === "/" && !isEditableTarget) {
+        event.preventDefault();
+        focusSearch();
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [activePage, clearSearchAndSuggestions, drawerOpen, focusSearch]);
+
+  useEffect(() => {
+    if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
+    const query = String(search || "").trim();
+    if (query.length < 2) {
+      setSearchSuggestions([]);
+      setSearchSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+      return undefined;
+    }
+    if (suppressedSuggestionQueryRef.current === query) {
+      setSearchSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        if (suppressedSuggestionQueryRef.current === query) return;
+        const response = await fetchSearchSuggestions(query, 8);
+        if (cancelled) return;
+        if (suppressedSuggestionQueryRef.current === query) return;
+        const items = Array.isArray(response?.items) ? response.items : [];
+        setSearchSuggestions(items);
+        setSearchSuggestionsOpen(items.length > 0);
+        setActiveSuggestionIndex(-1);
+      } catch (e) {
+        if (cancelled) return;
+        setSearchSuggestions([]);
+        setSearchSuggestionsOpen(false);
+        queueFrontendLog("warn", "search_suggestions_failed", String(e?.message || e), { search: query });
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activePage, queueFrontendLog, search]);
+
+  useEffect(() => () => {
+    if (syncNoticeTimerRef.current) {
+      clearTimeout(syncNoticeTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
     if (Platform.OS !== "windows") return undefined;
 
     const flushId = setInterval(() => {
@@ -1972,12 +2616,7 @@ export default function App() {
         await Promise.all([
           loadPostings("", { filters: postingsFiltersRef.current }),
           loadStatus(),
-          loadPersonalInformation(),
-          loadSyncServiceSettings(),
-          loadBlockedCompanies(),
-          loadMcpSettings(),
-          loadPostingFilterOptions(),
-          loadApplications()
+          loadPostingFilterOptions()
         ]);
       } catch (e) {
         setError(String(e.message || e));
@@ -1990,15 +2629,20 @@ export default function App() {
   }, [
     loadPostings,
     loadStatus,
-    loadPersonalInformation,
-    loadSyncServiceSettings,
-    loadBlockedCompanies,
-    loadMcpSettings,
-    loadPostingFilterOptions,
-    loadApplications
+    loadPostingFilterOptions
   ]);
 
   useEffect(() => {
+    const query = String(search || "").trim();
+    const filtersSignature = getPostingsFiltersSignature(postingsFilters);
+    const lastSubmit = lastSearchSubmitRef.current || {};
+    if (
+      lastSubmit.value === query &&
+      lastSubmit.filtersSignature === filtersSignature &&
+      Date.now() - Number(lastSubmit.at || 0) < 1900
+    ) {
+      return undefined;
+    }
     const timer = setTimeout(() => {
       loadPostings(search, { filters: postingsFilters });
     }, 1800);
@@ -2006,7 +2650,7 @@ export default function App() {
   }, [search, postingsFilters, loadPostings]);
 
   useEffect(() => {
-    if (!syncSettings.autoSyncEnabled) return undefined;
+    if (activePage === PAGE_KEYS.POSTINGS || !syncSettings.autoSyncEnabled) return undefined;
 
     const syncIntervalSeconds = normalizeSyncIntervalSeconds(syncSettings.syncIntervalSeconds);
     const syncIntervalMs = syncIntervalSeconds * 1000;
@@ -2035,7 +2679,7 @@ export default function App() {
     }, syncIntervalMs);
 
     return () => clearInterval(id);
-  }, [runSync, syncSettings.autoSyncEnabled, syncSettings.syncIntervalSeconds, syncSettings.wifiOnly]);
+  }, [activePage, runSync, syncSettings.autoSyncEnabled, syncSettings.syncIntervalSeconds, syncSettings.wifiOnly]);
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -2077,50 +2721,223 @@ export default function App() {
   }, [activePage, loadApplications]);
 
   useEffect(() => {
+    if (activePage !== PAGE_KEYS.SETTINGS_APPLICANTEE) return;
+    loadPersonalInformation({ silent: false });
+  }, [activePage, loadPersonalInformation]);
+
+  useEffect(() => {
+    if (activePage !== PAGE_KEYS.SETTINGS_SYNC) return;
+    loadSyncServiceSettings({ silent: false });
+    loadBlockedCompanies({ silent: false });
+  }, [activePage, loadBlockedCompanies, loadSyncServiceSettings]);
+
+  useEffect(() => {
+    if (activePage !== PAGE_KEYS.SETTINGS_MCP) return;
+    loadMcpSettings({ silent: false });
+  }, [activePage, loadMcpSettings]);
+
+  useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return;
     loadStatus();
-    loadSyncServiceSettings({ silent: true });
     loadPostingFilterOptions();
-  }, [activePage, loadStatus, loadSyncServiceSettings, loadPostingFilterOptions]);
+  }, [activePage, loadStatus, loadPostingFilterOptions]);
+
+  const renderSyncStatusPanel = () => {
+    const isWorkerRunning = syncing || syncStatusDetails.workerState === "Worker running";
+    const detailOpen = coverageDetailsOpen;
+    return (
+      <View style={styles.syncStatusPanel} testID="sync-status-panel">
+        <View style={styles.syncStatusCompactRow} testID="coverage-strip">
+          <View style={styles.syncStatusHeadingBlock}>
+            <Text style={styles.syncStatusTitle}>Index coverage</Text>
+            <Text numberOfLines={1} style={styles.syncStatusSummary} testID="sync-status-summary">
+              {syncStatusDetails.summary}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.syncStatusBadge,
+              isWorkerRunning ? styles.syncStatusBadgeRunning : null
+            ]}
+            testID="ingestion-status-summary"
+          >
+            <Text style={styles.syncStatusBadgeText}>{isWorkerRunning ? "Running" : "Idle"}</Text>
+          </View>
+          <Pressable
+            onPress={() => setCoverageDetailsOpen((prev) => !prev)}
+            style={({ pressed }) => [styles.coverageToggle, pressed ? styles.buttonPressed : null]}
+            testID="coverage-toggle"
+            accessibilityRole="button"
+            accessibilityLabel={detailOpen ? "Hide index coverage details" : "Show index coverage details"}
+          >
+            <Text style={styles.coverageToggleText}>{detailOpen ? "Less" : "Details"}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.syncStatusMetricsGrid}>
+          {syncStatusDetails.metrics.map((metric) => (
+            <View key={metric.label} style={styles.syncStatusMetric} testID={`sync-metric-${toTestIdPart(metric.label)}`}>
+              <Text style={styles.syncStatusMetricValue}>{metric.value}</Text>
+              <Text style={styles.syncStatusMetricLabel}>{metric.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {detailOpen ? (
+          <View style={styles.syncStatusDetailsBlock} testID="coverage-details">
+            <View style={styles.syncStatusStatesRow}>
+              <Text style={styles.syncStatusState}>{syncStatusDetails.workerState}</Text>
+              <Text style={styles.syncStatusState}>{syncStatusDetails.latestRunText}</Text>
+            </View>
+            {syncStatusDetails.activeAts?.length ? (
+              <Text style={styles.syncStatusDetail} testID="sync-active-ats">
+                Active ATS: {syncStatusDetails.activeAts.join(", ")}
+              </Text>
+            ) : null}
+            {syncStatusDetails.healthNote ? (
+              <Text style={styles.syncStatusError} testID="sync-last-error">
+                {syncStatusDetails.healthNote}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
 
   const renderPostingsPage = () => (
-    <>
-      <View style={styles.controls}>
-        <TextInput
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search company or title"
-          autoCapitalize="none"
-        />
-        <Pressable onPress={runSync} style={styles.syncBtn}>
-          <Text style={styles.syncBtnText}>{syncing ? "Syncing..." : "Sync Postings"}</Text>
+    <ScrollView
+      ref={postingsListRef}
+      style={styles.postingsPageScroll}
+      contentContainerStyle={styles.postingsPageContent}
+      keyboardShouldPersistTaps="handled"
+      testID="postings-page-scroll"
+    >
+      <Animated.View
+        style={[
+          styles.searchShell,
+          searchShellCompact ? styles.searchShellCompact : styles.searchShellHome,
+          Platform.OS === "web" ? styles.webSmoothMotion : null,
+          searchMotionStyle
+        ]}
+        testID="search-shell"
+      >
+        <Pressable
+          onPress={handleBrandHome}
+          style={({ pressed }) => [styles.brandWordmark, pressed ? styles.brandWordmarkPressed : null]}
+          testID="brand-wordmark"
+          accessibilityRole="link"
+          accessibilityLabel="openjobslots home"
+        >
+          {WORDMARK_SEGMENTS.map((segment, index) => (
+            <Text
+              key={`brand-wordmark-${segment.text}-${index}`}
+              style={[
+                styles.brandWordmarkLetter,
+                searchShellCompact ? styles.brandWordmarkLetterCompact : null,
+                { color: segment.color }
+              ]}
+            >
+              {segment.text}
+            </Text>
+          ))}
         </Pressable>
-      </View>
-
-      <View style={styles.postingsFiltersHeaderRow}>
-        <Pressable onPress={() => setPostingsFilterPanelOpen((prev) => !prev)} style={styles.postingsFiltersToggleBtn}>
-          <Text style={styles.postingsFiltersToggleText}>
-            {postingsFilterPanelOpen ? "Hide Filters" : "Show Filters"}
+        <Text style={[styles.searchLead, searchShellCompact ? styles.searchLeadCompact : null]}>
+          Find fresh openings across public ATS job boards.
+        </Text>
+        <View style={styles.searchBoxRow}>
+          <TextInput
+            ref={searchInputRef}
+            style={styles.search}
+            value={search}
+            onChangeText={handleSearchChange}
+            onSubmitEditing={() => submitSearch(search)}
+            onKeyPress={handleSearchKeyPress}
+            placeholder="Search title, company, location, or country"
+            autoCapitalize="none"
+            returnKeyType="search"
+            blurOnSubmit={false}
+            testID="postings-search-input"
+            accessibilityLabel="Search postings"
+          />
+        </View>
+        {suggestionsVisible ? (
+          <Animated.View
+            style={[styles.searchSuggestionsPanel, suggestionsMotionStyle]}
+            testID="search-suggestions-panel"
+          >
+            {searchSuggestions.map((suggestion, index) => {
+              const label = String(suggestion?.label || suggestion?.value || "").trim();
+              const hint = String(suggestion?.type || "").trim();
+              const selected = index === activeSuggestionIndex;
+              return (
+                <Pressable
+                  key={`${hint}-${label}-${index}`}
+                  onPress={() => selectSearchSuggestion(suggestion)}
+                  style={[styles.searchSuggestionItem, selected ? styles.searchSuggestionItemActive : null]}
+                  testID={`search-suggestion-${index}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Search ${label}`}
+                >
+                  <Text numberOfLines={1} style={styles.searchSuggestionLabel}>{label}</Text>
+                  {hint ? <Text numberOfLines={1} style={styles.searchSuggestionHint}>{hint}</Text> : null}
+                </Pressable>
+              );
+            })}
+          </Animated.View>
+        ) : null}
+        {!suggestionsVisible ? (
+          <Text style={styles.searchShortcutHint}>/ or Ctrl+K focuses search. Enter searches. Esc clears.</Text>
+        ) : null}
+        {searchNotice ? (
+          <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
+            {searchNotice}
           </Text>
-        </Pressable>
-        <Pressable onPress={clearAllPostingFilters} style={styles.postingsFiltersClearBtn}>
-          <Text style={styles.postingsFiltersClearText}>Clear</Text>
-        </Pressable>
-      </View>
+        ) : null}
+        {!suggestionsVisible ? (
+          <View style={styles.searchActionsRow}>
+            <Pressable
+              onPress={() => setPostingsFilterPanelOpen((prev) => !prev)}
+              style={({ pressed }) => [styles.postingsFiltersToggleBtn, pressed ? styles.buttonPressed : null]}
+              testID="postings-filter-toggle"
+              accessibilityRole="button"
+              accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
+            >
+              <Text style={styles.postingsFiltersToggleText}>
+                {postingsFilterPanelOpen ? "Hide filters" : "Filters"}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={clearAllPostingFilters}
+              style={({ pressed }) => [styles.postingsFiltersClearBtn, pressed ? styles.buttonPressed : null]}
+              testID="postings-filter-clear"
+              accessibilityRole="button"
+              accessibilityLabel="Clear posting filters"
+            >
+              <Text style={styles.postingsFiltersClearText}>Clear</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {syncNotice ? (
+          <Text style={styles.syncNotice} testID="sync-action-notice" accessibilityRole="status">
+            {syncNotice}
+          </Text>
+        ) : null}
+      </Animated.View>
 
       {postingsFilterPanelOpen ? (
-        <View style={styles.postingsFiltersPanel}>
-          <ScrollView
-            style={styles.postingsFiltersPanelScroll}
-            contentContainerStyle={styles.postingsFiltersPanelContent}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-          >
+        <View style={styles.postingsFiltersPanel} testID="filters-panel">
+          <View style={styles.postingsFiltersPanelContent}>
             {postingFilterOptionsLoading ? (
               <Text style={styles.small}>Loading filter options...</Text>
             ) : (
               <>
+                <View style={styles.postingsFiltersIntro}>
+                  <Text style={styles.postingsFiltersIntroTitle}>Worldwide filters</Text>
+                  <Text style={styles.postingsFiltersIntroText}>
+                    Search stays global until you choose a region, country, or remote mode.
+                  </Text>
+                </View>
                 <SingleSelectDropdown
                   label="ATS"
                   options={postingFilterOptions.ats}
@@ -2141,11 +2958,13 @@ export default function App() {
                     }))
                   }
                   emptyText="No industries available."
+                  helperText="Optional. Leave empty to search every indexed industry."
+                  anyLabel="Any industry"
                 />
 
                 <MultiSelectDropdown
                   label="Regions"
-                  options={postingFilterOptions.regions}
+                  options={normalizedRegionOptions}
                   selectedValues={postingsFilters.regions}
                   onToggleValue={toggleRegionFilter}
                   onClear={() =>
@@ -2155,7 +2974,9 @@ export default function App() {
                       countries: []
                     }))
                   }
-                  emptyText="No regions available."
+                  emptyText="Worldwide search is active. Region metadata is not indexed yet."
+                  helperText="Start broad by continent, then narrow to countries when useful."
+                  anyLabel="Worldwide"
                 />
 
                 <MultiSelectDropdown
@@ -2169,37 +2990,63 @@ export default function App() {
                       countries: []
                     }))
                   }
-                  emptyText="No countries match selected regions."
+                  emptyText={
+                    postingsFilters.regions?.length
+                      ? "No countries match the selected region yet. Clear Regions to search worldwide."
+                      : "Country metadata is not indexed yet. Worldwide search is still active."
+                  }
+                  helperText={
+                    postingsFilters.regions?.length
+                      ? "Countries are limited by the selected region."
+                      : "Leave empty to include every country."
+                  }
+                  anyLabel="All countries"
                 />
 
-                <MultiSelectDropdown
-                  label="States"
-                  options={postingFilterOptions.states}
-                  selectedValues={postingsFilters.states}
-                  onToggleValue={toggleStateFilter}
-                  onClear={() =>
-                    setPostingsFilters((prev) => ({
-                      ...prev,
-                      states: [],
-                      counties: []
-                    }))
-                  }
-                  emptyText="No states available."
-                />
+                {(postingsFilters.countries || []).length > 0 || (postingsFilters.states || []).length > 0 ? (
+                  <MultiSelectDropdown
+                    label="States"
+                    options={postingFilterOptions.states}
+                    selectedValues={postingsFilters.states}
+                    onToggleValue={toggleStateFilter}
+                    onClear={() =>
+                      setPostingsFilters((prev) => ({
+                        ...prev,
+                        states: [],
+                        counties: []
+                      }))
+                    }
+                    emptyText="No states or provinces are indexed for the selected countries."
+                    helperText="Shown after country selection. Leave empty to include all states/provinces."
+                    anyLabel="All states/provinces"
+                  />
+                ) : (
+                  <Text style={styles.contextualFilterHint}>
+                    Choose a country to narrow by state or province.
+                  </Text>
+                )}
 
-                <MultiSelectDropdown
-                  label="Counties"
-                  options={visibleCountyOptions}
-                  selectedValues={postingsFilters.counties}
-                  onToggleValue={toggleCountyFilter}
-                  onClear={() =>
-                    setPostingsFilters((prev) => ({
-                      ...prev,
-                      counties: []
-                    }))
-                  }
-                  emptyText="No counties match selected states."
-                />
+                {(postingsFilters.states || []).length > 0 || (postingsFilters.counties || []).length > 0 ? (
+                  <MultiSelectDropdown
+                    label="Counties"
+                    options={visibleCountyOptions}
+                    selectedValues={postingsFilters.counties}
+                    onToggleValue={toggleCountyFilter}
+                    onClear={() =>
+                      setPostingsFilters((prev) => ({
+                        ...prev,
+                        counties: []
+                      }))
+                    }
+                    emptyText="No counties match selected states."
+                    helperText="Shown after state selection for sources that include county metadata."
+                    anyLabel="All counties"
+                  />
+                ) : (
+                  <Text style={styles.contextualFilterHint}>
+                    Choose a state/province to narrow by county when county data exists.
+                  </Text>
+                )}
               </>
             )}
 
@@ -2217,7 +3064,14 @@ export default function App() {
                           remote: option.value
                         }))
                       }
-                      style={[styles.remoteFilterChip, selected ? styles.remoteFilterChipActive : null]}
+                      style={({ pressed }) => [
+                        styles.remoteFilterChip,
+                        selected ? styles.remoteFilterChipActive : null,
+                        pressed ? styles.buttonPressed : null
+                      ]}
+                      testID={`remote-filter-${option.value}`}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
                     >
                       <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
                         {option.label}
@@ -2236,40 +3090,43 @@ export default function App() {
                       hide_no_date: value
                     }))
                   }
+                  testID="hide-no-date-filter"
+                  accessibilityLabel="Hide postings with no date"
                 />
               </View>
             </View>
-          </ScrollView>
+          </View>
         </View>
       ) : null}
 
-      <Text style={styles.status}>{statusText}</Text>
+      {renderSyncStatusPanel()}
       {loading && !initializing ? <Text style={styles.small}>Refreshing results...</Text> : null}
       {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
 
       {initializing && postings.length === 0 ? (
         <ActivityIndicator size="large" style={styles.loader} />
       ) : (
-        <FlatList
-          data={postings}
-          keyExtractor={(item, index) => String(item?.job_posting_url || item?._row_fallback_key || `posting-${index}`)}
-          renderItem={({ item }) => (
-            <PostingCard
-              item={item}
-              onTrackApplication={handleTrackPostingApplication}
-              onIgnorePosting={handleIgnorePosting}
-              onBlockCompany={handleBlockCompany}
-              savingApplicationIds={savingApplicationIds}
-              ignoringPostingIds={ignoringPostingIds}
-              blockedCompanyNames={blockedCompanyNames}
-              blockingCompanyNames={blockingCompanyNamesSet}
-            />
+        <View style={styles.list} testID="postings-list">
+          {postings.length === 0 ? (
+            <Text style={styles.empty}>No postings found.</Text>
+          ) : (
+            postings.map((item, index) => (
+              <PostingCard
+                key={String(item?.job_posting_url || item?._row_fallback_key || `posting-${index}`)}
+                item={item}
+                onTrackApplication={handleTrackPostingApplication}
+                onIgnorePosting={handleIgnorePosting}
+                onBlockCompany={handleBlockCompany}
+                savingApplicationIds={savingApplicationIds}
+                ignoringPostingIds={ignoringPostingIds}
+                blockedCompanyNames={blockedCompanyNames}
+                blockingCompanyNames={blockingCompanyNamesSet}
+              />
+            ))
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No postings found.</Text>}
-          contentContainerStyle={styles.list}
-        />
+        </View>
       )}
-    </>
+    </ScrollView>
   );
 
   const renderApplicationsPage = () => (
@@ -2598,23 +3455,29 @@ export default function App() {
         }}
       >
         <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => {
-              if (migrationRunning) return;
-              setMigrationModalOpen(false);
-            }}
-          />
+          <View style={styles.modalBackdrop} pointerEvents="none" />
           <View style={styles.modalCard}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Migrate Settings And Applications</Text>
+            <View style={styles.modalCloseRow} pointerEvents="box-none">
               <Pressable
-                onPress={() => setMigrationModalOpen(false)}
+                onPress={() => {
+                  if (migrationRunning) return;
+                  setMigrationModalOpen(false);
+                }}
                 disabled={migrationRunning}
-                style={[styles.modalCloseButton, migrationRunning ? styles.settingsSaveButtonDisabled : null]}
+                style={({ pressed }) => [
+                  styles.modalCloseButton,
+                  pressed ? styles.buttonPressed : null,
+                  migrationRunning ? styles.settingsSaveButtonDisabled : null
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: migrationRunning }}
+                hitSlop={10}
               >
                 <Text style={styles.modalCloseButtonText}>Close</Text>
               </Pressable>
+            </View>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Migrate Settings And Applications</Text>
             </View>
             <Text style={styles.settingsInlineHint}>
               Imports selected data from another SQLite database file. The Companies table is never modified.
@@ -2736,7 +3599,7 @@ export default function App() {
                 preferred_agent_name: value
               }))
             }
-            placeholder="Codex, Claude, or OpenPostings Agent"
+            placeholder="Codex, Claude, or openjobslots Agent"
           />
         </View>
 
@@ -2839,7 +3702,11 @@ export default function App() {
                       preferred_remote: option.value
                     }))
                   }
-                  style={[styles.remoteFilterChip, selected ? styles.remoteFilterChipActive : null]}
+                  style={({ pressed }) => [
+                    styles.remoteFilterChip,
+                    selected ? styles.remoteFilterChipActive : null,
+                    pressed ? styles.buttonPressed : null
+                  ]}
                 >
                   <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
                     {option.label}
@@ -2867,7 +3734,7 @@ export default function App() {
 
           <MultiSelectDropdown
             label="Preferred Regions"
-            options={postingFilterOptions.regions}
+            options={normalizedRegionOptions}
             selectedValues={mcpSettings.preferred_regions}
             onToggleValue={toggleMcpRegionPreference}
             onClear={() =>
@@ -2962,43 +3829,85 @@ export default function App() {
     return renderPostingsPage();
   };
 
+  const renderHeaderNav = () => {
+    if (activePage === PAGE_KEYS.POSTINGS) {
+      return null;
+    }
+    return (
+      <View style={styles.headerNav} testID="top-nav">
+        <HeaderNavButton
+          label="Search"
+          selected={activePage === PAGE_KEYS.POSTINGS}
+          onPress={handleBrandHome}
+        />
+        <HeaderNavButton
+          label="Applications"
+          selected={activePage === PAGE_KEYS.APPLICATIONS}
+          onPress={handleOpenApplicationsPage}
+        />
+        <HeaderNavButton
+          label="Profile"
+          selected={activePage === PAGE_KEYS.SETTINGS_APPLICANTEE}
+          onPress={() => navigateToPage(PAGE_KEYS.SETTINGS_APPLICANTEE)}
+        />
+        <HeaderNavButton
+          label="Sync"
+          selected={activePage === PAGE_KEYS.SETTINGS_SYNC}
+          onPress={() => navigateToPage(PAGE_KEYS.SETTINGS_SYNC)}
+        />
+        <HeaderNavButton
+          label="MCP"
+          selected={activePage === PAGE_KEYS.SETTINGS_MCP}
+          onPress={() => navigateToPage(PAGE_KEYS.SETTINGS_MCP)}
+        />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, activePage === PAGE_KEYS.POSTINGS ? styles.headerCompact : null]}>
         <View style={styles.headerTopRow}>
-          <Pressable
-            onPress={() => setDrawerOpen((prev) => !prev)}
-            style={styles.hamburgerButton}
-            accessibilityRole="button"
-            accessibilityLabel="Open navigation menu"
-          >
-            <Text style={styles.hamburgerIcon}>{"\u2630"}</Text>
-          </Pressable>
-          <View style={styles.headerLogoContainer}>
-            {activePage === PAGE_KEYS.POSTINGS ? (
-              <Image source={require("./logo.png")} style={styles.headerLogo} resizeMode="contain" />
-            ) : (
-              <Text style={styles.title}>OpenPostings</Text>
-            )}
-          </View>
+          {activePage !== PAGE_KEYS.POSTINGS ? (
+            <Pressable
+              onPress={handleBrandHome}
+              style={({ pressed }) => [styles.headerLogoContainer, pressed ? styles.buttonPressed : null]}
+              accessibilityRole="link"
+              accessibilityLabel="openjobslots home"
+            >
+              <View style={styles.headerWordmark}>
+                {WORDMARK_SEGMENTS.map((segment, index) => (
+                  <Text
+                    key={`header-wordmark-${segment.text}-${index}`}
+                    style={[styles.headerWordmarkLetter, { color: segment.color }]}
+                  >
+                    {segment.text}
+                  </Text>
+                ))}
+              </View>
+            </Pressable>
+          ) : (
+            <View style={styles.headerPublicSpacer} />
+          )}
+          {renderHeaderNav()}
         </View>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.subtitle}>ATS postings ({Platform.OS})</Text>
-          <Text style={styles.small}>API: {API_BASE_URL}</Text>
-        </View>
-        <Text style={styles.pageTitle}>{pageTitle}</Text>
+        {activePage !== PAGE_KEYS.POSTINGS ? <Text style={styles.pageTitle}>{pageTitle}</Text> : null}
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.error} testID="app-error-message" accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
       {renderActivePage()}
 
-      {drawerOpen ? (
+      {drawerOpen && activePage !== PAGE_KEYS.POSTINGS ? (
         <View style={styles.drawerOverlay}>
           <Pressable style={styles.drawerBackdrop} onPress={() => setDrawerOpen(false)} />
           <View style={styles.drawerPanel}>
             <Text style={styles.drawerHeading}>Navigation</Text>
             <DrawerItem
-              label="Postings"
+              label="Job slots"
               selected={activePage === PAGE_KEYS.POSTINGS}
               onPress={() => navigateToPage(PAGE_KEYS.POSTINGS)}
             />
@@ -3034,18 +3943,61 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f6f8"
+    backgroundColor: OJS_COLORS.bg
   },
   header: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 6
+    paddingBottom: 6,
+    backgroundColor: OJS_COLORS.bg
+  },
+  headerCompact: {
+    paddingBottom: 0,
+    paddingTop: 8
   },
   headerTopRow: {
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    rowGap: 6
+  },
+  headerPublicSpacer: {
+    flex: 1,
+    minWidth: 1
+  },
+  headerNav: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    maxWidth: "100%"
+  },
+  headerNavButton: {
+    borderRadius: 16,
+    marginLeft: 6,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    minHeight: 32,
+    flexShrink: 0,
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden"
+  },
+  headerNavButtonActive: {
+    backgroundColor: OJS_COLORS.pressed
+  },
+  headerNavButtonText: {
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  headerNavButtonTextActive: {
+    color: OJS_COLORS.blue
   },
   headerTextContainer: {
     alignItems: "flex-start",
@@ -3056,6 +4008,28 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: "flex-end"
   },
+  headerWordmark: {
+    flexDirection: "row",
+    alignItems: "baseline"
+  },
+  headerWordmarkLetter: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  headerWordmarkOpen: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "800",
+    color: OJS_COLORS.blue
+  },
+  headerWordmarkSlots: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "800",
+    color: OJS_COLORS.ink
+  },
   headerLogo: {
     width: 220,
     height: 52,
@@ -3065,10 +4039,10 @@ const styles = StyleSheet.create({
   hamburgerButton: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#d3dbe4",
-    backgroundColor: "#ffffff",
+    borderColor: OJS_COLORS.softBorder,
+    backgroundColor: OJS_COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -3077,28 +4051,124 @@ const styles = StyleSheet.create({
   hamburgerIcon: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#102a43"
+    color: OJS_COLORS.ink
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#14213d"
+    color: OJS_COLORS.ink
   },
   subtitle: {
     fontSize: 14,
-    color: "#4f5d75",
+    color: OJS_COLORS.muted,
     marginTop: 4
   },
   pageTitle: {
     marginTop: 10,
     fontSize: 13,
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontWeight: "600"
   },
   small: {
     fontSize: 11,
-    color: "#7a8798",
+    color: OJS_COLORS.muted,
     marginTop: 2
+  },
+  postingsPageScroll: {
+    flex: 1,
+    backgroundColor: OJS_COLORS.bg,
+    ...(Platform.OS === "web"
+      ? {
+          scrollbarColor: `${OJS_COLORS.border} ${OJS_COLORS.bg}`,
+          scrollbarWidth: "thin"
+        }
+      : {})
+  },
+  postingsPageContent: {
+    paddingBottom: 20
+  },
+  webSmoothMotion: {
+    transitionProperty: "padding, margin, transform, opacity",
+    transitionDuration: "220ms",
+    transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+  },
+  searchShell: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 980,
+    paddingHorizontal: 16,
+    alignItems: "center"
+  },
+  searchShellHome: {
+    paddingTop: Platform.OS === "web" ? 70 : 28,
+    paddingBottom: 22
+  },
+  searchShellCompact: {
+    paddingTop: Platform.OS === "web" ? 22 : 12,
+    paddingBottom: 10
+  },
+  brandWordmark: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+    marginTop: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 24
+  },
+  brandWordmarkPressed: {
+    backgroundColor: OJS_COLORS.hover,
+    transform: [{ scale: 0.992 }]
+  },
+  brandWordmarkLetter: {
+    fontSize: 42,
+    lineHeight: 48,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  brandWordmarkLetterCompact: {
+    fontSize: 34,
+    lineHeight: 39
+  },
+  brandWordmarkOpen: {
+    fontSize: 36,
+    lineHeight: 42,
+    fontWeight: "800",
+    color: OJS_COLORS.blue
+  },
+  brandWordmarkSlots: {
+    fontSize: 36,
+    lineHeight: 42,
+    fontWeight: "800",
+    color: OJS_COLORS.ink
+  },
+  searchLead: {
+    marginTop: 2,
+    marginBottom: 16,
+    textAlign: "center",
+    fontSize: 13,
+    color: OJS_COLORS.muted
+  },
+  searchLeadCompact: {
+    marginBottom: 10
+  },
+  searchBoxRow: {
+    width: "100%",
+    maxWidth: 760
+  },
+  searchShortcutHint: {
+    marginTop: 7,
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    textAlign: "center"
+  },
+  searchActionsRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    flexWrap: "wrap"
   },
   controls: {
     flexDirection: "row",
@@ -3115,53 +4185,92 @@ const styles = StyleSheet.create({
   },
   postingsFiltersToggleBtn: {
     borderWidth: 1,
-    borderColor: "#c6ceda",
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8
+    borderColor: OJS_COLORS.border,
+    backgroundColor: OJS_COLORS.surface,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    minHeight: 38,
+    justifyContent: "center"
   },
   postingsFiltersToggleText: {
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontWeight: "600",
     fontSize: 12
   },
   postingsFiltersClearBtn: {
     borderWidth: 1,
-    borderColor: "#dbe2ea",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: "#ffffff"
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    minHeight: 38,
+    justifyContent: "center",
+    backgroundColor: OJS_COLORS.surface
   },
   postingsFiltersClearText: {
-    color: "#7a8798",
+    color: OJS_COLORS.muted,
     fontSize: 12,
     fontWeight: "600"
   },
+  buttonPressed: {
+    backgroundColor: OJS_COLORS.hover,
+    transform: [{ scale: 0.98 }]
+  },
   postingsFiltersPanel: {
-    marginHorizontal: 16,
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 1160,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#dbe2ea",
-    borderRadius: 12,
-    backgroundColor: "#ffffff",
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    backgroundColor: OJS_COLORS.surface,
     padding: 10
-  },
-  postingsFiltersPanelScroll: {
-    maxHeight: Platform.OS === "web" ? 420 : 360
   },
   postingsFiltersPanelContent: {
     paddingBottom: 4
+  },
+  postingsFiltersIntro: {
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 12,
+    backgroundColor: OJS_COLORS.surfaceMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10
+  },
+  postingsFiltersIntroTitle: {
+    color: OJS_COLORS.ink,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  postingsFiltersIntroText: {
+    marginTop: 3,
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17
+  },
+  contextualFilterHint: {
+    color: OJS_COLORS.muted,
+    backgroundColor: OJS_COLORS.surfaceMuted,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 10,
+    fontSize: 12,
+    lineHeight: 17
   },
   dropdownWrap: {
     marginBottom: 10
   },
   dropdownTrigger: {
     borderWidth: 1,
-    borderColor: "#c6ceda",
-    borderRadius: 10,
-    backgroundColor: "#f8fafc",
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 12,
+    backgroundColor: OJS_COLORS.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: "row",
@@ -3171,26 +4280,63 @@ const styles = StyleSheet.create({
   dropdownTriggerLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#334e68"
+    color: OJS_COLORS.text,
+    marginRight: 10
   },
   dropdownTriggerValue: {
+    flex: 1,
     fontSize: 12,
-    color: "#52606d",
-    fontWeight: "600"
+    color: OJS_COLORS.muted,
+    fontWeight: "600",
+    textAlign: "right"
   },
   dropdownPanel: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#dbe2ea",
+    borderColor: OJS_COLORS.softBorder,
     borderRadius: 10,
-    backgroundColor: "#ffffff",
+    backgroundColor: OJS_COLORS.surface,
     padding: 8
+  },
+  dropdownHelper: {
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 8,
+    paddingHorizontal: 2
+  },
+  dropdownSelectedChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8
+  },
+  dropdownSelectedChip: {
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#c7d8ff",
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.pressed,
+    color: OJS_COLORS.blue,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  dropdownSelectedMore: {
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.hover,
+    color: OJS_COLORS.muted,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: "700"
   },
   dropdownSearch: {
     borderWidth: 1,
-    borderColor: "#c6ceda",
+    borderColor: OJS_COLORS.border,
     borderRadius: 10,
-    backgroundColor: "#ffffff",
+    backgroundColor: OJS_COLORS.surface,
     height: 40,
     paddingHorizontal: 10
   },
@@ -3200,49 +4346,57 @@ const styles = StyleSheet.create({
   },
   dropdownOption: {
     borderWidth: 1,
-    borderColor: "#edf2f7",
+    borderColor: OJS_COLORS.softBorder,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 6,
-    backgroundColor: "#f8fafc"
+    backgroundColor: OJS_COLORS.surfaceMuted
   },
   dropdownOptionSelected: {
-    borderColor: "#0b6e4f",
-    backgroundColor: "#e8f6ef"
+    borderColor: OJS_COLORS.focus,
+    backgroundColor: OJS_COLORS.pressed
   },
   dropdownOptionDisabled: {
-    borderColor: "#e4e7eb",
-    backgroundColor: "#f5f7fa"
+    borderColor: OJS_COLORS.softBorder,
+    backgroundColor: OJS_COLORS.hover
   },
   dropdownOptionLabel: {
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontSize: 12
   },
   dropdownOptionLabelSelected: {
-    color: "#0b6e4f",
+    color: OJS_COLORS.focus,
     fontWeight: "700"
   },
   dropdownOptionLabelDisabled: {
-    color: "#9aa5b1"
+    color: OJS_COLORS.muted
   },
   dropdownEmpty: {
-    color: "#7a8798",
+    color: OJS_COLORS.muted,
     fontSize: 12,
-    paddingVertical: 8,
+    lineHeight: 17,
+    paddingVertical: 10,
     paddingHorizontal: 4
+  },
+  dropdownOptionCount: {
+    marginTop: 2,
+    marginBottom: 2,
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    textAlign: "right"
   },
   dropdownClearBtn: {
     marginTop: 4,
     borderWidth: 1,
-    borderColor: "#dbe2ea",
+    borderColor: OJS_COLORS.softBorder,
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: "center",
-    backgroundColor: "#ffffff"
+    backgroundColor: OJS_COLORS.surface
   },
   dropdownClearBtnText: {
-    color: "#52606d",
+    color: OJS_COLORS.muted,
     fontSize: 12,
     fontWeight: "600"
   },
@@ -3260,33 +4414,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#dbe2ea",
+    borderColor: OJS_COLORS.softBorder,
     borderRadius: 10,
-    backgroundColor: "#f8fafc",
+    backgroundColor: OJS_COLORS.surfaceMuted,
     paddingVertical: 9,
     paddingHorizontal: 12
   },
   remoteNoDateToggleLabel: {
     flex: 1,
     marginRight: 10,
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontSize: 12,
     fontWeight: "600"
   },
   remoteFilterChip: {
     borderWidth: 1,
-    borderColor: "#c6ceda",
-    backgroundColor: "#ffffff",
+    borderColor: OJS_COLORS.border,
+    backgroundColor: OJS_COLORS.surface,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 8
   },
   remoteFilterChipActive: {
-    borderColor: "#102a43",
-    backgroundColor: "#102a43"
+    borderColor: OJS_COLORS.focus,
+    backgroundColor: OJS_COLORS.focus
   },
   remoteFilterChipText: {
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontSize: 12,
     fontWeight: "600"
   },
@@ -3294,85 +4448,303 @@ const styles = StyleSheet.create({
     color: "#ffffff"
   },
   search: {
-    flex: 1,
     borderWidth: 1,
-    borderColor: "#c6ceda",
-    borderRadius: 10,
-    backgroundColor: "#fff",
+    borderColor: OJS_COLORS.border,
+    borderRadius: 28,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 22,
+    height: 56,
+    fontSize: 16,
+    color: OJS_COLORS.ink,
+    shadowColor: OJS_COLORS.shadow,
+    shadowOpacity: 0.11,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 }
+  },
+  searchSuggestionsPanel: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    marginTop: 8,
+    overflow: "hidden",
+    zIndex: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 18,
+    backgroundColor: OJS_COLORS.surface,
+    paddingVertical: 6,
+    shadowColor: OJS_COLORS.shadow,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    ...(Platform.OS === "web"
+      ? {
+          transitionProperty: "opacity, transform, margin",
+          transitionDuration: "180ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  searchSuggestionItem: {
+    minHeight: 38,
     paddingHorizontal: 12,
-    height: 42
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  searchSuggestionItemActive: {
+    backgroundColor: OJS_COLORS.pressed
+  },
+  searchSuggestionLabel: {
+    flex: 1,
+    color: OJS_COLORS.ink,
+    fontSize: 13,
+    fontWeight: "600"
+  },
+  searchSuggestionHint: {
+    flexShrink: 0,
+    maxWidth: 120,
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    textTransform: "capitalize"
+  },
+  searchNotice: {
+    marginTop: 8,
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    textAlign: "center"
   },
   syncBtn: {
-    backgroundColor: "#0b6e4f",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    justifyContent: "center"
+    backgroundColor: OJS_COLORS.blue,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    minWidth: 82,
+    minHeight: 38,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    shadowColor: OJS_COLORS.blue,
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }
+  },
+  syncBtnRunning: {
+    backgroundColor: OJS_COLORS.red
+  },
+  syncBtnUpdated: {
+    backgroundColor: OJS_COLORS.green
+  },
+  syncBtnFailed: {
+    backgroundColor: "#b3261e"
+  },
+  syncBtnPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9
+  },
+  syncBtnDisabled: {
+    opacity: 0.82
+  },
+  syncBtnSpinner: {
+    marginRight: 6
   },
   syncBtnText: {
     color: "#fff",
     fontWeight: "600"
   },
+  syncNotice: {
+    marginTop: 8,
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    textAlign: "center"
+  },
   status: {
     paddingHorizontal: 16,
     fontSize: 12,
-    color: "#334e68"
+    color: OJS_COLORS.text
+  },
+  syncStatusPanel: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 8,
+    padding: 9,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    backgroundColor: OJS_COLORS.surface
+  },
+  syncStatusCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  syncStatusHeadingBlock: {
+    flex: 1,
+    minWidth: 0
+  },
+  syncStatusTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: OJS_COLORS.ink
+  },
+  syncStatusSummary: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
+    color: OJS_COLORS.muted
+  },
+  syncStatusBadge: {
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: OJS_COLORS.hover
+  },
+  syncStatusBadgeRunning: {
+    backgroundColor: OJS_COLORS.successSoft
+  },
+  syncStatusBadgeText: {
+    fontSize: 11,
+    color: OJS_COLORS.ink,
+    fontWeight: "700"
+  },
+  coverageToggle: {
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: OJS_COLORS.surfaceMuted
+  },
+  coverageToggleText: {
+    fontSize: 11,
+    color: OJS_COLORS.muted,
+    fontWeight: "700"
+  },
+  syncStatusStatesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  syncStatusState: {
+    fontSize: 12,
+    color: OJS_COLORS.muted,
+    backgroundColor: OJS_COLORS.surfaceMuted,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 5
+  },
+  syncStatusMetricsGrid: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7
+  },
+  syncStatusMetric: {
+    minWidth: 110,
+    flexGrow: 1,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    backgroundColor: OJS_COLORS.surfaceMuted
+  },
+  syncStatusMetricValue: {
+    fontSize: 15,
+    color: OJS_COLORS.ink,
+    fontWeight: "700"
+  },
+  syncStatusMetricLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    color: OJS_COLORS.muted
+  },
+  syncStatusDetail: {
+    marginTop: 8,
+    fontSize: 12,
+    color: OJS_COLORS.text
+  },
+  syncStatusDetailsBlock: {
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: OJS_COLORS.softBorder
+  },
+  syncStatusDiagnostic: {
+    marginTop: 8,
+    fontSize: 11,
+    color: OJS_COLORS.muted
+  },
+  syncStatusError: {
+    marginTop: 8,
+    fontSize: 12,
+    color: OJS_COLORS.warning,
+    fontWeight: "600"
   },
   error: {
     marginHorizontal: 16,
     marginTop: 2,
-    color: "#b00020",
+    color: OJS_COLORS.danger,
     fontSize: 13
   },
   loader: {
     marginTop: 20
   },
   list: {
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
     gap: 10
   },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: OJS_COLORS.surface,
+    borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#dbe2ea"
+    borderColor: OJS_COLORS.softBorder
   },
   position: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#102a43"
+    color: OJS_COLORS.ink
   },
   location: {
     marginTop: 4,
     fontSize: 12,
-    color: "#486581"
+    color: OJS_COLORS.muted
   },
   company: {
     marginTop: 4,
     fontSize: 14,
-    color: "#334e68"
+    color: OJS_COLORS.text
   },
   ats: {
     marginTop: 3,
     fontSize: 12,
-    color: "#243b53",
+    color: OJS_COLORS.text,
     fontWeight: "600"
   },
   posted: {
     marginTop: 2,
     fontSize: 12,
-    color: "#486581"
+    color: OJS_COLORS.muted
   },
   postingAppliedNotice: {
     marginTop: 6,
     fontSize: 12,
-    color: "#0b6e4f",
+    color: OJS_COLORS.success,
     fontWeight: "600"
   },
   url: {
     marginTop: 6,
     fontSize: 11,
-    color: "#7b8794"
+    color: OJS_COLORS.muted
   },
   postingCardTopRow: {
     flexDirection: "row",
@@ -3383,24 +4755,27 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
+  postingCardMainPressAreaPressed: {
+    opacity: 0.78
+  },
   postingCardMenuAnchor: {
     position: "relative",
     zIndex: 2
   },
   postingCardMenuTrigger: {
     borderWidth: 1,
-    borderColor: "#c6ceda",
+    borderColor: OJS_COLORS.border,
     borderRadius: 8,
     minWidth: 34,
     height: 30,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#ffffff"
+    backgroundColor: OJS_COLORS.surface
   },
   postingCardMenuTriggerText: {
     fontSize: 18,
     lineHeight: 20,
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontWeight: "700"
   },
   postingCardMenu: {
@@ -3409,34 +4784,34 @@ const styles = StyleSheet.create({
     right: 0,
     minWidth: 190,
     borderWidth: 1,
-    borderColor: "#dbe2ea",
+    borderColor: OJS_COLORS.softBorder,
     borderRadius: 10,
-    backgroundColor: "#ffffff",
+    backgroundColor: OJS_COLORS.surface,
     padding: 6
   },
   postingCardMenuItem: {
     borderWidth: 1,
-    borderColor: "#edf2f7",
+    borderColor: OJS_COLORS.softBorder,
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginBottom: 6,
-    backgroundColor: "#f8fafc"
+    backgroundColor: OJS_COLORS.surfaceMuted
   },
   postingCardMenuItemDestructive: {
-    borderColor: "#f4d4d4",
-    backgroundColor: "#fff4f4"
+    borderColor: OJS_COLORS.dangerSoft,
+    backgroundColor: OJS_COLORS.dangerSoft
   },
   postingCardMenuItemDisabled: {
     opacity: 0.6
   },
   postingCardMenuItemText: {
-    color: "#334e68",
+    color: OJS_COLORS.text,
     fontWeight: "600",
     fontSize: 12
   },
   postingCardMenuItemTextDestructive: {
-    color: "#a12d2d"
+    color: OJS_COLORS.danger
   },
   postingCardActionSaveDisabled: {
     opacity: 0.65
@@ -3444,13 +4819,13 @@ const styles = StyleSheet.create({
   inlineNotice: {
     paddingHorizontal: 16,
     marginTop: 4,
-    color: "#0b6e4f",
+    color: OJS_COLORS.success,
     fontSize: 12
   },
   empty: {
     textAlign: "center",
     marginTop: 20,
-    color: "#52606d"
+    color: OJS_COLORS.muted
   },
   applicationCard: {
     marginTop: 12,
@@ -3637,9 +5012,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0
   },
   modalCard: {
+    position: "relative",
+    zIndex: 1,
+    elevation: 8,
     width: "100%",
     maxWidth: 700,
     maxHeight: "86%",
@@ -3647,27 +5026,54 @@ const styles = StyleSheet.create({
     borderColor: "#dbe2ea",
     borderRadius: 12,
     backgroundColor: "#ffffff",
-    padding: 12
+    padding: 12,
+    paddingTop: 14,
+    overflow: "visible"
+  },
+  modalCloseRow: {
+    position: "relative",
+    zIndex: 60,
+    elevation: 16,
+    alignItems: "flex-end",
+    marginBottom: 4
   },
   modalHeaderRow: {
+    position: "relative",
+    zIndex: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8
+    gap: 8,
+    paddingRight: 82
   },
   modalTitle: {
     flex: 1,
+    minWidth: 0,
     fontSize: 15,
     fontWeight: "700",
     color: "#102a43"
   },
   modalCloseButton: {
+    zIndex: 61,
+    elevation: 16,
+    minWidth: 64,
+    minHeight: 36,
     borderWidth: 1,
     borderColor: "#dbe2ea",
     borderRadius: 8,
     backgroundColor: "#ffffff",
     paddingHorizontal: 10,
-    paddingVertical: 7
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden"
+  },
+  modalCloseButtonFloating: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 50,
+    elevation: 12
   },
   modalCloseButtonText: {
     color: "#334e68",
@@ -3675,7 +5081,8 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   modalBodyScroll: {
-    marginTop: 8
+    marginTop: 8,
+    zIndex: 1
   },
   modalBodyContent: {
     paddingBottom: 10

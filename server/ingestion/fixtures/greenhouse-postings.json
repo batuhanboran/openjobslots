@@ -1,0 +1,27 @@
+{
+  "company": {
+    "company_name": "Fixture Greenhouse",
+    "company_url": "https://boards.greenhouse.io/fixtureco",
+    "ATS_name": "Greenhouse"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture Greenhouse",
+      "position_name": "Turkish Customer Success Specialist",
+      "job_posting_url": "https://boards.greenhouse.io/fixtureco/jobs/1001#app",
+      "location": "Istanbul, T\u00fcrkiye",
+      "posting_date": "2026-05-06T08:00:00+03:00"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "greenhouse",
+      "company_name": "Fixture Greenhouse",
+      "position_name": "Turkish Customer Success Specialist",
+      "job_posting_url": "https://boards.greenhouse.io/fixtureco/jobs/1001",
+      "country": "Turkey",
+      "remote_type": "unknown",
+      "is_remote": false
+    }
+  ]
+}

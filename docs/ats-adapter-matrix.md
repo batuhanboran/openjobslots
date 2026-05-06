@@ -1,0 +1,68 @@
+# OpenJobSlots ATS Parser Matrix
+
+OpenJobSlots prefers direct public ATS APIs, durable cached payload metadata, and conservative validation. Third-party scraper projects may be useful references, but parser code should not be vendored until license, maintenance, and correctness are reviewed.
+
+Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normalize`, `validate`, `cacheKey`, `rateLimit`, and `fixtures`. Every normalized posting must fit the durable shape: `source_job_id`, `canonical_url`, `apply_url`, `title`, `company`, `location_text`, `country`, `region`, `remote_type`, `industry`, `posted_at`, `first_seen`, `last_seen`, `ats_key`, `parser_version`, `raw_hash`, and `confidence`.
+
+## Parser Tiers
+
+| Tier | ATS keys | Parse rule | Fixture status |
+| --- | --- | --- | --- |
+| Direct JSON stable | `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `teamtailor`, `freshteam`, `pinpointhq`, `recruitcrm`, `fountain`, `getro` | Prefer public JSON job-board endpoint, parse pagination before HTML fallback, cache response hash/metadata. | `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `pinpointhq`, `recruitcrm`, `fountain` backed now; `teamtailor`, `freshteam`, `getro` pending fixtures. |
+| Enterprise/direct | `workday`, `oracle`, `adp_myjobs`, `adp_workforcenow`, `paylocity`, `dayforcehcm`, `eightfold`, `saphrcloud`, `ultipro`, `pageup` | Extract tenant/site identifiers, prefer candidate API responses, normalize product-specific dates and locations. | `oracle`, `paylocity` backed now; all others pending fixtures. |
+| Embedded or semi-structured | `jobvite`, `icims`, `zoho`, `breezy`, `applicantpro`, `applytojob`, `theapplicantmanager`, `careerplug`, `talentreef`, `hirebridge`, `hrmdirect`, `isolvisolvedhire` | Extract embedded JSON first, then conservative DOM card parsing only when URL/title/company are reliable. | `applytojob`, `breezy`, `hrmdirect`, `icims`, `zoho` backed now; all others pending fixtures. |
+| Vendor-specific | `applicantai`, `gem`, `join`, `careerspage`, `manatal`, `hibob`, `sagehr`, `loxo`, `peopleforce`, `simplicant`, `rippling`, `careerpuck`, `talentlyft`, `talexio` | Use vendor-specific public payloads where stable; otherwise reject ambiguous postings. | Pending fixtures. |
+| Public sector / education | `governmentjobs`, `usajobs`, `k12jobspot`, `schoolspring`, `calcareers`, `calopps`, `statejobsny`, `policeapp`, `jobaps`, `applitrack` | Preserve agency/school location fields, enforce polite pagination, avoid mixing aggregate board URLs with canonical apply URLs. | `applitrack` backed now; all others pending fixtures. |
+| Brittle / high risk | `taleo`, `brassring` | Keep low confidence until fixtures prove stability; rate-limit heavily and reject ambiguous records. | Pending fixtures; keep under review. |
+
+## Certification Gates
+
+- Saved raw response fixture and expected normalized fixture for each ATS.
+- Validation rejects missing URL, company, or title.
+- Parser documents endpoint or URL pattern, pagination, date/location parsing, remote/hybrid handling, failure modes, confidence, and rate limit.
+- Cache key includes ATS key and company URL; posting key is canonical URL.
+- New ATS cannot be enabled by default until fixture tests pass.
+
+## Current Coverage Snapshot
+
+- Configured ATS keys: 60.
+- Fixture-backed parser normalization: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `applytojob`, `breezy`, `hrmdirect`, `icims`, `zoho`, `applitrack`, `pinpointhq`, `recruitcrm`, `fountain`, `paylocity`, `oracle`.
+- Legacy fetch dispatcher gaps found: canonical `ashby` did not map to the legacy Ashby collector; the adapter now fetches as `ashbyhq`.
+- Known unsupported configured source: `dayforcehcm` has metadata and is visible as an ATS, but no collector implementation exists yet. The adapter now fails explicitly with `parser_adapter_not_implemented` instead of silently returning zero postings.
+- Parser attention should count typed parser errors only: `parser_validation`, `parser_parse`, `parser_normalize`, and `parser_adapter_not_implemented`. Fetch/network failures remain run errors but should not inflate parser attention.
+
+## Wave 2 Certification Notes
+
+| ATS | Status | Confidence | Parser attention notes |
+| --- | --- | --- | --- |
+| `applytojob` | Fixture-backed for parsed list and legacy Resumator-style URL/location output. | Medium; HTML class names are still semi-structured. | Missing title or URL is a parser bug; empty result after a non-OK request is fetch/network. |
+| `breezy` | Fixture-backed for `/p/` posting cards, department, location, and posted date output. | Medium; card HTML parsing is conservative. | Missing `h2` title or `/p/` URL is parser attention; portal fetch failure is network. |
+| `hrmdirect` | Fixture-backed for `reqitem` rows with city/state, department, date, and absolute employment URL. | Medium-low; row class and cell classes are brittle. | Empty rows after successful fetch can be parser drift; request failure is network. |
+| `icims` | Fixture-backed for iCIMS job card/fallback output with query-string canonical URL and remote location. | Medium-low; iframe and pagination discovery remain brittle. | Bad job-card extraction is parser; iframe/page fetch failure is network. |
+| `zoho` | Fixture-backed for hidden jobs payload output with department and built Careers URL. | Medium; hidden JSON payload is stable when present. | JSON parse failure or missing job id is parser; missing careers page is network/source. |
+| `applitrack` | Fixture-backed for `applyFor(jobId, category, specialty)` output. | Medium-low; location/date are unavailable from current output. | No `applyFor` matches after successful `Output.asp` fetch is parser drift; HTTP failure is network. |
+
+## Wave 3 Certification Notes
+
+| ATS | Status | Confidence | Parser attention notes |
+| --- | --- | --- | --- |
+| `pinpointhq` | Fixture-backed from `postings.json` API response through parser and normalizer. | Medium; direct JSON fields are stable but location/departments can be sparse. | Missing `url` or `path` after a successful API response is parser/source drift. |
+| `recruitcrm` | Fixture-backed from public jobs API response through parser and normalizer. | Medium; remote flag and slug fallback are covered. | Missing `data.jobs`, missing slug/url, or bad date fields are parser/source drift. |
+| `fountain` | Fixture-backed from board `.json` openings response. | Medium; direct JSON is clear, but board URL parsing depends on `/c/{company}/...` path shape. | Empty `openings` with HTTP 200 is source/parser attention; HTTP failure remains fetch. |
+| `paylocity` | Fixture-backed from extracted page-data JSON `Jobs` array. | Medium-low; source is direct JSON embedded in a page, and collector requires `PublishedDate`. | Missing `Jobs` or `JobId` is parser/source drift; landing page fetch is network. |
+| `oracle` | Fixture-backed from CandidateExperience requisition API response. | Medium-low; parser handles nested `requisitionList`, but tenant/site/language discovery remains brittle. | Missing `requisitionList`, `Id`, `Title`, or `PostedDate` is parser/source drift. |
+
+## Wave 3 Deferred Blockers
+
+- `teamtailor`: current collector parses HTML job cards, not the Teamtailor API. Certification should wait for saved board HTML or a direct API endpoint fixture; expected output is title, canonical job URL, department, and location from metadata spans.
+- `getro`: current collector extracts jobs from `__NEXT_DATA__` embedded in HTML. It is usable but not direct JSON; certification should include a saved Next.js page fixture and expected `initialState.jobs.found` output.
+- `workday`: current collector combines fetch, pagination, and a same-day `postedOn` filter inside `collectTodayPostingsForWorkdayCompany`. Before certifying, extract a pure Workday parser for CXS `jobPostings` pages so fixtures are date-stable.
+- `pageup`: current collector parses AJAX result HTML and then fetches each details page to confirm posting date. Certification needs two-part fixtures: search results HTML plus detail page HTML.
+
+## Research Anchors
+
+- Greenhouse Job Board API: https://developer.greenhouse.io/job-board.html
+- Ashby public job posting API: https://developers.ashbyhq.com/docs/public-job-posting-api
+- Lever postings API: https://github.com/lever/postings-api
+- Meilisearch search/indexing: https://github.com/meilisearch/meilisearch
+- pg-boss queueing on Postgres: https://github.com/timgit/pg-boss

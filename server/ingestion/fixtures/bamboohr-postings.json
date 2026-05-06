@@ -1,0 +1,31 @@
+{
+  "company": {
+    "company_name": "Fixture BambooHR",
+    "company_url": "https://fixtureco.bamboohr.com/careers",
+    "ATS_name": "BambooHR"
+  },
+  "postings": [
+    {
+      "id": "bamboo-1001",
+      "jobOpeningName": "Remote Payroll Specialist",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1001?source=openjobslots#details",
+      "companyName": "Fixture BambooHR",
+      "location": {
+        "name": "Remote - United States"
+      },
+      "postedDate": "2026-05-06T08:00:00+03:00",
+      "department": "Finance"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "bamboohr",
+      "company_name": "Fixture BambooHR",
+      "position_name": "Remote Payroll Specialist",
+      "job_posting_url": "https://fixtureco.bamboohr.com/careers/1001?source=openjobslots",
+      "country": "United States",
+      "remote_type": "remote",
+      "is_remote": true
+    }
+  ]
+}

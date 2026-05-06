@@ -1,0 +1,34 @@
+{
+  "ats_key": "fountain",
+  "company_name_for_postings": "Fixture Fountain",
+  "company": {
+    "company_name": "Fixture Fountain",
+    "company_url": "https://web.fountain.com/c/fixtureco/jobs/board",
+    "ATS_name": "Fountain"
+  },
+  "config": {
+    "boardUrl": "https://web.fountain.com/c/fixtureco/jobs/board"
+  },
+  "raw_response": {
+    "openings": [
+      {
+        "title": "Delivery Operations Associate",
+        "to_param": "delivery-operations-associate",
+        "posted_at": "2026-05-06T08:00:00+03:00",
+        "location_name": "Madrid, Spain",
+        "job_type": "On-site"
+      }
+    ]
+  },
+  "expected": [
+    {
+      "ats_key": "fountain",
+      "company_name": "Fixture Fountain",
+      "position_name": "Delivery Operations Associate",
+      "job_posting_url": "https://web.fountain.com/c/fixtureco/jobs/board/delivery-operations-associate",
+      "country": "Spain",
+      "remote_type": "onsite",
+      "is_remote": false
+    }
+  ]
+}

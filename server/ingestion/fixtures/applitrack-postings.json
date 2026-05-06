@@ -1,0 +1,27 @@
+{
+  "company": {
+    "company_name": "Fixture Applitrack",
+    "company_url": "https://www.applitrack.com/fixtureco/onlineapp/default.aspx",
+    "ATS_name": "Applitrack"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture Applitrack",
+      "position_name": "Teaching - Math Teacher",
+      "job_posting_url": "https://www.applitrack.com/fixtureco/onlineapp/default.aspx?JobID=1001",
+      "posting_date": null,
+      "location": null
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "applitrack",
+      "company_name": "Fixture Applitrack",
+      "position_name": "Teaching - Math Teacher",
+      "job_posting_url": "https://www.applitrack.com/fixtureco/onlineapp/default.aspx?JobID=1001",
+      "country": "",
+      "remote_type": "unknown",
+      "is_remote": false
+    }
+  ]
+}

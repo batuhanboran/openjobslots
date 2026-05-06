@@ -1,0 +1,38 @@
+{
+  "ats_key": "recruitcrm",
+  "company_name_for_postings": "Fixture RecruitCRM",
+  "company": {
+    "company_name": "Fixture RecruitCRM",
+    "company_url": "https://recruitcrm.io/jobs/fixtureco",
+    "ATS_name": "RecruitCRM"
+  },
+  "config": {
+    "publicJobsUrl": "https://recruitcrm.io/jobs/fixtureco"
+  },
+  "raw_response": {
+    "data": {
+      "jobs": [
+        {
+          "name": "Remote Talent Partner",
+          "slug": "remote-talent-partner",
+          "posted_at": "2026-05-06",
+          "remote": "1",
+          "employment_type": "Full time",
+          "department": "Talent"
+        }
+      ]
+    }
+  },
+  "expected": [
+    {
+      "ats_key": "recruitcrm",
+      "company_name": "Fixture RecruitCRM",
+      "position_name": "Remote Talent Partner",
+      "job_posting_url": "https://recruitcrm.io/jobs/fixtureco/remote-talent-partner",
+      "country": "",
+      "remote_type": "remote",
+      "industry": "Talent",
+      "is_remote": true
+    }
+  ]
+}

@@ -67,3 +67,6 @@ public/static/
 /db_*
 *.db-shm
 *.db-wal
+.tmp/
+playwright-report/
+test-results/
