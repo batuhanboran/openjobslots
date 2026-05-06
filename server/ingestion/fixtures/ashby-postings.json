@@ -1,0 +1,27 @@
+{
+  "company": {
+    "company_name": "Fixture Ashby",
+    "company_url": "https://jobs.ashbyhq.com/fixtureco",
+    "ATS_name": "Ashby"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture Ashby",
+      "position_name": "Hybrid Platform Engineer",
+      "job_posting_url": "https://jobs.ashbyhq.com/fixtureco/platform-engineer",
+      "location": "Hybrid - Ankara, Turkey",
+      "posting_date": "2026-05-04"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "ashby",
+      "company_name": "Fixture Ashby",
+      "position_name": "Hybrid Platform Engineer",
+      "job_posting_url": "https://jobs.ashbyhq.com/fixtureco/platform-engineer",
+      "country": "Turkey",
+      "remote_type": "hybrid",
+      "is_remote": true
+    }
+  ]
+}

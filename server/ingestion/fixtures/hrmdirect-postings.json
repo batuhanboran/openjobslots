@@ -1,0 +1,29 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect",
+    "company_url": "https://fixtureco.hrmdirect.com/employment/",
+    "ATS_name": "HRMDirect"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture HRMDirect",
+      "position_name": "Warehouse Associate",
+      "job_posting_url": "https://fixtureco.hrmdirect.com/employment/job-opening.php?req=1001",
+      "posting_date": "05/06/2026",
+      "location": "Dallas, TX",
+      "department": "Operations"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "hrmdirect",
+      "company_name": "Fixture HRMDirect",
+      "position_name": "Warehouse Associate",
+      "job_posting_url": "https://fixtureco.hrmdirect.com/employment/job-opening.php?req=1001",
+      "country": "",
+      "remote_type": "unknown",
+      "industry": "Operations",
+      "is_remote": false
+    }
+  ]
+}

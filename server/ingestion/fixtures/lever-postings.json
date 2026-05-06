@@ -1,0 +1,27 @@
+{
+  "company": {
+    "company_name": "Fixture Lever",
+    "company_url": "https://jobs.lever.co/fixtureco",
+    "ATS_name": "Lever"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture Lever",
+      "position_name": "Remote Backend Engineer",
+      "job_posting_url": "https://jobs.lever.co/fixtureco/backend-engineer?lever-source=test#apply",
+      "location": "Remote - EMEA",
+      "posting_date": "2026-05-05T12:00:00Z"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "lever",
+      "company_name": "Fixture Lever",
+      "position_name": "Remote Backend Engineer",
+      "job_posting_url": "https://jobs.lever.co/fixtureco/backend-engineer?lever-source=test",
+      "country": "",
+      "remote_type": "remote",
+      "is_remote": true
+    }
+  ]
+}

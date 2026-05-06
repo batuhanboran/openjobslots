@@ -1,4 +1,5 @@
 const cors = require("cors");
+const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -6,9 +7,54 @@ const { execFile } = require("child_process");
 const { promisify } = require("util");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
+const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
+const { isPlaceholderCompanyName } = require("./ingestion/posting");
+const {
+  createPostgresPool,
+  ensurePostgresSchema,
+  seedPostgresAtsSources
+} = require("./backends/postgres");
+const {
+  getPostgresAtsAdmin,
+  getPostgresCounts,
+  getPostgresFilterOptions,
+  getPostgresParserAdmin,
+  getPostgresParserAttentionByAts,
+  getPostgresSuggestions,
+  getPostgresSyncStatus,
+  listPostgresIngestionRuns,
+  listPostgresPostings,
+  requestSyncStart,
+  requestSyncStop
+} = require("./backends/postgresStore");
+const { ensureMeiliPostingsIndex } = require("./search/meili");
 
 const PORT = Number(process.env.PORT || 8787);
+const NODE_ENV = String(process.env.NODE_ENV || "development").trim().toLowerCase();
 const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "..", "jobs.db");
+const BUNDLED_DB_PATH = path.resolve(__dirname, "..", "jobs.db");
+const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
+const SEARCH_BACKEND = String(process.env.OPENJOBSLOTS_SEARCH_BACKEND || "sqlite").trim().toLowerCase();
+const QUEUE_BACKEND = String(
+  process.env.OPENJOBSLOTS_QUEUE_BACKEND || (DB_BACKEND === "postgres" ? "postgres-sync-control" : "sqlite-worker")
+).trim().toLowerCase();
+const DISABLE_API_SCHEDULER = String(process.env.OPENJOBSLOTS_DISABLE_API_SCHEDULER || "")
+  .trim()
+  .toLowerCase() === "1";
+const API_JSON_LIMIT = String(process.env.OPENJOBSLOTS_JSON_LIMIT || "128kb").trim() || "128kb";
+const ADMIN_TOKEN = String(process.env.OPENJOBSLOTS_ADMIN_TOKEN || "").trim();
+const ALLOW_LOCAL_ADMIN = String(process.env.OPENJOBSLOTS_ALLOW_LOCAL_ADMIN || "")
+  .trim()
+  .toLowerCase() === "1";
+const TRUST_PROXY = String(process.env.OPENJOBSLOTS_TRUST_PROXY || "")
+  .trim()
+  .toLowerCase() === "1";
+const RATE_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.OPENJOBSLOTS_RATE_LIMIT_WINDOW_MS || 60_000));
+const PUBLIC_RATE_LIMIT_MAX = Math.max(10, Number(process.env.OPENJOBSLOTS_PUBLIC_RATE_LIMIT_MAX || 300));
+const CONTROL_RATE_LIMIT_MAX = Math.max(5, Number(process.env.OPENJOBSLOTS_CONTROL_RATE_LIMIT_MAX || 60));
+const FRONTEND_LOG_RATE_LIMIT_MAX = Math.max(5, Number(process.env.OPENJOBSLOTS_FRONTEND_LOG_RATE_LIMIT_MAX || 60));
+const PUBLIC_READ_CACHE_TTL_MS = Math.max(0, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS || 5_000));
+const PUBLIC_READ_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_MAX_ENTRIES || 250));
 const BACKEND_DATA_ROOT = path.dirname(DB_PATH);
 const BACKEND_LOG_DIRECTORY_PATH = path.join(BACKEND_DATA_ROOT, "logs");
 const FRONTEND_LOG_PATH = path.join(BACKEND_LOG_DIRECTORY_PATH, "frontend-client.log");
@@ -153,12 +199,15 @@ const ASHBY_QUERY = `
 `;
 
 let db;
+let postgresPool = null;
 let wordIndustryCoverageCache = null;
 let phraseNgramIndustryCoverageCache = null;
 let syncPromise = null;
 let postingLocationByJobUrl = new Map();
+let postingLocationVersion = 0;
 let postingLocationGeoFilterOptionsCache = {
   mapRef: null,
+  version: -1,
   countries: [],
   regions: []
 };
@@ -273,6 +322,22 @@ const WEAK_INDUSTRY_LIKE_PARTS = new Set([
   "field",
   "division",
   "product"
+]);
+const SEARCH_STOP_WORDS = new Set([
+  "job",
+  "jobs",
+  "posting",
+  "postings",
+  "opening",
+  "openings",
+  "career",
+  "careers",
+  "role",
+  "roles",
+  "position",
+  "positions",
+  "vacancy",
+  "vacancies"
 ]);
 const IT_SOFTWARE_INDUSTRY_KEY = "information_technology_software";
 const SALES_BUSINESS_INDUSTRY_KEY = "sales_business_development";
@@ -510,7 +575,7 @@ const COUNTRY_DEFINITIONS = Object.freeze([
   { code: "BY", label: "Belarus", region: "EMEA", aliases: [] },
   { code: "MD", label: "Moldova", region: "EMEA", aliases: [] },
   { code: "RU", label: "Russia", region: "EMEA", aliases: ["russian federation"] },
-  { code: "TR", label: "Turkey", region: "EMEA", aliases: ["turkiye"] },
+  { code: "TR", label: "Turkey", region: "EMEA", aliases: ["turkiye", "turkish", "turkyie", "turksih"] },
   { code: "AE", label: "United Arab Emirates", region: "EMEA", aliases: ["uae", "u.a.e."] },
   { code: "SA", label: "Saudi Arabia", region: "EMEA", aliases: ["ksa"] },
   { code: "QA", label: "Qatar", region: "EMEA", aliases: [] },
@@ -698,7 +763,7 @@ const SYNC_DEFAULT_ENABLED_ATS = Object.freeze(ATS_FILTER_OPTION_ITEMS.map((item
 const POSTING_SORT_OPTIONS = new Set(["recent", "company_asc"]);
 const MCP_SETTINGS_DEFAULTS = {
   enabled: false,
-  preferred_agent_name: "OpenJobSlots Agent",
+  preferred_agent_name: "openjobslots Agent",
   agent_login_email: "",
   agent_login_password: "",
   mfa_login_email: "",
@@ -771,6 +836,240 @@ function sanitizeFrontendValue(value) {
   return value;
 }
 
+function parseCsvEnv(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  } catch {
+    return raw.replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+function getAllowedOrigins() {
+  const configured = parseCsvEnv(process.env.OPENJOBSLOTS_ALLOWED_ORIGINS).map(normalizeOrigin);
+  const defaults = [
+    "http://localhost:8787",
+    `http://localhost:${PORT}`,
+    "http://127.0.0.1:8787",
+    `http://127.0.0.1:${PORT}`,
+    "http://jobs.local",
+    "https://jobs.local",
+    "https://openjobslots.com",
+    "https://www.openjobslots.com"
+  ];
+  return new Set([...configured, ...defaults.map(normalizeOrigin)].filter(Boolean));
+}
+
+function isLocalDevelopmentOrigin(origin) {
+  try {
+    const parsed = new URL(String(origin || ""));
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isLocalRequest(req) {
+  const candidates = [
+    req.ip,
+    req.socket?.remoteAddress,
+    req.connection?.remoteAddress
+  ].map((value) => String(value || "").toLowerCase());
+  return candidates.some((ip) =>
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip === "::ffff:127.0.0.1" ||
+    ip === "localhost" ||
+    ip.startsWith("::ffff:127.")
+  );
+}
+
+function safeCompareToken(actual, expected) {
+  if (!actual || !expected) return false;
+  const actualBuffer = Buffer.from(String(actual), "utf8");
+  const expectedBuffer = Buffer.from(String(expected), "utf8");
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function getBearerToken(req) {
+  const header = String(req.get("authorization") || "").trim();
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
+function hasAdminAccess(req) {
+  const requestToken = getBearerToken(req) || String(req.get("x-openjobslots-admin-token") || "").trim();
+  if (ADMIN_TOKEN) return safeCompareToken(requestToken, ADMIN_TOKEN);
+  return ALLOW_LOCAL_ADMIN && isLocalRequest(req);
+}
+
+const CONTROL_ROUTE_PREFIXES = Object.freeze([
+  "/admin",
+  "/settings",
+  "/mcp",
+  "/applications"
+]);
+const CONTROL_ROUTE_EXACT = Object.freeze([
+  "/sync/start",
+  "/sync/stop",
+  "/sync/ats",
+  "/sync/workday",
+  "/postings/ignore"
+]);
+
+function isControlRoute(req) {
+  const pathname = String(req.path || "").toLowerCase();
+  return CONTROL_ROUTE_EXACT.includes(pathname) || CONTROL_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function securityHeadersMiddleware(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+  }
+  next();
+}
+
+function createRateLimiter({ windowMs, max, name }) {
+  const buckets = new Map();
+  let lastCleanup = Date.now();
+  return (req, res, next) => {
+    const now = Date.now();
+    if (now - lastCleanup > windowMs) {
+      for (const [key, bucket] of buckets.entries()) {
+        if (bucket.resetAt <= now) buckets.delete(key);
+      }
+      lastCleanup = now;
+    }
+
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    const key = `${name}:${ip}`;
+    const bucket = buckets.get(key) || { count: 0, resetAt: now + windowMs };
+    if (bucket.resetAt <= now) {
+      bucket.count = 0;
+      bucket.resetAt = now + windowMs;
+    }
+    bucket.count += 1;
+    buckets.set(key, bucket);
+
+    res.setHeader("RateLimit-Limit", String(max));
+    res.setHeader("RateLimit-Remaining", String(Math.max(0, max - bucket.count)));
+    res.setHeader("RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
+
+    if (bucket.count > max) {
+      return res.status(429).json({
+        ok: false,
+        error: "Too many requests. Please retry shortly."
+      });
+    }
+    return next();
+  };
+}
+
+function createTtlJsonCache({ ttlMs, maxEntries }) {
+  const entries = new Map();
+  const resolvedTtlMs = Math.max(0, Number(ttlMs || 0));
+  const resolvedMaxEntries = Math.max(1, Number(maxEntries || 1));
+
+  const pruneExpired = (now) => {
+    for (const [key, entry] of entries.entries()) {
+      if (entry.expiresAt <= now) entries.delete(key);
+    }
+  };
+
+  return {
+    clear() {
+      entries.clear();
+    },
+    get(key) {
+      if (resolvedTtlMs <= 0) return null;
+      const now = Date.now();
+      const entry = entries.get(key);
+      if (!entry) return null;
+      if (entry.expiresAt <= now) {
+        entries.delete(key);
+        return null;
+      }
+      return entry.payload;
+    },
+    set(key, payload) {
+      if (resolvedTtlMs <= 0) return;
+      const now = Date.now();
+      if (entries.size >= resolvedMaxEntries) pruneExpired(now);
+      while (entries.size >= resolvedMaxEntries) {
+        const oldestKey = entries.keys().next().value;
+        if (!oldestKey) break;
+        entries.delete(oldestKey);
+      }
+      entries.set(key, {
+        payload,
+        expiresAt: now + resolvedTtlMs
+      });
+    }
+  };
+}
+
+function getPublicReadCacheKey(req) {
+  return `${req.method}:${req.originalUrl || req.url || req.path || ""}`;
+}
+
+async function sendCachedPublicJson(req, res, cache, producer) {
+  const key = getPublicReadCacheKey(req);
+  const cached = cache.get(key);
+  if (cached) {
+    res.setHeader("X-OpenJobSlots-Cache", "HIT");
+    return res.json(cached);
+  }
+  const payload = await producer();
+  cache.set(key, payload);
+  res.setHeader("X-OpenJobSlots-Cache", "MISS");
+  return res.json(payload);
+}
+
+function adminGateMiddleware(req, res, next) {
+  if (!isControlRoute(req)) return next();
+  if (hasAdminAccess(req)) return next();
+  return res.status(401).json({
+    ok: false,
+    error: ADMIN_TOKEN
+      ? "Admin token required."
+      : "Admin endpoint requires OPENJOBSLOTS_ADMIN_TOKEN, or OPENJOBSLOTS_ALLOW_LOCAL_ADMIN=1 for private local development."
+  });
+}
+
+function genericErrorMiddleware(error, req, res, _next) {
+  const status = Number(error?.status || error?.statusCode || 500);
+  const safeStatus = Number.isFinite(status) && status >= 400 && status < 600 ? status : 500;
+  console.error("[openjobslots API] request failed:", {
+    method: req.method,
+    path: req.path,
+    status: safeStatus,
+    message: String(error?.message || error)
+  });
+  if (res.headersSent) return;
+  res.status(safeStatus).json({
+    ok: false,
+    error: safeStatus >= 500 ? "Internal server error. Details were logged for debugging." : "Request failed."
+  });
+}
+
 function ensureFrontendLogDirectory() {
   fs.mkdirSync(BACKEND_LOG_DIRECTORY_PATH, { recursive: true });
 }
@@ -808,6 +1107,32 @@ function normalizeLikeText(value) {
     .replace(/\s+/g, " ");
 }
 
+function stripSearchDiacritics(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "I");
+}
+
+function normalizeSearchText(value) {
+  return stripSearchDiacritics(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function tokenizeSearchText(value) {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return [];
+  return normalized
+    .split(" ")
+    .map((part) => part.trim())
+    .filter((part) => part && !SEARCH_STOP_WORDS.has(part));
+}
+
 function parseCsvParam(value) {
   return String(value || "")
     .split(",")
@@ -833,7 +1158,7 @@ function escapeRegExp(value) {
 }
 
 function normalizeGeoText(value) {
-  return String(value || "")
+  return stripSearchDiacritics(value)
     .toLowerCase()
     .replace(/&/g, " and ")
     .replace(/['’]/g, "")
@@ -1098,8 +1423,48 @@ function parseCountryFilters(values) {
   return parsed;
 }
 
+function getCountryCodeForSearchToken(token) {
+  const normalizedToken = normalizeCountryLikePart(token);
+  if (!normalizedToken) return "";
+  return COUNTRY_ALIAS_TO_CODE.get(normalizedToken) || "";
+}
+
+function searchTokenMatchesPosting(token, row) {
+  const normalizedToken = normalizeSearchText(token);
+  if (!normalizedToken) return true;
+
+  const companyName = normalizeSearchText(row?.company_name);
+  const positionName = normalizeSearchText(row?.position_name);
+  const location = String(row?.location || "").trim();
+  const normalizedLocation = normalizeSearchText(location);
+
+  if (
+    companyName.includes(normalizedToken) ||
+    positionName.includes(normalizedToken) ||
+    normalizedLocation.includes(normalizedToken)
+  ) {
+    return true;
+  }
+
+  const countryCode = getCountryCodeForSearchToken(normalizedToken);
+  if (!countryCode || !location) return false;
+
+  const inferredGeo = inferLocationGeo(location);
+  if (inferredGeo.countryCode && inferredGeo.countryCode === countryCode) {
+    return true;
+  }
+
+  const aliases = COUNTRY_ALIASES_BY_CODE.get(countryCode);
+  if (!(aliases instanceof Set)) return false;
+  const normalizedGeoLocation = normalizeGeoText(location);
+  return Array.from(aliases).some((alias) => containsGeoPhrase(normalizedGeoLocation, alias));
+}
+
 function getPostingLocationGeoFilterOptions() {
-  if (postingLocationGeoFilterOptionsCache.mapRef === postingLocationByJobUrl) {
+  if (
+    postingLocationGeoFilterOptionsCache.mapRef === postingLocationByJobUrl &&
+    postingLocationGeoFilterOptionsCache.version === postingLocationVersion
+  ) {
     return postingLocationGeoFilterOptionsCache;
   }
 
@@ -1131,6 +1496,7 @@ function getPostingLocationGeoFilterOptions() {
 
   postingLocationGeoFilterOptionsCache = {
     mapRef: postingLocationByJobUrl,
+    version: postingLocationVersion,
     countries,
     regions
   };
@@ -5453,6 +5819,28 @@ function extractAdpWorkforcenowCompanyName(contentLinksJson) {
   return "";
 }
 
+function normalizeAdpWorkforcenowSourceCompanyName(value) {
+  const cleaned = cleanAdpWorkforcenowText(value);
+  return cleaned && !isPlaceholderCompanyName(cleaned) ? cleaned : "";
+}
+
+function resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson) {
+  const sourceCompanyName = normalizeAdpWorkforcenowSourceCompanyName(company?.company_name);
+  if (sourceCompanyName) return sourceCompanyName;
+
+  const inferredCompanyName = normalizeAdpWorkforcenowSourceCompanyName(
+    extractAdpWorkforcenowCompanyName(contentLinksJson)
+  );
+  if (inferredCompanyName) return inferredCompanyName;
+
+  const ccIdCompanyName = normalizeAdpWorkforcenowSourceCompanyName(
+    slugToAdpWorkforcenowCompanyName(config?.ccId)
+  );
+  if (ccIdCompanyName) return ccIdCompanyName;
+
+  return "";
+}
+
 function extractAdpWorkforcenowLocation(job) {
   const item = job && typeof job === "object" ? job : {};
   const values = [];
@@ -5502,6 +5890,9 @@ function parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, res
   const postings = [];
   const seenUrls = new Set();
   const seenIds = new Set();
+  const effectiveCompanyName =
+    normalizeAdpWorkforcenowSourceCompanyName(companyNameForPostings) ||
+    normalizeAdpWorkforcenowSourceCompanyName(slugToAdpWorkforcenowCompanyName(config?.ccId));
 
   for (const row of jobs) {
     const item = row && typeof row === "object" ? row : {};
@@ -5512,7 +5903,7 @@ function parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, res
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
     postings.push({
-      company_name: companyNameForPostings,
+      company_name: effectiveCompanyName,
       position_name: String(item?.requisitionTitle || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: String(item?.postDate || "").trim() || null,
@@ -9421,10 +9812,8 @@ async function collectPostingsForAdpWorkforcenowCompany(company) {
   const config = parseAdpWorkforcenowCompany(company.url_string);
   if (!config) return [];
 
-  const normalizedCompanyName = String(company?.company_name || "").trim();
   const contentLinksJson = await fetchAdpWorkforcenowContentLinks(config);
-  const inferredCompanyName = extractAdpWorkforcenowCompanyName(contentLinksJson);
-  const companyNameForPostings = normalizedCompanyName || inferredCompanyName || config.ccId.toLowerCase();
+  const companyNameForPostings = resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson);
   const responseJson = await fetchAdpWorkforcenowJobsPage(config);
   return parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson);
 }
@@ -11802,6 +12191,7 @@ async function initDb() {
   });
 
   await db.exec(`
+    PRAGMA busy_timeout = 15000;
     PRAGMA journal_mode = WAL;
 
     CREATE TABLE IF NOT EXISTS companies (
@@ -11819,12 +12209,200 @@ async function initDb() {
   `);
 
   await ensurePostingsTable();
+  await hydratePostingLocationMapFromDb();
+  await ensureJobIndustryTables();
+  await ensureStateLocationIndexTable();
+  await seedReferenceDataFromBundledDb();
+  await ensureIngestionTables(db);
+  await seedAtsSources(db, ATS_FILTER_OPTION_ITEMS);
   await ensurePersonalInformationTable();
   await ensureApplicationsTable();
   await ensureBlockedCompaniesTable();
   await ensureSyncServiceSettingsTable();
   await loadSyncServiceSettingsIntoRuntime();
   await ensureCompaniesTableSchema();
+
+  if (DB_BACKEND === "postgres") {
+    postgresPool = createPostgresPool();
+    await ensurePostgresSchema(postgresPool);
+    await seedPostgresAtsSources(postgresPool, ATS_FILTER_OPTION_ITEMS);
+  }
+
+  if (SEARCH_BACKEND === "meili") {
+    await ensureMeiliPostingsIndex();
+  }
+}
+
+async function hydratePostingLocationMapFromDb() {
+  const rows = await db.all(
+    `
+      SELECT job_posting_url, location
+      FROM Postings
+      WHERE location IS NOT NULL
+        AND TRIM(location) <> '';
+    `
+  );
+
+  postingLocationByJobUrl = new Map();
+  for (const row of rows) {
+    const url = String(row?.job_posting_url || "").trim();
+    const location = String(row?.location || "").trim();
+    if (url && location) {
+      postingLocationByJobUrl.set(url, location);
+    }
+  }
+  postingLocationVersion += 1;
+  postingLocationGeoFilterOptionsCache = {
+    mapRef: null,
+    version: -1,
+    countries: [],
+    regions: []
+  };
+}
+
+async function ensureJobIndustryTables() {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS job_industry_categories (
+      id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      industry_key TEXT NOT NULL UNIQUE,
+      industry_label TEXT NOT NULL,
+      priority INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS job_position_industry (
+      id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      job_title TEXT NOT NULL,
+      normalized_job_title TEXT NOT NULL UNIQUE,
+      industry_key TEXT NOT NULL,
+      industry_label TEXT NOT NULL,
+      matched_rules TEXT NOT NULL,
+      confidence_score REAL NOT NULL,
+      rule_version TEXT NOT NULL DEFAULT 'rule_bootstrap_v4',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (industry_key) REFERENCES job_industry_categories(industry_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_job_position_industry_key
+      ON job_position_industry(industry_key);
+  `);
+}
+
+async function ensureStateLocationIndexTable() {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS state_location_index (
+      id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      location_type TEXT NOT NULL CHECK (location_type IN ('city', 'county')),
+      state_usps TEXT NOT NULL,
+      state_geoid TEXT,
+      location_geoid TEXT NOT NULL,
+      ansicode TEXT,
+      location_name TEXT NOT NULL,
+      search_location_name TEXT NOT NULL,
+      normalized_location_name TEXT NOT NULL,
+      normalized_search_location_name TEXT NOT NULL,
+      lsad_code TEXT,
+      funcstat TEXT,
+      aland INTEGER,
+      awater INTEGER,
+      aland_sqmi REAL,
+      awater_sqmi REAL,
+      intptlat REAL,
+      intptlong REAL,
+      source_file TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(location_type, location_geoid)
+    );
+  `);
+}
+
+async function getTableCount(tableName) {
+  const row = await db.get(`SELECT COUNT(*) AS count FROM ${tableName};`);
+  return Number(row?.count || 0);
+}
+
+async function seedReferenceTableWhenEmpty(tableName, columns) {
+  const source = await db.get(
+    `
+      SELECT name
+      FROM seed_ref.sqlite_master
+      WHERE type = 'table'
+        AND name = ?;
+    `,
+    [tableName]
+  );
+  if (!source?.name) return 0;
+
+  const targetCount = await getTableCount(tableName);
+  if (targetCount > 0) return 0;
+
+  const columnList = columns.join(", ");
+  const result = await db.run(
+    `
+      INSERT OR IGNORE INTO ${tableName} (${columnList})
+      SELECT ${columnList}
+      FROM seed_ref.${tableName};
+    `
+  );
+  return Number(result?.changes || 0);
+}
+
+async function seedReferenceDataFromBundledDb() {
+  const resolvedDbPath = path.resolve(DB_PATH);
+  const resolvedBundledDbPath = path.resolve(BUNDLED_DB_PATH);
+  if (resolvedDbPath === resolvedBundledDbPath || !fs.existsSync(resolvedBundledDbPath)) {
+    return;
+  }
+
+  try {
+    await db.run(`ATTACH DATABASE ? AS seed_ref;`, [resolvedBundledDbPath]);
+    await seedReferenceTableWhenEmpty("companies", ["company_name", "url_string", "ATS_name"]);
+    await seedReferenceTableWhenEmpty("job_industry_categories", [
+      "industry_key",
+      "industry_label",
+      "priority",
+      "created_at"
+    ]);
+    await seedReferenceTableWhenEmpty("job_position_industry", [
+      "job_title",
+      "normalized_job_title",
+      "industry_key",
+      "industry_label",
+      "matched_rules",
+      "confidence_score",
+      "rule_version",
+      "created_at",
+      "updated_at"
+    ]);
+    await seedReferenceTableWhenEmpty("state_location_index", [
+      "location_type",
+      "state_usps",
+      "state_geoid",
+      "location_geoid",
+      "ansicode",
+      "location_name",
+      "search_location_name",
+      "normalized_location_name",
+      "normalized_search_location_name",
+      "lsad_code",
+      "funcstat",
+      "aland",
+      "awater",
+      "aland_sqmi",
+      "awater_sqmi",
+      "intptlat",
+      "intptlong",
+      "source_file",
+      "created_at"
+    ]);
+  } catch (error) {
+    console.warn(`[openjobslots API] reference seed skipped: ${String(error?.message || error)}`);
+  } finally {
+    try {
+      await db.exec(`DETACH DATABASE seed_ref;`);
+    } catch {}
+  }
 }
 
 async function createCanonicalPostingsTable() {
@@ -11834,6 +12412,7 @@ async function createCanonicalPostingsTable() {
       company_name TEXT NOT NULL,
       position_name TEXT NOT NULL,
       job_posting_url TEXT NOT NULL UNIQUE,
+      location TEXT,
       posting_date TEXT,
       first_seen_epoch INTEGER,
       last_seen_epoch INTEGER,
@@ -11855,6 +12434,9 @@ async function createCanonicalPostingsTable() {
 
     CREATE INDEX IF NOT EXISTS idx_postings_hidden_first_seen_epoch
       ON Postings(hidden, first_seen_epoch);
+
+    CREATE INDEX IF NOT EXISTS idx_postings_hidden_last_seen_epoch
+      ON Postings(hidden, last_seen_epoch DESC);
   `);
 }
 
@@ -11911,6 +12493,12 @@ async function ensurePostingsTable() {
     await db.exec(`ALTER TABLE Postings ADD COLUMN hidden_at_epoch INTEGER;`);
   }
 
+  if (!existingColumns.has("location")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN location TEXT;`);
+  }
+
+  await db.run(`UPDATE Postings SET last_seen_epoch = ? WHERE last_seen_epoch IS NULL;`, [nowEpochSeconds()]);
+
   await db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_postings_job_posting_url
       ON Postings(job_posting_url);
@@ -11929,6 +12517,9 @@ async function ensurePostingsTable() {
 
     CREATE INDEX IF NOT EXISTS idx_postings_hidden_first_seen_epoch
       ON Postings(hidden, first_seen_epoch);
+
+    CREATE INDEX IF NOT EXISTS idx_postings_hidden_last_seen_epoch
+      ON Postings(hidden, last_seen_epoch DESC);
   `);
 }
 
@@ -12017,7 +12608,7 @@ async function ensureApplicationsTable() {
     CREATE TABLE IF NOT EXISTS McpSettings (
       id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
       enabled INTEGER NOT NULL DEFAULT 0,
-      preferred_agent_name TEXT NOT NULL DEFAULT 'OpenJobSlots Agent',
+      preferred_agent_name TEXT NOT NULL DEFAULT 'openjobslots Agent',
       agent_login_email TEXT NOT NULL DEFAULT '',
       agent_login_password TEXT NOT NULL DEFAULT '',
       mfa_login_email TEXT NOT NULL DEFAULT '',
@@ -12569,7 +13160,6 @@ async function enrichPostingsWithApplicationState(items) {
 }
 
 async function listPostingsWithFilters(options = {}) {
-  await pruneExpiredPostings();
   const search = String(options?.search || "").trim();
   const limit = Math.max(1, Math.min(2000, Number(options?.limit || 500)));
   const offset = Math.max(0, Number(options?.offset || 0));
@@ -12599,7 +13189,7 @@ async function listPostingsWithFilters(options = {}) {
     if (includeApplied && includeIgnored) {
       rows = await db.all(
         `
-          SELECT id, company_name, position_name, job_posting_url, posting_date, last_seen_epoch
+          SELECT id, company_name, position_name, job_posting_url, location, posting_date, last_seen_epoch
           FROM Postings
           WHERE COALESCE(hidden, 0) = 0
             AND (? = 0 OR (posting_date IS NOT NULL AND TRIM(posting_date) <> ''))
@@ -12616,7 +13206,7 @@ async function listPostingsWithFilters(options = {}) {
     } else {
       rows = await db.all(
         `
-          SELECT p.id, p.company_name, p.position_name, p.job_posting_url, p.posting_date, p.last_seen_epoch
+          SELECT p.id, p.company_name, p.position_name, p.job_posting_url, p.location, p.posting_date, p.last_seen_epoch
           FROM Postings p
           LEFT JOIN posting_application_state s
             ON s.job_posting_url = p.job_posting_url
@@ -12642,7 +13232,7 @@ async function listPostingsWithFilters(options = {}) {
   } else {
     rows = await db.all(
       `
-        SELECT id, company_name, position_name, job_posting_url, posting_date, last_seen_epoch
+        SELECT id, company_name, position_name, job_posting_url, location, posting_date, last_seen_epoch
         FROM Postings
         WHERE COALESCE(hidden, 0) = 0
           AND NOT EXISTS (
@@ -12657,24 +13247,19 @@ async function listPostingsWithFilters(options = {}) {
 
   const enrichedRows = rows.map((row) => ({
     ...row,
-    location: inferPostingLocationFromJobUrl(row?.job_posting_url),
+    location: String(row?.location || "").trim() || inferPostingLocationFromJobUrl(row?.job_posting_url),
     ats: inferAtsFromJobPostingUrl(row?.job_posting_url)
   }));
 
-  const searchTerms = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const searchTerms = tokenizeSearchText(search);
   const industryMatchersByKey = await buildIndustryMatchersByKey(industryKeys);
 
   let items = enrichedRows;
   if (search || hasStructuredFilters) {
     items = enrichedRows.filter((row) => {
-      const companyName = String(row?.company_name || "").toLowerCase();
-      const positionName = String(row?.position_name || "").toLowerCase();
-      const location = String(row?.location || "").toLowerCase();
       const ats = String(row?.ats || "").toLowerCase();
 
-      const matchesSearch = searchTerms.every(
-        (term) => companyName.includes(term) || positionName.includes(term) || location.includes(term)
-      );
+      const matchesSearch = searchTerms.every((term) => searchTokenMatchesPosting(term, row));
       if (!matchesSearch) return false;
 
       if (atsFilters.length > 0 && !atsFilters.includes(ats)) return false;
@@ -12738,7 +13323,7 @@ async function listPostingsWithFilters(options = {}) {
 }
 
 function buildMcpRunbook(settings, personalInformation, candidates) {
-  const preferredAgent = String(settings?.preferred_agent_name || "OpenJobSlots Agent").trim();
+  const preferredAgent = String(settings?.preferred_agent_name || "openjobslots Agent").trim();
   const applicantFullName = [
     String(personalInformation?.first_name || "").trim(),
     String(personalInformation?.middle_name || "").trim(),
@@ -13060,7 +13645,11 @@ async function createApplication(input) {
     await db.exec("COMMIT;");
     return getApplicationById(result.lastID);
   } catch (error) {
-    await db.exec("ROLLBACK;");
+    try {
+      await db.exec("ROLLBACK;");
+    } catch {
+      // A failed BEGIN leaves no open transaction to roll back.
+    }
     throw error;
   }
 }
@@ -13699,6 +14288,7 @@ async function upsertPostings(postings, lastSeenEpoch) {
       const positionName = String(posting.position_name || "").trim() || "Untitled Position";
       const jobPostingUrl = String(posting.job_posting_url || "").trim();
       if (!jobPostingUrl) continue;
+      const location = String(posting.location || "").trim() || null;
       const postingDateRaw = String(posting.posting_date ?? "").trim();
       const postingDate = postingDateRaw || null;
 
@@ -13708,16 +14298,18 @@ async function upsertPostings(postings, lastSeenEpoch) {
             company_name,
             position_name,
             job_posting_url,
+            location,
             posting_date,
             first_seen_epoch,
             hidden,
             hidden_at_epoch,
             last_seen_epoch
           )
-          VALUES (?, ?, ?, ?, ?, 0, NULL, ?)
+          VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?)
           ON CONFLICT(job_posting_url) DO UPDATE SET
             company_name = excluded.company_name,
             position_name = excluded.position_name,
+            location = COALESCE(excluded.location, Postings.location),
             posting_date = COALESCE(excluded.posting_date, Postings.posting_date),
             first_seen_epoch = COALESCE(Postings.first_seen_epoch, Postings.last_seen_epoch, excluded.first_seen_epoch),
             last_seen_epoch = excluded.last_seen_epoch
@@ -13727,6 +14319,7 @@ async function upsertPostings(postings, lastSeenEpoch) {
           companyName,
           positionName,
           jobPostingUrl,
+          location,
           postingDate,
           seenEpoch,
           seenEpoch
@@ -13735,7 +14328,11 @@ async function upsertPostings(postings, lastSeenEpoch) {
     }
     await db.exec("COMMIT;");
   } catch (error) {
-    await db.exec("ROLLBACK;");
+    try {
+      await db.exec("ROLLBACK;");
+    } catch {
+      // A failed BEGIN leaves no open transaction to roll back.
+    }
     throw error;
   }
 }
@@ -13984,6 +14581,7 @@ async function runWorkdaySyncInternal() {
             if (location) {
               nextPostingLocationByJobUrl.set(posting.job_posting_url, location);
               postingLocationByJobUrl.set(posting.job_posting_url, location);
+              postingLocationVersion += 1;
             }
           }
         } catch (error) {
@@ -14015,6 +14613,7 @@ async function runWorkdaySyncInternal() {
     totalPruned += await pruneExpiredPostings(syncReferenceEpoch);
     postingDatePruned += await prunePostingsOutsideDateWindow(syncReferenceEpoch);
     postingLocationByJobUrl = nextPostingLocationByJobUrl;
+    postingLocationVersion += 1;
     const syncScopeStats = await getSyncScopeStats();
 
     syncStatus.last_sync_at = new Date().toISOString();
@@ -14046,8 +14645,14 @@ function runWorkdaySync() {
   return syncPromise;
 }
 
+function getDb() {
+  if (!db) {
+    throw new Error("Database is not initialized");
+  }
+  return db;
+}
+
 async function getCounts() {
-  await pruneExpiredPostings();
   const companyRow = await db.get(`SELECT COUNT(*) AS count FROM companies;`);
   const postingRow = await db.get(
     `
@@ -14055,6 +14660,15 @@ async function getCounts() {
       FROM Postings
       WHERE COALESCE(hidden, 0) = 0;
     `
+  );
+  const seen24hRow = await db.get(
+    `
+      SELECT COUNT(*) AS count
+      FROM Postings
+      WHERE COALESCE(hidden, 0) = 0
+        AND COALESCE(last_seen_epoch, 0) >= ?;
+    `,
+    [nowEpochSeconds() - 24 * 60 * 60]
   );
   const byAtsRows = await db.all(`
     SELECT ATS_name, COUNT(*) AS count
@@ -14071,14 +14685,228 @@ async function getCounts() {
   return {
     company_count: Number(companyRow?.count || 0),
     posting_count: Number(postingRow?.count || 0),
+    postings_seen_24h_count: Number(seen24hRow?.count || 0),
     company_count_by_ats: companyCountByAts
   };
 }
 
+async function getIngestionWorkerStatus() {
+  const latestRun = await db.get(
+    `
+      SELECT
+        id,
+        started_at_epoch,
+        finished_at_epoch,
+        status,
+        total_targets,
+        success_count,
+        failure_count,
+        cache_hit_count,
+        cache_write_count,
+        posting_upsert_count,
+        active_ats,
+        last_error
+      FROM ingestion_runs
+      ORDER BY id DESC
+      LIMIT 1;
+    `
+  );
+  const dueRow = await db.get(
+    `
+      SELECT COUNT(*) AS count
+      FROM company_sync_state
+      WHERE next_sync_epoch <= ?;
+    `,
+    [nowEpochSeconds()]
+  );
+  const parserErrorRow = await db.get(
+    `
+      SELECT COUNT(*) AS count
+      FROM ingestion_run_errors
+      WHERE created_at >= datetime('now', '-24 hours')
+        AND error_type LIKE 'parser_%';
+    `
+  );
+
+  let activeAts = [];
+  try {
+    activeAts = JSON.parse(String(latestRun?.active_ats || "[]"));
+  } catch {
+    activeAts = [];
+  }
+
+  return {
+    latest_run_id: Number(latestRun?.id || 0),
+    latest_status: String(latestRun?.status || ""),
+    started_at_epoch: Number(latestRun?.started_at_epoch || 0),
+    finished_at_epoch: Number(latestRun?.finished_at_epoch || 0),
+    last_run_duration_seconds:
+      latestRun?.finished_at_epoch && latestRun?.started_at_epoch
+        ? Math.max(0, Number(latestRun.finished_at_epoch) - Number(latestRun.started_at_epoch))
+        : 0,
+    total_targets: Number(latestRun?.total_targets || 0),
+    success_count: Number(latestRun?.success_count || 0),
+    failure_count: Number(latestRun?.failure_count || 0),
+    cache_hit_count: Number(latestRun?.cache_hit_count || 0),
+    cache_write_count: Number(latestRun?.cache_write_count || 0),
+    posting_upsert_count: Number(latestRun?.posting_upsert_count || 0),
+    queue_due_count: Number(dueRow?.count || 0),
+    parser_error_count_24h: Number(parserErrorRow?.count || 0),
+    active_ats: Array.isArray(activeAts) ? activeAts : [],
+    last_error: String(latestRun?.last_error || "")
+  };
+}
+
+async function getParserAttentionByAts(limit = 20) {
+  const rows = await db.all(
+    `
+      SELECT
+        ats_key,
+        COUNT(*) AS error_count,
+        MAX(created_at) AS latest_error_at,
+        (
+          SELECT e2.error_message
+          FROM ingestion_run_errors e2
+          WHERE e2.ats_key = ingestion_run_errors.ats_key
+            AND e2.error_type LIKE 'parser_%'
+          ORDER BY e2.id DESC
+          LIMIT 1
+        ) AS latest_error
+      FROM ingestion_run_errors
+      WHERE created_at >= datetime('now', '-24 hours')
+        AND error_type LIKE 'parser_%'
+      GROUP BY ats_key
+      ORDER BY error_count DESC, latest_error_at DESC
+      LIMIT ?;
+    `,
+    [Math.max(1, Math.min(100, Number(limit || 20)))]
+  );
+
+  return rows.map((row) => ({
+    ats_key: String(row?.ats_key || ""),
+    error_count: Number(row?.error_count || 0),
+    latest_error_at: String(row?.latest_error_at || ""),
+    latest_error: String(row?.latest_error || "")
+  }));
+}
+
+function getWritePressure(ingestionWorker = {}) {
+  if (syncStatus.running || String(ingestionWorker?.latest_status || "").toLowerCase() === "running") {
+    return "active";
+  }
+  if (Number(ingestionWorker?.queue_due_count || 0) > 0) {
+    return "due";
+  }
+  return "idle";
+}
+
+function addSuggestion(suggestions, seen, type, value, count = 1) {
+  const label = String(value || "").trim();
+  if (!label) return;
+  const key = `${type}:${normalizeSearchText(label)}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  suggestions.push({
+    type,
+    value: label,
+    label,
+    count: Number(count || 1)
+  });
+}
+
+async function getSearchSuggestions(search, limit = 8) {
+  const query = String(search || "").trim();
+  const resolvedLimit = Math.max(1, Math.min(20, Number(limit || 8)));
+  const suggestions = [];
+  const seen = new Set();
+
+  for (const alias of ["remote jobs", "turkish jobs", "t\u00fcrkiye", "turkiye", "turkey"]) {
+    if (!query || normalizeSearchText(alias).includes(normalizeSearchText(query))) {
+      addSuggestion(suggestions, seen, "shortcut", alias);
+    }
+  }
+
+  if (query) {
+    const like = `%${query.replace(/[%_]/g, "")}%`;
+    const rows = await db.all(
+      `
+        SELECT 'title' AS type, position_name AS value, COUNT(*) AS count
+        FROM Postings
+        WHERE COALESCE(hidden, 0) = 0
+          AND position_name LIKE ?
+        GROUP BY position_name
+        UNION ALL
+        SELECT 'company' AS type, company_name AS value, COUNT(*) AS count
+        FROM Postings
+        WHERE COALESCE(hidden, 0) = 0
+          AND company_name LIKE ?
+        GROUP BY company_name
+        UNION ALL
+        SELECT 'location' AS type, location AS value, COUNT(*) AS count
+        FROM Postings
+        WHERE COALESCE(hidden, 0) = 0
+          AND location IS NOT NULL
+          AND TRIM(location) <> ''
+          AND location LIKE ?
+        GROUP BY location
+        ORDER BY count DESC
+        LIMIT ?;
+      `,
+      [like, like, like, resolvedLimit * 3]
+    );
+
+    for (const row of rows) {
+      addSuggestion(suggestions, seen, row?.type, row?.value, row?.count);
+      if (suggestions.length >= resolvedLimit) break;
+    }
+  }
+
+  return suggestions.slice(0, resolvedLimit);
+}
+
 function createServer() {
   const app = express();
-  app.use(cors());
-  app.use(express.json());
+  const allowedOrigins = getAllowedOrigins();
+  const publicLimiter = createRateLimiter({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: PUBLIC_RATE_LIMIT_MAX,
+    name: "public"
+  });
+  const controlLimiter = createRateLimiter({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: CONTROL_RATE_LIMIT_MAX,
+    name: "control"
+  });
+  const frontendLogLimiter = createRateLimiter({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: FRONTEND_LOG_RATE_LIMIT_MAX,
+    name: "frontend-log"
+  });
+  const publicReadCache = createTtlJsonCache({
+    ttlMs: PUBLIC_READ_CACHE_TTL_MS,
+    maxEntries: PUBLIC_READ_CACHE_MAX_ENTRIES
+  });
+
+  app.disable("x-powered-by");
+  if (TRUST_PROXY) app.set("trust proxy", 1);
+  app.use(securityHeadersMiddleware);
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      const normalized = normalizeOrigin(origin);
+      if (allowedOrigins.has(normalized) || isLocalDevelopmentOrigin(origin)) return callback(null, true);
+      const error = new Error("CORS origin is not allowed");
+      error.statusCode = 403;
+      return callback(error);
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-OpenJobSlots-Admin-Token"],
+    maxAge: 600
+  }));
+  app.use(express.json({ limit: API_JSON_LIMIT }));
+  app.use("/frontend/log", frontendLogLimiter);
+  app.use((req, res, next) => (isControlRoute(req) ? controlLimiter(req, res, next) : publicLimiter(req, res, next)));
+  app.use(adminGateMiddleware);
 
   app.post("/frontend/log", async (req, res) => {
     try {
@@ -14098,6 +14926,17 @@ function createServer() {
   });
 
   const handleSyncRequest = async (req, res) => {
+    if (DB_BACKEND === "postgres") {
+      const control = await requestSyncStart(postgresPool);
+      const status = await getPostgresSyncStatus(postgresPool);
+      return res.status(202).json(sanitizeFrontendValue({
+        ok: true,
+        started: String(control?.status || "") === "requested",
+        running: true,
+        ...status
+      }));
+    }
+
     const wait = String(req.query.wait || "").toLowerCase();
     const shouldWait = wait === "1" || wait === "true";
     const wasRunning = Boolean(syncPromise);
@@ -14123,138 +14962,518 @@ function createServer() {
     });
   };
 
-  app.get("/health", async (_req, res) => {
-    const counts = await getCounts();
-    res.json({
-      ok: true,
-      db_path: DB_PATH,
-      ...counts
+  app.get("/health", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        const counts = await getPostgresCounts(postgresPool);
+        return {
+          ok: true,
+          db_backend: DB_BACKEND,
+          search_backend: SEARCH_BACKEND,
+          queue_backend: QUEUE_BACKEND,
+          legacy_api_sync: false,
+          ...counts
+        };
+      }
+
+      const counts = await getCounts();
+      return {
+        ok: true,
+        db_path: DB_PATH,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        queue_backend: QUEUE_BACKEND,
+        legacy_api_sync: true,
+        ...counts
+      };
     });
   });
 
-  app.get("/sync/status", async (_req, res) => {
-    const [counts, syncScopeStats] = await Promise.all([getCounts(), getSyncScopeStats()]);
-    const payload = sanitizeFrontendValue({
-      ...syncStatus,
-      ...syncScopeStats,
-      ...counts
+  app.get("/sync/status", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        const [status, parserAttentionByAts] = await Promise.all([
+          getPostgresSyncStatus(postgresPool),
+          getPostgresParserAttentionByAts(postgresPool)
+        ]);
+        return sanitizeFrontendValue({
+          ...status,
+          write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+          parser_attention_by_ats: parserAttentionByAts,
+          ingestion_worker: {
+            ...(status.ingestion_worker || {}),
+            parser_attention_by_ats: parserAttentionByAts
+          }
+        });
+      }
+
+      const [counts, syncScopeStats, ingestionWorker, parserAttentionByAts] = await Promise.all([
+        getCounts(),
+        getSyncScopeStats(),
+        getIngestionWorkerStatus(),
+        getParserAttentionByAts()
+      ]);
+      return sanitizeFrontendValue({
+        ...syncStatus,
+        ...syncScopeStats,
+        ...counts,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        queue_backend: QUEUE_BACKEND,
+        legacy_api_sync: true,
+        write_pressure: getWritePressure(ingestionWorker),
+        parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+        parser_attention_by_ats: parserAttentionByAts,
+        ingestion_worker: {
+          ...ingestionWorker,
+          parser_attention_by_ats: parserAttentionByAts
+        }
+      });
     });
-    res.json(payload);
+  });
+
+  app.get("/ingestion/status", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        const [status, parserAttentionByAts] = await Promise.all([
+          getPostgresSyncStatus(postgresPool),
+          getPostgresParserAttentionByAts(postgresPool)
+        ]);
+        return sanitizeFrontendValue({
+          ok: true,
+          item: {
+            ...(status.ingestion_worker || {}),
+            db_backend: DB_BACKEND,
+            search_backend: SEARCH_BACKEND,
+            queue_backend: QUEUE_BACKEND,
+            write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
+            parser_attention_by_ats: parserAttentionByAts
+          }
+        });
+      }
+
+      const [status, parserAttentionByAts] = await Promise.all([
+        getIngestionWorkerStatus(),
+        getParserAttentionByAts()
+      ]);
+      return sanitizeFrontendValue({
+        ok: true,
+        item: {
+          ...status,
+          db_backend: DB_BACKEND,
+          search_backend: SEARCH_BACKEND,
+          queue_backend: QUEUE_BACKEND,
+          write_pressure: getWritePressure(status),
+          parser_attention_by_ats: parserAttentionByAts
+        }
+      });
+    });
+  });
+
+  app.get("/admin/services", async (_req, res) => {
+    res.json(sanitizeFrontendValue({
+      ok: true,
+      services: {
+        app: {
+          role: "api-and-static-web",
+          public: true,
+          port: PORT
+        },
+        worker: {
+          role: "ingestion",
+          public: false
+        },
+        postgres: {
+          role: "primary-database-and-durable-cache",
+          active: DB_BACKEND === "postgres",
+          public: false
+        },
+        meilisearch: {
+          role: "search-index",
+          active: SEARCH_BACKEND === "meili",
+          public: false
+        },
+        redis_or_valkey: {
+          active: false,
+          reason: "Not needed for the single-machine v1 stack."
+        },
+        extra_load_balancer: {
+          active: false,
+          reason: "Nginx Proxy Manager remains the only public reverse proxy."
+        }
+      }
+    }));
+  });
+
+  app.get("/admin/storage", async (_req, res) => {
+    const counts = DB_BACKEND === "postgres" ? await getPostgresCounts(postgresPool) : await getCounts();
+    res.json(sanitizeFrontendValue({
+      ok: true,
+      db_backend: DB_BACKEND,
+      search_backend: SEARCH_BACKEND,
+      queue_backend: QUEUE_BACKEND,
+      primary_store: DB_BACKEND === "postgres" ? "postgres" : "sqlite",
+      search_store: SEARCH_BACKEND === "meili" ? "meilisearch" : "sqlite",
+      sqlite_path: DB_BACKEND === "postgres" ? "backup/import only" : DB_PATH,
+      ...counts
+    }));
+  });
+
+  app.get("/admin/queue", async (_req, res) => {
+    const status = DB_BACKEND === "postgres" ? await getPostgresSyncStatus(postgresPool) : {
+      running: syncStatus.running,
+      queue_depth: 0,
+      queue_backend: QUEUE_BACKEND,
+      ingestion_worker: await getIngestionWorkerStatus()
+    };
+    res.json(sanitizeFrontendValue({
+      ok: true,
+      db_backend: DB_BACKEND,
+      search_backend: SEARCH_BACKEND,
+      queue_backend: QUEUE_BACKEND,
+      running: Boolean(status.running),
+      stopping: Boolean(status.stopping),
+      cancel_requested: Boolean(status.cancel_requested),
+      queue_depth: Number(status.queue_depth || status.ingestion_worker?.queue_due_count || 0),
+      active_ats: status.active_ats || status.ingestion_worker?.active_ats || []
+    }));
+  });
+
+  app.post("/sync/start", handleSyncRequest);
+
+  app.post("/sync/stop", async (_req, res) => {
+    if (DB_BACKEND === "postgres") {
+      const control = await requestSyncStop(postgresPool);
+      const status = await getPostgresSyncStatus(postgresPool);
+      return res.status(202).json(sanitizeFrontendValue({
+        ok: true,
+        stopped: String(control?.status || "") === "idle",
+        stopping: status.stopping,
+        running: status.running,
+        ...status
+      }));
+    }
+
+    return res.status(202).json({
+      ok: true,
+      stopping: Boolean(syncPromise),
+      running: Boolean(syncPromise),
+      legacy_api_sync: true,
+      message: syncPromise
+        ? "Legacy in-process sync cannot cancel mid-run. Restart the app container to interrupt it."
+        : "No sync is running."
+    });
   });
 
   app.post("/sync/workday", handleSyncRequest);
   app.post("/sync/ats", handleSyncRequest);
 
-  app.get("/postings/filter-options", async (req, res) => {
-    const selectedStates = parseCsvParam(req.query.states).map((state) => state.toUpperCase());
-    const syncSettings = await getSyncServiceSettings();
-    const enabledAts = new Set(normalizeSyncEnabledAts(syncSettings?.sync_enabled_ats));
-    const ats = ATS_FILTER_OPTION_ITEMS.map((item) => ({
-      value: item.value,
-      label: item.label,
-      enabled: enabledAts.has(item.value)
-    }));
-    const sort_options = [
-      { value: "recent", label: "Most Recently Seen" },
-      { value: "company_asc", label: "Company (A-Z)" }
-    ];
-
-    let industries = [];
-    try {
-      industries = await db.all(
-        `
-          SELECT industry_key AS value, industry_label AS label
-          FROM job_industry_categories
-          ORDER BY industry_label ASC;
-        `
-      );
-    } catch {
-      industries = await db.all(
-        `
-          SELECT industry_key AS value, industry_label AS label
-          FROM job_position_industry
-          GROUP BY industry_key, industry_label
-          ORDER BY industry_label ASC;
-        `
-      );
-    }
-
-    let states = [];
-    try {
-      const stateRows = await db.all(
-        `
-          SELECT DISTINCT state_usps
-          FROM state_location_index
-          WHERE state_usps IS NOT NULL AND TRIM(state_usps) <> ''
-          ORDER BY state_usps ASC;
-        `
-      );
-      states = stateRows.map((row) => {
-        const code = String(row?.state_usps || "").trim().toUpperCase();
-        const readableName = STATE_CODE_TO_NAME[code];
+  app.get("/search/suggest", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        const items = await getPostgresSuggestions(postgresPool, req.query.search, Number(req.query.limit || 8));
         return {
-          value: code,
-          label: readableName ? `${code} - ${readableName.replace(/\b\w/g, (c) => c.toUpperCase())}` : code
+          ok: true,
+          items,
+          count: items.length
         };
-      });
-    } catch {
-      states = [];
-    }
-
-    let counties = [];
-    try {
-      let countyRows = [];
-      if (selectedStates.length === 0) {
-        countyRows = await db.all(
-          `
-            SELECT DISTINCT state_usps, search_location_name
-            FROM state_location_index
-            WHERE location_type = 'county'
-              AND search_location_name IS NOT NULL
-              AND TRIM(search_location_name) <> ''
-            ORDER BY state_usps ASC, search_location_name ASC;
-          `
-        );
-      } else {
-        const placeholders = selectedStates.map(() => "?").join(", ");
-        countyRows = await db.all(
-          `
-            SELECT DISTINCT state_usps, search_location_name
-            FROM state_location_index
-            WHERE location_type = 'county'
-              AND search_location_name IS NOT NULL
-              AND TRIM(search_location_name) <> ''
-              AND state_usps IN (${placeholders})
-            ORDER BY state_usps ASC, search_location_name ASC;
-          `,
-          selectedStates
-        );
       }
 
-      counties = countyRows.map((row) => {
-        const stateCode = String(row?.state_usps || "").trim().toUpperCase();
-        const countyName = String(row?.search_location_name || "").trim();
-        return {
-          value: `${stateCode}|${countyName}`,
-          label: `${countyName} (${stateCode})`,
-          state: stateCode,
-          county: countyName
-        };
+      const items = await getSearchSuggestions(req.query.search, Number(req.query.limit || 8));
+      return {
+        ok: true,
+        items,
+        count: items.length
+      };
+    });
+  });
+
+  app.get("/admin/ats", async (_req, res) => {
+    if (DB_BACKEND === "postgres") {
+      return res.json({
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        queue_backend: QUEUE_BACKEND,
+        items: await getPostgresAtsAdmin(postgresPool)
       });
-    } catch {
-      counties = [];
     }
 
-    const locationGeoOptions = getPostingLocationGeoFilterOptions();
-
+    const rows = await db.all(
+      `
+        SELECT
+          s.ats_key,
+          s.display_name,
+          s.enabled,
+          s.default_ttl_seconds,
+          s.rate_limit_ms,
+          COUNT(c.id) AS company_count
+        FROM ats_sources s
+        LEFT JOIN companies c
+          ON LOWER(TRIM(c.ATS_name)) = s.ats_key
+        GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms
+        ORDER BY s.display_name ASC;
+      `
+    );
     res.json({
-      ats,
-      sort_options,
-      industries,
-      regions: Array.isArray(locationGeoOptions?.regions) ? locationGeoOptions.regions : [],
-      countries: Array.isArray(locationGeoOptions?.countries) ? locationGeoOptions.countries : [],
-      states,
-      counties
+      ok: true,
+      db_backend: DB_BACKEND,
+      search_backend: SEARCH_BACKEND,
+      queue_backend: QUEUE_BACKEND,
+      items: rows.map((row) => ({
+        ats_key: String(row?.ats_key || ""),
+        display_name: String(row?.display_name || ""),
+        enabled: Number(row?.enabled || 0) === 1,
+        default_ttl_seconds: Number(row?.default_ttl_seconds || 0),
+        rate_limit_ms: Number(row?.rate_limit_ms || 0),
+        company_count: Number(row?.company_count || 0)
+      }))
+    });
+  });
+
+  app.get("/admin/parsers/:ats_key", async (req, res) => {
+    if (DB_BACKEND === "postgres") {
+      const item = await getPostgresParserAdmin(postgresPool, req.params.ats_key);
+      if (!item) {
+        return res.status(404).json({ ok: false, error: "ATS parser not found" });
+      }
+      return res.json({ ok: true, item });
+    }
+
+    const atsKey = normalizeAtsFilterValue(req.params.ats_key);
+    const source = await db.get(
+      `
+        SELECT ats_key, display_name, enabled, default_ttl_seconds, rate_limit_ms
+        FROM ats_sources
+        WHERE ats_key = ?;
+      `,
+      [atsKey]
+    );
+    if (!source) {
+      return res.status(404).json({ ok: false, error: "ATS parser not found" });
+    }
+    const errorRows = await db.all(
+      `
+        SELECT run_id, company_url, company_name, error_type, error_message, http_status, created_at
+        FROM ingestion_run_errors
+        WHERE ats_key = ?
+        ORDER BY id DESC
+        LIMIT 25;
+      `,
+      [atsKey]
+    );
+    return res.json({
+      ok: true,
+      item: {
+        ats_key: String(source.ats_key || ""),
+        display_name: String(source.display_name || ""),
+        enabled: Number(source.enabled || 0) === 1,
+        default_ttl_seconds: Number(source.default_ttl_seconds || 0),
+        rate_limit_ms: Number(source.rate_limit_ms || 0),
+        parser_version: "legacy-adapter-v1",
+        fixture_status: [
+          "greenhouse",
+          "lever",
+          "ashby",
+          "smartrecruiters",
+          "recruitee",
+          "bamboohr",
+          "applytojob",
+          "breezy",
+          "hrmdirect",
+          "icims",
+          "zoho",
+          "applitrack",
+          "pinpointhq",
+          "recruitcrm",
+          "fountain",
+          "paylocity",
+          "oracle",
+          "adp_workforcenow"
+        ].includes(atsKey) ? "fixture-backed" : "pending-fixture",
+        recent_errors: errorRows.map((row) => ({
+          run_id: Number(row?.run_id || 0),
+          company_url: String(row?.company_url || ""),
+          company_name: String(row?.company_name || ""),
+          error_type: String(row?.error_type || "unknown"),
+          error_message: String(row?.error_message || ""),
+          http_status: row?.http_status == null ? null : Number(row.http_status),
+          created_at: String(row?.created_at || "")
+        }))
+      }
+    });
+  });
+
+  app.get("/admin/ingestion/runs", async (req, res) => {
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit || 25)));
+    if (DB_BACKEND === "postgres") {
+      return res.json({
+        ok: true,
+        items: await listPostgresIngestionRuns(postgresPool, limit)
+      });
+    }
+
+    const rows = await db.all(
+      `
+        SELECT
+          id,
+          started_at_epoch,
+          finished_at_epoch,
+          status,
+          total_targets,
+          success_count,
+          failure_count,
+          cache_hit_count,
+          cache_write_count,
+          posting_upsert_count,
+          active_ats,
+          last_error
+        FROM ingestion_runs
+        ORDER BY id DESC
+        LIMIT ?;
+      `,
+      [limit]
+    );
+    res.json({
+      ok: true,
+      items: rows.map((row) => ({
+        id: Number(row?.id || 0),
+        started_at_epoch: Number(row?.started_at_epoch || 0),
+        finished_at_epoch: Number(row?.finished_at_epoch || 0),
+        status: String(row?.status || ""),
+        total_targets: Number(row?.total_targets || 0),
+        success_count: Number(row?.success_count || 0),
+        failure_count: Number(row?.failure_count || 0),
+        cache_hit_count: Number(row?.cache_hit_count || 0),
+        cache_write_count: Number(row?.cache_write_count || 0),
+        posting_upsert_count: Number(row?.posting_upsert_count || 0),
+        active_ats: parseJsonArray(row?.active_ats),
+        last_error: String(row?.last_error || "")
+      }))
+    });
+  });
+
+  app.get("/postings/filter-options", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        return getPostgresFilterOptions(postgresPool, ATS_FILTER_OPTION_ITEMS);
+      }
+
+      const selectedStates = parseCsvParam(req.query.states).map((state) => state.toUpperCase());
+      const syncSettings = await getSyncServiceSettings();
+      const enabledAts = new Set(normalizeSyncEnabledAts(syncSettings?.sync_enabled_ats));
+      const ats = ATS_FILTER_OPTION_ITEMS.map((item) => ({
+        value: item.value,
+        label: item.label,
+        enabled: enabledAts.has(item.value)
+      }));
+      const sort_options = [
+        { value: "recent", label: "Most Recently Seen" },
+        { value: "company_asc", label: "Company (A-Z)" }
+      ];
+
+      let industries = [];
+      try {
+        industries = await db.all(
+          `
+            SELECT industry_key AS value, industry_label AS label
+            FROM job_industry_categories
+            ORDER BY industry_label ASC;
+          `
+        );
+      } catch {
+        try {
+          industries = await db.all(
+            `
+              SELECT industry_key AS value, industry_label AS label
+              FROM job_position_industry
+              GROUP BY industry_key, industry_label
+              ORDER BY industry_label ASC;
+            `
+          );
+        } catch {
+          industries = [];
+        }
+      }
+
+      let states = [];
+      try {
+        const stateRows = await db.all(
+          `
+            SELECT DISTINCT state_usps
+            FROM state_location_index
+            WHERE state_usps IS NOT NULL AND TRIM(state_usps) <> ''
+            ORDER BY state_usps ASC;
+          `
+        );
+        states = stateRows.map((row) => {
+          const code = String(row?.state_usps || "").trim().toUpperCase();
+          const readableName = STATE_CODE_TO_NAME[code];
+          return {
+            value: code,
+            label: readableName ? `${code} - ${readableName.replace(/\b\w/g, (c) => c.toUpperCase())}` : code
+          };
+        });
+      } catch {
+        states = [];
+      }
+
+      let counties = [];
+      try {
+        let countyRows = [];
+        if (selectedStates.length === 0) {
+          countyRows = await db.all(
+            `
+              SELECT DISTINCT state_usps, search_location_name
+              FROM state_location_index
+              WHERE location_type = 'county'
+                AND search_location_name IS NOT NULL
+                AND TRIM(search_location_name) <> ''
+              ORDER BY state_usps ASC, search_location_name ASC;
+            `
+          );
+        } else {
+          const placeholders = selectedStates.map(() => "?").join(", ");
+          countyRows = await db.all(
+            `
+              SELECT DISTINCT state_usps, search_location_name
+              FROM state_location_index
+              WHERE location_type = 'county'
+                AND search_location_name IS NOT NULL
+                AND TRIM(search_location_name) <> ''
+                AND state_usps IN (${placeholders})
+              ORDER BY state_usps ASC, search_location_name ASC;
+            `,
+            selectedStates
+          );
+        }
+
+        counties = countyRows.map((row) => {
+          const stateCode = String(row?.state_usps || "").trim().toUpperCase();
+          const countyName = String(row?.search_location_name || "").trim();
+          return {
+            value: `${stateCode}|${countyName}`,
+            label: `${countyName} (${stateCode})`,
+            state: stateCode,
+            county: countyName
+          };
+        });
+      } catch {
+        counties = [];
+      }
+
+      const locationGeoOptions = getPostingLocationGeoFilterOptions();
+
+      return {
+        ats,
+        sort_options,
+        industries,
+        regions: Array.isArray(locationGeoOptions?.regions) ? locationGeoOptions.regions : [],
+        countries: Array.isArray(locationGeoOptions?.countries) ? locationGeoOptions.countries : [],
+        states,
+        counties
+      };
     });
   });
 
@@ -14693,30 +15912,55 @@ function createServer() {
   });
 
   app.get("/postings", async (req, res) => {
-    const result = await listPostingsWithFilters({
-      search: String(req.query.search || "").trim(),
-      limit: Number(req.query.limit || 500),
-      offset: Number(req.query.offset || 0),
-      sort_by: String(req.query.sort_by || "").trim(),
-      ats: parseCsvParam(req.query.ats),
-      industries: parseCsvParam(req.query.industries),
-      states: parseCsvParam(req.query.states),
-      counties: parseCsvParam(req.query.counties),
-      countries: parseCsvParam(req.query.countries),
-      regions: parseCsvParam(req.query.regions),
-      remote: req.query.remote,
-      hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
-      include_applied: normalizeBoolean(req.query.include_applied, true),
-      include_ignored: normalizeBoolean(req.query.include_ignored, false)
-    });
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const options = {
+        search: String(req.query.search || "").trim(),
+        limit: Number(req.query.limit || 500),
+        offset: Number(req.query.offset || 0),
+        sort_by: String(req.query.sort_by || "").trim(),
+        ats: parseCsvParam(req.query.ats),
+        industries: parseCsvParam(req.query.industries),
+        states: parseCsvParam(req.query.states),
+        counties: parseCsvParam(req.query.counties),
+        countries: parseCsvParam(req.query.countries),
+        regions: parseCsvParam(req.query.regions),
+        remote: req.query.remote,
+        hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
+        include_applied: normalizeBoolean(req.query.include_applied, true),
+        include_ignored: normalizeBoolean(req.query.include_ignored, false)
+      };
 
-    res.json({
-      items: sanitizeFrontendValue(result.items),
-      count: result.count,
-      limit: result.limit,
-      offset: result.offset
+      const result =
+        DB_BACKEND === "postgres"
+          ? await listPostgresPostings(postgresPool, options)
+          : await listPostingsWithFilters(options);
+
+      return {
+        items: sanitizeFrontendValue(result.items),
+        count: result.count,
+        limit: result.limit,
+        offset: result.offset
+      };
     });
   });
+
+  const webDistPath = path.resolve(__dirname, "..", "dist");
+  const webIndexPath = path.join(webDistPath, "index.html");
+  if (fs.existsSync(webIndexPath)) {
+    app.use(express.static(webDistPath, {
+      extensions: ["html"],
+      index: "index.html",
+      maxAge: "5m"
+    }));
+    app.use((req, res, next) => {
+      if (req.method === "GET" && req.accepts("html")) {
+        return res.sendFile(webIndexPath);
+      }
+      return next();
+    });
+  }
+
+  app.use(genericErrorMiddleware);
 
   return app;
 }
@@ -14726,25 +15970,60 @@ async function start() {
 
   const app = createServer();
   app.listen(PORT, () => {
-    console.log(`[OpenJobSlots API] listening on http://localhost:${PORT}`);
-    console.log(`[OpenJobSlots API] using database ${DB_PATH}`);
+    console.log(`[openjobslots API] listening on http://localhost:${PORT}`);
+    console.log(`[openjobslots API] using database ${DB_PATH}`);
     console.log(
-      `[OpenJobSlots API] ATS request queue concurrency (runtime): ${atsRequestQueueConcurrency} (saved changes apply after restart)`
+      `[openjobslots API] ATS request queue concurrency (runtime): ${atsRequestQueueConcurrency} (saved changes apply after restart)`
     );
   });
 
-  runWorkdaySync().catch((error) => {
-    console.error("[OpenJobSlots API] initial sync failed:", error);
-  });
-
-  setInterval(() => {
+  if (!DISABLE_API_SCHEDULER && DB_BACKEND !== "postgres") {
     runWorkdaySync().catch((error) => {
-      console.error("[OpenJobSlots API] scheduled sync failed:", error);
+      console.error("[openjobslots API] initial sync failed:", error);
     });
-  }, SYNC_INTERVAL_MS);
+
+    setInterval(() => {
+      runWorkdaySync().catch((error) => {
+        console.error("[openjobslots API] scheduled sync failed:", error);
+      });
+    }, SYNC_INTERVAL_MS);
+  } else {
+    console.log("[openjobslots API] internal sync scheduler disabled; ingestion worker handles sync");
+  }
 }
 
-start().catch((error) => {
-  console.error("[OpenJobSlots API] startup failed:", error);
-  process.exit(1);
-});
+module.exports = {
+  ATS_FILTER_OPTION_ITEMS,
+  ATS_FILTER_OPTIONS,
+  DB_PATH,
+  collectPostingsForCompany,
+  createServer,
+  getCompaniesForSync,
+  getCounts,
+  getDb,
+  getIngestionWorkerStatus,
+  inferAtsFromJobPostingUrl,
+  getParserAttentionByAts,
+  getSyncScopeStats,
+  initDb,
+  normalizeAtsFilterValue,
+  normalizeSyncEnabledAts,
+  nowEpochSeconds,
+  extractAdpWorkforcenowCompanyName,
+  parseAdpWorkforcenowPostingsFromApi,
+  parseFountainPostingsFromApi,
+  parseOraclePostingsFromApi,
+  parsePaylocityPostingsFromPageData,
+  parsePinpointHqPostingsFromApi,
+  parseRecruitCrmPostingsFromApi,
+  resolveAdpWorkforcenowCompanyName,
+  runWorkdaySync,
+  upsertPostings
+};
+
+if (require.main === module) {
+  start().catch((error) => {
+    console.error("[openjobslots API] startup failed:", error);
+    process.exit(1);
+  });
+}

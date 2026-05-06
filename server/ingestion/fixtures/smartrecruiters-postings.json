@@ -1,0 +1,34 @@
+{
+  "company": {
+    "company_name": "Fixture SmartRecruiters",
+    "company_url": "https://jobs.smartrecruiters.com/fixtureco",
+    "ATS_name": "SmartRecruiters"
+  },
+  "postings": [
+    {
+      "id": "sr-1001",
+      "name": "Senior Search Engineer",
+      "ref": "https://jobs.smartrecruiters.com/FixtureCo/743999999999-search-engineer#apply",
+      "company": {
+        "name": "Fixture SmartRecruiters"
+      },
+      "location": {
+        "city": "Istanbul",
+        "country": "Turkiye"
+      },
+      "releasedDate": "1778043600000",
+      "industry": "Software"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "smartrecruiters",
+      "company_name": "Fixture SmartRecruiters",
+      "position_name": "Senior Search Engineer",
+      "job_posting_url": "https://jobs.smartrecruiters.com/FixtureCo/743999999999-search-engineer",
+      "country": "Turkey",
+      "remote_type": "unknown",
+      "is_remote": false
+    }
+  ]
+}

@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "OpenJobSlots",
+    "name": "openjobslots",
     "slug": "openjobslots",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./favicon.png",
+    "icon": "./ojs-favicon.png",
     "platforms": [
       "android",
       "web"
     ],
     "web": {
       "bundler": "metro",
-      "favicon": "./favicon.png"
+      "favicon": "./ojs-favicon.png"
     }
   }
 }

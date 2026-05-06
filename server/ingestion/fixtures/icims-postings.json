@@ -1,0 +1,27 @@
+{
+  "company": {
+    "company_name": "Fixture iCIMS",
+    "company_url": "https://fixtureco.icims.com/jobs/search",
+    "ATS_name": "iCIMS"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture iCIMS",
+      "position_name": "Remote Data Analyst",
+      "job_posting_url": "https://fixtureco.icims.com/jobs/1001/remote-data-analyst/job?mode=job&iis=OpenJobSlots#apply",
+      "posting_date": "2026-05-06",
+      "location": "Remote - United States"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "icims",
+      "company_name": "Fixture iCIMS",
+      "position_name": "Remote Data Analyst",
+      "job_posting_url": "https://fixtureco.icims.com/jobs/1001/remote-data-analyst/job?mode=job&iis=OpenJobSlots",
+      "country": "United States",
+      "remote_type": "remote",
+      "is_remote": true
+    }
+  ]
+}

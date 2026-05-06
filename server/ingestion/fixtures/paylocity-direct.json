@@ -1,0 +1,41 @@
+{
+  "ats_key": "paylocity",
+  "company_name_for_postings": "Fixture Paylocity",
+  "company": {
+    "company_name": "Fixture Paylocity",
+    "company_url": "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco",
+    "ATS_name": "Paylocity"
+  },
+  "config": {
+    "companyId": "fixtureco",
+    "siteBaseUrl": "https://recruiting.paylocity.com"
+  },
+  "raw_response": {
+    "Jobs": [
+      {
+        "JobId": "1001",
+        "JobTitle": "Hybrid Benefits Specialist",
+        "PublishedDate": "2026-05-06T08:00:00+03:00",
+        "HiringDepartment": "People",
+        "IsRemote": false,
+        "JobLocation": {
+          "City": "Berlin",
+          "State": "",
+          "Country": "Germany"
+        }
+      }
+    ]
+  },
+  "expected": [
+    {
+      "ats_key": "paylocity",
+      "company_name": "Fixture Paylocity",
+      "position_name": "Hybrid Benefits Specialist",
+      "job_posting_url": "https://recruiting.paylocity.com/Recruiting/Jobs/Details/1001",
+      "country": "Germany",
+      "remote_type": "hybrid",
+      "industry": "People",
+      "is_remote": true
+    }
+  ]
+}

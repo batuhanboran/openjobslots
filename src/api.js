@@ -1,22 +1,82 @@
 import { Platform } from "react-native";
 
 const DEFAULT_API_BASE_URL =
-  Platform.OS === "android" ? "http://10.0.2.2:8787" : "http://localhost:8787";
+  Platform.OS === "web"
+    ? ""
+    : Platform.OS === "android"
+      ? "http://10.0.2.2:8787"
+      : "http://localhost:8787";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
 
-async function request(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options
-  });
+function stripHtml(value) {
+  return String(value || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text}`);
+function createHttpError(status, bodyText, path) {
+  const plainText = stripHtml(bodyText);
+  let message = `Request failed (${status}). Please retry in a moment.`;
+  const isTransientBusy = /SQLITE_BUSY|database is locked/i.test(plainText);
+  const isAdminAuthError = Number(status) === 401 || Number(status) === 403;
+
+  if (isTransientBusy) {
+    message = "The database is busy while sync is writing. Please retry in a moment.";
+  } else if (isAdminAuthError) {
+    message = "Admin access required.";
+  } else if (/SQLITE_ERROR/i.test(plainText)) {
+    message = "The backend hit a database error. Details were logged for debugging.";
+  } else if (Number(status) >= 500) {
+    message = "The backend hit an internal error. Details were logged for debugging.";
   }
 
-  return res.json();
+  const error = new Error(message);
+  error.status = status;
+  error.path = path;
+  error.isAdminAuthError = isAdminAuthError;
+  Object.defineProperty(error, "backendText", {
+    value: bodyText,
+    enumerable: false
+  });
+  error.isTransientBusy = isTransientBusy;
+  return error;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function request(path, options = {}) {
+  const method = String(options?.method || "GET").toUpperCase();
+  const maxAttempts = method === "GET" ? 3 : 1;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options
+    });
+
+    if (res.ok) {
+      return res.json();
+    }
+
+    const text = await res.text();
+    const error = createHttpError(res.status, text, path);
+    lastError = error;
+
+    if (!error.isTransientBusy || attempt >= maxAttempts) {
+      throw error;
+    }
+
+    await sleep(150 * attempt);
+  }
+
+  throw lastError || new Error("Request failed. Please retry in a moment.");
 }
 
 export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}) {
@@ -72,6 +132,15 @@ export function fetchPostingFilterOptions() {
   return request("/postings/filter-options");
 }
 
+export function fetchSearchSuggestions(search = "", limit = 8) {
+  const params = new URLSearchParams({
+    search,
+    limit: String(limit),
+    _ts: String(Date.now())
+  });
+  return request(`/search/suggest?${params.toString()}`);
+}
+
 export function fetchApplications(limit = 500, offset = 0, status = "") {
   const params = new URLSearchParams({
     limit: String(limit),
@@ -118,6 +187,15 @@ export function fetchSyncStatus() {
 export function triggerWorkdaySync(wait = false) {
   const suffix = wait ? "?wait=1" : "";
   return request(`/sync/ats${suffix}`, { method: "POST" });
+}
+
+export function startSync(wait = false) {
+  const suffix = wait ? "?wait=1" : "";
+  return request(`/sync/start${suffix}`, { method: "POST" });
+}
+
+export function stopSync() {
+  return request("/sync/stop", { method: "POST" });
 }
 
 export function fetchPersonalInformation() {

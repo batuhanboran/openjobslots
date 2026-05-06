@@ -1,0 +1,29 @@
+{
+  "company": {
+    "company_name": "Fixture Zoho",
+    "company_url": "https://fixtureco.zohorecruit.com/jobs/Careers",
+    "ATS_name": "Zoho"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture Zoho",
+      "position_name": "Finance Systems Manager",
+      "job_posting_url": "https://fixtureco.zohorecruit.com/jobs/Careers/476000000001001",
+      "posting_date": "2026-05-06",
+      "location": "Dublin, Ireland",
+      "department": "Finance"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "zoho",
+      "company_name": "Fixture Zoho",
+      "position_name": "Finance Systems Manager",
+      "job_posting_url": "https://fixtureco.zohorecruit.com/jobs/Careers/476000000001001",
+      "country": "Ireland",
+      "remote_type": "unknown",
+      "industry": "Finance",
+      "is_remote": false
+    }
+  ]
+}

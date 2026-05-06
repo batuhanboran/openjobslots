@@ -194,7 +194,7 @@ const STATE_CODE_TO_NAME = {
 
 const MCP_SETTINGS_DEFAULTS = {
   enabled: false,
-  preferred_agent_name: "OpenJobSlots Agent",
+  preferred_agent_name: "openjobslots Agent",
   agent_login_email: "",
   agent_login_password: "",
   mfa_login_email: "",
@@ -738,7 +738,7 @@ async function ensureTables() {
     CREATE TABLE IF NOT EXISTS McpSettings (
       id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
       enabled INTEGER NOT NULL DEFAULT 0,
-      preferred_agent_name TEXT NOT NULL DEFAULT 'OpenJobSlots Agent',
+      preferred_agent_name TEXT NOT NULL DEFAULT 'openjobslots Agent',
       agent_login_email TEXT NOT NULL DEFAULT '',
       agent_login_password TEXT NOT NULL DEFAULT '',
       mfa_login_email TEXT NOT NULL DEFAULT '',
@@ -793,7 +793,7 @@ async function ensureTables() {
       preferred_states,
       preferred_counties,
       instructions_for_agent
-    ) VALUES (1, 0, 'OpenJobSlots Agent', '', '', '', 1, 1, 10, '', 'all', '[]', '[]', '[]', '')
+    ) VALUES (1, 0, 'openjobslots Agent', '', '', '', 1, 1, 10, '', 'all', '[]', '[]', '[]', '')
     ON CONFLICT(id) DO NOTHING;
   `);
 

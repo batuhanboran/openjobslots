@@ -1,0 +1,27 @@
+{
+  "company": {
+    "company_name": "Fixture ApplyToJob",
+    "company_url": "https://fixtureco.applytojob.com/apply",
+    "ATS_name": "ApplyToJob"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture ApplyToJob",
+      "position_name": "Customer Support Representative",
+      "job_posting_url": "https://fixtureco.applytojob.com/apply/abc123/Customer-Support-Representative#apply",
+      "posting_date": null,
+      "location": "Istanbul, Turkiye"
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "applytojob",
+      "company_name": "Fixture ApplyToJob",
+      "position_name": "Customer Support Representative",
+      "job_posting_url": "https://fixtureco.applytojob.com/apply/abc123/Customer-Support-Representative",
+      "country": "Turkey",
+      "remote_type": "unknown",
+      "is_remote": false
+    }
+  ]
+}
