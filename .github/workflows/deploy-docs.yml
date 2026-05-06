@@ -1,9 +1,12 @@
-﻿name: Deploy OpenJobSlots Docs
+name: Deploy OpenJobSlots Docs
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "docs-site/**"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
