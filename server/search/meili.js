@@ -360,6 +360,7 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
       limit: Math.max(1, Math.min(2000, Number(options.limit || 500))),
       offset: Math.max(0, Number(options.offset || 0)),
       filter: filters.length > 0 ? filters.join(" AND ") : undefined,
+      matchingStrategy: "all",
       sort: ["last_seen_epoch:desc"]
     })
   });

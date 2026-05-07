@@ -242,6 +242,7 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     assert.match(searchBody.filter, /posting_date EXISTS/);
     assert.match(searchBody.filter, /posting_date IS NOT EMPTY/);
     assert.equal(searchBody.q, "engineer");
+    assert.equal(searchBody.matchingStrategy, "all");
     assert.equal(result.items.length, 1);
     assert.equal(result.count, 1);
     assert.equal(result.items[0].job_posting_url, "https://example.com/visible");
@@ -541,6 +542,7 @@ async function testMeiliSearchRequiresExplicitVisibleFlag() {
     );
     assert.match(body.filter, /hidden = false/);
     assert.doesNotMatch(body.filter, /NOT hidden = true/);
+    assert.equal(body.matchingStrategy, "all");
   } finally {
     global.fetch = previousFetch;
   }

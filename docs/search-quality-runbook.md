@@ -114,6 +114,7 @@ docker exec openjobslots-meilisearch wget -qO- --header="Authorization: Bearer $
 
 - Meili may return stale or partial hits while Postgres has correct rows.
 - Meili visibility must be positive: public search should filter `hidden = false`. A negative filter like `NOT hidden = true` can include legacy documents where the field is missing, causing hydration underfill and heavy Postgres fallback.
+- Meili result search should set `matchingStrategy: "all"` for public postings. The default strategy can drop trailing terms from multi-word job titles, which creates irrelevant hits that Postgres later drops during hydration.
 - Hydration can underfill pages after hidden/applied/ignored/no-date filters remove Meili hits.
 - Title/country/remote intersections can fail even when each dimension passes alone.
 - UI infinite scroll can hide API paging bugs unless offsets, uniqueness, and appended result counts are asserted.
