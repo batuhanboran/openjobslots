@@ -26,9 +26,9 @@ Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normaliz
 ## Current Coverage Snapshot
 
 - Configured ATS keys: 60.
-- Fixture-backed parser normalization: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `applytojob`, `breezy`, `hrmdirect`, `icims`, `zoho`, `applitrack`, `pinpointhq`, `recruitcrm`, `fountain`, `paylocity`, `oracle`.
+- Fixture-backed parser normalization: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `applytojob`, `breezy`, `hrmdirect`, `icims`, `zoho`, `applitrack`, `pinpointhq`, `recruitcrm`, `fountain`, `paylocity`, `oracle`, `adp_workforcenow`.
 - Legacy fetch dispatcher gaps found: canonical `ashby` did not map to the legacy Ashby collector; the adapter now fetches as `ashbyhq`.
-- Known unsupported configured source: `dayforcehcm` has metadata and is visible as an ATS, but no collector implementation exists yet. The adapter now fails explicitly with `parser_adapter_not_implemented` instead of silently returning zero postings.
+- Known unsupported configured source: `dayforcehcm` has metadata and is visible as an ATS, but no collector implementation exists yet. It is disabled by default for sync, and the adapter fails explicitly with `parser_adapter_not_implemented` if called.
 - Parser attention should count typed parser errors only: `parser_validation`, `parser_parse`, `parser_normalize`, and `parser_adapter_not_implemented`. Fetch/network failures remain run errors but should not inflate parser attention.
 
 ## Wave 2 Certification Notes
@@ -66,3 +66,9 @@ Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normaliz
 - Lever postings API: https://github.com/lever/postings-api
 - Meilisearch search/indexing: https://github.com/meilisearch/meilisearch
 - pg-boss queueing on Postgres: https://github.com/timgit/pg-boss
+
+## Expansion Priority
+
+Wave 1 candidates must be certified before enabling: Personio XML feed, Trakstar Hire / Recruiterbox frontend API, and JobScore feed API. Wave 2 candidates are Workable, Bullhorn, and Comeet after public token/config handling is reviewed. Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must stay separate from direct ATS adapters.
+
+Detailed certification requirements live in [ATS Source Certification](./ats-source-certification.md). Data freshness and pruning rules live in [Data Retention](./data-retention.md).

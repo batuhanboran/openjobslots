@@ -111,11 +111,14 @@ async function expectSearchEngineVisualContract(page) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
     await expect(page.getByText("Public v1.4.0")).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
-    await expect(page.getByText("LinkedIn")).toBeVisible();
+    const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
+    await expect(attributionLink).toBeVisible();
+    await expect(attributionLink).toHaveAttribute("href", "https://www.linkedin.com/in/batuhan-boran-320b311b7/");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
     await expect(page.getByText("Version 1.4.0")).toBeVisible();
     await expect(page.getByText("OpenJobSlots live baseline")).toBeVisible();
+    await expect(page.getByText("Public product history. Internal deployment and security details are intentionally omitted.")).toHaveCount(0);
     await page.getByTestId("release-notes-close").click();
     await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
   } else {

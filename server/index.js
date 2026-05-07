@@ -8,6 +8,7 @@ const { promisify } = require("util");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
+const { getAdapterMetadata, isAtsEnabledByDefault } = require("./ingestion/adapter-metadata");
 const { isPlaceholderCompanyName } = require("./ingestion/posting");
 const {
   createPostgresPool,
@@ -76,7 +77,8 @@ const ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT =
     : 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
-const POSTING_TTL_SECONDS = Number(process.env.POSTING_TTL_SECONDS || 24 * 60 * 60);
+const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 90));
+const POSTING_TTL_SECONDS = Number(process.env.POSTING_TTL_SECONDS || POSTING_VISIBLE_RETENTION_DAYS * 24 * 60 * 60);
 const SYNC_POSTING_FLUSH_BATCH_SIZE = Number(process.env.SYNC_POSTING_FLUSH_BATCH_SIZE || 200);
 const WORKDAY_PAGE_SIZE = 20;
 const ULTIPRO_PAGE_SIZE = 50;
@@ -638,69 +640,6 @@ const APPLICATION_STATUS_OPTIONS = new Set([
   "denied"
 ]);
 const MCP_REMOTE_OPTIONS = new Set(["all", "remote", "hybrid", "non_remote"]);
-const ATS_FILTER_OPTIONS = new Set([
-  "workday",
-  "ashby",
-  "greenhouse",
-  "lever",
-  "recruitee",
-  "ultipro",
-  "taleo",
-  "jobvite",
-  "applicantpro",
-  "applytojob",
-  "icims",
-  "theapplicantmanager",
-  "breezy",
-  "zoho",
-  "applicantai",
-  "careerplug",
-  "bamboohr",
-  "manatal",
-  "careerpuck",
-  "dayforcehcm",
-  "fountain",
-  "getro",
-  "governmentjobs",
-  "smartrecruiters",
-  "policeapp",
-  "usajobs",
-  "k12jobspot",
-  "schoolspring",
-  "calcareers",
-  "calopps",
-  "statejobsny",
-  "hrmdirect",
-  "talentlyft",
-  "talexio",
-  "teamtailor",
-  "freshteam",
-  "sagehr",
-  "loxo",
-  "peopleforce",
-  "simplicant",
-  "pinpointhq",
-  "recruitcrm",
-  "rippling",
-  "gem",
-  "jobaps",
-  "join",
-  "talentreef",
-  "saphrcloud",
-  "adp_myjobs",
-  "adp_workforcenow",
-  "careerspage",
-  "oracle",
-  "paylocity",
-  "eightfold",
-  "hirebridge",
-  "pageup",
-  "brassring"
-  ,
-  "applitrack",
-  "hibob",
-  "isolvisolvedhire"
-]);
 const ATS_FILTER_OPTION_ITEMS = Object.freeze([
   { value: "workday", label: "Workday" },
   { value: "ashby", label: "Ashby" },
@@ -727,7 +666,7 @@ const ATS_FILTER_OPTION_ITEMS = Object.freeze([
   { value: "eightfold", label: "Eightfold" },
   { value: "manatal", label: "Manatal" },
   { value: "careerspage", label: "CareersPage" },
-  { value: "dayforcehcm", label: "Dayforce" },
+  { value: "dayforcehcm", label: "Dayforce", enabledByDefault: false },
   { value: "pageup", label: "PageUp" },
   { value: "hirebridge", label: "Hirebridge" },
   { value: "brassring", label: "BrassRing" },
@@ -763,7 +702,12 @@ const ATS_FILTER_OPTION_ITEMS = Object.freeze([
   { value: "ultipro", label: "UltiPro" },
   { value: "taleo", label: "Taleo" }
 ]);
-const SYNC_DEFAULT_ENABLED_ATS = Object.freeze(ATS_FILTER_OPTION_ITEMS.map((item) => item.value));
+const ATS_FILTER_OPTIONS = new Set(ATS_FILTER_OPTION_ITEMS.map((item) => item.value));
+const SYNC_DEFAULT_ENABLED_ATS = Object.freeze(
+  ATS_FILTER_OPTION_ITEMS
+    .filter((item) => item.enabledByDefault !== false && isAtsEnabledByDefault(item.value))
+    .map((item) => item.value)
+);
 const POSTING_SORT_OPTIONS = new Set(["recent", "company_asc"]);
 const MCP_SETTINGS_DEFAULTS = {
   enabled: false,
@@ -2535,9 +2479,12 @@ function normalizeAtsRequestQueueConcurrency(value, fallbackValue = ATS_REQUEST_
 }
 
 function normalizeSyncEnabledAts(value, fallbackValue = SYNC_DEFAULT_ENABLED_ATS) {
-  const fallback = normalizeAtsFilters(Array.isArray(fallbackValue) ? fallbackValue : SYNC_DEFAULT_ENABLED_ATS);
-  const normalized = normalizeAtsFilters(Array.isArray(value) ? value : parseJsonArray(value));
+  const activeOnly = (items) => items.filter((item) => isAtsEnabledByDefault(item));
+  const fallback = activeOnly(normalizeAtsFilters(Array.isArray(fallbackValue) ? fallbackValue : SYNC_DEFAULT_ENABLED_ATS));
+  const requested = normalizeAtsFilters(Array.isArray(value) ? value : parseJsonArray(value));
+  const normalized = activeOnly(requested);
   if (normalized.length > 0) return normalized;
+  if (requested.length > 0) return [];
   if (fallback.length > 0) return fallback;
   return Array.from(SYNC_DEFAULT_ENABLED_ATS);
 }
@@ -14455,7 +14402,7 @@ async function pruneExpiredPostings(referenceEpoch = nowEpochSeconds()) {
         hidden = 1,
         hidden_at_epoch = COALESCE(hidden_at_epoch, ?)
       WHERE COALESCE(hidden, 0) = 0
-        AND COALESCE(first_seen_epoch, last_seen_epoch, 0) < ?;
+        AND COALESCE(last_seen_epoch, first_seen_epoch, 0) < ?;
     `,
     [resolvedReferenceEpoch, cutoffEpoch]
   );
@@ -15380,26 +15327,11 @@ function createServer() {
         default_ttl_seconds: Number(source.default_ttl_seconds || 0),
         rate_limit_ms: Number(source.rate_limit_ms || 0),
         parser_version: "legacy-adapter-v1",
-        fixture_status: [
-          "greenhouse",
-          "lever",
-          "ashby",
-          "smartrecruiters",
-          "recruitee",
-          "bamboohr",
-          "applytojob",
-          "breezy",
-          "hrmdirect",
-          "icims",
-          "zoho",
-          "applitrack",
-          "pinpointhq",
-          "recruitcrm",
-          "fountain",
-          "paylocity",
-          "oracle",
-          "adp_workforcenow"
-        ].includes(atsKey) ? "fixture-backed" : "pending-fixture",
+        fixture_status: getAdapterMetadata(atsKey, source.display_name).fixtureStatus,
+        confidence: getAdapterMetadata(atsKey, source.display_name).confidence,
+        tier: getAdapterMetadata(atsKey, source.display_name).tier,
+        parse_strategy: getAdapterMetadata(atsKey, source.display_name).parseStrategy,
+        enabled_by_default: getAdapterMetadata(atsKey, source.display_name).enabledByDefault,
         recent_errors: errorRows.map((row) => ({
           run_id: Number(row?.run_id || 0),
           company_url: String(row?.company_url || ""),

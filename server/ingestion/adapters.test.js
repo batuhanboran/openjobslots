@@ -2,12 +2,19 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
-const { ATS_FILTER_OPTION_ITEMS } = require("../index");
+const { ATS_FILTER_OPTION_ITEMS, normalizeSyncEnabledAts } = require("../index");
 const {
   LEGACY_FETCH_ATS_NAME_OVERRIDES,
   UNSUPPORTED_LEGACY_FETCH_ATS,
   adapters
 } = require("./adapters");
+const {
+  AGGREGATOR_SOURCE_CANDIDATES,
+  FIXTURE_BACKED,
+  FUTURE_DIRECT_SOURCE_CANDIDATES,
+  getAdapterMetadata,
+  isAtsEnabledByDefault
+} = require("./adapter-metadata");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("./posting");
 
 test("canonicalizePostingUrl removes fragments but preserves query strings", () => {
@@ -94,4 +101,45 @@ test("legacy fetch dispatcher is explicit for every configured ATS", () => {
     missing.push(key);
   }
   assert.deepEqual(missing, []);
+});
+
+test("fixture-backed adapter metadata points to saved fixtures", () => {
+  for (const atsKey of FIXTURE_BACKED) {
+    const directFixture = path.join(__dirname, "fixtures", `${atsKey}-direct.json`);
+    const postingsFixture = path.join(__dirname, "fixtures", `${atsKey}-postings.json`);
+    assert.ok(
+      fs.existsSync(directFixture) || fs.existsSync(postingsFixture),
+      `${atsKey} should have a saved parser fixture`
+    );
+    assert.equal(getAdapterMetadata(atsKey).fixtureStatus, "fixture-backed");
+  }
+});
+
+test("dayforcehcm is configured but disabled until parser certification exists", () => {
+  const adapter = adapters.get("dayforcehcm");
+  const metadata = getAdapterMetadata("dayforcehcm", "Dayforce");
+  assert.ok(adapter, "dayforcehcm remains discoverable for admin diagnostics");
+  assert.equal(UNSUPPORTED_LEGACY_FETCH_ATS.has("dayforcehcm"), true);
+  assert.equal(isAtsEnabledByDefault("dayforcehcm"), false);
+  assert.equal(metadata.enabledByDefault, false);
+  assert.equal(metadata.fixtureStatus, "unsupported");
+  assert.equal(metadata.confidence, "unsupported");
+  assert.equal(normalizeSyncEnabledAts().includes("dayforcehcm"), false);
+  assert.deepEqual(normalizeSyncEnabledAts(["dayforcehcm"]), []);
+});
+
+test("future ATS and aggregator candidates are research-only until certified", () => {
+  assert.deepEqual(
+    FUTURE_DIRECT_SOURCE_CANDIDATES.map((item) => item.key),
+    ["personio", "recruiterbox", "jobscore", "workable", "bullhorn", "comeet"]
+  );
+  for (const candidate of FUTURE_DIRECT_SOURCE_CANDIDATES) {
+    assert.ok(candidate.docsUrl, `${candidate.key} should have source docs`);
+    assert.ok(candidate.endpointPattern, `${candidate.key} should document endpoint pattern`);
+    assert.equal(adapters.has(candidate.key), false, `${candidate.key} should not be active before fixtures`);
+  }
+  assert.deepEqual(
+    AGGREGATOR_SOURCE_CANDIDATES.map((item) => item.key),
+    ["remotive", "himalayas", "arbeitnow"]
+  );
 });
