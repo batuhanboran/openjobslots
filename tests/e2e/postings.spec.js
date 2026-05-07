@@ -107,9 +107,22 @@ async function expectSearchEngineVisualContract(page) {
   expect(wordmarkColors).toContain("rgb(82, 125, 104)");
   expect(wordmarkColors).toContain("rgb(127, 191, 166)");
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
-  await expect(page.getByText("Public version")).toBeVisible();
-  await expect(page.getByText("Deployed and developed by")).toBeVisible();
-  await expect(page.getByText("LinkedIn")).toBeVisible();
+  if (viewport.width >= 768) {
+    await expect(page.getByTestId("public-version-button")).toBeVisible();
+    await expect(page.getByText("Public v1.4.0")).toBeVisible();
+    await expect(page.getByText("Deployed and developed by")).toBeVisible();
+    await expect(page.getByText("LinkedIn")).toBeVisible();
+    await page.getByTestId("public-version-button").click();
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await expect(page.getByText("Version 1.4.0")).toBeVisible();
+    await expect(page.getByText("OpenJobSlots live baseline")).toBeVisible();
+    await page.getByTestId("release-notes-close").click();
+    await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+  } else {
+    await expect(page.getByTestId("public-version-button")).toHaveCount(0);
+    await expect(page.getByText("Public v1.4.0")).toHaveCount(0);
+    await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
+  }
 }
 
 async function expectSuggestionPanelDoesNotOverlap(page) {
@@ -133,7 +146,7 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
   await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   await expect(page.getByTestId("results-surface")).toBeVisible();
-  await expect(page.getByText("Public version")).toHaveCount(0);
+  await expect(page.getByText("Public v1.4.0")).toHaveCount(0);
   await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
 }
 
