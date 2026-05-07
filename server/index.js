@@ -784,6 +784,23 @@ function sanitizeFrontendValue(value) {
   return value;
 }
 
+function sanitizePublicPostingItem(posting) {
+  return {
+    id: Number(posting?.id || 0),
+    company_name: String(posting?.company_name || ""),
+    position_name: String(posting?.position_name || ""),
+    job_posting_url: String(posting?.job_posting_url || ""),
+    location: posting?.location || null,
+    posting_date: posting?.posting_date || null,
+    last_seen_epoch: Number(posting?.last_seen_epoch || 0),
+    ats: String(posting?.ats || "")
+  };
+}
+
+function sanitizePublicPostings(items) {
+  return (Array.isArray(items) ? items : []).map(sanitizePublicPostingItem);
+}
+
 function parseCsvEnv(value) {
   return String(value || "")
     .split(",")
@@ -15034,7 +15051,6 @@ function createServer() {
       const counts = await getCounts();
       return {
         ok: true,
-        db_path: DB_PATH,
         db_backend: DB_BACKEND,
         search_backend: SEARCH_BACKEND,
         queue_backend: QUEUE_BACKEND,
@@ -15966,8 +15982,8 @@ function createServer() {
         regions: parseCsvParam(req.query.regions),
         remote: req.query.remote,
         hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
-        include_applied: normalizeBoolean(req.query.include_applied, true),
-        include_ignored: normalizeBoolean(req.query.include_ignored, false)
+        include_applied: false,
+        include_ignored: false
       };
 
       const result =
@@ -15976,7 +15992,7 @@ function createServer() {
           : await listPostingsWithFilters(options);
 
       return {
-        items: sanitizeFrontendValue(result.items),
+        items: sanitizeFrontendValue(sanitizePublicPostings(result.items)),
         count: result.count,
         limit: result.limit,
         offset: result.offset
