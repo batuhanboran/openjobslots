@@ -951,7 +951,10 @@ function getAllowedOrigins() {
     `http://127.0.0.1:${PORT}`,
     "http://jobs.local",
     "https://jobs.local",
+    "http://openjobslots.com",
     "https://openjobslots.com",
+    "http://www.openjobslots.com",
+    "http://192.168.1.100:8081",
     "https://www.openjobslots.com"
   ];
   return new Set([...configured, ...defaults.map(normalizeOrigin)].filter(Boolean));
