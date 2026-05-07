@@ -21,6 +21,38 @@ For high-risk changes, compare three views of the same case before declaring suc
 
 The comparison must explain differences such as stale Meili documents, hydration underfill, `hide_no_date` filtering, hidden/applied/ignored rows, or fallback behavior.
 
+Production parity tests must compare all three layers for the same query and filters:
+
+- `/postings` public API rows, including paging metadata.
+- Raw Meilisearch hits before hydration.
+- Direct Postgres source-of-truth rows after equivalent visibility and structured filters.
+
+Do not treat service health, HTTP status, or count-only checks as production parity. Passing parity means the same expected canonical URLs appear, forbidden rows stay out, and every difference between API, Meili, and Postgres has an explained cause.
+
+## May 8, 2026 Live Findings
+
+The May 8 live probe did not show a search-service availability failure:
+
+- Probe corpus: 4,000 queries from O*NET official occupation titles.
+- HTTP results: 4,000/4,000 returned `200`.
+- Latency: median `6.9ms`, p95 `15.5ms`.
+- Result distribution: `3,250` zero-result searches and `750` nonzero searches.
+
+Current Meilisearch storage and memory are explainable for the observed live index size:
+
+- Indexed documents: about `750,144`.
+- Meili volume size: about `1.5GB`.
+- Raw exported document payload estimate: about `298MB`.
+- Meili RSS after the probe: about `2.5GB`.
+
+This is not, by itself, evidence that Meili is leaking memory or that the index should be manually purged. Treat it as normal indexed-data overhead unless repeated measurements show unbounded growth after document count, settings, and task backlog are stable.
+
+Operational policy from these findings:
+
+- Parser normalization must improve before aggressive search-index cleanup. Premature cleanup can delete or hide rows that are only mismatched because parser fields are inconsistent.
+- Stale or hidden Meili documents must be removed through durable delete/reindex work, not one-off manual cleanup.
+- Production parity tests must compare `/postings`, Meili hits, and Postgres source-of-truth rows before declaring cleanup or search changes successful.
+
 ## Live-Like Intersection Matrices
 
 Search and filter changes must run a live-like matrix that crosses title intent, country/region intent, and remote mode. A useful matrix includes at least:
@@ -42,9 +74,24 @@ Use this order when search results are wrong:
 4. Check fallback. If Meili returns irrelevant nonzero hits while Postgres has good matches, fallback must trigger on hydrated underfill, not only fully empty Meili responses.
 5. Check query semantics. If Postgres and Meili disagree on title plus country/region/remote terms, update aliases, normalized fields, synonyms, or tests before deployment.
 
+## Index Cleanup And Reindexing
+
+Cleanup is allowed only after the parser emits normalized fields consistently enough for deletes and replacements to be trusted. Before scheduling cleanup, confirm the affected parser family preserves stable canonical URLs, hidden state, posting dates, location fields, remote mode, and source job identifiers.
+
+Use durable outbox-driven work for search-index mutation:
+
+- Enqueue deletes when a posting becomes hidden, stale, removed, or replaced.
+- Enqueue upserts when normalized public fields change.
+- Retry failed Meili tasks until the outbox item is acknowledged or explicitly quarantined.
+- Reconcile by comparing Postgres visible rows with Meili document IDs, then enqueue the missing delete/upsert work.
+
+Manual Meili deletes or full index clears are emergency procedures only. If used, follow with a documented full reindex and parity test run that compares `/postings`, raw Meili hits, and Postgres rows for representative title/country/remote cases.
+
 ## Required Search Corpus
 
 Maintain a pinned 1000-query corpus. Generate it from reviewed static fixtures or public occupational taxonomies, not from `jobs.db` or production dumps.
+
+O*NET official occupation titles are an approved public taxonomy source for query probes and corpus expansion. Record the source and date when generating a corpus snapshot so later runs can distinguish corpus drift from search behavior changes.
 
 Coverage target:
 
@@ -123,4 +170,5 @@ docker exec openjobslots-meilisearch wget -qO- --header="Authorization: Bearer $
 - High-volume live probes can hit public rate limits and can expose Postgres shared-memory pressure when Meili hydration falls back to SQL. Throttle probes, record `429` separately from correctness failures, and check app logs for `/dev/shm` errors before changing query semantics.
 - Postgres fallback search with `lower(unaccent(...)) LIKE` may not use existing trigram indexes.
 - Reindex scripts that only upsert visible rows do not remove stale Meili documents unless the index is cleared or deletes are diffed.
+- Hidden, removed, or parser-replaced postings can remain searchable if delete events are not written to and processed from a durable outbox.
 - Worker maintenance currently depends on sync runs; retention and search outbox processing should also run on an independent maintenance cadence.

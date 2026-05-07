@@ -55,6 +55,13 @@ These notes are for Codex and subagents working in this repository.
 - Verify meaningful changes with `npm.cmd run test:backend`; use Playwright desktop/mobile when UI changes.
 - When using subagents, give each a bounded lane: frontend/UI, backend/data, parser/ATS, security/services, desktop QA, mobile QA. The parent agent remains responsible for integration and final deployment.
 
+## Operating And Version Policy
+
+- May 8 lesson: keep this stabilization line in `v1.5.x`. Search, parser, and storage hardening are not a `v2` product rewrite.
+- Current docs-only operating checkpoint is `v1.5.12`; the next stabilization update should increment the patch version unless it is a deliberate product rewrite.
+- Current stabilization priority order: parser normalization first, Meilisearch reindex/cleanup second, production parity tests third, image/build cache later.
+- Future-use Codex skills installed: `playwright`, `security-best-practices`, and `security-threat-model`. A Codex restart may be needed before newly installed skills load.
+
 ## Search Quality Incident Lessons
 
 - A green UI smoke test is not enough for this product. Search incidents require backend contract tests against the production path: Postgres plus Meilisearch.
