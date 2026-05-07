@@ -111,14 +111,15 @@ async function expectSearchEngineVisualContract(page) {
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
   if (viewport.width >= 768) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
-    await expect(page.getByText("Public v1.5.5")).toBeVisible();
+    await expect(page.getByText("Public v1.5.6")).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
     const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
     await expect(attributionLink).toBeVisible();
     await expect(attributionLink).toHaveAttribute("href", "https://www.linkedin.com/in/batuhan-boran-320b311b7/");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
-    await expect(page.getByText("Version 1.5.5")).toBeVisible();
+    await expect(page.getByText("Version 1.5.6")).toBeVisible();
+    await expect(page.getByText("Search filter diagnostics")).toBeVisible();
     await expect(page.getByText("Search reliability and sync budgeting")).toBeVisible();
     await expect(page.getByText("OpenJobSlots live baseline")).toBeVisible();
     await expect(page.getByText("Public product history. Internal deployment and security details are intentionally omitted.")).toHaveCount(0);
@@ -126,7 +127,7 @@ async function expectSearchEngineVisualContract(page) {
     await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
   } else {
     await expect(page.getByTestId("public-version-button")).toHaveCount(0);
-    await expect(page.getByText("Public v1.5.5")).toHaveCount(0);
+    await expect(page.getByText("Public v1.5.6")).toHaveCount(0);
     await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
   }
 }
@@ -152,7 +153,7 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
   await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   await expect(page.getByTestId("results-surface")).toBeVisible();
-  await expect(page.getByText("Public v1.5.5")).toHaveCount(0);
+    await expect(page.getByText("Public v1.5.6")).toHaveCount(0);
   await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
 }
 
@@ -821,13 +822,17 @@ test.describe("postings page QA", () => {
 
     await page.getByTestId("remote-filter-remote").click();
     await expectMobileTapTarget(page, "remote-filter-remote");
-    await expect(page.getByText("No postings found.").or(page.getByTestId("posting-card").first())).toBeVisible();
+    await expect(page.getByTestId("postings-empty-state").or(page.getByTestId("posting-card").first())).toBeVisible();
+    if (await page.getByTestId("postings-empty-state").isVisible()) {
+      await expect(page.getByTestId("empty-clear-location-filters")).toBeVisible();
+      await expect(page.getByTestId("empty-clear-remote-filter")).toBeVisible();
+    }
 
     await page.getByTestId("countries-filter-clear").click();
     await expect(page.getByTestId("countries-filter-trigger")).toContainText(/Any|All countries|Worldwide/i);
 
     await page.getByTestId("hide-no-date-filter").click();
-    await expect(page.getByText("No postings found.").or(page.getByTestId("posting-card").first())).toBeVisible();
+    await expect(page.getByTestId("postings-empty-state").or(page.getByTestId("posting-card").first())).toBeVisible();
 
     await page.getByTestId("postings-filter-clear").click();
     await expect(page.getByTestId("posting-card")).toHaveCount(0);

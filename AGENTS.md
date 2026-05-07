@@ -58,11 +58,13 @@ These notes are for Codex and subagents working in this repository.
 ## Search Quality Incident Lessons
 
 - A green UI smoke test is not enough for this product. Search incidents require backend contract tests against the production path: Postgres plus Meilisearch.
+- UI smoke tests can miss critical search/filter data intersections. Future search work must run live-like title/country/remote matrices instead of single happy-path queries.
 - Any change touching `/postings`, filters, country/region aliases, remote classification, Meilisearch settings, or Postgres fallback search must run a representative search corpus before deployment.
 - "Returns rows" is not a passing assertion. Returned rows must match title intent, country intent, region intent, remote intent, hidden/applied/ignored filters, and pagination rules.
-- Keep a pinned 200-query search corpus using public occupational taxonomies, not live production DB dumps. Include title-only, title plus country, title plus region, remote/hybrid/on-site, diacritics, abbreviations, and hard negative cases.
+- Compare the public API response against direct Postgres rows and Meilisearch hits for each high-risk matrix case before treating a fix as verified.
+- Keep a pinned 1000-query search corpus using reviewed static fixtures, not live production DB dumps. Include title-only, title plus country, title plus region, title plus country plus remote mode, remote/hybrid/on-site, diacritics, abbreviations, pagination, and hard negative cases.
 - Test both search engines: direct Postgres SQL fallback and Meilisearch plus Postgres hydration. Meili zero hits, partial stale hits, hydration underfill, and `hide_no_date` filtering must all be covered.
-- Live deploy verification must include correctness probes, not only service health. At minimum test `/postings?search=Director%20United%20States`, `/postings?search=Director%20US`, `/postings?search=t%C3%BCrkiye`, `/postings?search=remote%20engineer`, and one paginated result flow.
+- Live deploy verification must include correctness probes, not only service health. At minimum test `/postings?search=Director%20United%20States`, `/postings?search=Director%20US`, `/postings?search=t%C3%BCrkiye`, `/postings?search=remote%20engineer`, and one paginated scroll flow that verifies stable offsets, unique rows, and no dropped/duplicated results.
 - Diagnose CPU spikes with measurements before changing architecture: `docker stats`, Postgres logs, `pg_stat_activity`, table/index size, dead tuples, Meili task backlog, and query plans. Do not add Redis, another load balancer, or a new database until those measurements show the bottleneck.
 - Subagents must produce bounded findings or patches, then be closed. The parent agent must not leave agents idle and must integrate the results into code, tests, docs, and deployment decisions.
 - Detailed runbook: [Search Quality Runbook](./docs/search-quality-runbook.md).
@@ -72,6 +74,7 @@ These notes are for Codex and subagents working in this repository.
 - Certify existing ATS before broad expansion.
 - Normalized sample fixtures are not enough for certification. Certified ATS require saved raw source fixtures that exercise the parser plus expected normalized output.
 - New ATS requires source docs, endpoint pattern, rate limits, raw fixtures, expected normalized output, confidence, and adapter notes.
+- Missing or nullable location, posting date, and remote fields must be certified from saved source fixtures. Do not assume absence is source truth until the raw fixture proves the source omitted the field or the parser documents why it cannot safely extract it.
 - Do not invent posting dates. If the source does not expose a date, leave the date empty and rely on `last_seen_epoch` for freshness.
 - Preserve the source id (`id`, `jobId`, requisition id, vacancy id, URL id) as `source_job_id` whenever the source exposes one.
 - `dayforcehcm` is configured but disabled by default until parser certification exists.

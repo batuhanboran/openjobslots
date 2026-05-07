@@ -1,6 +1,6 @@
 # OpenJobSlots Search Quality Runbook
 
-This runbook exists because public search correctness is the product. Frontend reload tests and service health checks can pass while the production search path still returns false zeroes, stale rows, or mismatched filters.
+This runbook exists because public search correctness is the product. Frontend reload tests and service health checks can pass while the production search path still returns false zeroes, stale rows, or mismatched filters. UI smoke tests have missed critical title/country/remote data intersections, so verification must exercise the live-like data contract, not only page rendering.
 
 ## Production Search Contract
 
@@ -12,6 +12,25 @@ The public `/postings` path must be validated as a contract across:
 - Postgres fallback when Meili is empty, stale, unhealthy, or underfilled after hydration.
 
 A search result is correct only when returned rows match the user's intent. Count-only assertions are not sufficient.
+
+For high-risk changes, compare three views of the same case before declaring success:
+
+- Public API response from `/postings`.
+- Direct Postgres rows and filters against the source-of-truth postings table.
+- Meilisearch hits before Postgres hydration.
+
+The comparison must explain differences such as stale Meili documents, hydration underfill, `hide_no_date` filtering, hidden/applied/ignored rows, or fallback behavior.
+
+## Live-Like Intersection Matrices
+
+Search and filter changes must run a live-like matrix that crosses title intent, country/region intent, and remote mode. A useful matrix includes at least:
+
+- Title only: exact, partial, abbreviation, diacritic, and hard negative terms.
+- Title plus country: common country names and aliases, including `US`, `United States`, `UK`, `United Kingdom`, `Turkey`, and `Turkiye`.
+- Title plus remote mode: remote, hybrid, and on-site rows with same-title hard negatives in the wrong mode.
+- Title plus country plus remote mode: same title in multiple countries and remote modes, so one dimension cannot mask another failure.
+
+Each matrix case should assert the expected canonical URLs, rejected hard negatives, and parity notes across API, Postgres, and Meili.
 
 ## Root-Cause Decision Tree
 
@@ -25,7 +44,7 @@ Use this order when search results are wrong:
 
 ## Required Search Corpus
 
-Maintain a pinned 200-query corpus. Generate it from public occupational taxonomies or reviewed static fixtures, not from `jobs.db` or production dumps.
+Maintain a pinned 1000-query corpus. Generate it from reviewed static fixtures or public occupational taxonomies, not from `jobs.db` or production dumps.
 
 Coverage target:
 
@@ -48,7 +67,8 @@ Every corpus test should assert:
 - Remote queries do not return only on-site rows.
 - Quoted and unquoted title queries do not diverge unexpectedly.
 - Meilisearch and direct Postgres overlap on expected canonical URLs.
-- Pagination returns unique URLs and stable `next_offset`/`has_more`.
+- Scroll and paging semantics return unique URLs, stable `next_offset`/`has_more`, and no dropped or duplicated rows when the UI appends pages.
+- API, Postgres, and Meili differences are recorded and either expected or fixed.
 
 ## Live Service Checks
 
@@ -60,6 +80,10 @@ docker stats --no-stream openjobslots-app openjobslots-worker openjobslots-postg
 curl -fsS http://127.0.0.1:8081/health
 curl -fsS http://127.0.0.1:8081/sync/status
 curl -fsS http://127.0.0.1:8081/ingestion/status
+curl -fsS "http://127.0.0.1:8081/postings?search=Director%20United%20States&limit=20"
+curl -fsS "http://127.0.0.1:8081/postings?search=Director%20US&limit=20"
+curl -fsS "http://127.0.0.1:8081/postings?search=remote%20engineer&limit=20"
+curl -fsS "http://127.0.0.1:8081/postings?search=remote%20engineer&limit=20&offset=20"
 ```
 
 Postgres inspection:
@@ -90,6 +114,8 @@ docker exec openjobslots-meilisearch wget -qO- --header="Authorization: Bearer $
 
 - Meili may return stale or partial hits while Postgres has correct rows.
 - Hydration can underfill pages after hidden/applied/ignored/no-date filters remove Meili hits.
+- Title/country/remote intersections can fail even when each dimension passes alone.
+- UI infinite scroll can hide API paging bugs unless offsets, uniqueness, and appended result counts are asserted.
 - Postgres fallback search with `lower(unaccent(...)) LIKE` may not use existing trigram indexes.
 - Reindex scripts that only upsert visible rows do not remove stale Meili documents unless the index is cleared or deletes are diffed.
 - Worker maintenance currently depends on sync runs; retention and search outbox processing should also run on an independent maintenance cadence.

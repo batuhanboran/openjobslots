@@ -10,7 +10,7 @@ const {
   requestSyncStart,
   requestSyncStop
 } = require("./postgresStore");
-const { toMeiliPostingDocument } = require("../search/meili");
+const { searchMeiliPostings, toMeiliPostingDocument } = require("../search/meili");
 
 function createMockPool(status = "idle") {
   const calls = [];
@@ -171,10 +171,12 @@ async function testHydratePostgresPostingsKeepsHiddenAndFilterGuards() {
   );
 
   assert.match(captured.sql, /p\.hidden = false/);
-  assert.match(captured.sql, /p\.country IN \(\$2\)/);
+  assert.match(captured.sql, /lower\(unaccent\(coalesce\(p\.country, ''\)\)\)/);
+  assert.match(captured.sql, /p\.location_text/);
   assert.match(captured.sql, /lower\(unaccent\(p\.position_name\)\)/);
   assert.deepEqual(captured.params[0], ["https://example.com/hidden", "https://example.com/visible"]);
   assert.equal(captured.params[1], "Turkey");
+  assert.ok(captured.params.some((value) => value === "%turkiye%"));
   assert.ok(captured.params.some((value) => value === "%engineer%"));
   assert.ok(!captured.params.some((value) => String(value).includes("\"")));
   assert.deepEqual(items.map((item) => item.job_posting_url), ["https://example.com/visible"]);
@@ -236,7 +238,8 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     assert.match(searchBody.filter, /NOT hidden = true/);
     assert.match(searchBody.filter, /country IN \["United States"\]/);
     assert.match(searchBody.filter, /region IN \["North America"\]/);
-    assert.match(searchBody.filter, /posted_at_epoch > 0/);
+    assert.match(searchBody.filter, /posting_date EXISTS/);
+    assert.match(searchBody.filter, /posting_date IS NOT EMPTY/);
     assert.equal(searchBody.q, "engineer");
     assert.equal(result.items.length, 1);
     assert.equal(result.count, 1);
@@ -415,10 +418,105 @@ async function testEmptyMeiliSearchFallsBackToPostgres() {
   }
 }
 
+async function testPostgresStructuredFiltersUseConservativeLocationFallbacks() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "sqlite";
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) {
+        return { rows: [{ count: 1 }] };
+      }
+      return {
+        rows: [{
+          canonical_url: "https://example.com/technical-support-turkey",
+          company_name: "Support Co",
+          position_name: "Technical Support Engineer",
+          location_text: "Remote - Istanbul, T\u00fcrkiye",
+          country: "",
+          region: "EMEA",
+          remote_type: "unknown",
+          ats_key: "greenhouse",
+          last_seen_epoch: 123
+        }]
+      };
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "Technical Support Engineer",
+      countries: ["Turkey"],
+      remote: "remote",
+      limit: 10,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    const countCall = calls.find((call) => /SELECT COUNT\(\*\)::int AS count/i.test(call.sql));
+    assert.match(countCall.sql, /p\.location_text/);
+    assert.match(countCall.sql, /p\.country IS NULL OR btrim\(p\.country\) = ''/);
+    assert.match(countCall.sql, /p\.remote_type = /);
+    assert.match(countCall.sql, /p\.remote_type = 'unknown'/);
+    assert.ok(countCall.params.includes("%istanbul%"));
+    assert.ok(countCall.params.includes("%remote%"));
+    assert.equal(result.items.length, 1);
+  } finally {
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 function testMeiliDocumentsCarryHiddenFlagSafely() {
   assert.equal(toMeiliPostingDocument({ canonical_url: "a", hidden: "false" }).hidden, false);
   assert.equal(toMeiliPostingDocument({ canonical_url: "b", hidden: "1" }).hidden, true);
   assert.equal(toMeiliPostingDocument({ canonical_url: "c", posting_date: "2026-05-07" }).posting_date, "2026-05-07");
+}
+
+function testMeiliDocumentsInferMissingSearchFacetsFromLocation() {
+  const document = toMeiliPostingDocument({
+    canonical_url: "https://example.com/technical-support-turkey",
+    position_name: "Technical Support Engineer",
+    company_name: "Support Co",
+    location_text: "Remote - Istanbul, T\u00fcrkiye",
+    remote_type: "unknown"
+  });
+  assert.equal(document.country, "Turkey");
+  assert.equal(document.region, "EMEA");
+  assert.equal(document.remote_type, "remote");
+}
+
+async function testMeiliHideNoDateUsesPostingDatePresence() {
+  const previousFetch = global.fetch;
+  let body = null;
+  global.fetch = async (_url, options = {}) => {
+    body = JSON.parse(String(options.body || "{}"));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { hits: [], estimatedTotalHits: 0 };
+      }
+    };
+  };
+
+  try {
+    await searchMeiliPostings(
+      { search: "Technical Support Engineer", hide_no_date: true, limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+    assert.match(body.filter, /posting_date EXISTS/);
+    assert.match(body.filter, /posting_date IS NOT EMPTY/);
+    assert.match(body.filter, /posting_date IS NOT NULL/);
+    assert.doesNotMatch(body.filter, /posted_at_epoch > 0/);
+  } finally {
+    global.fetch = previousFetch;
+  }
 }
 
 function testRetentionDefaultsUseLastSeenPolicy() {
@@ -515,7 +613,10 @@ async function main() {
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchFallsBackToPostgres();
+  await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
   testMeiliDocumentsCarryHiddenFlagSafely();
+  testMeiliDocumentsInferMissingSearchFacetsFromLocation();
+  await testMeiliHideNoDateUsesPostingDatePresence();
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();
