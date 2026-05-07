@@ -5,6 +5,11 @@ const {
   upsertMeiliPostings
 } = require("../search/meili");
 const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
+const {
+  normalizeCountryFromLocation,
+  normalizeRegionFromCountry,
+  normalizeRemoteType
+} = require("../ingestion/posting");
 
 const DAY_SECONDS = 24 * 60 * 60;
 
@@ -48,28 +53,15 @@ function cleanSearchToken(value) {
 }
 
 function inferCountry(location) {
-  const normalized = normalizeText(location);
-  if (/\b(turkiye|turkey|turkish|istanbul|ankara|izmir|bodrum|antalya)\b/.test(normalized)) return "Turkey";
-  if (/\b(united states|usa|u\.s\.|new york|california|texas)\b/.test(normalized)) return "United States";
-  if (/\b(united kingdom|uk|england|london)\b/.test(normalized)) return "United Kingdom";
-  if (/\b(germany|deutschland|berlin)\b/.test(normalized)) return "Germany";
-  if (/\b(france|paris)\b/.test(normalized)) return "France";
-  if (/\b(canada|toronto|vancouver)\b/.test(normalized)) return "Canada";
-  return "";
+  return normalizeCountryFromLocation(location);
 }
 
 function inferRegion(country) {
-  if (["Turkey", "United Kingdom", "Germany", "France"].includes(country)) return "EMEA";
-  if (["United States", "Canada"].includes(country)) return "North America";
-  return "";
+  return normalizeRegionFromCountry(country);
 }
 
 function inferRemoteType(location) {
-  const normalized = normalizeText(location);
-  if (/\b(remote|work from home|wfh|anywhere)\b/.test(normalized)) return "remote";
-  if (/\bhybrid\b/.test(normalized)) return "hybrid";
-  if (/\b(on[- ]?site|office based|in office)\b/.test(normalized)) return "onsite";
-  return "unknown";
+  return normalizeRemoteType(location);
 }
 
 function normalizeAtsKey(value) {

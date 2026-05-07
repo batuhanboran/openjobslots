@@ -75,13 +75,44 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeCountryFromLocation("Istanbul, T\u00fcrkiye"), "Turkey");
   assert.equal(normalizeCountryFromLocation("Ankara, Turkey"), "Turkey");
   assert.equal(normalizeCountryFromLocation("Gebze, Kocaeli, Turkiye"), "Turkey");
+  assert.equal(normalizeCountryFromLocation("Indianapolis, IN"), "United States");
+  assert.equal(normalizeCountryFromLocation("Bengaluru, Karnataka, India"), "India");
+  assert.equal(normalizeCountryFromLocation("Sydney, NSW, Australia"), "Australia");
+  assert.equal(normalizeCountryFromLocation("Sao Paulo, Brazil"), "Brazil");
+  assert.equal(normalizeCountryFromLocation("Dubai, UAE"), "United Arab Emirates");
   assert.equal(normalizeCountryName("TR"), "Turkey");
   assert.equal(normalizeCountryName("U.S."), "United States");
+  assert.equal(normalizeCountryName("IN"), "India");
+  assert.equal(normalizeCountryName("AUS"), "Australia");
   assert.equal(normalizeRemoteType("Hybrid Remote - Ankara"), "hybrid");
   assert.equal(normalizeRemoteType("Remote - EMEA"), "remote");
+  assert.equal(normalizeRemoteType("Home office - Portugal"), "remote");
+  assert.equal(normalizeRemoteType("Telecommute - United States"), "remote");
   assert.equal(normalizeRemoteType("Hybrid - Ankara"), "hybrid");
   assert.equal(normalizeRemoteType("On-site - Berlin"), "onsite");
   assert.equal(normalizePostingDate("2026-05-06T08:00:00+03:00").epoch, 1778043600);
   assert.equal(normalizePostingDate("1778043600").epoch, 1778043600);
   assert.equal(normalizePostingDate("1778043600000").epoch, 1778043600);
+});
+
+test("nested ATS location objects preserve structured country fields", () => {
+  const normalized = normalizePosting(
+    {
+      company_name: "Fixture",
+      position_name: "Support Engineer",
+      job_posting_url: "https://example.com/jobs/support",
+      location: {
+        name: "Indianapolis, IN",
+        country: "United States"
+      },
+      isRemote: true
+    },
+    {},
+    "bamboohr"
+  );
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.region, "North America");
+  assert.equal(normalized.remote_type, "remote");
+  assert.match(normalized.location_text, /Indianapolis/);
+  assert.match(normalized.location_text, /United States/);
 });

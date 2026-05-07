@@ -10,7 +10,7 @@ Missing location, posting date, or remote fields must be certified by source fix
 
 ## May 8 Priority Order
 
-Parser normalization is the current blocker. Fix `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup or search-index tuning. Reindex only after normalization materially improves, then run production parity tests against the Postgres plus Meilisearch path. Image work and build-cache cleanup are later tasks.
+Parser normalization is the current blocker. Fix `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup or search-index tuning. v1.5.13 improves shared worldwide normalization and the first high-volume parser batch: `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`. Reindex only after normalization materially improves, then run production parity tests against the Postgres plus Meilisearch path. Image work and build-cache cleanup are later tasks.
 
 Current live ltx100 data-quality finding: 722,591 active postings; 625,905 are missing `country`/`region`; 96,686 have `country`/`region`. The biggest ATS gaps include `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`.
 
@@ -41,7 +41,7 @@ Current live ltx100 data-quality finding: 722,591 active postings; 625,905 are m
 
 - Configured ATS keys: 60.
 - Normalized fixture-backed parser output: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `applytojob`, `breezy`, `hrmdirect`, `icims`, `zoho`, `applitrack`, `pinpointhq`, `recruitcrm`, `fountain`, `paylocity`, `oracle`, `adp_workforcenow`.
-- Strict raw parser-backed adapters: `adp_workforcenow`, `fountain`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`.
+- Strict raw parser-backed adapters/tests: `adp_workforcenow`, `applitrack`, `applytojob`, `bamboohr`, `breezy`, `fountain`, `icims`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`.
 - Certification blocker: normalized fixtures are useful, but they do not prove raw ATS HTML/JSON parsing. Each source still needs raw-response fixtures before it is considered fully certified.
 - Legacy fetch dispatcher gaps found: canonical `ashby` did not map to the legacy Ashby collector; the adapter now fetches as `ashbyhq`.
 - Known unsupported configured source: `dayforcehcm` has metadata and is visible as an ATS, but no collector implementation exists yet. It is disabled by default for sync, and the adapter fails explicitly with `parser_adapter_not_implemented` if called.
@@ -56,7 +56,7 @@ Current live ltx100 data-quality finding: 722,591 active postings; 625,905 are m
 | `hrmdirect` | Fixture-backed for `reqitem` rows with city/state, department, date, and absolute employment URL. | Medium-low; row class and cell classes are brittle. | Empty rows after successful fetch can be parser drift; request failure is network. |
 | `icims` | Fixture-backed for iCIMS job card/fallback output with query-string canonical URL and remote location. | Medium-low; iframe and pagination discovery remain brittle. | Bad job-card extraction is parser; iframe/page fetch failure is network. |
 | `zoho` | Fixture-backed for hidden jobs payload output with department and built Careers URL. | Medium; hidden JSON payload is stable when present. | JSON parse failure or missing job id is parser; missing careers page is network/source. |
-| `applitrack` | Fixture-backed for `applyFor(jobId, category, specialty)` output. | Medium-low; location/date are unavailable from current output. | No `applyFor` matches after successful `Output.asp` fetch is parser drift; HTTP failure is network. |
+| `applitrack` | Fixture-backed for `applyFor(jobId, category, specialty)` output. | Medium-low; v1.5.13 extracts same-row location/date only when the listing exposes them. | No `applyFor` matches after successful `Output.asp` fetch is parser drift; HTTP failure is network. |
 
 ## Wave 3 Certification Notes
 

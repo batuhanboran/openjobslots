@@ -6,7 +6,7 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 
 - Configured ATS keys: 60.
 - Normalized fixture-backed ATS keys: 18.
-- Strict raw parser-backed ATS keys: 6 (`adp_workforcenow`, `fountain`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`).
+- Strict raw parser-backed ATS keys: 11 (`adp_workforcenow`, `applitrack`, `applytojob`, `bamboohr`, `breezy`, `fountain`, `icims`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`).
 - Implemented collectors pending raw parser fixtures: 53.
 - Disabled unsupported ATS: `dayforcehcm`.
 
@@ -20,7 +20,7 @@ Missing location, posting date, or remote fields must be certified by saved sour
 
 Live ltx100 currently has 722,591 active postings; 625,905 are missing `country`/`region`; 96,686 have `country`/`region`. The largest gaps include `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`.
 
-Treat ATS parser normalization as the first fix: improve `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup. Reindex after normalization improves, then require production parity tests against the live-like Postgres plus Meilisearch path. Image work and build-cache cleanup are lower priority.
+Treat ATS parser normalization as the first fix: improve `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup. v1.5.13 starts this with shared worldwide country/region/remote normalization plus targeted fixes for `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`. Reindex after normalization improves, then require production parity tests against the live-like Postgres plus Meilisearch path. Image work and build-cache cleanup are lower priority.
 
 ## Certification Gate
 
@@ -64,10 +64,10 @@ Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must sta
 | --- | --- | --- | --- |
 | `greenhouse` | Greenhouse Job Board API JSON. | No `source_job_id`; department/team not carried; remote inferred from text. | Add raw `jobs[]` parser fixture, carry `id`, department, nested location, and remote text cases. |
 | `lever` | Lever postings API JSON. | No `source_job_id`, team, or commitment; broad regional remote can miss country. | Add raw fixture for `id`, categories, multiple locations, hosted URL fallback. |
-| `ashby` | Ashby public GraphQL JSON. | Date not emitted; `workplaceType`, team, employment not carried. | Add raw GraphQL fixture, carry `id`, team, employment, workplace type. |
+| `ashby` | Ashby public GraphQL JSON. | Source has no posting date in current public query; broad workplace/location terms can still be country-sparse. | v1.5.13 carries `id`, team, employment, and workplace type; add raw GraphQL fixture next. |
 | `smartrecruiters` | Public SmartRecruiters search JSON. | Rows can drop when `applyUrl` is absent; `id`/industry not carried. | Parse `applyUrl || ref`, add `content[]` fixture and pagination test. |
 | `recruitee` | PublicApp embedded JSON in HTML. | No source id/department; slug fallback can dedupe poorly. | Add saved PublicApp HTML fixture and parser test for translations, locations, slug rejection. |
-| `bamboohr` | BambooHR careers JSON. | No source id; city/state/country can collapse to partial location. | Export parser, add direct fixture with `id`, full location, and remote flag. |
+| `bamboohr` | BambooHR careers JSON. | Some source rows omit country or only expose it in `atsLocation`. | v1.5.13 preserves `id`, city/state/country, explicit country, and remote flag; expand fixtures with more tenants. |
 | `teamtailor` | Teamtailor board HTML. | Null date; HTML classes are brittle; no source id. | Prefer stable JSON endpoint if available, otherwise certify saved HTML fixture. |
 | `freshteam` | Freshteam board HTML. | Null date; remote attribute is not normalized into `remote_type`. | Emit remote field from `data-portal-remote-location`; add raw HTML fixture. |
 | `pinpointhq` | Pinpoint `postings.json`. | Source id absent; sparse location/path variants need coverage. | Extend direct fixtures for path fallback, sparse location, remote/hybrid/onsite. |
@@ -85,11 +85,11 @@ Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must sta
 | `ultipro` | UKG/UltiPro search results API. | Inline parser; `Id` not source id; remote weak. | Extract parser, add `opportunities` fixture, source id, pagination. |
 | `pageup` | PageUp board HTML plus AJAX search/detail pages. | Detail fetch failures skip jobs; external id not source id. | Add two-part search/detail fixtures and listing-date fallback. |
 | `jobvite` | Jobvite careers HTML tables. | Date absent; no source id; department only from grouping. | Add raw HTML fixture with grouped departments and source id from URL. |
-| `icims` | iCIMS wrapper page, iframe, and paged cards. | Source id absent; iframe/date selectors brittle. | Add wrapper, iframe, next-page fixtures; derive id from `/jobs/{id}`. |
+| `icims` | iCIMS wrapper page, iframe, and paged cards. | Iframe/pagination selectors remain brittle; source detail pages may expose fields not present in cards. | v1.5.13 derives source id from `/jobs/{id}` and broadens location/date label extraction; add wrapper, iframe, and next-page fixtures. |
 | `zoho` | Zoho hidden `jobs` JSON in careers page. | Strong fields but job id not mapped to source id. | Add raw hidden-input fixture; set source id and malformed JSON test. |
-| `breezy` | Breezy portal HTML cards. | Relative dates may not parse; no source id. | Add raw card fixture and derive id from `/p/{id}`. |
+| `breezy` | Breezy portal HTML cards. | Relative dates may not parse when source does not provide absolute dates. | v1.5.13 derives source id from `/p/{id}` and keeps location/date from cards; add more country/location fixtures. |
 | `applicantpro` | Board HTML discovers domain id, then core jobs JSON. | Domain discovery brittle; source id absent. | Add board HTML and API JSON fixtures; set source id from job id. |
-| `applytojob` | ApplyToJob/Resumator HTML. | Date absent; no source id/department. | Add modern and legacy raw HTML fixtures and remote/location cases. |
+| `applytojob` | ApplyToJob/Resumator HTML. | Legacy pages may still omit dates or department. | v1.5.13 extracts source id, modern/legacy date text, and location text where exposed; add more remote/location cases. |
 | `theapplicantmanager` | Applicant Manager HTML careers page. | Date/location absent; department only. | Add raw fixture and consider detail fetch for date/location. |
 | `careerplug` | CareerPlug jobs HTML. | Date/source id absent; href rule too narrow. | Add raw fixture for aria/no-aria cards; derive id from `/jobs/{id}`. |
 | `talentreef` | TalentReef alias and search API. | No source id; country blank for state-only rows. | Add alias/search fixtures, set source id from `jobId`, add location tests. |
@@ -121,7 +121,7 @@ Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must sta
 | `statejobsny` | StateJobsNY dated HTML table. | Column indexes brittle; vacancy id not source id. | Add table fixture and vacancy id extraction. |
 | `policeapp` | PoliceApp AJAX endpoint. | No pagination; invented date; location null. | Add pagination/date strategy or leave date null; raw fixture. |
 | `jobaps` | JobAps company page. | No posting date; external id ignored by normalizer. | Add raw fixture and map JobNum to source id. |
-| `applitrack` | Applitrack `Output.asp?all=1`. | Date/location absent; job id not source id; normalized-only fixture. | Add raw `Output.asp` fixture and map `applyFor` id. |
+| `applitrack` | Applitrack `Output.asp?all=1`. | Many pages still omit location/date in the listing, and detail fetch certification is pending. | v1.5.13 maps `applyFor` job id to `source_job_id` and extracts same-row date/location when present; add saved `Output.asp` fixtures and evaluate polite detail fetches. |
 
 ## Slot Card Field Quality Rules
 

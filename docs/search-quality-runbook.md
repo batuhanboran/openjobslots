@@ -50,6 +50,7 @@ This is not, by itself, evidence that Meili is leaking memory or that the index 
 Operational policy from these findings:
 
 - Parser normalization must improve before aggressive search-index cleanup. Premature cleanup can delete or hide rows that are only mismatched because parser fields are inconsistent.
+- After parser normalization changes, run `npm run backfill:normalization` in dry-run mode first. A real run may fill missing `country`, `region`, and `remote_type` from existing visible rows where `location_text` or title signals already contain enough evidence; it does not invent posting dates.
 - Stale or hidden Meili documents must be removed through durable delete/reindex work, not one-off manual cleanup.
 - Production parity tests must compare `/postings`, Meili hits, and Postgres source-of-truth rows before declaring cleanup or search changes successful.
 
