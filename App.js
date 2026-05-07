@@ -3066,9 +3066,6 @@ export default function App() {
           <View style={styles.releaseNotesHeader}>
             <View style={styles.releaseNotesHeaderCopy}>
               <Text style={styles.releaseNotesTitle}>Release notes</Text>
-              <Text style={styles.releaseNotesSubtitle}>
-                Public product history. Internal deployment and security details are intentionally omitted.
-              </Text>
             </View>
             <Pressable
               onPress={() => setReleaseNotesOpen(false)}
@@ -3130,12 +3127,14 @@ export default function App() {
             <Text style={styles.searchCreditText}>
               Deployed and developed by{" "}
               <Text
+                href={LINKEDIN_PROFILE_URL}
+                hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
                 onPress={handleOpenLinkedInCredit}
                 style={styles.searchCreditLink}
                 accessibilityRole="link"
-                accessibilityLabel="LinkedIn profile"
+                accessibilityLabel="Batuhan Boran LinkedIn profile"
               >
-                LinkedIn
+                Batuhan Boran
               </Text>
             </Text>
           </View>
@@ -5494,12 +5493,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 34,
     fontWeight: "800"
-  },
-  releaseNotesSubtitle: {
-    marginTop: 6,
-    color: OJS_COLORS.muted,
-    fontSize: 13,
-    lineHeight: 19
   },
   releaseNotesCloseButton: {
     borderWidth: 1,

@@ -3,14 +3,14 @@ const {
   collectPostingsForCompany,
   normalizeAtsFilterValue
 } = require("../index");
-const { getAdapterMetadata } = require("./adapter-metadata");
+const { UNSUPPORTED_ATS, getAdapterMetadata } = require("./adapter-metadata");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("./posting");
 
 const PARSER_VERSION = "legacy-adapter-v1";
 const LEGACY_FETCH_ATS_NAME_OVERRIDES = {
   ashby: "ashbyhq"
 };
-const UNSUPPORTED_LEGACY_FETCH_ATS = new Set(["dayforcehcm"]);
+const UNSUPPORTED_LEGACY_FETCH_ATS = UNSUPPORTED_ATS;
 
 function confidenceToScore(value) {
   const normalized = String(value || "").trim().toLowerCase();

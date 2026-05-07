@@ -1,4 +1,5 @@
 const POSTGRES_SCHEMA_VERSION = "openjobslots-postgres-v1";
+const { isAtsEnabledByDefault } = require("../ingestion/adapter-metadata");
 
 function getPostgresConfig(env = process.env) {
   return {
@@ -103,6 +104,8 @@ async function ensurePostgresSchema(pool) {
 
     CREATE INDEX IF NOT EXISTS idx_posting_cache_ats_seen
       ON posting_cache(ats_key, last_seen_epoch DESC);
+    CREATE INDEX IF NOT EXISTS idx_posting_cache_last_seen
+      ON posting_cache(last_seen_epoch DESC);
 
     CREATE TABLE IF NOT EXISTS postings (
       canonical_url TEXT PRIMARY KEY,
@@ -133,6 +136,18 @@ async function ensurePostgresSchema(pool) {
       ON postings(ats_key);
     CREATE INDEX IF NOT EXISTS idx_postings_country_region
       ON postings(country, region);
+    CREATE INDEX IF NOT EXISTS idx_postings_active_ats_seen
+      ON postings(ats_key, last_seen_epoch DESC)
+      WHERE hidden = false;
+    CREATE INDEX IF NOT EXISTS idx_postings_active_country_region_seen
+      ON postings(country, region, last_seen_epoch DESC)
+      WHERE hidden = false;
+    CREATE INDEX IF NOT EXISTS idx_postings_active_industry_seen
+      ON postings(industry, last_seen_epoch DESC)
+      WHERE hidden = false;
+    CREATE INDEX IF NOT EXISTS idx_postings_active_remote_seen
+      ON postings(remote_type, last_seen_epoch DESC)
+      WHERE hidden = false;
 
     CREATE EXTENSION IF NOT EXISTS pg_trgm;
     CREATE EXTENSION IF NOT EXISTS unaccent;
@@ -243,13 +258,14 @@ async function seedPostgresAtsSources(pool, atsItems) {
     if (!atsKey) continue;
     await pool.query(
       `
-        INSERT INTO ats_sources (ats_key, display_name, updated_at)
-        VALUES ($1, $2, now())
+        INSERT INTO ats_sources (ats_key, display_name, enabled, updated_at)
+        VALUES ($1, $2, $3, now())
         ON CONFLICT(ats_key) DO UPDATE SET
           display_name = EXCLUDED.display_name,
+          enabled = CASE WHEN EXCLUDED.enabled = false THEN false ELSE ats_sources.enabled END,
           updated_at = now();
       `,
-      [atsKey, String(item?.label || atsKey).trim()]
+      [atsKey, String(item?.label || atsKey).trim(), isAtsEnabledByDefault(atsKey)]
     );
     count += 1;
   }

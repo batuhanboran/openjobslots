@@ -17,6 +17,8 @@ const {
 } = require("../backends/postgres");
 const {
   normalizeAtsKey,
+  processPostgresSearchIndexOutbox,
+  prunePostgresRetention,
   upsertPostgresPostings
 } = require("../backends/postgresStore");
 const { ensureMeiliPostingsIndex } = require("../search/meili");
@@ -894,6 +896,13 @@ async function runPostgresIngestionOnce(pool) {
       }
     };
     await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+
+    try {
+      await prunePostgresRetention(pool);
+      await processPostgresSearchIndexOutbox(pool);
+    } catch (maintenanceError) {
+      console.warn(`[ingestion] retention/search-index maintenance failed: ${maintenanceError.message}`);
+    }
 
     const finalStatus = cancelled
       ? "cancelled"

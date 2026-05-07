@@ -1,5 +1,6 @@
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
 const DEFAULT_RATE_LIMIT_MS = 1000;
+const { isAtsEnabledByDefault } = require("./adapter-metadata");
 
 async function ensureColumn(db, tableName, columnName, definition) {
   const columns = await db.all(`PRAGMA table_info('${tableName}');`);
@@ -111,6 +112,7 @@ async function seedAtsSources(db, atsItems, options = {}) {
     const atsKey = String(item?.value || "").trim();
     if (!atsKey) continue;
     const displayName = String(item?.label || atsKey).trim();
+    const enabledByDefault = isAtsEnabledByDefault(atsKey) ? 1 : 0;
     await db.run(
       `
         INSERT INTO ats_sources (
@@ -120,12 +122,13 @@ async function seedAtsSources(db, atsItems, options = {}) {
           default_ttl_seconds,
           rate_limit_ms,
           updated_at
-        ) VALUES (?, ?, 1, ?, ?, datetime('now'))
+        ) VALUES (?, ?, ?, ?, ?, datetime('now'))
         ON CONFLICT(ats_key) DO UPDATE SET
           display_name = excluded.display_name,
+          enabled = CASE WHEN excluded.enabled = 0 THEN 0 ELSE ats_sources.enabled END,
           updated_at = datetime('now');
       `,
-      [atsKey, displayName, defaultTtlSeconds, defaultRateLimitMs]
+      [atsKey, displayName, enabledByDefault, defaultTtlSeconds, defaultRateLimitMs]
     );
   }
 }

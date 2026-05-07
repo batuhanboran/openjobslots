@@ -1,4 +1,35 @@
-const { getMeiliConfig, searchMeiliPostings, upsertMeiliPostings } = require("../search/meili");
+const {
+  deleteMeiliPostingsByCanonicalUrls,
+  getMeiliConfig,
+  searchMeiliPostings,
+  upsertMeiliPostings
+} = require("../search/meili");
+const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
+
+const DAY_SECONDS = 24 * 60 * 60;
+
+function getRetentionConfig(env = process.env) {
+  return {
+    hotDays: Math.max(1, Number(env.OPENJOBSLOTS_POSTING_HOT_DAYS || 90)),
+    hiddenRetentionDays: Math.max(1, Number(env.OPENJOBSLOTS_HIDDEN_POSTING_RETENTION_DAYS || 180)),
+    cacheMetadataDays: Math.max(1, Number(env.OPENJOBSLOTS_CACHE_METADATA_RETENTION_DAYS || 365)),
+    runSummaryDays: Math.max(1, Number(env.OPENJOBSLOTS_INGESTION_RUN_RETENTION_DAYS || 365)),
+    detailedErrorDays: Math.max(1, Number(env.OPENJOBSLOTS_INGESTION_ERROR_RETENTION_DAYS || 90)),
+    outboxProcessedDays: Math.max(1, Number(env.OPENJOBSLOTS_SEARCH_OUTBOX_PROCESSED_DAYS || 7))
+  };
+}
+
+function getRetentionCutoffs(referenceEpoch = Math.floor(Date.now() / 1000), config = getRetentionConfig()) {
+  const nowEpoch = Number(referenceEpoch || Math.floor(Date.now() / 1000));
+  return {
+    staleVisibleEpoch: nowEpoch - config.hotDays * DAY_SECONDS,
+    hiddenArchiveEpoch: nowEpoch - config.hiddenRetentionDays * DAY_SECONDS,
+    cacheArchiveEpoch: nowEpoch - config.cacheMetadataDays * DAY_SECONDS,
+    runArchiveEpoch: nowEpoch - config.runSummaryDays * DAY_SECONDS,
+    errorArchiveEpoch: nowEpoch - config.detailedErrorDays * DAY_SECONDS,
+    outboxProcessedEpoch: nowEpoch - config.outboxProcessedDays * DAY_SECONDS
+  };
+}
 
 function normalizeText(value) {
   return String(value || "")
@@ -443,6 +474,7 @@ async function getPostgresParserAdmin(pool, atsKey) {
     [normalizedAtsKey]
   );
   if (!source.rows[0]) return null;
+  const metadata = getAdapterMetadata(normalizedAtsKey, source.rows[0].display_name);
 
   const errorRows = await pool.query(
     `
@@ -462,26 +494,11 @@ async function getPostgresParserAdmin(pool, atsKey) {
     default_ttl_seconds: Number(source.rows[0].default_ttl_seconds || 0),
     rate_limit_ms: Number(source.rows[0].rate_limit_ms || 0),
     parser_version: "postgres-adapter-v1",
-    fixture_status: [
-      "greenhouse",
-      "lever",
-      "ashby",
-      "smartrecruiters",
-      "recruitee",
-      "bamboohr",
-      "applytojob",
-      "breezy",
-      "hrmdirect",
-      "icims",
-      "zoho",
-      "applitrack",
-      "pinpointhq",
-      "recruitcrm",
-      "fountain",
-      "paylocity",
-      "oracle",
-      "adp_workforcenow"
-    ].includes(normalizedAtsKey) ? "fixture-backed" : "pending-fixture",
+    fixture_status: metadata.fixtureStatus,
+    confidence: metadata.confidence,
+    tier: metadata.tier,
+    parse_strategy: metadata.parseStrategy,
+    enabled_by_default: metadata.enabledByDefault,
     recent_errors: errorRows.rows.map((row) => ({
       run_id: Number(row?.run_id || 0),
       company_url: String(row?.company_url || ""),
@@ -723,7 +740,198 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
   );
 }
 
+async function prunePostgresRetention(pool, options = {}) {
+  const config = options.config || getRetentionConfig();
+  const cutoffs = getRetentionCutoffs(options.referenceEpoch, config);
+  const batchSize = Math.max(1, Math.min(10000, Number(options.batchSize || 5000)));
+  const client = await pool.connect();
+  const stats = {
+    hidden_postings: 0,
+    deleted_hidden_postings: 0,
+    deleted_cache_rows: 0,
+    deleted_error_rows: 0,
+    deleted_run_rows: 0,
+    deleted_outbox_rows: 0,
+    outbox_delete_rows: 0
+  };
+
+  try {
+    await client.query("BEGIN");
+    const stale = await client.query(
+      `
+        SELECT canonical_url
+        FROM postings
+        WHERE hidden = false
+          AND last_seen_epoch < $1
+        ORDER BY last_seen_epoch ASC
+        LIMIT $2;
+      `,
+      [cutoffs.staleVisibleEpoch, batchSize]
+    );
+    const staleUrls = stale.rows.map((row) => String(row.canonical_url || "")).filter(Boolean);
+    if (staleUrls.length > 0) {
+      const hidden = await client.query(
+        `
+          UPDATE postings
+          SET hidden = true,
+              updated_at = now()
+          WHERE canonical_url = ANY($1::text[]);
+        `,
+        [staleUrls]
+      );
+      stats.hidden_postings = Number(hidden.rowCount || 0);
+      for (const canonicalUrl of staleUrls) {
+        await client.query(
+          `
+            INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
+            VALUES ($1, 'delete', $2::jsonb, now());
+          `,
+          [canonicalUrl, JSON.stringify({ reason: "retention", canonical_url: canonicalUrl })]
+        );
+        stats.outbox_delete_rows += 1;
+      }
+    }
+
+    const deletedHidden = await client.query(
+      `
+        WITH doomed AS (
+          SELECT canonical_url
+          FROM postings
+          WHERE hidden = true
+            AND last_seen_epoch < $1
+          ORDER BY last_seen_epoch ASC
+          LIMIT $2
+        )
+        DELETE FROM postings
+        WHERE canonical_url IN (SELECT canonical_url FROM doomed);
+      `,
+      [cutoffs.hiddenArchiveEpoch, batchSize]
+    );
+    stats.deleted_hidden_postings = Number(deletedHidden.rowCount || 0);
+
+    const deletedCache = await client.query(
+      `
+        WITH doomed AS (
+          SELECT canonical_url
+          FROM posting_cache
+          WHERE last_seen_epoch < $1
+          ORDER BY last_seen_epoch ASC
+          LIMIT $2
+        )
+        DELETE FROM posting_cache
+        WHERE canonical_url IN (SELECT canonical_url FROM doomed);
+      `,
+      [cutoffs.cacheArchiveEpoch, batchSize]
+    );
+    stats.deleted_cache_rows = Number(deletedCache.rowCount || 0);
+
+    const deletedErrors = await client.query(
+      `
+        WITH doomed AS (
+          SELECT id
+          FROM ingestion_run_errors
+          WHERE created_at < to_timestamp($1)
+          ORDER BY id ASC
+          LIMIT $2
+        )
+        DELETE FROM ingestion_run_errors
+        WHERE id IN (SELECT id FROM doomed);
+      `,
+      [cutoffs.errorArchiveEpoch, batchSize]
+    );
+    stats.deleted_error_rows = Number(deletedErrors.rowCount || 0);
+
+    const deletedRuns = await client.query(
+      `
+        WITH doomed AS (
+          SELECT id
+          FROM ingestion_runs
+          WHERE finished_at_epoch IS NOT NULL
+            AND finished_at_epoch < $1
+          ORDER BY id ASC
+          LIMIT $2
+        )
+        DELETE FROM ingestion_runs
+        WHERE id IN (SELECT id FROM doomed);
+      `,
+      [cutoffs.runArchiveEpoch, batchSize]
+    );
+    stats.deleted_run_rows = Number(deletedRuns.rowCount || 0);
+
+    const deletedOutbox = await client.query(
+      `
+        WITH doomed AS (
+          SELECT id
+          FROM search_index_outbox
+          WHERE processed_at IS NOT NULL
+            AND processed_at < to_timestamp($1)
+          ORDER BY id ASC
+          LIMIT $2
+        )
+        DELETE FROM search_index_outbox
+        WHERE id IN (SELECT id FROM doomed);
+      `,
+      [cutoffs.outboxProcessedEpoch, batchSize]
+    );
+    stats.deleted_outbox_rows = Number(deletedOutbox.rowCount || 0);
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return { ok: true, config, cutoffs, stats };
+}
+
+async function processPostgresSearchIndexOutbox(pool, options = {}) {
+  const limit = Math.max(1, Math.min(1000, Number(options.limit || 250)));
+  const result = await pool.query(
+    `
+      SELECT id, canonical_url, operation, payload
+      FROM search_index_outbox
+      WHERE processed_at IS NULL
+        AND available_at <= now()
+      ORDER BY id ASC
+      LIMIT $1;
+    `,
+    [limit]
+  );
+  const rows = result.rows || [];
+  if (rows.length === 0) return { ok: true, processed: 0 };
+
+  const deleteUrls = rows
+    .filter((row) => String(row.operation || "") === "delete")
+    .map((row) => String(row.canonical_url || ""))
+    .filter(Boolean);
+  const upsertPayloads = rows
+    .filter((row) => String(row.operation || "") === "upsert")
+    .map((row) => row.payload)
+    .filter(Boolean);
+
+  if (deleteUrls.length > 0) {
+    await deleteMeiliPostingsByCanonicalUrls(deleteUrls, getMeiliConfig());
+  }
+  if (upsertPayloads.length > 0) {
+    await upsertMeiliPostings(upsertPayloads, getMeiliConfig());
+  }
+
+  await pool.query(
+    `
+      UPDATE search_index_outbox
+      SET processed_at = now()
+      WHERE id = ANY($1::bigint[]);
+    `,
+    [rows.map((row) => Number(row.id)).filter(Boolean)]
+  );
+  return { ok: true, processed: rows.length, deleted: deleteUrls.length, upserted: upsertPayloads.length };
+}
+
 module.exports = {
+  getRetentionConfig,
+  getRetentionCutoffs,
   getPostgresAtsAdmin,
   getPostgresCounts,
   getPostgresFilterOptions,
@@ -738,6 +946,8 @@ module.exports = {
   listPostgresIngestionRuns,
   listPostgresPostings,
   normalizeAtsKey,
+  processPostgresSearchIndexOutbox,
+  prunePostgresRetention,
   requestSyncStart,
   requestSyncStop,
   upsertPostgresPostings

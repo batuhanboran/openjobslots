@@ -222,6 +222,19 @@ async function upsertMeiliPostings(postings, config = getMeiliConfig()) {
   });
 }
 
+async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMeiliConfig()) {
+  if (!config.enabled) return { ok: true, skipped: true, count: 0 };
+  const ids = (Array.isArray(canonicalUrls) ? canonicalUrls : [])
+    .map((url) => String(url || "").trim())
+    .filter(Boolean)
+    .map(toMeiliDocumentId);
+  if (ids.length === 0) return { ok: true, count: 0 };
+  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents/delete-batch`, {
+    method: "POST",
+    body: JSON.stringify(ids)
+  });
+}
+
 async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
   if (!config.enabled) return { ok: true, skipped: true, hits: [], estimatedTotalHits: 0 };
   const filters = ["NOT hidden = true"];
@@ -258,6 +271,7 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
 
 module.exports = {
   MEILI_POSTINGS_INDEX,
+  deleteMeiliPostingsByCanonicalUrls,
   ensureMeiliPostingsIndex,
   getMeiliConfig,
   searchMeiliPostings,

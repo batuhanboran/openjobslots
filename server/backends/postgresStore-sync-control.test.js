@@ -1,8 +1,12 @@
 const assert = require("node:assert/strict");
 const {
   getPostgresSyncStatus,
+  getRetentionConfig,
+  getRetentionCutoffs,
   hydratePostgresPostings,
   listPostgresPostings,
+  processPostgresSearchIndexOutbox,
+  prunePostgresRetention,
   requestSyncStart,
   requestSyncStop
 } = require("./postgresStore");
@@ -240,6 +244,90 @@ function testMeiliDocumentsCarryHiddenFlagSafely() {
   assert.equal(toMeiliPostingDocument({ canonical_url: "b", hidden: "1" }).hidden, true);
 }
 
+function testRetentionDefaultsUseLastSeenPolicy() {
+  const config = getRetentionConfig({});
+  assert.equal(config.hotDays, 90);
+  assert.equal(config.hiddenRetentionDays, 180);
+  assert.equal(config.cacheMetadataDays, 365);
+  assert.equal(config.runSummaryDays, 365);
+  assert.equal(config.detailedErrorDays, 90);
+
+  const cutoffs = getRetentionCutoffs(200 * 24 * 60 * 60, config);
+  assert.equal(cutoffs.staleVisibleEpoch, 110 * 24 * 60 * 60);
+  assert.equal(cutoffs.hiddenArchiveEpoch, 20 * 24 * 60 * 60);
+}
+
+async function testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes() {
+  const calls = [];
+  const client = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT canonical_url\s+FROM postings/i.test(sql)) {
+        return { rows: [{ canonical_url: "https://example.com/old" }] };
+      }
+      if (/UPDATE postings\s+SET hidden = true/i.test(sql)) return { rowCount: 1, rows: [] };
+      if (/INSERT INTO search_index_outbox/i.test(sql)) return { rowCount: 1, rows: [] };
+      if (/DELETE FROM postings/i.test(sql)) return { rowCount: 2, rows: [] };
+      if (/DELETE FROM posting_cache/i.test(sql)) return { rowCount: 3, rows: [] };
+      if (/DELETE FROM ingestion_run_errors/i.test(sql)) return { rowCount: 4, rows: [] };
+      if (/DELETE FROM ingestion_runs/i.test(sql)) return { rowCount: 5, rows: [] };
+      if (/DELETE FROM search_index_outbox/i.test(sql)) return { rowCount: 6, rows: [] };
+      return { rowCount: 0, rows: [] };
+    },
+    release() {}
+  };
+  const pool = {
+    async connect() {
+      return client;
+    }
+  };
+
+  const result = await prunePostgresRetention(pool, {
+    referenceEpoch: 200 * 24 * 60 * 60,
+    batchSize: 1
+  });
+
+  const pruneSelect = calls.find((call) => /SELECT canonical_url\s+FROM postings/i.test(call.sql));
+  assert.match(pruneSelect.sql, /last_seen_epoch < \$1/);
+  assert.doesNotMatch(pruneSelect.sql, /first_seen_epoch/);
+  assert.equal(result.stats.hidden_postings, 1);
+  assert.equal(result.stats.outbox_delete_rows, 1);
+  assert.ok(calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)));
+}
+
+async function testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "sqlite";
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM search_index_outbox/i.test(sql)) {
+        return {
+          rows: [
+            { id: 1, canonical_url: "https://example.com/old", operation: "delete", payload: {} }
+          ]
+        };
+      }
+      if (/UPDATE search_index_outbox/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+
+  try {
+    const result = await processPostgresSearchIndexOutbox(pool);
+    assert.equal(result.processed, 1);
+    assert.equal(result.deleted, 1);
+    assert.ok(calls.some((call) => /UPDATE search_index_outbox/i.test(call.sql)));
+  } finally {
+    if (previousBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+    }
+  }
+}
+
 async function main() {
   await testRequestSyncStartCastsEpochFields();
   await testRequestSyncStopCastsEpochFields();
@@ -249,6 +337,9 @@ async function main() {
   await testHydratePostgresPostingsKeepsHiddenAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
   testMeiliDocumentsCarryHiddenFlagSafely();
+  testRetentionDefaultsUseLastSeenPolicy();
+  await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
+  await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();
   console.log("postgres sync-control bigint cast tests passed");
 }
 
