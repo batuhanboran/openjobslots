@@ -13,75 +13,193 @@ function normalizeSearchText(value) {
     .toLowerCase();
 }
 
+const COUNTRY_ALIAS_GROUPS = Object.freeze([
+  ["Turkey", ["tr", "tur", "turkiye", "türkiye", "turkey", "turkish"]],
+  ["United States", ["us", "u.s.", "u.s", "usa", "united states", "unitedstates", "united states of america", "america"]],
+  ["United Kingdom", ["uk", "gb", "gbr", "great britain", "united kingdom", "england", "scotland", "wales", "northern ireland"]],
+  ["Canada", ["ca", "can", "canada"]],
+  ["Germany", ["de", "deu", "germany", "deutschland"]],
+  ["France", ["fr", "fra", "france"]],
+  ["Netherlands", ["nl", "nld", "netherlands", "holland"]],
+  ["Spain", ["es", "esp", "spain", "españa", "espana"]],
+  ["Italy", ["it", "ita", "italy", "italia"]],
+  ["Ireland", ["ie", "irl", "ireland"]],
+  ["India", ["in", "ind", "india"]],
+  ["Australia", ["au", "aus", "australia"]],
+  ["New Zealand", ["nz", "nzl", "new zealand"]],
+  ["Singapore", ["sg", "sgp", "singapore"]],
+  ["Japan", ["jp", "jpn", "japan"]],
+  ["South Korea", ["kr", "kor", "south korea", "korea", "republic of korea"]],
+  ["China", ["cn", "chn", "china"]],
+  ["Hong Kong", ["hk", "hkg", "hong kong"]],
+  ["Malaysia", ["my", "mys", "malaysia"]],
+  ["Indonesia", ["id", "idn", "indonesia"]],
+  ["Philippines", ["ph", "phl", "philippines"]],
+  ["Thailand", ["th", "tha", "thailand"]],
+  ["Vietnam", ["vn", "vnm", "vietnam", "viet nam"]],
+  ["Brazil", ["br", "bra", "brazil", "brasil"]],
+  ["Mexico", ["mx", "mex", "mexico", "méxico"]],
+  ["Argentina", ["ar", "arg", "argentina"]],
+  ["Chile", ["cl", "chl", "chile"]],
+  ["Colombia", ["co", "col", "colombia"]],
+  ["Peru", ["pe", "per", "peru"]],
+  ["Portugal", ["pt", "prt", "portugal"]],
+  ["Poland", ["pl", "pol", "poland", "polska"]],
+  ["Romania", ["ro", "rou", "romania"]],
+  ["Czech Republic", ["cz", "cze", "czech republic", "czechia"]],
+  ["Slovakia", ["sk", "svk", "slovakia"]],
+  ["Hungary", ["hu", "hun", "hungary"]],
+  ["Austria", ["at", "aut", "austria"]],
+  ["Switzerland", ["ch", "che", "switzerland", "schweiz", "suisse"]],
+  ["Belgium", ["be", "bel", "belgium"]],
+  ["Denmark", ["dk", "dnk", "denmark"]],
+  ["Sweden", ["se", "swe", "sweden"]],
+  ["Norway", ["no", "nor", "norway"]],
+  ["Finland", ["fi", "fin", "finland"]],
+  ["Estonia", ["ee", "est", "estonia"]],
+  ["Latvia", ["lv", "lva", "latvia"]],
+  ["Lithuania", ["lt", "ltu", "lithuania"]],
+  ["Greece", ["gr", "grc", "greece"]],
+  ["Bulgaria", ["bg", "bgr", "bulgaria"]],
+  ["Croatia", ["hr", "hrv", "croatia"]],
+  ["Serbia", ["rs", "srb", "serbia"]],
+  ["Slovenia", ["si", "svn", "slovenia"]],
+  ["Ukraine", ["ua", "ukr", "ukraine"]],
+  ["Israel", ["il", "isr", "israel"]],
+  ["United Arab Emirates", ["ae", "are", "uae", "united arab emirates", "dubai", "abu dhabi"]],
+  ["Saudi Arabia", ["sa", "sau", "saudi arabia"]],
+  ["South Africa", ["za", "zaf", "south africa"]],
+  ["Egypt", ["eg", "egy", "egypt"]],
+  ["Pakistan", ["pk", "pak", "pakistan"]]
+]);
+
+const COUNTRY_ALIASES = Object.freeze(COUNTRY_ALIAS_GROUPS.reduce((aliases, [country, values]) => {
+  for (const value of values) {
+    aliases[normalizeSearchText(value)] = country;
+  }
+  return aliases;
+}, {}));
+
+const COUNTRY_LOCATION_TERMS = Object.freeze([
+  ["Turkey", ["istanbul", "ankara", "izmir", "antalya", "bursa", "gebze", "kocaeli", "konya", "adana", "kayseri", "mugla", "bodrum"]],
+  ["United States", ["new york", "los angeles", "san francisco", "seattle", "chicago", "boston", "austin", "dallas", "houston", "washington dc", "washington, dc", "california", "texas", "florida", "illinois", "massachusetts", "pennsylvania", "ohio", "georgia", "virginia", "north carolina", "new jersey", "arizona", "colorado", "michigan", "indiana"]],
+  ["United Kingdom", ["london", "manchester", "birmingham", "edinburgh", "glasgow", "bristol", "leeds", "cambridge"]],
+  ["Canada", ["toronto", "vancouver", "montreal", "ottawa", "calgary", "edmonton", "waterloo", "quebec"]],
+  ["Germany", ["berlin", "munich", "münchen", "hamburg", "frankfurt", "cologne", "stuttgart"]],
+  ["France", ["paris", "lyon", "marseille", "toulouse", "lille"]],
+  ["Netherlands", ["amsterdam", "rotterdam", "utrecht", "eindhoven"]],
+  ["Spain", ["madrid", "barcelona", "valencia", "malaga"]],
+  ["Italy", ["rome", "roma", "milan", "milano", "turin"]],
+  ["Ireland", ["dublin", "cork", "galway"]],
+  ["India", ["bengaluru", "bangalore", "hyderabad", "pune", "mumbai", "delhi", "gurgaon", "gurugram", "noida", "chennai"]],
+  ["Australia", ["sydney", "melbourne", "brisbane", "perth", "adelaide"]],
+  ["Singapore", ["singapore"]],
+  ["Japan", ["tokyo", "osaka", "kyoto"]],
+  ["Brazil", ["sao paulo", "são paulo", "rio de janeiro", "curitiba"]],
+  ["Mexico", ["mexico city", "ciudad de mexico", "guadalajara", "monterrey"]],
+  ["Poland", ["warsaw", "krakow", "kraków", "wroclaw", "wrocław"]],
+  ["Portugal", ["lisbon", "lisboa", "porto"]],
+  ["United Arab Emirates", ["dubai", "abu dhabi"]]
+]);
+
+const US_STATE_ABBREVIATION_PATTERN =
+  /(?:^|,\s*|\s-\s)(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(?:\s|,|$)/i;
+const CANADA_PROVINCE_ABBREVIATION_PATTERN =
+  /(?:^|,\s*|\s-\s)(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s|,|$)/i;
+
 function normalizeCountryFromLocation(value) {
   const location = normalizePostingValue(value);
   const normalized = normalizeSearchText(location);
   if (!normalized) return "";
-  if (/\b(tr|turkiye|turkey|turkish|istanbul|ankara|izmir|antalya|bursa|gebze|kocaeli)\b/.test(normalized)) return "Turkey";
-  if (/\b(united states|usa|u\.s\.|u\.s|us|new york|california|texas|washington|florida)\b/.test(normalized)) return "United States";
-  if (/\b(united kingdom|uk|england|london)\b/.test(normalized)) return "United Kingdom";
-  if (/\b(germany|deutschland|berlin)\b/.test(normalized)) return "Germany";
-  if (/\b(france|paris)\b/.test(normalized)) return "France";
-  if (/\b(canada|toronto|vancouver)\b/.test(normalized)) return "Canada";
-  if (/\b(netherlands|amsterdam)\b/.test(normalized)) return "Netherlands";
-  if (/\b(spain|madrid|barcelona)\b/.test(normalized)) return "Spain";
-  if (/\b(italy|rome|milan)\b/.test(normalized)) return "Italy";
-  if (/\b(ireland|dublin)\b/.test(normalized)) return "Ireland";
+  if (US_STATE_ABBREVIATION_PATTERN.test(location)) return "United States";
+  if (CANADA_PROVINCE_ABBREVIATION_PATTERN.test(location)) return "Canada";
+
+  for (const [alias, country] of Object.entries(COUNTRY_ALIASES)) {
+    if (alias.length <= 2) continue;
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    if (new RegExp(`\\b${escaped}\\b`, "i").test(normalized)) return country;
+  }
+
+  for (const [country, terms] of COUNTRY_LOCATION_TERMS) {
+    for (const term of terms) {
+      const normalizedTerm = normalizeSearchText(term);
+      const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      if (new RegExp(`\\b${escaped}\\b`, "i").test(normalized)) return country;
+    }
+  }
   return "";
 }
 
 function normalizeCountryName(value) {
   const normalized = normalizeSearchText(value);
   if (!normalized) return "";
-  const aliases = {
-    tr: "Turkey",
-    tur: "Turkey",
-    turkiye: "Turkey",
-    turkey: "Turkey",
-    turkish: "Turkey",
-    us: "United States",
-    "u.s.": "United States",
-    "u.s": "United States",
-    usa: "United States",
-    unitedstates: "United States",
-    "united states": "United States",
-    uk: "United Kingdom",
-    gb: "United Kingdom",
-    gbr: "United Kingdom",
-    "united kingdom": "United Kingdom",
-    de: "Germany",
-    deu: "Germany",
-    germany: "Germany",
-    deutschland: "Germany",
-    fr: "France",
-    fra: "France",
-    france: "France",
-    ca: "Canada",
-    can: "Canada",
-    canada: "Canada",
-    nl: "Netherlands",
-    nld: "Netherlands",
-    netherlands: "Netherlands",
-    es: "Spain",
-    esp: "Spain",
-    spain: "Spain",
-    it: "Italy",
-    ita: "Italy",
-    italy: "Italy",
-    ie: "Ireland",
-    irl: "Ireland",
-    ireland: "Ireland"
-  };
-  return aliases[normalized] || "";
+  return COUNTRY_ALIASES[normalized] || COUNTRY_ALIASES[normalized.replace(/[^a-z0-9]+/g, "")] || "";
 }
 
 function normalizeRegionFromCountry(country) {
   const normalized = normalizeSearchText(country);
-  if (["turkey", "united kingdom", "germany", "france", "netherlands", "spain", "italy", "ireland"].includes(normalized)) {
+  if ([
+    "turkey",
+    "united kingdom",
+    "germany",
+    "france",
+    "netherlands",
+    "spain",
+    "italy",
+    "ireland",
+    "portugal",
+    "poland",
+    "romania",
+    "czech republic",
+    "slovakia",
+    "hungary",
+    "austria",
+    "switzerland",
+    "belgium",
+    "denmark",
+    "sweden",
+    "norway",
+    "finland",
+    "estonia",
+    "latvia",
+    "lithuania",
+    "greece",
+    "bulgaria",
+    "croatia",
+    "serbia",
+    "slovenia",
+    "ukraine",
+    "israel",
+    "united arab emirates",
+    "saudi arabia",
+    "south africa",
+    "egypt"
+  ].includes(normalized)) {
     return "EMEA";
   }
   if (normalized === "united states" || normalized === "canada") {
     return "North America";
+  }
+  if ([
+    "india",
+    "australia",
+    "new zealand",
+    "singapore",
+    "japan",
+    "south korea",
+    "china",
+    "hong kong",
+    "malaysia",
+    "indonesia",
+    "philippines",
+    "thailand",
+    "vietnam",
+    "pakistan"
+  ].includes(normalized)) {
+    return "APAC";
+  }
+  if (["brazil", "mexico", "argentina", "chile", "colombia", "peru"].includes(normalized)) {
+    return "LATAM";
   }
   return "";
 }
@@ -91,8 +209,8 @@ function normalizeRemoteType(value) {
   if (!normalized) return "unknown";
   if (normalized === "true") return "remote";
   if (/\bhybrid\b/.test(normalized)) return "hybrid";
-  if (/\b(remote|work from home|wfh|anywhere)\b/.test(normalized)) return "remote";
-  if (/\b(on[- ]?site|office based|in office)\b/.test(normalized)) return "onsite";
+  if (/\b(remote|fully remote|work from home|work from anywhere|wfh|anywhere|home based|home office|telecommute|telework|virtual|distributed)\b/.test(normalized)) return "remote";
+  if (/\b(on[- ]?site|onsite|office based|in office|work from office)\b/.test(normalized)) return "onsite";
   return "unknown";
 }
 
@@ -134,19 +252,48 @@ function firstValue(values) {
   return "";
 }
 
+function pushUniqueText(values, candidate) {
+  const normalized = normalizePostingValue(candidate);
+  if (!normalized) return;
+  const comparable = normalizeSearchText(normalized);
+  if (!comparable) return;
+  if (values.some((existing) => {
+    const existingComparable = normalizeSearchText(existing);
+    return existingComparable === comparable || existingComparable.includes(comparable) || comparable.includes(existingComparable);
+  })) {
+    return;
+  }
+  values.push(normalized);
+}
+
 function extractLocationText(value) {
   if (value === null || value === undefined) return "";
   if (Array.isArray(value)) {
-    return value.map(extractLocationText).filter(Boolean).join(", ");
+    const values = [];
+    for (const item of value) {
+      pushUniqueText(values, extractLocationText(item));
+    }
+    return values.join(", ");
   }
   if (typeof value === "object") {
-    return firstValue([
-      extractLocationText(value.location),
-      value.locationName,
-      value.name,
-      value.text,
-      [value.city, value.region, value.state, value.country].filter(Boolean).join(", ")
-    ]);
+    const values = [];
+    if (value.remote === true || value.isRemote === true || value.remoteAllowed === true) {
+      pushUniqueText(values, "Remote");
+    }
+    pushUniqueText(values, value.locationName);
+    pushUniqueText(values, value.name);
+    pushUniqueText(values, value.text);
+    pushUniqueText(values, value.label);
+    pushUniqueText(values, value.displayName);
+    pushUniqueText(values, value.formattedAddress);
+    pushUniqueText(values, value.address);
+    pushUniqueText(values, [value.city, value.region, value.state, value.province, value.country || value.countryName || value.countryCode].filter(Boolean).join(", "));
+    pushUniqueText(values, extractLocationText(value.location));
+    pushUniqueText(values, extractLocationText(value.locations));
+    pushUniqueText(values, extractLocationText(value.jobLocation));
+    pushUniqueText(values, extractLocationText(value.primaryLocation || value.PrimaryLocation));
+    pushUniqueText(values, extractLocationText(value.workLocation));
+    return values.join(", ");
   }
   return normalizePostingValue(value);
 }
@@ -217,6 +364,8 @@ function normalizePosting(posting, company, atsKey, options = {}) {
   ]) || null;
   const postingDate = normalizePostingDate(firstValue([
     posting?.posting_date,
+    posting?.date_posted,
+    posting?.datePosted,
     posting?.posted_at,
     posting?.postedAt,
     posting?.postedDate,
@@ -236,13 +385,37 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     posting?.remote,
     posting?.is_remote,
     posting?.isRemote,
+    posting?.location?.remote,
+    posting?.location?.isRemote,
+    posting?.location?.remoteAllowed,
+    extractLocationText(posting?.locations),
     posting?.employment_type,
     posting?.job_type,
     location,
     positionName
   ].map((value) => (value === true ? "remote" : normalizePostingValue(value))).filter(Boolean).join(" ");
   const remoteType = normalizeRemoteType(remoteSignal);
-  const country = firstValue([normalizeCountryName(posting?.country), normalizeCountryFromLocation(location)]);
+  const explicitCountry = firstValue([
+    posting?.country,
+    posting?.countryName,
+    posting?.country_code,
+    posting?.countryCode,
+    posting?.isoCountry,
+    posting?.iso3,
+    posting?.location?.country,
+    posting?.location?.countryName,
+    posting?.location?.country_code,
+    posting?.location?.countryCode,
+    posting?.location?.isoCountry,
+    posting?.location?.iso3,
+    posting?.jobLocation?.country,
+    posting?.jobLocation?.countryName,
+    posting?.PrimaryLocation?.country,
+    posting?.PrimaryLocation?.countryName,
+    posting?.workLocation?.country,
+    posting?.workLocation?.countryName
+  ]);
+  const country = firstValue([normalizeCountryName(explicitCountry), normalizeCountryFromLocation(location)]);
   const region = firstValue([posting?.region, normalizeRegionFromCountry(country)]);
   const parserVersion = normalizePostingValue(options?.parserVersion) || "legacy-adapter-v1";
   const sourceJobId =

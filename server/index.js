@@ -5654,7 +5654,7 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
   for (const row of result) {
     const item = row && typeof row === "object" ? row : {};
     const postingId = String(item?.id || "").trim();
-    const itemUrlRaw = String(item?.url || item?.jobUrl || item?.applyUrl || "").trim();
+    const itemUrlRaw = String(item?.url || item?.jobUrl || item?.applyUrl || item?.applicationUrl || "").trim();
     const jobUrl = itemUrlRaw
       ? new URL(itemUrlRaw, `${config.baseOrigin || config.boardUrl || ""}/`).toString()
       : postingId
@@ -5666,9 +5666,10 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
     const atsLocationObject = item?.atsLocation && typeof item.atsLocation === "object" ? item.atsLocation : {};
     const city = String(locationObject?.city || atsLocationObject?.city || "").trim();
     const state = String(locationObject?.state || atsLocationObject?.state || atsLocationObject?.province || "").trim();
-    const country = String(atsLocationObject?.country || "").trim();
-    const cityState = [city, state].filter(Boolean).join(", ");
-    const location = cityState || [city, country].filter(Boolean).join(", ") || (item?.isRemote ? "Remote" : null);
+    const country = String(locationObject?.country || atsLocationObject?.country || locationObject?.countryName || atsLocationObject?.countryName || "").trim();
+    const locationName = String(locationObject?.name || atsLocationObject?.name || "").trim();
+    const structuredLocation = [city, state, country].filter(Boolean).join(", ");
+    const location = structuredLocation || locationName || (item?.isRemote ? "Remote" : null);
 
     const postingDate =
       String(item?.postingDate || item?.postedDate || item?.publishDate || item?.createdDate || item?.updatedDate || "").trim() ||
@@ -5676,10 +5677,15 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: postingId,
+      id: postingId,
       position_name: String(item?.jobOpeningName || item?.title || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
       location,
+      country: country || null,
+      remote: item?.isRemote === true,
+      is_remote: item?.isRemote === true,
       department: String(item?.departmentLabel || item?.department || "").trim() || null,
       employment_type: String(item?.employmentStatusLabel || item?.employmentStatus || "").trim() || null
     });
@@ -7007,6 +7013,18 @@ function cleanApplyToJobText(value) {
     .trim();
 }
 
+function extractApplyToJobSourceId(urlValue) {
+  try {
+    const parsed = new URL(String(urlValue || ""));
+    const parts = parsed.pathname.split("/").map((part) => part.trim()).filter(Boolean);
+    const applyIndex = parts.findIndex((part) => part.toLowerCase() === "apply");
+    if (applyIndex >= 0 && parts[applyIndex + 1]) return parts[applyIndex + 1];
+    return parts[parts.length - 1] || "";
+  } catch {
+    return "";
+  }
+}
+
 function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
@@ -7017,6 +7035,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
   const listHeadingPattern =
     /<h3[^>]*class=["'][^"']*\blist-group-item-heading\b[^"']*["'][^>]*>[\s\S]*?<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
   const listLocationPattern = /fa-map-marker[^>]*><\/i>\s*([^<]+)/i;
+  const listDatePattern = /fa-(?:calendar|clock)[^>]*><\/i>\s*([^<]+)/i;
 
   let listItemMatch = listItemPattern.exec(source);
   while (listItemMatch) {
@@ -7036,12 +7055,15 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
 
     const locationMatch = itemHtml.match(listLocationPattern);
     const location = locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null;
+    const dateMatch = itemHtml.match(listDatePattern);
+    const postingDate = dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null;
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractApplyToJobSourceId(absoluteUrl),
       position_name: cleanApplyToJobText(headingMatch[2]) || "Untitled Position",
       job_posting_url: absoluteUrl,
-      posting_date: null,
+      posting_date: postingDate,
       location
     });
     seenUrls.add(absoluteUrl);
@@ -7053,6 +7075,8 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     /<a(?=[^>]*\bresumator-job-title-link\b)(?=[^>]*href=["']([^"']+)["'])[^>]*>([\s\S]*?)<\/a>/gi;
   const legacyLocationPattern =
     /<span[^>]*class=["'][^"']*\bresumator-job-location\b[^"']*["'][^>]*>\s*Location:\s*<\/span>\s*([^<]*)/i;
+  const legacyDatePattern =
+    /<span[^>]*class=["'][^"']*(?:resumator-job-date|resumator-job-posted)[^"']*["'][^>]*>\s*(?:Posted|Date Posted)?:?\s*<\/span>\s*([^<]*)/i;
 
   const legacyMatches = Array.from(source.matchAll(legacyLinkPattern));
   for (let index = 0; index < legacyMatches.length; index += 1) {
@@ -7067,12 +7091,15 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     const contextHtml = source.slice(currentEnd, searchEnd);
     const locationMatch = contextHtml.match(legacyLocationPattern);
     const location = locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null;
+    const dateMatch = contextHtml.match(legacyDatePattern);
+    const postingDate = dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null;
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractApplyToJobSourceId(absoluteUrl),
       position_name: cleanApplyToJobText(match?.[2]) || "Untitled Position",
       job_posting_url: absoluteUrl,
-      posting_date: null,
+      posting_date: postingDate,
       location
     });
     seenUrls.add(absoluteUrl);
@@ -7190,11 +7217,56 @@ function cleanIcimsText(value) {
     .trim();
 }
 
+function icimsTextLines(sourceHtml) {
+  return decodeHtmlEntities(
+    String(sourceHtml || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:dt|dd|li|div|span|p|h[1-6])>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+  )
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function extractIcimsLabeledText(sourceHtml, labels) {
+  const normalizedLabels = new Set((Array.isArray(labels) ? labels : [])
+    .map((label) => String(label || "").trim().toLowerCase())
+    .filter(Boolean));
+  const lines = icimsTextLines(sourceHtml);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const normalizedLine = line.toLowerCase().replace(/\s*:\s*$/, "");
+    if (normalizedLabels.has(normalizedLine)) {
+      return lines.slice(index + 1).find((candidate) => candidate && !normalizedLabels.has(candidate.toLowerCase())) || null;
+    }
+    for (const label of normalizedLabels) {
+      const prefix = `${label}:`;
+      if (normalizedLine.startsWith(prefix)) {
+        const value = line.slice(prefix.length).trim();
+        if (value) return value;
+      }
+    }
+  }
+  return null;
+}
+
 function cleanBreezyText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .replace(/\s*,\s*/g, ", ")
     .trim();
+}
+
+function extractBreezySourceId(urlValue) {
+  try {
+    const parsed = new URL(String(urlValue || ""));
+    const parts = parsed.pathname.split("/").map((part) => part.trim()).filter(Boolean);
+    const pIndex = parts.findIndex((part) => part.toLowerCase() === "p");
+    return pIndex >= 0 && parts[pIndex + 1] ? parts[pIndex + 1] : "";
+  } catch {
+    return "";
+  }
 }
 
 function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
@@ -7240,6 +7312,7 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractBreezySourceId(absoluteUrl),
       position_name: title || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: cleanBreezyText(postedMatch?.[1] || "") || null,
@@ -7511,7 +7584,8 @@ function extractIcimsLocationFromHtml(sourceHtml) {
   const source = String(sourceHtml || "");
   const patterns = [
     /field-label">Location\s*<\/span>\s*<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
-    /glyphicons-map-marker[^>]*>[\s\S]*?<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i
+    /glyphicons-map-marker[^>]*>[\s\S]*?<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
+    /data-(?:field|label)=["'](?:location|job-location|primary-location)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
   ];
 
   for (const pattern of patterns) {
@@ -7521,18 +7595,32 @@ function extractIcimsLocationFromHtml(sourceHtml) {
     if (location) return location;
   }
 
+  const labeled = extractIcimsLabeledText(source, ["Location", "Job Location", "Primary Location", "Work Location"]);
+  if (labeled) return cleanIcimsText(labeled);
+
   return null;
 }
 
 function extractIcimsPostingDateFromHtml(sourceHtml) {
   const source = String(sourceHtml || "");
-  const match = source.match(
-    /field-label">Date Posted\s*<\/span>\s*<span[^>]*?(?:title=["']([^"']+)["'])?[^>]*>\s*([^<]*)/i
-  );
-  const withTitle = String(match?.[1] || "").trim();
-  if (withTitle) return withTitle;
-  const fallback = cleanIcimsText(match?.[2] || "");
-  return fallback || null;
+  const patterns = [
+    /field-label">Date Posted\s*<\/span>\s*<span[^>]*?(?:title=["']([^"']+)["'])?[^>]*>\s*([^<]*)/i,
+    /data-(?:field|label)=["'](?:date-posted|posted-date|posting-date)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    const withTitle = String(match?.[0] || "").match(/title=["']([^"']+)["']/i)?.[1] || String(match?.[1] || "").trim();
+    if (withTitle) return withTitle;
+    const fallback = cleanIcimsText(match?.[2] || match?.[1] || "");
+    if (fallback) return fallback;
+  }
+  const labeled = extractIcimsLabeledText(source, ["Date Posted", "Posted Date", "Posting Date", "Posted"]);
+  return labeled ? cleanIcimsText(labeled) : null;
+}
+
+function extractIcimsSourceJobId(urlValue) {
+  const match = String(urlValue || "").match(/\/jobs\/(\d+)/i);
+  return String(match?.[1] || "").trim();
 }
 
 function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
@@ -7575,6 +7663,7 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractIcimsSourceJobId(absoluteUrl),
       position_name: positionName,
       job_posting_url: absoluteUrl,
       posting_date: extractIcimsPostingDateFromHtml(cardHtml),
@@ -7606,6 +7695,7 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractIcimsSourceJobId(absoluteUrl),
       position_name: positionName,
       job_posting_url: absoluteUrl,
       posting_date: extractIcimsPostingDateFromHtml(contextHtml),
@@ -9493,6 +9583,12 @@ async function collectPostingsForAshbyCompany(company) {
   const jobPostings = Array.isArray(response?.data?.jobBoard?.jobPostings)
     ? response.data.jobBoard.jobPostings
     : [];
+  const teams = Array.isArray(response?.data?.jobBoard?.teams) ? response.data.jobBoard.teams : [];
+  const teamNameById = new Map(
+    teams
+      .map((team) => [String(team?.id || "").trim(), String(team?.externalName || team?.name || "").trim()])
+      .filter(([id, name]) => id && name)
+  );
 
   const collected = [];
   for (const posting of jobPostings) {
@@ -9504,10 +9600,15 @@ async function collectPostingsForAshbyCompany(company) {
 
     collected.push({
       company_name: company.company_name,
+      source_job_id: jobId,
+      id: jobId,
       position_name: String(posting?.title || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: null,
-      location: extractAshbyLocationName(posting)
+      location: extractAshbyLocationName(posting),
+      workplaceType: String(posting?.workplaceType || "").trim() || null,
+      employment_type: String(posting?.employmentType || "").trim() || null,
+      department: teamNameById.get(String(posting?.teamId || "").trim()) || null
     });
   }
 
@@ -10017,6 +10118,34 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   const applyPattern = /applyFor\(\s*'(?<job_id>\d+)'\s*,\s*'(?<category>[^']*)'\s*,\s*'(?<specialty>[^']*)'\s*\)/gi;
   let match = applyPattern.exec(page);
 
+  const extractRowContext = (matchIndex) => {
+    const start = page.lastIndexOf("<tr", matchIndex);
+    const end = page.indexOf("</tr>", matchIndex);
+    if (start >= 0 && end > start) return page.slice(start, end + "</tr>".length);
+    return page.slice(Math.max(0, matchIndex - 1200), Math.min(page.length, matchIndex + 1800));
+  };
+  const cleanApplitrackRowText = (rowHtml) =>
+    decodeHtmlEntities(String(rowHtml || "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " "))
+      .replace(/\s+/g, " ")
+      .trim();
+  const extractDateFromRow = (rowText) => {
+    const compact = String(rowText || "");
+    return compact.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/)?.[0] ||
+      compact.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+\d{4}\b/i)?.[0] ||
+      null;
+  };
+  const extractLocationFromRow = (rowText, titleParts) => {
+    const compact = String(rowText || "");
+    if (/\b(remote|virtual|telework|work from home)\b/i.test(compact)) return "Remote";
+    const usCityState = compact.match(/\b([A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(?:\s+\d{5})?)\b/);
+    if (usCityState?.[1]) return usCityState[1].trim();
+    const countryMatch = compact.match(/\b(United States|USA|Canada|Turkey|T[üu]rkiye|United Kingdom|Germany|France|India|Australia)\b/i);
+    if (countryMatch?.[1]) return countryMatch[1].trim();
+    const withoutTitle = titleParts.reduce((text, part) => part ? text.replace(new RegExp(part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " ") : text, compact);
+    const locationLabel = withoutTitle.match(/\b(?:Location|School|Site|Campus)\s*:?\s*([A-Z][^|;]{2,80})/i);
+    return locationLabel?.[1] ? locationLabel[1].trim().replace(/\s{2,}/g, " ") : null;
+  };
+
   while (match) {
     const groups = match.groups || {};
     const jobId = cleanSmartRecruitersText(groups.job_id);
@@ -10029,13 +10158,16 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
     const specialty = cleanSmartRecruitersText(groups.specialty);
     const title = [category, specialty].filter(Boolean).join(" - ") || `Job ${jobId}`;
     const jobUrl = new URL(`default.aspx?JobID=${encodeURIComponent(jobId)}`, siteRoot).toString();
+    const rowContext = extractRowContext(Number(match.index || 0));
+    const rowText = cleanApplitrackRowText(rowContext);
 
     postings.push({
       company_name: companyName,
+      source_job_id: jobId,
       position_name: title,
       job_posting_url: jobUrl,
-      posting_date: null,
-      location: null
+      posting_date: extractDateFromRow(rowText),
+      location: extractLocationFromRow(rowText, [jobId, category, specialty, title])
     });
     seenIds.add(jobId);
     match = applyPattern.exec(page);
@@ -16096,7 +16228,13 @@ module.exports = {
   nowEpochSeconds,
   extractAdpWorkforcenowCompanyName,
   parseAdpWorkforcenowPostingsFromApi,
+  parseApplitrackPostings,
+  parseApplyToJobPostingsFromHtml,
+  parseAshbyCompany,
+  parseBambooHrPostingsFromApi,
+  parseBreezyPostingsFromHtml,
   parseFountainPostingsFromApi,
+  parseIcimsPostingsFromHtml,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
