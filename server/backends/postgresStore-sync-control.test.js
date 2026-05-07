@@ -358,7 +358,7 @@ async function testUnderfilledMeiliHydrationFallsBackToPostgres() {
   }
 }
 
-async function testEmptyMeiliSearchFallsBackToPostgres() {
+async function testEmptyMeiliSearchReturnsFastZero() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousFetch = global.fetch;
   const previousWarn = console.warn;
@@ -405,10 +405,9 @@ async function testEmptyMeiliSearchFallsBackToPostgres() {
       include_ignored: true
     });
 
-    assert.equal(postgresCalls, 2);
-    assert.equal(result.count, 1);
-    assert.equal(result.items.length, 1);
-    assert.equal(result.items[0].position_name, "Director");
+    assert.equal(postgresCalls, 0);
+    assert.equal(result.count, 0);
+    assert.equal(result.items.length, 0);
   } finally {
     console.warn = previousWarn;
     global.fetch = previousFetch;
@@ -641,7 +640,7 @@ async function main() {
   await testHydratePostgresPostingsKeepsHiddenAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
-  await testEmptyMeiliSearchFallsBackToPostgres();
+  await testEmptyMeiliSearchReturnsFastZero();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
   testMeiliDocumentsCarryHiddenFlagSafely();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();

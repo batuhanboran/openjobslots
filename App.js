@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.9";
+const PUBLIC_APP_VERSION = "1.5.10";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.10",
+    date: "May 7, 2026",
+    title: "Zero-result search speed",
+    summary:
+      "Stopped running expensive database fallback searches when the healthy search index already proves a query has no matching public slots."
+  },
   {
     version: "1.5.9",
     date: "May 7, 2026",
