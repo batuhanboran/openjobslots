@@ -52,8 +52,8 @@ async function openPostings(page) {
   await expect(page.getByTestId("brand-wordmark")).toContainText("openjobslots");
   await expect(page.getByTestId("search-shell")).toBeVisible();
   await expect(page.getByTestId("postings-search-input")).toBeVisible();
-  await expect(page.getByTestId("sync-status-panel")).toBeVisible();
-  await expect(page.getByTestId("posting-card").first()).toBeVisible();
+  await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
+  await expect(page.getByTestId("posting-card")).toHaveCount(0);
   await expect(page.getByTestId("app-error-message")).toHaveCount(0);
   await expect(page.getByText(/API:|ATS postings|Sync-enabled companies:|Stored today:/i)).toHaveCount(0);
   await expect(page.getByText(/Request failed \(401\)|Admin token required/i)).toHaveCount(0);
@@ -63,18 +63,25 @@ async function openPostings(page) {
   return failedResponses;
 }
 
+async function submitSearchAndExpectResults(page, query = "remote jobs") {
+  await page.getByTestId("postings-search-input").fill(query);
+  await page.getByTestId("postings-search-input").press("Enter");
+  await expect(page.getByTestId("sync-status-panel")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
+}
+
 async function expectSearchEngineVisualContract(page) {
   const searchBox = await page.getByTestId("postings-search-input").boundingBox();
   const shell = await page.getByTestId("search-shell").boundingBox();
-  const statusPanel = await page.getByTestId("sync-status-panel").boundingBox();
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
 
   expect(searchBox.width).toBeGreaterThan(viewport.width < 600 ? 250 : 520);
-  expect(shell.y).toBeLessThan(viewport.height * 0.34);
+  expect(shell.height).toBeGreaterThan(viewport.height * (viewport.width < 600 ? 0.42 : 0.5));
+  expect(searchBox.y).toBeGreaterThan(viewport.height * (viewport.width < 600 ? 0.15 : 0.2));
+  expect(searchBox.y).toBeLessThan(viewport.height * 0.5);
   expect(Math.abs((searchBox.x + searchBox.width / 2) - viewport.width / 2)).toBeLessThan(viewport.width * 0.08);
   expect(Math.abs((searchBox.x + searchBox.width / 2) - (shell.x + shell.width / 2))).toBeLessThan(8);
-  expect(statusPanel.y).toBeGreaterThan(searchBox.y);
-  expect(statusPanel.height).toBeLessThan(viewport.width < 600 ? 360 : 220);
+  await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
 
   const wordmarkColors = await page.getByTestId("brand-wordmark").evaluate((node) => {
     const colors = [];
@@ -93,16 +100,20 @@ async function expectSearchEngineVisualContract(page) {
     "rgb(251, 188, 5)",
     "rgb(52, 168, 83)"
   ]) {
-    expect(wordmarkColors, `wordmark should include ${googleColor}`).toContain(googleColor);
+    expect(wordmarkColors, `wordmark should not include Google color ${googleColor}`).not.toContain(googleColor);
   }
+  expect(wordmarkColors).toContain("rgb(23, 59, 109)");
+  expect(wordmarkColors).toContain("rgb(95, 102, 115)");
 }
 
 async function expectSuggestionPanelDoesNotOverlap(page) {
   const suggestions = await page.getByTestId("search-suggestions-panel").boundingBox();
-  const coverage = await page.getByTestId("sync-status-panel").boundingBox();
   expect(suggestions).toBeTruthy();
-  expect(coverage).toBeTruthy();
-  expect(suggestions.y + suggestions.height).toBeLessThan(coverage.y);
+  if ((await page.getByTestId("sync-status-panel").count()) > 0) {
+    const coverage = await page.getByTestId("sync-status-panel").boundingBox();
+    expect(coverage).toBeTruthy();
+    expect(suggestions.y + suggestions.height).toBeLessThan(coverage.y);
+  }
 }
 
 async function expectSearchMovesUpAfterSubmit(page) {
@@ -112,8 +123,9 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(260);
   const compactSearchBox = await page.getByTestId("postings-search-input").boundingBox();
-  expect(compactSearchBox.y).toBeLessThan(homeSearchBox.y - 12);
+  expect(compactSearchBox.y).toBeLessThan(homeSearchBox.y - 70);
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+  await expect(page.getByTestId("sync-status-panel")).toBeVisible();
 }
 
 async function expectNoNestedPublicScroll(page) {
@@ -136,7 +148,9 @@ async function expectNoNestedPublicScroll(page) {
   if (nestedState.filters) {
     expect(nestedState.filters.scrollable, "filters panel should expand in-page instead of scrolling internally").toBe(false);
   }
-  expect(nestedState.list.scrollable, "posting cards should use the main page scroll, not their own list scrollbar").toBe(false);
+  if (nestedState.list) {
+    expect(nestedState.list.scrollable, "posting cards should use the main page scroll, not their own list scrollbar").toBe(false);
+  }
 }
 
 async function expectPublicPaletteIsSoft(page) {
@@ -516,7 +530,8 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("brand-wordmark")).toContainText("openjobslots");
     await expect(page.getByTestId("search-shell")).toBeVisible();
     await expect(page.getByTestId("postings-search-input")).toBeVisible();
-    await expect(page.getByTestId("posting-card").first()).toBeVisible();
+    await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
     await expectNoRawErrors(page);
     await expectPublicSearchChrome(page);
     await expectNoProtectedPublicRouteCalls(protectedRouteCalls, "reload");
@@ -543,16 +558,17 @@ test.describe("postings page QA", () => {
     await openPostings(page);
 
     await expect(page.getByTestId("coverage-details")).toHaveCount(0);
-    await page.getByTestId("coverage-toggle").click();
-    await expect(page.getByTestId("coverage-details")).toBeVisible();
-    await page.getByTestId("coverage-toggle").click();
-    await expect(page.getByTestId("coverage-details")).toHaveCount(0);
+    await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
+    const homeSearchBox = await page.getByTestId("postings-search-input").boundingBox();
 
     await page.getByTestId("postings-search-input").fill("tur");
     await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByText(/Ctrl\+K focuses search/i)).toHaveCount(0);
     await expectSuggestionPanelDoesNotOverlap(page);
+    const suggestSearchBox = await page.getByTestId("postings-search-input").boundingBox();
+    expect(Math.abs(suggestSearchBox.y - homeSearchBox.y)).toBeLessThan(24);
+    await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
 
     await page.getByTestId("postings-search-input").press("Escape");
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
@@ -563,6 +579,10 @@ test.describe("postings page QA", () => {
 
     await page.getByTestId("brand-wordmark").click();
     await expectSearchMovesUpAfterSubmit(page);
+    await page.getByTestId("coverage-toggle").click();
+    await expect(page.getByTestId("coverage-details")).toBeVisible();
+    await page.getByTestId("coverage-toggle").click();
+    await expect(page.getByTestId("coverage-details")).toHaveCount(0);
     await expectNoRawErrors(page);
   });
 
@@ -643,6 +663,7 @@ test.describe("postings page QA", () => {
 
   test("search keeps stale results visible during transient database busy errors", async ({ page }) => {
     await openPostings(page);
+    await submitSearchAndExpectResults(page, "remote jobs");
     const firstCardText = await page.getByTestId("posting-card").first().innerText();
 
     await page.route("**/postings**", async (route) => {
@@ -692,9 +713,8 @@ test.describe("postings page QA", () => {
     await expect(page.getByText("No postings found.").or(page.getByTestId("posting-card").first())).toBeVisible();
 
     await page.getByTestId("postings-filter-clear").click();
-    await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("sync-metric-indexed-slots")).toBeVisible();
-    await expect(page.getByTestId("sync-metric-seen-in-24h")).toBeVisible();
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
+    await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
   });
 
   test("worldwide geo filters are usable or show graceful empty states", async ({ page }) => {
@@ -742,6 +762,7 @@ test.describe("postings page QA", () => {
 
   test("posting cards do not expose protected mutation actions on the public page", async ({ page }) => {
     await openPostings(page);
+    await submitSearchAndExpectResults(page, "remote jobs");
 
     await expect(page.getByTestId("posting-card").first()).toBeVisible();
     await expect(page.getByTestId("posting-card-menu")).toHaveCount(0);

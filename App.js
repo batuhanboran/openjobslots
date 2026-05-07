@@ -71,36 +71,35 @@ const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const OJS_COLORS = {
-  blue: "#4285f4",
-  red: "#ea4335",
-  yellow: "#fbbc05",
-  green: "#34a853",
-  ink: "#202124",
-  text: "#3c4043",
-  muted: "#5f6368",
-  border: "#dfe3ea",
-  softBorder: "#eef1f5",
-  bg: "#f8fafd",
+  blue: "#173B6D",
+  accent: "#14B8A6",
+  accentSoft: "#DDF7F3",
+  red: "#B42318",
+  yellow: "#B54708",
+  green: "#137A5A",
+  ink: "#1F2937",
+  text: "#364152",
+  muted: "#667085",
+  slotGray: "#5F6673",
+  border: "#D7DEE8",
+  softBorder: "#E8EDF3",
+  bg: "#F7FAFC",
   surface: "#ffffff",
-  surfaceMuted: "#f5f8fc",
-  hover: "#f1f3f4",
-  pressed: "#e8f0fe",
-  focus: "#1a73e8",
-  success: "#188038",
-  successSoft: "#e6f4ea",
-  warning: "#b06000",
-  warningSoft: "#fff7e0",
-  danger: "#b3261e",
-  dangerSoft: "#fce8e6",
-  shadow: "#202124"
+  surfaceMuted: "#F2F6FA",
+  hover: "#EEF4F8",
+  pressed: "#DDF7F3",
+  focus: "#14B8A6",
+  success: "#137A5A",
+  successSoft: "#E4F8F1",
+  warning: "#B54708",
+  warningSoft: "#FFF4E5",
+  danger: "#B42318",
+  dangerSoft: "#FEE4E2",
+  shadow: "#101828"
 };
 const WORDMARK_SEGMENTS = [
-  { text: "o", color: OJS_COLORS.blue },
-  { text: "p", color: OJS_COLORS.red },
-  { text: "e", color: OJS_COLORS.yellow },
-  { text: "n", color: OJS_COLORS.blue },
-  { text: "job", color: OJS_COLORS.green },
-  { text: "slots", color: OJS_COLORS.ink }
+  { text: "openjob", color: OJS_COLORS.blue },
+  { text: "slots", color: OJS_COLORS.slotGray }
 ];
 const WORLDWIDE_REGION_OPTIONS = [
   { value: "Africa", label: "Africa" },
@@ -1249,6 +1248,7 @@ export default function App() {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const [searchResultsMode, setSearchResultsMode] = useState(false);
   const [coverageDetailsOpen, setCoverageDetailsOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const [personalInformation, setPersonalInformation] = useState(createEmptyPersonalInformation);
@@ -1518,23 +1518,21 @@ export default function App() {
     );
   }, [postingsFilters]);
 
-  const searchShellCompact = Boolean(
-    String(search || "").trim() ||
-      hasActivePostingFilters ||
-      postingsFilterPanelOpen ||
-      searchSuggestionsOpen
-  );
+  const searchQueryText = String(search || "").trim();
+  const showResultsSurface = searchResultsMode || hasActivePostingFilters;
+  const searchShellCompact = Boolean(showResultsSurface);
   const suggestionsVisible = searchSuggestionsOpen && searchSuggestions.length > 0;
+  const searchUiMode = showResultsSurface ? "results" : suggestionsVisible || searchQueryText ? "suggest" : "home";
   const searchMotionStyle = {
     opacity: searchMotionRef.current.interpolate({
       inputRange: [0, 1],
-      outputRange: [0.96, 1]
+      outputRange: [0.98, 1]
     }),
     transform: [
       {
         translateY: searchMotionRef.current.interpolate({
           inputRange: [0, 1],
-          outputRange: [18, 0]
+          outputRange: [26, 0]
         })
       }
     ]
@@ -1823,6 +1821,7 @@ export default function App() {
       now - lastSubmit.at < 250;
     lastSearchSubmitRef.current = { value: nextSearch, filtersSignature, at: now };
     suppressedSuggestionQueryRef.current = nextSearch;
+    setSearchResultsMode(true);
     setSearch(nextSearch);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
@@ -1833,18 +1832,21 @@ export default function App() {
   }, [loadPostings, scrollPostingsToTop]);
 
   const clearSearchAndSuggestions = useCallback(() => {
-    const filters = postingsFiltersRef.current;
+    const defaultFilters = createDefaultPostingsFilters();
     lastSearchSubmitRef.current = {
       value: "",
-      filtersSignature: getPostingsFiltersSignature(filters),
+      filtersSignature: getPostingsFiltersSignature(defaultFilters),
       at: Date.now()
     };
     suppressedSuggestionQueryRef.current = "";
     setSearch("");
+    setPostingsFilters(defaultFilters);
+    setPostingsFilterPanelOpen(false);
+    setSearchResultsMode(false);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
-    void loadPostings("", { filters });
+    void loadPostings("", { filters: defaultFilters });
   }, [loadPostings, scrollPostingsToTop]);
 
   const selectSearchSuggestion = useCallback((suggestion) => {
@@ -1860,6 +1862,7 @@ export default function App() {
     setSearch("");
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
+    setSearchResultsMode(false);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     suppressedSuggestionQueryRef.current = "";
@@ -2283,6 +2286,7 @@ export default function App() {
 
   const setAtsFilter = useCallback((value) => {
     const nextValue = String(value || "all").trim().toLowerCase();
+    setSearchResultsMode(true);
     setPostingsFilters((prev) => ({
       ...prev,
       ats: nextValue || "all"
@@ -2290,6 +2294,7 @@ export default function App() {
   }, []);
 
   const toggleIndustryFilter = useCallback((value) => {
+    setSearchResultsMode(true);
     setPostingsFilters((prev) => {
       const next = new Set(prev.industries);
       if (next.has(value)) {
@@ -2306,6 +2311,7 @@ export default function App() {
 
   const toggleRegionFilter = useCallback(
     (value) => {
+      setSearchResultsMode(true);
       setPostingsFilters((prev) => {
         const nextRegions = new Set(prev.regions || []);
         if (nextRegions.has(value)) {
@@ -2332,6 +2338,7 @@ export default function App() {
   );
 
   const toggleCountryFilter = useCallback((value) => {
+    setSearchResultsMode(true);
     setPostingsFilters((prev) => {
       const next = new Set(prev.countries || []);
       if (next.has(value)) {
@@ -2347,6 +2354,7 @@ export default function App() {
   }, []);
 
   const toggleStateFilter = useCallback((value) => {
+    setSearchResultsMode(true);
     setPostingsFilters((prev) => {
       const nextStates = new Set(prev.states);
       if (nextStates.has(value)) {
@@ -2370,6 +2378,7 @@ export default function App() {
   }, []);
 
   const toggleCountyFilter = useCallback((value) => {
+    setSearchResultsMode(true);
     setPostingsFilters((prev) => {
       const next = new Set(prev.counties);
       if (next.has(value)) {
@@ -2387,6 +2396,7 @@ export default function App() {
   const clearAllPostingFilters = useCallback(() => {
     const defaultFilters = createDefaultPostingsFilters();
     setPostingsFilters(defaultFilters);
+    setSearchResultsMode(Boolean(String(searchRef.current || "").trim()));
     lastSearchSubmitRef.current = {
       value: searchRef.current,
       filtersSignature: getPostingsFiltersSignature(defaultFilters),
@@ -2500,9 +2510,15 @@ export default function App() {
   }, [postingsFilters]);
 
   useEffect(() => {
+    if (hasActivePostingFilters) {
+      setSearchResultsMode(true);
+    }
+  }, [hasActivePostingFilters]);
+
+  useEffect(() => {
     Animated.timing(searchMotionRef.current, {
       toValue: searchShellCompact ? 1 : 0,
-      duration: 240,
+      duration: 220,
       useNativeDriver: true
     }).start();
   }, [searchShellCompact]);
@@ -2510,7 +2526,7 @@ export default function App() {
   useEffect(() => {
     Animated.timing(suggestionsMotionRef.current, {
       toValue: suggestionsVisible ? 1 : 0,
-      duration: 160,
+      duration: 180,
       useNativeDriver: true
     }).start();
   }, [suggestionsVisible]);
@@ -2571,10 +2587,10 @@ export default function App() {
     const timer = setTimeout(async () => {
       try {
         if (suppressedSuggestionQueryRef.current === query) return;
-        const response = await fetchSearchSuggestions(query, 8);
+        const response = await fetchSearchSuggestions(query, 5);
         if (cancelled) return;
         if (suppressedSuggestionQueryRef.current === query) return;
-        const items = Array.isArray(response?.items) ? response.items : [];
+        const items = Array.isArray(response?.items) ? response.items.slice(0, 5) : [];
         setSearchSuggestions(items);
         setSearchSuggestionsOpen(items.length > 0);
         setActiveSuggestionIndex(-1);
@@ -2584,7 +2600,7 @@ export default function App() {
         setSearchSuggestionsOpen(false);
         queueFrontendLog("warn", "search_suggestions_failed", String(e?.message || e), { search: query });
       }
-    }, 250);
+    }, 120);
 
     return () => {
       cancelled = true;
@@ -2817,6 +2833,7 @@ export default function App() {
         style={[
           styles.searchShell,
           searchShellCompact ? styles.searchShellCompact : styles.searchShellHome,
+          searchUiMode === "suggest" ? styles.searchShellSuggest : null,
           Platform.OS === "web" ? styles.webSmoothMotion : null,
           searchMotionStyle
         ]}
@@ -3059,10 +3076,13 @@ export default function App() {
                     <Pressable
                       key={option.value}
                       onPress={() =>
-                        setPostingsFilters((prev) => ({
-                          ...prev,
-                          remote: option.value
-                        }))
+                        {
+                          setSearchResultsMode(true);
+                          setPostingsFilters((prev) => ({
+                            ...prev,
+                            remote: option.value
+                          }));
+                        }
                       }
                       style={({ pressed }) => [
                         styles.remoteFilterChip,
@@ -3085,10 +3105,13 @@ export default function App() {
                 <Switch
                   value={Boolean(postingsFilters.hide_no_date)}
                   onValueChange={(value) =>
-                    setPostingsFilters((prev) => ({
-                      ...prev,
-                      hide_no_date: value
-                    }))
+                    {
+                      setSearchResultsMode(true);
+                      setPostingsFilters((prev) => ({
+                        ...prev,
+                        hide_no_date: value
+                      }));
+                    }
                   }
                   testID="hide-no-date-filter"
                   accessibilityLabel="Hide postings with no date"
@@ -3099,33 +3122,37 @@ export default function App() {
         </View>
       ) : null}
 
-      {renderSyncStatusPanel()}
-      {loading && !initializing ? <Text style={styles.small}>Refreshing results...</Text> : null}
-      {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
+      {showResultsSurface ? (
+        <>
+          {renderSyncStatusPanel()}
+          {loading && !initializing ? <Text style={styles.small}>Refreshing results...</Text> : null}
+          {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
 
-      {initializing && postings.length === 0 ? (
-        <ActivityIndicator size="large" style={styles.loader} />
-      ) : (
-        <View style={styles.list} testID="postings-list">
-          {postings.length === 0 ? (
-            <Text style={styles.empty}>No postings found.</Text>
+          {initializing && postings.length === 0 ? (
+            <ActivityIndicator size="large" style={styles.loader} />
           ) : (
-            postings.map((item, index) => (
-              <PostingCard
-                key={String(item?.job_posting_url || item?._row_fallback_key || `posting-${index}`)}
-                item={item}
-                onTrackApplication={handleTrackPostingApplication}
-                onIgnorePosting={handleIgnorePosting}
-                onBlockCompany={handleBlockCompany}
-                savingApplicationIds={savingApplicationIds}
-                ignoringPostingIds={ignoringPostingIds}
-                blockedCompanyNames={blockedCompanyNames}
-                blockingCompanyNames={blockingCompanyNamesSet}
-              />
-            ))
+            <View style={styles.list} testID="postings-list">
+              {postings.length === 0 ? (
+                <Text style={styles.empty}>No postings found.</Text>
+              ) : (
+                postings.map((item, index) => (
+                  <PostingCard
+                    key={String(item?.job_posting_url || item?._row_fallback_key || `posting-${index}`)}
+                    item={item}
+                    onTrackApplication={handleTrackPostingApplication}
+                    onIgnorePosting={handleIgnorePosting}
+                    onBlockCompany={handleBlockCompany}
+                    savingApplicationIds={savingApplicationIds}
+                    ignoringPostingIds={ignoringPostingIds}
+                    blockedCompanyNames={blockedCompanyNames}
+                    blockingCompanyNames={blockingCompanyNamesSet}
+                  />
+                ))
+              )}
+            </View>
           )}
-        </View>
-      )}
+        </>
+      ) : null}
     </ScrollView>
   );
 
@@ -4088,7 +4115,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20
   },
   webSmoothMotion: {
-    transitionProperty: "padding, margin, transform, opacity",
+    transitionProperty: "min-height, padding, margin, transform, opacity",
     transitionDuration: "220ms",
     transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
   },
@@ -4097,15 +4124,26 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 980,
     paddingHorizontal: 16,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center"
   },
   searchShellHome: {
-    paddingTop: Platform.OS === "web" ? 70 : 28,
-    paddingBottom: 22
+    minHeight: Platform.OS === "web" ? "58vh" : 360,
+    justifyContent: "flex-start",
+    paddingTop: Platform.OS === "web" ? 96 : 58,
+    paddingBottom: 34
+  },
+  searchShellSuggest: {
+    minHeight: Platform.OS === "web" ? "58vh" : 360,
+    justifyContent: "flex-start",
+    paddingTop: Platform.OS === "web" ? 96 : 58,
+    paddingBottom: 28
   },
   searchShellCompact: {
+    minHeight: Platform.OS === "web" ? 168 : 154,
+    justifyContent: "flex-start",
     paddingTop: Platform.OS === "web" ? 22 : 12,
-    paddingBottom: 10
+    paddingBottom: 12
   },
   brandWordmark: {
     flexDirection: "row",
@@ -4121,14 +4159,14 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.992 }]
   },
   brandWordmarkLetter: {
-    fontSize: 42,
-    lineHeight: 48,
+    fontSize: 44,
+    lineHeight: 50,
     fontWeight: "800",
     letterSpacing: 0
   },
   brandWordmarkLetterCompact: {
-    fontSize: 34,
-    lineHeight: 39
+    fontSize: 31,
+    lineHeight: 36
   },
   brandWordmarkOpen: {
     fontSize: 36,
@@ -4450,53 +4488,62 @@ const styles = StyleSheet.create({
   search: {
     borderWidth: 1,
     borderColor: OJS_COLORS.border,
-    borderRadius: 28,
+    borderRadius: 30,
     backgroundColor: OJS_COLORS.surface,
-    paddingHorizontal: 22,
-    height: 56,
+    paddingHorizontal: 24,
+    height: 58,
     fontSize: 16,
     color: OJS_COLORS.ink,
     shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.11,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 }
+    shadowOpacity: 0.09,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    ...(Platform.OS === "web"
+      ? {
+          outlineColor: OJS_COLORS.focus,
+          outlineOffset: 2,
+          transitionProperty: "border-color, box-shadow, transform",
+          transitionDuration: "180ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
   },
   searchSuggestionsPanel: {
     width: "100%",
     maxWidth: 760,
     alignSelf: "center",
-    marginTop: 8,
+    marginTop: 10,
     overflow: "hidden",
     zIndex: 4,
     elevation: 4,
     borderWidth: 1,
     borderColor: OJS_COLORS.softBorder,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: OJS_COLORS.surface,
-    paddingVertical: 6,
+    paddingVertical: 8,
     shadowColor: OJS_COLORS.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
     ...(Platform.OS === "web"
       ? {
-          transitionProperty: "opacity, transform, margin",
+          transitionProperty: "opacity, transform, margin, max-height",
           transitionDuration: "180ms",
           transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
       : {})
   },
   searchSuggestionItem: {
-    minHeight: 38,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    minHeight: 42,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10
   },
   searchSuggestionItemActive: {
-    backgroundColor: OJS_COLORS.pressed
+    backgroundColor: OJS_COLORS.accentSoft
   },
   searchSuggestionLabel: {
     flex: 1,
