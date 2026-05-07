@@ -1043,8 +1043,7 @@ function securityHeadersMiddleware(_req, res, next) {
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline'",
       "connect-src 'self'",
-      "form-action 'self'",
-      "upgrade-insecure-requests"
+      "form-action 'self'"
     ].join("; ")
   );
   if (NODE_ENV === "production") {
