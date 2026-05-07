@@ -1,6 +1,6 @@
 ﻿# OpenJobSlots
 
-OpenJobSlots is an OpenSource ATS job aggregator and application tracking app. **It pulls jobs that were posted in the last 24 hours** or that has no posted date. 
+OpenJobSlots is a public ATS job search engine. The current production architecture uses a Node app, ingestion worker, Postgres source-of-truth database, and Meilisearch public search index.
 
 Over **78000+** companies from multiple ATSs all sourced into 1 location!
 
@@ -117,7 +117,11 @@ Choose the setup type during install:
 Once the installation is complete, you can launch OpenJobSlots from the start menu. 
 
 ## Docs
-- Docs: https://batuhanboran.github.io/OpenJobSlots/docs/intro
+- Search quality runbook: [docs/search-quality-runbook.md](docs/search-quality-runbook.md)
+- ATS parser matrix: [docs/ats-adapter-matrix.md](docs/ats-adapter-matrix.md)
+- ATS certification: [docs/ats-source-certification.md](docs/ats-source-certification.md)
+- Data retention: [docs/data-retention.md](docs/data-retention.md)
+- Deployment: [docs/deployment.md](docs/deployment.md)
 
 ## Source Installation Setup (Best Stability & Compatibility)
 

@@ -4,6 +4,8 @@ OpenJobSlots prefers direct public ATS APIs, durable cached payload metadata, an
 
 Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normalize`, `validate`, `cacheKey`, `rateLimit`, and `fixtures`. Every normalized posting must fit the durable shape: `source_job_id`, `canonical_url`, `apply_url`, `title`, `company`, `location_text`, `country`, `region`, `remote_type`, `industry`, `posted_at`, `first_seen`, `last_seen`, `ats_key`, `parser_version`, `raw_hash`, and `confidence`.
 
+Parser changes must be checked against public search quality, not only parser unit output. When parser output changes title, location, country, region, remote type, posting date, hidden state, or canonical URL behavior, run the search corpus described in [Search Quality Runbook](./search-quality-runbook.md).
+
 ## Parser Tiers
 
 | Tier | ATS keys | Parse rule | Fixture status |

@@ -25,3 +25,7 @@ OpenJobSlots uses Postgres as the source of truth and Meilisearch as the public 
 ## Worker Maintenance
 
 The ingestion worker hides stale visible postings in Postgres, writes Meilisearch delete operations to `search_index_outbox`, and then processes that outbox. Public API reads should stay read-only.
+
+Retention and search index maintenance must be observable separately from the public visible count. `Indexed slots` is a visible-row count, not a net-new-growth metric; compare visible rows, hidden rows, `first_seen` in 24h, `last_seen` in 24h, and Meilisearch document count when debugging freshness.
+
+Search parity and retention checks are covered in [Search Quality Runbook](./search-quality-runbook.md).
