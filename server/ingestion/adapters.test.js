@@ -12,6 +12,7 @@ const {
   AGGREGATOR_SOURCE_CANDIDATES,
   FIXTURE_BACKED,
   FUTURE_DIRECT_SOURCE_CANDIDATES,
+  PARSER_FIXTURE_BACKED,
   getAdapterMetadata,
   isAtsEnabledByDefault
 } = require("./adapter-metadata");
@@ -40,6 +41,25 @@ test("normalizePosting fills company fallback and required fields", () => {
   assert.equal(posting.job_posting_url, "https://example.com/job/1");
   assert.equal(posting.location, "Remote");
   assert.equal(posting.ats_key, "exampleats");
+});
+
+test("normalizePosting preserves common ATS source id, location, and remote aliases", () => {
+  const posting = normalizePosting(
+    {
+      title: "Support Engineer",
+      url: "https://example.com/jobs/42",
+      jobId: "job-42",
+      jobLocation: { city: "Istanbul", country: "Türkiye" },
+      isRemote: true
+    },
+    { company_name: "Alias Co" },
+    "aliasats"
+  );
+
+  assert.equal(posting.source_job_id, "job-42");
+  assert.equal(posting.location_text, "Istanbul, Türkiye");
+  assert.equal(posting.country, "Turkey");
+  assert.equal(posting.remote_type, "remote");
 });
 
 test("validatePosting rejects incomplete postings", () => {
@@ -113,6 +133,18 @@ test("fixture-backed adapter metadata points to saved fixtures", () => {
     );
     assert.equal(getAdapterMetadata(atsKey).fixtureStatus, "fixture-backed");
   }
+});
+
+test("strict parser-backed metadata is separate from normalized fixture coverage", () => {
+  assert.deepEqual(
+    Array.from(PARSER_FIXTURE_BACKED).sort(),
+    ["adp_workforcenow", "fountain", "oracle", "paylocity", "pinpointhq", "recruitcrm"].sort()
+  );
+  for (const atsKey of PARSER_FIXTURE_BACKED) {
+    const metadata = getAdapterMetadata(atsKey);
+    assert.equal(metadata.parserFixtureStatus, "parser-fixture-backed");
+  }
+  assert.equal(getAdapterMetadata("greenhouse").parserFixtureStatus, "normalized-fixture-only");
 });
 
 test("dayforcehcm is configured but disabled until parser certification exists", () => {

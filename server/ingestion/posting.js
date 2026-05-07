@@ -207,6 +207,10 @@ function normalizePosting(posting, company, atsKey, options = {}) {
   const location = firstValue([
     posting?.location_text,
     extractLocationText(posting?.location),
+    extractLocationText(posting?.locations),
+    extractLocationText(posting?.jobLocation),
+    extractLocationText(posting?.PrimaryLocation),
+    extractLocationText(posting?.workLocation),
     posting?.locationName,
     posting?.workplaceLocation,
     posting?.workplace
@@ -227,12 +231,16 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     posting?.workplaceType,
     posting?.workplace_type,
     posting?.workplace_type_text,
+    posting?.locationType,
+    posting?.workLocationOption,
     posting?.remote,
+    posting?.is_remote,
+    posting?.isRemote,
     posting?.employment_type,
     posting?.job_type,
     location,
     positionName
-  ].map((value) => normalizePostingValue(value)).filter(Boolean).join(" ");
+  ].map((value) => (value === true ? "remote" : normalizePostingValue(value))).filter(Boolean).join(" ");
   const remoteType = normalizeRemoteType(remoteSignal);
   const country = firstValue([normalizeCountryName(posting?.country), normalizeCountryFromLocation(location)]);
   const region = firstValue([posting?.region, normalizeRegionFromCountry(country)]);
@@ -241,6 +249,23 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     normalizePostingValue(posting?.source_job_id) ||
     normalizePostingValue(posting?.id) ||
     normalizePostingValue(posting?.job_id) ||
+    normalizePostingValue(posting?.jobId) ||
+    normalizePostingValue(posting?.JobId) ||
+    normalizePostingValue(posting?.jobID) ||
+    normalizePostingValue(posting?.itemID) ||
+    normalizePostingValue(posting?.itemId) ||
+    normalizePostingValue(posting?.reqId) ||
+    normalizePostingValue(posting?.reqID) ||
+    normalizePostingValue(posting?.DocumentID) ||
+    normalizePostingValue(posting?.documentId) ||
+    normalizePostingValue(posting?.external_id) ||
+    normalizePostingValue(posting?.externalId) ||
+    normalizePostingValue(posting?.vacancyId) ||
+    normalizePostingValue(posting?.JobControl) ||
+    normalizePostingValue(posting?.jobNum) ||
+    normalizePostingValue(posting?.JobNum) ||
+    normalizePostingValue(posting?.openingId) ||
+    normalizePostingValue(posting?.opening_id) ||
     normalizePostingValue(posting?.requisition_id) ||
     normalizePostingValue(posting?.requisitionId);
   const seenEpoch = Number(options?.nowEpoch || options?.lastSeenEpoch || 0) || null;

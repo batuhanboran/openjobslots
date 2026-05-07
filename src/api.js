@@ -84,7 +84,6 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
     search,
     limit: String(limit),
     offset: String(offset),
-    _ts: String(Date.now()),
     include_applied: filters?.include_applied === undefined ? "0" : filters?.include_applied ? "1" : "0",
     include_ignored: filters?.include_ignored === undefined ? "0" : filters?.include_ignored ? "1" : "0"
   });
