@@ -5,7 +5,7 @@ RUN apk add --no-cache python3 make g++ sqlite
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build:web

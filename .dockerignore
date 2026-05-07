@@ -3,6 +3,12 @@
 .env.*
 node_modules
 data
+jobs.db
+jobs.db-shm
+jobs.db-wal
+*.db
+*.sqlite
+*.sqlite3
 logs
 .tmp
 tests
