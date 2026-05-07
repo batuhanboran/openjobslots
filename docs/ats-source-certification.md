@@ -16,6 +16,12 @@ Certification must also prove search impact. A parser is not production-ready if
 
 Missing location, posting date, or remote fields must be certified by saved source fixtures. A nullable field is acceptable only when the raw fixture proves the source omitted it, or the parser notes explain why extracting it would be unsafe or require extra source load that certification rejected.
 
+## May 8 Data-Quality Priority
+
+Live ltx100 currently has 722,591 active postings; 625,905 are missing `country`/`region`; 96,686 have `country`/`region`. The largest gaps include `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`.
+
+Treat ATS parser normalization as the first fix: improve `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup. Reindex after normalization improves, then require production parity tests against the live-like Postgres plus Meilisearch path. Image work and build-cache cleanup are lower priority.
+
 ## Certification Gate
 
 An ATS is certified only when all of these exist:
@@ -26,7 +32,9 @@ An ATS is certified only when all of these exist:
 - Expected normalized fixture using the common posting shape.
 - Parser test that rejects missing title, company, or canonical URL.
 - Adapter notes for date parsing, location parsing, remote/hybrid handling, known failure modes, and confidence.
+- Fixture-backed proof for `location_text`, `country`, `region`, `remote_type`, `posting_date`/`posted_at`, `source_job_id`, and `last_seen_epoch`.
 - Fixture-backed proof for missing or nullable location, date, and remote fields.
+- Production parity tests showing normalized rows survive Postgres persistence, Meilisearch indexing, hydration, and public filter/search behavior.
 
 ## Expansion Priority
 

@@ -2,11 +2,17 @@
 
 OpenJobSlots prefers direct public ATS APIs, durable cached payload metadata, and conservative validation. Third-party scraper projects may be useful references, but parser code should not be vendored until license, maintenance, and correctness are reviewed.
 
-Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normalize`, `validate`, `cacheKey`, `rateLimit`, and `fixtures`. Every normalized posting must fit the durable shape: `source_job_id`, `canonical_url`, `apply_url`, `title`, `company`, `location_text`, `country`, `region`, `remote_type`, `industry`, `posted_at`, `first_seen`, `last_seen`, `ats_key`, `parser_version`, `raw_hash`, and `confidence`.
+Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normalize`, `validate`, `cacheKey`, `rateLimit`, and `fixtures`. Every normalized posting must fit the durable shape: `source_job_id`, `canonical_url`, `apply_url`, `title`, `company`, `location_text`, `country`, `region`, `remote_type`, `industry`, `posting_date`/`posted_at`, `first_seen`, `last_seen_epoch`, `ats_key`, `parser_version`, `raw_hash`, and `confidence`.
 
 Parser changes must be checked against public search quality, not only parser unit output. When parser output changes title, location, country, region, remote type, posting date, hidden state, or canonical URL behavior, run the search corpus described in [Search Quality Runbook](./search-quality-runbook.md).
 
 Missing location, posting date, or remote fields must be certified by source fixtures. A parser may leave those fields blank only when a saved raw response proves the source omitted them, or adapter notes document why extracting them would be unsafe or require rejected extra fetches.
+
+## May 8 Priority Order
+
+Parser normalization is the current blocker. Fix `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup or search-index tuning. Reindex only after normalization materially improves, then run production parity tests against the Postgres plus Meilisearch path. Image work and build-cache cleanup are later tasks.
+
+Current live ltx100 data-quality finding: 722,591 active postings; 625,905 are missing `country`/`region`; 96,686 have `country`/`region`. The biggest ATS gaps include `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`.
 
 ## Parser Tiers
 
@@ -24,9 +30,12 @@ Missing location, posting date, or remote fields must be certified by source fix
 - Saved raw response fixture and expected normalized fixture for each ATS.
 - Validation rejects missing URL, company, or title.
 - Parser documents endpoint or URL pattern, pagination, date/location parsing, remote/hybrid handling, failure modes, confidence, and rate limit.
-- Missing or nullable location, date, and remote fields are explained by raw source fixtures, not only normalized output.
+- Expected normalized fixtures include `location_text`, `country`, `region`, `remote_type`, `posting_date`/`posted_at`, `source_job_id`, and `last_seen_epoch`.
+- Missing or nullable `location_text`, `country`, `region`, `remote_type`, or posting-date fields are explained by raw source fixtures, not only normalized output.
+- `source_job_id` preserves the strongest source id when the raw response exposes one.
+- `last_seen_epoch` is present for freshness and pruning.
 - Cache key includes ATS key and company URL; posting key is canonical URL.
-- New ATS cannot be enabled by default until fixture tests pass.
+- New ATS cannot be enabled by default until raw fixture tests and production parity tests pass.
 
 ## Current Coverage Snapshot
 
