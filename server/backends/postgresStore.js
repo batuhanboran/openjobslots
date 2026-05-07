@@ -458,7 +458,7 @@ async function listPostgresPostings(pool, options = {}) {
       const searchResult = await searchMeiliPostings({ ...options, limit: searchLimit, offset: 0 }, meiliConfig);
       const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
       if (urls.length === 0 && Number(searchResult.estimatedTotalHits || 0) === 0) {
-        return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+        return { items: [], count: 0, limit, offset };
       }
       const hydratedItems = await hydratePostgresPostings(pool, urls, options);
       const items = hydratedItems.slice(offset, offset + limit);
