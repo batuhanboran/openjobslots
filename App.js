@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.5";
+const PUBLIC_APP_VERSION = "1.5.6";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.6",
+    date: "May 7, 2026",
+    title: "Search filter diagnostics",
+    summary:
+      "Expanded search quality coverage to 1000 deterministic title/filter cases and added clearer empty-state actions when a title, location, and remote-mode intersection has no indexed slots."
+  },
   {
     version: "1.5.5",
     date: "May 7, 2026",
@@ -1767,6 +1774,15 @@ export default function App() {
       Boolean(postingsFilters.hide_no_date)
     );
   }, [postingsFilters]);
+  const hasLocationPostingFilters = useMemo(() => {
+    return (
+      (postingsFilters.regions || []).length > 0 ||
+      (postingsFilters.countries || []).length > 0 ||
+      (postingsFilters.states || []).length > 0 ||
+      (postingsFilters.counties || []).length > 0
+    );
+  }, [postingsFilters]);
+  const hasRemotePostingFilter = postingsFilters.remote !== "all";
 
   const searchQueryText = String(search || "").trim();
   const showResultsSurface = searchResultsMode || hasActivePostingFilters;
@@ -2758,6 +2774,37 @@ export default function App() {
     void loadPostings(searchRef.current, { filters: defaultFilters });
   }, [loadPostings, scrollPostingsToTop]);
 
+  const applyPostingsFiltersImmediately = useCallback((nextFilters) => {
+    const defaultFiltersSignature = getPostingsFiltersSignature(createDefaultPostingsFilters());
+    const nextFiltersSignature = getPostingsFiltersSignature(nextFilters);
+    setPostingsFilters(nextFilters);
+    setSearchResultsMode(Boolean(String(searchRef.current || "").trim()) || nextFiltersSignature !== defaultFiltersSignature);
+    lastSearchSubmitRef.current = {
+      value: searchRef.current,
+      filtersSignature: nextFiltersSignature,
+      at: Date.now()
+    };
+    scrollPostingsToTop();
+    void loadPostings(searchRef.current, { filters: nextFilters });
+  }, [loadPostings, scrollPostingsToTop]);
+
+  const clearLocationPostingFilters = useCallback(() => {
+    applyPostingsFiltersImmediately({
+      ...postingsFiltersRef.current,
+      regions: [],
+      countries: [],
+      states: [],
+      counties: []
+    });
+  }, [applyPostingsFiltersImmediately]);
+
+  const clearRemotePostingFilter = useCallback(() => {
+    applyPostingsFiltersImmediately({
+      ...postingsFiltersRef.current,
+      remote: "all"
+    });
+  }, [applyPostingsFiltersImmediately]);
+
   const toggleMcpIndustryPreference = useCallback((value) => {
     setMcpSettings((prev) => {
       const next = new Set(prev.preferred_industries || []);
@@ -3654,7 +3701,44 @@ export default function App() {
           ) : (
             <View style={styles.list} testID="postings-list">
               {postings.length === 0 ? (
-                <Text style={styles.empty}>No postings found.</Text>
+                <View style={styles.emptyState} testID="postings-empty-state">
+                  <Text style={styles.emptyTitle}>No slots match this exact search.</Text>
+                  <Text style={styles.emptyText}>
+                    The title can exist globally while the selected location or work mode has no indexed match yet.
+                  </Text>
+                  <View style={styles.emptyActions}>
+                    {hasLocationPostingFilters ? (
+                      <Pressable
+                        onPress={clearLocationPostingFilters}
+                        style={({ pressed }) => [styles.emptyActionButton, styles.emptyActionPrimary, pressed ? styles.buttonPressed : null]}
+                        testID="empty-clear-location-filters"
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.emptyActionPrimaryText}>Search all locations</Text>
+                      </Pressable>
+                    ) : null}
+                    {hasRemotePostingFilter ? (
+                      <Pressable
+                        onPress={clearRemotePostingFilter}
+                        style={({ pressed }) => [styles.emptyActionButton, pressed ? styles.buttonPressed : null]}
+                        testID="empty-clear-remote-filter"
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.emptyActionText}>All work modes</Text>
+                      </Pressable>
+                    ) : null}
+                    {hasActivePostingFilters ? (
+                      <Pressable
+                        onPress={clearAllPostingFilters}
+                        style={({ pressed }) => [styles.emptyActionButton, pressed ? styles.buttonPressed : null]}
+                        testID="empty-clear-all-filters"
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.emptyActionText}>Clear filters</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               ) : (
                 postings.map((item, index) => (
                   <PostingCard
@@ -5592,6 +5676,64 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     color: OJS_COLORS.muted
+  },
+  emptyState: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 680,
+    marginTop: 18,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 16,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    alignItems: "center"
+  },
+  emptyTitle: {
+    color: OJS_COLORS.ink,
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  emptyText: {
+    marginTop: 7,
+    color: OJS_COLORS.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center"
+  },
+  emptyActions: {
+    marginTop: 14,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8
+  },
+  emptyActionButton: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.border,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  emptyActionPrimary: {
+    borderColor: OJS_COLORS.focus,
+    backgroundColor: OJS_COLORS.accent
+  },
+  emptyActionText: {
+    color: OJS_COLORS.text,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  emptyActionPrimaryText: {
+    color: OJS_COLORS.ink,
+    fontSize: 12,
+    fontWeight: "800"
   },
   applicationCard: {
     marginTop: 12,

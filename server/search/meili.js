@@ -51,6 +51,40 @@ function normalizeAtsKey(value) {
   return aliases[normalized] || normalized;
 }
 
+function inferCountryFromLocation(location) {
+  const normalized = normalizeText(location);
+  if (/\b(turkiye|turkey|turkish|istanbul|ankara|izmir|bodrum|antalya|bursa|gebze|kocaeli)\b/.test(normalized)) return "Turkey";
+  if (/\b(united states|usa|u\.s\.|new york|california|texas)\b/.test(normalized)) return "United States";
+  if (/\b(united kingdom|uk|england|london)\b/.test(normalized)) return "United Kingdom";
+  if (/\b(germany|deutschland|berlin)\b/.test(normalized)) return "Germany";
+  if (/\b(france|paris)\b/.test(normalized)) return "France";
+  if (/\b(canada|toronto|vancouver)\b/.test(normalized)) return "Canada";
+  return "";
+}
+
+function inferRegionFromCountry(country) {
+  if (["Turkey", "United Kingdom", "Germany", "France"].includes(country)) return "EMEA";
+  if (["United States", "Canada"].includes(country)) return "North America";
+  return "";
+}
+
+function inferRemoteTypeFromLocation(location) {
+  const normalized = normalizeText(location);
+  if (/\bhybrid\b/.test(normalized)) return "hybrid";
+  if (/\b(remote|work from home|work from anywhere|wfh|anywhere|home based|telecommute|telework|virtual)\b/.test(normalized)) {
+    return "remote";
+  }
+  if (/\b(on[- ]?site|office based|in office)\b/.test(normalized)) return "onsite";
+  return "unknown";
+}
+
+function normalizeRemoteType(value, location = "") {
+  const normalized = normalizeText(value);
+  if (normalized === "remote" || normalized === "hybrid" || normalized === "onsite") return normalized;
+  const inferred = inferRemoteTypeFromLocation(location);
+  return inferred || "unknown";
+}
+
 function normalizeSearchQuery(value) {
   const tokens = String(value || "")
     .trim()
@@ -247,15 +281,18 @@ function normalizeBooleanFlag(value, defaultValue = false) {
 
 function toMeiliPostingDocument(posting) {
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
+  const location = String(posting?.location || posting?.location_text || "").trim();
+  const country = String(posting?.country || inferCountryFromLocation(location)).trim();
+  const region = String(posting?.region || inferRegionFromCountry(country)).trim();
   return {
     id: toMeiliDocumentId(canonicalUrl),
     canonical_url: canonicalUrl,
     title: String(posting?.title || posting?.position_name || "").trim(),
     company: String(posting?.company || posting?.company_name || "").trim(),
-    location: String(posting?.location || posting?.location_text || "").trim(),
-    country: String(posting?.country || "").trim(),
-    region: String(posting?.region || "").trim(),
-    remote_type: String(posting?.remote_type || "unknown").trim(),
+    location,
+    country,
+    region,
+    remote_type: normalizeRemoteType(posting?.remote_type, location),
     industry: String(posting?.industry || "").trim(),
     ats_key: normalizeAtsKey(posting?.ats_key || posting?.ATS_name),
     description_plain: String(posting?.description_plain || "").trim(),
@@ -313,7 +350,7 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
     }
   }
   if (options.hide_no_date) {
-    filters.push("posted_at_epoch > 0");
+    filters.push("(posting_date EXISTS AND posting_date IS NOT EMPTY AND posting_date IS NOT NULL)");
   }
 
   return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {

@@ -139,6 +139,21 @@ const REGION_FILTER_ALIASES = new Map([
   ["asia pacific", "APAC"]
 ]);
 
+const COUNTRY_LOCATION_FALLBACK_TERMS_BY_LABEL = new Map([
+  ["Turkey", ["turkey", "turkiye", "t\u00fcrkiye", "turkish", "istanbul", "ankara", "izmir", "bodrum", "antalya", "bursa", "gebze", "kocaeli"]],
+  ["United States", ["united states", "united states of america", "usa", "u.s.", "u.s.a.", "new york", "california", "texas"]],
+  ["United Kingdom", ["united kingdom", "great britain", "britain", "england", "scotland", "wales", "northern ireland", "london"]],
+  ["Canada", ["canada", "toronto", "vancouver"]],
+  ["Germany", ["germany", "deutschland", "berlin"]],
+  ["France", ["france", "paris"]]
+]);
+
+const REMOTE_LOCATION_FALLBACK_TERMS_BY_TYPE = Object.freeze({
+  remote: ["remote", "work from home", "work from anywhere", "wfh", "anywhere", "home based", "telecommute", "telework", "virtual"],
+  hybrid: ["hybrid"],
+  onsite: ["onsite", "on site", "on-site", "office based", "in office"]
+});
+
 function normalizeCountryFilterValue(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -151,6 +166,33 @@ function normalizeRegionFilterValue(value) {
   if (!raw) return "";
   const normalized = normalizeText(raw).replace(/\s+/g, " ");
   return REGION_FILTER_ALIASES.get(normalized) || raw;
+}
+
+function uniqueNormalizedTerms(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const term = String(value || "").trim();
+    const normalized = normalizeText(term).replace(/\s+/g, " ");
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(term);
+  }
+  return result;
+}
+
+function getCountryFilterTerms(countryLabel) {
+  const label = normalizeCountryFilterValue(countryLabel);
+  const terms = [label];
+  for (const [alias, targetLabel] of COUNTRY_FILTER_ALIASES.entries()) {
+    if (targetLabel === label) terms.push(alias);
+  }
+  terms.push(...(COUNTRY_LOCATION_FALLBACK_TERMS_BY_LABEL.get(label) || []));
+  return uniqueNormalizedTerms(terms).filter((term) => normalizeText(term).replace(/[^a-z0-9]+/g, "").length > 2);
+}
+
+function getRemoteLocationFallbackTerms(remoteType) {
+  return uniqueNormalizedTerms(REMOTE_LOCATION_FALLBACK_TERMS_BY_TYPE[remoteType] || []);
 }
 
 const SEARCH_STOP_WORDS = new Set([
@@ -235,6 +277,46 @@ function buildFilterSql(options, startIndex = 1) {
     where.push(`${field} IN (${placeholders.join(", ")})`);
     values.push(...valuesList);
   };
+  const addLocationLikeClauses = (terms) => {
+    const clauses = [];
+    for (const term of uniqueNormalizedTerms(terms)) {
+      clauses.push(`lower(unaccent(coalesce(p.location_text, ''))) LIKE lower(unaccent($${index}))`);
+      values.push(`%${term}%`);
+      index += 1;
+    }
+    return clauses;
+  };
+  const addCountryFilters = (items) => {
+    const labels = uniqueNormalizedTerms(items.map(normalizeCountryFilterValue));
+    if (labels.length === 0) return;
+    const countryClauses = [];
+    const locationFallbackClauses = [];
+    for (const label of labels) {
+      for (const term of getCountryFilterTerms(label)) {
+        countryClauses.push(`lower(unaccent(coalesce(p.country, ''))) = lower(unaccent($${index}))`);
+        values.push(term);
+        index += 1;
+      }
+      locationFallbackClauses.push(...addLocationLikeClauses(getCountryFilterTerms(label)));
+    }
+    const clauses = [];
+    if (countryClauses.length > 0) clauses.push(`(${countryClauses.join(" OR ")})`);
+    if (locationFallbackClauses.length > 0) {
+      clauses.push(`((p.country IS NULL OR btrim(p.country) = '') AND (${locationFallbackClauses.join(" OR ")}))`);
+    }
+    if (clauses.length > 0) where.push(`(${clauses.join(" OR ")})`);
+  };
+  const unknownRemoteSql = "(p.remote_type IS NULL OR btrim(p.remote_type) = '' OR p.remote_type = 'unknown')";
+  const addRemoteFilter = (remoteType) => {
+    const clauses = [`p.remote_type = $${index}`];
+    values.push(remoteType);
+    index += 1;
+    const locationFallbackClauses = addLocationLikeClauses(getRemoteLocationFallbackTerms(remoteType));
+    if (locationFallbackClauses.length > 0) {
+      clauses.push(`(${unknownRemoteSql} AND (${locationFallbackClauses.join(" OR ")}))`);
+    }
+    where.push(`(${clauses.join(" OR ")})`);
+  };
 
   const ats = parseCsv(options.ats).map(normalizeAtsKey);
   const countries = parseCsv(options.countries).map(normalizeCountryFilterValue);
@@ -242,11 +324,21 @@ function buildFilterSql(options, startIndex = 1) {
   const industries = parseCsv(options.industries);
   const remote = String(options.remote || "all").trim().toLowerCase();
   addIn("p.ats_key", ats);
-  addIn("p.country", countries);
+  addCountryFilters(countries);
   addIn("p.region", regions);
   addIn("p.industry", industries);
-  if (remote === "remote" || remote === "hybrid" || remote === "onsite") add("p.remote_type = ?", remote);
-  if (remote === "non_remote") where.push("p.remote_type NOT IN ('remote', 'hybrid')");
+  if (remote === "remote" || remote === "hybrid" || remote === "onsite") addRemoteFilter(remote);
+  if (remote === "non_remote") {
+    const remoteLikeClauses = addLocationLikeClauses([
+      ...getRemoteLocationFallbackTerms("remote"),
+      ...getRemoteLocationFallbackTerms("hybrid")
+    ]);
+    where.push(
+      remoteLikeClauses.length > 0
+        ? `(p.remote_type NOT IN ('remote', 'hybrid') AND NOT (${unknownRemoteSql} AND (${remoteLikeClauses.join(" OR ")})))`
+        : "p.remote_type NOT IN ('remote', 'hybrid')"
+    );
+  }
   if (options.hide_no_date) where.push("p.posting_date IS NOT NULL AND btrim(p.posting_date) <> ''");
   if (!options.include_applied) where.push("COALESCE(s.applied, false) = false");
   if (!options.include_ignored) where.push("COALESCE(s.ignored, false) = false");

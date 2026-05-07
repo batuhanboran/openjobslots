@@ -1,7 +1,8 @@
 const assert = require("node:assert/strict");
 const {
   buildCorpusCases,
-  buildSeedPostings
+  buildSeedPostings,
+  CORPUS_CASE_TARGET
 } = require("./search-corpus-fixtures");
 
 const COUNTRY_ALIASES = new Map([
@@ -290,6 +291,12 @@ function assertCase(postings, corpusCase) {
   if (typeof expected.pageLength === "number") {
     assert.equal(result.items.length, expected.pageLength, `${corpusCase.id}: expected page length`);
   }
+  if (typeof expected.hasMore === "boolean") {
+    assert.equal(result.has_more, expected.hasMore, `${corpusCase.id}: expected has_more`);
+  }
+  if (Object.prototype.hasOwnProperty.call(expected, "nextOffset")) {
+    assert.equal(result.next_offset, expected.nextOffset, `${corpusCase.id}: expected next_offset`);
+  }
   if (expected.first) {
     assert.equal(ids[0], expected.first, `${corpusCase.id}: expected first result`);
   }
@@ -302,6 +309,42 @@ function assertCase(postings, corpusCase) {
   assertEvery(corpusCase.id, result.items, expected.every);
 }
 
+function assertProgressiveLoading(postings, options = {}) {
+  const pageSize = Number(options.limit || 25);
+  let offset = 0;
+  let expectedCount = null;
+  let previousNextOffset = null;
+  const loadedIds = [];
+  const seenIds = new Set();
+
+  for (let page = 0; page < 100; page += 1) {
+    const result = runSearch(postings, { ...options, limit: pageSize, offset });
+    if (expectedCount === null) expectedCount = result.count;
+    assert.equal(result.count, expectedCount, "progressive loading: count changed between pages");
+    assert.ok(result.items.length <= pageSize, "progressive loading: page exceeded requested limit");
+    assert.equal(result.offset, offset, "progressive loading: offset echo mismatch");
+
+    for (const item of result.items) {
+      assert.ok(!seenIds.has(item.id), `progressive loading: duplicate item ${item.id}`);
+      seenIds.add(item.id);
+      loadedIds.push(item.id);
+    }
+
+    if (!result.has_more) {
+      assert.equal(result.next_offset, null, "progressive loading: final page should not advertise next_offset");
+      assert.equal(loadedIds.length, expectedCount, "progressive loading: loaded result count mismatch");
+      return loadedIds;
+    }
+
+    assert.equal(result.next_offset, offset + pageSize, "progressive loading: next_offset should advance by limit");
+    assert.notEqual(result.next_offset, previousNextOffset, "progressive loading: next_offset did not advance");
+    previousNextOffset = result.next_offset;
+    offset = result.next_offset;
+  }
+
+  assert.fail("progressive loading: pagination did not terminate");
+}
+
 function countByKind(cases) {
   const counts = new Map();
   for (const corpusCase of cases) counts.set(corpusCase.kind, (counts.get(corpusCase.kind) || 0) + 1);
@@ -312,9 +355,17 @@ function main() {
   const postings = buildSeedPostings();
   const cases = buildCorpusCases();
   assert.equal(postings.length, 435, "expected deterministic synthetic posting count");
-  assert.equal(cases.length, 202, "expected roughly 200 deterministic search cases");
+  assert.equal(cases.length, CORPUS_CASE_TARGET, "expected deterministic 1000-query search corpus");
 
   for (const corpusCase of cases) assertCase(postings, corpusCase);
+
+  assertProgressiveLoading(postings, { search: "Engineer", limit: 25 });
+  assertProgressiveLoading(postings, {
+    search: "Software Engineer United States",
+    countries: ["US"],
+    remote: "remote",
+    limit: 1
+  });
 
   const summary = countByKind(cases)
     .map(([kind, count]) => `${kind}=${count}`)

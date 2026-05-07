@@ -91,6 +91,14 @@ const REMOTE_MODES = Object.freeze([
   { value: "onsite", label: "On-site" }
 ]);
 
+const REMOTE_QUERY_TERMS = Object.freeze({
+  remote: ["remote", "wfh", "anywhere"],
+  hybrid: ["hybrid"],
+  onsite: ["onsite", "on-site", "on site"]
+});
+
+const CORPUS_CASE_TARGET = 1000;
+
 const REGION_ALIASES = Object.freeze([
   { value: "North America", aliases: ["North America", "NA", "AMER", "Americas"] },
   { value: "EMEA", aliases: ["EMEA", "Europe", "Europe Middle East Africa"] },
@@ -281,6 +289,112 @@ function remoteModeCases() {
   return cases;
 }
 
+function titleCountryRemoteQueryCases() {
+  const cases = [];
+  for (const role of ROLES) {
+    for (const country of COUNTRIES) {
+      for (const remoteMode of REMOTE_MODES) {
+        const aliasIndex = (cases.length + role.length + country.code.length) % country.aliases.length;
+        const aliases = country.aliases[aliasIndex];
+        const remoteTerms = REMOTE_QUERY_TERMS[remoteMode.value] || [remoteMode.value];
+        const remoteTerm = remoteTerms[(cases.length + country.code.length) % remoteTerms.length];
+        cases.push({
+          id: `title-country-remote-query-${slug(role)}-${country.code}-${remoteMode.value}-${slug(remoteTerm)}`,
+          kind: "title+country+remote-query",
+          search: `${role} ${aliases} ${remoteTerm}`,
+          expect: {
+            count: 1,
+            every: { title: role, country: country.label, remote: remoteMode.value },
+            includes: [`${slug(role)}-${country.code}-${remoteMode.value}`],
+            excludes: [
+              `${slug(role)}-${country.code}-${remoteMode.value === "remote" ? "hybrid" : "remote"}`,
+              `${slug(role)}-${country.code === "US" ? "CA" : "US"}-${remoteMode.value}`
+            ]
+          }
+        });
+      }
+    }
+  }
+  return cases;
+}
+
+function structuredRegionRemoteCases() {
+  const cases = [];
+  for (const role of ROLES) {
+    for (const region of REGION_ALIASES) {
+      const countryCount = COUNTRIES.filter((country) => country.region === region.value).length;
+      for (const remoteMode of REMOTE_MODES) {
+        const alias = region.aliases[(cases.length + role.length) % region.aliases.length];
+        cases.push({
+          id: `structured-region-remote-${slug(role)}-${slug(alias)}-${remoteMode.value}`,
+          kind: "structured-region+remote",
+          search: role,
+          options: { regions: [alias], remote: remoteMode.value },
+          expect: {
+            count: countryCount,
+            every: { title: role, region: region.value, remote: remoteMode.value }
+          }
+        });
+      }
+    }
+  }
+  return cases;
+}
+
+function titleCountryHideNoDateCases() {
+  const cases = [];
+  for (const role of ROLES) {
+    for (const country of COUNTRIES) {
+      const alias = country.aliases[(cases.length + country.code.length) % country.aliases.length];
+      const expectedIds = REMOTE_MODES
+        .map((remoteMode) => `${slug(role)}-${country.code}-${remoteMode.value}`)
+        .filter((id) => {
+          const roleIndex = ROLES.indexOf(role);
+          const countryIndex = COUNTRIES.indexOf(country);
+          const remoteIndex = REMOTE_MODES.findIndex((remoteMode) => id.endsWith(`-${remoteMode.value}`));
+          const sequence = roleIndex * COUNTRIES.length * REMOTE_MODES.length + countryIndex * REMOTE_MODES.length + remoteIndex;
+          return sequence % 17 !== 0;
+        });
+      cases.push({
+        id: `title-country-hide-no-date-${slug(role)}-${country.code}`,
+        kind: "title+country+hide-no-date",
+        search: `${role} ${alias}`,
+        options: { hide_no_date: true },
+        expect: {
+          count: expectedIds.length,
+          every: { title: role, country: country.label },
+          includes: expectedIds
+        }
+      });
+    }
+  }
+  return cases;
+}
+
+function structuredTitleCountryRemoteCases() {
+  const cases = [];
+  for (const role of ROLES) {
+    for (const country of COUNTRIES) {
+      for (const remoteMode of REMOTE_MODES) {
+        const searchAlias = country.aliases[(cases.length + role.length) % country.aliases.length];
+        const filterAlias = country.aliases[(cases.length + 1) % country.aliases.length];
+        cases.push({
+          id: `structured-title-country-remote-${slug(role)}-${country.code}-${remoteMode.value}`,
+          kind: "structured-title+country+remote",
+          search: `${role} ${searchAlias}`,
+          options: { countries: [filterAlias], remote: remoteMode.value },
+          expect: {
+            count: 1,
+            every: { title: role, country: country.label, remote: remoteMode.value },
+            includes: [`${slug(role)}-${country.code}-${remoteMode.value}`]
+          }
+        });
+      }
+    }
+  }
+  return cases;
+}
+
 function diacriticAndQuoteCases() {
   return [
     {
@@ -435,7 +549,9 @@ function paginationCases() {
         count: 135,
         pageLength: 10,
         first: "software-engineer-US-remote",
-        includes: ["software-engineer-US-remote"]
+        includes: ["software-engineer-US-remote"],
+        hasMore: true,
+        nextOffset: 10
       }
     },
     {
@@ -447,7 +563,9 @@ function paginationCases() {
         count: 135,
         pageLength: 10,
         first: "software-engineer-GB-hybrid",
-        excludes: ["software-engineer-US-remote"]
+        excludes: ["software-engineer-US-remote"],
+        hasMore: true,
+        nextOffset: 20
       }
     },
     {
@@ -457,7 +575,9 @@ function paginationCases() {
       options: { limit: 10, offset: 130 },
       expect: {
         count: 135,
-        pageLength: 5
+        pageLength: 5,
+        hasMore: false,
+        nextOffset: null
       }
     },
     {
@@ -468,7 +588,9 @@ function paginationCases() {
       expect: {
         count: 3,
         pageLength: 1,
-        every: { title: "Director", country: "United States" }
+        every: { title: "Director", country: "United States" },
+        hasMore: false,
+        nextOffset: null
       }
     },
     {
@@ -479,7 +601,9 @@ function paginationCases() {
       expect: {
         count: 24,
         pageLength: 5,
-        every: { region: "EMEA" }
+        every: { region: "EMEA" },
+        hasMore: true,
+        nextOffset: 10
       }
     },
     {
@@ -490,7 +614,9 @@ function paginationCases() {
       expect: {
         count: 27,
         pageLength: 4,
-        every: { remote: "remote" }
+        every: { remote: "remote" },
+        hasMore: true,
+        nextOffset: 8
       }
     }
   ];
@@ -557,7 +683,7 @@ function negativeCases() {
 }
 
 function buildCorpusCases() {
-  return [
+  const baseCases = [
     ...titleOnlyCases(),
     ...titleCountryCases(),
     ...regionAliasCases(),
@@ -566,9 +692,17 @@ function buildCorpusCases() {
     ...paginationCases(),
     ...negativeCases()
   ];
+  const generatedCases = [
+    ...titleCountryRemoteQueryCases(),
+    ...structuredRegionRemoteCases(),
+    ...titleCountryHideNoDateCases(),
+    ...structuredTitleCountryRemoteCases()
+  ];
+  return [...baseCases, ...generatedCases].slice(0, CORPUS_CASE_TARGET);
 }
 
 module.exports = {
+  CORPUS_CASE_TARGET,
   COUNTRIES,
   REGION_ALIASES,
   REMOTE_MODES,

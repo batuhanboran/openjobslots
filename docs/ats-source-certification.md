@@ -14,6 +14,8 @@ The difference matters: a normalized fixture proves that a sample posting can fi
 
 Certification must also prove search impact. A parser is not production-ready if it creates rows that cannot be found by title, country, region, remote mode, or canonical URL in the production Postgres plus Meilisearch path. Use the [Search Quality Runbook](./search-quality-runbook.md) for corpus and parity expectations.
 
+Missing location, posting date, or remote fields must be certified by saved source fixtures. A nullable field is acceptable only when the raw fixture proves the source omitted it, or the parser notes explain why extracting it would be unsafe or require extra source load that certification rejected.
+
 ## Certification Gate
 
 An ATS is certified only when all of these exist:
@@ -24,6 +26,7 @@ An ATS is certified only when all of these exist:
 - Expected normalized fixture using the common posting shape.
 - Parser test that rejects missing title, company, or canonical URL.
 - Adapter notes for date parsing, location parsing, remote/hybrid handling, known failure modes, and confidence.
+- Fixture-backed proof for missing or nullable location, date, and remote fields.
 
 ## Expansion Priority
 
@@ -117,4 +120,5 @@ Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must sta
 - Do not invent posting dates. If a source only proves that the job is currently visible, leave `posted_at`/`posting_date` null and rely on `last_seen_epoch`.
 - Always preserve the strongest available source id (`id`, `jobId`, requisition id, vacancy id, URL id) as `source_job_id`.
 - When list endpoints omit location/date but detail pages show them, certification should decide whether a polite detail fetch is worth the extra load. The parser must document that decision.
+- Missing `location_text`, `country`, `region`, `posted_at`, or `remote_type` fields require raw fixture evidence. Do not certify a parser from normalized fixtures alone when those fields are blank.
 - If a source exposes city/state/country separately, keep both the raw `location_text` and normalized `country`/`region` fields so filters remain worldwide-friendly.

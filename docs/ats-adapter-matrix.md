@@ -6,6 +6,8 @@ Every adapter must expose `detect`, `buildRequests`, `fetch`, `parse`, `normaliz
 
 Parser changes must be checked against public search quality, not only parser unit output. When parser output changes title, location, country, region, remote type, posting date, hidden state, or canonical URL behavior, run the search corpus described in [Search Quality Runbook](./search-quality-runbook.md).
 
+Missing location, posting date, or remote fields must be certified by source fixtures. A parser may leave those fields blank only when a saved raw response proves the source omitted them, or adapter notes document why extracting them would be unsafe or require rejected extra fetches.
+
 ## Parser Tiers
 
 | Tier | ATS keys | Parse rule | Fixture status |
@@ -22,6 +24,7 @@ Parser changes must be checked against public search quality, not only parser un
 - Saved raw response fixture and expected normalized fixture for each ATS.
 - Validation rejects missing URL, company, or title.
 - Parser documents endpoint or URL pattern, pagination, date/location parsing, remote/hybrid handling, failure modes, confidence, and rate limit.
+- Missing or nullable location, date, and remote fields are explained by raw source fixtures, not only normalized output.
 - Cache key includes ATS key and company URL; posting key is canonical URL.
 - New ATS cannot be enabled by default until fixture tests pass.
 
