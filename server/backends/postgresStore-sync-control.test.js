@@ -235,7 +235,8 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
       include_ignored: true
     });
 
-    assert.match(searchBody.filter, /NOT hidden = true/);
+    assert.match(searchBody.filter, /hidden = false/);
+    assert.doesNotMatch(searchBody.filter, /NOT hidden = true/);
     assert.match(searchBody.filter, /country IN \["United States"\]/);
     assert.match(searchBody.filter, /region IN \["North America"\]/);
     assert.match(searchBody.filter, /posting_date EXISTS/);
@@ -519,6 +520,32 @@ async function testMeiliHideNoDateUsesPostingDatePresence() {
   }
 }
 
+async function testMeiliSearchRequiresExplicitVisibleFlag() {
+  const previousFetch = global.fetch;
+  let body = null;
+  global.fetch = async (_url, options = {}) => {
+    body = JSON.parse(String(options.body || "{}"));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { hits: [], estimatedTotalHits: 0 };
+      }
+    };
+  };
+
+  try {
+    await searchMeiliPostings(
+      { search: "Director", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+    assert.match(body.filter, /hidden = false/);
+    assert.doesNotMatch(body.filter, /NOT hidden = true/);
+  } finally {
+    global.fetch = previousFetch;
+  }
+}
+
 function testRetentionDefaultsUseLastSeenPolicy() {
   const config = getRetentionConfig({});
   assert.equal(config.hotDays, 90);
@@ -617,6 +644,7 @@ async function main() {
   testMeiliDocumentsCarryHiddenFlagSafely();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
   await testMeiliHideNoDateUsesPostingDatePresence();
+  await testMeiliSearchRequiresExplicitVisibleFlag();
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();

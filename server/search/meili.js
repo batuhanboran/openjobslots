@@ -330,7 +330,7 @@ async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMei
 
 async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
   if (!config.enabled) return { ok: true, skipped: true, hits: [], estimatedTotalHits: 0 };
-  const filters = ["NOT hidden = true"];
+  const filters = ["hidden = false"];
   const quote = (value) => `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   const pushInFilter = (field, values) => {
     const items = (Array.isArray(values) ? values : []).map((item) => String(item || "").trim()).filter(Boolean);
