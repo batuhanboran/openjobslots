@@ -111,22 +111,22 @@ async function expectSearchEngineVisualContract(page) {
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
   if (viewport.width >= 768) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
-    await expect(page.getByText("Public v1.5.2")).toBeVisible();
+    await expect(page.getByText("Public v1.5.3")).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
     const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
     await expect(attributionLink).toBeVisible();
     await expect(attributionLink).toHaveAttribute("href", "https://www.linkedin.com/in/batuhan-boran-320b311b7/");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
-    await expect(page.getByText("Version 1.5.2")).toBeVisible();
-    await expect(page.getByText("Progressive results and ATS certification audit")).toBeVisible();
+    await expect(page.getByText("Version 1.5.3")).toBeVisible();
+    await expect(page.getByText("Scroll comfort and docs CI cleanup")).toBeVisible();
     await expect(page.getByText("OpenJobSlots live baseline")).toBeVisible();
     await expect(page.getByText("Public product history. Internal deployment and security details are intentionally omitted.")).toHaveCount(0);
     await page.getByTestId("release-notes-close").click();
     await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
   } else {
     await expect(page.getByTestId("public-version-button")).toHaveCount(0);
-    await expect(page.getByText("Public v1.5.2")).toHaveCount(0);
+    await expect(page.getByText("Public v1.5.3")).toHaveCount(0);
     await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
   }
 }
@@ -152,7 +152,7 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
   await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   await expect(page.getByTestId("results-surface")).toBeVisible();
-  await expect(page.getByText("Public v1.5.2")).toHaveCount(0);
+  await expect(page.getByText("Public v1.5.3")).toHaveCount(0);
   await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
 }
 
@@ -218,6 +218,24 @@ async function expectMobileTapTarget(page, testId) {
   await expect(target).toBeVisible();
   const box = await target.boundingBox();
   expect(box.height, `${testId} should be at least 44px tall on mobile`).toBeGreaterThanOrEqual(44);
+}
+
+async function expectScrollTopButtonWorks(page) {
+  await expect(page.getByTestId("postings-scroll-top-button")).toHaveCount(0);
+  await page.getByTestId("postings-page-scroll").hover();
+  await page.mouse.wheel(0, 1300);
+  await expect(page.getByTestId("postings-scroll-top-button")).toBeVisible({ timeout: 3000 });
+  await expectMobileTapTarget(page, "postings-scroll-top-button");
+  await page.getByTestId("postings-scroll-top-button").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const scrollNode = document.querySelector('[data-testid="postings-page-scroll"]');
+        return Math.max(window.scrollY || 0, scrollNode?.scrollTop || 0);
+      })
+    )
+    .toBeLessThan(80);
+  await expect(page.getByTestId("postings-scroll-top-button")).toHaveCount(0);
 }
 
 async function expectMobileFiltersNearControls(page) {
@@ -670,6 +688,7 @@ test.describe("postings page QA", () => {
 
     await page.getByTestId("brand-wordmark").click();
     await expectSearchMovesUpAfterSubmit(page);
+    await expectScrollTopButtonWorks(page);
     await page.getByTestId("coverage-toggle").click();
     await expectMobileTapTarget(page, "coverage-toggle");
     await expect(page.getByTestId("coverage-details")).toBeVisible();
