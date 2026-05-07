@@ -24,6 +24,14 @@ function normalizeText(value) {
     .trim();
 }
 
+function cleanSearchToken(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^[`"“”'‘’]+|[`"“”'‘’]+$/g, "")
+    .replace(/[“”]/g, "")
+    .trim();
+}
+
 function normalizeAtsKey(value) {
   const normalized = normalizeText(value).replace(/[^a-z0-9]+/g, "");
   const aliases = {
@@ -47,11 +55,57 @@ function normalizeSearchQuery(value) {
   const tokens = String(value || "")
     .trim()
     .split(/\s+/)
-    .map((token) => token.trim())
+    .map(cleanSearchToken)
     .filter(Boolean);
   if (tokens.length <= 1) return tokens.join(" ");
   const meaningfulTokens = tokens.filter((token) => !SEARCH_STOP_WORDS.has(normalizeText(token)));
   return (meaningfulTokens.length > 0 ? meaningfulTokens : tokens).join(" ");
+}
+
+const COUNTRY_FILTER_ALIASES = new Map([
+  ["us", "United States"],
+  ["usa", "United States"],
+  ["u.s.", "United States"],
+  ["u.s.a.", "United States"],
+  ["united states", "United States"],
+  ["united states of america", "United States"],
+  ["uk", "United Kingdom"],
+  ["u.k.", "United Kingdom"],
+  ["gb", "United Kingdom"],
+  ["great britain", "United Kingdom"],
+  ["turkiye", "Turkey"],
+  ["türkiye", "Turkey"],
+  ["turkey", "Turkey"],
+  ["turkish", "Turkey"],
+  ["ca", "Canada"],
+  ["can", "Canada"],
+  ["canada", "Canada"],
+  ["de", "Germany"],
+  ["deutschland", "Germany"],
+  ["germany", "Germany"],
+  ["fr", "France"],
+  ["france", "France"]
+]);
+
+const REGION_FILTER_ALIASES = new Map([
+  ["amer", "North America"],
+  ["americas", "North America"],
+  ["america", "North America"],
+  ["north america", "North America"],
+  ["na", "North America"],
+  ["northamerica", "North America"],
+  ["emea", "EMEA"],
+  ["europe", "EMEA"],
+  ["europe middle east africa", "EMEA"],
+  ["apac", "APAC"],
+  ["asia pacific", "APAC"]
+]);
+
+function normalizeFilterValue(value, aliases) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = normalizeText(raw).replace(/\s+/g, " ");
+  return aliases.get(normalized) || raw;
 }
 
 function getMeiliConfig(env = process.env) {
@@ -246,8 +300,8 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
   };
 
   pushInFilter("ats_key", options.ats);
-  pushInFilter("country", options.countries);
-  pushInFilter("region", options.regions);
+  pushInFilter("country", (Array.isArray(options.countries) ? options.countries : []).map((item) => normalizeFilterValue(item, COUNTRY_FILTER_ALIASES)));
+  pushInFilter("region", (Array.isArray(options.regions) ? options.regions : []).map((item) => normalizeFilterValue(item, REGION_FILTER_ALIASES)));
   pushInFilter("industry", options.industries);
   if (options.remote && options.remote !== "all") {
     if (options.remote === "non_remote") {

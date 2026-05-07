@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.3";
+const PUBLIC_APP_VERSION = "1.5.4";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.4",
+    date: "May 7, 2026",
+    title: "Search index and sync freshness repair",
+    summary:
+      "Improved country and region matching, added a Postgres safety fallback when the search index is empty, and made ingestion distribute due sync work across ATS sources."
+  },
   {
     version: "1.5.3",
     date: "May 7, 2026",

@@ -28,6 +28,9 @@ const WORKER_POLL_MS = Number(process.env.INGESTION_WORKER_POLL_MS || 5000);
 const WORKER_CONCURRENCY = Math.max(1, Number(process.env.INGESTION_WORKER_CONCURRENCY || 4));
 const MAX_TARGETS_PER_RUN = Math.max(1, Number(process.env.INGESTION_MAX_TARGETS_PER_RUN || 2000));
 const RUN_ONCE = String(process.env.INGESTION_RUN_ONCE || "").trim() === "1";
+const AUTO_SYNC_ENABLED = !["0", "false", "no", "off"].includes(
+  String(process.env.OPENJOBSLOTS_AUTO_SYNC ?? "1").trim().toLowerCase()
+);
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
 let writeQueue = Promise.resolve();
@@ -478,23 +481,38 @@ async function selectPostgresDueTargets(pool) {
   const nowEpoch = nowEpochSeconds();
   const result = await pool.query(
     `
+      WITH due_targets AS (
+        SELECT
+          c.id,
+          c.company_name,
+          c.url_string,
+          c.ats_key,
+          s.default_ttl_seconds,
+          s.rate_limit_ms,
+          COALESCE(st.next_sync_epoch, 0) AS next_sync_epoch,
+          row_number() OVER (
+            PARTITION BY c.ats_key
+            ORDER BY COALESCE(st.next_sync_epoch, 0) ASC, c.company_name ASC, c.url_string ASC
+          ) AS ats_rank
+        FROM companies c
+        INNER JOIN ats_sources s
+          ON s.ats_key = c.ats_key
+        LEFT JOIN company_sync_state st
+          ON st.ats_key = c.ats_key
+          AND st.company_url = c.url_string
+        WHERE s.enabled = true
+          AND COALESCE(st.next_sync_epoch, 0) <= $1
+      )
       SELECT
-        c.id,
-        c.company_name,
-        c.url_string,
-        c.ats_key,
-        s.default_ttl_seconds,
-        s.rate_limit_ms,
-        COALESCE(st.next_sync_epoch, 0) AS next_sync_epoch
-      FROM companies c
-      INNER JOIN ats_sources s
-        ON s.ats_key = c.ats_key
-      LEFT JOIN company_sync_state st
-        ON st.ats_key = c.ats_key
-        AND st.company_url = c.url_string
-      WHERE s.enabled = true
-        AND COALESCE(st.next_sync_epoch, 0) <= $1
-      ORDER BY COALESCE(st.next_sync_epoch, 0) ASC, c.ats_key ASC, c.company_name ASC
+        id,
+        company_name,
+        url_string,
+        ats_key,
+        default_ttl_seconds,
+        rate_limit_ms,
+        next_sync_epoch
+      FROM due_targets
+      ORDER BY ats_rank ASC, next_sync_epoch ASC, ats_key ASC, company_name ASC
       LIMIT $2;
     `,
     [nowEpoch, MAX_TARGETS_PER_RUN]
@@ -1007,15 +1025,34 @@ async function startWorker() {
     await recoverPostgresStaleRuns(pool);
     console.log(`[${WORKER_NAME}] using Postgres primary store`);
 
+    let lastAutomaticSyncEpoch = 0;
     while (true) {
       const control = await postgresGetSyncControl(pool);
       const status = String(control?.status || "idle");
       if (status === "requested" || (RUN_ONCE && status !== "running")) {
         const summary = await runPostgresIngestionOnce(pool);
+        if (!summary?.skipped) {
+          lastAutomaticSyncEpoch = nowEpochSeconds();
+        }
         console.log(`[${WORKER_NAME}] postgres run summary: ${JSON.stringify(summary)}`);
         if (RUN_ONCE) return;
       } else if (status === "stopping") {
         await postgresClearSyncControl(pool, "idle", "Stop request completed while worker was idle");
+        lastAutomaticSyncEpoch = nowEpochSeconds();
+      } else if (AUTO_SYNC_ENABLED && status === "idle") {
+        const nowEpoch = nowEpochSeconds();
+        const autoSyncIntervalSeconds = Math.max(60, Math.floor(WORKER_INTERVAL_MS / 1000));
+        if (nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds) {
+          const dueTargets = await countPostgresDueTargets(pool);
+          if (dueTargets > 0) {
+            await postgresSetSyncControl(pool, {
+              status: "requested",
+              activeRunId: null,
+              message: `Auto sync queued; ${dueTargets} companies due`
+            });
+            lastAutomaticSyncEpoch = nowEpoch;
+          }
+        }
       }
       await sleep(WORKER_POLL_MS);
     }

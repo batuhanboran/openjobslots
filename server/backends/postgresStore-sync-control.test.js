@@ -64,6 +64,9 @@ function createStatusMockPool(controlStatus = "requested") {
       if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) {
         return { rows: [{ count: 20 }] };
       }
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) {
+        return { rows: [{ count: 57 }] };
+      }
       if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) {
         return { rows: [{ count: 18 }] };
       }
@@ -160,8 +163,8 @@ async function testHydratePostgresPostingsKeepsHiddenAndFilterGuards() {
     pool,
     ["https://example.com/hidden", "https://example.com/visible"],
     {
-      search: "engineer",
-      countries: ["Turkey"],
+      search: "\"engineer\"",
+      countries: ["turkiye"],
       include_applied: true,
       include_ignored: true
     }
@@ -172,6 +175,8 @@ async function testHydratePostgresPostingsKeepsHiddenAndFilterGuards() {
   assert.match(captured.sql, /lower\(unaccent\(p\.position_name\)\)/);
   assert.deepEqual(captured.params[0], ["https://example.com/hidden", "https://example.com/visible"]);
   assert.equal(captured.params[1], "Turkey");
+  assert.ok(captured.params.some((value) => value === "%engineer%"));
+  assert.ok(!captured.params.some((value) => String(value).includes("\"")));
   assert.deepEqual(items.map((item) => item.job_posting_url), ["https://example.com/visible"]);
 }
 
@@ -218,7 +223,9 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
 
   try {
     const result = await listPostgresPostings(pool, {
-      search: "engineer",
+      search: "\"engineer\"",
+      countries: ["US"],
+      regions: ["AMER"],
       limit: 10,
       offset: 0,
       include_applied: true,
@@ -226,9 +233,71 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     });
 
     assert.match(searchBody.filter, /NOT hidden = true/);
+    assert.match(searchBody.filter, /country IN \["United States"\]/);
+    assert.match(searchBody.filter, /region IN \["North America"\]/);
+    assert.equal(searchBody.q, "engineer");
     assert.equal(result.items.length, 1);
     assert.equal(result.count, 1);
     assert.equal(result.items[0].job_posting_url, "https://example.com/visible");
+  } finally {
+    global.fetch = previousFetch;
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
+async function testEmptyMeiliSearchFallsBackToPostgres() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousFetch = global.fetch;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  let postgresCalls = 0;
+
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    async json() {
+      return { hits: [], estimatedTotalHits: 0 };
+    }
+  });
+
+  const pool = {
+    async query(sql) {
+      postgresCalls += 1;
+      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) {
+        return { rows: [{ count: 1 }] };
+      }
+      return {
+        rows: [{
+          canonical_url: "https://example.com/director-us",
+          company_name: "Visible Co",
+          position_name: "Director",
+          location_text: "Boston, MA, United States",
+          country: "United States",
+          region: "North America",
+          remote_type: "onsite",
+          ats_key: "greenhouse",
+          last_seen_epoch: 123
+        }]
+      };
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "\"Director\" \"United States\"",
+      limit: 10,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    assert.equal(postgresCalls, 2);
+    assert.equal(result.count, 1);
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].position_name, "Director");
   } finally {
     global.fetch = previousFetch;
     if (previousSearchBackend === undefined) {
@@ -336,6 +405,7 @@ async function main() {
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
   await testHydratePostgresPostingsKeepsHiddenAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
+  await testEmptyMeiliSearchFallsBackToPostgres();
   testMeiliDocumentsCarryHiddenFlagSafely();
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
