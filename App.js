@@ -70,32 +70,45 @@ const MAX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
 const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
+const SEARCH_SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
+const SEARCH_SUGGESTION_DEBOUNCE_MS = 90;
+const SEARCH_SUGGESTION_LIMIT = 4;
+const LOCAL_SEARCH_SHORTCUTS = [
+  { type: "search", value: "remote jobs", label: "remote jobs" },
+  { type: "search", value: "technical support", label: "technical support" },
+  { type: "search", value: "software engineer", label: "software engineer" },
+  { type: "search", value: "product manager", label: "product manager" },
+  { type: "search", value: "customer support", label: "customer support" },
+  { type: "country", value: "türkiye", label: "türkiye" },
+  { type: "country", value: "turkiye", label: "turkiye" },
+  { type: "search", value: "turkish jobs", label: "turkish jobs" }
+];
 const OJS_COLORS = {
-  blue: "#173B6D",
-  accent: "#14B8A6",
-  accentSoft: "#DDF7F3",
-  red: "#B42318",
-  yellow: "#B54708",
-  green: "#137A5A",
-  ink: "#1F2937",
-  text: "#364152",
-  muted: "#667085",
-  slotGray: "#5F6673",
-  border: "#D7DEE8",
-  softBorder: "#E8EDF3",
-  bg: "#F7FAFC",
+  blue: "#26332D",
+  accent: "#C0E1D2",
+  accentSoft: "#E5EEE4",
+  red: "#DC9B9B",
+  yellow: "#9A6A4F",
+  green: "#527D68",
+  ink: "#26332D",
+  text: "#33443C",
+  muted: "#68756E",
+  slotGray: "#68756E",
+  border: "#D7DDD2",
+  softBorder: "#E2E7DE",
+  bg: "#F6F4E8",
   surface: "#ffffff",
-  surfaceMuted: "#F2F6FA",
-  hover: "#EEF4F8",
-  pressed: "#DDF7F3",
-  focus: "#14B8A6",
-  success: "#137A5A",
-  successSoft: "#E4F8F1",
-  warning: "#B54708",
-  warningSoft: "#FFF4E5",
-  danger: "#B42318",
-  dangerSoft: "#FEE4E2",
-  shadow: "#101828"
+  surfaceMuted: "#E5EEE4",
+  hover: "#F2EDE1",
+  pressed: "#C0E1D2",
+  focus: "#7FBFA6",
+  success: "#527D68",
+  successSoft: "#E5EEE4",
+  warning: "#9A6A4F",
+  warningSoft: "#F6F4E8",
+  danger: "#A65F5F",
+  dangerSoft: "#F1DEDC",
+  shadow: "#26332D"
 };
 const WORDMARK_SEGMENTS = [
   { text: "openjob", color: OJS_COLORS.blue },
@@ -455,6 +468,98 @@ function normalizePostingItem(item, index = 0) {
 function normalizePostingItems(items) {
   const source = Array.isArray(items) ? items : [];
   return source.map((item, index) => normalizePostingItem(item, index));
+}
+
+function normalizeSuggestionQuery(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeSearchSuggestionItem(item, fallbackType = "search") {
+  const source = item && typeof item === "object" ? item : {};
+  const value = sanitizeDisplayText(source.value || source.label, "").trim();
+  const label = sanitizeDisplayText(source.label || source.value, "").trim();
+  if (!value || !label) return null;
+  return {
+    type: sanitizeDisplayText(source.type, fallbackType).trim() || fallbackType,
+    value,
+    label,
+    count: Number(source.count || 1)
+  };
+}
+
+function mergeSearchSuggestions(...groups) {
+  const merged = [];
+  const seen = new Set();
+  groups.flat().forEach((item) => {
+    const normalized = normalizeSearchSuggestionItem(item);
+    if (!normalized) return;
+    const key = `${normalized.type}:${normalizeSuggestionQuery(normalized.value)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(normalized);
+  });
+  return merged;
+}
+
+function appendLocalSuggestion(candidates, type, value, label = value, count = 1) {
+  const normalized = normalizeSearchSuggestionItem({ type, value, label, count }, type);
+  if (normalized) {
+    candidates.push(normalized);
+  }
+}
+
+function buildLocalSearchSuggestions(query, limit = 5, context = {}) {
+  const normalizedQuery = normalizeSuggestionQuery(query);
+  if (normalizedQuery.length < 2) return [];
+
+  const candidates = [];
+  const filterOptions = context.postingFilterOptions || {};
+  const postingsSource = Array.isArray(context.postings) ? context.postings.slice(0, 250) : [];
+
+  LOCAL_SEARCH_SHORTCUTS.forEach((shortcut) => {
+    appendLocalSuggestion(candidates, shortcut.type, shortcut.value, shortcut.label);
+  });
+  (context.recentSearches || []).forEach((recent) => {
+    appendLocalSuggestion(candidates, "recent", recent, recent);
+  });
+  (filterOptions.industries || []).forEach((option) => {
+    appendLocalSuggestion(candidates, "industry", option?.value || option?.label, option?.label || option?.value, option?.count);
+  });
+  (filterOptions.countries || []).forEach((option) => {
+    appendLocalSuggestion(candidates, "country", option?.value || option?.label, option?.label || option?.value, option?.count);
+  });
+  (filterOptions.regions || []).forEach((option) => {
+    appendLocalSuggestion(candidates, "region", option?.value || option?.label, option?.label || option?.value, option?.count);
+  });
+  (filterOptions.ats || []).forEach((option) => {
+    appendLocalSuggestion(candidates, "ATS", option?.value || option?.label, option?.label || option?.value, option?.count);
+  });
+  postingsSource.forEach((posting) => {
+    appendLocalSuggestion(candidates, "title", posting?.position_name, posting?.position_name);
+    appendLocalSuggestion(candidates, "company", posting?.company_name, posting?.company_name);
+    appendLocalSuggestion(candidates, "location", posting?.location, posting?.location);
+  });
+
+  const scored = mergeSearchSuggestions(candidates)
+    .map((item) => {
+      const label = normalizeSuggestionQuery(item.label);
+      const value = normalizeSuggestionQuery(item.value);
+      const starts = label.startsWith(normalizedQuery) || value.startsWith(normalizedQuery);
+      const contains = label.includes(normalizedQuery) || value.includes(normalizedQuery);
+      const wordStarts = label.split(" ").some((part) => part.startsWith(normalizedQuery));
+      const score = starts ? 3 : wordStarts ? 2 : contains ? 1 : 0;
+      return { item, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || b.item.count - a.item.count || a.item.label.length - b.item.label.length)
+    .map((entry) => entry.item)
+    .slice(0, limit);
+
+  if (scored.length > 0) return scored;
+  return [{ type: "search", value: query.trim(), label: query.trim(), count: 1 }];
 }
 
 function normalizeAtsValue(value) {
@@ -1295,8 +1400,12 @@ export default function App() {
   const frontendLogFlushInFlightRef = useRef(false);
   const lastFrontendLogFlushAtRef = useRef(0);
   const syncNoticeTimerRef = useRef(null);
+  const searchSuggestionCacheRef = useRef(new Map());
+  const recentSearchesRef = useRef([]);
+  const prefersReducedMotionRef = useRef(false);
   const searchMotionRef = useRef(new Animated.Value(0));
   const suggestionsMotionRef = useRef(new Animated.Value(0));
+  const resultsMotionRef = useRef(new Animated.Value(0));
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
   const flushFrontendLogs = useCallback(async () => {
@@ -1520,9 +1629,9 @@ export default function App() {
 
   const searchQueryText = String(search || "").trim();
   const showResultsSurface = searchResultsMode || hasActivePostingFilters;
-  const searchShellCompact = Boolean(showResultsSurface);
+  const searchUiMode = showResultsSurface ? "results" : searchQueryText ? "suggest" : "home";
+  const searchShellCompact = searchUiMode === "results";
   const suggestionsVisible = searchSuggestionsOpen && searchSuggestions.length > 0;
-  const searchUiMode = showResultsSurface ? "results" : suggestionsVisible || searchQueryText ? "suggest" : "home";
   const searchMotionStyle = {
     opacity: searchMotionRef.current.interpolate({
       inputRange: [0, 1],
@@ -1532,7 +1641,7 @@ export default function App() {
       {
         translateY: searchMotionRef.current.interpolate({
           inputRange: [0, 1],
-          outputRange: [26, 0]
+          outputRange: [0, -14]
         })
       }
     ]
@@ -1544,6 +1653,17 @@ export default function App() {
         translateY: suggestionsMotionRef.current.interpolate({
           inputRange: [0, 1],
           outputRange: [-6, 0]
+        })
+      }
+    ]
+  };
+  const resultsMotionStyle = {
+    opacity: resultsMotionRef.current,
+    transform: [
+      {
+        translateY: resultsMotionRef.current.interpolate({
+          inputRange: [0, 1],
+          outputRange: [64, 0]
         })
       }
     ]
@@ -1821,6 +1941,12 @@ export default function App() {
       now - lastSubmit.at < 250;
     lastSearchSubmitRef.current = { value: nextSearch, filtersSignature, at: now };
     suppressedSuggestionQueryRef.current = nextSearch;
+    if (nextSearch) {
+      recentSearchesRef.current = [
+        nextSearch,
+        ...recentSearchesRef.current.filter((item) => normalizeSuggestionQuery(item) !== normalizeSuggestionQuery(nextSearch))
+      ].slice(0, 8);
+    }
     setSearchResultsMode(true);
     setSearch(nextSearch);
     setSearchSuggestionsOpen(false);
@@ -2516,9 +2642,20 @@ export default function App() {
   }, [hasActivePostingFilters]);
 
   useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !window.matchMedia) return undefined;
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => {
+      prefersReducedMotionRef.current = Boolean(motionQuery.matches);
+    };
+    updatePreference();
+    motionQuery.addEventListener?.("change", updatePreference);
+    return () => motionQuery.removeEventListener?.("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
     Animated.timing(searchMotionRef.current, {
       toValue: searchShellCompact ? 1 : 0,
-      duration: 220,
+      duration: prefersReducedMotionRef.current ? 0 : 300,
       useNativeDriver: true
     }).start();
   }, [searchShellCompact]);
@@ -2526,10 +2663,18 @@ export default function App() {
   useEffect(() => {
     Animated.timing(suggestionsMotionRef.current, {
       toValue: suggestionsVisible ? 1 : 0,
-      duration: 180,
+      duration: prefersReducedMotionRef.current ? 0 : 180,
       useNativeDriver: true
     }).start();
   }, [suggestionsVisible]);
+
+  useEffect(() => {
+    Animated.timing(resultsMotionRef.current, {
+      toValue: showResultsSurface ? 1 : 0,
+      duration: prefersReducedMotionRef.current ? 0 : 320,
+      useNativeDriver: true
+    }).start();
+  }, [showResultsSurface]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return undefined;
@@ -2571,6 +2716,7 @@ export default function App() {
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
     const query = String(search || "").trim();
+    const cacheKey = normalizeSuggestionQuery(query);
     if (query.length < 2) {
       setSearchSuggestions([]);
       setSearchSuggestionsOpen(false);
@@ -2583,30 +2729,49 @@ export default function App() {
       return undefined;
     }
 
+    const cached = searchSuggestionCacheRef.current.get(cacheKey);
+    const cachedItems =
+      cached && Date.now() - Number(cached.at || 0) < SEARCH_SUGGESTION_CACHE_TTL_MS
+        ? Array.isArray(cached.items)
+          ? cached.items
+          : []
+        : [];
+    const localItems = buildLocalSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT, {
+      postingFilterOptions,
+      postings,
+      recentSearches: recentSearchesRef.current
+    });
+    const immediateItems = mergeSearchSuggestions(cachedItems, localItems).slice(0, SEARCH_SUGGESTION_LIMIT);
+    setSearchSuggestions(immediateItems);
+    setSearchSuggestionsOpen(immediateItems.length > 0);
+    setActiveSuggestionIndex(-1);
+
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
         if (suppressedSuggestionQueryRef.current === query) return;
-        const response = await fetchSearchSuggestions(query, 5);
+        const response = await fetchSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT);
         if (cancelled) return;
         if (suppressedSuggestionQueryRef.current === query) return;
-        const items = Array.isArray(response?.items) ? response.items.slice(0, 5) : [];
-        setSearchSuggestions(items);
+        const remoteItems = Array.isArray(response?.items) ? response.items.slice(0, SEARCH_SUGGESTION_LIMIT) : [];
+        const items = mergeSearchSuggestions(remoteItems, localItems).slice(0, SEARCH_SUGGESTION_LIMIT);
+        searchSuggestionCacheRef.current.set(cacheKey, { at: Date.now(), items });
         setSearchSuggestionsOpen(items.length > 0);
+        setSearchSuggestions(items);
         setActiveSuggestionIndex(-1);
       } catch (e) {
         if (cancelled) return;
-        setSearchSuggestions([]);
-        setSearchSuggestionsOpen(false);
+        setSearchSuggestions(immediateItems);
+        setSearchSuggestionsOpen(immediateItems.length > 0);
         queueFrontendLog("warn", "search_suggestions_failed", String(e?.message || e), { search: query });
       }
-    }, 120);
+    }, SEARCH_SUGGESTION_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activePage, queueFrontendLog, search]);
+  }, [activePage, postingFilterOptions, postings, queueFrontendLog, search]);
 
   useEffect(() => () => {
     if (syncNoticeTimerRef.current) {
@@ -2878,68 +3043,69 @@ export default function App() {
             accessibilityLabel="Search postings"
           />
         </View>
-        {suggestionsVisible ? (
-          <Animated.View
-            style={[styles.searchSuggestionsPanel, suggestionsMotionStyle]}
-            testID="search-suggestions-panel"
-          >
-            {searchSuggestions.map((suggestion, index) => {
-              const label = String(suggestion?.label || suggestion?.value || "").trim();
-              const hint = String(suggestion?.type || "").trim();
-              const selected = index === activeSuggestionIndex;
-              return (
+        <View style={styles.searchLowerRail}>
+          {suggestionsVisible ? (
+            <Animated.View
+              style={[styles.searchSuggestionsPanel, suggestionsMotionStyle]}
+              testID="search-suggestions-panel"
+            >
+              {searchSuggestions.map((suggestion, index) => {
+                const label = String(suggestion?.label || suggestion?.value || "").trim();
+                const hint = String(suggestion?.type || "").trim();
+                const selected = index === activeSuggestionIndex;
+                return (
+                  <Pressable
+                    key={`${hint}-${label}-${index}`}
+                    onPress={() => selectSearchSuggestion(suggestion)}
+                    style={[styles.searchSuggestionItem, selected ? styles.searchSuggestionItemActive : null]}
+                    testID={`search-suggestion-${index}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Search ${label}`}
+                  >
+                    <Text numberOfLines={1} style={styles.searchSuggestionLabel}>{label}</Text>
+                    {hint ? <Text numberOfLines={1} style={styles.searchSuggestionHint}>{hint}</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
+          ) : (
+            <>
+              <Text style={styles.searchShortcutHint}>Enter to search · Esc to clear</Text>
+              {searchNotice ? (
+                <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
+                  {searchNotice}
+                </Text>
+              ) : null}
+              <View style={styles.searchActionsRow}>
                 <Pressable
-                  key={`${hint}-${label}-${index}`}
-                  onPress={() => selectSearchSuggestion(suggestion)}
-                  style={[styles.searchSuggestionItem, selected ? styles.searchSuggestionItemActive : null]}
-                  testID={`search-suggestion-${index}`}
+                  onPress={() => setPostingsFilterPanelOpen((prev) => !prev)}
+                  style={({ pressed }) => [styles.postingsFiltersToggleBtn, pressed ? styles.buttonPressed : null]}
+                  testID="postings-filter-toggle"
                   accessibilityRole="button"
-                  accessibilityLabel={`Search ${label}`}
+                  accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
                 >
-                  <Text numberOfLines={1} style={styles.searchSuggestionLabel}>{label}</Text>
-                  {hint ? <Text numberOfLines={1} style={styles.searchSuggestionHint}>{hint}</Text> : null}
+                  <Text style={styles.postingsFiltersToggleText}>
+                    {postingsFilterPanelOpen ? "Hide filters" : "Filters"}
+                  </Text>
                 </Pressable>
-              );
-            })}
-          </Animated.View>
-        ) : null}
-        {!suggestionsVisible ? (
-          <Text style={styles.searchShortcutHint}>/ or Ctrl+K focuses search. Enter searches. Esc clears.</Text>
-        ) : null}
-        {searchNotice ? (
-          <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
-            {searchNotice}
-          </Text>
-        ) : null}
-        {!suggestionsVisible ? (
-          <View style={styles.searchActionsRow}>
-            <Pressable
-              onPress={() => setPostingsFilterPanelOpen((prev) => !prev)}
-              style={({ pressed }) => [styles.postingsFiltersToggleBtn, pressed ? styles.buttonPressed : null]}
-              testID="postings-filter-toggle"
-              accessibilityRole="button"
-              accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
-            >
-              <Text style={styles.postingsFiltersToggleText}>
-                {postingsFilterPanelOpen ? "Hide filters" : "Filters"}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={clearAllPostingFilters}
-              style={({ pressed }) => [styles.postingsFiltersClearBtn, pressed ? styles.buttonPressed : null]}
-              testID="postings-filter-clear"
-              accessibilityRole="button"
-              accessibilityLabel="Clear posting filters"
-            >
-              <Text style={styles.postingsFiltersClearText}>Clear</Text>
-            </Pressable>
-          </View>
-        ) : null}
-        {syncNotice ? (
-          <Text style={styles.syncNotice} testID="sync-action-notice" accessibilityRole="status">
-            {syncNotice}
-          </Text>
-        ) : null}
+                <Pressable
+                  onPress={clearAllPostingFilters}
+                  style={({ pressed }) => [styles.postingsFiltersClearBtn, pressed ? styles.buttonPressed : null]}
+                  testID="postings-filter-clear"
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear posting filters"
+                >
+                  <Text style={styles.postingsFiltersClearText}>Clear</Text>
+                </Pressable>
+              </View>
+              {syncNotice ? (
+                <Text style={styles.syncNotice} testID="sync-action-notice" accessibilityRole="status">
+                  {syncNotice}
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
       </Animated.View>
 
       {postingsFilterPanelOpen ? (
@@ -3123,7 +3289,10 @@ export default function App() {
       ) : null}
 
       {showResultsSurface ? (
-        <>
+        <Animated.View
+          style={[styles.resultsSurface, Platform.OS === "web" ? styles.resultsSurfaceMotion : null, resultsMotionStyle]}
+          testID="results-surface"
+        >
           {renderSyncStatusPanel()}
           {loading && !initializing ? <Text style={styles.small}>Refreshing results...</Text> : null}
           {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
@@ -3151,7 +3320,7 @@ export default function App() {
               )}
             </View>
           )}
-        </>
+        </Animated.View>
       ) : null}
     </ScrollView>
   );
@@ -4116,7 +4285,7 @@ const styles = StyleSheet.create({
   },
   webSmoothMotion: {
     transitionProperty: "min-height, padding, margin, transform, opacity",
-    transitionDuration: "220ms",
+    transitionDuration: "300ms",
     transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
   },
   searchShell: {
@@ -4128,21 +4297,21 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   searchShellHome: {
-    minHeight: Platform.OS === "web" ? "58vh" : 360,
-    justifyContent: "flex-start",
-    paddingTop: Platform.OS === "web" ? 96 : 58,
-    paddingBottom: 34
+    minHeight: Platform.OS === "web" ? "calc(100svh - 48px)" : 620,
+    justifyContent: "center",
+    paddingTop: Platform.OS === "web" ? 24 : 18,
+    paddingBottom: 0
   },
   searchShellSuggest: {
-    minHeight: Platform.OS === "web" ? "58vh" : 360,
-    justifyContent: "flex-start",
-    paddingTop: Platform.OS === "web" ? 96 : 58,
-    paddingBottom: 28
+    minHeight: Platform.OS === "web" ? "calc(100svh - 48px)" : 620,
+    justifyContent: "center",
+    paddingTop: Platform.OS === "web" ? 24 : 18,
+    paddingBottom: 0
   },
   searchShellCompact: {
-    minHeight: Platform.OS === "web" ? 168 : 154,
+    minHeight: Platform.OS === "web" ? 172 : 154,
     justifyContent: "flex-start",
-    paddingTop: Platform.OS === "web" ? 22 : 12,
+    paddingTop: Platform.OS === "web" ? 20 : 12,
     paddingBottom: 12
   },
   brandWordmark: {
@@ -4155,7 +4324,7 @@ const styles = StyleSheet.create({
     borderRadius: 24
   },
   brandWordmarkPressed: {
-    backgroundColor: OJS_COLORS.hover,
+    backgroundColor: OJS_COLORS.surfaceMuted,
     transform: [{ scale: 0.992 }]
   },
   brandWordmarkLetter: {
@@ -4182,7 +4351,7 @@ const styles = StyleSheet.create({
   },
   searchLead: {
     marginTop: 2,
-    marginBottom: 16,
+    marginBottom: 18,
     textAlign: "center",
     fontSize: 13,
     color: OJS_COLORS.muted
@@ -4193,6 +4362,12 @@ const styles = StyleSheet.create({
   searchBoxRow: {
     width: "100%",
     maxWidth: 760
+  },
+  searchLowerRail: {
+    width: "100%",
+    maxWidth: 760,
+    minHeight: Platform.OS === "web" ? 170 : 170,
+    alignItems: "center"
   },
   searchShortcutHint: {
     marginTop: 7,
@@ -4252,7 +4427,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   buttonPressed: {
-    backgroundColor: OJS_COLORS.hover,
+    backgroundColor: OJS_COLORS.surfaceMuted,
     transform: [{ scale: 0.98 }]
   },
   postingsFiltersPanel: {
@@ -4352,7 +4527,7 @@ const styles = StyleSheet.create({
   dropdownSelectedChip: {
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#c7d8ff",
+    borderColor: OJS_COLORS.accent,
     borderRadius: 999,
     backgroundColor: OJS_COLORS.pressed,
     color: OJS_COLORS.blue,
@@ -4483,7 +4658,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   remoteFilterChipTextActive: {
-    color: "#ffffff"
+    color: OJS_COLORS.ink
   },
   search: {
     borderWidth: 1,
@@ -4495,8 +4670,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: OJS_COLORS.ink,
     shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.09,
-    shadowRadius: 18,
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
     shadowOffset: { width: 0, height: 6 },
     ...(Platform.OS === "web"
       ? {
@@ -4512,17 +4687,17 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 760,
     alignSelf: "center",
-    marginTop: 10,
+    marginTop: 9,
     overflow: "hidden",
     zIndex: 4,
     elevation: 4,
     borderWidth: 1,
     borderColor: OJS_COLORS.softBorder,
-    borderRadius: 20,
+    borderRadius: 22,
     backgroundColor: OJS_COLORS.surface,
-    paddingVertical: 8,
+    paddingVertical: 6,
     shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.1,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
     ...(Platform.OS === "web"
@@ -4534,16 +4709,16 @@ const styles = StyleSheet.create({
       : {})
   },
   searchSuggestionItem: {
-    minHeight: 42,
+    minHeight: 36,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingVertical: 7,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10
   },
   searchSuggestionItemActive: {
-    backgroundColor: OJS_COLORS.accentSoft
+    backgroundColor: OJS_COLORS.surfaceMuted
   },
   searchSuggestionLabel: {
     flex: 1,
@@ -4586,7 +4761,7 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.green
   },
   syncBtnFailed: {
-    backgroundColor: "#b3261e"
+    backgroundColor: OJS_COLORS.danger
   },
   syncBtnPressed: {
     transform: [{ scale: 0.98 }],
@@ -4599,7 +4774,7 @@ const styles = StyleSheet.create({
     marginRight: 6
   },
   syncBtnText: {
-    color: "#fff",
+    color: OJS_COLORS.surface,
     fontWeight: "600"
   },
   syncNotice: {
@@ -4742,6 +4917,14 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 20
+  },
+  resultsSurface: {
+    width: "100%"
+  },
+  resultsSurfaceMotion: {
+    transitionProperty: "opacity, transform",
+    transitionDuration: "320ms",
+    transitionTimingFunction: "cubic-bezier(0.0, 0.0, 0.2, 1)"
   },
   list: {
     paddingHorizontal: 16,
