@@ -39,6 +39,14 @@ function normalizeText(value) {
     .trim();
 }
 
+function cleanSearchToken(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^[`"“”'‘’]+|[`"“”'‘’]+$/g, "")
+    .replace(/[“”]/g, "")
+    .trim();
+}
+
 function inferCountry(location) {
   const normalized = normalizeText(location);
   if (/\b(turkiye|turkey|turkish|istanbul|ankara|izmir|bodrum|antalya)\b/.test(normalized)) return "Turkey";
@@ -92,6 +100,59 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+const COUNTRY_FILTER_ALIASES = new Map([
+  ["us", "United States"],
+  ["usa", "United States"],
+  ["u.s.", "United States"],
+  ["u.s.a.", "United States"],
+  ["united states", "United States"],
+  ["united states of america", "United States"],
+  ["uk", "United Kingdom"],
+  ["u.k.", "United Kingdom"],
+  ["gb", "United Kingdom"],
+  ["great britain", "United Kingdom"],
+  ["turkiye", "Turkey"],
+  ["türkiye", "Turkey"],
+  ["turkey", "Turkey"],
+  ["turkish", "Turkey"],
+  ["ca", "Canada"],
+  ["can", "Canada"],
+  ["canada", "Canada"],
+  ["de", "Germany"],
+  ["deutschland", "Germany"],
+  ["germany", "Germany"],
+  ["fr", "France"],
+  ["france", "France"]
+]);
+
+const REGION_FILTER_ALIASES = new Map([
+  ["amer", "North America"],
+  ["americas", "North America"],
+  ["america", "North America"],
+  ["north america", "North America"],
+  ["na", "North America"],
+  ["northamerica", "North America"],
+  ["emea", "EMEA"],
+  ["europe", "EMEA"],
+  ["europe middle east africa", "EMEA"],
+  ["apac", "APAC"],
+  ["asia pacific", "APAC"]
+]);
+
+function normalizeCountryFilterValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = normalizeText(raw).replace(/\s+/g, " ");
+  return COUNTRY_FILTER_ALIASES.get(normalized) || raw;
+}
+
+function normalizeRegionFilterValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = normalizeText(raw).replace(/\s+/g, " ");
+  return REGION_FILTER_ALIASES.get(normalized) || raw;
+}
+
 const SEARCH_STOP_WORDS = new Set([
   "job",
   "jobs",
@@ -125,7 +186,7 @@ function expandSearchTokens(search) {
   const rawTokens = String(search || "")
     .trim()
     .split(/\s+/)
-    .map((token) => token.trim())
+    .map(cleanSearchToken)
     .filter(Boolean);
   const meaningfulTokens = rawTokens.filter((token) => !SEARCH_STOP_WORDS.has(normalizeText(token)));
   const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : rawTokens;
@@ -176,8 +237,8 @@ function buildFilterSql(options, startIndex = 1) {
   };
 
   const ats = parseCsv(options.ats).map(normalizeAtsKey);
-  const countries = parseCsv(options.countries);
-  const regions = parseCsv(options.regions);
+  const countries = parseCsv(options.countries).map(normalizeCountryFilterValue);
+  const regions = parseCsv(options.regions).map(normalizeRegionFilterValue);
   const industries = parseCsv(options.industries);
   const remote = String(options.remote || "all").trim().toLowerCase();
   addIn("p.ats_key", ats);
@@ -241,33 +302,7 @@ async function hydratePostgresPostings(pool, urls, options = {}) {
   return canonicalUrls.map((url) => byUrl.get(url)).filter(Boolean);
 }
 
-async function listPostgresPostings(pool, options = {}) {
-  const limit = Math.max(1, Math.min(2000, Number(options.limit || 500)));
-  const offset = Math.max(0, Number(options.offset || 0));
-  const meiliConfig = getMeiliConfig();
-  const sortBy = String(options.sort_by || "recent").trim();
-  const useMeili = meiliConfig.enabled && sortBy !== "company_asc" && offset + limit <= 2000 && (String(options.search || "").trim() || parseCsv(options.ats).length || parseCsv(options.countries).length || parseCsv(options.regions).length || parseCsv(options.industries).length || String(options.remote || "all") !== "all");
-
-  if (useMeili) {
-    try {
-      const searchLimit = Math.min(2000, offset + Math.max(limit * 3, limit + 100));
-      const searchResult = await searchMeiliPostings({ ...options, limit: searchLimit, offset: 0 }, meiliConfig);
-      const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
-      const hydratedItems = await hydratePostgresPostings(pool, urls, options);
-      const items = hydratedItems.slice(offset, offset + limit);
-      const estimatedTotalHits = Number(searchResult.estimatedTotalHits || 0);
-      const count =
-        hydratedItems.length === urls.length
-          ? estimatedTotalHits
-          : estimatedTotalHits <= searchLimit
-            ? hydratedItems.length
-            : Math.max(offset + items.length, hydratedItems.length);
-      return { items, count, limit, offset };
-    } catch (error) {
-      console.warn("[openjobslots] Meilisearch fallback to Postgres:", String(error?.message || error));
-    }
-  }
-
+async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset = 0, sortBy = "recent") {
   const filter = buildFilterSql(options, 1);
   const limitIndex = filter.nextIndex;
   const offsetIndex = filter.nextIndex + 1;
@@ -309,8 +344,41 @@ async function listPostgresPostings(pool, options = {}) {
   return { items: result.rows.map(rowToPosting), count: Number(countResult.rows[0]?.count || 0), limit, offset };
 }
 
+async function listPostgresPostings(pool, options = {}) {
+  const limit = Math.max(1, Math.min(2000, Number(options.limit || 500)));
+  const offset = Math.max(0, Number(options.offset || 0));
+  const meiliConfig = getMeiliConfig();
+  const sortBy = String(options.sort_by || "recent").trim();
+  const useMeili = meiliConfig.enabled && sortBy !== "company_asc" && offset + limit <= 2000 && (String(options.search || "").trim() || parseCsv(options.ats).length || parseCsv(options.countries).length || parseCsv(options.regions).length || parseCsv(options.industries).length || String(options.remote || "all") !== "all");
+
+  if (useMeili) {
+    try {
+      const searchLimit = Math.min(2000, offset + Math.max(limit * 3, limit + 100));
+      const searchResult = await searchMeiliPostings({ ...options, limit: searchLimit, offset: 0 }, meiliConfig);
+      const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
+      if (urls.length === 0 && Number(searchResult.estimatedTotalHits || 0) === 0) {
+        return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+      }
+      const hydratedItems = await hydratePostgresPostings(pool, urls, options);
+      const items = hydratedItems.slice(offset, offset + limit);
+      const estimatedTotalHits = Number(searchResult.estimatedTotalHits || 0);
+      const count =
+        hydratedItems.length === urls.length
+          ? estimatedTotalHits
+          : estimatedTotalHits <= searchLimit
+            ? hydratedItems.length
+            : Math.max(offset + items.length, hydratedItems.length);
+      return { items, count, limit, offset };
+    } catch (error) {
+      console.warn("[openjobslots] Meilisearch fallback to Postgres:", String(error?.message || error));
+    }
+  }
+
+  return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+}
+
 async function getPostgresCounts(pool) {
-  const [companyRow, syncCompanyRow, postingRow, seenRow, atsRows] = await Promise.all([
+  const [companyRow, syncCompanyRow, enabledAtsRow, postingRow, seenRow, atsRows] = await Promise.all([
     pool.query("SELECT COUNT(*)::int AS count FROM companies;"),
     pool.query(
       `
@@ -321,6 +389,7 @@ async function getPostgresCounts(pool) {
         WHERE s.enabled = true;
       `
     ),
+    pool.query("SELECT COUNT(*)::int AS count FROM ats_sources WHERE enabled = true;"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false;"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false AND last_seen_epoch >= $1;", [
       Math.floor(Date.now() / 1000) - 24 * 60 * 60
@@ -332,6 +401,7 @@ async function getPostgresCounts(pool) {
   return {
     company_count: Number(companyRow.rows[0]?.count || 0),
     sync_enabled_company_count: Number(syncCompanyRow.rows[0]?.count || 0),
+    configured_enabled_ats_count: Number(enabledAtsRow.rows[0]?.count || 0),
     posting_count: Number(postingRow.rows[0]?.count || 0),
     postings_seen_24h_count: Number(seenRow.rows[0]?.count || 0),
     company_count_by_ats
@@ -636,7 +706,7 @@ async function getPostgresSyncStatus(pool) {
     queue_backend: process.env.OPENJOBSLOTS_QUEUE_BACKEND || "postgres-sync-control",
     queue_depth: Number(due.rows[0]?.count || 0),
     sync_enabled_company_count: counts.sync_enabled_company_count,
-    configured_enabled_ats_count: Array.isArray(run.active_ats) ? run.active_ats.length : 0,
+    configured_enabled_ats_count: counts.configured_enabled_ats_count,
     excluded_ats_count: 0,
     active_ats: Array.isArray(run.active_ats) ? run.active_ats : [],
     ingestion_worker: {
@@ -665,6 +735,7 @@ async function getPostgresSyncStatus(pool) {
 
 async function upsertPostgresPostings(pool, postings, options = {}) {
   const nowEpoch = Number(options.nowEpoch || Math.floor(Date.now() / 1000));
+  const normalizedForSearchIndex = [];
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -678,6 +749,22 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
       const region = String(posting?.region || inferRegion(country)).trim();
       const remoteType = String(posting?.remote_type || inferRemoteType(location)).trim() || "unknown";
       const atsKey = normalizeAtsKey(posting?.ats_key || posting?.ATS_name);
+      const normalizedPosting = {
+        ...posting,
+        canonical_url: canonicalUrl,
+        company_name: companyName,
+        position_name: title,
+        apply_url: String(posting?.apply_url || canonicalUrl),
+        location_text: location,
+        country,
+        region,
+        remote_type: remoteType,
+        ats_key: atsKey,
+        last_seen_epoch: nowEpoch,
+        posted_at_epoch: posting?.posted_at_epoch || posting?.posting_date_epoch || null,
+        hidden: false
+      };
+      normalizedForSearchIndex.push(normalizedPosting);
       await client.query(
         `
           INSERT INTO postings (
@@ -734,10 +821,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
     client.release();
   }
 
-  await upsertMeiliPostings(
-    (Array.isArray(postings) ? postings : []).map((posting) => ({ ...posting, hidden: false })),
-    getMeiliConfig()
-  );
+  await upsertMeiliPostings(normalizedForSearchIndex, getMeiliConfig());
 }
 
 async function prunePostgresRetention(pool, options = {}) {
