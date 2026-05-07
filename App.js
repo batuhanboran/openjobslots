@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.8";
+const PUBLIC_APP_VERSION = "1.5.9";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.9",
+    date: "May 7, 2026",
+    title: "Search term precision fix",
+    summary:
+      "Changed public result search to require all title terms in the search index, reducing misleading partial matches before database hydration."
+  },
   {
     version: "1.5.8",
     date: "May 7, 2026",
