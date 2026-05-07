@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.6";
+const PUBLIC_APP_VERSION = "1.5.7";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.7",
+    date: "May 7, 2026",
+    title: "Postgres search stability",
+    summary:
+      "Increased Postgres shared memory, reduced database connection pressure, and disabled parallel fallback scans so high-volume search probes do not exhaust container shared memory."
+  },
   {
     version: "1.5.6",
     date: "May 7, 2026",

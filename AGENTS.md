@@ -66,6 +66,7 @@ These notes are for Codex and subagents working in this repository.
 - Test both search engines: direct Postgres SQL fallback and Meilisearch plus Postgres hydration. Meili zero hits, partial stale hits, hydration underfill, and `hide_no_date` filtering must all be covered.
 - Live deploy verification must include correctness probes, not only service health. At minimum test `/postings?search=Director%20United%20States`, `/postings?search=Director%20US`, `/postings?search=t%C3%BCrkiye`, `/postings?search=remote%20engineer`, and one paginated scroll flow that verifies stable offsets, unique rows, and no dropped/duplicated results.
 - Diagnose CPU spikes with measurements before changing architecture: `docker stats`, Postgres logs, `pg_stat_activity`, table/index size, dead tuples, Meili task backlog, and query plans. Do not add Redis, another load balancer, or a new database until those measurements show the bottleneck.
+- Live high-volume search probes can exhaust Docker's default Postgres `/dev/shm` when fallback SQL uses parallel scans. Keep `openjobslots-postgres` configured with explicit `shm_size`, bounded pool sizes, and conservative parallel worker settings before treating 500s as application logic failures.
 - Subagents must produce bounded findings or patches, then be closed. The parent agent must not leave agents idle and must integrate the results into code, tests, docs, and deployment decisions.
 - Detailed runbook: [Search Quality Runbook](./docs/search-quality-runbook.md).
 
