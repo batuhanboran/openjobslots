@@ -49,6 +49,8 @@ These notes are for Codex and subagents working in this repository.
 ## Development Expectations
 
 - Keep public UI search-first and admin controls hidden from public users.
+- This frontend currently uses React Native Web `StyleSheet`, not Tailwind. Do not introduce Tailwind or a new styling stack unless the app architecture is intentionally changed.
+- Job results should be progressive: keep the first page small, append more results on scroll, and avoid rendering hundreds of cards at once.
 - Existing public endpoints should remain compatible: `/postings`, `/postings/filter-options`, `/search/suggest`, `/sync/status`, `/ingestion/status`, `/health`.
 - Verify meaningful changes with `npm.cmd run test:backend`; use Playwright desktop/mobile when UI changes.
 - When using subagents, give each a bounded lane: frontend/UI, backend/data, parser/ATS, security/services, desktop QA, mobile QA. The parent agent remains responsible for integration and final deployment.
@@ -56,7 +58,10 @@ These notes are for Codex and subagents working in this repository.
 ## ATS And Retention Rules
 
 - Certify existing ATS before broad expansion.
-- New ATS requires source docs, endpoint pattern, rate limits, fixtures, expected normalized output, confidence, and adapter notes.
+- Normalized sample fixtures are not enough for certification. Certified ATS require saved raw source fixtures that exercise the parser plus expected normalized output.
+- New ATS requires source docs, endpoint pattern, rate limits, raw fixtures, expected normalized output, confidence, and adapter notes.
+- Do not invent posting dates. If the source does not expose a date, leave the date empty and rely on `last_seen_epoch` for freshness.
+- Preserve the source id (`id`, `jobId`, requisition id, vacancy id, URL id) as `source_job_id` whenever the source exposes one.
 - `dayforcehcm` is configured but disabled by default until parser certification exists.
 - Freshness and pruning must use `last_seen_epoch`, not `first_seen_epoch`.
 - Default hot/searchable posting window: 90 days after last seen.

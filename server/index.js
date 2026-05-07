@@ -15990,12 +15990,25 @@ function createServer() {
         DB_BACKEND === "postgres"
           ? await listPostgresPostings(postgresPool, options)
           : await listPostingsWithFilters(options);
+      const resultItems = Array.isArray(result.items) ? result.items : [];
+      const resultLimit = Math.max(1, Number(result.limit || options.limit || 500));
+      const resultOffset = Math.max(0, Number(result.offset || options.offset || 0));
+      const resultCount = Math.max(0, Number(result.count || 0));
+      const loadedThrough = resultOffset + resultItems.length;
+      const hasMore =
+        resultCount > loadedThrough ||
+        (resultItems.length >= resultLimit && resultCount <= loadedThrough);
+      const publicCount = hasMore
+        ? Math.max(resultCount, loadedThrough + 1)
+        : Math.max(resultCount, loadedThrough);
 
       return {
-        items: sanitizeFrontendValue(sanitizePublicPostings(result.items)),
-        count: result.count,
-        limit: result.limit,
-        offset: result.offset
+        items: sanitizeFrontendValue(sanitizePublicPostings(resultItems)),
+        count: publicCount,
+        limit: resultLimit,
+        offset: resultOffset,
+        has_more: Boolean(hasMore && resultItems.length > 0),
+        next_offset: hasMore && resultItems.length > 0 ? loadedThrough : null
       };
     });
   });

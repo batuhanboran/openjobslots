@@ -1,4 +1,4 @@
-const ADAPTER_METADATA_VERSION = "adapter-certification-v1";
+const ADAPTER_METADATA_VERSION = "adapter-certification-v2";
 
 const DIRECT_JSON_STABLE = [
   "greenhouse",
@@ -95,6 +95,15 @@ const FIXTURE_BACKED = new Set([
   "paylocity",
   "oracle",
   "adp_workforcenow"
+]);
+
+const PARSER_FIXTURE_BACKED = new Set([
+  "adp_workforcenow",
+  "fountain",
+  "oracle",
+  "paylocity",
+  "pinpointhq",
+  "recruitcrm"
 ]);
 
 const FUTURE_DIRECT_SOURCE_CANDIDATES = Object.freeze([
@@ -194,6 +203,14 @@ function getFixtureStatus(atsKey) {
   return FIXTURE_BACKED.has(key) ? "fixture-backed" : "pending-fixture";
 }
 
+function getParserFixtureStatus(atsKey) {
+  const key = String(atsKey || "").trim().toLowerCase();
+  if (UNSUPPORTED_ATS.has(key)) return "unsupported";
+  if (PARSER_FIXTURE_BACKED.has(key)) return "parser-fixture-backed";
+  if (FIXTURE_BACKED.has(key)) return "normalized-fixture-only";
+  return "pending-parser-fixture";
+}
+
 function isAtsEnabledByDefault(atsKey) {
   return !UNSUPPORTED_ATS.has(String(atsKey || "").trim().toLowerCase());
 }
@@ -229,6 +246,7 @@ function getAdapterMetadata(atsKey, displayName = "") {
     metadataVersion: ADAPTER_METADATA_VERSION,
     tier: getAdapterTier(key),
     fixtureStatus: getFixtureStatus(key),
+    parserFixtureStatus: getParserFixtureStatus(key),
     enabledByDefault: isAtsEnabledByDefault(key),
     confidence: getDefaultConfidence(key),
     parseStrategy: getAdapterParseStrategy(key),
@@ -263,10 +281,12 @@ module.exports = {
   ENTERPRISE_DIRECT,
   FIXTURE_BACKED,
   FUTURE_DIRECT_SOURCE_CANDIDATES,
+  PARSER_FIXTURE_BACKED,
   PUBLIC_SECTOR_EDUCATION,
   UNSUPPORTED_ATS,
   VENDOR_SPECIFIC,
   getFixtureStatus,
+  getParserFixtureStatus,
   getAdapterMetadata,
   getAdapterParseStrategy,
   getAdapterTier,

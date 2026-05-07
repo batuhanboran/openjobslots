@@ -65,7 +65,8 @@ const APPLICATION_STATUS_OPTIONS = [
   "denied"
 ];
 const DEFAULT_SYNC_INTERVAL_SECONDS = 3600;
-const FRONTEND_POSTINGS_FETCH_LIMIT = 500;
+const FRONTEND_POSTINGS_PAGE_SIZE = 80;
+const FRONTEND_POSTINGS_PREFETCH_DISTANCE_PX = 720;
 const MIN_SYNC_INTERVAL_SECONDS = 60;
 const MAX_SYNC_INTERVAL_SECONDS = 24 * 60 * 60;
 const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
@@ -116,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.1";
+const PUBLIC_APP_VERSION = "1.5.2";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.2",
+    date: "May 7, 2026",
+    title: "Progressive results and ATS certification audit",
+    summary:
+      "Added scroll-based result paging, clarified refresh states, and documented strict parser-certification gaps across all configured ATS sources."
+  },
   {
     version: "1.5.1",
     date: "May 7, 2026",
@@ -524,6 +532,38 @@ function normalizePostingItem(item, index = 0) {
 function normalizePostingItems(items) {
   const source = Array.isArray(items) ? items : [];
   return source.map((item, index) => normalizePostingItem(item, index));
+}
+
+function getPostingIdentity(item, fallbackIndex = 0) {
+  const source = item && typeof item === "object" ? item : {};
+  return String(
+    source.job_posting_url ||
+      source.canonical_url ||
+      source._row_fallback_key ||
+      `posting-${fallbackIndex}`
+  ).trim();
+}
+
+function mergePostingItems(existingItems, nextItems) {
+  const merged = [];
+  const indexByKey = new Map();
+
+  const addOrReplace = (item, fallbackIndex) => {
+    const key = getPostingIdentity(item, fallbackIndex);
+    if (!key) return;
+    if (indexByKey.has(key)) {
+      merged[indexByKey.get(key)] = item;
+      return;
+    }
+    indexByKey.set(key, merged.length);
+    merged.push(item);
+  };
+
+  (Array.isArray(existingItems) ? existingItems : []).forEach(addOrReplace);
+  (Array.isArray(nextItems) ? nextItems : []).forEach((item, index) =>
+    addOrReplace(item, index + merged.length)
+  );
+  return merged;
 }
 
 function normalizeSuggestionQuery(value) {
@@ -1390,6 +1430,10 @@ export default function App() {
   const [postingFilterOptionsLoading, setPostingFilterOptionsLoading] = useState(false);
   const [postingsFilterPanelOpen, setPostingsFilterPanelOpen] = useState(false);
   const [postings, setPostings] = useState([]);
+  const [postingsTotalCount, setPostingsTotalCount] = useState(0);
+  const [postingsHasMore, setPostingsHasMore] = useState(false);
+  const [postingsNextOffset, setPostingsNextOffset] = useState(0);
+  const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
   const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [applicationsNotice, setApplicationsNotice] = useState("");
@@ -1454,6 +1498,10 @@ export default function App() {
   const lastPostingRefreshAtRef = useRef(0);
   const wasSyncRunningRef = useRef(false);
   const postingsRequestSequenceRef = useRef(0);
+  const postingsRef = useRef([]);
+  const postingsHasMoreRef = useRef(false);
+  const postingsNextOffsetRef = useRef(0);
+  const postingsLoadingMoreRef = useRef(false);
   const applicationsRequestSequenceRef = useRef(0);
   const frontendLogQueueRef = useRef([]);
   const frontendLogFlushInFlightRef = useRef(false);
@@ -1765,43 +1813,84 @@ export default function App() {
   }, []);
 
   const loadPostings = useCallback(async (q, options = {}) => {
+    const append = Boolean(options.append);
     const silent = Boolean(options.silent);
     const filters = options.filters || postingsFiltersRef.current;
-    const requestSequence = postingsRequestSequenceRef.current + 1;
-    postingsRequestSequenceRef.current = requestSequence;
-    if (!silent) {
+    const limit = Math.max(1, Math.min(500, Number(options.limit || FRONTEND_POSTINGS_PAGE_SIZE)));
+    const offset = append
+      ? Math.max(0, Number(options.offset ?? postingsNextOffsetRef.current ?? postingsRef.current.length))
+      : 0;
+    const requestSequence = append
+      ? postingsRequestSequenceRef.current
+      : postingsRequestSequenceRef.current + 1;
+
+    if (append && postingsLoadingMoreRef.current) {
+      return;
+    }
+    if (!append) {
+      postingsRequestSequenceRef.current = requestSequence;
+    }
+    if (append) {
+      postingsLoadingMoreRef.current = true;
+      setPostingsLoadingMore(true);
+    } else if (!silent) {
       setLoading(true);
     }
     setError("");
     try {
-      const response = await fetchPostings(q, FRONTEND_POSTINGS_FETCH_LIMIT, 0, filters);
+      const response = await fetchPostings(q, limit, offset, filters);
       if (requestSequence !== postingsRequestSequenceRef.current) {
         return;
       }
       const normalizedItems = normalizePostingItems(response?.items);
-      setPostings(normalizedItems);
+      const nextVisibleItems = append
+        ? mergePostingItems(postingsRef.current, normalizedItems)
+        : normalizedItems;
+      const visibleCountAfterLoad = nextVisibleItems.length;
+      const responseCount = Number(response?.count || 0);
+      const totalCount = Math.max(responseCount, visibleCountAfterLoad);
+      const rawNextOffset = response && Object.prototype.hasOwnProperty.call(response, "next_offset")
+        ? response.next_offset
+        : undefined;
+      const nextOffset = rawNextOffset !== null && rawNextOffset !== undefined && Number.isFinite(Number(rawNextOffset))
+        ? Math.max(0, Number(rawNextOffset))
+        : offset + normalizedItems.length;
+      const responseHasMore =
+        Boolean(response?.has_more) ||
+        (responseCount > 0 && responseCount > offset + normalizedItems.length) ||
+        normalizedItems.length >= limit;
+
+      postingsRef.current = nextVisibleItems;
+      postingsNextOffsetRef.current = nextOffset;
+      postingsHasMoreRef.current = Boolean(responseHasMore && normalizedItems.length > 0);
+      setPostings(nextVisibleItems);
+      setPostingsTotalCount(totalCount);
+      setPostingsNextOffset(nextOffset);
+      setPostingsHasMore(Boolean(responseHasMore && normalizedItems.length > 0));
       setSearchNotice("");
-      if (normalizedItems.length >= FRONTEND_POSTINGS_FETCH_LIMIT) {
-        queueFrontendLog("warn", "postings_limit_reached", "Postings payload reached frontend fetch limit.", {
-          limit: FRONTEND_POSTINGS_FETCH_LIMIT,
-          search: q
-        });
-      }
       lastPostingRefreshAtRef.current = Date.now();
     } catch (e) {
       if (requestSequence === postingsRequestSequenceRef.current) {
         if (e?.isTransientBusy) {
           setSearchNotice("Showing the latest results while indexing catches up. Search will retry shortly.");
-        } else {
+        } else if (!append) {
           setError(String(e.message || e));
+        } else {
+          setSearchNotice("Could not load the next result page. Try scrolling again in a moment.");
         }
-        queueFrontendLog("error", "load_postings_failed", String(e?.stack || e?.message || e), {
+        queueFrontendLog("error", append ? "load_more_postings_failed" : "load_postings_failed", String(e?.stack || e?.message || e), {
           search: q,
+          offset,
+          limit,
+          append,
           transient_busy: Boolean(e?.isTransientBusy)
         });
       }
     } finally {
-      if (!silent && requestSequence === postingsRequestSequenceRef.current) {
+      if (append) {
+        postingsLoadingMoreRef.current = false;
+        setPostingsLoadingMore(false);
+      } else if (!silent && requestSequence === postingsRequestSequenceRef.current) {
         setLoading(false);
       }
     }
@@ -1825,6 +1914,33 @@ export default function App() {
       setPostingFilterOptionsLoading(false);
     }
   }, []);
+
+  const loadMorePostings = useCallback(() => {
+    if (initializing || loading) return;
+    if (postingsLoadingMoreRef.current || !postingsHasMoreRef.current) return;
+    const offset = Math.max(0, Number(postingsNextOffsetRef.current || postingsRef.current.length));
+    void loadPostings(searchRef.current, {
+      append: true,
+      silent: true,
+      filters: postingsFiltersRef.current,
+      limit: FRONTEND_POSTINGS_PAGE_SIZE,
+      offset
+    });
+  }, [initializing, loading, loadPostings]);
+
+  const handlePostingsScroll = useCallback((event) => {
+    if (!showResultsSurface) return;
+    const nativeEvent = event?.nativeEvent || {};
+    const layoutHeight = Number(nativeEvent?.layoutMeasurement?.height || 0);
+    const contentHeight = Number(nativeEvent?.contentSize?.height || 0);
+    const scrollY = Number(nativeEvent?.contentOffset?.y || 0);
+    if (!layoutHeight || !contentHeight) return;
+    const distanceFromBottom = contentHeight - (scrollY + layoutHeight);
+    const triggerDistance = Math.max(FRONTEND_POSTINGS_PREFETCH_DISTANCE_PX, layoutHeight * 0.75);
+    if (distanceFromBottom <= triggerDistance) {
+      loadMorePostings();
+    }
+  }, [loadMorePostings, showResultsSurface]);
 
   const loadApplications = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -2706,6 +2822,18 @@ export default function App() {
   }, [postingsFilters]);
 
   useEffect(() => {
+    postingsRef.current = postings;
+  }, [postings]);
+
+  useEffect(() => {
+    postingsHasMoreRef.current = postingsHasMore;
+  }, [postingsHasMore]);
+
+  useEffect(() => {
+    postingsNextOffsetRef.current = postingsNextOffset;
+  }, [postingsNextOffset]);
+
+  useEffect(() => {
     if (hasActivePostingFilters) {
       setSearchResultsMode(true);
     }
@@ -3114,6 +3242,8 @@ export default function App() {
       style={styles.postingsPageScroll}
       contentContainerStyle={styles.postingsPageContent}
       keyboardShouldPersistTaps="handled"
+      onScroll={handlePostingsScroll}
+      scrollEventThrottle={250}
       testID="postings-page-scroll"
     >
       <Animated.View
@@ -3449,7 +3579,11 @@ export default function App() {
           testID="results-surface"
         >
           {renderSyncStatusPanel()}
-          {loading && !initializing ? <Text style={styles.small}>Refreshing results...</Text> : null}
+          {loading && !initializing ? (
+            <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" accessibilityRole="status">
+              Updating visible results...
+            </Text>
+          ) : null}
           {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
 
           {initializing && postings.length === 0 ? (
@@ -3475,6 +3609,24 @@ export default function App() {
               )}
             </View>
           )}
+          {!initializing && postings.length > 0 ? (
+            <View style={styles.postingsPagingFooter} testID="postings-pagination-status" accessibilityRole="status">
+              <Text style={styles.postingsPagingText}>
+                Showing {formatCompactNumberLabel(postings.length)} of{" "}
+                {formatCompactNumberLabel(Math.max(postingsTotalCount, postings.length))} slots
+              </Text>
+              <View style={styles.postingsPagingStateRow}>
+                {postingsLoadingMore ? <ActivityIndicator size="small" color={OJS_COLORS.green} /> : null}
+                <Text style={styles.postingsPagingHint}>
+                  {postingsLoadingMore
+                    ? "Loading more slots..."
+                    : postingsHasMore
+                      ? "Scroll to load more"
+                      : "All visible slots loaded"}
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </Animated.View>
       ) : null}
       {isDesktopViewport ? renderReleaseNotesModal() : null}
@@ -5161,6 +5313,38 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     gap: 10
+  },
+  postingsRefreshIndicator: {
+    marginHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 4,
+    color: OJS_COLORS.muted,
+    fontSize: 11
+  },
+  postingsPagingFooter: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 980,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 24,
+    alignItems: "center",
+    gap: 6
+  },
+  postingsPagingStateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  postingsPagingText: {
+    color: OJS_COLORS.text,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  postingsPagingHint: {
+    color: OJS_COLORS.muted,
+    fontSize: 11
   },
   card: {
     backgroundColor: OJS_COLORS.surface,
