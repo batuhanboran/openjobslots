@@ -10,6 +10,8 @@
       "web"
     ],
     "web": {
+      "name": "OpenJobSlots | Fresh Job Openings",
+      "description": "Search fresh job openings across ATS platforms, filter by role, company, location, industry, and remote work, and track applications in one place.",
       "bundler": "metro",
       "favicon": "./ojs-favicon.png"
     }

@@ -111,9 +111,12 @@ const OJS_COLORS = {
   shadow: "#26332D"
 };
 const WORDMARK_SEGMENTS = [
-  { text: "openjob", color: OJS_COLORS.blue },
-  { text: "slots", color: OJS_COLORS.slotGray }
+  { text: "open", color: OJS_COLORS.green },
+  { text: "job", color: OJS_COLORS.focus },
+  { text: "slots", color: OJS_COLORS.muted }
 ];
+const PUBLIC_VERSION_LABEL = "Public version";
+const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const WORLDWIDE_REGION_OPTIONS = [
   { value: "Africa", label: "Africa" },
   { value: "Americas", label: "Americas" },
@@ -1455,6 +1458,17 @@ export default function App() {
     },
     [flushFrontendLogs]
   );
+  const handleOpenLinkedInCredit = useCallback(async () => {
+    try {
+      if (!isSafeExternalHttpUrl(LINKEDIN_PROFILE_URL)) return;
+      const supported = await Linking.canOpenURL(LINKEDIN_PROFILE_URL);
+      if (supported) {
+        await Linking.openURL(LINKEDIN_PROFILE_URL);
+      }
+    } catch {
+      // Non-critical attribution link; ignore platform/browser launch failures.
+    }
+  }, []);
   const remoteFilterOptions = useMemo(
     () => [
       { value: "all", label: "All Locations" },
@@ -2999,11 +3013,28 @@ export default function App() {
           styles.searchShell,
           searchShellCompact ? styles.searchShellCompact : styles.searchShellHome,
           searchUiMode === "suggest" ? styles.searchShellSuggest : null,
+          postingsFilterPanelOpen && !showResultsSurface ? styles.searchShellFilterOpen : null,
           Platform.OS === "web" ? styles.webSmoothMotion : null,
           searchMotionStyle
         ]}
         testID="search-shell"
       >
+        {searchUiMode !== "results" ? (
+          <View pointerEvents="box-none" style={styles.searchMetaRail}>
+            <Text style={styles.publicVersionLabel}>{PUBLIC_VERSION_LABEL}</Text>
+            <Text style={styles.searchCreditText}>
+              Deployed and developed by{" "}
+              <Text
+                onPress={handleOpenLinkedInCredit}
+                style={styles.searchCreditLink}
+                accessibilityRole="link"
+                accessibilityLabel="LinkedIn profile"
+              >
+                LinkedIn
+              </Text>
+            </Text>
+          </View>
+        ) : null}
         <Pressable
           onPress={handleBrandHome}
           style={({ pressed }) => [styles.brandWordmark, pressed ? styles.brandWordmarkPressed : null]}
@@ -3030,7 +3061,7 @@ export default function App() {
         <View style={styles.searchBoxRow}>
           <TextInput
             ref={searchInputRef}
-            style={styles.search}
+            style={[styles.search, searchShellCompact ? styles.searchCompact : null]}
             value={search}
             onChangeText={handleSearchChange}
             onSubmitEditing={() => submitSearch(search)}
@@ -3043,7 +3074,13 @@ export default function App() {
             accessibilityLabel="Search postings"
           />
         </View>
-        <View style={styles.searchLowerRail}>
+        <View
+          style={[
+            styles.searchLowerRail,
+            searchShellCompact ? styles.searchLowerRailCompact : null,
+            postingsFilterPanelOpen && !showResultsSurface ? styles.searchLowerRailFiltersOpen : null
+          ]}
+        >
           {suggestionsVisible ? (
             <Animated.View
               style={[styles.searchSuggestionsPanel, suggestionsMotionStyle]}
@@ -4289,6 +4326,7 @@ const styles = StyleSheet.create({
     transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
   },
   searchShell: {
+    position: "relative",
     alignSelf: "center",
     width: "100%",
     maxWidth: 980,
@@ -4309,10 +4347,52 @@ const styles = StyleSheet.create({
     paddingBottom: 0
   },
   searchShellCompact: {
-    minHeight: Platform.OS === "web" ? 172 : 154,
+    minHeight: Platform.OS === "web" ? 144 : 132,
     justifyContent: "flex-start",
-    paddingTop: Platform.OS === "web" ? 20 : 12,
-    paddingBottom: 12
+    paddingTop: Platform.OS === "web" ? 8 : 6,
+    paddingBottom: 8
+  },
+  searchShellFilterOpen: {
+    minHeight: Platform.OS === "web" ? 280 : 280,
+    justifyContent: "flex-start",
+    paddingTop: Platform.OS === "web" ? 34 : 28,
+    paddingBottom: 10
+  },
+  searchMetaRail: {
+    position: "absolute",
+    top: Platform.OS === "web" ? 14 : 10,
+    left: 16,
+    right: 16,
+    zIndex: 3,
+    elevation: 3,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  publicVersionLabel: {
+    flexShrink: 1,
+    maxWidth: "36%",
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    letterSpacing: 0
+  },
+  searchCreditText: {
+    flexShrink: 1,
+    maxWidth: "62%",
+    textAlign: "right",
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "600",
+    letterSpacing: 0
+  },
+  searchCreditLink: {
+    color: OJS_COLORS.green,
+    fontWeight: "800",
+    textDecorationLine: "underline"
   },
   brandWordmark: {
     flexDirection: "row",
@@ -4334,8 +4414,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   brandWordmarkLetterCompact: {
-    fontSize: 31,
-    lineHeight: 36
+    fontSize: 26,
+    lineHeight: 30
   },
   brandWordmarkOpen: {
     fontSize: 36,
@@ -4357,7 +4437,10 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted
   },
   searchLeadCompact: {
-    marginBottom: 10
+    marginTop: 0,
+    marginBottom: 7,
+    fontSize: 12,
+    lineHeight: 16
   },
   searchBoxRow: {
     width: "100%",
@@ -4368,6 +4451,12 @@ const styles = StyleSheet.create({
     maxWidth: 760,
     minHeight: Platform.OS === "web" ? 170 : 170,
     alignItems: "center"
+  },
+  searchLowerRailCompact: {
+    minHeight: Platform.OS === "web" ? 58 : 54
+  },
+  searchLowerRailFiltersOpen: {
+    minHeight: Platform.OS === "web" ? 72 : 72
   },
   searchShortcutHint: {
     marginTop: 7,
@@ -4403,7 +4492,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    minHeight: 38,
+    minHeight: 44,
     justifyContent: "center"
   },
   postingsFiltersToggleText: {
@@ -4417,7 +4506,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 13,
     paddingVertical: 9,
-    minHeight: 38,
+    minHeight: 44,
     justifyContent: "center",
     backgroundColor: OJS_COLORS.surface
   },
@@ -4486,6 +4575,7 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    minHeight: 44,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center"
@@ -4563,6 +4653,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
+    minHeight: 44,
     marginBottom: 6,
     backgroundColor: OJS_COLORS.surfaceMuted
   },
@@ -4605,7 +4696,9 @@ const styles = StyleSheet.create({
     borderColor: OJS_COLORS.softBorder,
     borderRadius: 8,
     paddingVertical: 8,
+    minHeight: 44,
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: OJS_COLORS.surface
   },
   dropdownClearBtnText: {
@@ -4646,7 +4739,9 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.surface,
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 8
+    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: "center"
   },
   remoteFilterChipActive: {
     borderColor: OJS_COLORS.focus,
@@ -4683,6 +4778,11 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  searchCompact: {
+    height: 48,
+    paddingHorizontal: 20,
+    fontSize: 15
+  },
   searchSuggestionsPanel: {
     width: "100%",
     maxWidth: 760,
@@ -4709,7 +4809,7 @@ const styles = StyleSheet.create({
       : {})
   },
   searchSuggestionItem: {
-    minHeight: 36,
+    minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 7,
     flexDirection: "row",
@@ -4839,6 +4939,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 9,
     paddingVertical: 5,
+    minHeight: 44,
+    justifyContent: "center",
     backgroundColor: OJS_COLORS.surfaceMuted
   },
   coverageToggleText: {
