@@ -12,6 +12,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from "react-native";
 import {
@@ -115,8 +116,46 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_VERSION_LABEL = "Public version";
+const PUBLIC_APP_VERSION = "1.4.0";
+const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
+const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.4.0",
+    date: "May 7, 2026",
+    title: "Release notes and launch polish",
+    summary:
+      "Added desktop release notes, public SEO metadata, stronger mobile QA checks, and direct browser compatibility for the live site."
+  },
+  {
+    version: "1.3.0",
+    date: "May 7, 2026",
+    title: "Centered search experience",
+    summary:
+      "Refined the centered search home, smoother results transition, faster suggestions, compact coverage, and softer public palette."
+  },
+  {
+    version: "1.2.0",
+    date: "May 6, 2026",
+    title: "Public search boundary",
+    summary:
+      "Separated the public search page from admin-only controls, cleaned reload behavior, and expanded desktop and mobile automation."
+  },
+  {
+    version: "1.1.0",
+    date: "May 6, 2026",
+    title: "Production search foundation",
+    summary:
+      "Moved the public product toward an app, worker, Postgres, and Meilisearch stack with safer sync controls and deployment workflow."
+  },
+  {
+    version: "1.0.0",
+    date: "May 6, 2026",
+    title: "OpenJobSlots live baseline",
+    summary:
+      "Launched the openjobslots public job-search baseline with searchable postings, ATS coverage, filters, and live service deployment."
+  }
+];
 const WORLDWIDE_REGION_OPTIONS = [
   { value: "Africa", label: "Africa" },
   { value: "Americas", label: "Americas" },
@@ -1319,9 +1358,12 @@ function ToggleRow({ label, value, onValueChange }) {
 }
 
 export default function App() {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isDesktopViewport = Platform.OS === "web" && Number(viewportWidth || 0) >= 768;
   const [activePage, setActivePage] = useState(PAGE_KEYS.POSTINGS);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [postingsFilters, setPostingsFilters] = useState(createDefaultPostingsFilters);
   const [postingFilterOptions, setPostingFilterOptions] = useState({
     ats: DEFAULT_ATS_FILTER_OPTIONS,
@@ -2691,6 +2733,12 @@ export default function App() {
   }, [showResultsSurface]);
 
   useEffect(() => {
+    if (!isDesktopViewport && releaseNotesOpen) {
+      setReleaseNotesOpen(false);
+    }
+  }, [isDesktopViewport, releaseNotesOpen]);
+
+  useEffect(() => {
     if (Platform.OS !== "web") return undefined;
 
     const handleGlobalKeyDown = (event) => {
@@ -3000,6 +3048,55 @@ export default function App() {
     );
   };
 
+  const renderReleaseNotesModal = () => (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={releaseNotesOpen && isDesktopViewport}
+      onRequestClose={() => setReleaseNotesOpen(false)}
+    >
+      <View style={styles.releaseNotesOverlay} testID="release-notes-modal">
+        <Pressable
+          style={styles.releaseNotesBackdrop}
+          onPress={() => setReleaseNotesOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close release notes"
+        />
+        <View style={styles.releaseNotesCard}>
+          <View style={styles.releaseNotesHeader}>
+            <View style={styles.releaseNotesHeaderCopy}>
+              <Text style={styles.releaseNotesTitle}>Release notes</Text>
+              <Text style={styles.releaseNotesSubtitle}>
+                Public product history. Internal deployment and security details are intentionally omitted.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setReleaseNotesOpen(false)}
+              style={({ pressed }) => [styles.releaseNotesCloseButton, pressed ? styles.buttonPressed : null]}
+              testID="release-notes-close"
+              accessibilityRole="button"
+              accessibilityLabel="Close release notes"
+            >
+              <Text style={styles.releaseNotesCloseText}>Close</Text>
+            </Pressable>
+          </View>
+          <ScrollView style={styles.releaseNotesScroll} contentContainerStyle={styles.releaseNotesScrollContent}>
+            {PUBLIC_RELEASE_NOTES.map((release) => (
+              <View key={release.version} style={styles.releaseNoteItem}>
+                <View style={styles.releaseNoteHeadingRow}>
+                  <Text style={styles.releaseNoteVersion}>Version {release.version}</Text>
+                  <Text style={styles.releaseNoteDate}>{release.date}</Text>
+                </View>
+                <Text style={styles.releaseNoteTitle}>{release.title}</Text>
+                <Text style={styles.releaseNoteSummary}>{release.summary}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const renderPostingsPage = () => (
     <ScrollView
       ref={postingsListRef}
@@ -3019,9 +3116,17 @@ export default function App() {
         ]}
         testID="search-shell"
       >
-        {searchUiMode !== "results" ? (
+        {isDesktopViewport && searchUiMode !== "results" ? (
           <View pointerEvents="box-none" style={styles.searchMetaRail}>
-            <Text style={styles.publicVersionLabel}>{PUBLIC_VERSION_LABEL}</Text>
+            <Pressable
+              onPress={() => setReleaseNotesOpen(true)}
+              style={({ pressed }) => [styles.publicVersionButton, pressed ? styles.publicVersionButtonPressed : null]}
+              testID="public-version-button"
+              accessibilityRole="button"
+              accessibilityLabel={`Open release notes for version ${PUBLIC_APP_VERSION}`}
+            >
+              <Text style={styles.publicVersionLabel}>{PUBLIC_VERSION_LABEL}</Text>
+            </Pressable>
             <Text style={styles.searchCreditText}>
               Deployed and developed by{" "}
               <Text
@@ -3359,6 +3464,7 @@ export default function App() {
           )}
         </Animated.View>
       ) : null}
+      {isDesktopViewport ? renderReleaseNotesModal() : null}
     </ScrollView>
   );
 
@@ -4370,9 +4476,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
-  publicVersionLabel: {
+  publicVersionButton: {
     flexShrink: 1,
     maxWidth: "36%",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  publicVersionButtonPressed: {
+    backgroundColor: OJS_COLORS.surfaceMuted,
+    transform: [{ scale: 0.985 }]
+  },
+  publicVersionLabel: {
     color: OJS_COLORS.muted,
     fontSize: 11,
     lineHeight: 15,
@@ -5335,6 +5450,113 @@ const styles = StyleSheet.create({
   settingsSecondaryButtonText: {
     color: "#334e68",
     fontWeight: "600"
+  },
+  releaseNotesOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(38, 51, 45, 0.36)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 18
+  },
+  releaseNotesBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0
+  },
+  releaseNotesCard: {
+    position: "relative",
+    zIndex: 1,
+    width: "100%",
+    maxWidth: 760,
+    maxHeight: "82%",
+    borderWidth: 1,
+    borderColor: OJS_COLORS.border,
+    borderRadius: 18,
+    backgroundColor: OJS_COLORS.surface,
+    padding: 22,
+    shadowColor: OJS_COLORS.shadow,
+    shadowOpacity: 0.14,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 }
+  },
+  releaseNotesHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 16,
+    marginBottom: 14
+  },
+  releaseNotesHeaderCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  releaseNotesTitle: {
+    color: OJS_COLORS.ink,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "800"
+  },
+  releaseNotesSubtitle: {
+    marginTop: 6,
+    color: OJS_COLORS.muted,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  releaseNotesCloseButton: {
+    borderWidth: 1,
+    borderColor: OJS_COLORS.border,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.surfaceMuted,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    minHeight: 40,
+    justifyContent: "center"
+  },
+  releaseNotesCloseText: {
+    color: OJS_COLORS.text,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  releaseNotesScroll: {
+    maxHeight: 540
+  },
+  releaseNotesScrollContent: {
+    paddingBottom: 4
+  },
+  releaseNoteItem: {
+    borderTopWidth: 1,
+    borderTopColor: OJS_COLORS.softBorder,
+    paddingTop: 16,
+    paddingBottom: 16
+  },
+  releaseNoteHeadingRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
+    flexWrap: "wrap"
+  },
+  releaseNoteVersion: {
+    color: OJS_COLORS.ink,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "800"
+  },
+  releaseNoteDate: {
+    color: OJS_COLORS.muted,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  releaseNoteTitle: {
+    marginTop: 8,
+    color: OJS_COLORS.text,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700"
+  },
+  releaseNoteSummary: {
+    marginTop: 5,
+    color: OJS_COLORS.text,
+    fontSize: 14,
+    lineHeight: 21
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
