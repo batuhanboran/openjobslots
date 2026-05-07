@@ -3,6 +3,10 @@ services:
     image: postgres:16-alpine
     container_name: openjobslots-postgres
     restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=${OPENJOBSLOTS_POSTGRES_SHARED_PRELOAD_LIBRARIES-pg_stat_statements}"
     environment:
       - POSTGRES_DB=openjobslots
       - POSTGRES_USER=openjobslots
@@ -69,9 +73,14 @@ services:
       - INGESTION_WORKER_CONCURRENCY=2
       - INGESTION_WORKER_POLL_MS=5000
       - INGESTION_MAX_TARGETS_PER_RUN=500
+      - INGESTION_WORKER_INTERVAL_MS=${INGESTION_WORKER_INTERVAL_MS:-1800000}
+      - INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=${INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET:-250}
+      - INGESTION_AUTO_SYNC_TARGETS_PER_RUN=${INGESTION_AUTO_SYNC_TARGETS_PER_RUN:-50}
       - OPENJOBSLOTS_DISABLE_API_SCHEDULER=1
+      - OPENJOBSLOTS_AUTO_SYNC=${OPENJOBSLOTS_AUTO_SYNC:-1}
       - OPENJOBSLOTS_DB_BACKEND=postgres
       - OPENJOBSLOTS_SEARCH_BACKEND=meili
+      - OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS=${OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS:-1}
       - DATABASE_URL=postgres://openjobslots:${OPENJOBSLOTS_POSTGRES_PASSWORD:?Set OPENJOBSLOTS_POSTGRES_PASSWORD before starting the stack}@openjobslots-postgres:5432/openjobslots
       - MEILI_HOST=http://openjobslots-meilisearch:7700
       - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?Set MEILI_MASTER_KEY before starting the stack}

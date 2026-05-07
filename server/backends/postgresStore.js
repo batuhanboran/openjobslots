@@ -273,6 +273,15 @@ function getPostgresOrderBy(sortBy) {
   return "p.last_seen_epoch DESC, p.canonical_url";
 }
 
+function logSearchFallback(reason, metadata = {}) {
+  console.warn("[openjobslots] search_backend_fallback", JSON.stringify({
+    reason,
+    search_backend: "meili",
+    fallback_backend: "postgres",
+    ...metadata
+  }));
+}
+
 async function hydratePostgresPostings(pool, urls, options = {}) {
   const canonicalUrls = (Array.isArray(urls) ? urls : []).map((url) => String(url || "").trim()).filter(Boolean);
   if (canonicalUrls.length === 0) return [];
@@ -341,7 +350,7 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
       [...filter.values, limit, offset]
     )
   ]);
-  return { items: result.rows.map(rowToPosting), count: Number(countResult.rows[0]?.count || 0), limit, offset };
+  return { items: result.rows.map(rowToPosting).slice(0, limit), count: Number(countResult.rows[0]?.count || 0), limit, offset };
 }
 
 async function listPostgresPostings(pool, options = {}) {
@@ -362,15 +371,44 @@ async function listPostgresPostings(pool, options = {}) {
       const hydratedItems = await hydratePostgresPostings(pool, urls, options);
       const items = hydratedItems.slice(offset, offset + limit);
       const estimatedTotalHits = Number(searchResult.estimatedTotalHits || 0);
+      const loadedThrough = offset + items.length;
+      const hydrationDroppedHits = hydratedItems.length < urls.length;
+      const pageUnderfilled = items.length < limit && estimatedTotalHits > loadedThrough;
+      const hydrationUnderfilledPage = hydrationDroppedHits && hydratedItems.length < offset + limit;
+      if (pageUnderfilled || hydrationUnderfilledPage) {
+        logSearchFallback("hydration_underfill", {
+          limit,
+          offset,
+          search_limit: searchLimit,
+          meili_hits: urls.length,
+          meili_estimated_total_hits: estimatedTotalHits,
+          hydrated_hits: hydratedItems.length,
+          page_items: items.length,
+          filters: {
+            search: Boolean(String(options.search || "").trim()),
+            ats: parseCsv(options.ats).length,
+            countries: parseCsv(options.countries).length,
+            regions: parseCsv(options.regions).length,
+            industries: parseCsv(options.industries).length,
+            remote: String(options.remote || "all"),
+            hide_no_date: Boolean(options.hide_no_date)
+          }
+        });
+        return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+      }
       const count =
         hydratedItems.length === urls.length
           ? estimatedTotalHits
           : estimatedTotalHits <= searchLimit
             ? hydratedItems.length
             : Math.max(offset + items.length, hydratedItems.length);
-      return { items, count, limit, offset };
+      return { items: items.slice(0, limit), count, limit, offset };
     } catch (error) {
-      console.warn("[openjobslots] Meilisearch fallback to Postgres:", String(error?.message || error));
+      logSearchFallback("meili_error", {
+        limit,
+        offset,
+        error: String(error?.message || error).slice(0, 240)
+      });
     }
   }
 

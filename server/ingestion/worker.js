@@ -23,13 +23,36 @@ const {
 } = require("../backends/postgresStore");
 const { ensureMeiliPostingsIndex } = require("../search/meili");
 
-const WORKER_INTERVAL_MS = Number(process.env.INGESTION_WORKER_INTERVAL_MS || 10 * 60 * 1000);
-const WORKER_POLL_MS = Number(process.env.INGESTION_WORKER_POLL_MS || 5000);
-const WORKER_CONCURRENCY = Math.max(1, Number(process.env.INGESTION_WORKER_CONCURRENCY || 4));
-const MAX_TARGETS_PER_RUN = Math.max(1, Number(process.env.INGESTION_MAX_TARGETS_PER_RUN || 2000));
+function positiveNumber(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return number;
+}
+
+function nonNegativeNumber(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return fallback;
+  return number;
+}
+
+const WORKER_INTERVAL_MS = positiveNumber(process.env.INGESTION_WORKER_INTERVAL_MS, 10 * 60 * 1000);
+const WORKER_POLL_MS = positiveNumber(process.env.INGESTION_WORKER_POLL_MS, 5000);
+const WORKER_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_WORKER_CONCURRENCY, 4)));
+const MAX_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_MAX_TARGETS_PER_RUN, 2000)));
 const RUN_ONCE = String(process.env.INGESTION_RUN_ONCE || "").trim() === "1";
 const AUTO_SYNC_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_AUTO_SYNC ?? "1").trim().toLowerCase()
+);
+const AUTO_SYNC_DAILY_TARGET_BUDGET = Math.floor(nonNegativeNumber(
+  process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET,
+  250
+));
+const AUTO_SYNC_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(
+  process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN,
+  50
+)));
+const PG_STAT_STATEMENTS_ENABLED = !["0", "false", "no", "off"].includes(
+  String(process.env.OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS ?? "1").trim().toLowerCase()
 );
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
@@ -64,6 +87,14 @@ function computeRetryEpoch(baseEpoch, consecutiveFailures) {
   const failures = Math.max(1, Number(consecutiveFailures || 1));
   const backoffSeconds = Math.min(24 * 60 * 60, 60 * 60 * 2 ** Math.min(6, failures - 1));
   return Number(baseEpoch || nowEpochSeconds()) + backoffSeconds;
+}
+
+function startOfUtcDayEpoch(epoch = nowEpochSeconds()) {
+  return Math.floor(Number(epoch || 0) / 86400) * 86400;
+}
+
+function isAutoSyncRequest(control) {
+  return String(control?.message || "").startsWith("Auto sync queued;");
 }
 
 function classifyIngestionError(error, fallback = "fetch") {
@@ -447,6 +478,18 @@ async function countPostgresDueTargets(pool) {
   return Number(result.rows[0]?.count || 0);
 }
 
+async function countPostgresRunTargetsSince(pool, startedAtEpoch) {
+  const result = await pool.query(
+    `
+      SELECT COALESCE(SUM(total_targets), 0)::int AS count
+      FROM ingestion_runs
+      WHERE started_at_epoch >= $1;
+    `,
+    [Number(startedAtEpoch || 0)]
+  );
+  return Number(result.rows[0]?.count || 0);
+}
+
 async function recoverPostgresStaleRuns(pool) {
   await pool.query(
     `
@@ -477,8 +520,23 @@ async function recoverPostgresStaleRuns(pool) {
   );
 }
 
-async function selectPostgresDueTargets(pool) {
+async function ensurePostgresObservability(pool) {
+  if (!PG_STAT_STATEMENTS_ENABLED) return { skipped: true, reason: "disabled" };
+  try {
+    await pool.query("CREATE EXTENSION IF NOT EXISTS pg_stat_statements;");
+    return { ok: true };
+  } catch (error) {
+    console.warn(`[ingestion] pg_stat_statements extension not enabled: ${error.message}`);
+    return { ok: false, error: String(error?.message || error) };
+  }
+}
+
+async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
   const nowEpoch = nowEpochSeconds();
+  const targetLimit = Math.max(1, Math.min(
+    MAX_TARGETS_PER_RUN,
+    Math.floor(positiveNumber(limit, MAX_TARGETS_PER_RUN))
+  ));
   const result = await pool.query(
     `
       WITH due_targets AS (
@@ -515,7 +573,7 @@ async function selectPostgresDueTargets(pool) {
       ORDER BY ats_rank ASC, next_sync_epoch ASC, ats_key ASC, company_name ASC
       LIMIT $2;
     `,
-    [nowEpoch, MAX_TARGETS_PER_RUN]
+    [nowEpoch, targetLimit]
   );
 
   const targets = [];
@@ -868,18 +926,26 @@ async function processPostgresTarget(pool, runId, target, counters) {
   }
 }
 
-async function runPostgresIngestionOnce(pool) {
+async function runPostgresIngestionOnce(pool, options = {}) {
+  const automatic = Boolean(options.automatic);
+  const targetLimit = Math.max(1, Math.min(
+    MAX_TARGETS_PER_RUN,
+    Math.floor(positiveNumber(options.targetLimit, MAX_TARGETS_PER_RUN))
+  ));
   const control = await postgresGetSyncControl(pool);
   const controlStatus = String(control?.status || "idle");
   if (controlStatus === "stopping") {
     await postgresClearSyncControl(pool, "idle", "Stop request completed before a run started");
     return { skipped: true, reason: "stopped-before-start" };
   }
-  if (controlStatus !== "requested" && !RUN_ONCE) {
+  if (!automatic && controlStatus !== "requested" && !RUN_ONCE) {
     return { skipped: true, reason: "not-requested" };
   }
+  if (automatic && !["idle", "requested"].includes(controlStatus) && !RUN_ONCE) {
+    return { skipped: true, reason: `control-${controlStatus}` };
+  }
 
-  const targets = await selectPostgresDueTargets(pool);
+  const targets = await selectPostgresDueTargets(pool, targetLimit);
   const runId = await createPostgresRun(pool, targets);
   const counters = {
     successCount: 0,
@@ -937,11 +1003,15 @@ async function runPostgresIngestionOnce(pool) {
     } else {
       const remainingDueTargets = RUN_ONCE ? 0 : await countPostgresDueTargets(pool);
       if (remainingDueTargets > 0) {
-        await postgresSetSyncControl(pool, {
-          status: "requested",
-          activeRunId: null,
-          message: `Continuing sync; ${remainingDueTargets} companies still due`
-        });
+        if (automatic) {
+          await postgresClearSyncControl(pool, "idle", `Auto run completed; ${remainingDueTargets} companies still due`);
+        } else {
+          await postgresSetSyncControl(pool, {
+            status: "requested",
+            activeRunId: null,
+            message: `Continuing sync; ${remainingDueTargets} companies still due`
+          });
+        }
       } else {
         await postgresClearSyncControl(pool, "idle", "Run completed");
       }
@@ -1020,6 +1090,7 @@ async function startWorker() {
   if (DB_BACKEND === "postgres") {
     const pool = createPostgresPool();
     await ensurePostgresSchema(pool);
+    await ensurePostgresObservability(pool);
     await seedPostgresAtsSources(pool, ATS_FILTER_OPTION_ITEMS);
     await ensureMeiliPostingsIndex();
     await recoverPostgresStaleRuns(pool);
@@ -1030,7 +1101,37 @@ async function startWorker() {
       const control = await postgresGetSyncControl(pool);
       const status = String(control?.status || "idle");
       if (status === "requested" || (RUN_ONCE && status !== "running")) {
-        const summary = await runPostgresIngestionOnce(pool);
+        let summary;
+        if (!RUN_ONCE && isAutoSyncRequest(control)) {
+          if (!AUTO_SYNC_ENABLED) {
+            await postgresClearSyncControl(pool, "idle", "Auto sync disabled");
+            summary = {
+              skipped: true,
+              reason: "auto-disabled"
+            };
+          } else {
+            const nowEpoch = nowEpochSeconds();
+            const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+            const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
+            const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
+            if (remainingBudget <= 0) {
+              await postgresClearSyncControl(pool, "idle", "Auto sync daily budget exhausted");
+              summary = {
+                skipped: true,
+                reason: "auto-budget-exhausted",
+                dailyBudget: AUTO_SYNC_DAILY_TARGET_BUDGET,
+                targetsStartedToday
+              };
+            } else {
+              summary = await runPostgresIngestionOnce(pool, {
+                automatic: true,
+                targetLimit: Math.min(AUTO_SYNC_TARGETS_PER_RUN, remainingBudget)
+              });
+            }
+          }
+        } else {
+          summary = await runPostgresIngestionOnce(pool);
+        }
         if (!summary?.skipped) {
           lastAutomaticSyncEpoch = nowEpochSeconds();
         }
@@ -1044,12 +1145,29 @@ async function startWorker() {
         const autoSyncIntervalSeconds = Math.max(60, Math.floor(WORKER_INTERVAL_MS / 1000));
         if (nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds) {
           const dueTargets = await countPostgresDueTargets(pool);
-          if (dueTargets > 0) {
-            await postgresSetSyncControl(pool, {
-              status: "requested",
-              activeRunId: null,
-              message: `Auto sync queued; ${dueTargets} companies due`
+          const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+          const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
+          const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
+          if (dueTargets > 0 && remainingBudget > 0) {
+            const targetLimit = Math.min(AUTO_SYNC_TARGETS_PER_RUN, remainingBudget);
+            const summary = await runPostgresIngestionOnce(pool, {
+              automatic: true,
+              targetLimit
             });
+            console.log(`[${WORKER_NAME}] postgres auto run summary: ${JSON.stringify({
+              ...summary,
+              dailyBudget: AUTO_SYNC_DAILY_TARGET_BUDGET,
+              remainingBudgetBeforeRun: remainingBudget
+            })}`);
+            lastAutomaticSyncEpoch = nowEpoch;
+          } else if (dueTargets > 0 && AUTO_SYNC_DAILY_TARGET_BUDGET === 0) {
+            lastAutomaticSyncEpoch = nowEpoch;
+          } else if (dueTargets > 0 && remainingBudget <= 0) {
+            console.log(`[${WORKER_NAME}] auto sync daily budget exhausted: ${JSON.stringify({
+              dailyBudget: AUTO_SYNC_DAILY_TARGET_BUDGET,
+              targetsStartedToday,
+              dueTargets
+            })}`);
             lastAutomaticSyncEpoch = nowEpoch;
           }
         }
