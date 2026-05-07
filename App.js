@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.2";
+const PUBLIC_APP_VERSION = "1.5.3";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.3",
+    date: "May 7, 2026",
+    title: "Scroll comfort and docs CI cleanup",
+    summary:
+      "Added a floating back-to-top control for long result lists and changed the docs workflow to validate docs without requiring GitHub Pages."
+  },
   {
     version: "1.5.2",
     date: "May 7, 2026",
@@ -1434,6 +1441,7 @@ export default function App() {
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
   const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
+  const [showScrollTopButton, setShowScrollTopButton] = useState(false);
   const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [applicationsNotice, setApplicationsNotice] = useState("");
@@ -1502,6 +1510,7 @@ export default function App() {
   const postingsHasMoreRef = useRef(false);
   const postingsNextOffsetRef = useRef(0);
   const postingsLoadingMoreRef = useRef(false);
+  const showScrollTopButtonRef = useRef(false);
   const applicationsRequestSequenceRef = useRef(0);
   const frontendLogQueueRef = useRef([]);
   const frontendLogFlushInFlightRef = useRef(false);
@@ -1805,8 +1814,23 @@ export default function App() {
     setDrawerOpen(false);
   }, []);
 
+  const setScrollTopButtonVisible = useCallback((visible) => {
+    if (showScrollTopButtonRef.current === visible) return;
+    showScrollTopButtonRef.current = visible;
+    setShowScrollTopButton(visible);
+  }, []);
+
   const scrollPostingsToTop = useCallback(() => {
+    showScrollTopButtonRef.current = false;
+    setShowScrollTopButton(false);
     setTimeout(() => {
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const behavior = prefersReducedMotionRef.current ? "auto" : "smooth";
+        window.scrollTo?.({ top: 0, behavior });
+        window.document
+          ?.querySelector?.('[data-testid="postings-page-scroll"]')
+          ?.scrollTo?.({ top: 0, behavior });
+      }
       postingsListRef.current?.scrollTo?.({ y: 0, animated: true });
       postingsListRef.current?.scrollToOffset?.({ offset: 0, animated: true });
     }, 0);
@@ -1935,12 +1959,14 @@ export default function App() {
     const contentHeight = Number(nativeEvent?.contentSize?.height || 0);
     const scrollY = Number(nativeEvent?.contentOffset?.y || 0);
     if (!layoutHeight || !contentHeight) return;
+    const shouldShowScrollTop = scrollY > Math.max(520, layoutHeight * 0.75);
+    setScrollTopButtonVisible(shouldShowScrollTop);
     const distanceFromBottom = contentHeight - (scrollY + layoutHeight);
     const triggerDistance = Math.max(FRONTEND_POSTINGS_PREFETCH_DISTANCE_PX, layoutHeight * 0.75);
     if (distanceFromBottom <= triggerDistance) {
       loadMorePostings();
     }
-  }, [loadMorePostings, showResultsSurface]);
+  }, [loadMorePostings, setScrollTopButtonVisible, showResultsSurface]);
 
   const loadApplications = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -2875,6 +2901,28 @@ export default function App() {
   }, [showResultsSurface]);
 
   useEffect(() => {
+    if (!showResultsSurface) {
+      setScrollTopButtonVisible(false);
+    }
+  }, [setScrollTopButtonVisible, showResultsSurface]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const updateWindowScrollTopButton = () => {
+      if (!showResultsSurface) {
+        setScrollTopButtonVisible(false);
+        return;
+      }
+      const scrollY = Number(window.scrollY || window.document?.documentElement?.scrollTop || 0);
+      const viewportHeight = Number(window.innerHeight || 0);
+      setScrollTopButtonVisible(scrollY > Math.max(520, viewportHeight * 0.75));
+    };
+    window.addEventListener("scroll", updateWindowScrollTopButton, { passive: true });
+    updateWindowScrollTopButton();
+    return () => window.removeEventListener("scroll", updateWindowScrollTopButton);
+  }, [setScrollTopButtonVisible, showResultsSurface]);
+
+  useEffect(() => {
     if (!isDesktopViewport && releaseNotesOpen) {
       setReleaseNotesOpen(false);
     }
@@ -3237,15 +3285,16 @@ export default function App() {
   );
 
   const renderPostingsPage = () => (
-    <ScrollView
-      ref={postingsListRef}
-      style={styles.postingsPageScroll}
-      contentContainerStyle={styles.postingsPageContent}
-      keyboardShouldPersistTaps="handled"
-      onScroll={handlePostingsScroll}
-      scrollEventThrottle={250}
-      testID="postings-page-scroll"
-    >
+    <View style={styles.postingsPageFrame}>
+      <ScrollView
+        ref={postingsListRef}
+        style={styles.postingsPageScroll}
+        contentContainerStyle={styles.postingsPageContent}
+        keyboardShouldPersistTaps="handled"
+        onScroll={handlePostingsScroll}
+        scrollEventThrottle={250}
+        testID="postings-page-scroll"
+      >
       <Animated.View
         style={[
           styles.searchShell,
@@ -3629,8 +3678,24 @@ export default function App() {
           ) : null}
         </Animated.View>
       ) : null}
+      </ScrollView>
+      {showResultsSurface && showScrollTopButton ? (
+        <Pressable
+          onPress={scrollPostingsToTop}
+          style={({ pressed }) => [
+            styles.scrollTopButton,
+            isDesktopViewport ? styles.scrollTopButtonDesktop : styles.scrollTopButtonMobile,
+            pressed ? styles.scrollTopButtonPressed : null
+          ]}
+          testID="postings-scroll-top-button"
+          accessibilityRole="button"
+          accessibilityLabel="Back to top"
+        >
+          <Text style={styles.scrollTopButtonText}>Top</Text>
+        </Pressable>
+      ) : null}
       {isDesktopViewport ? renderReleaseNotesModal() : null}
-    </ScrollView>
+    </View>
   );
 
   const renderApplicationsPage = () => (
@@ -4588,6 +4653,11 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  postingsPageFrame: {
+    flex: 1,
+    position: "relative",
+    backgroundColor: OJS_COLORS.bg
+  },
   postingsPageContent: {
     paddingBottom: 20
   },
@@ -5345,6 +5415,44 @@ const styles = StyleSheet.create({
   postingsPagingHint: {
     color: OJS_COLORS.muted,
     fontSize: 11
+  },
+  scrollTopButton: {
+    position: "absolute",
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: OJS_COLORS.green,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.focus,
+    shadowColor: OJS_COLORS.shadow,
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+    zIndex: 40
+  },
+  scrollTopButtonDesktop: {
+    right: 28,
+    bottom: 28,
+    minHeight: 48,
+    minWidth: 68
+  },
+  scrollTopButtonMobile: {
+    right: 16,
+    bottom: 16,
+    minHeight: 52,
+    minWidth: 72
+  },
+  scrollTopButtonPressed: {
+    backgroundColor: OJS_COLORS.ink,
+    transform: [{ scale: 0.97 }]
+  },
+  scrollTopButtonText: {
+    color: OJS_COLORS.surface,
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0
   },
   card: {
     backgroundColor: OJS_COLORS.surface,
