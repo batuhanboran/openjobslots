@@ -55,6 +55,10 @@ const CONTROL_RATE_LIMIT_MAX = Math.max(5, Number(process.env.OPENJOBSLOTS_CONTR
 const FRONTEND_LOG_RATE_LIMIT_MAX = Math.max(5, Number(process.env.OPENJOBSLOTS_FRONTEND_LOG_RATE_LIMIT_MAX || 60));
 const PUBLIC_READ_CACHE_TTL_MS = Math.max(0, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS || 5_000));
 const PUBLIC_READ_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_MAX_ENTRIES || 250));
+const PUBLIC_SITE_URL = String(process.env.OPENJOBSLOTS_PUBLIC_SITE_URL || "").trim();
+const SEO_SITE_TITLE = "OpenJobSlots | Fresh Job Openings";
+const SEO_SITE_DESCRIPTION =
+  "Search fresh job openings across ATS platforms, filter by role, company, location, industry, and remote work, and track applications in one place.";
 const BACKEND_DATA_ROOT = path.dirname(DB_PATH);
 const BACKEND_LOG_DIRECTORY_PATH = path.join(BACKEND_DATA_ROOT, "logs");
 const FRONTEND_LOG_PATH = path.join(BACKEND_LOG_DIRECTORY_PATH, "frontend-client.log");
@@ -854,6 +858,90 @@ function normalizeOrigin(value) {
   }
 }
 
+function escapeHtmlAttribute(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function getPublicSiteOrigin(req) {
+  const configured = normalizeOrigin(PUBLIC_SITE_URL);
+  if (configured) return configured;
+  if (NODE_ENV === "production") return "https://openjobslots.com";
+
+  const forwardedProto = String(req.get("x-forwarded-proto") || "").split(",")[0].trim();
+  const forwardedHost = String(req.get("x-forwarded-host") || "").split(",")[0].trim();
+  const protocol = forwardedProto || req.protocol || "http";
+  const host = forwardedHost || req.get("host") || `localhost:${PORT}`;
+  return normalizeOrigin(`${protocol}://${host}`) || `http://localhost:${PORT}`;
+}
+
+function getPublicSiteCanonicalUrl(req) {
+  return `${getPublicSiteOrigin(req)}/`;
+}
+
+function removeExistingSeoTags(html) {
+  return String(html || "")
+    .replace(/\s*<meta[^>]+name=["'](?:description|robots|twitter:card|twitter:title|twitter:description)["'][^>]*>/gi, "")
+    .replace(/\s*<meta[^>]+property=["'](?:og:title|og:description|og:type|og:url|og:site_name)["'][^>]*>/gi, "")
+    .replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/gi, "");
+}
+
+function renderSeoIndexHtml(indexHtml, req) {
+  const canonicalUrl = getPublicSiteCanonicalUrl(req);
+  const title = escapeHtmlAttribute(SEO_SITE_TITLE);
+  const description = escapeHtmlAttribute(SEO_SITE_DESCRIPTION);
+  const canonical = escapeHtmlAttribute(canonicalUrl);
+  const tags = [
+    '<meta name="description" content="' + description + '" />',
+    '<link rel="canonical" href="' + canonical + '" />',
+    '<meta name="robots" content="index, follow" />',
+    '<meta property="og:type" content="website" />',
+    '<meta property="og:site_name" content="OpenJobSlots" />',
+    '<meta property="og:title" content="' + title + '" />',
+    '<meta property="og:description" content="' + description + '" />',
+    '<meta property="og:url" content="' + canonical + '" />',
+    '<meta name="twitter:card" content="summary" />',
+    '<meta name="twitter:title" content="' + title + '" />',
+    '<meta name="twitter:description" content="' + description + '" />'
+  ].join("\n    ");
+
+  let html = removeExistingSeoTags(indexHtml).replace(/<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
+  if (!/<\/head>/i.test(html)) return html;
+  return html.replace(/<\/head>/i, `    <!-- OpenJobSlots SEO metadata -->\n    ${tags}\n</head>`);
+}
+
+function buildRobotsTxt(req) {
+  return [
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /applications",
+    "Disallow: /settings",
+    "Disallow: /sync",
+    "Disallow: /ingestion",
+    "Disallow: /mcp",
+    "Disallow: /frontend",
+    "Disallow: /postings",
+    `Sitemap: ${getPublicSiteOrigin(req)}/sitemap.xml`
+  ].join("\n") + "\n";
+}
+
+function buildSitemapXml(req) {
+  const canonicalUrl = escapeHtmlAttribute(getPublicSiteCanonicalUrl(req));
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    "  <url>",
+    `    <loc>${canonicalUrl}</loc>`,
+    "    <changefreq>daily</changefreq>",
+    "    <priority>1.0</priority>",
+    "  </url>",
+    "</urlset>"
+  ].join("\n") + "\n";
+}
+
 function getAllowedOrigins() {
   const configured = parseCsvEnv(process.env.OPENJOBSLOTS_ALLOWED_ORIGINS).map(normalizeOrigin);
   const defaults = [
@@ -870,6 +958,7 @@ function getAllowedOrigins() {
 }
 
 function isLocalDevelopmentOrigin(origin) {
+  if (NODE_ENV === "production") return false;
   try {
     const parsed = new URL(String(origin || ""));
     return (
@@ -913,6 +1002,7 @@ function getBearerToken(req) {
 function hasAdminAccess(req) {
   const requestToken = getBearerToken(req) || String(req.get("x-openjobslots-admin-token") || "").trim();
   if (ADMIN_TOKEN) return safeCompareToken(requestToken, ADMIN_TOKEN);
+  if (NODE_ENV === "production") return false;
   return ALLOW_LOCAL_ADMIN && isLocalRequest(req);
 }
 
@@ -941,6 +1031,22 @@ function securityHeadersMiddleware(_req, res, next) {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "img-src 'self' data:",
+      "font-src 'self' data:",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline'",
+      "connect-src 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests"
+    ].join("; ")
+  );
   if (NODE_ENV === "production") {
     res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   }
@@ -15947,14 +16053,30 @@ function createServer() {
   const webDistPath = path.resolve(__dirname, "..", "dist");
   const webIndexPath = path.join(webDistPath, "index.html");
   if (fs.existsSync(webIndexPath)) {
+    const sendSeoIndex = (req, res, next) => {
+      try {
+        const indexHtml = fs.readFileSync(webIndexPath, "utf8");
+        res.type("html").send(renderSeoIndexHtml(indexHtml, req));
+      } catch (error) {
+        next(error);
+      }
+    };
+
+    app.get(["/", "/index.html"], sendSeoIndex);
+    app.get("/robots.txt", (req, res) => {
+      res.type("text/plain").send(buildRobotsTxt(req));
+    });
+    app.get("/sitemap.xml", (req, res) => {
+      res.type("application/xml").send(buildSitemapXml(req));
+    });
     app.use(express.static(webDistPath, {
       extensions: ["html"],
-      index: "index.html",
+      index: false,
       maxAge: "5m"
     }));
     app.use((req, res, next) => {
       if (req.method === "GET" && req.accepts("html")) {
-        return res.sendFile(webIndexPath);
+        return sendSeoIndex(req, res, next);
       }
       return next();
     });

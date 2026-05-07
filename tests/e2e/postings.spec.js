@@ -104,8 +104,12 @@ async function expectSearchEngineVisualContract(page) {
   ]) {
     expect(wordmarkColors, `wordmark should not include Google color ${googleColor}`).not.toContain(googleColor);
   }
-  expect(wordmarkColors).toContain("rgb(38, 51, 45)");
+  expect(wordmarkColors).toContain("rgb(82, 125, 104)");
+  expect(wordmarkColors).toContain("rgb(127, 191, 166)");
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
+  await expect(page.getByText("Public version")).toBeVisible();
+  await expect(page.getByText("Deployed and developed by")).toBeVisible();
+  await expect(page.getByText("LinkedIn")).toBeVisible();
 }
 
 async function expectSuggestionPanelDoesNotOverlap(page) {
@@ -129,6 +133,8 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
   await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   await expect(page.getByTestId("results-surface")).toBeVisible();
+  await expect(page.getByText("Public version")).toHaveCount(0);
+  await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
 }
 
 async function expectNoNestedPublicScroll(page) {
@@ -154,6 +160,55 @@ async function expectNoNestedPublicScroll(page) {
   if (nestedState.list) {
     expect(nestedState.list.scrollable, "posting cards should use the main page scroll, not their own list scrollbar").toBe(false);
   }
+}
+
+async function expectNoHorizontalOverflow(page) {
+  const overflow = await page.evaluate(() => {
+    const viewportWidth = window.innerWidth;
+    const rootWidth = Math.max(
+      document.documentElement.scrollWidth,
+      document.body?.scrollWidth || 0,
+      document.querySelector('[data-testid="postings-page-scroll"]')?.scrollWidth || 0
+    );
+    const offenders = Array.from(document.querySelectorAll("body *"))
+      .map((node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          testId: node.getAttribute("data-testid") || "",
+          tag: node.tagName,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width
+        };
+      })
+      .filter((item) => item.width > 1 && (item.left < -1 || item.right > viewportWidth + 1))
+      .slice(0, 5);
+    return { viewportWidth, rootWidth, offenders };
+  });
+
+  expect(overflow.rootWidth, `page should not horizontally overflow: ${JSON.stringify(overflow.offenders)}`).toBeLessThanOrEqual(
+    overflow.viewportWidth + 1
+  );
+  expect(overflow.offenders).toEqual([]);
+}
+
+async function expectMobileTapTarget(page, testId) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width >= 600) return;
+  const target = page.getByTestId(testId).first();
+  await expect(target).toBeVisible();
+  const box = await target.boundingBox();
+  expect(box.height, `${testId} should be at least 44px tall on mobile`).toBeGreaterThanOrEqual(44);
+}
+
+async function expectMobileFiltersNearControls(page) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width >= 600) return;
+  await page.waitForTimeout(360);
+  const toggleBox = await page.getByTestId("postings-filter-toggle").boundingBox();
+  const panelBox = await page.getByTestId("filters-panel").boundingBox();
+  const gap = panelBox.y - (toggleBox.y + toggleBox.height);
+  expect(gap, "mobile filters panel should open close to the filter controls").toBeLessThan(90);
 }
 
 async function expectPublicPaletteIsSoft(page) {
@@ -541,6 +596,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("brand-wordmark")).toContainText("openjobslots");
     await expect(page.getByTestId("search-shell")).toBeVisible();
     await expect(page.getByTestId("postings-search-input")).toBeVisible();
+    await expectNoHorizontalOverflow(page);
     await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
     await expect(page.getByTestId("posting-card")).toHaveCount(0);
     await expectNoRawErrors(page);
@@ -574,6 +630,7 @@ test.describe("postings page QA", () => {
 
     await page.getByTestId("postings-search-input").fill("tur");
     await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await expectMobileTapTarget(page, "search-suggestion-0");
     await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByText(/Ctrl\+K focuses search/i)).toHaveCount(0);
     await expectSuggestionPanelDoesNotOverlap(page);
@@ -584,13 +641,18 @@ test.describe("postings page QA", () => {
     await page.getByTestId("postings-search-input").press("Escape");
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
     await expect(page.getByTestId("postings-filter-toggle")).toBeVisible();
+    await expectMobileTapTarget(page, "postings-filter-toggle");
+    await expectMobileTapTarget(page, "postings-filter-clear");
     await page.getByTestId("postings-filter-toggle").click();
     await expect(page.getByTestId("filters-panel")).toBeVisible();
+    await expectMobileFiltersNearControls(page);
     await expectNoNestedPublicScroll(page);
+    await expectNoHorizontalOverflow(page);
 
     await page.getByTestId("brand-wordmark").click();
     await expectSearchMovesUpAfterSubmit(page);
     await page.getByTestId("coverage-toggle").click();
+    await expectMobileTapTarget(page, "coverage-toggle");
     await expect(page.getByTestId("coverage-details")).toBeVisible();
     await page.getByTestId("coverage-toggle").click();
     await expect(page.getByTestId("coverage-details")).toHaveCount(0);
@@ -704,8 +766,13 @@ test.describe("postings page QA", () => {
 
     await page.getByTestId("postings-filter-toggle").click();
     await expect(page.getByTestId("ats-filter-trigger")).toBeVisible();
+    await expectMobileFiltersNearControls(page);
+    await expectMobileTapTarget(page, "ats-filter-trigger");
+    await expectMobileTapTarget(page, "postings-filter-clear");
+    await expectNoHorizontalOverflow(page);
 
     await page.getByTestId("ats-filter-trigger").click();
+    await expectMobileTapTarget(page, "ats-filter-option-greenhouse");
     await page.getByTestId("ats-filter-option-greenhouse").click();
     await expect(page.getByTestId("posting-card").first()).toContainText(/Greenhouse|Turkish/i);
 
@@ -715,6 +782,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("countries-filter-trigger")).toContainText(/selected|Turkey|T\u00fcrkiye/i);
 
     await page.getByTestId("remote-filter-remote").click();
+    await expectMobileTapTarget(page, "remote-filter-remote");
     await expect(page.getByText("No postings found.").or(page.getByTestId("posting-card").first())).toBeVisible();
 
     await page.getByTestId("countries-filter-clear").click();
