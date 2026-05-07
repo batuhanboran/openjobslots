@@ -116,6 +116,7 @@ docker exec openjobslots-meilisearch wget -qO- --header="Authorization: Bearer $
 - Hydration can underfill pages after hidden/applied/ignored/no-date filters remove Meili hits.
 - Title/country/remote intersections can fail even when each dimension passes alone.
 - UI infinite scroll can hide API paging bugs unless offsets, uniqueness, and appended result counts are asserted.
+- High-volume live probes can hit public rate limits and can expose Postgres shared-memory pressure when Meili hydration falls back to SQL. Throttle probes, record `429` separately from correctness failures, and check app logs for `/dev/shm` errors before changing query semantics.
 - Postgres fallback search with `lower(unaccent(...)) LIKE` may not use existing trigram indexes.
 - Reindex scripts that only upsert visible rows do not remove stale Meili documents unless the index is cleared or deletes are diffed.
 - Worker maintenance currently depends on sync runs; retention and search outbox processing should also run on an independent maintenance cadence.
