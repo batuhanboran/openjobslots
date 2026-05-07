@@ -70,6 +70,7 @@ These notes are for Codex and subagents working in this repository.
 - Meilisearch visibility filters must require `hidden = false`. Do not use negative filters such as `NOT hidden = true`; legacy or partial index documents without a `hidden` field can pass negative filters, then get dropped by Postgres hydration and force expensive fallback queries.
 - Public job result searches should use Meilisearch `matchingStrategy: "all"` so multi-word titles do not silently drop important terms and return misleading broad hits.
 - A healthy Meilisearch zero-hit response should return an API zero directly. Do not run full Postgres fallback for every search-index zero; that turns normal empty intersections into slow CPU-heavy queries. Use fallback for Meili errors and hydration underfill, then fix/reindex Meili when index parity is wrong.
+- Postgres hydration should not re-run the free-text search after Meili has ranked the hits. Hydration is for public visibility, application-state, and structured guard filters; rechecking fuzzy/tokenized Meili hits with stricter SQL text matching causes underfill and fallback loops.
 - Subagents must produce bounded findings or patches, then be closed. The parent agent must not leave agents idle and must integrate the results into code, tests, docs, and deployment decisions.
 - Detailed runbook: [Search Quality Runbook](./docs/search-quality-runbook.md).
 

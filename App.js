@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.10";
+const PUBLIC_APP_VERSION = "1.5.11";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.11",
+    date: "May 7, 2026",
+    title: "Search hydration repair",
+    summary:
+      "Changed result hydration to trust search-index text relevance while keeping public visibility and structured filter guards in Postgres."
+  },
   {
     version: "1.5.10",
     date: "May 7, 2026",
