@@ -226,8 +226,9 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
       search: "\"engineer\"",
       countries: ["US"],
       regions: ["AMER"],
-      limit: 10,
+      limit: 1,
       offset: 0,
+      hide_no_date: true,
       include_applied: true,
       include_ignored: true
     });
@@ -235,6 +236,7 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     assert.match(searchBody.filter, /NOT hidden = true/);
     assert.match(searchBody.filter, /country IN \["United States"\]/);
     assert.match(searchBody.filter, /region IN \["North America"\]/);
+    assert.match(searchBody.filter, /posted_at_epoch > 0/);
     assert.equal(searchBody.q, "engineer");
     assert.equal(result.items.length, 1);
     assert.equal(result.count, 1);
@@ -249,9 +251,112 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
   }
 }
 
+async function testUnderfilledMeiliHydrationFallsBackToPostgres() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousFetch = global.fetch;
+  const previousWarn = console.warn;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  const warnings = [];
+
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    async json() {
+      return {
+        hits: [
+          { canonical_url: "https://example.com/stale" },
+          { canonical_url: "https://example.com/visible" }
+        ],
+        estimatedTotalHits: 5
+      };
+    }
+  });
+  console.warn = (...args) => warnings.push(args);
+
+  let fallbackSelectLimit = null;
+  const pool = {
+    async query(sql, params = []) {
+      if (/p\.canonical_url = ANY\(\$1\)/i.test(sql)) {
+        return {
+          rows: [{
+            canonical_url: "https://example.com/visible",
+            company_name: "Visible Co",
+            position_name: "Director",
+            location_text: "Boston, MA, United States",
+            country: "United States",
+            region: "North America",
+            remote_type: "onsite",
+            ats_key: "greenhouse",
+            last_seen_epoch: 123
+          }]
+        };
+      }
+      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) {
+        return { rows: [{ count: 3 }] };
+      }
+      fallbackSelectLimit = params[params.length - 2];
+      return {
+        rows: [
+          {
+            canonical_url: "https://example.com/director-1",
+            company_name: "Visible Co",
+            position_name: "Director",
+            location_text: "Boston, MA, United States",
+            country: "United States",
+            region: "North America",
+            remote_type: "onsite",
+            ats_key: "greenhouse",
+            last_seen_epoch: 200
+          },
+          {
+            canonical_url: "https://example.com/director-2",
+            company_name: "Another Co",
+            position_name: "Director",
+            location_text: "New York, NY, United States",
+            country: "United States",
+            region: "North America",
+            remote_type: "hybrid",
+            ats_key: "greenhouse",
+            last_seen_epoch: 100
+          }
+        ]
+      };
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "Director United States",
+      limit: 2,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    assert.equal(fallbackSelectLimit, 2);
+    assert.equal(result.count, 3);
+    assert.equal(result.limit, 2);
+    assert.equal(result.items.length, 2);
+    assert.deepEqual(result.items.map((item) => item.job_posting_url), [
+      "https://example.com/director-1",
+      "https://example.com/director-2"
+    ]);
+    assert.ok(warnings.some((entry) => String(entry[0]).includes("search_backend_fallback") && String(entry[1]).includes("hydration_underfill")));
+  } finally {
+    console.warn = previousWarn;
+    global.fetch = previousFetch;
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 async function testEmptyMeiliSearchFallsBackToPostgres() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousFetch = global.fetch;
+  const previousWarn = console.warn;
   process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
   let postgresCalls = 0;
 
@@ -262,6 +367,7 @@ async function testEmptyMeiliSearchFallsBackToPostgres() {
       return { hits: [], estimatedTotalHits: 0 };
     }
   });
+  console.warn = () => {};
 
   const pool = {
     async query(sql) {
@@ -299,6 +405,7 @@ async function testEmptyMeiliSearchFallsBackToPostgres() {
     assert.equal(result.items.length, 1);
     assert.equal(result.items[0].position_name, "Director");
   } finally {
+    console.warn = previousWarn;
     global.fetch = previousFetch;
     if (previousSearchBackend === undefined) {
       delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
@@ -311,6 +418,7 @@ async function testEmptyMeiliSearchFallsBackToPostgres() {
 function testMeiliDocumentsCarryHiddenFlagSafely() {
   assert.equal(toMeiliPostingDocument({ canonical_url: "a", hidden: "false" }).hidden, false);
   assert.equal(toMeiliPostingDocument({ canonical_url: "b", hidden: "1" }).hidden, true);
+  assert.equal(toMeiliPostingDocument({ canonical_url: "c", posting_date: "2026-05-07" }).posting_date, "2026-05-07");
 }
 
 function testRetentionDefaultsUseLastSeenPolicy() {
@@ -405,6 +513,7 @@ async function main() {
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
   await testHydratePostgresPostingsKeepsHiddenAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
+  await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchFallsBackToPostgres();
   testMeiliDocumentsCarryHiddenFlagSafely();
   testRetentionDefaultsUseLastSeenPolicy();

@@ -206,7 +206,8 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
         "company",
         "hidden",
         "last_seen_epoch",
-        "posted_at_epoch"
+        "posted_at_epoch",
+        "posting_date"
       ],
       sortableAttributes: ["last_seen_epoch", "posted_at_epoch"],
       synonyms: {
@@ -260,7 +261,8 @@ function toMeiliPostingDocument(posting) {
     description_plain: String(posting?.description_plain || "").trim(),
     hidden: normalizeBooleanFlag(posting?.hidden, false),
     last_seen_epoch: Number(posting?.last_seen_epoch || 0),
-    posted_at_epoch: Number(posting?.posted_at_epoch || posting?.posting_date_epoch || 0)
+    posted_at_epoch: Number(posting?.posted_at_epoch || posting?.posting_date_epoch || 0),
+    posting_date: String(posting?.posting_date || "").trim()
   };
 }
 
@@ -309,6 +311,9 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
     } else {
       filters.push(`remote_type = ${quote(options.remote)}`);
     }
+  }
+  if (options.hide_no_date) {
+    filters.push("posted_at_epoch > 0");
   }
 
   return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {

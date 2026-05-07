@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.4";
+const PUBLIC_APP_VERSION = "1.5.5";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.5",
+    date: "May 7, 2026",
+    title: "Search reliability and sync budgeting",
+    summary:
+      "Added a backend search corpus, improved Meilisearch/Postgres fallback behavior, capped hydrated result pages, and budgeted automatic sync work to reduce continuous load."
+  },
   {
     version: "1.5.4",
     date: "May 7, 2026",

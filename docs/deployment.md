@@ -39,6 +39,24 @@ curl -fsS "http://127.0.0.1:8081/postings?search=t%C3%BCrkiye&limit=5"
 
 Search correctness checks are part of deployment verification. Service health alone does not prove that Postgres, Meilisearch, and hydration agree. See [Search Quality Runbook](./search-quality-runbook.md).
 
+## Worker Sync Budget
+
+The worker keeps manual sync controls available, but automatic Postgres syncs are budgeted so idle due-target pressure does not turn into continuous fetch/write load.
+
+- `OPENJOBSLOTS_AUTO_SYNC`: set to `0` to disable automatic sync scheduling. Manual sync requests still work.
+- `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `1800000` ms.
+- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `250`; set to `0` for a reversible pause of automatic sync work.
+- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `50`.
+- `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose keeps this at `500`; manual requested syncs may continue across runs until due targets drain.
+
+The daily budget is conservative and restart-safe because the worker counts targets already recorded in `ingestion_runs` since UTC midnight before starting another automatic run. Manual requested syncs are not blocked by the budget, but their recorded targets count against later automatic work for the same day.
+
+## Postgres Observability
+
+`pg_stat_statements` is preloaded for Postgres through Compose with `shared_preload_libraries=pg_stat_statements`, and the worker creates the extension on startup when `OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS=1`.
+
+To disable the runtime change, set `OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS=0` for the worker and set `OPENJOBSLOTS_POSTGRES_SHARED_PRELOAD_LIBRARIES=` before recreating Postgres. The extension object can remain installed; removing the preload stops statement tracking after the container restart.
+
 ## Rollback
 
 Each successful deploy creates a git bundle in `/root/OpenPostings/.deploy-backups/` before resetting to the new commit. Runtime databases and Docker volumes are not deleted by the deploy watcher.
