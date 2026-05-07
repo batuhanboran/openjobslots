@@ -74,14 +74,16 @@ async function expectSearchEngineVisualContract(page) {
   const searchBox = await page.getByTestId("postings-search-input").boundingBox();
   const shell = await page.getByTestId("search-shell").boundingBox();
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  const searchCenterY = searchBox.y + searchBox.height / 2;
 
   expect(searchBox.width).toBeGreaterThan(viewport.width < 600 ? 250 : 520);
-  expect(shell.height).toBeGreaterThan(viewport.height * (viewport.width < 600 ? 0.42 : 0.5));
-  expect(searchBox.y).toBeGreaterThan(viewport.height * (viewport.width < 600 ? 0.15 : 0.2));
-  expect(searchBox.y).toBeLessThan(viewport.height * 0.5);
+  expect(shell.height).toBeGreaterThan(viewport.height * (viewport.width < 600 ? 0.82 : 0.86));
+  expect(searchCenterY).toBeGreaterThan(viewport.height * 0.43);
+  expect(searchCenterY).toBeLessThan(viewport.height * 0.55);
   expect(Math.abs((searchBox.x + searchBox.width / 2) - viewport.width / 2)).toBeLessThan(viewport.width * 0.08);
   expect(Math.abs((searchBox.x + searchBox.width / 2) - (shell.x + shell.width / 2))).toBeLessThan(8);
   await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
+  await expect(page.getByText("Enter to search · Esc to clear")).toBeVisible();
 
   const wordmarkColors = await page.getByTestId("brand-wordmark").evaluate((node) => {
     const colors = [];
@@ -102,8 +104,8 @@ async function expectSearchEngineVisualContract(page) {
   ]) {
     expect(wordmarkColors, `wordmark should not include Google color ${googleColor}`).not.toContain(googleColor);
   }
-  expect(wordmarkColors).toContain("rgb(23, 59, 109)");
-  expect(wordmarkColors).toContain("rgb(95, 102, 115)");
+  expect(wordmarkColors).toContain("rgb(38, 51, 45)");
+  expect(wordmarkColors).toContain("rgb(104, 117, 110)");
 }
 
 async function expectSuggestionPanelDoesNotOverlap(page) {
@@ -121,11 +123,12 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await page.getByTestId("postings-search-input").fill("remote jobs");
   await page.getByTestId("postings-search-input").press("Enter");
   await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
-  await page.waitForTimeout(260);
+  await page.waitForTimeout(380);
   const compactSearchBox = await page.getByTestId("postings-search-input").boundingBox();
   expect(compactSearchBox.y).toBeLessThan(homeSearchBox.y - 70);
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
   await expect(page.getByTestId("sync-status-panel")).toBeVisible();
+  await expect(page.getByTestId("results-surface")).toBeVisible();
 }
 
 async function expectNoNestedPublicScroll(page) {
@@ -157,6 +160,7 @@ async function expectPublicPaletteIsSoft(page) {
   const colors = await page.evaluate(() => {
     const nodes = [
       document.querySelector('[data-testid="search-shell"]'),
+      document.querySelector('[data-testid="postings-page-scroll"]'),
       document.querySelector('[data-testid="coverage-strip"]'),
       document.querySelector('[data-testid="posting-card"]'),
       document.querySelector('[data-testid="postings-filter-toggle"]')
@@ -167,7 +171,14 @@ async function expectPublicPaletteIsSoft(page) {
     });
   });
 
-  for (const oldDashboardColor of ["rgb(16, 42, 67)", "rgb(11, 110, 79)", "rgb(51, 78, 104)"]) {
+  expect(colors).toContain("rgb(246, 244, 232)");
+  for (const oldDashboardColor of [
+    "rgb(23, 59, 109)",
+    "rgb(20, 184, 166)",
+    "rgb(16, 42, 67)",
+    "rgb(11, 110, 79)",
+    "rgb(51, 78, 104)"
+  ]) {
     expect(colors, `public search surface should not use old dashboard color ${oldDashboardColor}`).not.toContain(oldDashboardColor);
   }
 }
@@ -562,7 +573,7 @@ test.describe("postings page QA", () => {
     const homeSearchBox = await page.getByTestId("postings-search-input").boundingBox();
 
     await page.getByTestId("postings-search-input").fill("tur");
-    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
     await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByText(/Ctrl\+K focuses search/i)).toHaveCount(0);
     await expectSuggestionPanelDoesNotOverlap(page);
@@ -592,7 +603,7 @@ test.describe("postings page QA", () => {
     await page.keyboard.press("/");
     await expect(page.getByTestId("postings-search-input")).toBeFocused();
     await page.getByTestId("postings-search-input").fill("tur");
-    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
     await page.getByTestId("search-suggestion-0").click();
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
@@ -652,7 +663,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("ats-filter-trigger")).toHaveCount(0);
 
     await page.getByTestId("postings-search-input").fill("tur");
-    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
     await page.getByTestId("search-suggestion-0").click();
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
 
