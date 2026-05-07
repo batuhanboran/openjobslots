@@ -377,7 +377,7 @@ function logSearchFallback(reason, metadata = {}) {
 async function hydratePostgresPostings(pool, urls, options = {}) {
   const canonicalUrls = (Array.isArray(urls) ? urls : []).map((url) => String(url || "").trim()).filter(Boolean);
   if (canonicalUrls.length === 0) return [];
-  const filter = buildFilterSql(options, 2);
+  const filter = buildFilterSql({ ...options, search: "" }, 2);
   const result = await pool.query(
     `
       SELECT

@@ -138,7 +138,7 @@ async function testSyncStatusDefaultsToPostgresSyncControlQueue() {
   }
 }
 
-async function testHydratePostgresPostingsKeepsHiddenAndFilterGuards() {
+async function testHydratePostgresPostingsKeepsSafetyAndFilterGuards() {
   let captured = null;
   const pool = {
     async query(sql, params) {
@@ -173,11 +173,11 @@ async function testHydratePostgresPostingsKeepsHiddenAndFilterGuards() {
   assert.match(captured.sql, /p\.hidden = false/);
   assert.match(captured.sql, /lower\(unaccent\(coalesce\(p\.country, ''\)\)\)/);
   assert.match(captured.sql, /p\.location_text/);
-  assert.match(captured.sql, /lower\(unaccent\(p\.position_name\)\)/);
+  assert.doesNotMatch(captured.sql, /lower\(unaccent\(p\.position_name\)\)/);
   assert.deepEqual(captured.params[0], ["https://example.com/hidden", "https://example.com/visible"]);
   assert.equal(captured.params[1], "Turkey");
   assert.ok(captured.params.some((value) => value === "%turkiye%"));
-  assert.ok(captured.params.some((value) => value === "%engineer%"));
+  assert.ok(!captured.params.some((value) => value === "%engineer%"));
   assert.ok(!captured.params.some((value) => String(value).includes("\"")));
   assert.deepEqual(items.map((item) => item.job_posting_url), ["https://example.com/visible"]);
 }
@@ -637,7 +637,7 @@ async function main() {
   await testSyncStatusReportsQueuedSeparatelyFromRunning();
   await testSyncStatusReportsRunningForActiveWorkerOnly();
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
-  await testHydratePostgresPostingsKeepsHiddenAndFilterGuards();
+  await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchReturnsFastZero();
