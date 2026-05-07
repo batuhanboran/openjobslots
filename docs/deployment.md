@@ -14,6 +14,8 @@ The ltx100 host runs `/root/OpenPostings` and deploys from `main` using a system
 - `openjobslots-meilisearch`
 - `openjobslots-deploy.timer`
 
+These four services are the intended v1 runtime. Do not add Redis, a second reverse proxy, or another database engine until measured query, queue, or cache pressure proves the need.
+
 ## Deploy Key
 
 The server uses `/root/.ssh/openjobslots_deploy` as a read-only GitHub deploy key. Add the public key to GitHub at:
@@ -30,7 +32,12 @@ systemctl start openjobslots-deploy.service
 journalctl -u openjobslots-deploy.service -n 100 --no-pager
 tail -n 100 /var/log/openjobslots-deploy.log
 docker compose --project-directory /root/OpenPostings ps
+curl -fsS http://127.0.0.1:8081/health
+curl -fsS "http://127.0.0.1:8081/postings?search=Director%20United%20States&limit=5"
+curl -fsS "http://127.0.0.1:8081/postings?search=t%C3%BCrkiye&limit=5"
 ```
+
+Search correctness checks are part of deployment verification. Service health alone does not prove that Postgres, Meilisearch, and hydration agree. See [Search Quality Runbook](./search-quality-runbook.md).
 
 ## Rollback
 

@@ -12,6 +12,8 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 
 The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires the raw parser fixture.
 
+Certification must also prove search impact. A parser is not production-ready if it creates rows that cannot be found by title, country, region, remote mode, or canonical URL in the production Postgres plus Meilisearch path. Use the [Search Quality Runbook](./search-quality-runbook.md) for corpus and parity expectations.
+
 ## Certification Gate
 
 An ATS is certified only when all of these exist:

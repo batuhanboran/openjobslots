@@ -55,6 +55,18 @@ These notes are for Codex and subagents working in this repository.
 - Verify meaningful changes with `npm.cmd run test:backend`; use Playwright desktop/mobile when UI changes.
 - When using subagents, give each a bounded lane: frontend/UI, backend/data, parser/ATS, security/services, desktop QA, mobile QA. The parent agent remains responsible for integration and final deployment.
 
+## Search Quality Incident Lessons
+
+- A green UI smoke test is not enough for this product. Search incidents require backend contract tests against the production path: Postgres plus Meilisearch.
+- Any change touching `/postings`, filters, country/region aliases, remote classification, Meilisearch settings, or Postgres fallback search must run a representative search corpus before deployment.
+- "Returns rows" is not a passing assertion. Returned rows must match title intent, country intent, region intent, remote intent, hidden/applied/ignored filters, and pagination rules.
+- Keep a pinned 200-query search corpus using public occupational taxonomies, not live production DB dumps. Include title-only, title plus country, title plus region, remote/hybrid/on-site, diacritics, abbreviations, and hard negative cases.
+- Test both search engines: direct Postgres SQL fallback and Meilisearch plus Postgres hydration. Meili zero hits, partial stale hits, hydration underfill, and `hide_no_date` filtering must all be covered.
+- Live deploy verification must include correctness probes, not only service health. At minimum test `/postings?search=Director%20United%20States`, `/postings?search=Director%20US`, `/postings?search=t%C3%BCrkiye`, `/postings?search=remote%20engineer`, and one paginated result flow.
+- Diagnose CPU spikes with measurements before changing architecture: `docker stats`, Postgres logs, `pg_stat_activity`, table/index size, dead tuples, Meili task backlog, and query plans. Do not add Redis, another load balancer, or a new database until those measurements show the bottleneck.
+- Subagents must produce bounded findings or patches, then be closed. The parent agent must not leave agents idle and must integrate the results into code, tests, docs, and deployment decisions.
+- Detailed runbook: [Search Quality Runbook](./docs/search-quality-runbook.md).
+
 ## ATS And Retention Rules
 
 - Certify existing ATS before broad expansion.
