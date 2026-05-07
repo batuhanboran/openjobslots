@@ -12,7 +12,7 @@ Missing location, posting date, or remote fields must be certified by source fix
 
 Parser normalization is the current blocker. Fix `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup or search-index tuning. v1.5.13 improves shared worldwide normalization and the first high-volume parser batch: `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`. Reindex only after normalization materially improves, then run production parity tests against the Postgres plus Meilisearch path. Image work and build-cache cleanup are later tasks.
 
-Current live ltx100 data-quality finding: 722,591 active postings; 625,905 are missing `country`/`region`; 96,686 have `country`/`region`. The biggest ATS gaps include `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`.
+Current live ltx100 data-quality finding before v1.5.13: 722,591 active postings; 625,905 were missing `country`/`region`; 96,686 had `country`/`region`. After the v1.5.13 parser-normalization backfill and Meili reindex, 337,606 active rows have `country`/`region` and 384,985 still miss one or both fields. The remaining biggest ATS gaps include `icims`, `applitrack`, `workday`, `bamboohr`, `taleo`, `applytojob`, `breezy`, and `recruitee`.
 
 ## Parser Tiers
 

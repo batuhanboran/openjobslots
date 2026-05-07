@@ -18,7 +18,7 @@ Missing location, posting date, or remote fields must be certified by saved sour
 
 ## May 8 Data-Quality Priority
 
-Live ltx100 currently has 722,591 active postings; 625,905 are missing `country`/`region`; 96,686 have `country`/`region`. The largest gaps include `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`.
+Live ltx100 before v1.5.13 had 722,591 active postings; 625,905 were missing `country`/`region`; 96,686 had `country`/`region`. The v1.5.13 backfill updated 254,694 existing rows, then reindexed 722,591 visible rows into Meilisearch. After that run, 337,606 active rows have `country`/`region` and 384,985 still miss one or both fields. The largest remaining gaps include `icims`, `applitrack`, `workday`, `bamboohr`, `taleo`, `applytojob`, `breezy`, and `recruitee`.
 
 Treat ATS parser normalization as the first fix: improve `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before Meilisearch cleanup. v1.5.13 starts this with shared worldwide country/region/remote normalization plus targeted fixes for `icims`, `applitrack`, `applytojob`, `breezy`, `bamboohr`, and `ashby`. Reindex after normalization improves, then require production parity tests against the live-like Postgres plus Meilisearch path. Image work and build-cache cleanup are lower priority.
 

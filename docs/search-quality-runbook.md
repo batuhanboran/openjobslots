@@ -54,6 +54,14 @@ Operational policy from these findings:
 - Stale or hidden Meili documents must be removed through durable delete/reindex work, not one-off manual cleanup.
 - Production parity tests must compare `/postings`, Meili hits, and Postgres source-of-truth rows before declaring cleanup or search changes successful.
 
+v1.5.13 production repair result:
+
+- Backfilled `254,694` existing Postgres rows from stored location/title signals.
+- Reindexed `722,591` visible postings into Meilisearch.
+- Active rows with both `country` and `region` increased from `96,686` to `337,606`.
+- Active rows missing `country` or `region` decreased from `625,905` to `384,985`.
+- Remaining misses are mostly source/parser gaps where the stored row lacks enough evidence; `icims`, `applitrack`, and `workday` need direct parser/detail-fetch work, not only alias expansion.
+
 ## Live-Like Intersection Matrices
 
 Search and filter changes must run a live-like matrix that crosses title intent, country/region intent, and remote mode. A useful matrix includes at least:
