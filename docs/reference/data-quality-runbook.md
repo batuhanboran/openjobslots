@@ -154,6 +154,78 @@ Safety rules:
 - Do not classify `remote` from broad description or marketing text.
 - iCIMS and Applitrack rows without enough list evidence are reported for detail refetch instead of being guessed.
 
+## Guarded Geo/Remote Apply Mode
+
+Production apply mode is intentionally hard to trigger. It must never be run until a production DB backup exists and the dry-run report has been reviewed.
+
+Required production backup:
+
+```powershell
+# Example only; use the actual deployed DB path/backend from PROJECT_STATE.
+Copy-Item C:\path\to\jobs.db C:\path\to\jobs.db.backup-YYYYMMDD-HHMMSS
+```
+
+Apply mode requires all four safety flags. Without all four, the command stays in dry-run mode:
+
+```powershell
+npm.cmd run backfill:geo-remote -- --source=careerplug --limit=100 --sample=20 --json
+```
+
+Guarded apply against an isolated/test DB:
+
+```powershell
+npm.cmd run backfill:geo-remote -- --source=careerplug --limit=100 --apply --confirm-production --backup-confirmed --max-updates=25 --batch-size=10 --json
+```
+
+Safety gates:
+
+- `--apply`: explicit write request.
+- `--confirm-production`: acknowledges the operator understands this may affect the active backend.
+- `--backup-confirmed`: confirms a backup/rollback point exists before production write.
+- `--max-updates=N`: caps row-level updates for the run.
+
+Operational controls:
+
+- `--batch-size=N`: commits per batch.
+- `--continue-on-error`: continues after a failed batch; default is stop on first error.
+- `--resume-run-id=<run_id>`: resumes an audited run and skips changes already recorded for that run.
+- `--operator=<name>`: stores operator label in the audit run.
+
+Audit tables created on first guarded apply/rollback:
+
+- `data_quality_backfill_runs`
+- `data_quality_backfill_changes`
+
+Each changed field stores old value, new value, rule name, confidence, source evidence summary, and reversible metadata.
+
+Rollback:
+
+```powershell
+npm.cmd run backfill:geo-remote:rollback -- --run-id=<run_id> --batch-size=10 --json
+```
+
+Rollback restores old values from the audit trail and marks the original run as `rolled_back`.
+
+Expected verification queries:
+
+```sql
+SELECT status, checkpoint_url, dry_run_summary
+FROM data_quality_backfill_runs
+WHERE run_id = '<run_id>';
+
+SELECT field_name, COUNT(*)
+FROM data_quality_backfill_changes
+WHERE run_id = '<run_id>' AND applied = 1
+GROUP BY field_name
+ORDER BY field_name;
+```
+
+Post-apply verification:
+
+```powershell
+npm.cmd run audit:data-quality -- --by-source --by-parser --json
+```
+
 ## Known Limitations
 
 - Existing rows may have `legacy-adapter-v1` parser metadata until a safe backfill runs.
