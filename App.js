@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.15";
+const PUBLIC_APP_VERSION = "1.5.16";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.16",
+    date: "May 8, 2026",
+    title: "ATS field quality repair",
+    summary:
+      "Expanded global location normalization and source ID recovery across high-volume ATS records so production backfills and search reindexing can repair more existing job slots."
+  },
   {
     version: "1.5.15",
     date: "May 8, 2026",

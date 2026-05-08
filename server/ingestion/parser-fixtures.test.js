@@ -8,6 +8,7 @@ const {
   normalizeCountryName,
   normalizePosting,
   normalizePostingDate,
+  normalizeRegionFromCountry,
   normalizeRemoteType,
   validatePosting
 } = require("./posting");
@@ -86,6 +87,25 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeCountryFromLocation("Washington, District of Columbia"), "United States");
   assert.equal(normalizeCountryFromLocation("Hsin Chu, Taiwan"), "Taiwan");
   assert.equal(normalizeCountryFromLocation("Ulsan"), "South Korea");
+  assert.equal(normalizeCountryFromLocation("Heidelberg"), "Germany");
+  assert.equal(normalizeCountryFromLocation("Carlton, Victoria"), "Australia");
+  assert.equal(normalizeCountryFromLocation("049909, SG"), "Singapore");
+  assert.equal(normalizeCountryFromLocation("Hebburn, GB"), "United Kingdom");
+  assert.equal(normalizeCountryFromLocation("Falmouth, GB"), "United Kingdom");
+  assert.equal(normalizeCountryFromLocation("OK-Sand Springs-74063"), "United States");
+  assert.equal(normalizeCountryFromLocation("Poipet, Cambodia"), "Cambodia");
+  assert.equal(normalizeCountryFromLocation("Nairobi Area, Kenya"), "Kenya");
+  assert.equal(normalizeCountryFromLocation("Bago, Myanmar"), "Myanmar");
+  assert.equal(normalizeCountryFromLocation("Skopje, Centar, Macedonia"), "North Macedonia");
+  assert.equal(normalizeCountryFromLocation("Honiara, Solomon Islands"), "Solomon Islands");
+  assert.equal(normalizeCountryFromLocation("Belgrade"), "Serbia");
+  assert.equal(normalizeCountryFromLocation("Cluj Napoca Hexagon Office"), "Romania");
+  assert.equal(normalizeCountryFromLocation("Taguig"), "Philippines");
+  assert.equal(normalizeCountryFromLocation("Ebene"), "Mauritius");
+  assert.equal(normalizeRegionFromCountry("Cambodia"), "APAC");
+  assert.equal(normalizeRegionFromCountry("Kenya"), "EMEA");
+  assert.equal(normalizeRegionFromCountry("North Macedonia"), "EMEA");
+  assert.equal(normalizeRegionFromCountry("Mauritius"), "EMEA");
   assert.equal(normalizeCountryName("TR"), "Turkey");
   assert.equal(normalizeCountryName("U.S."), "United States");
   assert.equal(normalizeCountryName("IN"), "India");

@@ -10,16 +10,23 @@ const {
   parseApplyToJobPostingsFromHtml,
   parseBambooHrPostingsFromApi,
   parseBreezyPostingsFromHtml,
+  parseCareerplugPostingsFromHtml,
   parseRecruiteePostingsFromPublicApp,
+  extractSourceIdFromPostingUrl,
   extractTaleoPostingsFromRest,
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
   parseFountainPostingsFromApi,
+  parseHrmDirectPostingsFromHtml,
   parseIcimsPostingsFromHtml,
+  parseJobvitePostingsFromHtml,
+  parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
+  parseTeamtailorPostingsFromHtml,
+  parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName
 } = require("../index");
 
@@ -249,4 +256,140 @@ test("Recruitee PublicApp parser preserves localized countries, departments, sou
   assert.equal(normalized.remote_type, "remote");
   assert.equal(normalized.industry, "Engineering");
   assert.equal(normalized.posting_date, "2026-05-08");
+});
+
+test("source id extraction covers high-volume ATS URL shapes", () => {
+  assert.equal(extractSourceIdFromPostingUrl("https://boards.greenhouse.io/acme/jobs/123456?gh_jid=123456", "greenhouse"), "123456");
+  assert.equal(extractSourceIdFromPostingUrl("https://jobs.lever.co/acme/abc-def-123", "lever"), "abc-def-123");
+  assert.equal(extractSourceIdFromPostingUrl("https://jobs.ashbyhq.com/acme/5b00c9d0-abc", "ashby"), "5b00c9d0-abc");
+  assert.equal(extractSourceIdFromPostingUrl("https://jobs.smartrecruiters.com/acme/743999999999-title", "smartrecruiters"), "743999999999");
+  assert.equal(extractSourceIdFromPostingUrl("https://acme.careers-page.com/job/QW12V3", "manatal"), "QW12V3");
+  assert.equal(extractSourceIdFromPostingUrl("https://acme.pinpointhq.com/en/postings/7ca2c3f3-123", "pinpointhq"), "7ca2c3f3-123");
+  assert.equal(extractSourceIdFromPostingUrl("https://jobs.recruitcrm.io/acme/vacancy/slug-123", "recruitcrm"), "slug-123");
+  assert.equal(extractSourceIdFromPostingUrl("https://acme.hrmdirect.com/employment/job-opening.php?req=3020632", "hrmdirect"), "3020632");
+  assert.equal(extractSourceIdFromPostingUrl("https://careers.zohorecruit.com/jobs/Careers/123456789", "zoho"), "123456789");
+  assert.equal(extractSourceIdFromPostingUrl("https://jobs.jobvite.com/acme/job/o0W5zfw8", "jobvite"), "o0W5zfw8");
+  assert.equal(extractSourceIdFromPostingUrl("https://acme.careerplug.com/jobs/2922288", "careerplug"), "2922288");
+  assert.equal(extractSourceIdFromPostingUrl("https://acme.teamtailor.com/jobs/5842331-support-engineer", "teamtailor"), "5842331-support-engineer");
+});
+
+test("implemented HTML/API parsers preserve source ids from source payloads and URLs", () => {
+  const jobvite = normalizeParsed(
+    "jobvite",
+    parseJobvitePostingsFromHtml(
+      "Fixture Jobvite",
+      { baseOrigin: "https://jobs.jobvite.com" },
+      `
+        <h3>Engineering</h3>
+        <table class="jv-job-list">
+          <tr>
+            <td class="jv-job-list-name"><a href="/fixture/job/o0W5zfw8">Network Support Specialist</a></td>
+            <td class="jv-job-list-location">Istanbul, TR</td>
+          </tr>
+        </table>
+      `
+    )[0],
+    "Fixture Jobvite"
+  );
+  assert.equal(jobvite.source_job_id, "o0W5zfw8");
+  assert.equal(jobvite.country, "Turkey");
+  assert.equal(jobvite.industry, "Engineering");
+
+  const careerplug = normalizeParsed(
+    "careerplug",
+    parseCareerplugPostingsFromHtml(
+      "Fixture CareerPlug",
+      { baseOrigin: "https://fixture.careerplug.com" },
+      `
+        <a aria-label="View job" href="/jobs/2922288">
+          <div class="job-title">Store Manager</div>
+          <div class="job-location">OK-Sand Springs-74063</div>
+        </a>
+      `
+    )[0],
+    "Fixture CareerPlug"
+  );
+  assert.equal(careerplug.source_job_id, "2922288");
+  assert.equal(careerplug.country, "United States");
+
+  const teamtailor = normalizeParsed(
+    "teamtailor",
+    parseTeamtailorPostingsFromHtml(
+      "Fixture Teamtailor",
+      { baseOrigin: "https://fixture.teamtailor.com" },
+      `
+        <li class="block-grid-item">
+          <a href="/jobs/5842331-support-engineer">
+            <span class="text-block-base-link" title="Support Engineer">Support Engineer</span>
+            <div class="mt-1 text-md"><span>Engineering</span><span>Heidelberg</span></div>
+          </a>
+        </li>
+      `
+    )[0],
+    "Fixture Teamtailor"
+  );
+  assert.equal(teamtailor.source_job_id, "5842331-support-engineer");
+  assert.equal(teamtailor.country, "Germany");
+  assert.equal(teamtailor.industry, "Engineering");
+
+  const manatal = normalizeParsed(
+    "manatal",
+    parseManatalPostingsFromApi(
+      "Fixture Manatal",
+      { domainSlug: "fixtureco", publicBaseUrl: "https://www.careers-page.com" },
+      {
+        results: [
+          {
+            id: "7788",
+            hash: "QW12V3",
+            title: "Operations Analyst",
+            city: "Poipet",
+            country: "Cambodia",
+            organization_name: "Operations"
+          }
+        ]
+      }
+    )[0],
+    "Fixture Manatal"
+  );
+  assert.equal(manatal.source_job_id, "QW12V3");
+  assert.equal(manatal.country, "Cambodia");
+  assert.equal(manatal.region, "APAC");
+
+  const hrmdirect = normalizeParsed(
+    "hrmdirect",
+    parseHrmDirectPostingsFromHtml(
+      "Fixture HRMDirect",
+      { baseOrigin: "https://fixture.hrmdirect.com" },
+      `
+        <tr class="reqitem">
+          <td class="posTitle"><a href="job-opening.php?req=3020632">Customer Support</a></td>
+          <td class="cities">Nairobi Area</td>
+          <td class="state">Kenya</td>
+          <td class="departments">Support</td>
+          <td class="date">2026-05-08</td>
+        </tr>
+      `
+    )[0],
+    "Fixture HRMDirect"
+  );
+  assert.equal(hrmdirect.source_job_id, "3020632");
+  assert.equal(hrmdirect.country, "Kenya");
+  assert.equal(hrmdirect.industry, "Support");
+
+  const zoho = normalizeParsed(
+    "zoho",
+    parseZohoPostingsFromHtml(
+      "Fixture Zoho",
+      { careersUrl: "https://fixture.zohorecruit.com/jobs/Careers" },
+      `
+        <input id="meta" value='{"list_url":"https://fixture.zohorecruit.com/jobs/Careers"}'>
+        <input id="jobs" value='[{"id":"123456789","Posting_Title":"Data Scientist","City":"Skopje","State":"Centar","Country":"Macedonia","Date_Opened":"2026-05-08","Industry":"Data"}]'>
+      `
+    )[0],
+    "Fixture Zoho"
+  );
+  assert.equal(zoho.source_job_id, "123456789");
+  assert.equal(zoho.country, "North Macedonia");
+  assert.equal(zoho.posting_date, "2026-05-08");
 });
