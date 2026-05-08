@@ -56,6 +56,8 @@ async function main() {
 
   try {
     await ensurePostgresSchema(pool);
+    const reindexStartedAtResult = await pool.query("SELECT now() AS started_at");
+    const reindexStartedAt = reindexStartedAtResult.rows[0]?.started_at;
     await resetMeiliIndexIfRequested();
     await ensureMeiliPostingsIndex();
 
@@ -95,6 +97,18 @@ async function main() {
     }
 
     console.log(`Reindexed ${indexed} visible postings into Meilisearch`);
+    if (REPLACE_INDEX && reindexStartedAt) {
+      const processed = await pool.query(
+        `
+          UPDATE search_index_outbox
+          SET processed_at = now()
+          WHERE processed_at IS NULL
+            AND created_at <= $1;
+        `,
+        [reindexStartedAt]
+      );
+      console.log(`Marked ${processed.rowCount || 0} pre-reindex search outbox rows as processed`);
+    }
   } finally {
     await pool.end();
   }
