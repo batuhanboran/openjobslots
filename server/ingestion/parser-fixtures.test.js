@@ -105,11 +105,15 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeCountryFromLocation("Belgrade"), "Serbia");
   assert.equal(normalizeCountryFromLocation("Cluj Napoca Hexagon Office"), "Romania");
   assert.equal(normalizeCountryFromLocation("Taguig"), "Philippines");
+  assert.equal(normalizeCountryFromLocation("Mandaluyong City"), "Philippines");
+  assert.equal(normalizeCountryFromLocation("Riyadh"), "Saudi Arabia");
+  assert.equal(normalizeCountryFromLocation("Guam"), "Guam");
   assert.equal(normalizeCountryFromLocation("Ebene"), "Mauritius");
   assert.equal(normalizeRegionFromCountry("Cambodia"), "APAC");
   assert.equal(normalizeRegionFromCountry("Kenya"), "EMEA");
   assert.equal(normalizeRegionFromCountry("North Macedonia"), "EMEA");
   assert.equal(normalizeRegionFromCountry("Mauritius"), "EMEA");
+  assert.equal(normalizeRegionFromCountry("Guam"), "APAC");
   assert.equal(normalizeCountryName("TR"), "Turkey");
   assert.equal(normalizeCountryName("U.S."), "United States");
   assert.equal(normalizeCountryName("IN"), "India");

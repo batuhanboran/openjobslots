@@ -68,6 +68,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Israel", ["il", "isr", "israel"]],
   ["United Arab Emirates", ["ae", "are", "uae", "united arab emirates", "dubai", "abu dhabi"]],
   ["Saudi Arabia", ["sa", "sau", "saudi arabia"]],
+  ["Guam", ["gu", "gum", "guam"]],
   ["Luxembourg", ["lu", "lux", "luxembourg"]],
   ["Lebanon", ["lb", "lbn", "lebanon"]],
   ["Jordan", ["jo", "jor", "jordan"]],
@@ -144,7 +145,8 @@ const COUNTRY_LOCATION_TERMS = Object.freeze([
   ["Solomon Islands", ["honiara"]],
   ["Serbia", ["belgrade"]],
   ["Romania", ["cluj napoca", "bucharest"]],
-  ["Philippines", ["taguig", "manila"]],
+  ["Philippines", ["taguig", "manila", "mandaluyong", "mandaluyong city"]],
+  ["Saudi Arabia", ["riyadh", "jeddah", "dammam", "madinah", "al ahsa"]],
   ["Mauritius", ["ebene"]],
   ["South Korea", ["seoul", "ulsan", "busan", "incheon"]],
   ["Taiwan", ["taipei", "hsinchu", "hsin chu", "taichung", "kaohsiung", "taiwan"]],
@@ -332,7 +334,8 @@ function normalizeRegionFromCountry(country) {
     "thailand",
     "vietnam",
     "pakistan",
-    "solomon islands"
+    "solomon islands",
+    "guam"
   ].includes(normalized)) {
     return "APAC";
   }
