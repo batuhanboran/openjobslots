@@ -225,6 +225,8 @@ function normalizeCountryFromLocation(value) {
   const location = normalizePostingValue(value);
   const normalized = normalizeSearchText(location);
   if (!normalized) return "";
+  const atsCodeCountry = normalizeCountryFromAtsCodeLocation(location);
+  if (atsCodeCountry) return atsCodeCountry;
   if (US_STATE_ABBREVIATION_PATTERN.test(location)) return "United States";
   if (US_STATE_HYPHEN_PREFIX_PATTERN.test(location)) return "United States";
   if (CANADA_PROVINCE_ABBREVIATION_PATTERN.test(location)) return "Canada";
