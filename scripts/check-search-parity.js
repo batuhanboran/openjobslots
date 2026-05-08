@@ -1,5 +1,9 @@
 const { createPostgresPool, getPostgresConfig } = require("../server/backends/postgres");
 const { listPostgresPostings } = require("../server/backends/postgresStore");
+const {
+  normalizeCountryFromLocation,
+  normalizeRemoteTypeFromEvidence
+} = require("../server/ingestion/posting");
 const { getMeiliConfig, searchMeiliPostings } = require("../server/search/meili");
 
 const DEFAULT_CASES = Object.freeze([
@@ -69,11 +73,22 @@ function companyFromItem(item) {
 }
 
 function countryFromItem(item) {
-  return String(item?.country || "").trim();
+  const explicit = String(item?.country || "").trim();
+  if (explicit) return explicit;
+  return normalizeCountryFromLocation(item?.location || item?.location_text || "");
 }
 
 function remoteTypeFromItem(item) {
-  return String(item?.remote_type || "unknown").trim() || "unknown";
+  const explicit = String(item?.remote_type || "").trim();
+  if (explicit && explicit !== "unknown") return explicit;
+  const evidence = [
+    item?.remote_type,
+    item?.location,
+    item?.location_text,
+    item?.position_name,
+    item?.title
+  ].map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+  return normalizeRemoteTypeFromEvidence(evidence, evidence);
 }
 
 function requiredFieldIssues(items, source) {

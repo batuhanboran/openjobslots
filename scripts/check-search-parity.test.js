@@ -63,6 +63,21 @@ test("filter violation checks country and remote mode", () => {
   assert.deepEqual(violations.map((item) => item.field), ["country", "remote_type"]);
 });
 
+test("filter violation checks infer public API country and remote evidence", () => {
+  const violations = checkFilterViolations(
+    { countries: ["United States"], remote: "remote" },
+    [
+      {
+        job_posting_url: "https://example.com/remote-us",
+        position_name: "Remote Customer Support",
+        location: "Seattle, Washington, United States"
+      }
+    ],
+    "api"
+  );
+  assert.deepEqual(violations, []);
+});
+
 test("top URL and sort helpers report parity-relevant differences", () => {
   assert.deepEqual(compareTopUrls(["a", "b"], ["a", "c"]), [{ index: 1, left: "b", right: "c" }]);
   assert.equal(isSortedByLastSeen([{ last_seen_epoch: 3 }, { last_seen_epoch: 2 }]), true);
