@@ -118,10 +118,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.21";
+const PUBLIC_APP_VERSION = "1.6.0";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.6.0",
+    date: "May 8, 2026",
+    title: "Production hardening release",
+    summary:
+      "Hardened search relevance and Meili parity, expanded ATS parser certification, improved ingestion cache and worker reliability, fixed UI issues found by automation, added data quality diagnostics, and verified the release with backend, parser, API, E2E, build, and quality-gate checks."
+  },
   {
     version: "1.5.21",
     date: "May 8, 2026",

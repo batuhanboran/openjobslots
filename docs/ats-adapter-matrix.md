@@ -39,7 +39,7 @@ Current live ltx100 data-quality finding before v1.5.13: 722,591 active postings
 - Cache key includes ATS key and company URL; posting key is canonical URL.
 - New ATS cannot be enabled by default until raw fixture tests and production parity tests pass.
 
-## Required 60-ATS Adapter Matrix (v1.5.21)
+## Required 60-ATS Adapter Matrix (v1.6.0)
 
 This table is intentionally conservative. `certified` means the ATS has raw parser-fixture-backed tests in this repo. Normalized fixtures alone are marked `partial` because they do not prove the real source parser.
 
