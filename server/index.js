@@ -13781,6 +13781,22 @@ async function createCanonicalPostingsTable() {
   `);
 }
 
+function isSqliteDuplicateColumnError(error) {
+  return String(error?.message || error || "").toLowerCase().includes("duplicate column name");
+}
+
+async function addPostingsColumnIfMissing(columnName, definition) {
+  const columns = await db.all(`PRAGMA table_info('Postings');`);
+  const existing = new Set(columns.map((column) => String(column?.name || "")));
+  if (existing.has(columnName)) return;
+  try {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN ${columnName} ${definition};`);
+  } catch (error) {
+    if (isSqliteDuplicateColumnError(error)) return;
+    throw error;
+  }
+}
+
 async function ensurePostingsTable() {
   const tableInfo = await db.all(`PRAGMA table_info('Postings');`);
 
@@ -13810,12 +13826,12 @@ async function ensurePostingsTable() {
   }
 
   if (!existingColumns.has("last_seen_epoch")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN last_seen_epoch INTEGER;`);
+    await addPostingsColumnIfMissing("last_seen_epoch", "INTEGER");
     await db.run(`UPDATE Postings SET last_seen_epoch = ? WHERE last_seen_epoch IS NULL;`, [nowEpochSeconds()]);
   }
 
   if (!existingColumns.has("first_seen_epoch")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN first_seen_epoch INTEGER;`);
+    await addPostingsColumnIfMissing("first_seen_epoch", "INTEGER");
   }
   await db.run(
     `
@@ -13827,39 +13843,39 @@ async function ensurePostingsTable() {
   );
 
   if (!existingColumns.has("hidden")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`);
+    await addPostingsColumnIfMissing("hidden", "INTEGER NOT NULL DEFAULT 0");
   }
 
   if (!existingColumns.has("hidden_at_epoch")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN hidden_at_epoch INTEGER;`);
+    await addPostingsColumnIfMissing("hidden_at_epoch", "INTEGER");
   }
 
   if (!existingColumns.has("location")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN location TEXT;`);
+    await addPostingsColumnIfMissing("location", "TEXT");
   }
 
   if (!existingColumns.has("source_job_id")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN source_job_id TEXT NOT NULL DEFAULT '';`);
+    await addPostingsColumnIfMissing("source_job_id", "TEXT NOT NULL DEFAULT ''");
   }
 
   if (!existingColumns.has("parser_version")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN parser_version TEXT NOT NULL DEFAULT 'legacy-adapter-v1';`);
+    await addPostingsColumnIfMissing("parser_version", "TEXT NOT NULL DEFAULT 'legacy-adapter-v1'");
   }
 
   if (!existingColumns.has("confidence")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN confidence REAL NOT NULL DEFAULT 0;`);
+    await addPostingsColumnIfMissing("confidence", "REAL NOT NULL DEFAULT 0");
   }
 
   if (!existingColumns.has("quality_score")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN quality_score INTEGER NOT NULL DEFAULT 0;`);
+    await addPostingsColumnIfMissing("quality_score", "INTEGER NOT NULL DEFAULT 0");
   }
 
   if (!existingColumns.has("quality_flags")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN quality_flags TEXT NOT NULL DEFAULT '[]';`);
+    await addPostingsColumnIfMissing("quality_flags", "TEXT NOT NULL DEFAULT '[]'");
   }
 
   if (!existingColumns.has("rejection_reason")) {
-    await db.exec(`ALTER TABLE Postings ADD COLUMN rejection_reason TEXT NOT NULL DEFAULT '';`);
+    await addPostingsColumnIfMissing("rejection_reason", "TEXT NOT NULL DEFAULT ''");
   }
 
   await db.run(`UPDATE Postings SET last_seen_epoch = ? WHERE last_seen_epoch IS NULL;`, [nowEpochSeconds()]);
