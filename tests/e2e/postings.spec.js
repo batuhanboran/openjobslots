@@ -39,6 +39,14 @@ async function expectNoProtectedPublicRouteCalls(calls, phase) {
 
 async function openJobSlots(page) {
   const failedResponses = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      failedResponses.push(`console error: ${message.text()}`);
+    }
+  });
+  page.on("requestfailed", (request) => {
+    failedResponses.push(`request failed: ${request.method()} ${request.url()} ${request.failure()?.errorText || ""}`.trim());
+  });
   page.on("response", (response) => {
     if (response.status() >= 500) {
       failedResponses.push(`${response.status()} ${response.url()}`);
@@ -624,6 +632,29 @@ async function installSettingsWriteMocks(page) {
   });
 }
 
+async function installNoResultsRoute(page, searchValue = "__openjobslots_empty_probe__") {
+  await page.route("**/postings**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/postings") && url.searchParams.get("search") === searchValue) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          count: 0,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          items: []
+        })
+      });
+      return;
+    }
+    await route.continue();
+  });
+}
+
 test.describe("postings page QA", () => {
   test("public first load and reload do not call protected routes or show raw auth errors", async ({ page }) => {
     const protectedRouteCalls = installProtectedPublicRouteRecorder(page);
@@ -802,6 +833,65 @@ test.describe("postings page QA", () => {
     });
     await expect(page.getByTestId("posting-card").first()).toContainText(firstCardText.split("\n")[0]);
     await expect(page.getByTestId("app-error-message")).toHaveCount(0);
+  });
+
+  test("no-results and clear states stay predictable", async ({ page }) => {
+    const emptySearch = "__openjobslots_empty_probe__";
+    await installNoResultsRoute(page, emptySearch);
+    await openJobSlots(page);
+
+    await page.getByTestId("postings-search-input").fill(emptySearch);
+    await page.getByTestId("postings-search-input").press("Enter");
+    await expect(page.getByTestId("sync-status-panel")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("postings-empty-state")).toBeVisible();
+    await expect(page.getByText(/No slots match this exact search/i)).toBeVisible();
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
+    await expectNoRawErrors(page);
+
+    await page.getByTestId("postings-filter-clear").click();
+    await expect(page.getByTestId("postings-search-input")).toHaveValue("");
+    await expect(page.getByTestId("postings-empty-state")).toHaveCount(0);
+    await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
+    await expectNoRawErrors(page);
+  });
+
+  test("status failures stay in coverage UI without raw backend text", async ({ page }) => {
+    await page.route("**/sync/status**", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "text/html",
+        body: "<!DOCTYPE html><pre>SQLITE_BUSY: database is locked</pre>"
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("postings-search-input").fill("remote jobs");
+    await page.getByTestId("postings-search-input").press("Enter");
+    await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("sync-status-panel")).toBeVisible();
+    await expect(page.getByTestId("sync-status-summary")).toContainText(/Index coverage is temporarily unavailable/i);
+    await page.getByTestId("coverage-toggle").click();
+    await expect(page.getByTestId("sync-last-error")).toContainText(/Coverage diagnostics are temporarily unavailable/i);
+    await expect(page.getByTestId("app-error-message")).toHaveCount(0);
+    await expectNoRawErrors(page);
+  });
+
+  test("release notes modal is closable by keyboard and backdrop", async ({ page }) => {
+    await openJobSlots(page);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width < 768, "release notes entry point is desktop-only");
+
+    await page.getByTestId("public-version-button").click();
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await expect(page.getByTestId("release-notes-scroll")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+
+    await page.getByTestId("public-version-button").click();
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await page.getByTestId("release-notes-backdrop").click({ position: { x: 5, y: 5 }, force: true });
+    await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+    await expect(page.getByTestId("postings-search-input")).toBeVisible();
   });
 
   test("filters can open, select, combine, and clear", async ({ page }) => {
