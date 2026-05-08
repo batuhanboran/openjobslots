@@ -26,7 +26,9 @@
         "city": "Victoria",
         "address": "",
         "zipcode": "",
-        "location_display": "Victoria, BC, Canada"
+        "location_display": "Victoria, BC, Canada",
+        "organization_name": "Sales",
+        "job_type": "Full-time"
       }
     ]
   },
@@ -44,6 +46,8 @@
       "remote_type": "remote",
       "posting_date": null,
       "posted_at_epoch": null,
+      "department": "Sales",
+      "employment_type": "Full-time",
       "description_plain": "Fully remote with structured training."
     }
   ]

@@ -468,6 +468,8 @@ function extractCityText(posting, location, country) {
   const firstSegment = locationText.split(/\s*,\s*|\s+-\s+|\s+\|\s+/)[0]?.trim() || "";
   if (!firstSegment || firstSegment.length > 80) return "";
   if (/^(remote|hybrid|onsite|on[- ]?site|work from home|wfh|worldwide|anywhere)$/i.test(firstSegment)) return "";
+  if (/^\(?\s*(multiple|various|several|all)\s+(locations|states|sites|schools|campuses)\s*\)?$/i.test(firstSegment)) return "";
+  if (/^(district[- ]?wide|statewide|nationwide|tbd|n\/?a|unknown)$/i.test(firstSegment)) return "";
   const normalizedFirst = normalizeSearchText(firstSegment);
   const normalizedCountry = normalizeSearchText(country);
   if (normalizedCountry && normalizedFirst === normalizedCountry) return "";

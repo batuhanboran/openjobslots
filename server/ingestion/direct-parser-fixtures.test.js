@@ -232,6 +232,7 @@ test("high-volume ATS parsers preserve country, date, remote, and source ids whe
         <h3 class="list-group-item-heading"><a href="/apply/abc123/Customer-Support">Customer Support</a></h3>
         <i class="fa fa-map-marker"></i> Istanbul, Turkiye
         <i class="fa fa-calendar"></i> 2026-05-08
+        <span>Employment Type: Full-time</span>
       </li>
     `
   );
@@ -240,6 +241,7 @@ test("high-volume ATS parsers preserve country, date, remote, and source ids whe
   assert.equal(applyToJob.region, "EMEA");
   assert.equal(applyToJob.source_job_id, "abc123");
   assert.equal(applyToJob.posting_date, "2026-05-08");
+  assert.equal(applyToJob.employment_type, "Full-time");
 
   const breezyParsed = parseBreezyPostingsFromHtml(
     "Fixture Breezy",
@@ -291,6 +293,7 @@ test("high-volume ATS parsers preserve country, date, remote, and source ids whe
   assert.equal(applitrack.region, "North America");
   assert.equal(applitrack.source_job_id, "5503511");
   assert.equal(applitrack.posting_date, "05/08/2026");
+  assert.equal(applitrack.department, "Teacher");
 });
 
 test("iCIMS raw detail fixtures certify ATS code locations and remote header evidence", () => {
@@ -594,7 +597,8 @@ test("implemented HTML/API parsers preserve source ids from source payloads and 
             title: "Operations Analyst",
             city: "Poipet",
             country: "Cambodia",
-            organization_name: "Operations"
+            organization_name: "Operations",
+            employment_type: "Full-time"
           }
         ]
       }
@@ -604,6 +608,8 @@ test("implemented HTML/API parsers preserve source ids from source payloads and 
   assert.equal(manatal.source_job_id, "QW12V3");
   assert.equal(manatal.country, "Cambodia");
   assert.equal(manatal.region, "APAC");
+  assert.equal(manatal.department, "Operations");
+  assert.equal(manatal.employment_type, "Full-time");
 
   const hrmdirect = normalizeParsed(
     "hrmdirect",
@@ -616,6 +622,7 @@ test("implemented HTML/API parsers preserve source ids from source payloads and 
           <td class="cities">Nairobi Area</td>
           <td class="state">Kenya</td>
           <td class="departments">Support</td>
+          <td class="jobtype">Full-time</td>
           <td class="date">2026-05-08</td>
         </tr>
       `
@@ -624,7 +631,10 @@ test("implemented HTML/API parsers preserve source ids from source payloads and 
   );
   assert.equal(hrmdirect.source_job_id, "3020632");
   assert.equal(hrmdirect.country, "Kenya");
+  assert.equal(hrmdirect.city, "Nairobi Area");
   assert.equal(hrmdirect.industry, "Support");
+  assert.equal(hrmdirect.department, "Support");
+  assert.equal(hrmdirect.employment_type, "Full-time");
 
   const zoho = normalizeParsed(
     "zoho",

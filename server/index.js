@@ -17,6 +17,7 @@ const {
 } = require("./backends/postgres");
 const {
   getPostgresAtsAdmin,
+  getPostgresAtsFieldQualityByAts,
   getPostgresCounts,
   getPostgresFilterOptions,
   getPostgresParserAdmin,
@@ -5266,6 +5267,24 @@ function parseManatalPostingsFromApi(companyNameForPostings, config, responseJso
     const locationParts = [city, state, country].filter(Boolean);
     const location = locationDisplay || locationParts.join(", ");
     const descriptionHtml = String(item?.description || "").trim();
+    const department = cleanManatalText(
+      item?.organization_name ||
+      item?.department ||
+      item?.department_name ||
+      item?.team ||
+      item?.job?.department?.name ||
+      ""
+    );
+    const employmentType = cleanManatalText(
+      item?.employment_type ||
+      item?.employmentType ||
+      item?.job_type ||
+      item?.jobType ||
+      item?.contract_type ||
+      item?.work_type ||
+      item?.type ||
+      ""
+    );
     const remoteType = normalizeExplicitRemoteValue([
       item?.remote === true || item?.is_remote === true ? "remote" : "",
       item?.workplace_type,
@@ -5303,7 +5322,8 @@ function parseManatalPostingsFromApi(companyNameForPostings, config, responseJso
       state: state || null,
       country: country || null,
       remote_type: remoteType || null,
-      department: cleanManatalText(item?.organization_name || "") || null,
+      department: department || null,
+      employment_type: employmentType || null,
       description_html: descriptionHtml || null,
       description_plain: cleanManatalText(descriptionHtml) || null
     });
@@ -7196,6 +7216,12 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "date")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "dates")) ||
       null;
+    const employmentType =
+      cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "jobtype")) ||
+      cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "jobType")) ||
+      cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "employmentType")) ||
+      cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "type")) ||
+      null;
     const location = [city, state].filter(Boolean).join(", ");
 
     postings.push({
@@ -7205,7 +7231,9 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
       location: location || null,
-      department: department || null
+      city: city || null,
+      department: department || null,
+      employment_type: employmentType
     });
     seenUrls.add(absoluteUrl);
     rowMatch = rowPattern.exec(source);
@@ -7331,7 +7359,13 @@ function extractApplyToJobLabeledField(cardHtml, labels) {
     .join("|");
   if (!text || !labelPattern) return null;
   const match = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^|•\\n]{2,120})`, "i"));
-  return match?.[1] ? cleanApplyToJobText(match[1]) : null;
+  if (!match?.[1]) return null;
+  return cleanApplyToJobText(
+    String(match[1] || "").replace(
+      /\s+(?:Employment Type|Job Type|Schedule|Type|Department|Category|Team|Location|Job Location|Office|Posted|Date Posted|Posting Date)\s*:.*$/i,
+      ""
+    )
+  );
 }
 
 function extractApplyToJobSourceId(urlValue) {
@@ -7385,6 +7419,12 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       extractApplyToJobIconField(itemHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]) ||
       extractApplyToJobLabeledField(itemHtml, ["Posted", "Date Posted", "Posting Date"]);
     const department = extractApplyToJobLabeledField(itemHtml, ["Department", "Category", "Team"]);
+    const employmentType = extractApplyToJobLabeledField(itemHtml, [
+      "Employment Type",
+      "Job Type",
+      "Schedule",
+      "Type"
+    ]);
 
     postings.push({
       company_name: companyNameForPostings,
@@ -7393,7 +7433,8 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
       location,
-      department
+      department,
+      employment_type: employmentType
     });
     seenUrls.add(absoluteUrl);
 
@@ -7429,6 +7470,12 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       extractApplyToJobIconField(contextHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]) ||
       extractApplyToJobLabeledField(contextHtml, ["Posted", "Date Posted", "Posting Date"]);
     const department = extractApplyToJobLabeledField(contextHtml, ["Department", "Category", "Team"]);
+    const employmentType = extractApplyToJobLabeledField(contextHtml, [
+      "Employment Type",
+      "Job Type",
+      "Schedule",
+      "Type"
+    ]);
 
     postings.push({
       company_name: companyNameForPostings,
@@ -7437,7 +7484,8 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
       location,
-      department
+      department,
+      employment_type: employmentType
     });
     seenUrls.add(absoluteUrl);
   }
@@ -10825,7 +10873,8 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
       job_posting_url: jobUrl,
       remote_type: extractRemoteTypeFromText(rowText),
       posting_date: extractDateFromRow(rowText),
-      location: extractLocationFromRow(rowText, [jobId, category, specialty, title])
+      location: extractLocationFromRow(rowText, [jobId, category, specialty, title]),
+      department: category || null
     });
     seenIds.add(jobId);
     match = applyPattern.exec(page);
@@ -16177,11 +16226,13 @@ function createServer() {
 
   app.get("/admin/parsers", async (_req, res) => {
     if (DB_BACKEND === "postgres") {
-      const [atsItems, parserAttentionByAts] = await Promise.all([
+      const [atsItems, parserAttentionByAts, fieldQualityByAts] = await Promise.all([
         getPostgresAtsAdmin(postgresPool),
-        getPostgresParserAttentionByAts(postgresPool, 100)
+        getPostgresParserAttentionByAts(postgresPool, 100),
+        getPostgresAtsFieldQualityByAts(postgresPool)
       ]);
       const attentionByKey = new Map(parserAttentionByAts.map((item) => [item.ats_key, item]));
+      const fieldQualityByKey = new Map(fieldQualityByAts.map((item) => [item.ats_key, item]));
       return res.json(sanitizeFrontendValue({
         ok: true,
         db_backend: DB_BACKEND,
@@ -16190,6 +16241,7 @@ function createServer() {
         items: atsItems.map((item) => {
           const metadata = getAdapterMetadata(item.ats_key, item.display_name);
           const attention = attentionByKey.get(item.ats_key) || null;
+          const fieldQuality = fieldQualityByKey.get(item.ats_key) || null;
           return {
             ...item,
             parser_version: "postgres-adapter-v1",
@@ -16199,6 +16251,7 @@ function createServer() {
             tier: metadata.tier,
             parse_strategy: metadata.parseStrategy,
             enabled_by_default: metadata.enabledByDefault,
+            field_quality: fieldQuality,
             parser_attention_count_24h: Number(attention?.error_count || 0),
             latest_parser_error_at: attention?.latest_error_at || "",
             latest_parser_error: attention?.latest_error || ""

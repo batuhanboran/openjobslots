@@ -8,7 +8,8 @@ const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
 const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
-  normalizeRemoteTypeFromEvidence
+  normalizeRemoteTypeFromEvidence,
+  validatePosting
 } = require("../ingestion/posting");
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -687,6 +688,111 @@ async function getPostgresAtsAdmin(pool) {
   }));
 }
 
+function formatFieldQualityRow(row) {
+  const total = Number(row?.total_postings || 0);
+  const pct = (value) => total > 0 ? Number(((Number(value || 0) / total) * 100).toFixed(2)) : 0;
+  const missingCountry = Number(row?.missing_country_count || 0);
+  const missingRegion = Number(row?.missing_region_count || 0);
+  const missingCity = Number(row?.missing_city_count || 0);
+  const missingRemoteType = Number(row?.missing_remote_type_count || 0);
+  const missingPostedAt = Number(row?.missing_posted_at_count || 0);
+  const missingDepartment = Number(row?.missing_department_count || 0);
+  const missingEmploymentType = Number(row?.missing_employment_type_count || 0);
+  const missingDescriptionPlain = Number(row?.missing_description_plain_count || 0);
+  return {
+    ats_key: String(row?.ats_key || ""),
+    total_postings: total,
+    missing_country_count: missingCountry,
+    missing_country_pct: pct(missingCountry),
+    missing_region_count: missingRegion,
+    missing_region_pct: pct(missingRegion),
+    missing_city_count: missingCity,
+    missing_city_pct: pct(missingCity),
+    missing_region_or_city_count: Number(row?.missing_region_or_city_count || 0),
+    missing_region_or_city_pct: pct(row?.missing_region_or_city_count),
+    missing_remote_type_count: missingRemoteType,
+    missing_remote_type_pct: pct(missingRemoteType),
+    missing_posted_at_count: missingPostedAt,
+    missing_posted_at_pct: pct(missingPostedAt),
+    missing_department_count: missingDepartment,
+    missing_department_pct: pct(missingDepartment),
+    missing_employment_type_count: missingEmploymentType,
+    missing_employment_type_pct: pct(missingEmploymentType),
+    missing_description_plain_count: missingDescriptionPlain,
+    missing_description_plain_pct: pct(missingDescriptionPlain),
+    parser_attention_count_24h: Number(row?.parser_attention_count_24h || 0),
+    impact_score: Number(row?.impact_score || 0)
+  };
+}
+
+async function getPostgresAtsFieldQualityByAts(pool, atsKeys = []) {
+  const keys = Array.isArray(atsKeys)
+    ? atsKeys.map((key) => normalizeAtsKey(key)).filter(Boolean)
+    : [];
+  const params = [];
+  const atsClause = keys.length > 0 ? "AND p.ats_key = ANY($1::text[])" : "";
+  if (keys.length > 0) params.push(keys);
+  const rows = await pool.query(
+    `
+      WITH parser_attention AS (
+        SELECT ats_key, COUNT(*)::int AS parser_attention_count_24h
+        FROM ingestion_run_errors
+        WHERE created_at >= now() - interval '24 hours'
+          AND error_type LIKE 'parser_%'
+        GROUP BY ats_key
+      )
+      SELECT
+        p.ats_key,
+        COUNT(*)::int AS total_postings,
+        COUNT(*) FILTER (WHERE btrim(coalesce(p.country, '')) = '')::int AS missing_country_count,
+        COUNT(*) FILTER (WHERE btrim(coalesce(p.region, '')) = '')::int AS missing_region_count,
+        COUNT(*) FILTER (WHERE btrim(coalesce(p.city, '')) = '')::int AS missing_city_count,
+        COUNT(*) FILTER (
+          WHERE btrim(coalesce(p.region, '')) = ''
+             OR btrim(coalesce(p.city, '')) = ''
+        )::int AS missing_region_or_city_count,
+        COUNT(*) FILTER (
+          WHERE btrim(coalesce(p.remote_type, '')) = ''
+             OR p.remote_type = 'unknown'
+        )::int AS missing_remote_type_count,
+        COUNT(*) FILTER (
+          WHERE p.posted_at_epoch IS NULL
+             OR p.posted_at_epoch <= 0
+        )::int AS missing_posted_at_count,
+        COUNT(*) FILTER (WHERE btrim(coalesce(p.department, '')) = '')::int AS missing_department_count,
+        COUNT(*) FILTER (WHERE btrim(coalesce(p.employment_type, '')) = '')::int AS missing_employment_type_count,
+        COUNT(*) FILTER (WHERE btrim(coalesce(p.description_plain, '')) = '')::int AS missing_description_plain_count,
+        COALESCE(MAX(pa.parser_attention_count_24h), 0)::int AS parser_attention_count_24h,
+        (
+          COUNT(*) FILTER (WHERE btrim(coalesce(p.country, '')) = '') +
+          COUNT(*) FILTER (WHERE btrim(coalesce(p.region, '')) = '') +
+          COUNT(*) FILTER (WHERE btrim(coalesce(p.city, '')) = '') +
+          COUNT(*) FILTER (
+            WHERE btrim(coalesce(p.remote_type, '')) = ''
+               OR p.remote_type = 'unknown'
+          ) +
+          COUNT(*) FILTER (
+            WHERE p.posted_at_epoch IS NULL
+               OR p.posted_at_epoch <= 0
+          ) +
+          COUNT(*) FILTER (WHERE btrim(coalesce(p.department, '')) = '') +
+          COUNT(*) FILTER (WHERE btrim(coalesce(p.employment_type, '')) = '') +
+          COUNT(*) FILTER (WHERE btrim(coalesce(p.description_plain, '')) = '') +
+          COALESCE(MAX(pa.parser_attention_count_24h), 0)
+        )::bigint AS impact_score
+      FROM postings p
+      LEFT JOIN parser_attention pa
+        ON pa.ats_key = p.ats_key
+      WHERE p.hidden = false
+        ${atsClause}
+      GROUP BY p.ats_key
+      ORDER BY impact_score DESC, total_postings DESC;
+    `,
+    params
+  );
+  return rows.rows.map(formatFieldQualityRow);
+}
+
 async function getPostgresParserAdmin(pool, atsKey) {
   const normalizedAtsKey = normalizeAtsKey(atsKey);
   const source = await pool.query(
@@ -720,6 +826,7 @@ async function getPostgresParserAdmin(pool, atsKey) {
     `,
     [normalizedAtsKey]
   );
+  const fieldQuality = await getPostgresAtsFieldQualityByAts(pool, [normalizedAtsKey]);
 
   return {
     ats_key: String(source.rows[0].ats_key || ""),
@@ -736,6 +843,7 @@ async function getPostgresParserAdmin(pool, atsKey) {
     tier: metadata.tier,
     parse_strategy: metadata.parseStrategy,
     enabled_by_default: metadata.enabledByDefault,
+    field_quality: fieldQuality[0] || null,
     recent_errors: errorRows.rows.map((row) => ({
       run_id: Number(row?.run_id || 0),
       company_url: String(row?.company_url || ""),
@@ -948,6 +1056,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         posted_at_epoch: posting?.posted_at_epoch || posting?.posting_date_epoch || null,
         hidden: false
       };
+      if (!validatePosting(normalizedPosting).ok) continue;
       normalizedForSearchIndex.push(normalizedPosting);
       await client.query(
         `
@@ -1215,6 +1324,7 @@ module.exports = {
   getRetentionConfig,
   getRetentionCutoffs,
   getPostgresAtsAdmin,
+  getPostgresAtsFieldQualityByAts,
   getPostgresCounts,
   getPostgresFilterOptions,
   getPostgresParserAdmin,
