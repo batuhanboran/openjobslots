@@ -85,7 +85,7 @@ Operational policy from these findings:
 
 - Parser normalization must improve before aggressive search-index cleanup. Premature cleanup can delete or hide rows that are only mismatched because parser fields are inconsistent.
 - After parser normalization changes, run `npm run backfill:normalization` in dry-run mode first. A real run may fill missing `country`, `region`, and `remote_type` from existing visible rows where `location_text` or title signals already contain enough evidence; it does not invent posting dates.
-- After detail-page parser changes, run `npm run backfill:detail-pages` in dry-run mode first with explicit `OPENJOBSLOTS_DETAIL_BACKFILL_ATS`, `OPENJOBSLOTS_DETAIL_BACKFILL_LIMIT`, and `OPENJOBSLOTS_DETAIL_BACKFILL_DELAY_MS`. This tool is for sampled/budgeted repair of rows whose list payload omitted fields; do not run an unbounded detail crawl.
+- After detail-page parser changes, run `npm run refetch:details:dry-run -- --source=<ats> --limit=<n> --company-limit=<n>` first. This tool is for sampled/budgeted repair of rows whose list payload omitted fields; do not run an unbounded detail crawl. Guarded apply requires `--apply --confirm-production --backup-confirmed --max-updates=N`.
 - Stale or hidden Meili documents must be removed through durable delete/reindex work, not one-off manual cleanup.
 - Production parity tests must compare `/postings`, Meili hits, and Postgres source-of-truth rows before declaring cleanup or search changes successful.
 
