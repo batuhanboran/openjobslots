@@ -540,6 +540,9 @@ async function testPostgresStructuredFiltersUseConservativeLocationFallbacks() {
     assert.ok(countCall.params.includes("%istanbul%"));
     assert.ok(countCall.params.includes("%remote%"));
     assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].country, "Turkey");
+    assert.equal(result.items[0].region, "EMEA");
+    assert.equal(result.items[0].remote_type, "remote");
   } finally {
     if (previousSearchBackend === undefined) {
       delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
