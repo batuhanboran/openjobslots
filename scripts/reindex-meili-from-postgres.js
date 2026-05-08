@@ -132,7 +132,7 @@ function validateMeiliSettings(index, settings) {
   if (index?.primaryKey !== "id") {
     mismatches.push({ setting: "primaryKey", expected: "id", actual: index?.primaryKey || null });
   }
-  for (const key of ["searchableAttributes", "filterableAttributes", "sortableAttributes", "rankingRules"]) {
+  for (const key of ["searchableAttributes", "filterableAttributes", "sortableAttributes", "rankingRules", "stopWords"]) {
     const mismatch = compareSettingList(key, settings?.[key], MEILI_POSTINGS_SETTINGS[key]);
     if (mismatch) mismatches.push(mismatch);
   }
@@ -151,6 +151,23 @@ function validateMeiliSettings(index, settings) {
     MEILI_POSTINGS_SETTINGS.typoTolerance.disableOnAttributes
   );
   if (typoMismatch) mismatches.push(typoMismatch);
+  const disabledWordMismatch = compareSettingList(
+    "typoTolerance.disableOnWords",
+    actualTypo.disableOnWords,
+    MEILI_POSTINGS_SETTINGS.typoTolerance.disableOnWords
+  );
+  if (disabledWordMismatch) mismatches.push(disabledWordMismatch);
+  for (const key of ["oneTypo", "twoTypos"]) {
+    const actualValue = Number(actualTypo?.minWordSizeForTypos?.[key] || 0);
+    const expectedValue = Number(MEILI_POSTINGS_SETTINGS.typoTolerance.minWordSizeForTypos[key] || 0);
+    if (actualValue !== expectedValue) {
+      mismatches.push({
+        setting: `typoTolerance.minWordSizeForTypos.${key}`,
+        expected: expectedValue,
+        actual: actualValue
+      });
+    }
+  }
   return {
     ok: mismatches.length === 0,
     mismatches
@@ -286,6 +303,16 @@ async function runReindex(pool, options = parseReindexArgs()) {
   let lastCanonicalUrl = "";
 
   try {
+    if (!pool) {
+      const skipped = {
+        ok: true,
+        skipped: true,
+        reason: "OPENJOBSLOTS_DB_BACKEND is not postgres; Meili reindex checks require the Postgres source of truth."
+      };
+      console.log(JSON.stringify(skipped));
+      return skipped;
+    }
+
     if (options.check) {
       const checkResult = await checkMeiliParity(pool, config, options);
       console.log(JSON.stringify(checkResult));
@@ -353,7 +380,7 @@ async function runReindex(pool, options = parseReindexArgs()) {
     }
     return { ok: true, check: false, indexed };
   } finally {
-    if (typeof pool.end === "function") await pool.end();
+    if (pool && typeof pool.end === "function") await pool.end();
   }
 }
 

@@ -29,6 +29,40 @@ Production parity tests must compare all three layers for the same query and fil
 
 Do not treat service health, HTTP status, or count-only checks as production parity. Passing parity means the same expected canonical URLs appear, forbidden rows stay out, and every difference between API, Meili, and Postgres has an explained cause.
 
+## v1.6 Search Settings Baseline
+
+Search settings are centralized in `server/search/config.js`. Do not add new country aliases, stop words, or Meili settings in a second module; update the shared config and the matching tests.
+
+Expected Meili settings:
+
+- Searchable attributes are ordered for relevance: `title`, normalized title, `company`, normalized company, location/city/state/country/region, work mode/source/facets, and `description_plain` last.
+- Filterable attributes cover public filters and hydration guards: `ats_key`, `country`, `region`, `city`, `state`, `remote_type`, `industry`, `department`, `employment_type`, `company`, `hidden`, `last_seen_epoch`, `posted_at_epoch`, and `posting_date`.
+- Sortable attributes are `last_seen_epoch` and `posted_at_epoch`.
+- Ranking rules remain `sort`, `words`, `typo`, `proximity`, `attribute`, `exactness` so explicit recency sort stays predictable while attribute order still helps relevance.
+- Synonyms include country aliases for Turkey/Turkiye/Turkiye-with-diacritic, common Turkey typos, US/UK aliases, remote/WFH aliases, and hybrid aliases.
+- Stop words include generic intent words such as `job`, `jobs`, `opening`, `openings`, `careers`, `hiring`, `role`, `position`, and `vacancy`, so `remote jobs` searches as `remote` instead of matching generic noise.
+
+Reindex verification:
+
+```bash
+npm run reindex:meili -- --check
+npm run search:parity -- --limit=20 --query="turkish jobs" --query="turkyie" --query="remote jobs"
+```
+
+Only run a replace reindex after parser/backfill changes have been tested and the check command reports settings mismatches or document-field drift that a normal outbox catch-up cannot fix:
+
+```bash
+npm run reindex:meili -- --replace
+```
+
+Diagnosing Meili versus SQLite/Postgres differences:
+
+1. Check `/admin/storage` for `db_backend`, `search_backend`, and `search_settings.last_error`.
+2. Run `npm run reindex:meili -- --check` to verify settings, document count, and indexed fields.
+3. Run `npm run search:parity` with the exact query and filters.
+4. If SQLite fallback differs, check whether `server/index.js`, `server/backends/postgresStore.js`, and `server/search/meili.js` all use `server/search/config.js` token and alias helpers.
+5. If Meili returns stale URLs, repair through the durable outbox or replace reindex; do not manually delete documents without a follow-up parity run.
+
 ## May 8, 2026 Live Findings
 
 The May 8 live probe did not show a search-service availability failure:

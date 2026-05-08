@@ -4,6 +4,7 @@ const {
   searchMeiliPostings,
   upsertMeiliPostings
 } = require("../search/meili");
+const searchConfig = require("../search/config");
 const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
 const {
   normalizeCountryFromLocation,
@@ -38,11 +39,7 @@ function getRetentionCutoffs(referenceEpoch = Math.floor(Date.now() / 1000), con
 }
 
 function normalizeText(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  return searchConfig.normalizeText(value);
 }
 
 function cleanSearchToken(value) {
@@ -66,23 +63,7 @@ function inferRemoteType(location) {
 }
 
 function normalizeAtsKey(value) {
-  const normalized = normalizeText(value).replace(/[^a-z0-9]+/g, "");
-  const aliases = {
-    ashbyhq: "ashby",
-    leverco: "lever",
-    greenhouseio: "greenhouse",
-    greenhouse: "greenhouse",
-    breezyhr: "breezy",
-    oraclecloud: "oracle",
-    pinpointhqcom: "pinpointhq",
-    recruitcrmio: "recruitcrm",
-    loxoco: "loxo",
-    icims: "icims",
-    applicantai: "applicantai",
-    adpworkforcenow: "adp_workforcenow",
-    workforcenow: "adp_workforcenow"
-  };
-  return aliases[normalized] || normalized;
+  return searchConfig.normalizeAtsKey(value);
 }
 
 function parseCsv(value) {
@@ -148,17 +129,11 @@ const REMOTE_LOCATION_FALLBACK_TERMS_BY_TYPE = Object.freeze({
 });
 
 function normalizeCountryFilterValue(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const normalized = normalizeText(raw).replace(/\s+/g, " ");
-  return COUNTRY_FILTER_ALIASES.get(normalized) || raw;
+  return searchConfig.normalizeCountryFilterValue(value);
 }
 
 function normalizeRegionFilterValue(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const normalized = normalizeText(raw).replace(/\s+/g, " ");
-  return REGION_FILTER_ALIASES.get(normalized) || raw;
+  return searchConfig.normalizeRegionFilterValue(value);
 }
 
 function uniqueNormalizedTerms(values) {
@@ -175,17 +150,11 @@ function uniqueNormalizedTerms(values) {
 }
 
 function getCountryFilterTerms(countryLabel) {
-  const label = normalizeCountryFilterValue(countryLabel);
-  const terms = [label];
-  for (const [alias, targetLabel] of COUNTRY_FILTER_ALIASES.entries()) {
-    if (targetLabel === label) terms.push(alias);
-  }
-  terms.push(...(COUNTRY_LOCATION_FALLBACK_TERMS_BY_LABEL.get(label) || []));
-  return uniqueNormalizedTerms(terms).filter((term) => normalizeText(term).replace(/[^a-z0-9]+/g, "").length > 2);
+  return searchConfig.getCountryFilterTerms(countryLabel);
 }
 
 function getRemoteLocationFallbackTerms(remoteType) {
-  return uniqueNormalizedTerms(REMOTE_LOCATION_FALLBACK_TERMS_BY_TYPE[remoteType] || []);
+  return searchConfig.getRemoteLocationFallbackTerms(remoteType);
 }
 
 const SEARCH_STOP_WORDS = new Set([
@@ -218,19 +187,7 @@ const SEARCH_TOKEN_ALIASES = {
 };
 
 function expandSearchTokens(search) {
-  const rawTokens = String(search || "")
-    .trim()
-    .split(/\s+/)
-    .map(cleanSearchToken)
-    .filter(Boolean);
-  const meaningfulTokens = rawTokens.filter((token) => !SEARCH_STOP_WORDS.has(normalizeText(token)));
-  const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : rawTokens;
-  return tokens.map((token) => {
-    const normalized = normalizeText(token);
-    const aliases = SEARCH_TOKEN_ALIASES[normalized] || [];
-    const expanded = [token, normalized, ...aliases];
-    return Array.from(new Set(expanded.map((item) => String(item || "").trim()).filter(Boolean)));
-  });
+  return searchConfig.expandSearchTokens(search);
 }
 
 function rowToPosting(row) {
@@ -371,6 +328,32 @@ function getPostgresOrderBy(sortBy) {
   return "p.last_seen_epoch DESC, p.canonical_url";
 }
 
+function buildSearchRankSql(search, startIndex = 1) {
+  const normalizedQuery = searchConfig.normalizeSearchQuery(search);
+  if (!normalizedQuery) {
+    return { sql: "", values: [], nextIndex: startIndex };
+  }
+  const queryIndex = startIndex;
+  const likeQuery = `%${normalizedQuery}%`;
+  return {
+    sql: `
+      CASE
+        WHEN lower(unaccent(p.position_name)) LIKE lower(unaccent($${queryIndex})) THEN 40
+        WHEN lower(unaccent(p.company_name)) LIKE lower(unaccent($${queryIndex})) THEN 30
+        WHEN lower(unaccent(coalesce(p.location_text, ''))) LIKE lower(unaccent($${queryIndex}))
+          OR lower(unaccent(coalesce(p.city, ''))) LIKE lower(unaccent($${queryIndex}))
+          OR lower(unaccent(coalesce(p.country, ''))) LIKE lower(unaccent($${queryIndex}))
+          OR lower(unaccent(coalesce(p.region, ''))) LIKE lower(unaccent($${queryIndex})) THEN 20
+        WHEN lower(unaccent(coalesce(p.ats_key, ''))) LIKE lower(unaccent($${queryIndex})) THEN 10
+        WHEN lower(unaccent(coalesce(p.description_plain, ''))) LIKE lower(unaccent($${queryIndex})) THEN 5
+        ELSE 0
+      END
+    `,
+    values: [likeQuery],
+    nextIndex: startIndex + 1
+  };
+}
+
 function logSearchFallback(reason, metadata = {}) {
   console.warn("[openjobslots] search_backend_fallback", JSON.stringify({
     reason,
@@ -411,9 +394,13 @@ async function hydratePostgresPostings(pool, urls, options = {}) {
 
 async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset = 0, sortBy = "recent") {
   const filter = buildFilterSql(options, 1);
-  const limitIndex = filter.nextIndex;
-  const offsetIndex = filter.nextIndex + 1;
+  const rank = String(sortBy || "").trim() === "company_asc"
+    ? { sql: "", values: [], nextIndex: filter.nextIndex }
+    : buildSearchRankSql(options.search, filter.nextIndex);
+  const limitIndex = rank.nextIndex;
+  const offsetIndex = rank.nextIndex + 1;
   const orderBy = getPostgresOrderBy(sortBy);
+  const rankedOrderBy = rank.sql ? `${rank.sql} DESC, ${orderBy}` : orderBy;
   const [countResult, result] = await Promise.all([
     pool.query(
       `
@@ -428,7 +415,7 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
     pool.query(
       `
         SELECT
-          row_number() OVER (ORDER BY ${orderBy}) AS id,
+          row_number() OVER (ORDER BY ${rankedOrderBy}) AS id,
           p.*,
           COALESCE(s.applied, false) AS applied,
           COALESCE(s.ignored, false) AS ignored,
@@ -442,10 +429,10 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
         LEFT JOIN posting_application_state s
           ON s.canonical_url = p.canonical_url
         WHERE ${filter.where.join(" AND ")}
-        ORDER BY ${orderBy}
+        ORDER BY ${rankedOrderBy}
         LIMIT $${limitIndex} OFFSET $${offsetIndex};
       `,
-      [...filter.values, limit, offset]
+      [...filter.values, ...rank.values, limit, offset]
     )
   ]);
   return { items: result.rows.map(rowToPosting).slice(0, limit), count: Number(countResult.rows[0]?.count || 0), limit, offset };
@@ -1327,6 +1314,7 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
 }
 
 module.exports = {
+  buildSearchRankSql,
   getRetentionConfig,
   getRetentionCutoffs,
   getPostgresAtsAdmin,

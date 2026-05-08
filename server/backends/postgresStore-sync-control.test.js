@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const {
+  buildSearchRankSql,
   getPostgresSyncStatus,
   getPostgresAtsFieldQualityByAts,
   getPostgresParserAttentionByAts,
@@ -725,6 +726,51 @@ async function testMeiliSearchRequiresExplicitVisibleFlag() {
   }
 }
 
+async function testMeiliSearchNormalizesGenericWordsAndTypos() {
+  const previousFetch = global.fetch;
+  const bodies = [];
+  global.fetch = async (_url, options = {}) => {
+    bodies.push(JSON.parse(String(options.body || "{}")));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { hits: [], estimatedTotalHits: 0 };
+      }
+    };
+  };
+
+  try {
+    await searchMeiliPostings(
+      { search: "turksih jobs", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+    await searchMeiliPostings(
+      { search: "turkyie openings", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+    await searchMeiliPostings(
+      { search: "remote jobs", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+
+    assert.equal(bodies[0].q, "turkish");
+    assert.equal(bodies[1].q, "turkey");
+    assert.equal(bodies[2].q, "remote");
+  } finally {
+    global.fetch = previousFetch;
+  }
+}
+
+function testPostgresSearchRankPrioritizesTitleCompanyBeforeDescription() {
+  const rank = buildSearchRankSql("software engineer jobs", 7);
+  assert.match(rank.sql, /p\.position_name[\s\S]*THEN 40/);
+  assert.match(rank.sql, /p\.company_name[\s\S]*THEN 30/);
+  assert.match(rank.sql, /p\.description_plain[\s\S]*THEN 5/);
+  assert.deepEqual(rank.values, ["%software engineer%"]);
+  assert.equal(rank.nextIndex, 8);
+}
+
 function testRetentionDefaultsUseLastSeenPolicy() {
   const config = getRetentionConfig({});
   assert.equal(config.hotDays, 90);
@@ -828,6 +874,8 @@ async function main() {
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
   await testMeiliHideNoDateUsesPostingDatePresence();
   await testMeiliSearchRequiresExplicitVisibleFlag();
+  await testMeiliSearchNormalizesGenericWordsAndTypos();
+  testPostgresSearchRankPrioritizesTitleCompanyBeforeDescription();
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();

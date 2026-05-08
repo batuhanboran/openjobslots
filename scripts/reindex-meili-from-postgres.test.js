@@ -6,6 +6,7 @@ const {
   compareMeiliDocument,
   indexablePostingsWhereClause,
   parseReindexArgs,
+  runReindex,
   validateMeiliSettings
 } = require("./reindex-meili-from-postgres");
 const { MEILI_POSTINGS_SETTINGS } = require("../server/search/meili");
@@ -42,6 +43,21 @@ test("reindex check mode is explicit and non-mutating", () => {
   assert.equal(parseReindexArgs(["--replace"], {}).replaceIndex, true);
 });
 
+test("reindex command skips safely when Postgres is not active", async () => {
+  const originalLog = console.log;
+  const logs = [];
+  console.log = (message) => logs.push(message);
+  try {
+    const result = await runReindex(null, { check: true });
+    assert.equal(result.ok, true);
+    assert.equal(result.skipped, true);
+    assert.match(result.reason, /not postgres/i);
+    assert.ok(logs.some((message) => String(message).includes("Meili reindex checks require")));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
 test("reindex query excludes bad visible rows before indexing", () => {
   const where = indexablePostingsWhereClause();
   assert.match(where, /hidden = false/);
@@ -55,8 +71,11 @@ test("Meili document conversion preserves required normalized fields", () => {
   const document = toMeiliPostingDocument(posting());
   assert.equal(document.canonical_url, "https://example.com/jobs/123");
   assert.equal(document.title, "Software Engineer");
+  assert.equal(document.title_normalized, "software engineer");
   assert.equal(document.company, "Example Co");
+  assert.equal(document.company_normalized, "example co");
   assert.equal(document.location, "Istanbul, Turkey");
+  assert.equal(document.location_normalized, "istanbul turkey");
   assert.equal(document.city, "Istanbul");
   assert.equal(document.country, "Turkey");
   assert.equal(document.region, "EMEA");
@@ -123,6 +142,7 @@ test("Meili settings validation reports missing filter/sort/search fields", () =
       filterableAttributes: ["country"],
       sortableAttributes: ["last_seen_epoch"],
       rankingRules: ["words", "sort"],
+      stopWords: [],
       synonyms: { turkey: ["turkiye"] },
       typoTolerance: { enabled: false, disableOnAttributes: [] }
     }
@@ -132,5 +152,8 @@ test("Meili settings validation reports missing filter/sort/search fields", () =
   assert.ok(result.mismatches.some((item) => item.setting === "filterableAttributes"));
   assert.ok(result.mismatches.some((item) => item.setting === "sortableAttributes"));
   assert.ok(result.mismatches.some((item) => item.setting === "rankingRules"));
+  assert.ok(result.mismatches.some((item) => item.setting === "stopWords"));
   assert.ok(result.mismatches.some((item) => item.setting === "typoTolerance.enabled"));
+  assert.ok(result.mismatches.some((item) => item.setting === "typoTolerance.disableOnWords"));
+  assert.ok(result.mismatches.some((item) => item.setting === "typoTolerance.minWordSizeForTypos.oneTypo"));
 });

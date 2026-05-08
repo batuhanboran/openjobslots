@@ -13,8 +13,10 @@ test("parity args default to representative search cases", () => {
   const options = parseParityArgs([], {});
   assert.equal(options.limit, 10);
   assert.equal(options.offset, 0);
-  assert.equal(options.cases.length, 10);
+  assert.equal(options.cases.length, 12);
   assert.ok(options.cases.some((item) => item.search === "t\u00fcrkiye"));
+  assert.ok(options.cases.some((item) => item.search === "turkyie"));
+  assert.ok(options.cases.some((item) => item.search === "turksih jobs"));
   assert.ok(options.cases.some((item) => item.search === "united states"));
 });
 

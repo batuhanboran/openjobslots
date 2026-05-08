@@ -16,6 +16,9 @@ const {
   seedPostgresAtsSources
 } = require("./backends/postgres");
 const {
+  expandSearchTokens
+} = require("./search/config");
+const {
   getPostgresAtsAdmin,
   getPostgresAtsFieldQualityByAts,
   getPostgresCounts,
@@ -29,7 +32,7 @@ const {
   requestSyncStart,
   requestSyncStop
 } = require("./backends/postgresStore");
-const { ensureMeiliPostingsIndex } = require("./search/meili");
+const { ensureMeiliPostingsIndex, getMeiliSettingsStatus } = require("./search/meili");
 
 const PORT = Number(process.env.PORT || 8787);
 const NODE_ENV = String(process.env.NODE_ENV || "development").trim().toLowerCase();
@@ -334,22 +337,6 @@ const WEAK_INDUSTRY_LIKE_PARTS = new Set([
   "field",
   "division",
   "product"
-]);
-const SEARCH_STOP_WORDS = new Set([
-  "job",
-  "jobs",
-  "posting",
-  "postings",
-  "opening",
-  "openings",
-  "career",
-  "careers",
-  "role",
-  "roles",
-  "position",
-  "positions",
-  "vacancy",
-  "vacancies"
 ]);
 const IT_SOFTWARE_INDUSTRY_KEY = "information_technology_software";
 const SALES_BUSINESS_INDUSTRY_KEY = "sales_business_development";
@@ -1200,12 +1187,7 @@ function normalizeSearchText(value) {
 }
 
 function tokenizeSearchText(value) {
-  const normalized = normalizeSearchText(value);
-  if (!normalized) return [];
-  return normalized
-    .split(" ")
-    .map((part) => part.trim())
-    .filter((part) => part && !SEARCH_STOP_WORDS.has(part));
+  return expandSearchTokens(value);
 }
 
 function parseCsvParam(value) {
@@ -1512,11 +1494,15 @@ function searchTokenMatchesPosting(token, row) {
   const positionName = normalizeSearchText(row?.position_name);
   const location = String(row?.location || "").trim();
   const normalizedLocation = normalizeSearchText(location);
+  const ats = normalizeSearchText(row?.ats || row?.ATS_name);
+  const remoteType = normalizeSearchText(classifyLocationWorkMode(location));
 
   if (
     companyName.includes(normalizedToken) ||
     positionName.includes(normalizedToken) ||
-    normalizedLocation.includes(normalizedToken)
+    normalizedLocation.includes(normalizedToken) ||
+    ats.includes(normalizedToken) ||
+    remoteType.includes(normalizedToken)
   ) {
     return true;
   }
@@ -14244,7 +14230,7 @@ async function listPostingsWithFilters(options = {}) {
     ats: inferAtsFromJobPostingUrl(row?.job_posting_url)
   }));
 
-  const searchTerms = tokenizeSearchText(search);
+  const searchTermGroups = tokenizeSearchText(search);
   const industryMatchersByKey = await buildIndustryMatchersByKey(industryKeys);
 
   let items = enrichedRows;
@@ -14252,7 +14238,9 @@ async function listPostingsWithFilters(options = {}) {
     items = enrichedRows.filter((row) => {
       const ats = String(row?.ats || "").toLowerCase();
 
-      const matchesSearch = searchTerms.every((term) => searchTokenMatchesPosting(term, row));
+      const matchesSearch = searchTermGroups.every((aliases) =>
+        aliases.some((term) => searchTokenMatchesPosting(term, row))
+      );
       if (!matchesSearch) return false;
 
       if (atsFilters.length > 0 && !atsFilters.includes(ats)) return false;
@@ -16107,6 +16095,7 @@ function createServer() {
       queue_backend: QUEUE_BACKEND,
       primary_store: DB_BACKEND === "postgres" ? "postgres" : "sqlite",
       search_store: SEARCH_BACKEND === "meili" ? "meilisearch" : "sqlite",
+      search_settings: getMeiliSettingsStatus(),
       sqlite_path: DB_BACKEND === "postgres" ? "backup/import only" : DB_PATH,
       ...counts
     }));
