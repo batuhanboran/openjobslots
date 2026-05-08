@@ -24,6 +24,10 @@ The server uses `REDACTED` as a read-only GitHub deploy key. Add the public key 
 
 Use read-only access. Write access is not needed.
 
+Recorded public key for this deployment identity:
+
+`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINaPPI85y7u/XcHIlczDKuCp6amyhbQyvE+w+4BqQxdr openjobslots-production-deploy`
+
 ## Useful Commands
 
 ```bash

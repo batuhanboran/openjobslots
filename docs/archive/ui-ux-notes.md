@@ -1,5 +1,7 @@
 # OpenJobSlots UI/UX Notes
 
+Archived UI/UX pass notes. Current project state lives in `../PROJECT_STATE.md`; QA guidance lives in `../reference/QA_RUNBOOK.md`.
+
 ## Fixed In This Pass
 
 - Public status failures no longer write to the global error banner. The coverage panel now shows a friendly unavailable state while search stays usable.

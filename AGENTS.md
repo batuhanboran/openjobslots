@@ -1,98 +1,106 @@
-# OpenJobSlots Agent Operating Notes
+# OpenJobSlots Agent Instructions
 
-These notes are for Codex and subagents working in this repository.
+These are the canonical operating notes for Codex and human operators working in this repository.
 
-## Product
+## Read First
+
+1. `AGENTS.md` - operator rules, safety constraints, branch/test/deploy expectations.
+2. `README.md` - project overview, local setup, architecture summary.
+3. `docs/PROJECT_STATE.md` - current version, deployment status, endpoints, known risks, next tasks.
+4. `docs/reference/` - detailed runbooks and certification records relevant to the task.
+5. `docs/archive/` - historical plans and notes. Read only when tracing why a decision was made.
+
+## Product Context
 
 - Public product name: `openjobslots`.
-- Public site/domain: `openjobslots.com`.
+- Public domain target: `openjobslots.com`.
 - Main repository: `https://github.com/batuhanboran/openjobslots`.
-- Hosted runtime: production / `public-services` at `internal-host`, checkout `/root/OpenJobSlots`.
-- Expected project services on production: `openjobslots-app`, `openjobslots-worker`, `openjobslots-postgres`, `openjobslots-meilisearch`.
+- Production host: production / `public-services`, checkout `/root/OpenJobSlots`.
+- Expected production services: `openjobslots-app`, `openjobslots-worker`, `openjobslots-postgres`, `openjobslots-meilisearch`.
+- Current production architecture: Node API/static web app, separate ingestion worker, Postgres source-of-truth DB, Meilisearch public search index.
+- SQLite remains useful for local fallback, migration/import paths, and isolated tests. Do not treat it as the intended production source of truth unless `docs/PROJECT_STATE.md` says the backend changed.
 
-## Git And Deployment
+## Documentation Map
 
-- User expects code changes to be committed and pushed to `main` unless they explicitly ask for local-only work.
-- The production deploy key only needs read access. Do not grant write access unless there is a separate server-side push workflow.
-- After pushing, verify production is on the same commit with:
+- Current state and risks: `docs/PROJECT_STATE.md`.
+- Deployment operations: `docs/reference/deployment.md`.
+- Search correctness and Meili/Postgres parity: `docs/reference/search-quality-runbook.md`.
+- Ingestion and worker operations: `docs/reference/ingestion-runbook.md`.
+- ATS parser matrix: `docs/reference/ats-adapter-matrix.md`.
+- Parser certification rules: `docs/reference/parser-certification.md` and `docs/reference/ats-source-certification.md`.
+- Data quality diagnostics: `docs/reference/data-quality-runbook.md`.
+- Retention rules: `docs/reference/data-retention.md`.
+- QA and Playwright/API testing: `docs/reference/QA_RUNBOOK.md`.
+- End-user docs site content: `docs-site/`.
+
+## Branch, Commit, And Deploy Rules
+
+- Do not deploy live unless the user explicitly asks for deployment.
+- For requested code/doc work, commit finished changes unless the user explicitly asks for local-only work.
+- Use the existing branch unless the user asks for a hardening branch or the task instructions name one.
+- Do not depend on GitHub CLI. Normal `git` commands are enough unless a GitHub-specific task requires the connector.
+- After a successful push intended for production, verify production alignment with the deployment runbook:
   - `git -C /root/OpenJobSlots rev-parse HEAD`
   - `docker compose --project-directory /root/OpenJobSlots ps`
   - `curl -fsS http://127.0.0.1:8081/health`
-- The production auto-deploy timer is `openjobslots-deploy.timer`.
-- If auto-deploy fetch fails, check `/var/log/openjobslots-deploy.log`.
-- The deploy script may use a specific SSH identity. A plain interactive `git fetch` can fail while the timer succeeds; use the deploy log and service status as the source of truth.
-- Known public deploy key to register in GitHub deploy keys if auto-fetch fails:
-  `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINaPPI85y7u/XcHIlczDKuCp6amyhbQyvE+w+4BqQxdr openjobslots-production-deploy`
-- If GitHub SSH deploy key is still not registered, manual alignment can be done with a git bundle over SSH, then rebuilding app and worker:
-  - `docker compose --project-directory /root/OpenJobSlots up -d --build openjobslots-app openjobslots-worker`
+- The production auto-deploy timer is `openjobslots-deploy.timer`; the deploy log is `/var/log/openjobslots-deploy.log`.
 
 ## Data Safety
 
-- Do not commit `jobs.db`, `jobs.db-shm`, `jobs.db-wal`, `/data`, backups, or live database dumps.
-- `jobs.db` is local/runtime data. It belongs in local/server storage, not Git.
-- Production source of truth is Postgres; Meilisearch is the public search index.
-- Public release notes must not expose tokens, host secrets, internal credentials, stack traces, or security-sensitive deployment details.
-- Public endpoints must not return private application state, personal settings, agent credentials, raw filesystem paths, stack traces, or upstream parser/debug payloads.
+- Do not commit runtime databases, WAL/SHM files, dumps, backups, logs, `.env`, or generated production data.
+- Specifically exclude `jobs.db`, `jobs.db-shm`, `jobs.db-wal`, `/data`, `.deploy-backups/`, and database exports.
+- Public release notes and UI must not expose tokens, internal host secrets, private paths, stack traces, raw parser payloads, or security-sensitive deployment details.
+- Public endpoints should return only public posting/status fields. Application state, MCP/application settings, and deep diagnostics belong behind admin/session controls.
+- Do not run production write backfills, replace-mode Meili reindex, schema-destructive migrations, or cleanup jobs without explicit approval and a rollback path.
 
-## Security Checklist
+## Test Rules
 
-- Run `npm.cmd audit` after dependency changes and do not use `npm audit fix --force` without reviewing breaking changes.
-- Keep patched transitive dependency overrides current when upstream packages lag security advisories.
-- Docker images must not copy runtime databases, dumps, `.env` files, logs, or backup data. Keep `.dockerignore` strict.
-- Production Docker builds should use lockfile installs (`npm ci`) and should not depend on mutable local `node_modules`.
-- Public search returns only public posting fields. Application state and MCP/application settings belong behind admin/session auth.
-- Deploy keys should be read-only by default.
-- Treat ATS/company URLs as untrusted input. Add central SSRF controls before broad parser expansion: scheme allowlist, redirect revalidation, DNS/private-IP blocking, response-size limits, and host validation where possible.
-- Keep public `/health`, `/sync/status`, and `/ingestion/status` coarse. Detailed diagnostics belong under admin routes.
-- Public frontend logging must be bounded, redacted, and rotated before high-traffic launch.
+Use the smallest safe test set that proves the change:
 
-## Development Expectations
+- Backend/search/parser changes: `npm.cmd run test:backend`, `npm.cmd run test:api`, and `npm.cmd run test:parsers` when available.
+- UI changes: `npm.cmd run test:e2e` plus relevant backend/API tests.
+- Broad hardening or release work: `npm.cmd run quality:gate`.
+- Search or Meili changes: also run `npm.cmd run search:parity` or the relevant check mode described in `docs/reference/search-quality-runbook.md`.
+- Docs-only changes do not require the app test suite unless a docs/build tool is changed. Run `git diff --check` at minimum.
 
-- Keep public UI search-first and admin controls hidden from public users.
-- This frontend currently uses React Native Web `StyleSheet`, not Tailwind. Do not introduce Tailwind or a new styling stack unless the app architecture is intentionally changed.
-- Job results should be progressive: keep the first page small, append more results on scroll, and avoid rendering hundreds of cards at once.
-- Existing public endpoints should remain compatible: `/postings`, `/postings/filter-options`, `/search/suggest`, `/sync/status`, `/ingestion/status`, `/health`.
-- Verify meaningful changes with `npm.cmd run test:backend`; use Playwright desktop/mobile when UI changes.
-- When using subagents, give each a bounded lane: frontend/UI, backend/data, parser/ATS, security/services, desktop QA, mobile QA. The parent agent remains responsible for integration and final deployment.
+## Implementation Rules
 
-## Operating And Version Policy
+- Keep public UI search-first. Do not expose admin controls, protected settings, raw API addresses, stack traces, or internal parser errors on the public page.
+- Preserve public endpoint compatibility unless the user explicitly asks for a breaking change:
+  - `/health`
+  - `/postings`
+  - `/postings/filter-options`
+  - `/search/suggest`
+  - `/sync/status`
+  - `/ingestion/status`
+- Search correctness requires public API, Postgres, and Meilisearch parity. A UI smoke test alone is not sufficient.
+- Parser certification requires saved raw fixtures, expected normalized output, validation tests, parser version, confidence, and documented nullable fields. Do not mark an ATS certified from normalized fixtures alone.
+- Do not invent posting dates, countries, regions, cities, remote state, or source IDs. Store `null`/`unknown` when source evidence is absent.
+- Freshness and pruning use `last_seen_epoch`, not `first_seen_epoch`.
+- The frontend currently uses React Native Web `StyleSheet`, not Tailwind. Do not introduce a new styling stack without an explicit architecture decision.
 
-- May 8 lesson: keep this stabilization line in `v1.5.x`. Search, parser, and storage hardening are not a `v2` product rewrite.
-- Current stabilization checkpoint is `v1.6.0`; the next stabilization update should increment the patch version unless it is a deliberate product rewrite.
-- Current stabilization priority order: parser normalization first, Meilisearch reindex/cleanup second, production parity tests third, image/build cache later.
-- After a full Meilisearch replace reindex, mark pre-reindex `search_index_outbox` rows processed so the worker does not replay hundreds of thousands of already-indexed writes.
-- Future-use Codex skills installed: `playwright`, `security-best-practices`, `security-threat-model`, `openjobslots-postgres-audit`, `ats-parser-certification`, `openjobslots-search-parity-corpus`, and `openjobslots-detail-page-certifier`. A Codex restart may be needed before newly installed skills load.
-- Parser/data incidents must use the OpenJobSlots skills together: `ats-parser-certification` for raw source evidence, `openjobslots-postgres-audit` for production DB/Meili/API parity, and `openjobslots-search-parity-corpus` for large title/filter matrices.
+## Subagent Rules
 
-## Search Quality Incident Lessons
+- Use subagents only when the user explicitly requests delegation or parallel agent work.
+- Keep each subagent lane bounded: frontend/UI, backend/data, parser/ATS, security/services, desktop QA, mobile QA, or research.
+- Close or repurpose agents when their task is complete. Do not leave idle agents running.
+- The parent agent remains responsible for integration, tests, docs, and deployment decisions.
 
-- A green UI smoke test is not enough for this product. Search incidents require backend contract tests against the production path: Postgres plus Meilisearch.
-- UI smoke tests can miss critical search/filter data intersections. Future search work must run live-like title/country/remote matrices instead of single happy-path queries.
-- Any change touching `/postings`, filters, country/region aliases, remote classification, Meilisearch settings, or Postgres fallback search must run a representative search corpus before deployment.
-- "Returns rows" is not a passing assertion. Returned rows must match title intent, country intent, region intent, remote intent, hidden/applied/ignored filters, and pagination rules.
-- Compare the public API response against direct Postgres rows and Meilisearch hits for each high-risk matrix case before treating a fix as verified.
-- Keep a pinned 1000-query local corpus using reviewed static fixtures, not live production DB dumps. For production readiness, also maintain a 10,000+ title-intent parity plan sourced from reviewed public title taxonomies such as O*NET/ESCO or license-reviewed job-title datasets. Include title-only, title plus country, title plus region, title plus country plus remote mode, remote/hybrid/on-site, diacritics, abbreviations, pagination, and hard negative cases.
-- Test both search engines: direct Postgres SQL fallback and Meilisearch plus Postgres hydration. Meili zero hits, partial stale hits, hydration underfill, and `hide_no_date` filtering must all be covered.
-- Live deploy verification must include correctness probes, not only service health. At minimum test `/postings?search=Director%20United%20States`, `/postings?search=Director%20US`, `/postings?search=t%C3%BCrkiye`, `/postings?search=remote%20engineer`, and one paginated scroll flow that verifies stable offsets, unique rows, and no dropped/duplicated results.
-- Diagnose CPU spikes with measurements before changing architecture: `docker stats`, Postgres logs, `pg_stat_activity`, table/index size, dead tuples, Meili task backlog, and query plans. Do not add Redis, another load balancer, or a new database until those measurements show the bottleneck.
-- A search bug is not closed until the same query is crossmatched against public `/postings`, direct Postgres rows, and raw Meilisearch hits. Classify the failure as parser/DB, index/outbox/reindex, hydration/filtering, or valid empty intersection.
-- Live high-volume search probes can exhaust Docker's default Postgres `/dev/shm` when fallback SQL uses parallel scans. Keep `openjobslots-postgres` configured with explicit `shm_size`, bounded pool sizes, and conservative parallel worker settings before treating 500s as application logic failures.
-- Meilisearch visibility filters must require `hidden = false`. Do not use negative filters such as `NOT hidden = true`; legacy or partial index documents without a `hidden` field can pass negative filters, then get dropped by Postgres hydration and force expensive fallback queries.
-- Public job result searches should use Meilisearch `matchingStrategy: "all"` so multi-word titles do not silently drop important terms and return misleading broad hits.
-- A healthy Meilisearch zero-hit response should return an API zero directly. Do not run full Postgres fallback for every search-index zero; that turns normal empty intersections into slow CPU-heavy queries. Use fallback for Meili errors and hydration underfill, then fix/reindex Meili when index parity is wrong.
-- Postgres hydration should not re-run the free-text search after Meili has ranked the hits. Hydration is for public visibility, application-state, and structured guard filters; rechecking fuzzy/tokenized Meili hits with stricter SQL text matching causes underfill and fallback loops.
-- Subagents must produce bounded findings or patches, then be closed. The parent agent must not leave agents idle and must integrate the results into code, tests, docs, and deployment decisions.
-- Detailed runbook: [Search Quality Runbook](./docs/search-quality-runbook.md).
+## Security Baseline
 
-## ATS And Retention Rules
+- Run `npm.cmd audit` after dependency changes.
+- Do not use `npm audit fix --force` without reviewing breaking changes.
+- Docker builds must not copy runtime DBs, dumps, `.env`, logs, or backups.
+- Production builds should use lockfile installs and should not depend on mutable local `node_modules`.
+- Treat ATS/company URLs as untrusted input. Central SSRF protections are required before broad parser expansion: scheme allowlist, redirect revalidation, DNS/private-IP blocking, response-size limits, and host validation.
+- Keep public `/health`, `/sync/status`, and `/ingestion/status` coarse. Detailed diagnostics belong in admin routes.
 
-- Certify existing ATS before broad expansion.
-- Normalized sample fixtures are not enough for certification. Certified ATS require saved raw source fixtures that exercise the parser plus expected normalized output.
-- New ATS requires source docs, endpoint pattern, rate limits, raw fixtures, expected normalized output, confidence, and adapter notes.
-- Missing or nullable location, posting date, and remote fields must be certified from saved source fixtures. Do not assume absence is source truth until the raw fixture proves the source omitted the field or the parser documents why it cannot safely extract it.
-- Do not invent posting dates. If the source does not expose a date, leave the date empty and rely on `last_seen_epoch` for freshness.
-- Preserve the source id (`id`, `jobId`, requisition id, vacancy id, URL id) as `source_job_id` whenever the source exposes one.
-- `dayforcehcm` is configured but disabled by default until parser certification exists.
-- Freshness and pruning must use `last_seen_epoch`, not `first_seen_epoch`.
-- Default hot/searchable posting window: 90 days after last seen.
-- v1.5.17 adds the ATS certification workbench. v1.5.18 stabilizes parser normalization backfill for source date epochs and conservative onsite classification from concrete physical locations. v1.5.19 adds iCIMS/Applitrack saved raw detail fixtures, iCIMS country-code location parsing, explicit iCIMS remote header parsing, Applitrack detail URL certification, and a dry-run-first detail-page backfill tool. v1.5.20 fixes the production backfill rule that preserved already-wrong iCIMS country values; always compare API results against the exact stored Postgres row before deciding a query or search index is faulty. v1.5.21 expands the normalized parser contract fields and certifies ApplicantPro core jobs JSON with a raw fixture. v1.5.22 improves iCIMS JSON-LD, Manatal API, and Applitrack detail normalization. v1.5.23 makes normalization backfill dry-run by default, requires explicit write mode, and adds Meilisearch check-mode parity reporting before reindex. v1.5.25 adds ATS field-quality diagnostics and only backfills source-evidenced city/department/employment fields; generic multi-location text must remain blank instead of becoming a fake city. v1.5.26 hardens normalization backfill with invalid-row reject reporting, resumable `--start-after`, explicit safe/refetch field reporting, and fixes the Meilisearch reindex batch-size variable. v1.5.27 adds read-only active/Postgres/Meili search parity tooling and validates Meili index settings in reindex check mode. v1.5.28 normalizes API result rows with the same source-evidence country/region/remote fallbacks used by filters and Meilisearch documents, so filtered search results no longer serialize blank country or `unknown` remote when the evidence is in `location_text`. v1.5.29 teaches the parity tool to evaluate the public `/postings` shape by deriving country/remote evidence from exposed title/location fields instead of requiring internal Meili/Postgres-only columns in the public response. v1.5.30 makes explicit Meilisearch sort ranking part of the production index contract so parity checks can enforce recent-first result ordering. v1.6.0 ships the production hardening line: search relevance and Meili parity, ATS parser certification, ingestion cache/worker durability, Playwright UX fixes, public-safe data quality diagnostics, and live deploy verification. Do not mark an ATS as parser-certified unless saved raw fixtures and tests prove geo, date, remote, and source-id behavior, or prove the source omitted a nullable field.
+## Current Operating Priority
+
+See `docs/PROJECT_STATE.md` for the current version, deployment state, and next tasks. As of the v1.6 line, the priority order is:
+
+1. Parser/location/date/remote/source-id data quality.
+2. Safe dry-run backfills and detail-page certification.
+3. Meilisearch reindex/check-mode parity after normalized fields improve.
+4. Production parity tests using realistic search corpora.
+5. Build/image/dependency cleanup after correctness is stable.
