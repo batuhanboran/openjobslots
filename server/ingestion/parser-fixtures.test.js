@@ -80,6 +80,12 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeCountryFromLocation("Sydney, NSW, Australia"), "Australia");
   assert.equal(normalizeCountryFromLocation("Sao Paulo, Brazil"), "Brazil");
   assert.equal(normalizeCountryFromLocation("Dubai, UAE"), "United Arab Emirates");
+  assert.equal(normalizeCountryFromLocation("Rijswijk, 2288EG, Nederland"), "Netherlands");
+  assert.equal(normalizeCountryFromLocation("Wien, Osterreich"), "Austria");
+  assert.equal(normalizeCountryFromLocation("Burnaby, British Columbia"), "Canada");
+  assert.equal(normalizeCountryFromLocation("Washington, District of Columbia"), "United States");
+  assert.equal(normalizeCountryFromLocation("Hsin Chu, Taiwan"), "Taiwan");
+  assert.equal(normalizeCountryFromLocation("Ulsan"), "South Korea");
   assert.equal(normalizeCountryName("TR"), "Turkey");
   assert.equal(normalizeCountryName("U.S."), "United States");
   assert.equal(normalizeCountryName("IN"), "India");
@@ -93,6 +99,8 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizePostingDate("2026-05-06T08:00:00+03:00").epoch, 1778043600);
   assert.equal(normalizePostingDate("1778043600").epoch, 1778043600);
   assert.equal(normalizePostingDate("1778043600000").epoch, 1778043600);
+  assert.equal(Number.isFinite(normalizePostingDate("Posted Today").epoch), true);
+  assert.equal(Number.isFinite(normalizePostingDate("2 days ago").epoch), true);
 });
 
 test("nested ATS location objects preserve structured country fields", () => {

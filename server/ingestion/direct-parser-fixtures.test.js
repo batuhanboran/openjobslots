@@ -10,6 +10,10 @@ const {
   parseApplyToJobPostingsFromHtml,
   parseBambooHrPostingsFromApi,
   parseBreezyPostingsFromHtml,
+  parseRecruiteePostingsFromPublicApp,
+  extractTaleoPostingsFromRest,
+  extractWorkdayLocationLabel,
+  extractWorkdaySourceJobId,
   parseFountainPostingsFromApi,
   parseIcimsPostingsFromHtml,
   parseOraclePostingsFromApi,
@@ -168,4 +172,81 @@ test("high-volume ATS parsers preserve country, date, remote, and source ids whe
   assert.equal(applitrack.region, "North America");
   assert.equal(applitrack.source_job_id, "5503511");
   assert.equal(applitrack.posting_date, "05/08/2026");
+});
+
+test("Workday parser helpers recover source id, location, and remote evidence from CXS fields and URLs", () => {
+  const posting = {
+    title: "Bodily Injury Claim Specialist - Meemic",
+    externalPath: "/job/MI-HMMI-Empl-Work-From-Home/Bodily-Injury-Claim-Specialist---Meemic_JR15792",
+    postedOn: "Posted Today"
+  };
+  const jobUrl = "https://acg.wd1.myworkdayjobs.com/Careers/job/MI-HMMI-Empl-Work-From-Home/Bodily-Injury-Claim-Specialist---Meemic_JR15792";
+  assert.equal(extractWorkdaySourceJobId(posting, jobUrl), "JR15792");
+  assert.match(extractWorkdayLocationLabel(posting, jobUrl), /Work From Home/);
+  const normalized = normalizeParsed("workday", {
+    company_name: "Fixture Workday",
+    source_job_id: extractWorkdaySourceJobId(posting, jobUrl),
+    position_name: posting.title,
+    job_posting_url: jobUrl,
+    posting_date: posting.postedOn,
+    location: extractWorkdayLocationLabel(posting, jobUrl),
+    workplaceType: "Work From Home"
+  }, "Fixture Workday");
+  assert.equal(normalized.source_job_id, "JR15792");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(Number.isFinite(normalized.posted_at_epoch), true);
+});
+
+test("Taleo REST parser scans unstable columns and rejects boolean dates", () => {
+  const parsed = extractTaleoPostingsFromRest(
+    "Fixture Taleo",
+    { baseSectionUrl: "https://fixture.taleo.net/careersection/001", lang: "en" },
+    [
+      {
+        jobId: "146407",
+        contestNo: "146407",
+        column: ["Kearney Finance Supervisor", "false", "Dubai, United Arab Emirates", "Full-time", "May 8, 2026"]
+      }
+    ]
+  );
+  const normalized = normalizeParsed("taleo", parsed[0], "Fixture Taleo");
+  assert.equal(normalized.source_job_id, "146407");
+  assert.equal(normalized.country, "United Arab Emirates");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.posting_date, "May 8, 2026");
+});
+
+test("Recruitee PublicApp parser preserves localized countries, departments, source id, and remote hints", () => {
+  const parsed = parseRecruiteePostingsFromPublicApp(
+    "Fixture Recruitee",
+    { baseUrl: "https://fixture.recruitee.com" },
+    {
+      appConfig: {
+        primaryLangCode: "nl",
+        locations: [
+          { id: 10, city: "Rijswijk", country: "Nederland", translations: { nl: { name: "Rijswijk", country: "Nederland" } } }
+        ],
+        departments: [{ id: 5, translations: { nl: { name: "Engineering" } } }],
+        offers: [
+          {
+            id: 1001,
+            slug: "support-engineer",
+            locationIds: [10],
+            departmentId: 5,
+            remote: true,
+            publishedAt: "2026-05-08",
+            translations: { nl: { title: "Support Engineer" } }
+          }
+        ]
+      }
+    }
+  );
+  const normalized = normalizeParsed("recruitee", parsed[0], "Fixture Recruitee");
+  assert.equal(normalized.source_job_id, "1001");
+  assert.equal(normalized.country, "Netherlands");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.industry, "Engineering");
+  assert.equal(normalized.posting_date, "2026-05-08");
 });

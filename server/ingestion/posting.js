@@ -20,7 +20,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Canada", ["ca", "can", "canada"]],
   ["Germany", ["de", "deu", "germany", "deutschland"]],
   ["France", ["fr", "fra", "france"]],
-  ["Netherlands", ["nl", "nld", "netherlands", "holland"]],
+  ["Netherlands", ["nl", "nld", "netherlands", "holland", "nederland", "niederlande"]],
   ["Spain", ["es", "esp", "spain", "españa", "espana"]],
   ["Italy", ["it", "ita", "italy", "italia"]],
   ["Ireland", ["ie", "irl", "ireland"]],
@@ -49,7 +49,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Czech Republic", ["cz", "cze", "czech republic", "czechia"]],
   ["Slovakia", ["sk", "svk", "slovakia"]],
   ["Hungary", ["hu", "hun", "hungary"]],
-  ["Austria", ["at", "aut", "austria"]],
+  ["Austria", ["at", "aut", "austria", "osterreich"]],
   ["Switzerland", ["ch", "che", "switzerland", "schweiz", "suisse"]],
   ["Belgium", ["be", "bel", "belgium"]],
   ["Denmark", ["dk", "dnk", "denmark"]],
@@ -70,7 +70,17 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Saudi Arabia", ["sa", "sau", "saudi arabia"]],
   ["South Africa", ["za", "zaf", "south africa"]],
   ["Egypt", ["eg", "egy", "egypt"]],
-  ["Pakistan", ["pk", "pak", "pakistan"]]
+  ["Pakistan", ["pk", "pak", "pakistan"]],
+  ["Iran", ["ir", "irn", "iran", "iran islamic republic of", "islamic republic of iran"]],
+  ["Ecuador", ["ec", "ecu", "ecuador"]],
+  ["Armenia", ["am", "arm", "armenia"]],
+  ["Cyprus", ["cy", "cyp", "cyprus"]],
+  ["Cayman Islands", ["ky", "cym", "cayman islands", "cayman"]],
+  ["Taiwan", ["tw", "twn", "taiwan"]],
+  ["Qatar", ["qa", "qat", "qatar"]],
+  ["Kuwait", ["kw", "kwt", "kuwait"]],
+  ["Bahrain", ["bh", "bhr", "bahrain"]],
+  ["Oman", ["om", "omn", "oman"]]
 ]);
 
 const COUNTRY_ALIASES = Object.freeze(COUNTRY_ALIAS_GROUPS.reduce((aliases, [country, values]) => {
@@ -82,9 +92,22 @@ const COUNTRY_ALIASES = Object.freeze(COUNTRY_ALIAS_GROUPS.reduce((aliases, [cou
 
 const COUNTRY_LOCATION_TERMS = Object.freeze([
   ["Turkey", ["istanbul", "ankara", "izmir", "antalya", "bursa", "gebze", "kocaeli", "konya", "adana", "kayseri", "mugla", "bodrum"]],
-  ["United States", ["new york", "los angeles", "san francisco", "seattle", "chicago", "boston", "austin", "dallas", "houston", "washington dc", "washington, dc", "california", "texas", "florida", "illinois", "massachusetts", "pennsylvania", "ohio", "georgia", "virginia", "north carolina", "new jersey", "arizona", "colorado", "michigan", "indiana"]],
+  ["United States", [
+    "new york", "los angeles", "san francisco", "seattle", "chicago", "boston", "austin", "dallas", "houston",
+    "washington dc", "washington, dc", "district of columbia",
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware", "florida",
+    "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine",
+    "maryland", "massachusetts", "michigan", "minnesota", "mississippi", "missouri", "montana", "nebraska",
+    "nevada", "new hampshire", "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio",
+    "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas",
+    "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming"
+  ]],
   ["United Kingdom", ["london", "manchester", "birmingham", "edinburgh", "glasgow", "bristol", "leeds", "cambridge"]],
-  ["Canada", ["toronto", "vancouver", "montreal", "ottawa", "calgary", "edmonton", "waterloo", "quebec"]],
+  ["Canada", [
+    "toronto", "vancouver", "montreal", "ottawa", "calgary", "edmonton", "waterloo", "quebec",
+    "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland and labrador", "nova scotia",
+    "ontario", "prince edward island", "saskatchewan", "northwest territories", "nunavut", "yukon"
+  ]],
   ["Germany", ["berlin", "munich", "münchen", "hamburg", "frankfurt", "cologne", "stuttgart"]],
   ["France", ["paris", "lyon", "marseille", "toulouse", "lille"]],
   ["Netherlands", ["amsterdam", "rotterdam", "utrecht", "eindhoven"]],
@@ -99,7 +122,14 @@ const COUNTRY_LOCATION_TERMS = Object.freeze([
   ["Mexico", ["mexico city", "ciudad de mexico", "guadalajara", "monterrey"]],
   ["Poland", ["warsaw", "krakow", "kraków", "wroclaw", "wrocław"]],
   ["Portugal", ["lisbon", "lisboa", "porto"]],
-  ["United Arab Emirates", ["dubai", "abu dhabi"]]
+  ["United Arab Emirates", ["dubai", "abu dhabi"]],
+  ["South Korea", ["seoul", "ulsan", "busan", "incheon"]],
+  ["Taiwan", ["taipei", "hsinchu", "hsin chu", "taichung", "kaohsiung", "taiwan"]],
+  ["Armenia", ["yerevan"]],
+  ["Cyprus", ["nicosia", "limassol"]],
+  ["Cayman Islands", ["george town", "grand cayman"]],
+  ["Ecuador", ["quito", "guayaquil"]],
+  ["Iran", ["tehran"]]
 ]);
 
 const US_STATE_ABBREVIATION_PATTERN =
@@ -170,6 +200,9 @@ function normalizeRegionFromCountry(country) {
     "slovenia",
     "ukraine",
     "israel",
+    "iran",
+    "armenia",
+    "cyprus",
     "united arab emirates",
     "saudi arabia",
     "south africa",
@@ -189,6 +222,7 @@ function normalizeRegionFromCountry(country) {
     "south korea",
     "china",
     "hong kong",
+    "taiwan",
     "malaysia",
     "indonesia",
     "philippines",
@@ -198,8 +232,11 @@ function normalizeRegionFromCountry(country) {
   ].includes(normalized)) {
     return "APAC";
   }
-  if (["brazil", "mexico", "argentina", "chile", "colombia", "peru"].includes(normalized)) {
+  if (["brazil", "mexico", "argentina", "chile", "colombia", "peru", "ecuador"].includes(normalized)) {
     return "LATAM";
+  }
+  if (normalized === "cayman islands") {
+    return "North America";
   }
   return "";
 }
@@ -217,6 +254,22 @@ function normalizeRemoteType(value) {
 function normalizePostingDate(value) {
   const rawValue = normalizePostingValue(value);
   if (!rawValue) return { raw: null, epoch: null };
+  const normalizedLower = rawValue.toLowerCase();
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  if (normalizedLower === "posted today" || normalizedLower === "today") {
+    return { raw: rawValue, epoch: nowEpoch };
+  }
+  if (normalizedLower === "posted yesterday" || normalizedLower === "yesterday") {
+    return { raw: rawValue, epoch: nowEpoch - 24 * 60 * 60 };
+  }
+  const relativeHours = normalizedLower.match(/^posted\s+(\d+)\s+hour(?:s)?\s+ago$/) || normalizedLower.match(/^(\d+)\s+hour(?:s)?\s+ago$/);
+  if (relativeHours?.[1]) {
+    return { raw: rawValue, epoch: nowEpoch - Number(relativeHours[1]) * 60 * 60 };
+  }
+  const relativeDays = normalizedLower.match(/^posted\s+(\d+)\s+day(?:s)?\s+ago$/) || normalizedLower.match(/^(\d+)\s+day(?:s)?\s+ago$/);
+  if (relativeDays?.[1]) {
+    return { raw: rawValue, epoch: nowEpoch - Number(relativeDays[1]) * 24 * 60 * 60 };
+  }
   if (/^\d{10}$/.test(rawValue)) {
     return { raw: rawValue, epoch: Number(rawValue) };
   }

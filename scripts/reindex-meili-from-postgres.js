@@ -1,7 +1,53 @@
 const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
-const { ensureMeiliPostingsIndex, upsertMeiliPostings } = require("../server/search/meili");
+const { ensureMeiliPostingsIndex, getMeiliConfig, upsertMeiliPostings } = require("../server/search/meili");
 
 const BATCH_SIZE = Math.max(100, Math.min(5000, Number(process.env.OPENJOBSLOTS_REINDEX_BATCH_SIZE || 1000)));
+const REPLACE_INDEX = String(process.env.OPENJOBSLOTS_REINDEX_REPLACE || "").trim() === "1";
+
+async function meiliRequest(config, path, options = {}) {
+  const response = await fetch(`${config.host}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if (response.status === 404 && options.allowNotFound) return {};
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Meilisearch request failed (${response.status}): ${text.slice(0, 200)}`);
+  }
+  if (response.status === 204) return {};
+  return response.json();
+}
+
+async function waitForMeiliTask(config, task, timeoutMs = 60000) {
+  const taskUid = Number(task?.taskUid ?? task?.uid ?? 0);
+  if (!taskUid) return;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const current = await meiliRequest(config, `/tasks/${taskUid}`);
+    if (current?.status === "succeeded") return;
+    if (current?.status === "failed" || current?.status === "canceled") {
+      throw new Error(`Meilisearch task ${taskUid} ${current.status}: ${current?.error?.message || "unknown error"}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Meilisearch task ${taskUid} did not finish within ${timeoutMs}ms`);
+}
+
+async function resetMeiliIndexIfRequested() {
+  if (!REPLACE_INDEX) return;
+  const config = getMeiliConfig();
+  if (!config.enabled) return;
+  const deleteTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`, {
+    method: "DELETE",
+    allowNotFound: true
+  });
+  await waitForMeiliTask(config, deleteTask);
+  console.log(`Deleted Meilisearch index ${config.indexName} before rebuild`);
+}
 
 async function main() {
   const pool = createPostgresPool();
@@ -10,6 +56,7 @@ async function main() {
 
   try {
     await ensurePostgresSchema(pool);
+    await resetMeiliIndexIfRequested();
     await ensureMeiliPostingsIndex();
 
     while (true) {
