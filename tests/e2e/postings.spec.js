@@ -987,6 +987,21 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("posting-card-block-company")).toHaveCount(0);
   });
 
+  test("posting card source diagnostics open and close safely", async ({ page }) => {
+    await openPostings(page);
+    await submitSearchAndExpectResults(page, "remote jobs");
+
+    const firstCard = page.getByTestId("posting-card").first();
+    await firstCard.getByTestId("posting-card-source-toggle").click();
+    await expect(firstCard.getByTestId("posting-card-source-panel")).toBeVisible();
+    await expect(firstCard.getByText(/Source:/i)).toBeVisible();
+    await expect(firstCard.getByText(/Quality:/i)).toBeVisible();
+    await expect(firstCard.getByText(/Parser:/i)).toBeVisible();
+    await expect(firstCard.getByText(/raw_payload|postgres:\/\/|MEILI_|MASTER_KEY|stack trace/i)).toHaveCount(0);
+    await firstCard.getByTestId("posting-card-source-toggle").click();
+    await expect(firstCard.getByTestId("posting-card-source-panel")).toHaveCount(0);
+  });
+
   test("public page does not expose admin destinations", async ({ page }) => {
     await openPostings(page);
     await expectPublicSearchChrome(page);

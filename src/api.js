@@ -140,6 +140,14 @@ export function fetchSearchSuggestions(search = "", limit = 8) {
   return request(`/search/suggest?${params.toString()}`);
 }
 
+export function fetchPostingDiagnostics(jobPostingUrl = "") {
+  const params = new URLSearchParams({
+    url: String(jobPostingUrl || ""),
+    _ts: String(Date.now())
+  });
+  return request(`/postings/diagnostics?${params.toString()}`);
+}
+
 export function fetchApplications(limit = 500, offset = 0, status = "") {
   const params = new URLSearchParams({
     limit: String(limit),

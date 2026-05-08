@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
+const { ensureIngestionTables } = require("../../server/ingestion/schema");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const fixtureSource = path.join(repoRoot, "jobs.db");
@@ -68,8 +69,10 @@ async function main() {
   try {
     await db.exec("PRAGMA journal_mode = WAL;");
     await ensurePostingsColumns(db);
+    await ensureIngestionTables(db);
     await ensureReferenceTables(db);
     await seedFixtureRows(db);
+    await seedDiagnosticsRows(db);
   } finally {
     await db.close();
   }
@@ -89,6 +92,12 @@ async function ensurePostingsColumns(db) {
   await addColumnIfMissing(db, "Postings", "first_seen_epoch", "first_seen_epoch INTEGER");
   await addColumnIfMissing(db, "Postings", "hidden", "hidden INTEGER NOT NULL DEFAULT 0");
   await addColumnIfMissing(db, "Postings", "hidden_at_epoch", "hidden_at_epoch INTEGER");
+  await addColumnIfMissing(db, "Postings", "source_job_id", "source_job_id TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing(db, "Postings", "parser_version", "parser_version TEXT NOT NULL DEFAULT 'legacy-adapter-v1'");
+  await addColumnIfMissing(db, "Postings", "confidence", "confidence REAL NOT NULL DEFAULT 0");
+  await addColumnIfMissing(db, "Postings", "quality_score", "quality_score INTEGER NOT NULL DEFAULT 0");
+  await addColumnIfMissing(db, "Postings", "quality_flags", "quality_flags TEXT NOT NULL DEFAULT '[]'");
+  await addColumnIfMissing(db, "Postings", "rejection_reason", "rejection_reason TEXT NOT NULL DEFAULT ''");
   await db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_postings_job_posting_url
       ON Postings(job_posting_url);
@@ -189,6 +198,94 @@ async function seedFixtureRows(db) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'));
     `,
     ["Backend Engineer", "backend engineer", "technology", "Technology", "[\"test-fixture\"]", 0.95, "test-fixture-v1"]
+  );
+}
+
+async function seedDiagnosticsRows(db) {
+  const now = Math.floor(Date.now() / 1000);
+  const run = await db.run(
+    `
+      INSERT INTO ingestion_runs (
+        status,
+        started_at_epoch,
+        finished_at_epoch,
+        total_targets,
+        success_count,
+        failure_count,
+        rejected_count,
+        last_error
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    ["completed_with_errors", now - 60, now - 30, 1, 0, 1, 1, "Parser rejected missing title"]
+  );
+  await db.run(
+    `
+      INSERT INTO ingestion_run_errors (
+        run_id,
+        ats_key,
+        company_url,
+        company_name,
+        error_type,
+        error_message,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'));
+    `,
+    [
+      Number(run.lastID || 0),
+      "careerplug",
+      "https://example.careerplug.com/jobs",
+      "QA CareerPlug Bad",
+      "parser_validation",
+      "missing required title"
+    ]
+  );
+  await db.run(
+    `
+      INSERT INTO posting_cache (
+        canonical_url,
+        ats_key,
+        company_name,
+        position_name,
+        location,
+        posting_date,
+        raw_payload_hash,
+        source_company_url,
+        first_seen_epoch,
+        last_seen_epoch,
+        parser_version,
+        quality_score,
+        quality_flags,
+        rejection_reason,
+        validation_status,
+        validation_error,
+        raw_metadata
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(canonical_url) DO UPDATE SET
+        validation_status = excluded.validation_status,
+        validation_error = excluded.validation_error,
+        rejection_reason = excluded.rejection_reason,
+        quality_flags = excluded.quality_flags,
+        updated_at = datetime('now');
+    `,
+    [
+      "https://example.careerplug.com/jobs/bad-title",
+      "careerplug",
+      "QA CareerPlug Bad",
+      "",
+      "",
+      null,
+      "test-raw-hash",
+      "https://example.careerplug.com/jobs",
+      now,
+      now,
+      "careerplug-parser-v1",
+      0,
+      JSON.stringify(["missing_title", "rejected"]),
+      "missing required title",
+      "invalid",
+      "missing required title",
+      "{}"
+    ]
   );
 }
 
