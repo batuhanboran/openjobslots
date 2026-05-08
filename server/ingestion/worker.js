@@ -54,6 +54,22 @@ const AUTO_SYNC_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(
 const PG_STAT_STATEMENTS_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS ?? "1").trim().toLowerCase()
 );
+const SQLITE_WRITE_RETRY_LIMIT = Math.max(0, Math.floor(nonNegativeNumber(
+  process.env.INGESTION_SQLITE_WRITE_RETRY_LIMIT,
+  3
+)));
+const SQLITE_WRITE_RETRY_BASE_MS = Math.max(25, Math.floor(positiveNumber(
+  process.env.INGESTION_SQLITE_WRITE_RETRY_BASE_MS,
+  75
+)));
+const MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN = Math.max(1, Math.floor(positiveNumber(
+  process.env.INGESTION_MAX_CONSECUTIVE_FAILURES,
+  8
+)));
+const FAILURE_COOLDOWN_SECONDS = Math.max(60 * 60, Math.floor(positiveNumber(
+  process.env.INGESTION_FAILURE_COOLDOWN_SECONDS,
+  7 * 24 * 60 * 60
+)));
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
 let writeQueue = Promise.resolve();
@@ -62,8 +78,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function withWriteLock(task) {
-  const run = writeQueue.then(task, task);
+function isSqliteBusyError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  const code = String(error?.code || "").toUpperCase();
+  return code === "SQLITE_BUSY" ||
+    code === "SQLITE_LOCKED" ||
+    message.includes("sqlite_busy") ||
+    message.includes("database is locked") ||
+    message.includes("database is busy");
+}
+
+async function withTransientWriteRetry(task, options = {}) {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await task();
+    } catch (error) {
+      if (!isSqliteBusyError(error) || attempt >= SQLITE_WRITE_RETRY_LIMIT) {
+        throw error;
+      }
+      attempt += 1;
+      if (typeof options.onBusyRetry === "function") {
+        options.onBusyRetry(error, attempt);
+      }
+      await sleep(SQLITE_WRITE_RETRY_BASE_MS * 2 ** (attempt - 1));
+    }
+  }
+}
+
+function withWriteLock(task, options = {}) {
+  const run = writeQueue.then(
+    () => withTransientWriteRetry(task, options),
+    () => withTransientWriteRetry(task, options)
+  );
   writeQueue = run.catch(() => {});
   return run;
 }
@@ -85,6 +132,9 @@ function computeNextSyncEpoch(baseEpoch, ttlSeconds, targetKey) {
 
 function computeRetryEpoch(baseEpoch, consecutiveFailures) {
   const failures = Math.max(1, Number(consecutiveFailures || 1));
+  if (failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
+    return Number(baseEpoch || nowEpochSeconds()) + FAILURE_COOLDOWN_SECONDS;
+  }
   const backoffSeconds = Math.min(24 * 60 * 60, 60 * 60 * 2 ** Math.min(6, failures - 1));
   return Number(baseEpoch || nowEpochSeconds()) + backoffSeconds;
 }
@@ -108,6 +158,53 @@ function classifyIngestionError(error, fallback = "fetch") {
   if (message.includes("parse") || message.includes("json")) return "parser_parse";
   if (message.includes("timeout") || message.includes("rate limit") || message.includes("request failed")) return "fetch";
   return fallback;
+}
+
+function extractHttpStatus(error) {
+  const explicit = Number(error?.status || error?.statusCode || error?.httpStatus || error?.response?.status || 0);
+  if (Number.isFinite(explicit) && explicit >= 100 && explicit <= 599) return explicit;
+  const match = String(error?.message || error || "").match(/\b([1-5][0-9]{2})\b/);
+  const parsed = match ? Number(match[1]) : 0;
+  return Number.isFinite(parsed) && parsed >= 100 && parsed <= 599 ? parsed : null;
+}
+
+function incrementHttpStatusCount(counters, httpStatus) {
+  const status = Number(httpStatus || 0);
+  if (!Number.isFinite(status) || status < 100 || status > 599) return;
+  const key = String(status);
+  counters.httpStatusCounts = counters.httpStatusCounts || {};
+  counters.httpStatusCounts[key] = Number(counters.httpStatusCounts[key] || 0) + 1;
+}
+
+function incrementDbBusyCount(counters) {
+  if (!counters) return;
+  counters.dbBusyCount = Number(counters.dbBusyCount || 0) + 1;
+}
+
+function createRunCounters() {
+  return {
+    successCount: 0,
+    failureCount: 0,
+    cacheHitCount: 0,
+    cacheWriteCount: 0,
+    postingUpsertCount: 0,
+    rejectedCount: 0,
+    duplicateCount: 0,
+    dbBusyCount: 0,
+    httpStatusCounts: {},
+    lastError: ""
+  };
+}
+
+function dedupeValidPosting(posting, seenCanonicalUrls, counters) {
+  const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
+  if (!canonicalUrl) return true;
+  if (seenCanonicalUrls.has(canonicalUrl)) {
+    counters.duplicateCount += 1;
+    return false;
+  }
+  seenCanonicalUrls.add(canonicalUrl);
+  return true;
 }
 
 async function loadAtsSourceSettings(db) {
@@ -210,6 +307,13 @@ async function updateRun(db, runId, patch) {
         cache_hit_count = ?,
         cache_write_count = ?,
         posting_upsert_count = ?,
+        rejected_count = ?,
+        duplicate_count = ?,
+        db_busy_count = ?,
+        current_ats = COALESCE(?, current_ats),
+        current_company_url = COALESCE(?, current_company_url),
+        current_company_name = COALESCE(?, current_company_name),
+        http_status_counts = ?,
         last_error = ?,
         updated_at = datetime('now')
       WHERE id = ?;
@@ -222,10 +326,27 @@ async function updateRun(db, runId, patch) {
       Number(patch.cacheHitCount || 0),
       Number(patch.cacheWriteCount || 0),
       Number(patch.postingUpsertCount || 0),
+      Number(patch.rejectedCount || 0),
+      Number(patch.duplicateCount || 0),
+      Number(patch.dbBusyCount || 0),
+      patch.currentAts == null ? null : String(patch.currentAts),
+      patch.currentCompanyUrl == null ? null : String(patch.currentCompanyUrl),
+      patch.currentCompanyName == null ? null : String(patch.currentCompanyName),
+      JSON.stringify(patch.httpStatusCounts || {}),
       String(patch.lastError || ""),
       runId
     ]
   ));
+}
+
+async function updateRunCurrentTarget(db, runId, target, counters) {
+  await updateRun(db, runId, {
+    ...counters,
+    status: "running",
+    currentAts: target?.atsKey || "",
+    currentCompanyUrl: target?.companyUrl || "",
+    currentCompanyName: String(target?.company?.company_name || "")
+  });
 }
 
 async function recoverStaleRuns(db) {
@@ -240,7 +361,7 @@ async function recoverStaleRuns(db) {
           ELSE last_error
         END,
         updated_at = datetime('now')
-      WHERE status = 'running';
+      WHERE status IN ('running', 'stopping');
     `,
     [nowEpochSeconds()]
   ));
@@ -372,12 +493,14 @@ async function processTarget(db, runId, target, counters) {
       throw error;
     }
     const validPostings = [];
+    const seenCanonicalUrls = new Set();
 
     for (const item of parsed) {
       let normalized;
       try {
         normalized = target.adapter.normalize(item, target.company, { nowEpoch });
       } catch (error) {
+        counters.rejectedCount += 1;
         await recordRunError(db, runId, target, error, null, "parser_normalize");
         continue;
       }
@@ -387,18 +510,25 @@ async function processTarget(db, runId, target, counters) {
         parserVersion: target.adapter.parserVersion,
         sourceCompanyUrl: target.companyUrl,
         validation
-      }));
+      }), {
+        onBusyRetry: () => incrementDbBusyCount(counters)
+      });
       if (cacheResult.cached && cacheResult.changed) counters.cacheWriteCount += 1;
       if (cacheResult.cached && !cacheResult.changed) counters.cacheHitCount += 1;
       if (validation.ok) {
-        validPostings.push(normalized);
+        if (dedupeValidPosting(normalized, seenCanonicalUrls, counters)) {
+          validPostings.push(normalized);
+        }
       } else {
+        counters.rejectedCount += 1;
         await recordRunError(db, runId, target, new Error(validation.error), null, classifyIngestionError(validation.error, "parser_validation"));
       }
     }
 
     if (validPostings.length > 0) {
-      await withWriteLock(() => upsertPostings(validPostings, nowEpoch));
+      await withWriteLock(() => upsertPostings(validPostings, nowEpoch), {
+        onBusyRetry: () => incrementDbBusyCount(counters)
+      });
       counters.postingUpsertCount += validPostings.length;
     }
 
@@ -412,8 +542,10 @@ async function processTarget(db, runId, target, counters) {
   } catch (error) {
     counters.failureCount += 1;
     counters.lastError = String(error?.message || error);
+    const httpStatus = extractHttpStatus(error);
+    incrementHttpStatusCount(counters, httpStatus);
     await markCompanyFailure(db, target, error, nowEpoch);
-    await recordRunError(db, runId, target, error, null, classifyIngestionError(error));
+    await recordRunError(db, runId, target, error, httpStatus, classifyIngestionError(error));
   }
 }
 
@@ -502,7 +634,7 @@ async function recoverPostgresStaleRuns(pool) {
           ELSE last_error
         END,
         updated_at = now()
-      WHERE status = 'running';
+      WHERE status IN ('running', 'stopping');
     `,
     [nowEpochSeconds()]
   );
@@ -636,9 +768,16 @@ async function updatePostgresRun(pool, runId, patch) {
         cache_hit_count = $5,
         cache_write_count = $6,
         posting_upsert_count = $7,
-        last_error = $8,
+        rejected_count = $8,
+        duplicate_count = $9,
+        db_busy_count = $10,
+        current_ats = COALESCE($11, current_ats),
+        current_company_url = COALESCE($12, current_company_url),
+        current_company_name = COALESCE($13, current_company_name),
+        http_status_counts = $14::jsonb,
+        last_error = $15,
         updated_at = now()
-      WHERE id = $9;
+      WHERE id = $16;
     `,
     [
       patch.finishedAtEpoch || null,
@@ -648,10 +787,27 @@ async function updatePostgresRun(pool, runId, patch) {
       Number(patch.cacheHitCount || 0),
       Number(patch.cacheWriteCount || 0),
       Number(patch.postingUpsertCount || 0),
+      Number(patch.rejectedCount || 0),
+      Number(patch.duplicateCount || 0),
+      Number(patch.dbBusyCount || 0),
+      patch.currentAts == null ? null : String(patch.currentAts),
+      patch.currentCompanyUrl == null ? null : String(patch.currentCompanyUrl),
+      patch.currentCompanyName == null ? null : String(patch.currentCompanyName),
+      JSON.stringify(patch.httpStatusCounts || {}),
       String(patch.lastError || ""),
       runId
     ]
   );
+}
+
+async function updatePostgresRunCurrentTarget(pool, runId, target, counters) {
+  await updatePostgresRun(pool, runId, {
+    ...counters,
+    status: "running",
+    currentAts: target?.atsKey || "",
+    currentCompanyUrl: target?.companyUrl || "",
+    currentCompanyName: String(target?.company?.company_name || "")
+  });
 }
 
 async function recordPostgresRunError(pool, runId, target, error, httpStatus = null, errorType = null) {
@@ -688,10 +844,38 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
   const rawPayloadHash = hashPayload(posting || {});
   if (!canonicalUrl) return { cached: false, changed: false, hash: rawPayloadHash };
 
-  const existing = await pool.query("SELECT raw_payload_hash FROM posting_cache WHERE canonical_url = $1;", [
+  const existing = await pool.query(
+    `
+      SELECT raw_payload_hash, parser_version, validation_status, validation_error
+      FROM posting_cache
+      WHERE canonical_url = $1;
+    `,
+    [
     canonicalUrl
-  ]);
-  const changed = String(existing.rows[0]?.raw_payload_hash || "") !== rawPayloadHash;
+    ]
+  );
+  const existingRow = existing.rows[0] || null;
+  const validationStatus = validation.ok ? "valid" : "invalid";
+  const validationError = String(validation.error || "");
+  const changed = !existingRow ||
+    String(existingRow?.raw_payload_hash || "") !== rawPayloadHash ||
+    String(existingRow?.parser_version || "") !== parserVersion ||
+    String(existingRow?.validation_status || "") !== validationStatus ||
+    String(existingRow?.validation_error || "") !== validationError;
+
+  if (existingRow && !changed) {
+    await pool.query(
+      `
+        UPDATE posting_cache
+        SET
+          last_seen_epoch = $1,
+          updated_at = now()
+        WHERE canonical_url = $2;
+      `,
+      [nowEpoch, canonicalUrl]
+    );
+    return { cached: true, changed: false, hash: rawPayloadHash };
+  }
 
   await pool.query(
     `
@@ -775,8 +959,8 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
       nowEpoch,
       parserVersion,
       Number(posting?.confidence || 0.5),
-      validation.ok ? "valid" : "invalid",
-      String(validation.error || ""),
+      validationStatus,
+      validationError,
       JSON.stringify({
         source_company_url: sourceCompanyUrl,
         parser_version: parserVersion
@@ -888,6 +1072,7 @@ async function processPostgresTarget(pool, runId, target, counters) {
       throw error;
     }
     const validPostings = [];
+    const seenCanonicalUrls = new Set();
 
     for (const item of parsed) {
       let normalized;
@@ -897,6 +1082,7 @@ async function processPostgresTarget(pool, runId, target, counters) {
           ats_key: target.atsKey
         };
       } catch (error) {
+        counters.rejectedCount += 1;
         await recordPostgresRunError(pool, runId, target, error, null, "parser_normalize");
         continue;
       }
@@ -910,8 +1096,11 @@ async function processPostgresTarget(pool, runId, target, counters) {
       if (cacheResult.cached && cacheResult.changed) counters.cacheWriteCount += 1;
       if (cacheResult.cached && !cacheResult.changed) counters.cacheHitCount += 1;
       if (validation.ok) {
-        validPostings.push(normalized);
+        if (dedupeValidPosting(normalized, seenCanonicalUrls, counters)) {
+          validPostings.push(normalized);
+        }
       } else {
+        counters.rejectedCount += 1;
         await recordPostgresRunError(pool, runId, target, new Error(validation.error), null, classifyIngestionError(validation.error, "parser_validation"));
       }
     }
@@ -935,8 +1124,10 @@ async function processPostgresTarget(pool, runId, target, counters) {
   } catch (error) {
     counters.failureCount += 1;
     counters.lastError = String(error?.message || error);
+    const httpStatus = extractHttpStatus(error);
+    incrementHttpStatusCount(counters, httpStatus);
     await markPostgresCompanyFailure(pool, target, error, nowEpoch);
-    await recordPostgresRunError(pool, runId, target, error, null, classifyIngestionError(error));
+    await recordPostgresRunError(pool, runId, target, error, httpStatus, classifyIngestionError(error));
     return "failed";
   }
 }
@@ -962,14 +1153,7 @@ async function runPostgresIngestionOnce(pool, options = {}) {
 
   const targets = await selectPostgresDueTargets(pool, targetLimit);
   const runId = await createPostgresRun(pool, targets);
-  const counters = {
-    successCount: 0,
-    failureCount: 0,
-    cacheHitCount: 0,
-    cacheWriteCount: 0,
-    postingUpsertCount: 0,
-    lastError: ""
-  };
+  const counters = createRunCounters();
   let cancelled = false;
 
   try {
@@ -983,6 +1167,7 @@ async function runPostgresIngestionOnce(pool, options = {}) {
         }
         const target = targets[nextIndex];
         nextIndex += 1;
+        await updatePostgresRunCurrentTarget(pool, runId, target, counters);
         const result = await processPostgresTarget(pool, runId, target, counters);
         if (result === "cancelled") {
           cancelled = true;
@@ -1011,7 +1196,10 @@ async function runPostgresIngestionOnce(pool, options = {}) {
     await updatePostgresRun(pool, runId, {
       ...counters,
       status: finalStatus,
-      finishedAtEpoch: nowEpochSeconds()
+      finishedAtEpoch: nowEpochSeconds(),
+      currentAts: "",
+      currentCompanyUrl: "",
+      currentCompanyName: ""
     });
     if (cancelled) {
       await postgresClearSyncControl(pool, "idle", "Run cancelled by user");
@@ -1043,6 +1231,9 @@ async function runPostgresIngestionOnce(pool, options = {}) {
       ...counters,
       status: "failed",
       finishedAtEpoch: nowEpochSeconds(),
+      currentAts: "",
+      currentCompanyUrl: "",
+      currentCompanyName: "",
       lastError: String(error?.message || error)
     });
     await postgresClearSyncControl(pool, "idle", String(error?.message || error));
@@ -1057,14 +1248,7 @@ async function runIngestionOnce() {
 
   const targets = await selectDueTargets(db);
   const runId = await createRun(db, targets);
-  const counters = {
-    successCount: 0,
-    failureCount: 0,
-    cacheHitCount: 0,
-    cacheWriteCount: 0,
-    postingUpsertCount: 0,
-    lastError: ""
-  };
+  const counters = createRunCounters();
 
   try {
     let nextIndex = 0;
@@ -1073,6 +1257,7 @@ async function runIngestionOnce() {
       while (nextIndex < targets.length) {
         const target = targets[nextIndex];
         nextIndex += 1;
+        await updateRunCurrentTarget(db, runId, target, counters);
         await processTarget(db, runId, target, counters);
         await updateRun(db, runId, {
           ...counters,
@@ -1084,13 +1269,19 @@ async function runIngestionOnce() {
     await updateRun(db, runId, {
       ...counters,
       status: counters.failureCount > 0 ? "completed_with_errors" : "completed",
-      finishedAtEpoch: nowEpochSeconds()
+      finishedAtEpoch: nowEpochSeconds(),
+      currentAts: "",
+      currentCompanyUrl: "",
+      currentCompanyName: ""
     });
   } catch (error) {
     await updateRun(db, runId, {
       ...counters,
       status: "failed",
       finishedAtEpoch: nowEpochSeconds(),
+      currentAts: "",
+      currentCompanyUrl: "",
+      currentCompanyName: "",
       lastError: String(error?.message || error)
     });
     throw error;
@@ -1209,11 +1400,19 @@ if (require.main === module) {
 }
 
 module.exports = {
+  computeNextSyncEpoch,
+  computeRetryEpoch,
+  createRunCounters,
   classifyIngestionError,
+  dedupeValidPosting,
+  extractHttpStatus,
+  incrementHttpStatusCount,
+  isSqliteBusyError,
   runPostgresIngestionOnce,
   runIngestionOnce,
   selectDueTargets,
   selectPostgresDueTargets,
   startWorker,
+  withTransientWriteRetry,
   withWriteLock
 };

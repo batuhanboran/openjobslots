@@ -73,6 +73,13 @@ async function ensureIngestionTables(db) {
       cache_hit_count INTEGER NOT NULL DEFAULT 0,
       cache_write_count INTEGER NOT NULL DEFAULT 0,
       posting_upsert_count INTEGER NOT NULL DEFAULT 0,
+      rejected_count INTEGER NOT NULL DEFAULT 0,
+      duplicate_count INTEGER NOT NULL DEFAULT 0,
+      db_busy_count INTEGER NOT NULL DEFAULT 0,
+      current_ats TEXT NOT NULL DEFAULT '',
+      current_company_url TEXT NOT NULL DEFAULT '',
+      current_company_name TEXT NOT NULL DEFAULT '',
+      http_status_counts TEXT NOT NULL DEFAULT '{}',
       active_ats TEXT NOT NULL DEFAULT '[]',
       last_error TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -97,6 +104,13 @@ async function ensureIngestionTables(db) {
   `);
 
   await ensureColumn(db, "ingestion_run_errors", "error_type", "TEXT NOT NULL DEFAULT 'unknown'");
+  await ensureColumn(db, "ingestion_runs", "rejected_count", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(db, "ingestion_runs", "duplicate_count", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(db, "ingestion_runs", "db_busy_count", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(db, "ingestion_runs", "current_ats", "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, "ingestion_runs", "current_company_url", "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, "ingestion_runs", "current_company_name", "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, "ingestion_runs", "http_status_counts", "TEXT NOT NULL DEFAULT '{}'");
   await db.exec(`
     CREATE INDEX IF NOT EXISTS idx_ingestion_run_errors_type_ats
       ON ingestion_run_errors(error_type, ats_key, created_at);

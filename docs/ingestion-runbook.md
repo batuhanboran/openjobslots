@@ -1,0 +1,94 @@
+# OpenJobSlots Ingestion Runbook
+
+This runbook covers the v1.6 ingestion worker path. It is operational documentation only; it does not require a live deploy.
+
+## Runtime Model
+
+- Production compose runs the API and worker as separate containers.
+- `OPENJOBSLOTS_DISABLE_API_SCHEDULER=1` disables the legacy in-process API scheduler in production compose.
+- Postgres is the production source of truth when `OPENJOBSLOTS_DB_BACKEND=postgres`.
+- Meilisearch is the public search index when `OPENJOBSLOTS_SEARCH_BACKEND=meili`.
+- SQLite remains the local/test fallback and still uses WAL plus `busy_timeout`.
+- Sync control is stored in Postgres `sync_control`; pg-boss code exists but is not the active queue path.
+
+## Sync Flow
+
+1. `/sync/start` marks `sync_control.status=requested`.
+2. The worker polls control state and selects due companies from `companies`, `ats_sources`, and `company_sync_state`.
+3. The worker fetches and parses targets concurrently, then writes cache/read-model updates through bounded transactions.
+4. Each target updates `company_sync_state` independently, so one failed company does not block the run.
+5. Successful targets schedule the next sync using the ATS TTL plus deterministic jitter.
+6. Failed targets schedule retry with exponential backoff, then a longer cooldown after repeated failures.
+7. The worker records `ingestion_runs` counters and bounded `ingestion_run_errors`.
+8. Retention and Meilisearch outbox maintenance are worker jobs, not public API reads.
+
+## Cache Freshness Rules
+
+- `posting_cache.canonical_url` is the durable cache key.
+- Cache change detection uses normalized payload hash, parser version, validation status, and validation error.
+- Unchanged cache payloads are freshness touches: `last_seen_epoch` updates, while `first_seen_epoch` remains stable.
+- Changed payloads update normalized cache fields and parser metadata.
+- Valid postings update the read model; invalid rows are rejected and counted as parser attention.
+- Duplicate canonical URLs in a single target are counted and skipped before read-model writes.
+
+## Scheduling And Backoff
+
+- `ats_sources.default_ttl_seconds` controls normal refresh cadence.
+- `computeNextSyncEpoch` adds deterministic jitter to avoid bursts.
+- Consecutive failures use exponential backoff.
+- After `INGESTION_MAX_CONSECUTIVE_FAILURES` failures, the target enters a longer cooldown controlled by `INGESTION_FAILURE_COOLDOWN_SECONDS`.
+- Disabled ATS sources are excluded from due-target selection.
+- Worker startup marks stale `running`/`stopping` runs as `interrupted` and clears stale sync control.
+
+## Status And Diagnostics
+
+Public coarse endpoints:
+
+- `GET /sync/status`
+- `GET /ingestion/status`
+
+Admin diagnostics:
+
+- `GET /admin/ingestion/runs?limit=25`
+- `GET /admin/ingestion/errors?limit=50`
+- `GET /admin/ingestion/sources?limit=100`
+- `GET /admin/parsers`
+- `GET /admin/parsers/:ats_key`
+
+Useful fields:
+
+- `cache_write_count`: changed cache rows.
+- `cache_hit_count`: unchanged cache freshness touches.
+- `posting_upsert_count`: valid postings sent to the read model.
+- `rejected_count`: invalid/parser-rejected postings.
+- `duplicate_count`: duplicate canonical URLs skipped inside a target.
+- `db_busy_count`: transient SQLite busy retries observed by the worker.
+- `http_status_counts`: bounded HTTP status buckets from fetch failures.
+- `current_ats`, `current_company_url`, `current_company_name`: latest safe worker target state.
+
+## Diagnosing A Failed ATS Or Company
+
+1. Check `/ingestion/status` for current worker state and parser attention count.
+2. Check `/admin/ingestion/errors` for recent bounded error samples.
+3. Check `/admin/parsers/:ats_key` for fixture status, confidence, field quality, and recent parser errors.
+4. Check `/admin/ingestion/sources` for due count, last success, last failure, and failure pressure.
+5. If a parser issue is confirmed, add a saved raw fixture and a failing parser test before changing normalization.
+
+## Safe Worker Restart
+
+1. Use `/sync/stop` first if a manual run is active.
+2. Restart only the worker container when possible.
+3. On startup, the worker marks stale running rows interrupted and clears stale `sync_control` running/stopping state.
+4. Confirm `/ingestion/status` returns `idle`, `queued`, or `running` with a fresh latest run.
+5. Do not run production write backfills or full Meili replace reindex from this restart path.
+
+## Test Commands
+
+```powershell
+npm.cmd run test:parsers
+npm.cmd run test:backend
+npm.cmd run test:api
+npm.cmd run quality:gate
+```
+
+The quality gate uses an isolated DB and verifies production DB files are unchanged.

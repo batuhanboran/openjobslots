@@ -207,11 +207,27 @@ async function ensurePostgresSchema(pool) {
       cache_hit_count INTEGER NOT NULL DEFAULT 0,
       cache_write_count INTEGER NOT NULL DEFAULT 0,
       posting_upsert_count INTEGER NOT NULL DEFAULT 0,
+      rejected_count INTEGER NOT NULL DEFAULT 0,
+      duplicate_count INTEGER NOT NULL DEFAULT 0,
+      db_busy_count INTEGER NOT NULL DEFAULT 0,
+      current_ats TEXT NOT NULL DEFAULT '',
+      current_company_url TEXT NOT NULL DEFAULT '',
+      current_company_name TEXT NOT NULL DEFAULT '',
+      http_status_counts JSONB NOT NULL DEFAULT '{}'::jsonb,
       active_ats JSONB NOT NULL DEFAULT '[]'::jsonb,
       last_error TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    ALTER TABLE IF EXISTS ingestion_runs
+      ADD COLUMN IF NOT EXISTS rejected_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS duplicate_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS db_busy_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS current_ats TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS current_company_url TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS current_company_name TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS http_status_counts JSONB NOT NULL DEFAULT '{}'::jsonb;
 
     CREATE TABLE IF NOT EXISTS ingestion_run_errors (
       id BIGSERIAL PRIMARY KEY,
