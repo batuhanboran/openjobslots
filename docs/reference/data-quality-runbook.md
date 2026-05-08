@@ -99,6 +99,61 @@ The audit derives counts from actual stored row fields instead of trusting `qual
 
 Each count also has a matching percentage field ending in `_pct`. Grouped output is available under `by_source` and `by_parser`.
 
+## Geo/Remote Backfill Planner
+
+Use the dry-run planner to estimate normalized geo, remote, and quality flag repairs that can be made from stored evidence only:
+
+```powershell
+npm.cmd run backfill:geo-remote:dry-run -- --limit=100 --sample=10 --no-production-write
+```
+
+Scope to one ATS/source:
+
+```powershell
+npm.cmd run backfill:geo-remote:dry-run -- --source=icims --limit=200 --json --no-production-write
+```
+
+Write a JSON report:
+
+```powershell
+npm.cmd run backfill:geo-remote:dry-run -- --source=applitrack --limit=200 --sample=20 --output=C:\tmp\openjobslots-geo-remote-dry-run.json --no-production-write
+```
+
+The planner is dry-run only. It opens SQLite in read-only mode or uses Postgres `SELECT` queries and has no write path.
+
+Output includes:
+
+- `total_scanned`
+- `classification_counts`
+- `proposed_updates_by_field`
+- `proposed_updates_by_source`
+- `proposed_updates_by_parser_version`
+- `rows_requiring_icims_detail_refetch`
+- `rows_requiring_applitrack_detail_refetch`
+- `unsafe_ambiguous_rows`
+- bounded before/after samples with a confidence score and rule name for every proposed change
+
+Classifications:
+
+- `fixable_country`: deterministic country evidence exists.
+- `fixable_region`: deterministic region evidence exists, usually derived from country or explicit supported state evidence.
+- `fixable_city`: deterministic city evidence exists.
+- `fixable_location_text`: row has source location evidence but missing `location_text`.
+- `fixable_remote_type`: explicit remote/hybrid/on-site evidence exists.
+- `fixable_quality_flags_only`: stored fields are unchanged, but derived quality flags can be corrected.
+- `needs_detail_refetch`: list/cache evidence is insufficient, and the ATS likely needs certified detail-page fetching.
+- `unsafe_ambiguous`: evidence is conflicting or multi-location and must not be automatically normalized.
+- `no_evidence`: no safe stored evidence exists.
+
+Safety rules:
+
+- Do not invent country, region, city, or remote mode.
+- Do not set city from country-only evidence.
+- Do not parse standalone `IN` or `IL` as country/state without deterministic context.
+- Do not classify `onsite` only because a physical location exists.
+- Do not classify `remote` from broad description or marketing text.
+- iCIMS and Applitrack rows without enough list evidence are reported for detail refetch instead of being guessed.
+
 ## Known Limitations
 
 - Existing rows may have `legacy-adapter-v1` parser metadata until a safe backfill runs.
