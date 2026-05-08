@@ -1,0 +1,430 @@
+{
+  "schema": "openjobslots.ats-field-certification.v1",
+  "scope": "direct-json-api-ats",
+  "updated": "2026-05-08",
+  "decision_legend": {
+    "list": "Field is available from the list/API payload or board listing currently fetched.",
+    "detail": "Field requires a per-job detail fetch or detail payload.",
+    "absent": "Field is not available or is not currently preserved by the parser.",
+    "inferable": "Field is derived from another source field such as URL, title, location, or workplace text."
+  },
+  "records": {
+    "greenhouse": {
+      "source_endpoint": "GET https://boards-api.greenhouse.io/v1/boards/{boardToken}/jobs?content=true",
+      "parser_location": [
+        "server/index.js:parseGreenhouseCompany",
+        "server/index.js:fetchGreenhouseJobBoard",
+        "server/index.js:collectPostingsForGreenhouseCompany",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "normalized-fixture-only",
+        "paths": [
+          "server/ingestion/fixtures/greenhouse-postings.json"
+        ],
+        "gap": "No saved raw jobs[] API response fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses location.name or flat location; country/region are normalized from location text."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses updated_at or first_published; updated_at is freshness-like and needs fixture proof before treating as posted date."
+        },
+        "remote": {
+          "decision": "inferable",
+          "basis": "No explicit remote flag is carried; normalizer derives remote_type from title/location text."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses id/internal_job_id, with URL fallback."
+        }
+      },
+      "priority": "P0: add raw jobs[] fixtures covering nested location, remote text, first_published vs updated_at, department, and missing-id fallback."
+    },
+    "lever": {
+      "source_endpoint": "GET https://api.lever.co/v0/postings/{organization}?mode=json",
+      "parser_location": [
+        "server/index.js:parseLeverCompany",
+        "server/index.js:fetchLeverJobBoard",
+        "server/index.js:collectPostingsForLeverCompany",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "normalized-fixture-only",
+        "paths": [
+          "server/ingestion/fixtures/lever-postings.json"
+        ],
+        "gap": "No saved raw Lever postings API fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses categories.allLocations or categories.location; broad regions still need country proof."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses createdAt timestamp."
+        },
+        "remote": {
+          "decision": "inferable",
+          "basis": "No explicit remote flag is carried; normalizer derives remote_type from categories/title/location text."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses id, with hostedUrl path fallback."
+        }
+      },
+      "priority": "P0: add raw fixture for categories, allLocations, createdAt, hostedUrl fallback, remote-only and broad-region cases."
+    },
+    "ashby": {
+      "source_endpoint": "POST https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobBoardWithTeams",
+      "parser_location": [
+        "server/index.js:parseAshbyCompany",
+        "server/index.js:fetchAshbyJobBoard",
+        "server/index.js:collectPostingsForAshbyCompany",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "normalized-fixture-only",
+        "paths": [
+          "server/ingestion/fixtures/ashby-postings.json"
+        ],
+        "gap": "No saved raw GraphQL response fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses locationName plus secondaryLocations."
+        },
+        "date": {
+          "decision": "absent",
+          "basis": "Current public GraphQL query does not carry a posting date; parser emits null."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses workplaceType and location text."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses job posting id."
+        }
+      },
+      "priority": "P1: add raw GraphQL fixture and document that posting date is unavailable in the current public query."
+    },
+    "smartrecruiters": {
+      "source_endpoint": "GET https://jobs.smartrecruiters.com/sr-jobs/search?limit={limit}&_={epochMs}",
+      "parser_location": [
+        "server/index.js:collectPostingsForSmartRecruitersDynamic",
+        "server/index.js:buildSmartRecruitersLocationLabel",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "normalized-fixture-only",
+        "paths": [
+          "server/ingestion/fixtures/smartrecruiters-postings.json"
+        ],
+        "gap": "No saved raw content[] search response fixture or pagination fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses shortLocation or location.city/region/country."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses releasedDate."
+        },
+        "remote": {
+          "decision": "inferable",
+          "basis": "No explicit remote flag is carried; normalizer derives remote_type from title/location text."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses id/uuid, with applyUrl numeric path fallback."
+        }
+      },
+      "priority": "P0: add raw content[] and pagination fixtures, including absent applyUrl and remote/location variants."
+    },
+    "recruitee": {
+      "source_endpoint": "GET https://{subdomain}.recruitee.com[/path] and parse PublicApp data-props from HTML",
+      "parser_location": [
+        "server/index.js:parseRecruiteeCompany",
+        "server/index.js:fetchRecruiteePublicApp",
+        "server/index.js:parseRecruiteePostingsFromPublicApp",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "normalized-fixture-only-with-inline-parser-regression",
+        "paths": [
+          "server/ingestion/fixtures/recruitee-postings.json",
+          "server/ingestion/direct-parser-fixtures.test.js"
+        ],
+        "gap": "No saved raw HTML PublicApp fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses appConfig.locations and offer locationIds/direct location, including localized country labels."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses publishedAt, then createdAt/updatedAt fallbacks."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses offer remote/isRemote/location remote flags and workplaceType."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses offer id/uuid/guid, falling back to slug."
+        }
+      },
+      "priority": "P1: save raw PublicApp HTML fixture with localized locations, department, remote, and slug fallback cases."
+    },
+    "bamboohr": {
+      "source_endpoint": "GET https://{tenant}.bamboohr.com/careers/list",
+      "parser_location": [
+        "server/index.js:parseBambooHrCompany",
+        "server/index.js:fetchBambooHrJobBoard",
+        "server/index.js:parseBambooHrPostingsFromApi",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "normalized-fixture-only-with-inline-parser-regression",
+        "paths": [
+          "server/ingestion/fixtures/bamboohr-postings.json",
+          "server/ingestion/direct-parser-fixtures.test.js"
+        ],
+        "gap": "No saved raw careers/list API fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses location/atsLocation object or string fields, plus country aliases."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses postingDate and common posted/published/created/updated/opened fallbacks."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses isRemote and workplace/remote status fields."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses id and URL fallback construction."
+        }
+      },
+      "priority": "P1: save raw API fixtures for city/state-only, string location, full country, remote, and date variants."
+    },
+    "teamtailor": {
+      "source_endpoint": "GET https://{tenant}.teamtailor.com/jobs",
+      "parser_location": [
+        "server/index.js:parseTeamtailorCompany",
+        "server/index.js:fetchTeamtailorJobsPage",
+        "server/index.js:parseTeamtailorPostingsFromHtml",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "pending-raw-fixture-with-inline-parser-regression",
+        "paths": [
+          "server/ingestion/direct-parser-fixtures.test.js"
+        ],
+        "gap": "No saved raw Teamtailor HTML fixture; no direct API fixture wired."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses listing-card metadata spans for department/location."
+        },
+        "date": {
+          "decision": "absent",
+          "basis": "Current listing parser emits no posting date."
+        },
+        "remote": {
+          "decision": "inferable",
+          "basis": "No explicit remote field is carried; normalizer can only infer from listing text."
+        },
+        "source_id": {
+          "decision": "inferable",
+          "basis": "Parser derives source_job_id from /jobs/{id-or-slug} URL."
+        }
+      },
+      "priority": "P0: save raw HTML fixture or switch to a stable API fixture; date and remote source evidence are unresolved."
+    },
+    "freshteam": {
+      "source_endpoint": "GET https://{tenant}.freshteam.com/jobs",
+      "parser_location": [
+        "server/index.js:parseFreshteamCompany",
+        "server/index.js:fetchFreshteamJobsPage",
+        "server/index.js:parseFreshteamPostingsFromHtml",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "pending-raw-fixture",
+        "paths": [],
+        "gap": "No saved raw Freshteam HTML fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses data-portal-location or location-info from listing card."
+        },
+        "date": {
+          "decision": "absent",
+          "basis": "Current listing parser emits null posting_date."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Listing exposes data-portal-remote-location, but current parser stores numeric is_remote and needs normalized remote_type proof."
+        },
+        "source_id": {
+          "decision": "inferable",
+          "basis": "Job URL path can identify the posting, but current parser does not set source_job_id."
+        }
+      },
+      "priority": "P0: add raw HTML fixture and fix/verify remote_type and source_job_id preservation from listing attributes and URL."
+    },
+    "pinpointhq": {
+      "source_endpoint": "GET https://{tenant}.pinpointhq.com/postings.json",
+      "parser_location": [
+        "server/index.js:parsePinpointHqCompany",
+        "server/index.js:fetchPinpointHqJobBoard",
+        "server/index.js:parsePinpointHqPostingsFromApi",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "saved-raw-direct-fixture",
+        "paths": [
+          "server/ingestion/fixtures/pinpointhq-direct.json"
+        ],
+        "gap": "Needs additional path fallback, sparse location, and workplace variants."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses location city/province/name object."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses posted_at/published_at/created_at/updated_at/deadline_at."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses workplace_type_text or workplace_type."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses id/uuid/job_id/jobId, with postings URL fallback."
+        }
+      },
+      "priority": "P2: extend strict fixture coverage for path-only URL, sparse location, remote, hybrid, onsite, and missing id cases."
+    },
+    "recruitcrm": {
+      "source_endpoint": "GET https://albatross.recruitcrm.io/v1/external-pages/jobs-by-account/get?account={account}&batch=true&limit={limit}&offset={offset}",
+      "parser_location": [
+        "server/index.js:parseRecruitCrmCompany",
+        "server/index.js:fetchRecruitCrmJobsPage",
+        "server/index.js:parseRecruitCrmPostingsFromApi",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "saved-raw-direct-fixture",
+        "paths": [
+          "server/ingestion/fixtures/recruitcrm-direct.json"
+        ],
+        "gap": "Needs pagination, URL override, country, and non-remote location variants."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses city/locality/postalcode, but country is often absent and must be fixture-proven."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses posted/published/created/updated fields."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses remote == 1 to emit Remote location."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses id/job_id/jobId/uuid/slug, with URL fallback."
+        }
+      },
+      "priority": "P2: extend strict fixture coverage for pagination, country-bearing locations, slug fallback, and non-remote rows."
+    },
+    "fountain": {
+      "source_endpoint": "GET https://web.fountain.com/c/{company}/{jobs}/{board}.json",
+      "parser_location": [
+        "server/index.js:parseFountainCompany",
+        "server/index.js:fetchFountainJobBoard",
+        "server/index.js:parseFountainPostingsFromApi",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "saved-raw-direct-fixture",
+        "paths": [
+          "server/ingestion/fixtures/fountain-direct.json"
+        ],
+        "gap": "Needs path variants and opening-id/source-id preservation coverage."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses location_name or location_address."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses posted_at/created_at/updated_at/published_at."
+        },
+        "remote": {
+          "decision": "inferable",
+          "basis": "No explicit remote field is carried; normalizer can only infer from job type/location/title text."
+        },
+        "source_id": {
+          "decision": "inferable",
+          "basis": "to_param or URL path can identify a posting, but current parser does not preserve source_job_id."
+        }
+      },
+      "priority": "P1: carry opening id/to_param as source_job_id and add path variant fixtures."
+    },
+    "getro": {
+      "source_endpoint": "GET https://{tenant}.getro.com/jobs and parse __NEXT_DATA__.props.pageProps.initialState.jobs.found",
+      "parser_location": [
+        "server/index.js:parseGetroCompany",
+        "server/index.js:fetchGetroJobsPage",
+        "server/index.js:parseGetroPostingsFromHtml",
+        "server/ingestion/posting.js:normalizePosting"
+      ],
+      "raw_fixture_status": {
+        "status": "pending-raw-fixture",
+        "paths": [],
+        "gap": "No saved raw Next.js HTML fixture."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses searchableLocations or locations from jobs.found."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses createdAt numeric or string value."
+        },
+        "remote": {
+          "decision": "inferable",
+          "basis": "No explicit remote field is carried; normalizer can only infer from title/location text."
+        },
+        "source_id": {
+          "decision": "inferable",
+          "basis": "Job URL or payload id may identify a posting, but current parser does not preserve source_job_id."
+        }
+      },
+      "priority": "P0: save raw __NEXT_DATA__ fixture and certify source id, company/apply URL distinction, and remote evidence."
+    }
+  }
+}
