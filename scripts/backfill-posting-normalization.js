@@ -3,8 +3,32 @@ const {
   normalizePosting,
   normalizePostingDate,
   normalizePostingValue,
-  normalizeRegionFromCountry
+  normalizeRegionFromCountry,
+  validatePosting
 } = require("../server/ingestion/posting");
+
+const SAFE_BACKFILL_FIELDS = Object.freeze([
+  "country",
+  "region",
+  "city",
+  "remote_type",
+  "source_job_id",
+  "department",
+  "employment_type",
+  "description_plain",
+  "posted_at_epoch_from_existing_posting_date"
+]);
+
+const REFETCH_REQUIRED_FIELDS = Object.freeze([
+  "title",
+  "company",
+  "canonical_url",
+  "apply_url",
+  "description_html",
+  "posted_at_when_source_date_is_absent",
+  "posted_at_epoch_when_source_date_is_absent",
+  "parser_confidence_without_existing_parser_metadata"
+]);
 
 function parseList(value) {
   return String(value || "")
@@ -25,6 +49,7 @@ function parseBackfillArgs(argv = process.argv.slice(2), env = process.env) {
     batchSize: parseNumberOption(env.OPENJOBSLOTS_BACKFILL_BATCH_SIZE || 2000, 2000, 100, 10000),
     limit: parseNumberOption(env.OPENJOBSLOTS_BACKFILL_LIMIT || 0, 0, 0, Number.MAX_SAFE_INTEGER),
     sampleLimit: parseNumberOption(env.OPENJOBSLOTS_BACKFILL_SAMPLE_LIMIT || 10, 10, 0, 100),
+    startAfter: String(env.OPENJOBSLOTS_BACKFILL_START_AFTER || "").trim(),
     write: String(env.OPENJOBSLOTS_BACKFILL_WRITE || "").trim() === "1"
   };
 
@@ -41,6 +66,8 @@ function parseBackfillArgs(argv = process.argv.slice(2), env = process.env) {
       options.batchSize = parseNumberOption(arg.slice("--batch-size=".length), options.batchSize, 100, 10000);
     } else if (arg.startsWith("--sample-limit=")) {
       options.sampleLimit = parseNumberOption(arg.slice("--sample-limit=".length), options.sampleLimit, 0, 100);
+    } else if (arg.startsWith("--start-after=")) {
+      options.startAfter = String(arg.slice("--start-after=".length) || "").trim();
     }
   }
 
@@ -373,6 +400,59 @@ function incrementNestedMap(map, key, nestedKey, amount = 1) {
   incrementMap(map.get(key), nestedKey, amount);
 }
 
+function getStoredRowRejectionReason(row) {
+  const validation = validatePosting({
+    canonical_url: row?.canonical_url,
+    job_posting_url: row?.canonical_url,
+    company_name: row?.company_name,
+    position_name: row?.position_name
+  });
+  return validation.ok ? "" : validation.error || "invalid posting";
+}
+
+function recordRejectedRow(summary, row, reason, options) {
+  const normalizedReason = String(reason || "invalid posting").trim();
+  summary.rejected += 1;
+  incrementMap(summary.rejectedByReason, normalizedReason);
+  incrementNestedMap(summary.rejectedByAtsAndReason, String(row?.ats_key || "unknown"), normalizedReason);
+  if (summary.rejectedSamples.length < options.sampleLimit) {
+    summary.rejectedSamples.push({
+      ats_key: row?.ats_key || "",
+      canonical_url: row?.canonical_url || "",
+      reason: normalizedReason
+    });
+  }
+}
+
+function evaluateRowsForBackfill(rows, summary, options) {
+  const changes = [];
+  for (const row of rows) {
+    let normalized;
+    try {
+      normalized = normalizeRowForBackfill(row);
+    } catch (error) {
+      recordRejectedRow(summary, row, `normalization failed: ${String(error?.message || error).slice(0, 120)}`, options);
+      continue;
+    }
+
+    const rejectionReason = getStoredRowRejectionReason({
+      ...row,
+      canonical_url: normalized.canonical_url || row.canonical_url,
+      company_name: normalized.company_name || row.company_name,
+      position_name: normalized.position_name || row.position_name
+    });
+    if (rejectionReason) {
+      recordRejectedRow(summary, row, rejectionReason, options);
+      continue;
+    }
+
+    const next = shouldChange(row, normalized);
+    if (!next.changed) continue;
+    changes.push({ row, next, changedFields: getChangedFields(row, next) });
+  }
+  return changes;
+}
+
 function sortedObjectFromMap(map) {
   return Object.fromEntries([...map.entries()].sort((a, b) => b[1] - a[1]));
 }
@@ -412,19 +492,15 @@ async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function writeBatchWithRetry(pool, rows, summary, options) {
+async function writeBatchWithRetry(pool, changes, summary, options) {
+  if (changes.length === 0) return;
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const committedChanges = [];
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      for (const row of rows) {
-        const normalized = normalizeRowForBackfill(row);
-        const next = shouldChange(row, normalized);
-        if (!next.changed) continue;
-        const changedFields = getChangedFields(row, next);
-
+      for (const change of changes) {
+        const { row, next } = change;
         await client.query(
           `
             UPDATE postings
@@ -497,10 +573,9 @@ async function writeBatchWithRetry(pool, rows, summary, options) {
           [row.canonical_url, JSON.stringify(toSearchPayload(row, next))]
         );
 
-        committedChanges.push({ row, next, changedFields });
       }
       await client.query("COMMIT");
-      mergeCommittedChanges(summary, committedChanges, options);
+      mergeCommittedChanges(summary, changes, options);
       return;
     } catch (error) {
       await client.query("ROLLBACK");
@@ -600,6 +675,49 @@ function buildCandidateQuery(atsFilter) {
   `;
 }
 
+function buildRejectedRowsQuery(atsFilter) {
+  const atsClause = atsFilter.length > 0 ? "AND ats_key = ANY($1::text[])" : "";
+  return `
+    WITH rejected AS (
+      SELECT
+        ats_key,
+        CASE
+          WHEN btrim(coalesce(canonical_url, '')) = '' THEN 'missing job_posting_url'
+          WHEN btrim(coalesce(canonical_url, '')) !~* '^https?://' THEN 'invalid job_posting_url'
+          WHEN btrim(coalesce(company_name, '')) = '' THEN 'missing company_name'
+          WHEN lower(btrim(coalesce(company_name, ''))) IN ('unknown', 'unknown company', 'unknown employer', 'n/a', 'na', 'none') THEN 'placeholder company_name'
+          WHEN btrim(coalesce(position_name, '')) = '' THEN 'missing position_name'
+          WHEN lower(btrim(coalesce(position_name, ''))) ~ '^(untitled|untitled position|unknown|unknown position|unknown job|n/?a|not available|job opening|new job|open position|position)$' THEN 'placeholder position_name'
+          ELSE ''
+        END AS reason
+      FROM postings
+      WHERE hidden = false
+        ${atsClause}
+    )
+    SELECT ats_key, reason, COUNT(*)::int AS count
+    FROM rejected
+    WHERE reason <> ''
+    GROUP BY ats_key, reason
+    ORDER BY count DESC, ats_key ASC, reason ASC;
+  `;
+}
+
+async function loadExistingRejectedRows(pool, options) {
+  const params = options.atsFilter.length > 0 ? [options.atsFilter] : [];
+  const result = await pool.query(buildRejectedRowsQuery(options.atsFilter), params);
+  return result.rows || [];
+}
+
+function mergeExistingRejectedRows(summary, rows) {
+  for (const row of rows || []) {
+    const count = Number(row.count || 0);
+    if (!count) continue;
+    summary.existingInvalidRows += count;
+    incrementMap(summary.existingInvalidRowsByReason, row.reason, count);
+    incrementNestedMap(summary.existingInvalidRowsByAtsAndReason, row.ats_key || "unknown", row.reason, count);
+  }
+}
+
 async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
   const logger = deps.logger || console.log;
   const ensureSchema = deps.ensureSchema || ensurePostgresSchema;
@@ -610,15 +728,24 @@ async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
     dry_run: options.dryRun,
     write: options.write,
     ats_filter: options.atsFilter,
+    start_after: options.startAfter,
     changedByAts: new Map(),
     changedByField: new Map(),
     changedByAtsAndField: new Map(),
+    rejected: 0,
+    rejectedByReason: new Map(),
+    rejectedByAtsAndReason: new Map(),
+    rejectedSamples: [],
+    existingInvalidRows: 0,
+    existingInvalidRowsByReason: new Map(),
+    existingInvalidRowsByAtsAndReason: new Map(),
     samples: []
   };
-  let lastCanonicalUrl = "";
+  let lastCanonicalUrl = String(options.startAfter || "");
 
   try {
     if (options.write) await ensureSchema(pool);
+    mergeExistingRejectedRows(summary, await loadExistingRejectedRows(pool, options));
 
     while (true) {
       if (options.limit > 0 && summary.scanned >= options.limit) break;
@@ -636,21 +763,9 @@ async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
       }
 
       if (options.write) {
-        await writeBatchWithRetry(pool, rows, summary, options);
+        await writeBatchWithRetry(pool, evaluateRowsForBackfill(rows, summary, options), summary, options);
       } else {
-        for (const row of rows) {
-          const normalized = normalizeRowForBackfill(row);
-          const next = shouldChange(row, normalized);
-          if (!next.changed) continue;
-          const changedFields = getChangedFields(row, next);
-          summary.changed += 1;
-          incrementMap(summary.changedByAts, row.ats_key);
-          for (const field of changedFields) {
-            incrementMap(summary.changedByField, field);
-            incrementNestedMap(summary.changedByAtsAndField, row.ats_key, field);
-          }
-          if (summary.samples.length < options.sampleLimit) summary.samples.push(summarizeSample(row, next, changedFields));
-        }
+        mergeCommittedChanges(summary, evaluateRowsForBackfill(rows, summary, options), options);
       }
 
       logger(JSON.stringify(formatSummary(summary, true)));
@@ -672,11 +787,23 @@ function formatSummary(summary, compact = false) {
     dry_run: summary.dry_run,
     write: summary.write,
     ats_filter: summary.ats_filter,
+    start_after: summary.start_after,
+    safe_backfill_fields: SAFE_BACKFILL_FIELDS,
+    refetch_required_fields: REFETCH_REQUIRED_FIELDS,
     changed_by_ats: sortedObjectFromMap(summary.changedByAts),
     changed_by_field: sortedObjectFromMap(summary.changedByField),
-    changed_by_ats_and_field: nestedObjectFromMap(summary.changedByAtsAndField)
+    changed_by_ats_and_field: nestedObjectFromMap(summary.changedByAtsAndField),
+    rejected: summary.rejected,
+    rejected_by_reason: sortedObjectFromMap(summary.rejectedByReason),
+    rejected_by_ats_and_reason: nestedObjectFromMap(summary.rejectedByAtsAndReason),
+    existing_invalid_rows: summary.existingInvalidRows,
+    existing_invalid_rows_by_reason: sortedObjectFromMap(summary.existingInvalidRowsByReason),
+    existing_invalid_rows_by_ats_and_reason: nestedObjectFromMap(summary.existingInvalidRowsByAtsAndReason)
   };
-  if (!compact) formatted.samples = summary.samples;
+  if (!compact) {
+    formatted.samples = summary.samples;
+    formatted.rejected_samples = summary.rejectedSamples;
+  }
   return formatted;
 }
 
@@ -695,9 +822,11 @@ if (require.main === module) {
 module.exports = {
   buildCandidateForNormalization,
   buildCandidateQuery,
+  buildRejectedRowsQuery,
   extractSourceJobIdFromUrl,
   formatSummary,
   getChangedFields,
+  getStoredRowRejectionReason,
   normalizeRowForBackfill,
   parseBackfillArgs,
   runBackfill,
