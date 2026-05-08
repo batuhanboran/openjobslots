@@ -118,10 +118,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.6.0";
+const PUBLIC_APP_VERSION = "1.6.1";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.6.1",
+    date: "May 9, 2026",
+    title: "Data quality tooling release",
+    summary:
+      "Added accurate data-quality summaries, read-only audit reports, dry-run geo and remote backfill planning, guarded production apply and rollback support, guarded iCIMS and Applitrack detail refetch tooling, and safe Meili replace-mode reindex checks. No production data backfill was applied in this deploy step."
+  },
   {
     version: "1.6.0",
     date: "May 8, 2026",

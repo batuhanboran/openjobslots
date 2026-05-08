@@ -1,5 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { toMeiliPostingDocument, upsertMeiliPostings } = require("../server/search/meili");
 const {
   ensureMeiliIndex,
@@ -48,10 +51,29 @@ test("reindex check mode is explicit and non-mutating", () => {
   assert.equal(parseReindexArgs(["--replace-mode"], {}).replaceMode, true);
   assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).replaceMode, true);
   assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).dryRun, true);
+  assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).json, true);
+  assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).output, "reports/meili.json");
   assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).apply, true);
   assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).confirmProduction, true);
   assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
   assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
+});
+
+test("reindex check can write JSON output without mutating", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openjobslots-reindex-"));
+  const outputPath = path.join(tmpDir, "check.json");
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    const result = await runReindex(null, { check: true, output: outputPath });
+    assert.equal(result.ok, true);
+    assert.equal(result.skipped, true);
+    const written = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    assert.equal(written.skipped, true);
+  } finally {
+    console.log = originalLog;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test("reindex command skips safely when Postgres is not active", async () => {
