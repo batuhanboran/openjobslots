@@ -10,6 +10,7 @@ const {
   normalizePostingDate,
   normalizeRegionFromCountry,
   normalizeRemoteType,
+  normalizeRemoteTypeFromEvidence,
   validatePosting
 } = require("./posting");
 
@@ -116,6 +117,8 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeRemoteType("Telecommute - United States"), "remote");
   assert.equal(normalizeRemoteType("Hybrid - Ankara"), "hybrid");
   assert.equal(normalizeRemoteType("On-site - Berlin"), "onsite");
+  assert.equal(normalizeRemoteTypeFromEvidence("Support Engineer Indianapolis, IN", "Indianapolis, IN"), "onsite");
+  assert.equal(normalizeRemoteTypeFromEvidence("Support Engineer Remote - United States", "Remote - United States"), "remote");
   assert.equal(normalizePostingDate("2026-05-06T08:00:00+03:00").epoch, 1778043600);
   assert.equal(normalizePostingDate("1778043600").epoch, 1778043600);
   assert.equal(normalizePostingDate("1778043600000").epoch, 1778043600);

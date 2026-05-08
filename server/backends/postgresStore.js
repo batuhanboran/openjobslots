@@ -8,7 +8,7 @@ const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
 const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
-  normalizeRemoteType
+  normalizeRemoteTypeFromEvidence
 } = require("../ingestion/posting");
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -61,7 +61,7 @@ function inferRegion(country) {
 }
 
 function inferRemoteType(location) {
-  return normalizeRemoteType(location);
+  return normalizeRemoteTypeFromEvidence(location, location);
 }
 
 function normalizeAtsKey(value) {
@@ -869,7 +869,19 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
       const location = String(posting?.location || posting?.location_text || "").trim();
       const country = String(posting?.country || inferCountry(location)).trim();
       const region = String(posting?.region || inferRegion(country)).trim();
-      const remoteType = String(posting?.remote_type || inferRemoteType(location)).trim() || "unknown";
+      const remoteType = normalizeRemoteTypeFromEvidence(
+        [
+          posting?.remote_type,
+          posting?.workplaceType,
+          posting?.workplace_type,
+          posting?.remote,
+          posting?.is_remote,
+          posting?.isRemote,
+          location,
+          title
+        ].map((value) => (value === true ? "remote" : String(value || "").trim())).filter(Boolean).join(" "),
+        location
+      );
       const atsKey = normalizeAtsKey(posting?.ats_key || posting?.ATS_name);
       const normalizedPosting = {
         ...posting,
@@ -901,10 +913,13 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
             location_text = COALESCE(EXCLUDED.location_text, postings.location_text),
             country = COALESCE(NULLIF(EXCLUDED.country, ''), postings.country),
             region = COALESCE(NULLIF(EXCLUDED.region, ''), postings.region),
-            remote_type = EXCLUDED.remote_type,
+            remote_type = CASE
+              WHEN EXCLUDED.remote_type = 'unknown' AND postings.remote_type <> 'unknown' THEN postings.remote_type
+              ELSE EXCLUDED.remote_type
+            END,
             industry = EXCLUDED.industry,
             ats_key = EXCLUDED.ats_key,
-            source_job_id = EXCLUDED.source_job_id,
+            source_job_id = COALESCE(NULLIF(EXCLUDED.source_job_id, ''), postings.source_job_id),
             posting_date = COALESCE(EXCLUDED.posting_date, postings.posting_date),
             posted_at_epoch = COALESCE(EXCLUDED.posted_at_epoch, postings.posted_at_epoch),
             first_seen_epoch = COALESCE(postings.first_seen_epoch, EXCLUDED.first_seen_epoch),

@@ -312,6 +312,31 @@ function normalizeRemoteType(value) {
   return "unknown";
 }
 
+function hasConcretePhysicalLocation(value) {
+  const location = normalizePostingValue(value);
+  const normalized = normalizeSearchText(location);
+  if (!normalized) return false;
+  if (normalizeRemoteType(location) === "remote" || normalizeRemoteType(location) === "hybrid") return false;
+  if (US_STATE_ABBREVIATION_PATTERN.test(location) || CANADA_PROVINCE_ABBREVIATION_PATTERN.test(location)) return true;
+  if (US_STATE_HYPHEN_PREFIX_PATTERN.test(location) || CANADA_PROVINCE_HYPHEN_PREFIX_PATTERN.test(location)) return true;
+  if (/[A-Za-z][A-Za-z .'-]+,\s*[A-Za-z][A-Za-z .'-]+/.test(location)) return true;
+  for (const [, terms] of COUNTRY_LOCATION_TERMS) {
+    for (const term of terms) {
+      const normalizedTerm = normalizeSearchText(term);
+      if (normalizedTerm.length < 4) continue;
+      const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      if (new RegExp(`\\b${escaped}\\b`, "i").test(normalized)) return true;
+    }
+  }
+  return false;
+}
+
+function normalizeRemoteTypeFromEvidence(remoteSignal, location) {
+  const remoteType = normalizeRemoteType(remoteSignal);
+  if (remoteType !== "unknown") return remoteType;
+  return hasConcretePhysicalLocation(location) ? "onsite" : "unknown";
+}
+
 function normalizePostingDate(value) {
   const rawValue = normalizePostingValue(value);
   if (!rawValue) return { raw: null, epoch: null };
@@ -508,7 +533,7 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     location,
     positionName
   ].map((value) => (value === true ? "remote" : normalizePostingValue(value))).filter(Boolean).join(" ");
-  const remoteType = normalizeRemoteType(remoteSignal);
+  const remoteType = normalizeRemoteTypeFromEvidence(remoteSignal, location);
   const explicitCountry = firstValue([
     posting?.country,
     posting?.countryName,
@@ -629,6 +654,7 @@ module.exports = {
   normalizePostingValue,
   normalizeRegionFromCountry,
   normalizeRemoteType,
+  normalizeRemoteTypeFromEvidence,
   stablePayloadHash,
   validatePosting
 };

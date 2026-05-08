@@ -1,6 +1,7 @@
 const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
 const {
   normalizePosting,
+  normalizePostingDate,
   normalizePostingValue,
   normalizeRegionFromCountry
 } = require("../server/ingestion/posting");
@@ -137,6 +138,20 @@ function normalizePostingDateForBackfill(value) {
   return raw || null;
 }
 
+function postedEpochFromBackfillDate(value, referenceEpoch) {
+  const raw = normalizePostingDateForBackfill(value);
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  const baseEpoch = Number(referenceEpoch || 0) || Math.floor(Date.now() / 1000);
+  if (normalized === "posted today" || normalized === "today") return baseEpoch;
+  if (normalized === "posted yesterday" || normalized === "yesterday") return baseEpoch - 24 * 60 * 60;
+  const relativeHours = normalized.match(/^posted\s+(\d+)\s+hour(?:s)?\s+ago$/) || normalized.match(/^(\d+)\s+hour(?:s)?\s+ago$/);
+  if (relativeHours?.[1]) return baseEpoch - Number(relativeHours[1]) * 60 * 60;
+  const relativeDays = normalized.match(/^posted\s+(\d+)\s+day(?:s)?\s+ago$/) || normalized.match(/^(\d+)\s+day(?:s)?\s+ago$/);
+  if (relativeDays?.[1]) return baseEpoch - Number(relativeDays[1]) * 24 * 60 * 60;
+  return normalizePostingDate(raw).epoch;
+}
+
 function shouldChange(row, normalized) {
   const currentCountry = String(row.country || "").trim();
   const currentRegion = String(row.region || "").trim();
@@ -145,6 +160,7 @@ function shouldChange(row, normalized) {
   const currentSourceJobId = String(row.source_job_id || "").trim();
   const currentPostingDateRaw = String(row.posting_date || "").trim();
   const currentPostingDate = normalizePostingDateForBackfill(row.posting_date);
+  const currentPostedAtEpoch = Number(row.posted_at_epoch || 0) || null;
   const nextCountry = currentCountry || String(normalized.country || "").trim();
   const nextRegion = currentRegion || String(normalized.region || normalizeRegionFromCountry(nextCountry) || "").trim();
   const nextRemoteType =
@@ -154,6 +170,10 @@ function shouldChange(row, normalized) {
   const nextLocationText = currentLocationText || String(normalized.location_text || normalized.location || "").trim();
   const nextSourceJobId = currentSourceJobId || String(normalized.source_job_id || "").trim();
   const nextPostingDate = currentPostingDate;
+  const nextPostedAtEpoch =
+    currentPostedAtEpoch ||
+    Number(normalized.posted_at_epoch || normalized.posting_date_epoch || 0) ||
+    (nextPostingDate ? postedEpochFromBackfillDate(nextPostingDate, row.last_seen_epoch) : null);
 
   return {
     changed:
@@ -162,13 +182,15 @@ function shouldChange(row, normalized) {
       nextRemoteType !== currentRemoteType ||
       nextLocationText !== currentLocationText ||
       nextSourceJobId !== currentSourceJobId ||
-      (currentPostingDateRaw && nextPostingDate !== currentPostingDateRaw),
+      (currentPostingDateRaw && nextPostingDate !== currentPostingDateRaw) ||
+      nextPostedAtEpoch !== currentPostedAtEpoch,
     nextCountry,
     nextRegion,
     nextRemoteType,
     nextLocationText,
     nextSourceJobId,
-    nextPostingDate
+    nextPostingDate,
+    nextPostedAtEpoch
   };
 }
 
@@ -186,7 +208,7 @@ function toSearchPayload(row, next) {
     ats_key: row.ats_key,
     source_job_id: next.nextSourceJobId || row.source_job_id,
     posting_date: next.nextPostingDate,
-    posted_at_epoch: row.posted_at_epoch,
+    posted_at_epoch: next.nextPostedAtEpoch || row.posted_at_epoch,
     last_seen_epoch: row.last_seen_epoch,
     hidden: row.hidden
   };
@@ -243,6 +265,12 @@ async function main() {
               OR source_job_id = ''
               OR posting_date in ('false', 'true', 'null', 'undefined')
               OR (
+                posted_at_epoch IS NULL
+                AND posting_date IS NOT NULL
+                AND btrim(posting_date) <> ''
+                AND lower(posting_date) NOT IN ('false', 'true', 'null', 'undefined')
+              )
+              OR (
                 coalesce(location_text, '') = ''
                 AND ats_key = ANY(ARRAY['workday','icims']::text[])
               )
@@ -298,6 +326,7 @@ async function main() {
                     remote_type = $5,
                     source_job_id = $6,
                     posting_date = $7,
+                    posted_at_epoch = $8,
                     updated_at = now()
                 WHERE canonical_url = $1;
               `,
@@ -308,7 +337,8 @@ async function main() {
                 next.nextRegion,
                 next.nextRemoteType,
                 next.nextSourceJobId,
-                next.nextPostingDate
+                next.nextPostingDate,
+                next.nextPostedAtEpoch
               ]
             );
             await client.query(
@@ -320,6 +350,7 @@ async function main() {
                     remote_type = $5,
                     source_job_id = $6,
                     posting_date = $7,
+                    posted_at_epoch = $8,
                     updated_at = now()
                 WHERE canonical_url = $1;
               `,
@@ -330,7 +361,8 @@ async function main() {
                 next.nextRegion,
                 next.nextRemoteType,
                 next.nextSourceJobId,
-                next.nextPostingDate
+                next.nextPostingDate,
+                next.nextPostedAtEpoch
               ]
             );
             await client.query(
