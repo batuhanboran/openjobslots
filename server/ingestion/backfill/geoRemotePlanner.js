@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../../backends/postgres");
 const { openSqliteReadOnly } = require("../dataQualityAudit");
-const { parseQualityFlags } = require("../dataQuality");
+const { parseQualityFlags, scorePostingQuality } = require("../dataQuality");
 const {
   normalizeCountryName,
   normalizeRegionFromCountry,
@@ -20,6 +20,9 @@ const FIX_CATEGORIES = [
   "unsafe_ambiguous",
   "no_evidence"
 ];
+
+const WRITABLE_FIELDS = Object.freeze(["location_text", "country", "region", "city", "remote_type", "quality_flags", "quality_score"]);
+const GEO_REMOTE_BACKFILL_AUDIT_SCHEMA_VERSION = "geo-remote-backfill-audit-v1";
 
 const US_STATES = Object.freeze({
   AL: "Alabama",
@@ -78,7 +81,6 @@ const US_STATES = Object.freeze({
 const COUNTRY_ALIASES = Object.freeze({
   turkey: "Turkey",
   turkiye: "Turkey",
-  türkiye: "Turkey",
   tr: "Turkey",
   tur: "Turkey",
   "united states": "United States",
@@ -440,6 +442,22 @@ function expectedQualityFlagsAfter(row, changes) {
   return Array.from(flags).sort();
 }
 
+function expectedQualityStateAfter(row, changes) {
+  const flags = expectedQualityFlagsAfter(row, changes);
+  const next = { ...row };
+  for (const change of changes) next[change.field] = change.after;
+  next.quality_flags = flags;
+  return {
+    flags,
+    score: scorePostingQuality(flags, { ...next, quality_score: undefined })
+  };
+}
+
+function parseStoredQualityScore(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : 0;
+}
+
 function classifyBackfillCandidate(row) {
   const changes = [];
   const categories = new Set();
@@ -479,7 +497,8 @@ function classifyBackfillCandidate(row) {
     categories.add("needs_detail_refetch");
   }
 
-  const expectedFlags = expectedQualityFlagsAfter(row, changes);
+  const expectedQuality = expectedQualityStateAfter(row, changes);
+  const expectedFlags = expectedQuality.flags;
   const currentFlags = parseQualityFlags(row.quality_flags).sort();
   const flagsChanged = JSON.stringify(expectedFlags) !== JSON.stringify(currentFlags);
   if (flagsChanged) {
@@ -492,10 +511,22 @@ function classifyBackfillCandidate(row) {
     });
     if (categories.size === 0) categories.add("fixable_quality_flags_only");
   }
+  const currentQualityScore = parseStoredQualityScore(row.quality_score);
+  if (expectedQuality.score !== currentQualityScore) {
+    changes.push({
+      field: "quality_score",
+      before: String(currentQualityScore),
+      after: String(expectedQuality.score),
+      rule: "derive-quality-score-from-quality-flags",
+      confidence: 1
+    });
+    if (categories.size === 0) categories.add("fixable_quality_flags_only");
+  }
 
   if (categories.size === 0) categories.add("no_evidence");
 
   return {
+    row_identifier: clean(row.row_id || row.id || row.canonical_url || row.job_posting_url),
     canonical_url: clean(row.canonical_url || row.job_posting_url),
     source_ats: clean(row.ats_key || row.source_ats || "unknown"),
     parser_version: clean(row.parser_version || "unknown"),
@@ -507,7 +538,8 @@ function classifyBackfillCandidate(row) {
       region: clean(row.region),
       city: clean(row.city),
       remote_type: clean(row.remote_type || "unknown"),
-      quality_flags: currentFlags
+      quality_flags: currentFlags,
+      quality_score: currentQualityScore
     },
     after: {
       location_text: changes.find((item) => item.field === "location_text")?.after || clean(row.location_text),
@@ -515,7 +547,8 @@ function classifyBackfillCandidate(row) {
       region: changes.find((item) => item.field === "region")?.after || clean(row.region),
       city: changes.find((item) => item.field === "city")?.after || clean(row.city),
       remote_type: changes.find((item) => item.field === "remote_type")?.after || clean(row.remote_type || "unknown"),
-      quality_flags: expectedFlags
+      quality_flags: expectedFlags,
+      quality_score: expectedQuality.score
     },
     classifications: Array.from(categories).sort(),
     primary_classification: Array.from(categories).sort()[0],
@@ -583,18 +616,38 @@ function parseArgs(argv = []) {
     json: false,
     sample: 10,
     output: "",
-    noProductionWrite: false
+    noProductionWrite: false,
+    apply: false,
+    confirmProduction: false,
+    backupConfirmed: false,
+    maxUpdates: 0,
+    batchSize: 100,
+    continueOnError: false,
+    resumeRunId: "",
+    rollbackRunId: "",
+    operator: clean(process.env.USERNAME || process.env.USER || "codex")
   };
   for (const arg of argv) {
     if (arg === "--json") options.json = true;
     else if (arg === "--no-production-write") options.noProductionWrite = true;
+    else if (arg === "--apply") options.apply = true;
+    else if (arg === "--confirm-production") options.confirmProduction = true;
+    else if (arg === "--backup-confirmed") options.backupConfirmed = true;
+    else if (arg === "--continue-on-error") options.continueOnError = true;
     else if (arg.startsWith("--limit=")) options.limit = Number(arg.slice("--limit=".length));
     else if (arg.startsWith("--source=")) options.source = clean(arg.slice("--source=".length)).toLowerCase();
     else if (arg.startsWith("--sample=")) options.sample = Number(arg.slice("--sample=".length));
     else if (arg.startsWith("--output=")) options.output = clean(arg.slice("--output=".length));
+    else if (arg.startsWith("--max-updates=")) options.maxUpdates = Number(arg.slice("--max-updates=".length));
+    else if (arg.startsWith("--batch-size=")) options.batchSize = Number(arg.slice("--batch-size=".length));
+    else if (arg.startsWith("--resume-run-id=")) options.resumeRunId = clean(arg.slice("--resume-run-id=".length));
+    else if (arg.startsWith("--run-id=")) options.rollbackRunId = clean(arg.slice("--run-id=".length));
+    else if (arg.startsWith("--operator=")) options.operator = clean(arg.slice("--operator=".length));
   }
   options.limit = Math.max(1, Math.min(100000, Number(options.limit || 100)));
   options.sample = Math.max(1, Math.min(100, Number(options.sample || 10)));
+  options.maxUpdates = Math.max(0, Math.min(100000, Number(options.maxUpdates || 0)));
+  options.batchSize = Math.max(1, Math.min(5000, Number(options.batchSize || 100)));
   return options;
 }
 
@@ -606,6 +659,7 @@ async function queryPostgresRows(pool, options = {}) {
     `
       SELECT
         p.canonical_url,
+        p.canonical_url AS row_id,
         p.ats_key,
         p.company_name,
         p.position_name,
@@ -616,6 +670,7 @@ async function queryPostgresRows(pool, options = {}) {
         p.remote_type,
         p.parser_version,
         p.quality_flags,
+        p.quality_score,
         pc.raw_metadata
       FROM postings p
       LEFT JOIN posting_cache pc
@@ -645,6 +700,7 @@ async function querySqliteRows(db, options = {}) {
       `
         SELECT
           job_posting_url AS canonical_url,
+          rowid AS row_id,
           coalesce(ats_key, '') AS ats_key,
           company_name,
           position_name,
@@ -655,6 +711,7 @@ async function querySqliteRows(db, options = {}) {
           coalesce(remote_type, 'unknown') AS remote_type,
           coalesce(parser_version, 'legacy-adapter-v1') AS parser_version,
           coalesce(quality_flags, '[]') AS quality_flags,
+          coalesce(quality_score, 0) AS quality_score,
           '{}' AS raw_metadata
         FROM Postings
         WHERE coalesce(hidden, 0) = 0
@@ -668,6 +725,7 @@ async function querySqliteRows(db, options = {}) {
       `
         SELECT
           job_posting_url AS canonical_url,
+          rowid AS row_id,
           '' AS ats_key,
           company_name,
           position_name,
@@ -678,6 +736,7 @@ async function querySqliteRows(db, options = {}) {
           'unknown' AS remote_type,
           'legacy-adapter-v1' AS parser_version,
           '[]' AS quality_flags,
+          0 AS quality_score,
           '{}' AS raw_metadata
         FROM Postings
         WHERE coalesce(hidden, 0) = 0
@@ -685,6 +744,598 @@ async function querySqliteRows(db, options = {}) {
       `,
       [options.limit]
     );
+  }
+}
+
+function serializeAuditValue(value) {
+  if (Array.isArray(value) || (value && typeof value === "object")) return JSON.stringify(value);
+  return String(value ?? "");
+}
+
+function parseAuditValue(value, field) {
+  if (field === "quality_flags") {
+    return JSON.stringify(parseQualityFlags(value));
+  }
+  if (field === "quality_score") return String(parseStoredQualityScore(value));
+  return clean(value);
+}
+
+function isApplyAuthorized(options = {}) {
+  return Boolean(options.apply && options.confirmProduction && options.backupConfirmed && Number(options.maxUpdates || 0) > 0);
+}
+
+function getSafetyGate(options = {}) {
+  return {
+    apply_requested: Boolean(options.apply),
+    authorized: isApplyAuthorized(options),
+    required_flags: ["--apply", "--confirm-production", "--backup-confirmed", "--max-updates=N"],
+    present: {
+      apply: Boolean(options.apply),
+      confirm_production: Boolean(options.confirmProduction),
+      backup_confirmed: Boolean(options.backupConfirmed),
+      max_updates: Number(options.maxUpdates || 0)
+    }
+  };
+}
+
+function canApplyPlan(plan) {
+  if (!plan || !Array.isArray(plan.changes) || plan.changes.length === 0) return false;
+  if (plan.classifications.includes("unsafe_ambiguous")) return false;
+  if (plan.classifications.includes("no_evidence")) return false;
+  if (plan.classifications.includes("needs_detail_refetch")) return false;
+  for (const change of plan.changes) {
+    if (!WRITABLE_FIELDS.includes(change.field)) return false;
+    if (change.field === "remote_type" && !["remote", "hybrid", "onsite"].includes(clean(change.after))) return false;
+    if (change.field === "remote_type" && ["remote", "hybrid", "onsite"].includes(norm(change.before))) return false;
+    if (["location_text", "country", "region", "city"].includes(change.field) && !isBlank(change.before)) return false;
+    if (change.field === "city" && !clean(change.after)) return false;
+  }
+  return true;
+}
+
+function createRunId(prefix = "geo-remote") {
+  const random = Math.random().toString(16).slice(2, 10);
+  return `${prefix}-${Date.now()}-${random}`;
+}
+
+function openSqliteWritable(dbPath) {
+  const sqlite3 = require("sqlite3");
+  const resolved = path.resolve(dbPath || "jobs.db");
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(resolved, (error) => {
+      if (error) reject(error);
+      else {
+        resolve({
+          all(sql, params = []) {
+            return new Promise((innerResolve, innerReject) => {
+              db.all(sql, params, (queryError, rows) => {
+                if (queryError) innerReject(queryError);
+                else innerResolve(rows || []);
+              });
+            });
+          },
+          run(sql, params = []) {
+            return new Promise((innerResolve, innerReject) => {
+              db.run(sql, params, function onRun(runError) {
+                if (runError) innerReject(runError);
+                else innerResolve({ changes: this.changes || 0, lastID: this.lastID || 0 });
+              });
+            });
+          },
+          exec(sql) {
+            return new Promise((innerResolve, innerReject) => {
+              db.exec(sql, (execError) => {
+                if (execError) innerReject(execError);
+                else innerResolve();
+              });
+            });
+          },
+          close() {
+            return new Promise((innerResolve, innerReject) => {
+              db.close((closeError) => {
+                if (closeError) innerReject(closeError);
+                else innerResolve();
+              });
+            });
+          }
+        });
+      }
+    });
+  });
+}
+
+async function ensureSqliteBackfillAuditSchema(db) {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS data_quality_backfill_runs (
+      run_id TEXT PRIMARY KEY,
+      schema_version TEXT NOT NULL,
+      started_at_epoch INTEGER NOT NULL,
+      completed_at_epoch INTEGER,
+      operator TEXT NOT NULL DEFAULT '',
+      mode TEXT NOT NULL,
+      status TEXT NOT NULL,
+      db_backend TEXT NOT NULL,
+      source_filter TEXT NOT NULL DEFAULT '',
+      limit_count INTEGER NOT NULL DEFAULT 0,
+      max_updates INTEGER NOT NULL DEFAULT 0,
+      batch_size INTEGER NOT NULL DEFAULT 0,
+      checkpoint_url TEXT NOT NULL DEFAULT '',
+      dry_run_summary TEXT NOT NULL DEFAULT '{}',
+      error TEXT NOT NULL DEFAULT '',
+      rollback_of_run_id TEXT NOT NULL DEFAULT '',
+      rollback_metadata TEXT NOT NULL DEFAULT '{}'
+    );
+
+    CREATE TABLE IF NOT EXISTS data_quality_backfill_changes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id TEXT NOT NULL,
+      changed_at_epoch INTEGER NOT NULL,
+      row_identifier TEXT NOT NULL DEFAULT '',
+      source_ats TEXT NOT NULL DEFAULT '',
+      canonical_url TEXT NOT NULL DEFAULT '',
+      parser_version TEXT NOT NULL DEFAULT '',
+      field_name TEXT NOT NULL,
+      old_value TEXT NOT NULL DEFAULT '',
+      new_value TEXT NOT NULL DEFAULT '',
+      rule_name TEXT NOT NULL DEFAULT '',
+      confidence REAL NOT NULL DEFAULT 0,
+      source_evidence_summary TEXT NOT NULL DEFAULT '',
+      reversible_metadata TEXT NOT NULL DEFAULT '{}',
+      applied INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY(run_id) REFERENCES data_quality_backfill_runs(run_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_data_quality_backfill_changes_run
+      ON data_quality_backfill_changes(run_id, id);
+    CREATE INDEX IF NOT EXISTS idx_data_quality_backfill_changes_url
+      ON data_quality_backfill_changes(canonical_url, field_name);
+  `);
+}
+
+async function ensurePostgresBackfillAuditSchema(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS data_quality_backfill_runs (
+      run_id TEXT PRIMARY KEY,
+      schema_version TEXT NOT NULL,
+      started_at_epoch BIGINT NOT NULL,
+      completed_at_epoch BIGINT,
+      operator TEXT NOT NULL DEFAULT '',
+      mode TEXT NOT NULL,
+      status TEXT NOT NULL,
+      db_backend TEXT NOT NULL,
+      source_filter TEXT NOT NULL DEFAULT '',
+      limit_count INTEGER NOT NULL DEFAULT 0,
+      max_updates INTEGER NOT NULL DEFAULT 0,
+      batch_size INTEGER NOT NULL DEFAULT 0,
+      checkpoint_url TEXT NOT NULL DEFAULT '',
+      dry_run_summary JSONB NOT NULL DEFAULT '{}'::jsonb,
+      error TEXT NOT NULL DEFAULT '',
+      rollback_of_run_id TEXT NOT NULL DEFAULT '',
+      rollback_metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+    );
+
+    CREATE TABLE IF NOT EXISTS data_quality_backfill_changes (
+      id BIGSERIAL PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES data_quality_backfill_runs(run_id),
+      changed_at_epoch BIGINT NOT NULL,
+      row_identifier TEXT NOT NULL DEFAULT '',
+      source_ats TEXT NOT NULL DEFAULT '',
+      canonical_url TEXT NOT NULL DEFAULT '',
+      parser_version TEXT NOT NULL DEFAULT '',
+      field_name TEXT NOT NULL,
+      old_value TEXT NOT NULL DEFAULT '',
+      new_value TEXT NOT NULL DEFAULT '',
+      rule_name TEXT NOT NULL DEFAULT '',
+      confidence REAL NOT NULL DEFAULT 0,
+      source_evidence_summary TEXT NOT NULL DEFAULT '',
+      reversible_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      applied BOOLEAN NOT NULL DEFAULT true
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_data_quality_backfill_changes_run
+      ON data_quality_backfill_changes(run_id, id);
+    CREATE INDEX IF NOT EXISTS idx_data_quality_backfill_changes_url
+      ON data_quality_backfill_changes(canonical_url, field_name);
+  `);
+}
+
+async function insertSqliteRun(db, run, summary) {
+  await db.run(
+    `
+      INSERT INTO data_quality_backfill_runs (
+        run_id, schema_version, started_at_epoch, operator, mode, status, db_backend,
+        source_filter, limit_count, max_updates, batch_size, dry_run_summary,
+        rollback_of_run_id, rollback_metadata
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id) DO UPDATE SET
+        status = excluded.status,
+        checkpoint_url = data_quality_backfill_runs.checkpoint_url
+    `,
+    [
+      run.runId,
+      GEO_REMOTE_BACKFILL_AUDIT_SCHEMA_VERSION,
+      run.startedAtEpoch,
+      run.operator,
+      run.mode,
+      run.status,
+      run.dbBackend,
+      run.sourceFilter,
+      run.limit,
+      run.maxUpdates,
+      run.batchSize,
+      JSON.stringify(summary || {}),
+      run.rollbackOfRunId || "",
+      JSON.stringify(run.rollbackMetadata || {})
+    ]
+  );
+}
+
+async function insertPostgresRun(pool, run, summary) {
+  await pool.query(
+    `
+      INSERT INTO data_quality_backfill_runs (
+        run_id, schema_version, started_at_epoch, operator, mode, status, db_backend,
+        source_filter, limit_count, max_updates, batch_size, dry_run_summary,
+        rollback_of_run_id, rollback_metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb)
+      ON CONFLICT(run_id) DO UPDATE SET
+        status = excluded.status,
+        max_updates = excluded.max_updates,
+        batch_size = excluded.batch_size
+    `,
+    [
+      run.runId,
+      GEO_REMOTE_BACKFILL_AUDIT_SCHEMA_VERSION,
+      run.startedAtEpoch,
+      run.operator,
+      run.mode,
+      run.status,
+      run.dbBackend,
+      run.sourceFilter,
+      run.limit,
+      run.maxUpdates,
+      run.batchSize,
+      JSON.stringify(summary || {}),
+      run.rollbackOfRunId || "",
+      JSON.stringify(run.rollbackMetadata || {})
+    ]
+  );
+}
+
+async function updateSqliteRun(db, runId, fields = {}) {
+  await db.run(
+    `
+      UPDATE data_quality_backfill_runs
+      SET status = coalesce(?, status),
+          completed_at_epoch = coalesce(?, completed_at_epoch),
+          checkpoint_url = coalesce(?, checkpoint_url),
+          error = coalesce(?, error),
+          rollback_metadata = coalesce(?, rollback_metadata)
+      WHERE run_id = ?
+    `,
+    [
+      fields.status ?? null,
+      fields.completedAtEpoch ?? null,
+      fields.checkpointUrl ?? null,
+      fields.error ?? null,
+      fields.rollbackMetadata ? JSON.stringify(fields.rollbackMetadata) : null,
+      runId
+    ]
+  );
+}
+
+async function updatePostgresRun(pool, runId, fields = {}) {
+  await pool.query(
+    `
+      UPDATE data_quality_backfill_runs
+      SET status = coalesce($1, status),
+          completed_at_epoch = coalesce($2, completed_at_epoch),
+          checkpoint_url = coalesce($3, checkpoint_url),
+          error = coalesce($4, error),
+          rollback_metadata = coalesce($5::jsonb, rollback_metadata)
+      WHERE run_id = $6
+    `,
+    [
+      fields.status ?? null,
+      fields.completedAtEpoch ?? null,
+      fields.checkpointUrl ?? null,
+      fields.error ?? null,
+      fields.rollbackMetadata ? JSON.stringify(fields.rollbackMetadata) : null,
+      runId
+    ]
+  );
+}
+
+async function getSqliteAppliedChangeKeys(db, runId) {
+  if (!runId) return new Set();
+  const rows = await db.all(
+    "SELECT canonical_url, field_name FROM data_quality_backfill_changes WHERE run_id = ? AND applied = 1;",
+    [runId]
+  );
+  return new Set(rows.map((row) => `${row.canonical_url}\u0000${row.field_name}`));
+}
+
+async function getPostgresAppliedChangeKeys(pool, runId) {
+  if (!runId) return new Set();
+  const result = await pool.query(
+    "SELECT canonical_url, field_name FROM data_quality_backfill_changes WHERE run_id = $1 AND applied = true;",
+    [runId]
+  );
+  return new Set((result.rows || []).map((row) => `${row.canonical_url}\u0000${row.field_name}`));
+}
+
+function sourceEvidenceSummary(plan, change) {
+  const evidence = plan.evidence || {};
+  if (["location_text", "country", "region", "city"].includes(change.field)) {
+    return [evidence.geo_rule, evidence.geo_source].filter(Boolean).join(": ").slice(0, 500);
+  }
+  if (change.field === "remote_type") {
+    return [evidence.remote_rule, evidence.remote_source].filter(Boolean).join(": ").slice(0, 500);
+  }
+  return [evidence.geo_rule, evidence.remote_rule].filter(Boolean).join("; ").slice(0, 500);
+}
+
+async function insertSqliteChange(db, runId, plan, change) {
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  await db.run(
+    `
+      INSERT INTO data_quality_backfill_changes (
+        run_id, changed_at_epoch, row_identifier, source_ats, canonical_url, parser_version,
+        field_name, old_value, new_value, rule_name, confidence, source_evidence_summary,
+        reversible_metadata, applied
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `,
+    [
+      runId,
+      nowEpoch,
+      plan.row_identifier,
+      plan.source_ats,
+      plan.canonical_url,
+      plan.parser_version,
+      change.field,
+      serializeAuditValue(change.before),
+      serializeAuditValue(change.after),
+      change.rule,
+      Number(change.confidence || 0),
+      sourceEvidenceSummary(plan, change),
+      JSON.stringify({ before: change.before, after: change.after, classifications: plan.classifications })
+    ]
+  );
+}
+
+async function insertPostgresChange(pool, runId, plan, change) {
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  await pool.query(
+    `
+      INSERT INTO data_quality_backfill_changes (
+        run_id, changed_at_epoch, row_identifier, source_ats, canonical_url, parser_version,
+        field_name, old_value, new_value, rule_name, confidence, source_evidence_summary,
+        reversible_metadata, applied
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, true)
+    `,
+    [
+      runId,
+      nowEpoch,
+      plan.row_identifier,
+      plan.source_ats,
+      plan.canonical_url,
+      plan.parser_version,
+      change.field,
+      serializeAuditValue(change.before),
+      serializeAuditValue(change.after),
+      change.rule,
+      Number(change.confidence || 0),
+      sourceEvidenceSummary(plan, change),
+      JSON.stringify({ before: change.before, after: change.after, classifications: plan.classifications })
+    ]
+  );
+}
+
+function sqliteStoredValue(field, value) {
+  if (field === "quality_flags") return JSON.stringify(parseQualityFlags(value));
+  if (field === "quality_score") return parseStoredQualityScore(value);
+  return clean(value);
+}
+
+async function applySqliteFieldChange(db, canonicalUrl, field, value) {
+  if (!WRITABLE_FIELDS.includes(field)) throw new Error(`unsupported backfill field ${field}`);
+  const storedValue = sqliteStoredValue(field, value);
+  await db.run(`UPDATE Postings SET ${field} = ? WHERE job_posting_url = ?;`, [storedValue, canonicalUrl]);
+}
+
+async function applyPostgresFieldChange(pool, canonicalUrl, field, value) {
+  if (!WRITABLE_FIELDS.includes(field)) throw new Error(`unsupported backfill field ${field}`);
+  if (field === "quality_flags") {
+    await pool.query("UPDATE postings SET quality_flags = $1::jsonb, updated_at = now() WHERE canonical_url = $2;", [JSON.stringify(parseQualityFlags(value)), canonicalUrl]);
+    await pool.query("UPDATE posting_cache SET quality_flags = $1::jsonb, updated_at = now() WHERE canonical_url = $2;", [JSON.stringify(parseQualityFlags(value)), canonicalUrl]);
+    return;
+  }
+  if (field === "quality_score") {
+    await pool.query("UPDATE postings SET quality_score = $1, updated_at = now() WHERE canonical_url = $2;", [parseStoredQualityScore(value), canonicalUrl]);
+    await pool.query("UPDATE posting_cache SET quality_score = $1, updated_at = now() WHERE canonical_url = $2;", [parseStoredQualityScore(value), canonicalUrl]);
+    return;
+  }
+  await pool.query(`UPDATE postings SET ${field} = $1, updated_at = now() WHERE canonical_url = $2;`, [clean(value), canonicalUrl]);
+  if (["location_text", "country", "region", "city", "remote_type"].includes(field)) {
+    await pool.query(`UPDATE posting_cache SET ${field} = $1, updated_at = now() WHERE canonical_url = $2;`, [clean(value), canonicalUrl]);
+  }
+}
+
+async function applySqlitePlans(db, plans, options, summary) {
+  const runId = options.resumeRunId || createRunId();
+  const startedAtEpoch = Math.floor(Date.now() / 1000);
+  await ensureSqliteBackfillAuditSchema(db);
+  await insertSqliteRun(
+    db,
+    {
+      runId,
+      startedAtEpoch,
+      operator: options.operator,
+      mode: options.resumeRunId ? "resume-apply" : "apply",
+      status: "running",
+      dbBackend: "sqlite",
+      sourceFilter: options.source || "",
+      limit: options.limit,
+      maxUpdates: options.maxUpdates,
+      batchSize: options.batchSize
+    },
+    summary
+  );
+  const appliedKeys = await getSqliteAppliedChangeKeys(db, runId);
+  let appliedRows = 0;
+  let appliedChanges = 0;
+  const errors = [];
+  const selected = plans.filter(canApplyPlan).slice(0, options.maxUpdates);
+  for (let index = 0; index < selected.length; index += options.batchSize) {
+    const batch = selected.slice(index, index + options.batchSize);
+    try {
+      await db.exec("BEGIN IMMEDIATE;");
+      for (const plan of batch) {
+        let rowChanged = false;
+        for (const change of plan.changes) {
+          const key = `${plan.canonical_url}\u0000${change.field}`;
+          if (appliedKeys.has(key)) continue;
+          await insertSqliteChange(db, runId, plan, change);
+          await applySqliteFieldChange(db, plan.canonical_url, change.field, change.after);
+          appliedKeys.add(key);
+          appliedChanges += 1;
+          rowChanged = true;
+        }
+        if (rowChanged) {
+          appliedRows += 1;
+          await updateSqliteRun(db, runId, { checkpointUrl: plan.canonical_url });
+        }
+      }
+      await db.exec("COMMIT;");
+    } catch (error) {
+      await db.exec("ROLLBACK;").catch(() => {});
+      errors.push(error?.message || String(error));
+      if (!options.continueOnError) throw error;
+    }
+  }
+  await updateSqliteRun(db, runId, {
+    status: errors.length > 0 ? "completed_with_errors" : "completed",
+    completedAtEpoch: Math.floor(Date.now() / 1000),
+    error: errors.join("; ").slice(0, 1000)
+  });
+  return { run_id: runId, applied_rows: appliedRows, applied_changes: appliedChanges, errors };
+}
+
+async function applyPostgresPlans(pool, plans, options, summary) {
+  const runId = options.resumeRunId || createRunId();
+  const startedAtEpoch = Math.floor(Date.now() / 1000);
+  await ensurePostgresBackfillAuditSchema(pool);
+  await insertPostgresRun(
+    pool,
+    {
+      runId,
+      startedAtEpoch,
+      operator: options.operator,
+      mode: options.resumeRunId ? "resume-apply" : "apply",
+      status: "running",
+      dbBackend: "postgres",
+      sourceFilter: options.source || "",
+      limit: options.limit,
+      maxUpdates: options.maxUpdates,
+      batchSize: options.batchSize
+    },
+    summary
+  );
+  const appliedKeys = await getPostgresAppliedChangeKeys(pool, runId);
+  let appliedRows = 0;
+  let appliedChanges = 0;
+  const errors = [];
+  const selected = plans.filter(canApplyPlan).slice(0, options.maxUpdates);
+  for (let index = 0; index < selected.length; index += options.batchSize) {
+    const batch = selected.slice(index, index + options.batchSize);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN;");
+      for (const plan of batch) {
+        let rowChanged = false;
+        for (const change of plan.changes) {
+          const key = `${plan.canonical_url}\u0000${change.field}`;
+          if (appliedKeys.has(key)) continue;
+          await insertPostgresChange(client, runId, plan, change);
+          await applyPostgresFieldChange(client, plan.canonical_url, change.field, change.after);
+          appliedKeys.add(key);
+          appliedChanges += 1;
+          rowChanged = true;
+        }
+        if (rowChanged) {
+          appliedRows += 1;
+          await updatePostgresRun(client, runId, { checkpointUrl: plan.canonical_url });
+        }
+      }
+      await client.query("COMMIT;");
+    } catch (error) {
+      await client.query("ROLLBACK;").catch(() => {});
+      errors.push(error?.message || String(error));
+      if (!options.continueOnError) throw error;
+    } finally {
+      client.release();
+    }
+  }
+  await updatePostgresRun(pool, runId, {
+    status: errors.length > 0 ? "completed_with_errors" : "completed",
+    completedAtEpoch: Math.floor(Date.now() / 1000),
+    error: errors.join("; ").slice(0, 1000)
+  });
+  return { run_id: runId, applied_rows: appliedRows, applied_changes: appliedChanges, errors };
+}
+
+async function runBackfill(options = parseArgs(process.argv.slice(2)), env = process.env) {
+  const dbBackend = clean(env.OPENJOBSLOTS_DB_BACKEND || "sqlite").toLowerCase();
+  let rows = [];
+  let applyResult = null;
+  const safetyGate = getSafetyGate(options);
+  if (dbBackend === "postgres") {
+    const pool = createPostgresPool({ enabled: true, connectionString: env.DATABASE_URL || env.POSTGRES_URL || "" });
+    try {
+      rows = await queryPostgresRows(pool, options);
+      const plans = rows.map(classifyBackfillCandidate);
+      const summary = summarizePlan(rows, options);
+      const reportBase = {
+        ok: true,
+        db_backend: dbBackend,
+        dry_run: !safetyGate.authorized,
+        apply_mode: safetyGate.authorized,
+        safety_gate: safetyGate,
+        source_filter: options.source || "",
+        limit: options.limit,
+        ...summary
+      };
+      if (safetyGate.authorized) {
+        applyResult = await applyPostgresPlans(pool, plans, options, summary);
+      }
+      return { ...reportBase, ...(applyResult || {}) };
+    } finally {
+      await pool.end();
+    }
+  }
+
+  const dbPath = env.DB_PATH || path.resolve(__dirname, "..", "..", "..", "jobs.db");
+  const db = safetyGate.authorized ? await openSqliteWritable(dbPath) : await openSqliteReadOnly(dbPath);
+  try {
+    rows = await querySqliteRows(db, options);
+    const plans = rows.map(classifyBackfillCandidate);
+    const summary = summarizePlan(rows, options);
+    const reportBase = {
+      ok: true,
+      db_backend: dbBackend,
+      dry_run: !safetyGate.authorized,
+      apply_mode: safetyGate.authorized,
+      safety_gate: safetyGate,
+      source_filter: options.source || "",
+      limit: options.limit,
+      ...summary
+    };
+    if (safetyGate.authorized) {
+      applyResult = await applySqlitePlans(db, plans, options, summary);
+    }
+    return { ...reportBase, ...(applyResult || {}) };
+  } finally {
+    await db.close();
   }
 }
 
@@ -723,12 +1374,174 @@ async function runDryRun(options = parseArgs(process.argv.slice(2)), env = proce
   return report;
 }
 
+async function getSqliteRollbackChanges(db, runId) {
+  return await db.all(
+    `
+      SELECT *
+      FROM data_quality_backfill_changes
+      WHERE run_id = ? AND applied = 1
+      ORDER BY id DESC;
+    `,
+    [runId]
+  );
+}
+
+async function getPostgresRollbackChanges(pool, runId) {
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM data_quality_backfill_changes
+      WHERE run_id = $1 AND applied = true
+      ORDER BY id DESC;
+    `,
+    [runId]
+  );
+  return result.rows || [];
+}
+
+async function rollbackSqliteRun(db, options) {
+  await ensureSqliteBackfillAuditSchema(db);
+  const runId = options.rollbackRunId;
+  if (!runId) throw new Error("rollback requires --run-id=<run_id>");
+  const changes = await getSqliteRollbackChanges(db, runId);
+  const rollbackRunId = createRunId("geo-remote-rollback");
+  await insertSqliteRun(
+    db,
+    {
+      runId: rollbackRunId,
+      startedAtEpoch: Math.floor(Date.now() / 1000),
+      operator: options.operator,
+      mode: "rollback",
+      status: "running",
+      dbBackend: "sqlite",
+      sourceFilter: "",
+      limit: 0,
+      maxUpdates: changes.length,
+      batchSize: options.batchSize,
+      rollbackOfRunId: runId,
+      rollbackMetadata: { change_count: changes.length }
+    },
+    {}
+  );
+  let restoredChanges = 0;
+  const errors = [];
+  for (let index = 0; index < changes.length; index += options.batchSize) {
+    const batch = changes.slice(index, index + options.batchSize);
+    try {
+      await db.exec("BEGIN IMMEDIATE;");
+      for (const change of batch) {
+        const restoredValue = parseAuditValue(change.old_value, change.field_name);
+        await applySqliteFieldChange(db, change.canonical_url, change.field_name, restoredValue);
+        restoredChanges += 1;
+      }
+      await db.exec("COMMIT;");
+    } catch (error) {
+      await db.exec("ROLLBACK;").catch(() => {});
+      errors.push(error?.message || String(error));
+      if (!options.continueOnError) throw error;
+    }
+  }
+  await updateSqliteRun(db, runId, {
+    status: errors.length > 0 ? "rollback_completed_with_errors" : "rolled_back",
+    rollbackMetadata: { rollback_run_id: rollbackRunId, restored_changes: restoredChanges, errors }
+  });
+  await updateSqliteRun(db, rollbackRunId, {
+    status: errors.length > 0 ? "completed_with_errors" : "completed",
+    completedAtEpoch: Math.floor(Date.now() / 1000),
+    error: errors.join("; ").slice(0, 1000)
+  });
+  return { rollback_run_id: rollbackRunId, rolled_back_run_id: runId, restored_changes: restoredChanges, errors };
+}
+
+async function rollbackPostgresRun(pool, options) {
+  await ensurePostgresBackfillAuditSchema(pool);
+  const runId = options.rollbackRunId;
+  if (!runId) throw new Error("rollback requires --run-id=<run_id>");
+  const changes = await getPostgresRollbackChanges(pool, runId);
+  const rollbackRunId = createRunId("geo-remote-rollback");
+  await insertPostgresRun(
+    pool,
+    {
+      runId: rollbackRunId,
+      startedAtEpoch: Math.floor(Date.now() / 1000),
+      operator: options.operator,
+      mode: "rollback",
+      status: "running",
+      dbBackend: "postgres",
+      sourceFilter: "",
+      limit: 0,
+      maxUpdates: changes.length,
+      batchSize: options.batchSize,
+      rollbackOfRunId: runId,
+      rollbackMetadata: { change_count: changes.length }
+    },
+    {}
+  );
+  let restoredChanges = 0;
+  const errors = [];
+  for (let index = 0; index < changes.length; index += options.batchSize) {
+    const batch = changes.slice(index, index + options.batchSize);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN;");
+      for (const change of batch) {
+        const restoredValue = parseAuditValue(change.old_value, change.field_name);
+        await applyPostgresFieldChange(client, change.canonical_url, change.field_name, restoredValue);
+        restoredChanges += 1;
+      }
+      await client.query("COMMIT;");
+    } catch (error) {
+      await client.query("ROLLBACK;").catch(() => {});
+      errors.push(error?.message || String(error));
+      if (!options.continueOnError) throw error;
+    } finally {
+      client.release();
+    }
+  }
+  await updatePostgresRun(pool, runId, {
+    status: errors.length > 0 ? "rollback_completed_with_errors" : "rolled_back",
+    rollbackMetadata: { rollback_run_id: rollbackRunId, restored_changes: restoredChanges, errors }
+  });
+  await updatePostgresRun(pool, rollbackRunId, {
+    status: errors.length > 0 ? "completed_with_errors" : "completed",
+    completedAtEpoch: Math.floor(Date.now() / 1000),
+    error: errors.join("; ").slice(0, 1000)
+  });
+  return { rollback_run_id: rollbackRunId, rolled_back_run_id: runId, restored_changes: restoredChanges, errors };
+}
+
+async function runRollback(options = parseArgs(process.argv.slice(2)), env = process.env) {
+  const dbBackend = clean(env.OPENJOBSLOTS_DB_BACKEND || "sqlite").toLowerCase();
+  if (dbBackend === "postgres") {
+    const pool = createPostgresPool({ enabled: true, connectionString: env.DATABASE_URL || env.POSTGRES_URL || "" });
+    try {
+      const result = await rollbackPostgresRun(pool, options);
+      return { ok: true, db_backend: dbBackend, ...result };
+    } finally {
+      await pool.end();
+    }
+  }
+  const dbPath = env.DB_PATH || path.resolve(__dirname, "..", "..", "..", "jobs.db");
+  const db = await openSqliteWritable(dbPath);
+  try {
+    const result = await rollbackSqliteRun(db, options);
+    return { ok: true, db_backend: dbBackend, ...result };
+  } finally {
+    await db.close();
+  }
+}
+
 module.exports = {
+  canApplyPlan,
   classifyBackfillCandidate,
+  getSafetyGate,
+  isApplyAuthorized,
   parseArgs,
   parseDelimitedLocation,
   parseGeoEvidence,
   parseRemoteEvidence,
+  runBackfill,
   runDryRun,
+  runRollback,
   summarizePlan
 };
