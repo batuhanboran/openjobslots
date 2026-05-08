@@ -37,6 +37,8 @@ An ATS is certified only when all of these exist:
 - Fixture-backed proof for missing or nullable location, date, and remote fields.
 - Production parity tests showing normalized rows survive Postgres persistence, Meilisearch indexing, hydration, and public filter/search behavior.
 
+Use the `ats-parser-certification` skill for the source-evidence workflow and the `openjobslots-postgres-audit` skill for production crossmatching. If a result looks fixed in parser output but still fails public search, do not certify it until `/postings`, direct Postgres rows, and raw Meilisearch hits agree or the delta is explicitly explained.
+
 ## Expansion Priority
 
 ### Wave 1

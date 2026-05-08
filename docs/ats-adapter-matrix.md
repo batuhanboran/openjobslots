@@ -8,6 +8,8 @@ Parser changes must be checked against public search quality, not only parser un
 
 Missing location, posting date, or remote fields must be certified by source fixtures. A parser may leave those fields blank only when a saved raw response proves the source omitted them, or adapter notes document why extracting them would be unsafe or require rejected extra fetches.
 
+For future Codex work, use `ats-parser-certification` for raw source and parser decisions, `openjobslots-postgres-audit` for DB/Meili/API parity, and `openjobslots-search-parity-corpus` for large title/filter matrices. These skills exist to prevent closing a parser incident from UI-only or count-only tests.
+
 ## May 8 Priority Order
 
 Parser normalization is the current blocker. Fix `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch` per ATS before search-index tuning. v1.5.14 expands the high-volume parser batch to `workday`, `bamboohr`, `taleo`, `applytojob`, `breezy`, `recruitee`, `icims`, and `applitrack`, then adds safe URL/title backfill and ATS quality auditing. v1.5.15 applies that backfill to production, fully rebuilds Meilisearch from Postgres, and marks pre-reindex search outbox rows processed to avoid duplicate worker indexing. v1.5.16 broadens stable URL source-id extraction and global location aliases for the next production backfill. v1.5.17 adds the 60-source certification workbench and tests that block parser-certified status without raw fixture-backed field decisions. Image work and build-cache cleanup are later tasks.
