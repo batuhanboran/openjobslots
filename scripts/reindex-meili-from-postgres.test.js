@@ -122,6 +122,7 @@ test("Meili settings validation reports missing filter/sort/search fields", () =
       ...MEILI_POSTINGS_SETTINGS,
       filterableAttributes: ["country"],
       sortableAttributes: ["last_seen_epoch"],
+      rankingRules: ["words", "sort"],
       synonyms: { turkey: ["turkiye"] },
       typoTolerance: { enabled: false, disableOnAttributes: [] }
     }
@@ -130,5 +131,6 @@ test("Meili settings validation reports missing filter/sort/search fields", () =
   assert.ok(result.mismatches.some((item) => item.setting === "primaryKey"));
   assert.ok(result.mismatches.some((item) => item.setting === "filterableAttributes"));
   assert.ok(result.mismatches.some((item) => item.setting === "sortableAttributes"));
+  assert.ok(result.mismatches.some((item) => item.setting === "rankingRules"));
   assert.ok(result.mismatches.some((item) => item.setting === "typoTolerance.enabled"));
 });
