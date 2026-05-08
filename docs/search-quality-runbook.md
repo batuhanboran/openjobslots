@@ -98,9 +98,11 @@ Manual Meili deletes or full index clears are emergency procedures only. If used
 
 ## Required Search Corpus
 
-Maintain a pinned 1000-query corpus. Generate it from reviewed static fixtures or public occupational taxonomies, not from `jobs.db` or production dumps.
+Maintain a pinned 1000-query local corpus. Generate it from reviewed static fixtures or public occupational taxonomies, not from `jobs.db` or production dumps.
 
 O*NET official occupation titles are an approved public taxonomy source for query probes and corpus expansion. Record the source and date when generating a corpus snapshot so later runs can distinguish corpus drift from search behavior changes.
+
+For production-readiness probes, maintain a separate 10,000+ title-intent parity plan. The expanded corpus may use O*NET and ESCO as primary public taxonomies, plus license-reviewed broad title vocabulary such as `jneidel/job-titles` only after reuse policy is accepted. Do not commit huge raw third-party dumps by default; commit a curated snapshot or generator manifest with source URL, source date/version, license note, transform hash, and generated fixture hash.
 
 Coverage target:
 
@@ -111,6 +113,14 @@ Coverage target:
 - 20 edge cases for diacritics, abbreviations, quoted terms, misspellings, and ambiguous titles.
 
 Each case needs at least one positive seeded row and hard negatives: same title in the wrong country, same country with the wrong title, and same title with the wrong remote mode.
+
+The large parity corpus should preserve these dimensions:
+
+- Title intent: exact, partial, alternate, abbreviation, seniority, punctuation, quoted/unquoted, typo, diacritic, and locale variants.
+- Geography: country aliases, city aliases, region aliases, country/region mismatch, and ambiguous aliases such as `US`, `UK`, `Turkey`, `Turkiye`, and `Türkiye`.
+- Work mode: `all`, `remote`, `hybrid`, and `onsite/unknown`, including query words and structured filter modes.
+- Visibility and state: hidden, applied, ignored, no posting date, stale Meili-only documents, Postgres-only rows, and hydration underfill.
+- Pagination: first, middle, and last pages with unique URLs, stable `next_offset`, and correct `has_more`.
 
 ## Assertions
 
