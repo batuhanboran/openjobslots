@@ -1,0 +1,33 @@
+{
+  "ats_key": "manatal",
+  "company_name_for_postings": "Fixture Manatal",
+  "config": {
+    "publicBaseUrl": "https://www.careers-page.com",
+    "domainSlug": "fixture-manatal",
+    "boardUrl": "https://www.careers-page.com/fixture-manatal/"
+  },
+  "raw_response": {
+    "results": [
+      {
+        "id": 1,
+        "hash": "BADTITLE",
+        "position_name": "",
+        "location_display": "Austin, TX, USA"
+      },
+      {
+        "id": 2,
+        "position_name": "Missing URL Engineer",
+        "location_display": "Austin, TX, USA"
+      }
+    ]
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "BADTITLE",
+      "reason": "missing position_name"
+    }
+  ],
+  "expected_skipped_titles": [
+    "Missing URL Engineer"
+  ]
+}

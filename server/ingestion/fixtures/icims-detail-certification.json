@@ -6,6 +6,13 @@
   },
   "list_html": "\n    <ul>\n      <li class=\"iCIMS_JobCardItem\">\n        <a href=\"/jobs/1001/technical-support-engineer/job\"><h3>Technical Support Engineer</h3></a>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>US-PA-Philadelphia</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      </li>\n      <li class=\"iCIMS_JobCardItem\">\n        <a href=\"/jobs/1002/remote-data-analyst/job\"><h3>Remote Data Analyst</h3></a>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>CA-ON-Toronto</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>Yes</span></dd>\n      </li>\n    </ul>\n  ",
   "detail_html_no_date": "\n    <section>\n      <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>US-PA-Philadelphia</span></dd>\n      <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      <p>This public detail page intentionally has no Date Posted field.</p>\n    </section>\n  ",
+  "detail_html_jsonld": "\n    <html><head>\n      <title>Business Development Manager - Sustainability Business in Shanghai</title>\n      <script type=\"application/ld+json\">\n        {\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Business Development Manager - Sustainability Business\",\"datePosted\":\"2026-02-03T05:00:00.000Z\",\"jobLocation\":[{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"Shanghai\",\"addressRegion\":\"UNAVAILABLE\",\"addressCountry\":\"CN\",\"postalCode\":\"UNAVAILABLE\",\"streetAddress\":\"UNAVAILABLE\"}}]}\n      </script>\n    </head><body><h1>Business Development Manager - Sustainability Business</h1></body></html>\n  ",
+  "expected_jsonld": {
+    "location": "Shanghai, China",
+    "posting_date": "2026-02-03T05:00:00.000Z",
+    "country": "China",
+    "region": "APAC"
+  },
   "expected": [
     {
       "source_job_id": "1001",

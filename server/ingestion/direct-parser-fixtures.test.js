@@ -42,6 +42,7 @@ const PARSERS = {
   adp_workforcenow: parseAdpWorkforcenowPostingsFromApi,
   applicantpro: parseApplicantProPostingsFromApi,
   fountain: parseFountainPostingsFromApi,
+  manatal: parseManatalPostingsFromApi,
   oracle: parseOraclePostingsFromApi,
   paylocity: parsePaylocityPostingsFromPageData,
   pinpointhq: parsePinpointHqPostingsFromApi,
@@ -93,6 +94,50 @@ for (const fileName of fixtureFileNames) {
     }
   });
 }
+
+test("manatal failure fixture rejects missing titles and skips rows without job URLs", () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, "manatal-failures.json"), "utf8"));
+  const parsed = parseManatalPostingsFromApi(
+    fixture.company_name_for_postings,
+    fixture.config,
+    fixture.raw_response
+  );
+  const adapter = adapters.get("manatal");
+  assert.ok(adapter, "expected manatal adapter");
+  const normalizedRows = parsed.map((posting) => {
+    const normalized = adapter.normalize(posting, { company_name: fixture.company_name_for_postings });
+    return {
+      normalized,
+      validation: validatePosting(normalized)
+    };
+  });
+
+  for (const expected of fixture.expected_rejections) {
+    const row = normalizedRows.find((item) => item.normalized.source_job_id === expected.source_job_id);
+    assert.ok(row, `expected rejected Manatal row ${expected.source_job_id}`);
+    assert.equal(row.validation.ok, false);
+    assert.equal(row.validation.error, expected.reason);
+  }
+  for (const title of fixture.expected_skipped_titles) {
+    assert.equal(parsed.some((posting) => posting.position_name === title), false, `${title} should be skipped without a usable URL`);
+  }
+});
+
+test("placeholder and missing-title postings fail validation before storage", () => {
+  const adapter = adapters.get("manatal");
+  assert.ok(adapter, "expected manatal adapter");
+  for (const positionName of ["", "Untitled Position", "Unknown Job"]) {
+    const normalized = adapter.normalize(
+      {
+        company_name: "Fixture Manatal",
+        position_name: positionName,
+        job_posting_url: "https://www.careers-page.com/fixture-manatal/job/bad-title"
+      },
+      { company_name: "Fixture Manatal" }
+    );
+    assert.equal(validatePosting(normalized).ok, false);
+  }
+});
 
 test("high-volume ATS parsers preserve country, date, remote, and source ids when source exposes them", () => {
   const bambooParsed = parseBambooHrPostingsFromApi(
@@ -210,6 +255,19 @@ test("iCIMS raw detail fixtures certify ATS code locations and remote header evi
   assert.equal(extractIcimsLocationFromHtml(fixture.detail_html_no_date), "US-PA-Philadelphia");
   assert.equal(extractIcimsRemoteTypeFromHtml(fixture.detail_html_no_date), "onsite");
   assert.equal(extractIcimsPostingDateFromHtml(fixture.detail_html_no_date), null);
+
+  assert.equal(extractIcimsLocationFromHtml(fixture.detail_html_jsonld), fixture.expected_jsonld.location);
+  assert.equal(extractIcimsPostingDateFromHtml(fixture.detail_html_jsonld), fixture.expected_jsonld.posting_date);
+  const jsonLdNormalized = normalizeParsed("icims", {
+    company_name: fixture.company_name_for_postings,
+    source_job_id: "3918",
+    position_name: "Business Development Manager - Sustainability Business",
+    job_posting_url: "https://fixtureco.icims.com/jobs/3918/business-development-manager/job",
+    posting_date: extractIcimsPostingDateFromHtml(fixture.detail_html_jsonld),
+    location: extractIcimsLocationFromHtml(fixture.detail_html_jsonld)
+  }, fixture.company_name_for_postings);
+  assert.equal(jsonLdNormalized.country, fixture.expected_jsonld.country);
+  assert.equal(jsonLdNormalized.region, fixture.expected_jsonld.region);
 });
 
 test("Applitrack detail fixtures recover location, date, remote evidence, and detail URL", () => {
@@ -234,6 +292,20 @@ test("Applitrack detail fixtures recover location, date, remote evidence, and de
 
   for (const [key, value] of Object.entries(fixture.expected)) {
     assert.equal(normalized[key], value, `Applitrack ${key} should match`);
+  }
+
+  const districtDetail = extractApplitrackDetailFields(fixture.detail_html_district_wide);
+  const districtNormalized = normalizeParsed("applitrack", {
+    company_name: fixture.company_name_for_postings,
+    source_job_id: "4174",
+    position_name: "Substitute Educational Support Professionals",
+    job_posting_url: "https://www.applitrack.com/fixtureco/onlineapp/default.aspx?JobID=4174",
+    location: districtDetail.location,
+    posting_date: districtDetail.posting_date,
+    remote_type: districtDetail.remote_type
+  }, fixture.company_name_for_postings);
+  for (const [key, value] of Object.entries(fixture.expected_district_wide)) {
+    assert.equal(districtNormalized[key], value, `Applitrack district-wide ${key} should match`);
   }
 });
 
