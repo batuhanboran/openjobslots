@@ -234,16 +234,22 @@ function expandSearchTokens(search) {
 }
 
 function rowToPosting(row) {
+  const location = String(row?.location_text || "");
+  const country = String(row?.country || inferCountry(location)).trim();
+  const region = String(row?.region || inferRegion(country)).trim();
+  const remoteEvidence = [row?.location_text, row?.position_name].map((item) => String(item || "").trim()).filter(Boolean).join(" ");
+  const storedRemoteType = normalizeRemoteTypeFromEvidence(row?.remote_type, "");
+  const remoteType = storedRemoteType === "unknown" ? inferRemoteType(remoteEvidence) : storedRemoteType;
   return {
     id: Number(row?.id || 0),
     company_name: String(row?.company_name || ""),
     position_name: String(row?.position_name || ""),
     job_posting_url: String(row?.canonical_url || ""),
-    location: row?.location_text || null,
+    location: location || null,
     city: String(row?.city || ""),
-    country: String(row?.country || ""),
-    region: String(row?.region || ""),
-    remote_type: String(row?.remote_type || "unknown"),
+    country,
+    region,
+    remote_type: remoteType,
     department: String(row?.department || ""),
     employment_type: String(row?.employment_type || ""),
     description_plain: String(row?.description_plain || ""),
