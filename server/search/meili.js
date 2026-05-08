@@ -111,6 +111,47 @@ const COUNTRY_FILTER_ALIASES = new Map([
   ["france", "France"]
 ]);
 
+const MEILI_POSTINGS_SETTINGS = Object.freeze({
+  searchableAttributes: [
+    "title",
+    "company",
+    "location",
+    "city",
+    "country",
+    "region",
+    "department",
+    "employment_type",
+    "description_plain",
+    "ats_key"
+  ],
+  filterableAttributes: [
+    "ats_key",
+    "country",
+    "region",
+    "remote_type",
+    "industry",
+    "department",
+    "employment_type",
+    "company",
+    "hidden",
+    "last_seen_epoch",
+    "posted_at_epoch",
+    "posting_date"
+  ],
+  sortableAttributes: ["last_seen_epoch", "posted_at_epoch"],
+  synonyms: {
+    turkey: ["turkiye", "t\u00fcrkiye", "turkish"],
+    turkiye: ["turkey", "t\u00fcrkiye", "turkish"],
+    "t\u00fcrkiye": ["turkey", "turkiye", "turkish"],
+    turkish: ["turkey", "turkiye", "t\u00fcrkiye"],
+    remote: ["wfh", "work from home", "anywhere"]
+  },
+  typoTolerance: {
+    enabled: true,
+    disableOnAttributes: ["ats_key"]
+  }
+});
+
 const REGION_FILTER_ALIASES = new Map([
   ["amer", "North America"],
   ["americas", "North America"],
@@ -211,46 +252,7 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
 
   const settingsTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/settings`, {
     method: "PATCH",
-    body: JSON.stringify({
-      searchableAttributes: [
-        "title",
-        "company",
-        "location",
-        "city",
-        "country",
-        "region",
-        "department",
-        "employment_type",
-        "description_plain",
-        "ats_key"
-      ],
-      filterableAttributes: [
-        "ats_key",
-        "country",
-        "region",
-        "remote_type",
-        "industry",
-        "department",
-        "employment_type",
-        "company",
-        "hidden",
-        "last_seen_epoch",
-        "posted_at_epoch",
-        "posting_date"
-      ],
-      sortableAttributes: ["last_seen_epoch", "posted_at_epoch"],
-      synonyms: {
-        turkey: ["turkiye", "t\u00fcrkiye", "turkish"],
-        turkiye: ["turkey", "t\u00fcrkiye", "turkish"],
-        "t\u00fcrkiye": ["turkey", "turkiye", "turkish"],
-        turkish: ["turkey", "turkiye", "t\u00fcrkiye"],
-        remote: ["wfh", "work from home", "anywhere"]
-      },
-      typoTolerance: {
-        enabled: true,
-        disableOnAttributes: ["ats_key"]
-      }
-    })
+    body: JSON.stringify(MEILI_POSTINGS_SETTINGS)
   });
   await waitForMeiliTask(config, settingsTask);
 
@@ -366,6 +368,7 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
 }
 
 module.exports = {
+  MEILI_POSTINGS_SETTINGS,
   MEILI_POSTINGS_INDEX,
   deleteMeiliPostingsByCanonicalUrls,
   ensureMeiliPostingsIndex,
