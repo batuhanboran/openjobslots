@@ -1,4 +1,6 @@
 const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   getMeiliConfig,
   MEILI_POSTINGS_SETTINGS,
@@ -38,6 +40,8 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     dryRun: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_DRY_RUN),
     replaceIndex: false,
     replaceMode: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPLACE_MODE),
+    json: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_JSON),
+    output: String(env.OPENJOBSLOTS_REINDEX_OUTPUT || "").trim(),
     sampleLimit: parseNumberOption(env.OPENJOBSLOTS_REINDEX_SAMPLE_LIMIT || 25, 25, 0, 200),
     taskTimeoutMs: parseNumberOption(env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000, 120000, 30000, 300000),
     tempIndexSuffix: String(env.OPENJOBSLOTS_REINDEX_TEMP_SUFFIX || "").trim(),
@@ -57,6 +61,7 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
       options.replaceMode = true;
       options.replaceIndex = true;
     }
+    if (arg === "--json") options.json = true;
     if (arg === "--validate-only") {
       options.check = true;
       options.validateOnly = true;
@@ -70,8 +75,21 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     if (arg.startsWith("--temp-index-suffix=")) {
       options.tempIndexSuffix = String(arg.slice("--temp-index-suffix=".length) || "").trim();
     }
+    if (arg.startsWith("--output=")) {
+      options.output = String(arg.slice("--output=".length) || "").trim();
+    }
   }
   return options;
+}
+
+function writeResultOutput(result, options = {}) {
+  if (options.output) {
+    const outputPath = path.resolve(options.output);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+  }
+  console.log(JSON.stringify(result));
+  return result;
 }
 
 async function meiliRequest(config, requestPath, options = {}) {
@@ -702,14 +720,12 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
         skipped: true,
         reason: "OPENJOBSLOTS_DB_BACKEND is not postgres; Meili reindex checks require the Postgres source of truth."
       };
-      console.log(JSON.stringify(skipped));
-      return skipped;
+      return writeResultOutput(skipped, options);
     }
 
     if ((options.replaceMode || options.replaceIndex) && !options.validateOnly) {
       const result = await runReplaceReindex(pool, config, options);
-      console.log(JSON.stringify(result));
-      return result;
+      return writeResultOutput(result, options);
     }
 
     if (options.check || options.validateOnly) {
@@ -721,13 +737,11 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
         last_facet_delta: latestFacetDeltaSummary(checkResult.remote_facet_delta),
         last_task_error: checkResult.ok ? "" : "Meili/Postgres validation mismatch."
       }, options, env);
-      console.log(JSON.stringify(checkResult));
-      return checkResult;
+      return writeResultOutput(checkResult, options);
     }
 
     const result = await runIncrementalReindex(pool, config, options);
-    console.log(JSON.stringify(result));
-    return result;
+    return writeResultOutput(result, options);
   } finally {
     if (pool && typeof pool.end === "function") await pool.end();
   }

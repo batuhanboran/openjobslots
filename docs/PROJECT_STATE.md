@@ -4,9 +4,9 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Current Version
 
-- Package/public release line: `v1.6.0`.
-- Last recorded deployed commit: `bc5f6c6e5da2eae036c161b3ba4c7fb30685e64b`.
-- Last recorded production deployment date: May 8, 2026.
+- Package/public release line: `v1.6.1`.
+- Last recorded deployed commit: v1.6.1 data-quality tooling release.
+- Last recorded production deployment date: May 9, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 
@@ -85,6 +85,7 @@ Treat these as the last recorded numbers, not proof of current live state. Re-ru
 - Parser certification is fixture-backed only for a subset of the configured ATS catalog. Do not claim all 60 ATS are certified.
 - Meilisearch is derived data. Reindex only after check/dry-run mode and with a rollback plan.
 - Production write backfills must be dry-run first, batched, explicit, and approved.
+- v1.6.1 adds guarded apply/rollback tooling, but the deployment step intentionally does not apply production backfills, detail-refetch writes, or replace-mode Meili reindexing.
 - Cloudflare/analytics CSP alignment and dependency version cleanup are separate maintenance tasks.
 
 ## Next Tasks
@@ -109,6 +110,11 @@ npm.cmd run test:e2e
 npm.cmd run quality:gate
 npm.cmd run search:parity
 npm.cmd run reindex:meili -- --check
+npm.cmd run audit:data-quality -- --json --output=reports/data-quality-audit.json
+npm.cmd run backfill:geo-remote:dry-run -- --limit=50000 --json --sample --output=reports/geo-remote-dry-run.json
+npm.cmd run refetch:details:dry-run -- --source=icims --limit=5000 --json --sample --output=reports/icims-detail-dry-run.json
+npm.cmd run refetch:details:dry-run -- --source=applitrack --limit=5000 --json --sample --output=reports/applitrack-detail-dry-run.json
+npm.cmd run search:reindex:check -- --json --output=reports/meili-reindex-check.json
 npm.cmd run audit:data-quality -- --by-source --by-parser
 npm.cmd run audit:ats-quality
 ```

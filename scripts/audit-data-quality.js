@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const { createPostgresPool } = require("../server/backends/postgres");
 const {
   getPostgresQualityAudit,
@@ -12,6 +13,7 @@ function parseArgs(argv) {
     bySource: false,
     byParser: false,
     limit: 25,
+    output: "",
     dbPath: ""
   };
   for (const arg of argv) {
@@ -24,9 +26,17 @@ function parseArgs(argv) {
       options.limit = Number(arg);
       options.expectLimit = false;
     } else if (arg.startsWith("--db=")) options.dbPath = arg.slice("--db=".length);
+    else if (arg.startsWith("--output=")) options.output = arg.slice("--output=".length);
   }
   options.limit = Math.max(1, Math.min(1000, Number(options.limit || 25)));
   return options;
+}
+
+function writeOutput(report, outputPath) {
+  if (!outputPath) return;
+  const resolved = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  fs.writeFileSync(resolved, `${JSON.stringify(report, null, 2)}\n`);
 }
 
 function formatPct(value) {
@@ -105,6 +115,7 @@ if (require.main === module) {
   const options = parseArgs(process.argv.slice(2));
   runAudit(options)
     .then((report) => {
+      writeOutput(report, options.output);
       if (options.json) {
         console.log(JSON.stringify(report, null, 2));
         return;
@@ -125,5 +136,6 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
-  runAudit
+  runAudit,
+  writeOutput
 };

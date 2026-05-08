@@ -102,3 +102,43 @@ Known remaining risks:
 - Production Meilisearch currently has six stale/bad visible documents beyond the Postgres indexable count; reindex check reports settings valid and the delta is explainable, but a replace-mode reindex should be scheduled after the next normalization backfill.
 - Cloudflare Insights injects a beacon script that is blocked by the app CSP. This does not block the app, but the CSP/Cloudflare analytics configuration should be aligned before public launch analytics are required.
 - Expo reports package compatibility warnings during tests/build. The release is validated, but dependency version alignment should be handled in a separate dependency-maintenance pass.
+
+## v1.6.1 Deployment Note - May 9, 2026
+
+Deployed version: `v1.6.1`.
+
+Pre-deploy Postgres backup:
+
+`/root/OpenJobSlots/backups/postgres-openjobslots-v1.6.1-predeploy-20260509-004527.dump`
+
+SQLite fallback/import backup:
+
+`/root/OpenJobSlots/backups/jobs.db-v1.6.1-predeploy-20260509-004527.sqlite`
+
+Validation run before deployment:
+
+- `npm.cmd run test:backend`
+- `npm.cmd run test:api`
+- `npm.cmd run test:parsers`
+- `npm.cmd run test:e2e`
+- `npm.cmd run build:web`
+- `npm.cmd run quality:gate`
+
+Production dry-run report paths for this release:
+
+- `/root/OpenJobSlots/reports/data-quality-audit-v1.6.1.json`
+- `/root/OpenJobSlots/reports/geo-remote-dry-run-v1.6.1.json`
+- `/root/OpenJobSlots/reports/icims-detail-dry-run-v1.6.1.json`
+- `/root/OpenJobSlots/reports/applitrack-detail-dry-run-v1.6.1.json`
+- `/root/OpenJobSlots/reports/meili-reindex-check-v1.6.1.json`
+
+Release scope:
+
+- Accurate data-quality summaries and parser stats derived from stored rows.
+- Read-only production audit command.
+- Dry-run geo/remote backfill planning.
+- Guarded production apply and rollback support for normalized geo/remote/quality backfill.
+- Guarded iCIMS and Applitrack detail refetch tooling.
+- Safe Meili replace-mode reindex checks.
+
+This deployment does not apply production data backfill, does not apply production detail-refetch writes, and does not run a production Meili replace reindex.
