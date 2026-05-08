@@ -199,6 +199,9 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "adp_workforcenow",
       "applicantpro",
       "applitrack",
+      "applytojob",
+      "bamboohr",
+      "breezy",
       "careerplug",
       "fountain",
       "icims",
@@ -206,7 +209,9 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "oracle",
       "paylocity",
       "pinpointhq",
-      "recruitcrm"
+      "recruitcrm",
+      "recruitee",
+      "zoho"
     ].sort()
   );
   for (const atsKey of PARSER_FIXTURE_BACKED) {

@@ -1,0 +1,51 @@
+{
+  "ats_key": "bamboohr",
+  "company_name_for_postings": "Fixture BambooHR",
+  "company": {
+    "company_name": "Fixture BambooHR",
+    "ATS_name": "BambooHR"
+  },
+  "config": {
+    "boardUrl": "https://fixtureco.bamboohr.com/careers",
+    "baseOrigin": "https://fixtureco.bamboohr.com"
+  },
+  "raw_response": {
+    "result": [
+      {
+        "id": "bad-title",
+        "jobOpeningName": "",
+        "applicationUrl": "https://fixtureco.bamboohr.com/careers/bad-title",
+        "location": {
+          "city": "Indianapolis",
+          "state": "IN"
+        }
+      }
+    ]
+  },
+  "missing_company_raw_response": {
+    "result": [
+      {
+        "id": "missing-company",
+        "jobOpeningName": "Support Engineer",
+        "applicationUrl": "https://fixtureco.bamboohr.com/careers/missing-company",
+        "location": {
+          "city": "Indianapolis",
+          "state": "IN"
+        }
+      }
+    ]
+  },
+  "missing_url_raw_response": {
+    "result": [
+      {
+        "jobOpeningName": "Missing URL and ID"
+      }
+    ]
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "bad-title",
+      "reason": "placeholder position_name"
+    }
+  ]
+}

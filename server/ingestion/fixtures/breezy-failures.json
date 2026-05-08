@@ -1,0 +1,15 @@
+{
+  "ats_key": "breezy",
+  "company_name_for_postings": "Fixture Breezy",
+  "company": {
+    "company_name": "Fixture Breezy",
+    "ATS_name": "Breezy"
+  },
+  "config": {
+    "origin": "https://fixtureco.breezy.hr"
+  },
+  "raw_response": "<a href=\"/p/bad-title\"><div>No title heading</div><li class=\"location\"><span>London, United Kingdom</span></li></a>",
+  "missing_company_raw_response": "<a href=\"/p/missing-company\"><h2>Support Engineer</h2><li class=\"location\"><span>London, United Kingdom</span></li></a>",
+  "missing_url_raw_response": "<div><h2>Missing URL</h2><li class=\"location\"><span>London, United Kingdom</span></li></div>",
+  "expected_rejections": []
+}

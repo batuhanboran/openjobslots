@@ -1,0 +1,60 @@
+{
+  "ats_key": "recruitee",
+  "company_name_for_postings": "Fixture Recruitee",
+  "company": {
+    "company_name": "Fixture Recruitee",
+    "ATS_name": "Recruitee"
+  },
+  "config": {
+    "baseUrl": "https://fixture.recruitee.com"
+  },
+  "raw_response": {
+    "appConfig": {
+      "offers": [
+        {
+          "id": 2001,
+          "slug": "bad-title",
+          "translations": {
+            "en": {
+              "title": ""
+            }
+          }
+        }
+      ]
+    }
+  },
+  "missing_company_raw_response": {
+    "appConfig": {
+      "offers": [
+        {
+          "id": 2002,
+          "slug": "missing-company",
+          "translations": {
+            "en": {
+              "title": "Support Engineer"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "missing_url_raw_response": {
+    "appConfig": {
+      "offers": [
+        {
+          "translations": {
+            "en": {
+              "title": "Missing URL and ID"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "2001",
+      "reason": "missing position_name"
+    }
+  ]
+}

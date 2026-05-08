@@ -1,0 +1,28 @@
+{
+  "ats_key": "breezy",
+  "company_name_for_postings": "Fixture Breezy",
+  "company": {
+    "company_name": "Fixture Breezy",
+    "company_url": "https://fixtureco.breezy.hr/",
+    "ATS_name": "Breezy"
+  },
+  "config": {
+    "origin": "https://fixtureco.breezy.hr"
+  },
+  "raw_response": "<h2 class=\"group-header\"><span>People</span></h2><a href=\"/p/4f1c7d80/hybrid-people-operations-lead\"><h2>Hybrid People Operations Lead</h2><li class=\"location\"><span>Hybrid - London, United Kingdom</span></li><li class=\"posted\"><span>2026-05-06</span></li></a>",
+  "expected": [
+    {
+      "ats_key": "breezy",
+      "source_job_id": "4f1c7d80",
+      "company_name": "Fixture Breezy",
+      "position_name": "Hybrid People Operations Lead",
+      "job_posting_url": "https://fixtureco.breezy.hr/p/4f1c7d80/hybrid-people-operations-lead",
+      "country": "United Kingdom",
+      "region": "EMEA",
+      "remote_type": "hybrid",
+      "posting_date": "2026-05-06",
+      "industry": "People",
+      "parser_confidence": 0.75
+    }
+  ]
+}
