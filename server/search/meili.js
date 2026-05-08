@@ -293,6 +293,7 @@ function toMeiliPostingDocument(posting) {
     department: String(posting?.department || "").trim(),
     employment_type: String(posting?.employment_type || "").trim(),
     ats_key: normalizeAtsKey(posting?.ats_key || posting?.ATS_name),
+    source_job_id: String(posting?.source_job_id || "").trim(),
     description_plain: String(posting?.description_plain || "").trim(),
     hidden: normalizeBooleanFlag(posting?.hidden, false),
     last_seen_epoch: Number(posting?.last_seen_epoch || 0),
@@ -305,7 +306,7 @@ async function upsertMeiliPostings(postings, config = getMeiliConfig()) {
   if (!config.enabled) return { ok: true, skipped: true, count: 0 };
   const documents = (Array.isArray(postings) ? postings : [])
     .map(toMeiliPostingDocument)
-    .filter((item) => item.canonical_url && item.title && item.company);
+    .filter((item) => /^https?:\/\//i.test(item.canonical_url) && item.title && item.company);
   if (documents.length === 0) return { ok: true, count: 0 };
   return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents`, {
     method: "POST",
@@ -370,6 +371,7 @@ module.exports = {
   ensureMeiliPostingsIndex,
   getMeiliConfig,
   searchMeiliPostings,
+  toMeiliDocumentId,
   toMeiliPostingDocument,
   upsertMeiliPostings
 };

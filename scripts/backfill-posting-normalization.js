@@ -6,13 +6,47 @@ const {
   normalizeRegionFromCountry
 } = require("../server/ingestion/posting");
 
-const BATCH_SIZE = Math.max(100, Math.min(10000, Number(process.env.OPENJOBSLOTS_BACKFILL_BATCH_SIZE || 2000)));
-const LIMIT = Math.max(0, Number(process.env.OPENJOBSLOTS_BACKFILL_LIMIT || 0));
-const DRY_RUN = String(process.env.OPENJOBSLOTS_BACKFILL_DRY_RUN || "").trim() === "1";
-const ATS_FILTER = String(process.env.OPENJOBSLOTS_BACKFILL_ATS || "")
-  .split(",")
-  .map((item) => item.trim())
-  .filter(Boolean);
+function parseList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseNumberOption(value, fallback, min, max) {
+  const parsed = Number(value);
+  const numeric = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.max(min, Math.min(max, numeric));
+}
+
+function parseBackfillArgs(argv = process.argv.slice(2), env = process.env) {
+  const options = {
+    atsFilter: parseList(env.OPENJOBSLOTS_BACKFILL_ATS || ""),
+    batchSize: parseNumberOption(env.OPENJOBSLOTS_BACKFILL_BATCH_SIZE || 2000, 2000, 100, 10000),
+    limit: parseNumberOption(env.OPENJOBSLOTS_BACKFILL_LIMIT || 0, 0, 0, Number.MAX_SAFE_INTEGER),
+    sampleLimit: parseNumberOption(env.OPENJOBSLOTS_BACKFILL_SAMPLE_LIMIT || 10, 10, 0, 100),
+    write: String(env.OPENJOBSLOTS_BACKFILL_WRITE || "").trim() === "1"
+  };
+
+  for (const arg of argv) {
+    if (arg === "--write") {
+      options.write = true;
+    } else if (arg === "--dry-run") {
+      options.write = false;
+    } else if (arg.startsWith("--ats=")) {
+      options.atsFilter = parseList(arg.slice("--ats=".length));
+    } else if (arg.startsWith("--limit=")) {
+      options.limit = parseNumberOption(arg.slice("--limit=".length), options.limit, 0, Number.MAX_SAFE_INTEGER);
+    } else if (arg.startsWith("--batch-size=")) {
+      options.batchSize = parseNumberOption(arg.slice("--batch-size=".length), options.batchSize, 100, 10000);
+    } else if (arg.startsWith("--sample-limit=")) {
+      options.sampleLimit = parseNumberOption(arg.slice("--sample-limit=".length), options.sampleLimit, 0, 100);
+    }
+  }
+
+  options.dryRun = !options.write;
+  return options;
+}
 
 function decodePathText(value) {
   try {
@@ -165,6 +199,7 @@ function shouldReplaceStoredCountry(row, normalizedCountry) {
 function shouldChange(row, normalized) {
   const currentCountry = String(row.country || "").trim();
   const currentRegion = String(row.region || "").trim();
+  const currentCity = String(row.city || "").trim();
   const currentRemoteType = String(row.remote_type || "unknown").trim() || "unknown";
   const currentLocationText = String(row.location_text || "").trim();
   const currentSourceJobId = String(row.source_job_id || "").trim();
@@ -180,6 +215,7 @@ function shouldChange(row, normalized) {
     nextCountry !== currentCountry
       ? String(normalized.region || normalizeRegionFromCountry(nextCountry) || "").trim()
       : currentRegion || String(normalized.region || normalizeRegionFromCountry(nextCountry) || "").trim();
+  const nextCity = currentCity || String(normalized.city || "").trim();
   const nextRemoteType =
     currentRemoteType === "unknown"
       ? String(normalized.remote_type || "unknown").trim() || "unknown"
@@ -196,6 +232,7 @@ function shouldChange(row, normalized) {
     changed:
       nextCountry !== currentCountry ||
       nextRegion !== currentRegion ||
+      nextCity !== currentCity ||
       nextRemoteType !== currentRemoteType ||
       nextLocationText !== currentLocationText ||
       nextSourceJobId !== currentSourceJobId ||
@@ -203,6 +240,7 @@ function shouldChange(row, normalized) {
       nextPostedAtEpoch !== currentPostedAtEpoch,
     nextCountry,
     nextRegion,
+    nextCity,
     nextRemoteType,
     nextLocationText,
     nextSourceJobId,
@@ -218,6 +256,7 @@ function toSearchPayload(row, next) {
     position_name: row.position_name,
     apply_url: row.apply_url,
     location_text: next.nextLocationText || row.location_text,
+    city: next.nextCity || row.city,
     country: next.nextCountry,
     region: next.nextRegion,
     remote_type: next.nextRemoteType,
@@ -231,222 +270,346 @@ function toSearchPayload(row, next) {
   };
 }
 
-async function main() {
-  const pool = createPostgresPool();
-  let scanned = 0;
-  let changed = 0;
+function buildCandidateForNormalization(row) {
+  return {
+    ...row,
+    country: "",
+    region: "",
+    source_job_id: extractSourceJobIdFromUrl(row),
+    location_text: extractLocationFromUrl(row),
+    job_posting_url: row.canonical_url,
+    posting_date: normalizePostingDateForBackfill(row.posting_date)
+  };
+}
+
+function normalizeRowForBackfill(row) {
+  return normalizePosting(
+    buildCandidateForNormalization(row),
+    { company_name: row.company_name },
+    row.ats_key,
+    {
+      parserVersion: row.parser_version,
+      confidence: row.confidence,
+      firstSeenEpoch: row.first_seen_epoch,
+      lastSeenEpoch: row.last_seen_epoch
+    }
+  );
+}
+
+function getChangedFields(row, next) {
+  const fields = [];
+  const checks = [
+    ["location_text", String(row.location_text || "").trim(), next.nextLocationText],
+    ["city", String(row.city || "").trim(), next.nextCity],
+    ["country", String(row.country || "").trim(), next.nextCountry],
+    ["region", String(row.region || "").trim(), next.nextRegion],
+    ["remote_type", String(row.remote_type || "unknown").trim() || "unknown", next.nextRemoteType],
+    ["source_job_id", String(row.source_job_id || "").trim(), next.nextSourceJobId],
+    ["posting_date", String(row.posting_date || "").trim(), next.nextPostingDate],
+    ["posted_at_epoch", Number(row.posted_at_epoch || 0) || null, next.nextPostedAtEpoch]
+  ];
+  for (const [field, before, after] of checks) {
+    if (String(before ?? "") !== String(after ?? "")) fields.push(field);
+  }
+  return fields;
+}
+
+function incrementMap(map, key, amount = 1) {
+  map.set(key, (map.get(key) || 0) + amount);
+}
+
+function incrementNestedMap(map, key, nestedKey, amount = 1) {
+  if (!map.has(key)) map.set(key, new Map());
+  incrementMap(map.get(key), nestedKey, amount);
+}
+
+function sortedObjectFromMap(map) {
+  return Object.fromEntries([...map.entries()].sort((a, b) => b[1] - a[1]));
+}
+
+function nestedObjectFromMap(map) {
+  return Object.fromEntries([...map.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([key, value]) => [
+    key,
+    sortedObjectFromMap(value)
+  ]));
+}
+
+function summarizeSample(row, next, changedFields) {
+  const before = {};
+  const after = {};
+  for (const field of changedFields) {
+    before[field] = field === "posted_at_epoch" ? row.posted_at_epoch : row[field];
+    const nextKey = `next${field.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("")}`;
+    after[field] = next[nextKey];
+  }
+  return {
+    ats_key: row.ats_key,
+    canonical_url: row.canonical_url,
+    changed_fields: changedFields,
+    before,
+    after
+  };
+}
+
+function isTransientWriteError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || error || "").toLowerCase();
+  return ["40001", "40P01", "55P03", "53300", "57P03"].includes(code) ||
+    /deadlock|serialization|lock timeout|too many connections|connection terminated|timeout/.test(message);
+}
+
+async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function writeBatchWithRetry(pool, rows, summary, options) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const committedChanges = [];
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const row of rows) {
+        const normalized = normalizeRowForBackfill(row);
+        const next = shouldChange(row, normalized);
+        if (!next.changed) continue;
+        const changedFields = getChangedFields(row, next);
+
+        await client.query(
+          `
+            UPDATE postings
+            SET location_text = NULLIF($2, ''),
+                city = $3,
+                country = $4,
+                region = $5,
+                remote_type = $6,
+                source_job_id = $7,
+                posting_date = $8,
+                posted_at_epoch = $9,
+                updated_at = now()
+            WHERE canonical_url = $1;
+          `,
+          [
+            row.canonical_url,
+            next.nextLocationText,
+            next.nextCity,
+            next.nextCountry,
+            next.nextRegion,
+            next.nextRemoteType,
+            next.nextSourceJobId,
+            next.nextPostingDate,
+            next.nextPostedAtEpoch
+          ]
+        );
+        await client.query(
+          `
+            UPDATE posting_cache
+            SET location_text = NULLIF($2, ''),
+                city = $3,
+                country = $4,
+                region = $5,
+                remote_type = $6,
+                source_job_id = $7,
+                posting_date = $8,
+                posted_at_epoch = $9,
+                updated_at = now()
+            WHERE canonical_url = $1;
+          `,
+          [
+            row.canonical_url,
+            next.nextLocationText,
+            next.nextCity,
+            next.nextCountry,
+            next.nextRegion,
+            next.nextRemoteType,
+            next.nextSourceJobId,
+            next.nextPostingDate,
+            next.nextPostedAtEpoch
+          ]
+        );
+        await client.query(
+          `
+            INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
+            VALUES ($1, 'upsert', $2::jsonb, now());
+          `,
+          [row.canonical_url, JSON.stringify(toSearchPayload(row, next))]
+        );
+
+        committedChanges.push({ row, next, changedFields });
+      }
+      await client.query("COMMIT");
+      mergeCommittedChanges(summary, committedChanges, options);
+      return;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (attempt >= maxAttempts || !isTransientWriteError(error)) throw error;
+      await sleep(250 * attempt);
+    } finally {
+      client.release();
+    }
+  }
+}
+
+function mergeCommittedChanges(summary, changes, options) {
+  for (const change of changes) {
+    summary.changed += 1;
+    incrementMap(summary.changedByAts, change.row.ats_key);
+    for (const field of change.changedFields) {
+      incrementMap(summary.changedByField, field);
+      incrementNestedMap(summary.changedByAtsAndField, change.row.ats_key, field);
+    }
+    if (summary.samples.length < options.sampleLimit) {
+      summary.samples.push(summarizeSample(change.row, change.next, change.changedFields));
+    }
+  }
+}
+
+function buildCandidateQuery(atsFilter) {
+  const atsClause = atsFilter.length > 0 ? "AND ats_key = ANY($3::text[])" : "";
+  return `
+    SELECT
+      canonical_url,
+      company_name,
+      position_name,
+      apply_url,
+      location_text,
+      city,
+      country,
+      region,
+      remote_type,
+      industry,
+      ats_key,
+      source_job_id,
+      posting_date,
+      posted_at_epoch,
+      first_seen_epoch,
+      last_seen_epoch,
+      hidden,
+      parser_version,
+      confidence
+    FROM postings
+    WHERE hidden = false
+      AND canonical_url > $1
+      AND btrim(coalesce(position_name, '')) <> ''
+      AND btrim(coalesce(company_name, '')) <> ''
+      AND btrim(coalesce(canonical_url, '')) ~* '^https?://'
+      AND position_name !~* '^(untitled|unknown|n/?a|not available|job opening|new job|open position|position)$'
+      AND (
+        country = ''
+        OR region = ''
+        OR city = ''
+        OR remote_type = 'unknown'
+        OR source_job_id = ''
+        OR posting_date in ('false', 'true', 'null', 'undefined')
+        OR (
+          posted_at_epoch IS NULL
+          AND posting_date IS NOT NULL
+          AND btrim(posting_date) <> ''
+          AND lower(posting_date) NOT IN ('false', 'true', 'null', 'undefined')
+        )
+        OR (
+          coalesce(location_text, '') = ''
+          AND ats_key = ANY(ARRAY['workday','icims']::text[])
+        )
+        OR (
+          ats_key = 'icims'
+          AND location_text ~ '^[A-Z]{2,3}[-[:space:]]'
+        )
+      )
+      AND (
+        coalesce(location_text, '') <> ''
+        OR position_name ~* '(remote|hybrid|telework|work from home|home office)'
+        OR ats_key = ANY(ARRAY['workday','icims','applitrack','taleo','applytojob','breezy','bamboohr','recruitee']::text[])
+      )
+      ${atsClause}
+    ORDER BY canonical_url ASC
+    LIMIT $2;
+  `;
+}
+
+async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
+  const logger = deps.logger || console.log;
+  const ensureSchema = deps.ensureSchema || ensurePostgresSchema;
+  const summary = {
+    ok: true,
+    scanned: 0,
+    changed: 0,
+    dry_run: options.dryRun,
+    write: options.write,
+    ats_filter: options.atsFilter,
+    changedByAts: new Map(),
+    changedByField: new Map(),
+    changedByAtsAndField: new Map(),
+    samples: []
+  };
   let lastCanonicalUrl = "";
-  const changedByAts = new Map();
 
   try {
-    await ensurePostgresSchema(pool);
+    if (options.write) await ensureSchema(pool);
 
     while (true) {
-      if (LIMIT > 0 && scanned >= LIMIT) break;
-      const remainingLimit = LIMIT > 0 ? Math.min(BATCH_SIZE, LIMIT - scanned) : BATCH_SIZE;
+      if (options.limit > 0 && summary.scanned >= options.limit) break;
+      const remainingLimit = options.limit > 0 ? Math.min(options.batchSize, options.limit - summary.scanned) : options.batchSize;
       const params = [lastCanonicalUrl, remainingLimit];
-      let atsClause = "";
-      if (ATS_FILTER.length > 0) {
-        params.push(ATS_FILTER);
-        atsClause = `AND ats_key = ANY($${params.length}::text[])`;
-      }
-
-      const result = await pool.query(
-        `
-          SELECT
-            canonical_url,
-            company_name,
-            position_name,
-            apply_url,
-            location_text,
-            country,
-            region,
-            remote_type,
-            industry,
-            ats_key,
-            source_job_id,
-            posting_date,
-            posted_at_epoch,
-            first_seen_epoch,
-            last_seen_epoch,
-            hidden,
-            parser_version,
-            confidence
-          FROM postings
-          WHERE hidden = false
-            AND canonical_url > $1
-            AND (
-              country = ''
-              OR region = ''
-              OR remote_type = 'unknown'
-              OR source_job_id = ''
-              OR posting_date in ('false', 'true', 'null', 'undefined')
-              OR (
-                posted_at_epoch IS NULL
-                AND posting_date IS NOT NULL
-                AND btrim(posting_date) <> ''
-                AND lower(posting_date) NOT IN ('false', 'true', 'null', 'undefined')
-              )
-              OR (
-                coalesce(location_text, '') = ''
-                AND ats_key = ANY(ARRAY['workday','icims']::text[])
-              )
-              OR (
-                ats_key = 'icims'
-                AND location_text ~ '^[A-Z]{2,3}[-[:space:]]'
-              )
-            )
-            AND (
-              coalesce(location_text, '') <> ''
-              OR position_name ~* '(remote|hybrid|telework|work from home|home office)'
-              OR ats_key = ANY(ARRAY['workday','icims','applitrack','taleo','applytojob','breezy','bamboohr','recruitee']::text[])
-            )
-            ${atsClause}
-          ORDER BY canonical_url ASC
-          LIMIT $2;
-        `,
-        params
-      );
+      if (options.atsFilter.length > 0) params.push(options.atsFilter);
+      const result = await pool.query(buildCandidateQuery(options.atsFilter), params);
 
       const rows = result.rows || [];
       if (rows.length === 0) break;
 
-      if (!DRY_RUN) {
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
-          for (const row of rows) {
-            scanned += 1;
-            lastCanonicalUrl = String(row.canonical_url || "");
-            const normalized = normalizePosting(
-              {
-                ...row,
-                country: "",
-                region: "",
-                source_job_id: extractSourceJobIdFromUrl(row),
-                location_text: extractLocationFromUrl(row),
-                job_posting_url: row.canonical_url,
-                posting_date: normalizePostingDateForBackfill(row.posting_date)
-              },
-              { company_name: row.company_name },
-              row.ats_key,
-              {
-                parserVersion: row.parser_version,
-                confidence: row.confidence,
-                firstSeenEpoch: row.first_seen_epoch,
-                lastSeenEpoch: row.last_seen_epoch
-              }
-            );
-            const next = shouldChange(row, normalized);
-            if (!next.changed) continue;
+      for (const row of rows) {
+        summary.scanned += 1;
+        lastCanonicalUrl = String(row.canonical_url || "");
+      }
 
-            await client.query(
-              `
-                UPDATE postings
-                SET location_text = NULLIF($2, ''),
-                    country = $3,
-                    region = $4,
-                    remote_type = $5,
-                    source_job_id = $6,
-                    posting_date = $7,
-                    posted_at_epoch = $8,
-                    updated_at = now()
-                WHERE canonical_url = $1;
-              `,
-              [
-                row.canonical_url,
-                next.nextLocationText,
-                next.nextCountry,
-                next.nextRegion,
-                next.nextRemoteType,
-                next.nextSourceJobId,
-                next.nextPostingDate,
-                next.nextPostedAtEpoch
-              ]
-            );
-            await client.query(
-              `
-                UPDATE posting_cache
-                SET location_text = NULLIF($2, ''),
-                    country = $3,
-                    region = $4,
-                    remote_type = $5,
-                    source_job_id = $6,
-                    posting_date = $7,
-                    posted_at_epoch = $8,
-                    updated_at = now()
-                WHERE canonical_url = $1;
-              `,
-              [
-                row.canonical_url,
-                next.nextLocationText,
-                next.nextCountry,
-                next.nextRegion,
-                next.nextRemoteType,
-                next.nextSourceJobId,
-                next.nextPostingDate,
-                next.nextPostedAtEpoch
-              ]
-            );
-            await client.query(
-              `
-                INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
-                VALUES ($1, 'upsert', $2::jsonb, now());
-              `,
-              [row.canonical_url, JSON.stringify(toSearchPayload(row, next))]
-            );
-            changed += 1;
-            changedByAts.set(row.ats_key, (changedByAts.get(row.ats_key) || 0) + 1);
-          }
-          await client.query("COMMIT");
-        } catch (error) {
-          await client.query("ROLLBACK");
-          throw error;
-        } finally {
-          client.release();
-        }
+      if (options.write) {
+        await writeBatchWithRetry(pool, rows, summary, options);
       } else {
         for (const row of rows) {
-          scanned += 1;
-          lastCanonicalUrl = String(row.canonical_url || "");
-          const normalized = normalizePosting(
-            {
-              ...row,
-              country: "",
-              region: "",
-              source_job_id: extractSourceJobIdFromUrl(row),
-              location_text: extractLocationFromUrl(row),
-              job_posting_url: row.canonical_url,
-              posting_date: normalizePostingDateForBackfill(row.posting_date)
-            },
-            { company_name: row.company_name },
-            row.ats_key
-          );
+          const normalized = normalizeRowForBackfill(row);
           const next = shouldChange(row, normalized);
           if (!next.changed) continue;
-          changed += 1;
-          changedByAts.set(row.ats_key, (changedByAts.get(row.ats_key) || 0) + 1);
+          const changedFields = getChangedFields(row, next);
+          summary.changed += 1;
+          incrementMap(summary.changedByAts, row.ats_key);
+          for (const field of changedFields) {
+            incrementMap(summary.changedByField, field);
+            incrementNestedMap(summary.changedByAtsAndField, row.ats_key, field);
+          }
+          if (summary.samples.length < options.sampleLimit) summary.samples.push(summarizeSample(row, next, changedFields));
         }
       }
 
-      console.log(JSON.stringify({
-        scanned,
-        changed,
-        dry_run: DRY_RUN,
-        changed_by_ats: Object.fromEntries([...changedByAts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20))
-      }));
+      logger(JSON.stringify(formatSummary(summary, true)));
     }
 
-    console.log(JSON.stringify({
-      ok: true,
-      scanned,
-      changed,
-      dry_run: DRY_RUN,
-      changed_by_ats: Object.fromEntries([...changedByAts.entries()].sort((a, b) => b[1] - a[1]))
-    }));
+    const finalSummary = formatSummary(summary, false);
+    logger(JSON.stringify(finalSummary));
+    return finalSummary;
   } finally {
-    await pool.end();
+    if (typeof pool.end === "function") await pool.end();
   }
+}
+
+function formatSummary(summary, compact = false) {
+  const formatted = {
+    ok: true,
+    scanned: summary.scanned,
+    changed: summary.changed,
+    dry_run: summary.dry_run,
+    write: summary.write,
+    ats_filter: summary.ats_filter,
+    changed_by_ats: sortedObjectFromMap(summary.changedByAts),
+    changed_by_field: sortedObjectFromMap(summary.changedByField),
+    changed_by_ats_and_field: nestedObjectFromMap(summary.changedByAtsAndField)
+  };
+  if (!compact) formatted.samples = summary.samples;
+  return formatted;
+}
+
+async function main() {
+  const pool = createPostgresPool();
+  await runBackfill(pool, parseBackfillArgs());
 }
 
 if (require.main === module) {
@@ -455,3 +618,16 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+module.exports = {
+  buildCandidateForNormalization,
+  buildCandidateQuery,
+  extractSourceJobIdFromUrl,
+  formatSummary,
+  getChangedFields,
+  normalizeRowForBackfill,
+  parseBackfillArgs,
+  runBackfill,
+  shouldChange,
+  toSearchPayload
+};
