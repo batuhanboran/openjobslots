@@ -245,7 +245,7 @@ async function runReindex(pool, options = parseReindexArgs()) {
           ORDER BY canonical_url ASC
           LIMIT $2;
         `,
-        [lastCanonicalUrl, BATCH_SIZE]
+        [lastCanonicalUrl, options.batchSize]
       );
 
       if (result.rows.length === 0) break;

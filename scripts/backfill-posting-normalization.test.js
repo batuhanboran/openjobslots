@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  buildRejectedRowsQuery,
+  getStoredRowRejectionReason,
   parseBackfillArgs,
   runBackfill,
   normalizeRowForBackfill,
@@ -37,13 +39,16 @@ function sampleRow(overrides = {}) {
   };
 }
 
-function createDryRunPool(rows) {
+function createDryRunPool(rows, rejectedRows = []) {
   let queried = false;
   const calls = [];
   return {
     calls,
     async query(sql, params) {
       calls.push({ sql, params });
+      if (/WITH rejected AS/i.test(sql)) {
+        return { rows: rejectedRows };
+      }
       if (/FROM postings/i.test(sql)) {
         if (queried) return { rows: [] };
         queried = true;
@@ -58,7 +63,7 @@ function createDryRunPool(rows) {
   };
 }
 
-function createWritePool(rows) {
+function createWritePool(rows, rejectedRows = []) {
   let queried = false;
   const calls = [];
   const client = {
@@ -74,6 +79,9 @@ function createWritePool(rows) {
     calls,
     async query(sql, params) {
       calls.push({ sql, params });
+      if (/WITH rejected AS/i.test(sql)) {
+        return { rows: rejectedRows };
+      }
       if (/FROM postings/i.test(sql)) {
         if (queried) return { rows: [] };
         queried = true;
@@ -93,6 +101,7 @@ test("backfill defaults to dry-run and requires explicit write mode", () => {
   assert.equal(parseBackfillArgs([], {}).write, false);
   assert.equal(parseBackfillArgs(["--write"], {}).dryRun, false);
   assert.deepEqual(parseBackfillArgs(["--ats=icims,applitrack"], {}).atsFilter, ["icims", "applitrack"]);
+  assert.equal(parseBackfillArgs(["--start-after=https://example.com/jobs/99"], {}).startAfter, "https://example.com/jobs/99");
 });
 
 test("backfill dry-run reports changes without writes", async () => {
@@ -108,8 +117,68 @@ test("backfill dry-run reports changes without writes", async () => {
   assert.equal(summary.changed, 1);
   assert.equal(summary.changed_by_field.country, 1);
   assert.equal(summary.changed_by_field.city, 1);
+  assert.equal(summary.safe_backfill_fields.includes("city"), true);
+  assert.equal(summary.refetch_required_fields.includes("description_html"), true);
   assert.equal(pool.calls.some((call) => /UPDATE postings/i.test(call.sql)), false);
   assert.equal(pool.calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)), false);
+});
+
+test("backfill reports existing invalid rows by reason", async () => {
+  const pool = createDryRunPool([], [
+    { ats_key: "careerplug", reason: "placeholder position_name", count: 3 },
+    { ats_key: "icims", reason: "missing company_name", count: 2 }
+  ]);
+  const summary = await runBackfill(
+    pool,
+    parseBackfillArgs(["--limit=1"], {}),
+    { ensureSchema: async () => {}, logger: () => {} }
+  );
+
+  assert.equal(summary.existing_invalid_rows, 5);
+  assert.equal(summary.existing_invalid_rows_by_reason["placeholder position_name"], 3);
+  assert.equal(summary.existing_invalid_rows_by_ats_and_reason.careerplug["placeholder position_name"], 3);
+});
+
+test("backfill rejects invalid candidate rows before write", async () => {
+  const pool = createWritePool([sampleRow({ position_name: "Untitled", country: "" })]);
+  const summary = await runBackfill(
+    pool,
+    parseBackfillArgs(["--write", "--limit=1", "--sample-limit=1"], {}),
+    { ensureSchema: async () => {}, logger: () => {} }
+  );
+
+  assert.equal(summary.changed, 0);
+  assert.equal(summary.rejected, 1);
+  assert.equal(summary.rejected_by_reason["placeholder position_name"], 1);
+  assert.equal(pool.calls.some((call) => /UPDATE postings/i.test(call.sql)), false);
+  assert.equal(pool.calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)), false);
+});
+
+test("backfill ATS filter and start cursor are passed to candidate query", async () => {
+  const pool = createDryRunPool([]);
+  await runBackfill(
+    pool,
+    parseBackfillArgs(["--ats=icims", "--start-after=https://example.com/jobs/5"], {}),
+    { ensureSchema: async () => {}, logger: () => {} }
+  );
+
+  const candidateCall = pool.calls.find((call) => /SELECT\s+canonical_url/i.test(call.sql));
+  assert.deepEqual(candidateCall.params, ["https://example.com/jobs/5", 2000, ["icims"]]);
+  assert.match(candidateCall.sql, /ats_key = ANY\(\$3::text\[\]\)/);
+});
+
+test("rejected rows query can be scoped by ATS", () => {
+  const scoped = buildRejectedRowsQuery(["icims"]);
+  const unscoped = buildRejectedRowsQuery([]);
+  assert.match(scoped, /ats_key = ANY\(\$1::text\[\]\)/);
+  assert.doesNotMatch(unscoped, /ats_key = ANY\(\$1::text\[\]\)/);
+});
+
+test("stored row rejection reason covers required fields", () => {
+  assert.equal(getStoredRowRejectionReason(sampleRow({ canonical_url: "" })), "missing job_posting_url");
+  assert.equal(getStoredRowRejectionReason(sampleRow({ canonical_url: "not-a-url" })), "invalid job_posting_url");
+  assert.equal(getStoredRowRejectionReason(sampleRow({ company_name: "" })), "missing company_name");
+  assert.equal(getStoredRowRejectionReason(sampleRow({ position_name: "" })), "missing position_name");
 });
 
 test("backfill dry-run fills source-backed department from stored category", async () => {
