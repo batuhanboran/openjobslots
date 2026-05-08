@@ -16,6 +16,10 @@ const {
   parseQualityFlags
 } = require("./ingestion/dataQuality");
 const {
+  getSqliteQualityAudit,
+  makeQualitySummary
+} = require("./ingestion/dataQualityAudit");
+const {
   createPostgresPool,
   ensurePostgresSchema,
   seedPostgresAtsSources
@@ -899,57 +903,11 @@ async function getSqlitePostingDiagnostics(options = {}) {
 }
 
 async function getSqliteQualitySummary(limit = 100) {
-  const rows = await db.all(
-    `
-      SELECT
-        id,
-        company_name,
-        position_name,
-        job_posting_url,
-        location,
-        posting_date,
-        first_seen_epoch,
-        last_seen_epoch,
-        source_job_id,
-        parser_version,
-        confidence,
-        quality_score,
-        quality_flags,
-        rejection_reason
-      FROM Postings
-      WHERE COALESCE(hidden, 0) = 0
-      LIMIT 100000;
-    `
-  );
-  const byAts = new Map();
-  for (const row of rows) {
-    const atsKey = inferAtsFromJobPostingUrl(row.job_posting_url) || "unknown";
-    const quality = buildQualityMetadata(sqlitePostingRowToQualityInput({ ...row, ats: atsKey }));
-    const bucket = byAts.get(atsKey) || {
-      ats_key: atsKey,
-      total_postings: 0,
-      quality_score_total: 0,
-      low_quality_count: 0,
-      flag_counts: {}
-    };
-    bucket.total_postings += 1;
-    bucket.quality_score_total += Number(quality.quality_score || 0);
-    if (Number(quality.quality_score || 0) < 60) bucket.low_quality_count += 1;
-    for (const flag of quality.quality_flags || []) {
-      bucket.flag_counts[flag] = Number(bucket.flag_counts[flag] || 0) + 1;
-    }
-    byAts.set(atsKey, bucket);
-  }
-  return Array.from(byAts.values())
-    .map((bucket) => ({
-      ats_key: bucket.ats_key,
-      total_postings: bucket.total_postings,
-      avg_quality_score: bucket.total_postings > 0 ? Math.round(bucket.quality_score_total / bucket.total_postings) : 0,
-      low_quality_count: bucket.low_quality_count,
-      flag_counts: bucket.flag_counts
-    }))
-    .sort((a, b) => b.low_quality_count - a.low_quality_count || b.total_postings - a.total_postings)
-    .slice(0, Math.max(1, Math.min(250, Number(limit || 100))));
+  const audit = await getSqliteQualityAudit(db, { limit });
+  return {
+    ...makeQualitySummary(audit.by_source, audit.summary),
+    by_parser: audit.by_parser
+  };
 }
 
 async function listSqliteRejections(limit = 50) {
@@ -1015,8 +973,8 @@ async function listSqliteRejections(limit = 50) {
 }
 
 async function getSqliteParserStats(limit = 100) {
-  const [quality, attentionRows] = await Promise.all([
-    getSqliteQualitySummary(limit),
+  const [qualityReport, attentionRows] = await Promise.all([
+    getSqliteQualityAudit(db, { limit }),
     db.all(
       `
         SELECT ats_key, COUNT(*) AS error_count, MAX(created_at) AS latest_error_at
@@ -1030,10 +988,11 @@ async function getSqliteParserStats(limit = 100) {
     )
   ]);
   const attentionByAts = new Map(attentionRows.map((row) => [String(row.ats_key || ""), row]));
-  return quality.map((item) => {
-    const attention = attentionByAts.get(item.ats_key) || {};
+  return qualityReport.by_parser.map((item) => {
+    const attention = attentionByAts.get(item.source_ats || item.ats_key) || {};
     return {
       ...item,
+      flag_counts: item.quality_flag_counts || {},
       parser_attention_count: Number(attention.error_count || 0),
       latest_parser_error_at: String(attention.latest_error_at || "")
     };
@@ -16545,15 +16504,18 @@ function createServer() {
   app.get("/ingestion/quality/summary", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       const limit = Number(req.query.limit || 100);
-      const items = DB_BACKEND === "postgres"
+      const report = DB_BACKEND === "postgres"
         ? await getPostgresQualitySummary(postgresPool, limit)
         : await getSqliteQualitySummary(limit);
       return sanitizeFrontendValue({
         ok: true,
         db_backend: DB_BACKEND,
         search_backend: SEARCH_BACKEND,
-        items,
-        count: items.length
+        summary: report.summary,
+        by_source: report.by_source,
+        by_parser: report.by_parser || [],
+        items: report.items || report.by_source || [],
+        count: Number(report.count || (report.items || report.by_source || []).length)
       });
     });
   });

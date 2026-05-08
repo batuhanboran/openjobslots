@@ -66,6 +66,39 @@ Check:
 
 All endpoints are read-only and return bounded data. Admin-only parser endpoints can still provide deeper operational context when an admin token is configured.
 
+## Read-Only Audit Command
+
+Use the derived stored-field audit when diagnosing production field gaps:
+
+```powershell
+npm.cmd run audit:data-quality -- --by-source --by-parser
+```
+
+JSON output:
+
+```powershell
+npm.cmd run audit:data-quality -- --json --by-source --by-parser
+```
+
+The command is read-only. With `OPENJOBSLOTS_DB_BACKEND=postgres`, it connects through `DATABASE_URL` or `POSTGRES_URL` and runs `SELECT` queries only. With SQLite/local fallback, it opens `DB_PATH` in read-only mode.
+
+The audit derives counts from actual stored row fields instead of trusting `quality_flags`, including:
+
+- `total_visible_postings`
+- `missing_country_count`
+- `missing_location_text_count`
+- `missing_region_state_count`
+- `missing_city_count`
+- `missing_any_normalized_geo_count`
+- `missing_all_normalized_geo_count`
+- `missing_location_and_all_geo_count`
+- `suspicious_unknown_geo_count`
+- `missing_remote_type_count`
+- `weak_unknown_remote_type_count`
+- `missing_all_geo_and_weak_remote_count`
+
+Each count also has a matching percentage field ending in `_pct`. Grouped output is available under `by_source` and `by_parser`.
+
 ## Known Limitations
 
 - Existing rows may have `legacy-adapter-v1` parser metadata until a safe backfill runs.
