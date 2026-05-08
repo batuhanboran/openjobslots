@@ -9,7 +9,7 @@ const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
 const { getAdapterMetadata, isAtsEnabledByDefault } = require("./ingestion/adapter-metadata");
-const { isPlaceholderCompanyName, normalizeCountryFromLocation } = require("./ingestion/posting");
+const { isPlaceholderCompanyName, normalizeCountryFromLocation, normalizeCountryName } = require("./ingestion/posting");
 const {
   createPostgresPool,
   ensurePostgresSchema,
@@ -5246,7 +5246,7 @@ function buildManatalJobPostingUrl(config, item) {
     return `${publicBaseUrl}/${domainSlug}/job/${encodeURIComponent(hash)}`;
   }
 
-  return String(config?.boardUrl || "").trim();
+  return "";
 }
 
 function parseManatalPostingsFromApi(companyNameForPostings, config, responseJson) {
@@ -5260,12 +5260,21 @@ function parseManatalPostingsFromApi(companyNameForPostings, config, responseJso
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
     const locationDisplay = cleanManatalText(item?.location_display || "");
-    const locationParts = [
-      cleanManatalText(item?.city || ""),
-      cleanManatalText(item?.state || ""),
-      cleanManatalText(item?.country || "")
-    ].filter(Boolean);
+    const city = cleanManatalText(item?.city || "");
+    const state = cleanManatalText(item?.state || "");
+    const country = cleanManatalText(item?.country || "");
+    const locationParts = [city, state, country].filter(Boolean);
     const location = locationDisplay || locationParts.join(", ");
+    const descriptionHtml = String(item?.description || "").trim();
+    const remoteType = normalizeExplicitRemoteValue([
+      item?.remote === true || item?.is_remote === true ? "remote" : "",
+      item?.workplace_type,
+      item?.location_type,
+      item?.remote_status,
+      item?.position_name,
+      location,
+      descriptionHtml
+    ].filter(Boolean).join(" "));
 
     let postingDate = null;
     for (const dateField of [
@@ -5286,11 +5295,17 @@ function parseManatalPostingsFromApi(companyNameForPostings, config, responseJso
       company_name: companyNameForPostings,
       source_job_id: extractSourceIdFromPostingUrl(jobUrl, "manatal") || String(item?.id ?? item?.hash ?? "").trim(),
       id: String(item?.id ?? item?.hash ?? "").trim() || undefined,
-      position_name: cleanManatalText(item?.position_name || item?.title || "") || "Untitled Position",
+      position_name: cleanManatalText(item?.position_name || item?.title || ""),
       job_posting_url: jobUrl,
       posting_date: postingDate,
       location: location || null,
-      department: cleanManatalText(item?.organization_name || "") || null
+      city: city || null,
+      state: state || null,
+      country: country || null,
+      remote_type: remoteType || null,
+      department: cleanManatalText(item?.organization_name || "") || null,
+      description_html: descriptionHtml || null,
+      description_plain: cleanManatalText(descriptionHtml) || null
     });
     seenUrls.add(jobUrl);
   }
@@ -7185,7 +7200,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "hrmdirect"),
-      position_name: title || "Untitled Position",
+      position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
       location: location || null,
@@ -7645,7 +7660,7 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: extractBreezySourceId(absoluteUrl),
-      position_name: title || "Untitled Position",
+      position_name: title,
       job_posting_url: absoluteUrl,
       posting_date:
         cleanBreezyText(postedMatch?.[1] || "") ||
@@ -7920,8 +7935,83 @@ function extractIcimsIframeUrlFromHtml(pageHtml, baseUrl) {
   return ensureIcimsIframeUrl(baseUrl);
 }
 
+function extractJsonLdObjectsFromHtml(sourceHtml) {
+  const source = String(sourceHtml || "");
+  const objects = [];
+  const scriptPattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match = scriptPattern.exec(source);
+
+  const visit = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (typeof value !== "object") return;
+    objects.push(value);
+    if (Array.isArray(value["@graph"])) visit(value["@graph"]);
+  };
+
+  while (match) {
+    const raw = decodeHtmlEntities(match[1] || "").trim();
+    if (raw) {
+      try {
+        visit(JSON.parse(raw));
+      } catch {
+        // Ignore malformed structured data and continue with DOM labels.
+      }
+    }
+    match = scriptPattern.exec(source);
+  }
+
+  return objects;
+}
+
+function findIcimsJobPostingJsonLd(sourceHtml) {
+  return extractJsonLdObjectsFromHtml(sourceHtml).find((item) => {
+    const type = item?.["@type"];
+    return Array.isArray(type)
+      ? type.some((value) => String(value || "").toLowerCase() === "jobposting")
+      : String(type || "").toLowerCase() === "jobposting";
+  }) || null;
+}
+
+function cleanStructuredJobValue(value) {
+  const raw = String(value || "").trim();
+  return raw && raw.toUpperCase() !== "UNAVAILABLE" ? raw : "";
+}
+
+function extractIcimsLocationFromJsonLd(sourceHtml) {
+  const jobPosting = findIcimsJobPostingJsonLd(sourceHtml);
+  const locations = Array.isArray(jobPosting?.jobLocation)
+    ? jobPosting.jobLocation
+    : jobPosting?.jobLocation
+      ? [jobPosting.jobLocation]
+      : [];
+  for (const location of locations) {
+    const address = location?.address && typeof location.address === "object" ? location.address : {};
+    const country = cleanStructuredJobValue(address.addressCountry);
+    const countryName = normalizeCountryName(country) || cleanStructuredJobValue(country);
+    const parts = [
+      cleanStructuredJobValue(address.addressLocality),
+      cleanStructuredJobValue(address.addressRegion),
+      countryName
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join(", ");
+  }
+  return null;
+}
+
+function extractIcimsPostingDateFromJsonLd(sourceHtml) {
+  const jobPosting = findIcimsJobPostingJsonLd(sourceHtml);
+  return cleanStructuredJobValue(jobPosting?.datePosted);
+}
+
 function extractIcimsLocationFromHtml(sourceHtml) {
   const source = String(sourceHtml || "");
+  const structuredLocation = extractIcimsLocationFromJsonLd(source);
+  if (structuredLocation) return structuredLocation;
+
   const patterns = [
     /field-label">Location\s*<\/span>\s*<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
     /glyphicons-map-marker[^>]*>[\s\S]*?<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
@@ -7943,6 +8033,9 @@ function extractIcimsLocationFromHtml(sourceHtml) {
 
 function extractIcimsPostingDateFromHtml(sourceHtml) {
   const source = String(sourceHtml || "");
+  const structuredDate = extractIcimsPostingDateFromJsonLd(source);
+  if (structuredDate) return structuredDate;
+
   const patterns = [
     /field-label">Date Posted\s*<\/span>\s*<span[^>]*?(?:title=["']([^"']+)["'])?[^>]*>\s*([^<]*)/i,
     /data-(?:field|label)=["'](?:date-posted|posted-date|posting-date)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
@@ -10744,6 +10837,7 @@ function extractApplitrackDetailFields(detailHtml) {
   const source = String(detailHtml || "");
   const text = decodeHtmlEntities(
     source
+      .replace(/&nbsp;/gi, " ")
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/(?:tr|td|th|div|p|li|span)>/gi, "\n")
       .replace(/<[^>]+>/g, " ")
@@ -10754,27 +10848,61 @@ function extractApplitrackDetailFields(detailHtml) {
     .filter(Boolean)
     .join("\n");
 
+  const stopLabels = [
+    "Date Posted",
+    "Posted",
+    "Posting Date",
+    "Date Available",
+    "Location",
+    "School",
+    "Site",
+    "Campus",
+    "Work Location",
+    "Job Location",
+    "Closing Date",
+    "Position Type",
+    "Category",
+    "Department",
+    "Remote",
+    "Work Location Type",
+    "Work Type"
+  ];
+  const cleanDetailValue = (value) => String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*&nbsp;\s*/gi, " ")
+    .trim();
   const pickLabel = (labels) => {
     const labelPattern = labels.map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
     if (!labelPattern) return null;
-    const inlineMatch = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^\\n]{2,140})`, "i"));
-    if (inlineMatch?.[1]) return inlineMatch[1].trim();
+    const stopPattern = stopLabels
+      .filter((label) => !labels.includes(label))
+      .map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
+    const inlineMatch = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^\\n]{1,180}?)(?=\\s+(?:${stopPattern})\\s*:|\\n|$)`, "i"));
+    if (inlineMatch?.[1]) return cleanDetailValue(inlineMatch[1]);
 
     const lines = text.split(/\n+/);
     for (let index = 0; index < lines.length - 1; index += 1) {
       if (new RegExp(`^(?:${labelPattern})\\s*:?$`, "i").test(lines[index])) {
-        return lines[index + 1]?.trim() || null;
+        return cleanDetailValue(lines[index + 1]) || null;
       }
     }
     return null;
   };
+  const extractFooterAddressLocation = () => {
+    const match = text.match(/\b([A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\s+\d{5})\b/);
+    return match?.[1] ? cleanDetailValue(match[1]) : null;
+  };
+  const rawLocation = pickLabel(["Location", "School", "Site", "Campus", "Work Location", "Job Location"]);
+  const genericLocation = /^(district\s*wide|various|multiple|tbd|n\/a|to be determined)$/i.test(cleanDetailValue(rawLocation));
+  const footerAddress = extractFooterAddressLocation();
 
   return {
     posting_date:
       pickLabel(["Date Posted", "Posted", "Posting Date", "Date Available"]) ||
       text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/)?.[0] ||
       null,
-    location: pickLabel(["Location", "School", "Site", "Campus", "Work Location", "Job Location"]),
+    location: genericLocation ? (footerAddress || rawLocation) : (rawLocation || footerAddress),
     department: pickLabel(["Position Type", "Category", "Department"]),
     remote_type: normalizeExplicitRemoteValue(
       pickLabel(["Remote", "Work Location Type", "Work Type"]) ||

@@ -1,0 +1,50 @@
+{
+  "ats_key": "manatal",
+  "company_name_for_postings": "Fixture Manatal",
+  "company": {
+    "company_name": "Fixture Manatal",
+    "company_url": "https://www.careers-page.com/fixture-manatal",
+    "ATS_name": "Manatal"
+  },
+  "config": {
+    "publicBaseUrl": "https://www.careers-page.com",
+    "domainSlug": "fixture-manatal",
+    "boardUrl": "https://www.careers-page.com/fixture-manatal/"
+  },
+  "raw_response": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 3844354,
+        "hash": "4R846955",
+        "position_name": "Appointment Setter (WFH)",
+        "description": "<p>Fully remote with structured training.</p>",
+        "country": "Canada",
+        "state": "BC",
+        "city": "Victoria",
+        "address": "",
+        "zipcode": "",
+        "location_display": "Victoria, BC, Canada"
+      }
+    ]
+  },
+  "expected": [
+    {
+      "ats_key": "manatal",
+      "company_name": "Fixture Manatal",
+      "position_name": "Appointment Setter (WFH)",
+      "source_job_id": "4R846955",
+      "job_posting_url": "https://www.careers-page.com/fixture-manatal/job/4R846955",
+      "location_text": "Victoria, BC, Canada",
+      "city": "Victoria",
+      "country": "Canada",
+      "region": "North America",
+      "remote_type": "remote",
+      "posting_date": null,
+      "posted_at_epoch": null,
+      "description_plain": "Fully remote with structured training."
+    }
+  ]
+}

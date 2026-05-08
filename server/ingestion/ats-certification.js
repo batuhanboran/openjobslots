@@ -151,6 +151,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Saved raw API fixture covers JSON id as source_job_id.")
     }
   },
+  manatal: {
+    priority: "P1",
+    sourcePattern: "Manatal careers-page runtime config plus public jobs API at /api/v1.0/c/{clientSlug}/jobs/.",
+    parserPath: "server/index.js parseManatalPostingsFromApi and fallback HTML parser",
+    requiredFixtures: ["jobs API response fixture", "missing-title fixture", "missing-url fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw API fixture covers city/state/country and location_display fields."),
+      date: decision("source-absent", "Saved Manatal API fixture contains no posted date fields; leave posting date null unless a future API variant exposes one."),
+      remote: decision("list-payload", "Saved raw API fixture covers WFH/remote evidence from title and description text."),
+      sourceId: decision("list-payload", "Saved raw API fixture covers hash/id source id and canonical /job/{hash} URL.")
+    }
+  },
   workday: {
     priority: "P1",
     sourcePattern: "Workday CXS jobPostings API with externalPath/job URL fields.",
