@@ -7943,6 +7943,35 @@ function extractIcimsPostingDateFromHtml(sourceHtml) {
   return labeled ? cleanIcimsText(labeled) : null;
 }
 
+function normalizeExplicitRemoteValue(value) {
+  const raw = cleanIcimsText(value);
+  const normalized = normalizeSearchText(raw);
+  if (!normalized) return null;
+  if (/^(yes|true|y|1)$/.test(normalized)) return "remote";
+  if (/^(no|false|n|0)$/.test(normalized)) return "onsite";
+  if (/\bhybrid\b/.test(normalized)) return "hybrid";
+  if (/\b(remote|virtual|telework|work from home|wfh)\b/.test(normalized)) return "remote";
+  if (/\b(on[- ]?site|onsite|office)\b/.test(normalized)) return "onsite";
+  return null;
+}
+
+function extractIcimsRemoteTypeFromHtml(sourceHtml) {
+  const source = String(sourceHtml || "");
+  const patterns = [
+    /field-label">Remote\s*<\/span>\s*<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
+    /data-(?:field|label)=["'](?:remote|workplace-type|location-type)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    const remoteType = normalizeExplicitRemoteValue(match?.[1] || "");
+    if (remoteType) return remoteType;
+  }
+
+  const labeled = extractIcimsLabeledText(source, ["Remote", "Remote Type", "Workplace Type", "Work Location Type"]);
+  return normalizeExplicitRemoteValue(labeled);
+}
+
 function extractIcimsSourceJobId(urlValue) {
   const match = String(urlValue || "").match(/\/jobs\/(\d+)/i);
   return String(match?.[1] || "").trim();
@@ -8036,6 +8065,7 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
       source_job_id: extractIcimsSourceJobId(absoluteUrl),
       position_name: positionName,
       job_posting_url: absoluteUrl,
+      remote_type: extractIcimsRemoteTypeFromHtml(cardHtml),
       posting_date: extractIcimsPostingDateFromHtml(cardHtml),
       location: extractIcimsLocationFromHtml(cardHtml) || extractIcimsLocationFromTitleOrUrl(positionName, absoluteUrl)
     });
@@ -8068,6 +8098,7 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
       source_job_id: extractIcimsSourceJobId(absoluteUrl),
       position_name: positionName,
       job_posting_url: absoluteUrl,
+      remote_type: extractIcimsRemoteTypeFromHtml(contextHtml),
       posting_date: extractIcimsPostingDateFromHtml(contextHtml),
       location: extractIcimsLocationFromHtml(contextHtml) || extractIcimsLocationFromTitleOrUrl(positionName, absoluteUrl)
     });
@@ -10313,6 +10344,7 @@ async function collectPostingsForIcimsCompany(company) {
           posting = {
             ...posting,
             posting_date: posting.posting_date || extractIcimsPostingDateFromHtml(detailHtml),
+            remote_type: posting.remote_type || extractIcimsRemoteTypeFromHtml(detailHtml),
             location:
               posting.location ||
               extractIcimsLocationFromHtml(detailHtml) ||
@@ -10644,6 +10676,13 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
     const locationLabel = withoutTitle.match(/\b(?:Location|School|Site|Campus)\s*:?\s*([A-Z][^|;]{2,80})/i);
     return locationLabel?.[1] ? locationLabel[1].trim().replace(/\s{2,}/g, " ") : null;
   };
+  const extractRemoteTypeFromText = (rowText) => {
+    const compact = String(rowText || "");
+    if (/\bhybrid\b/i.test(compact)) return "hybrid";
+    if (/\b(remote|primarily remote|virtual|telework|work from home|wfh)\b/i.test(compact)) return "remote";
+    if (/\b(on[- ]?site|onsite|in person|in-person)\b/i.test(compact)) return "onsite";
+    return null;
+  };
 
   while (match) {
     const groups = match.groups || {};
@@ -10665,6 +10704,7 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
       source_job_id: jobId,
       position_name: title,
       job_posting_url: jobUrl,
+      remote_type: extractRemoteTypeFromText(rowText),
       posting_date: extractDateFromRow(rowText),
       location: extractLocationFromRow(rowText, [jobId, category, specialty, title])
     });
@@ -10710,8 +10750,25 @@ function extractApplitrackDetailFields(detailHtml) {
       text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/)?.[0] ||
       null,
     location: pickLabel(["Location", "School", "Site", "Campus", "Work Location", "Job Location"]),
-    department: pickLabel(["Position Type", "Category", "Department"])
+    department: pickLabel(["Position Type", "Category", "Department"]),
+    remote_type: normalizeExplicitRemoteValue(
+      pickLabel(["Remote", "Work Location Type", "Work Type"]) ||
+      text.match(/\b(?:primarily remote|remote|hybrid|telework|work from home|wfh|on[- ]?site|onsite)\b/i)?.[0] ||
+      ""
+    )
   };
+}
+
+function buildApplitrackDetailUrl(siteRoot, jobId, fallbackJobUrl = "") {
+  const sourceJobId = String(jobId || "").trim();
+  if (!sourceJobId) return String(fallbackJobUrl || "").trim();
+  const detailUrl = new URL("JobPostings/view.asp", siteRoot);
+  detailUrl.searchParams.set("AppliTrackJobId", sourceJobId);
+  detailUrl.searchParams.set("AppliTrackLayoutMode", "detail");
+  detailUrl.searchParams.set("AppliTrackViewPosting", "1");
+  detailUrl.searchParams.set("all", "1");
+  detailUrl.searchParams.set("embed", "1");
+  return detailUrl.toString();
 }
 
 async function fetchApplitrackDetailFields(jobUrl) {
@@ -10750,10 +10807,12 @@ async function collectPostingsForApplitrackCompany(company) {
     if (detailFetches >= APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY) break;
     if (String(posting?.location || "").trim() && String(posting?.posting_date || "").trim()) continue;
     try {
-      const detail = await fetchApplitrackDetailFields(posting.job_posting_url);
+      const detailUrl = buildApplitrackDetailUrl(siteRoot, posting.source_job_id, posting.job_posting_url);
+      const detail = await fetchApplitrackDetailFields(detailUrl);
       detailFetches += 1;
       posting.location = posting.location || detail.location || null;
       posting.posting_date = posting.posting_date || detail.posting_date || null;
+      posting.remote_type = posting.remote_type || detail.remote_type || null;
       posting.department = posting.department || detail.department || null;
     } catch {
       detailFetches += 1;
@@ -16753,8 +16812,12 @@ module.exports = {
   normalizeAtsFilterValue,
   normalizeSyncEnabledAts,
   nowEpochSeconds,
+  buildApplitrackDetailUrl,
   extractAdpWorkforcenowCompanyName,
   extractApplitrackDetailFields,
+  extractIcimsLocationFromHtml,
+  extractIcimsPostingDateFromHtml,
+  extractIcimsRemoteTypeFromHtml,
   extractSourceIdFromPostingUrl,
   extractTaleoPostingsFromRest,
   extractWorkdayLocationLabel,

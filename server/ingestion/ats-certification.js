@@ -11,7 +11,7 @@ const {
   getParserFixtureStatus
 } = require("./adapter-metadata");
 
-const CERTIFICATION_VERSION = "ats-field-certification-v1.5.17";
+const CERTIFICATION_VERSION = "ats-field-certification-v1.5.19";
 
 const CERTIFICATION_STATUSES = new Set([
   "parser-fixture-backed",
@@ -110,9 +110,9 @@ const ATS_CERTIFICATION_OVERRIDES = {
     parserPath: "server/index.js parseIcimsPostingsFromHtml plus detail helpers",
     requiredFixtures: ["wrapper html", "iframe/list html", "next page html", "detail html"],
     fieldDecisions: {
-      geo: decision("detail-page", "Live rows show card/list geo is often missing; detail pages may expose location."),
-      date: decision("detail-page", "Live rows are almost all missing date; certify detail date extraction or documented absence."),
-      remote: decision("url-or-title-inference", "Remote can only be inferred from explicit title/location/detail text."),
+      geo: decision("detail-page", "Saved raw fixtures cover iCIMS CC-state-city and CC-remote list/detail evidence; blank-card tenants still need detail sampling."),
+      date: decision("source-absent", "Saved detail fixture proves some public iCIMS detail pages omit posted date; use source date only when a raw fixture exposes it."),
+      remote: decision("detail-page", "Saved raw fixtures cover explicit iCIMS Remote Yes/No header handling plus location/title inference."),
       sourceId: decision("url-or-title-inference", "Stable /jobs/{id}/ URL id is already recoverable.")
     }
   },
@@ -122,9 +122,9 @@ const ATS_CERTIFICATION_OVERRIDES = {
     parserPath: "server/index.js parseApplitrackPostings and extractApplitrackDetailFields",
     requiredFixtures: ["Output.asp list html", "detail page with location/date", "detail page with omitted fields"],
     fieldDecisions: {
-      geo: decision("detail-page", "Most live rows lack list geo; detail pages must decide whether data exists."),
-      date: decision("detail-page", "Most live rows lack list date; detail pages must decide whether data exists."),
-      remote: decision("url-or-title-inference", "Use only explicit remote/hybrid/on-site text."),
+      geo: decision("detail-page", "Saved raw detail fixture covers Applitrack detail-page location recovery when Output.asp omits it."),
+      date: decision("detail-page", "Saved raw detail fixture covers Applitrack detail-page Date Posted recovery when Output.asp omits it."),
+      remote: decision("detail-page", "Saved raw detail fixture covers explicit remote/hybrid/on-site text from detail body."),
       sourceId: decision("url-or-title-inference", "applyFor/listing URL id is recoverable.")
     }
   },

@@ -1,0 +1,18 @@
+{
+  "ats_key": "applitrack",
+  "company_name_for_postings": "Fixture Applitrack",
+  "site_root": "https://www.applitrack.com/fixtureco/onlineapp/",
+  "output_html": "\n    <table>\n      <tr>\n        <td>Technology</td>\n        <td>Support</td>\n        <td><script>applyFor('5503511','Technology','Support')</script></td>\n      </tr>\n    </table>\n  ",
+  "detail_html": "\n    <article>\n      <div>Date Posted: 05/08/2026</div>\n      <div>Location: Remote - United States</div>\n      <div>Position Type: Technology</div>\n      <p>This position is primarily remote with occasional meetings.</p>\n    </article>\n  ",
+  "expected_detail_url": "https://www.applitrack.com/fixtureco/onlineapp/JobPostings/view.asp?AppliTrackJobId=5503511&AppliTrackLayoutMode=detail&AppliTrackViewPosting=1&all=1&embed=1",
+  "expected": {
+    "source_job_id": "5503511",
+    "title": "Technology - Support",
+    "location_text": "Remote - United States",
+    "country": "United States",
+    "region": "North America",
+    "remote_type": "remote",
+    "posting_date": "05/08/2026",
+    "industry": "Technology"
+  }
+}

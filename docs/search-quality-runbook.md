@@ -51,6 +51,7 @@ Operational policy from these findings:
 
 - Parser normalization must improve before aggressive search-index cleanup. Premature cleanup can delete or hide rows that are only mismatched because parser fields are inconsistent.
 - After parser normalization changes, run `npm run backfill:normalization` in dry-run mode first. A real run may fill missing `country`, `region`, and `remote_type` from existing visible rows where `location_text` or title signals already contain enough evidence; it does not invent posting dates.
+- After detail-page parser changes, run `npm run backfill:detail-pages` in dry-run mode first with explicit `OPENJOBSLOTS_DETAIL_BACKFILL_ATS`, `OPENJOBSLOTS_DETAIL_BACKFILL_LIMIT`, and `OPENJOBSLOTS_DETAIL_BACKFILL_DELAY_MS`. This tool is for sampled/budgeted repair of rows whose list payload omitted fields; do not run an unbounded detail crawl.
 - Stale or hidden Meili documents must be removed through durable delete/reindex work, not one-off manual cleanup.
 - Production parity tests must compare `/postings`, Meili hits, and Postgres source-of-truth rows before declaring cleanup or search changes successful.
 
@@ -102,7 +103,7 @@ Maintain a pinned 1000-query local corpus. Generate it from reviewed static fixt
 
 O*NET official occupation titles are an approved public taxonomy source for query probes and corpus expansion. Record the source and date when generating a corpus snapshot so later runs can distinguish corpus drift from search behavior changes.
 
-For production-readiness probes, maintain a separate 10,000+ title-intent parity plan. The expanded corpus may use O*NET and ESCO as primary public taxonomies, plus license-reviewed broad title vocabulary such as `jneidel/job-titles` only after reuse policy is accepted. Do not commit huge raw third-party dumps by default; commit a curated snapshot or generator manifest with source URL, source date/version, license note, transform hash, and generated fixture hash.
+For production-readiness probes, maintain a separate 10,000+ title-intent parity plan. The expanded corpus may use O*NET and ESCO as primary public taxonomies, plus license-reviewed broad title vocabulary such as `jneidel/job-titles` only after reuse policy is accepted. Do not commit huge raw third-party dumps by default; commit generator code and a provenance manifest with source URL, source date/version, license note, transform hash, and generated fixture hash. Keep raw title dumps and generated large case files in ignored local artifacts or CI artifacts unless legal review approves redistribution.
 
 Coverage target:
 

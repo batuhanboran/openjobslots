@@ -163,6 +163,47 @@ const US_STATE_HYPHEN_PREFIX_PATTERN =
   /^(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)[-\s]/i;
 const CANADA_PROVINCE_HYPHEN_PREFIX_PATTERN =
   /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)[-\s]/i;
+const COUNTRY_CODE_LOCATION_PATTERN = /^([A-Z]{2,3})[-\s](.+)$/i;
+
+function normalizeCountryFromAtsCodeLocation(value) {
+  const location = normalizePostingValue(value);
+  const exactCode = location.match(/^([A-Z]{2,3})-?$/i);
+  if (exactCode?.[1]) {
+    return COUNTRY_ALIASES[normalizeSearchText(exactCode[1]).replace(/[^a-z0-9]+/g, "")] || "";
+  }
+
+  const match = location.match(COUNTRY_CODE_LOCATION_PATTERN);
+  if (!match?.[1] || !match?.[2]) return "";
+
+  const countryCode = normalizeSearchText(match[1]).replace(/[^a-z0-9]+/g, "");
+  const remainder = String(match[2] || "").trim();
+  const country = COUNTRY_ALIASES[countryCode];
+  if (!country) return "";
+
+  const remainderHead = String(remainder.split(/[-\s,]+/)[0] || "").toUpperCase();
+  if (country === "United States") {
+    if (/^(Remote|Hybrid|Virtual)$/i.test(remainder)) return country;
+    return US_STATE_ABBREVIATION_PATTERN.test(`, ${remainderHead}`) || /^[A-Z]{2}[-\s]/.test(remainder)
+      ? country
+      : "";
+  }
+  if (country === "Canada") {
+    if (/^(Remote|Hybrid|Virtual)$/i.test(remainder)) return country;
+    return CANADA_PROVINCE_ABBREVIATION_PATTERN.test(`, ${remainderHead}`) || /^[A-Z]{2}[-\s]/.test(remainder)
+      ? country
+      : "";
+  }
+
+  return country;
+}
+
+function hasAtsCountryCodePhysicalLocation(value) {
+  const location = normalizePostingValue(value);
+  if (!normalizeCountryFromAtsCodeLocation(location)) return false;
+  const remainder = String(location.match(COUNTRY_CODE_LOCATION_PATTERN)?.[2] || "");
+  if (!remainder || normalizeRemoteType(remainder) !== "unknown") return false;
+  return /[A-Za-z]{3,}/.test(remainder);
+}
 
 function normalizeCountryFromDelimitedCode(location) {
   const tokens = String(location || "")
@@ -317,6 +358,7 @@ function hasConcretePhysicalLocation(value) {
   const normalized = normalizeSearchText(location);
   if (!normalized) return false;
   if (normalizeRemoteType(location) === "remote" || normalizeRemoteType(location) === "hybrid") return false;
+  if (hasAtsCountryCodePhysicalLocation(location)) return true;
   if (US_STATE_ABBREVIATION_PATTERN.test(location) || CANADA_PROVINCE_ABBREVIATION_PATTERN.test(location)) return true;
   if (US_STATE_HYPHEN_PREFIX_PATTERN.test(location) || CANADA_PROVINCE_HYPHEN_PREFIX_PATTERN.test(location)) return true;
   if (/[A-Za-z][A-Za-z .'-]+,\s*[A-Za-z][A-Za-z .'-]+/.test(location)) return true;
@@ -554,7 +596,11 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     posting?.workLocation?.country,
     posting?.workLocation?.countryName
   ]);
-  const country = firstValue([normalizeCountryName(explicitCountry), normalizeCountryFromLocation(location)]);
+  const country = firstValue([
+    normalizeCountryName(explicitCountry),
+    normalizeSearchText(atsKey) === "icims" ? normalizeCountryFromAtsCodeLocation(location) : "",
+    normalizeCountryFromLocation(location)
+  ]);
   const region = firstValue([posting?.region, normalizeRegionFromCountry(country)]);
   const parserVersion = normalizePostingValue(options?.parserVersion) || "legacy-adapter-v1";
   const sourceJobId =
@@ -648,6 +694,7 @@ module.exports = {
   extractLocationText,
   isPlaceholderCompanyName,
   normalizeCountryFromLocation,
+  normalizeCountryFromAtsCodeLocation,
   normalizeCountryName,
   normalizePosting,
   normalizePostingDate,

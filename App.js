@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.18";
+const PUBLIC_APP_VERSION = "1.5.19";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.19",
+    date: "May 8, 2026",
+    title: "Detail parser certification",
+    summary:
+      "Added raw detail-page fixtures for iCIMS and Applitrack, improved iCIMS country-code location and remote parsing, and added a budgeted detail-page backfill tool for existing ATS rows."
+  },
   {
     version: "1.5.18",
     date: "May 8, 2026",

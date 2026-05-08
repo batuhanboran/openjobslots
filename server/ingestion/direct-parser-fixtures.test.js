@@ -3,8 +3,10 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { adapters } = require("./adapters");
-const { validatePosting } = require("./posting");
+const { normalizeCountryFromAtsCodeLocation, validatePosting } = require("./posting");
 const {
+  buildApplitrackDetailUrl,
+  extractApplitrackDetailFields,
   parseAdpWorkforcenowPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
@@ -16,6 +18,9 @@ const {
   extractTaleoPostingsFromRest,
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
+  extractIcimsLocationFromHtml,
+  extractIcimsPostingDateFromHtml,
+  extractIcimsRemoteTypeFromHtml,
   parseFountainPostingsFromApi,
   parseHrmDirectPostingsFromHtml,
   parseIcimsPostingsFromHtml,
@@ -179,6 +184,55 @@ test("high-volume ATS parsers preserve country, date, remote, and source ids whe
   assert.equal(applitrack.region, "North America");
   assert.equal(applitrack.source_job_id, "5503511");
   assert.equal(applitrack.posting_date, "05/08/2026");
+});
+
+test("iCIMS raw detail fixtures certify ATS code locations and remote header evidence", () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, "icims-detail-certification.json"), "utf8"));
+  const parsed = parseIcimsPostingsFromHtml(
+    fixture.company_name_for_postings,
+    fixture.config,
+    fixture.list_html
+  );
+  assert.equal(parsed.length, fixture.expected.length);
+
+  for (let index = 0; index < fixture.expected.length; index += 1) {
+    const normalized = normalizeParsed("icims", parsed[index], fixture.company_name_for_postings);
+    for (const [key, value] of Object.entries(fixture.expected[index])) {
+      assert.equal(normalized[key], value, `iCIMS ${key} should match`);
+    }
+  }
+
+  assert.equal(normalizeCountryFromAtsCodeLocation("US-PA-Philadelphia"), "United States");
+  assert.equal(normalizeCountryFromAtsCodeLocation("US-"), "United States");
+  assert.equal(normalizeCountryFromAtsCodeLocation("CA-ON-Toronto"), "Canada");
+  assert.equal(extractIcimsLocationFromHtml(fixture.detail_html_no_date), "US-PA-Philadelphia");
+  assert.equal(extractIcimsRemoteTypeFromHtml(fixture.detail_html_no_date), "onsite");
+  assert.equal(extractIcimsPostingDateFromHtml(fixture.detail_html_no_date), null);
+});
+
+test("Applitrack detail fixtures recover location, date, remote evidence, and detail URL", () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, "applitrack-detail-certification.json"), "utf8"));
+  const parsed = parseApplitrackPostings(
+    fixture.output_html,
+    fixture.site_root,
+    fixture.company_name_for_postings
+  );
+  assert.equal(parsed.length, 1);
+  const detailUrl = buildApplitrackDetailUrl(fixture.site_root, parsed[0].source_job_id, parsed[0].job_posting_url);
+  assert.equal(detailUrl, fixture.expected_detail_url);
+
+  const detail = extractApplitrackDetailFields(fixture.detail_html);
+  const normalized = normalizeParsed("applitrack", {
+    ...parsed[0],
+    location: parsed[0].location || detail.location,
+    posting_date: parsed[0].posting_date || detail.posting_date,
+    remote_type: parsed[0].remote_type || detail.remote_type,
+    department: parsed[0].department || detail.department
+  }, fixture.company_name_for_postings);
+
+  for (const [key, value] of Object.entries(fixture.expected)) {
+    assert.equal(normalized[key], value, `Applitrack ${key} should match`);
+  }
 });
 
 test("Workday parser helpers recover source id, location, and remote evidence from CXS fields and URLs", () => {
