@@ -152,6 +152,16 @@ function postedEpochFromBackfillDate(value, referenceEpoch) {
   return normalizePostingDate(raw).epoch;
 }
 
+function shouldReplaceStoredCountry(row, normalizedCountry) {
+  const currentCountry = String(row.country || "").trim();
+  const nextCountry = String(normalizedCountry || "").trim();
+  if (!nextCountry || !currentCountry || nextCountry === currentCountry) return false;
+  const atsKey = String(row.ats_key || "").trim().toLowerCase();
+  const location = String(row.location_text || "").trim();
+  if (atsKey === "icims" && /^[A-Z]{2,3}[-\s]/.test(location)) return true;
+  return false;
+}
+
 function shouldChange(row, normalized) {
   const currentCountry = String(row.country || "").trim();
   const currentRegion = String(row.region || "").trim();
@@ -161,8 +171,15 @@ function shouldChange(row, normalized) {
   const currentPostingDateRaw = String(row.posting_date || "").trim();
   const currentPostingDate = normalizePostingDateForBackfill(row.posting_date);
   const currentPostedAtEpoch = Number(row.posted_at_epoch || 0) || null;
-  const nextCountry = currentCountry || String(normalized.country || "").trim();
-  const nextRegion = currentRegion || String(normalized.region || normalizeRegionFromCountry(nextCountry) || "").trim();
+  const normalizedCountry = String(normalized.country || "").trim();
+  const nextCountry =
+    shouldReplaceStoredCountry(row, normalizedCountry) || !currentCountry
+      ? normalizedCountry || currentCountry
+      : currentCountry;
+  const nextRegion =
+    nextCountry !== currentCountry
+      ? String(normalized.region || normalizeRegionFromCountry(nextCountry) || "").trim()
+      : currentRegion || String(normalized.region || normalizeRegionFromCountry(nextCountry) || "").trim();
   const nextRemoteType =
     currentRemoteType === "unknown"
       ? String(normalized.remote_type || "unknown").trim() || "unknown"
@@ -274,6 +291,10 @@ async function main() {
                 coalesce(location_text, '') = ''
                 AND ats_key = ANY(ARRAY['workday','icims']::text[])
               )
+              OR (
+                ats_key = 'icims'
+                AND location_text ~ '^[A-Z]{2,3}[-[:space:]]'
+              )
             )
             AND (
               coalesce(location_text, '') <> ''
@@ -300,6 +321,8 @@ async function main() {
             const normalized = normalizePosting(
               {
                 ...row,
+                country: "",
+                region: "",
                 source_job_id: extractSourceJobIdFromUrl(row),
                 location_text: extractLocationFromUrl(row),
                 job_posting_url: row.canonical_url,
@@ -389,6 +412,8 @@ async function main() {
           const normalized = normalizePosting(
             {
               ...row,
+              country: "",
+              region: "",
               source_job_id: extractSourceJobIdFromUrl(row),
               location_text: extractLocationFromUrl(row),
               job_posting_url: row.canonical_url,
