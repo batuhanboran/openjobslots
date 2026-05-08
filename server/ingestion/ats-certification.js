@@ -11,7 +11,7 @@ const {
   getParserFixtureStatus
 } = require("./adapter-metadata");
 
-const CERTIFICATION_VERSION = "ats-field-certification-v1.5.19";
+const CERTIFICATION_VERSION = "ats-field-certification-v1.5.21";
 
 const CERTIFICATION_STATUSES = new Set([
   "parser-fixture-backed",
@@ -126,6 +126,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       date: decision("detail-page", "Saved raw detail fixture covers Applitrack detail-page Date Posted recovery when Output.asp omits it."),
       remote: decision("detail-page", "Saved raw detail fixture covers explicit remote/hybrid/on-site text from detail body."),
       sourceId: decision("url-or-title-inference", "applyFor/listing URL id is recoverable.")
+    }
+  },
+  applicantpro: {
+    priority: "P2",
+    sourcePattern: "ApplicantPro board HTML domain-id discovery plus core jobs JSON.",
+    parserPath: "server/index.js parseApplicantProPostingsFromApi",
+    requiredFixtures: ["core jobs JSON fixture", "expected normalized fixture", "board domain-id fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw API fixture covers jobLocation fallback to city/iso3 country evidence."),
+      date: decision("list-payload", "Saved raw API fixture covers startDateRef as the source posting date when exposed."),
+      remote: decision("url-or-title-inference", "Remote is only inferred from explicit title/location text in the saved parser fixture."),
+      sourceId: decision("list-payload", "Saved raw API fixture covers JSON id as source_job_id.")
     }
   },
   workday: {

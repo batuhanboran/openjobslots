@@ -111,13 +111,15 @@ async function expectSearchEngineVisualContract(page) {
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
   if (viewport.width >= 768) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
-    await expect(page.getByText("Public v1.5.7")).toBeVisible();
+    await expect(page.getByText("Public v1.5.21")).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
     const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
     await expect(attributionLink).toBeVisible();
     await expect(attributionLink).toHaveAttribute("href", "https://www.linkedin.com/in/batuhan-boran-320b311b7/");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await expect(page.getByText("Version 1.5.21")).toBeVisible();
+    await expect(page.getByText("Parser contract and diagnostics")).toBeVisible();
     await expect(page.getByText("Version 1.5.7")).toBeVisible();
     await expect(page.getByText("Postgres search stability")).toBeVisible();
     await expect(page.getByText("Version 1.5.6")).toBeVisible();
@@ -129,7 +131,7 @@ async function expectSearchEngineVisualContract(page) {
     await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
   } else {
     await expect(page.getByTestId("public-version-button")).toHaveCount(0);
-    await expect(page.getByText("Public v1.5.7")).toHaveCount(0);
+    await expect(page.getByText("Public v1.5.21")).toHaveCount(0);
     await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
   }
 }
@@ -155,7 +157,7 @@ async function expectSearchMovesUpAfterSubmit(page) {
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
   await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   await expect(page.getByTestId("results-surface")).toBeVisible();
-    await expect(page.getByText("Public v1.5.7")).toHaveCount(0);
+    await expect(page.getByText("Public v1.5.21")).toHaveCount(0);
   await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
 }
 

@@ -83,6 +83,7 @@ const FIXTURE_BACKED = new Set([
   "smartrecruiters",
   "recruitee",
   "bamboohr",
+  "applicantpro",
   "applytojob",
   "breezy",
   "hrmdirect",
@@ -99,6 +100,7 @@ const FIXTURE_BACKED = new Set([
 
 const PARSER_FIXTURE_BACKED = new Set([
   "adp_workforcenow",
+  "applicantpro",
   "applitrack",
   "fountain",
   "icims",
@@ -261,15 +263,23 @@ function getAdapterMetadata(atsKey, displayName = "") {
       "location_text",
       "country",
       "region",
+      "city",
       "remote_type",
+      "department",
+      "employment_type",
+      "description_plain",
+      "description_html",
       "industry",
       "posted_at",
+      "posted_at_epoch",
       "first_seen",
+      "first_seen_epoch",
       "last_seen",
+      "last_seen_epoch",
       "ats_key",
       "parser_version",
       "raw_hash",
-      "confidence"
+      "parser_confidence"
     ]
   };
 }

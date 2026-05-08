@@ -10233,6 +10233,42 @@ function extractApplicantProLocationLabel(job) {
   return values.length > 0 ? values.join(", ") : null;
 }
 
+function parseApplicantProPostingsFromApi(companyNameForPostings, config, response) {
+  const jobs = Array.isArray(response?.data?.jobs) ? response.data.jobs : [];
+  const origin = String(config?.origin || "").trim();
+  const companyName = String(companyNameForPostings || config?.subdomainLower || "").trim();
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const job of jobs) {
+    const rawJobUrl = String(job?.jobUrl || "").trim();
+    const fallbackJobId = String(job?.id ?? "").trim();
+    const absoluteUrl = rawJobUrl
+      ? new URL(rawJobUrl, origin ? `${origin}/` : "https://example.invalid/").toString()
+      : fallbackJobId && origin
+        ? `${origin}/jobs/${encodeURIComponent(fallbackJobId)}`
+        : "";
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) continue;
+
+    collected.push({
+      company_name: companyName,
+      source_job_id: fallbackJobId || extractSourceIdFromPostingUrl(absoluteUrl, "applicantpro"),
+      id: fallbackJobId || undefined,
+      position_name: String(job?.title || "").trim() || "Untitled Position",
+      job_posting_url: absoluteUrl,
+      posting_date: String(job?.startDateRef || "").trim() || null,
+      location: extractApplicantProLocationLabel(job),
+      city: String(job?.city || "").trim() || null,
+      country: String(job?.country || job?.countryName || job?.iso3 || "").trim() || null,
+      department: String(job?.department || job?.jobCategory || job?.category || "").trim() || null,
+      employment_type: String(job?.employmentType || job?.jobType || "").trim() || null
+    });
+    seenUrls.add(absoluteUrl);
+  }
+
+  return collected;
+}
+
 async function collectPostingsForApplicantProCompany(company) {
   const config = parseApplicantProCompany(company.url_string);
   if (!config) return [];
@@ -10246,33 +10282,7 @@ async function collectPostingsForApplicantProCompany(company) {
   }
 
   const response = await fetchApplicantProJobsList(config, domainId);
-  const jobs = Array.isArray(response?.data?.jobs) ? response.data.jobs : [];
-  const collected = [];
-  const seenUrls = new Set();
-
-  for (const job of jobs) {
-    const rawJobUrl = String(job?.jobUrl || "").trim();
-    const fallbackJobId = String(job?.id ?? "").trim();
-    const absoluteUrl = rawJobUrl
-      ? new URL(rawJobUrl, `${config.origin}/`).toString()
-      : fallbackJobId
-        ? `${config.origin}/jobs/${encodeURIComponent(fallbackJobId)}`
-        : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) continue;
-
-    collected.push({
-      company_name: companyNameForPostings,
-      source_job_id: fallbackJobId || extractSourceIdFromPostingUrl(absoluteUrl, "applicantpro"),
-      id: fallbackJobId || undefined,
-      position_name: String(job?.title || "").trim() || "Untitled Position",
-      job_posting_url: absoluteUrl,
-      posting_date: String(job?.startDateRef || "").trim() || null,
-      location: extractApplicantProLocationLabel(job)
-    });
-    seenUrls.add(absoluteUrl);
-  }
-
-  return collected;
+  return parseApplicantProPostingsFromApi(companyNameForPostings, config, response);
 }
 
 async function collectPostingsForApplyToJobCompany(company) {
@@ -16021,6 +16031,76 @@ function createServer() {
     });
   });
 
+  app.get("/admin/parsers", async (_req, res) => {
+    if (DB_BACKEND === "postgres") {
+      const [atsItems, parserAttentionByAts] = await Promise.all([
+        getPostgresAtsAdmin(postgresPool),
+        getPostgresParserAttentionByAts(postgresPool, 100)
+      ]);
+      const attentionByKey = new Map(parserAttentionByAts.map((item) => [item.ats_key, item]));
+      return res.json(sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        queue_backend: QUEUE_BACKEND,
+        items: atsItems.map((item) => {
+          const metadata = getAdapterMetadata(item.ats_key, item.display_name);
+          const attention = attentionByKey.get(item.ats_key) || null;
+          return {
+            ...item,
+            parser_version: "postgres-adapter-v1",
+            fixture_status: metadata.fixtureStatus,
+            parser_fixture_status: metadata.parserFixtureStatus,
+            confidence: metadata.confidence,
+            tier: metadata.tier,
+            parse_strategy: metadata.parseStrategy,
+            enabled_by_default: metadata.enabledByDefault,
+            parser_attention_count_24h: Number(attention?.error_count || 0),
+            latest_parser_error_at: attention?.latest_error_at || "",
+            latest_parser_error: attention?.latest_error || ""
+          };
+        })
+      }));
+    }
+
+    const rows = await db.all(
+      `
+        SELECT ats_key, display_name, enabled, default_ttl_seconds, rate_limit_ms
+        FROM ats_sources
+        ORDER BY display_name ASC;
+      `
+    );
+    const parserAttentionByAts = await getParserAttentionByAts();
+    const attentionByKey = new Map(parserAttentionByAts.map((item) => [item.ats_key, item]));
+    return res.json(sanitizeFrontendValue({
+      ok: true,
+      db_backend: DB_BACKEND,
+      search_backend: SEARCH_BACKEND,
+      queue_backend: QUEUE_BACKEND,
+      items: rows.map((row) => {
+        const metadata = getAdapterMetadata(row.ats_key, row.display_name);
+        const attention = attentionByKey.get(String(row.ats_key || "")) || null;
+        return {
+          ats_key: String(row.ats_key || ""),
+          display_name: String(row.display_name || ""),
+          enabled: Number(row.enabled || 0) === 1,
+          default_ttl_seconds: Number(row.default_ttl_seconds || 0),
+          rate_limit_ms: Number(row.rate_limit_ms || 0),
+          parser_version: "legacy-adapter-v1",
+          fixture_status: metadata.fixtureStatus,
+          parser_fixture_status: metadata.parserFixtureStatus,
+          confidence: metadata.confidence,
+          tier: metadata.tier,
+          parse_strategy: metadata.parseStrategy,
+          enabled_by_default: metadata.enabledByDefault,
+          parser_attention_count_24h: Number(attention?.error_count || 0),
+          latest_parser_error_at: attention?.latest_error_at || "",
+          latest_parser_error: attention?.latest_error || ""
+        };
+      })
+    }));
+  });
+
   app.get("/admin/parsers/:ats_key", async (req, res) => {
     if (DB_BACKEND === "postgres") {
       const item = await getPostgresParserAdmin(postgresPool, req.params.ats_key);
@@ -16823,6 +16903,7 @@ module.exports = {
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
   parseAdpWorkforcenowPostingsFromApi,
+  parseApplicantProPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
   parseAshbyCompany,

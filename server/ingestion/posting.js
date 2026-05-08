@@ -435,6 +435,46 @@ function firstValue(values) {
   return "";
 }
 
+function stripHtmlToPlainText(value) {
+  return normalizePostingValue(value)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|li|tr|td|th|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractCityText(posting, location, country) {
+  const explicit = firstValue([
+    posting?.city,
+    posting?.location?.city,
+    posting?.jobLocation?.city,
+    posting?.PrimaryLocation?.city,
+    posting?.primaryLocation?.city,
+    posting?.workLocation?.city
+  ]);
+  if (explicit) return explicit;
+
+  const locationText = normalizePostingValue(location);
+  if (!locationText || /^(remote|worldwide|anywhere)$/i.test(locationText)) return "";
+  const firstSegment = locationText.split(/\s*,\s*|\s+-\s+|\s+\|\s+/)[0]?.trim() || "";
+  if (!firstSegment || firstSegment.length > 80) return "";
+  if (/^(remote|hybrid|onsite|on[- ]?site|work from home|wfh|worldwide|anywhere)$/i.test(firstSegment)) return "";
+  const normalizedFirst = normalizeSearchText(firstSegment);
+  const normalizedCountry = normalizeSearchText(country);
+  if (normalizedCountry && normalizedFirst === normalizedCountry) return "";
+  if (COUNTRY_ALIASES[normalizedFirst]) return "";
+  return firstSegment;
+}
+
 function pushUniqueText(values, candidate) {
   const normalized = normalizePostingValue(candidate);
   if (!normalized) return;
@@ -604,6 +644,43 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     normalizeCountryFromLocation(location)
   ]);
   const region = firstValue([posting?.region, normalizeRegionFromCountry(country)]);
+  const city = extractCityText(posting, location, country);
+  const department = firstValue([
+    posting?.department,
+    posting?.team,
+    posting?.category,
+    posting?.departmentName,
+    posting?.job?.department?.name,
+    posting?.categories?.team,
+    posting?.categories?.department
+  ]);
+  const employmentType = firstValue([
+    posting?.employment_type,
+    posting?.employmentType,
+    posting?.job_type,
+    posting?.jobType,
+    posting?.commitment,
+    posting?.categories?.commitment,
+    posting?.type
+  ]);
+  const descriptionHtml = firstValue([
+    posting?.description_html,
+    posting?.descriptionHtml,
+    posting?.body_html,
+    posting?.content_html,
+    posting?.job_description_html
+  ]);
+  const descriptionTextSource = firstValue([
+    posting?.description_plain,
+    posting?.descriptionPlain,
+    posting?.description_text,
+    posting?.descriptionText,
+    posting?.description,
+    posting?.body,
+    posting?.content,
+    descriptionHtml
+  ]);
+  const descriptionPlain = stripHtmlToPlainText(descriptionTextSource);
   const parserVersion = normalizePostingValue(options?.parserVersion) || "legacy-adapter-v1";
   const sourceJobId =
     normalizePostingValue(posting?.source_job_id) ||
@@ -644,6 +721,7 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     job_posting_url: jobPostingUrl,
     location_text: location,
     location,
+    city,
     posting_date: postingDate.raw,
     posted_at: postingDate.raw,
     posting_date_epoch: postingDate.epoch,
@@ -652,6 +730,10 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     region,
     remote_type: remoteType,
     industry: firstValue([posting?.industry, posting?.department, posting?.team, posting?.category]),
+    department,
+    employment_type: employmentType,
+    description_plain: descriptionPlain,
+    description_html: descriptionHtml,
     first_seen: epochToIso(firstSeenEpoch),
     last_seen: epochToIso(lastSeenEpoch),
     first_seen_epoch: firstSeenEpoch,
@@ -659,6 +741,7 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     parser_version: parserVersion,
     raw_hash: stablePayloadHash(posting),
     confidence: normalizeConfidence(options?.confidence, 0.5),
+    parser_confidence: normalizeConfidence(options?.confidence, 0.5),
     is_remote: remoteType === "remote" || remoteType === "hybrid"
   };
 }

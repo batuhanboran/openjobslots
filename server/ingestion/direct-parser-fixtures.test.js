@@ -8,6 +8,7 @@ const {
   buildApplitrackDetailUrl,
   extractApplitrackDetailFields,
   parseAdpWorkforcenowPostingsFromApi,
+  parseApplicantProPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
   parseBambooHrPostingsFromApi,
@@ -39,6 +40,7 @@ const fixtureDir = path.join(__dirname, "fixtures");
 
 const PARSERS = {
   adp_workforcenow: parseAdpWorkforcenowPostingsFromApi,
+  applicantpro: parseApplicantProPostingsFromApi,
   fountain: parseFountainPostingsFromApi,
   oracle: parseOraclePostingsFromApi,
   paylocity: parsePaylocityPostingsFromPageData,

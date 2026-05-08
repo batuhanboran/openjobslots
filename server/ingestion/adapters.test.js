@@ -58,8 +58,39 @@ test("normalizePosting preserves common ATS source id, location, and remote alia
 
   assert.equal(posting.source_job_id, "job-42");
   assert.equal(posting.location_text, "Istanbul, Türkiye");
+  assert.equal(posting.city, "Istanbul");
   assert.equal(posting.country, "Turkey");
   assert.equal(posting.remote_type, "remote");
+  assert.equal(posting.parser_confidence, posting.confidence);
+});
+
+test("normalizePosting carries the full adapter contract shape", () => {
+  const posting = normalizePosting(
+    {
+      title: "Technical Support Engineer",
+      url: "https://example.com/jobs/contract-shape",
+      department: "Support",
+      employmentType: "Full-time",
+      descriptionHtml: "<p>Help customers &amp; resolve issues.</p>",
+      location: { city: "Istanbul", country: "TUR" }
+    },
+    { company_name: "Contract Co" },
+    "contractats",
+    { nowEpoch: 1778205600, parserVersion: "contract-test-v1", confidence: 0.91 }
+  );
+
+  assert.equal(validatePosting(posting).ok, true);
+  assert.equal(posting.city, "Istanbul");
+  assert.equal(posting.country, "Turkey");
+  assert.equal(posting.region, "EMEA");
+  assert.equal(posting.department, "Support");
+  assert.equal(posting.employment_type, "Full-time");
+  assert.equal(posting.description_plain, "Help customers & resolve issues.");
+  assert.equal(posting.description_html, "<p>Help customers &amp; resolve issues.</p>");
+  assert.equal(posting.first_seen_epoch, 1778205600);
+  assert.equal(posting.last_seen_epoch, 1778205600);
+  assert.equal(posting.parser_version, "contract-test-v1");
+  assert.equal(posting.parser_confidence, 0.91);
 });
 
 test("validatePosting rejects incomplete postings", () => {
@@ -75,6 +106,30 @@ test("validatePosting rejects incomplete postings", () => {
 });
 
 test("every configured ATS has a certified adapter contract", () => {
+  const requiredShape = [
+    "source_job_id",
+    "ats_key",
+    "company",
+    "title",
+    "location_text",
+    "country",
+    "region",
+    "city",
+    "remote_type",
+    "department",
+    "employment_type",
+    "description_plain",
+    "description_html",
+    "canonical_url",
+    "apply_url",
+    "posted_at",
+    "posted_at_epoch",
+    "first_seen_epoch",
+    "last_seen_epoch",
+    "raw_hash",
+    "parser_version",
+    "parser_confidence"
+  ];
   assert.equal(adapters.size, ATS_FILTER_OPTION_ITEMS.length);
   for (const item of ATS_FILTER_OPTION_ITEMS) {
     const key = String(item.value || "");
@@ -97,7 +152,9 @@ test("every configured ATS has a certified adapter contract", () => {
     assert.ok(adapter.metadata.tier, `${key} should have a tier`);
     assert.ok(adapter.metadata.parseStrategy, `${key} should document parse strategy`);
     assert.ok(Array.isArray(adapter.metadata.normalizedShape));
-    assert.ok(adapter.metadata.normalizedShape.includes("canonical_url"));
+    for (const fieldName of requiredShape) {
+      assert.ok(adapter.metadata.normalizedShape.includes(fieldName), `${key} normalized shape should include ${fieldName}`);
+    }
   }
 });
 
@@ -138,7 +195,7 @@ test("fixture-backed adapter metadata points to saved fixtures", () => {
 test("strict parser-backed metadata is separate from normalized fixture coverage", () => {
   assert.deepEqual(
     Array.from(PARSER_FIXTURE_BACKED).sort(),
-    ["adp_workforcenow", "applitrack", "fountain", "icims", "oracle", "paylocity", "pinpointhq", "recruitcrm"].sort()
+    ["adp_workforcenow", "applicantpro", "applitrack", "fountain", "icims", "oracle", "paylocity", "pinpointhq", "recruitcrm"].sort()
   );
   for (const atsKey of PARSER_FIXTURE_BACKED) {
     const metadata = getAdapterMetadata(atsKey);

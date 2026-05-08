@@ -239,6 +239,13 @@ function rowToPosting(row) {
     position_name: String(row?.position_name || ""),
     job_posting_url: String(row?.canonical_url || ""),
     location: row?.location_text || null,
+    city: String(row?.city || ""),
+    country: String(row?.country || ""),
+    region: String(row?.region || ""),
+    remote_type: String(row?.remote_type || "unknown"),
+    department: String(row?.department || ""),
+    employment_type: String(row?.employment_type || ""),
+    description_plain: String(row?.description_plain || ""),
     posting_date: row?.posting_date || null,
     last_seen_epoch: Number(row?.last_seen_epoch || 0),
     ats: String(row?.ats_key || ""),
@@ -637,10 +644,14 @@ async function getPostgresAtsAdmin(pool) {
         s.enabled,
         s.default_ttl_seconds,
         s.rate_limit_ms,
-        COUNT(c.id)::int AS company_count
+        MAX(st.last_success_epoch)::bigint AS last_success_epoch,
+        MAX(st.last_failure_epoch)::bigint AS last_failure_epoch,
+        COUNT(DISTINCT c.id)::int AS company_count
       FROM ats_sources s
       LEFT JOIN companies c
         ON c.ats_key = s.ats_key
+      LEFT JOIN company_sync_state st
+        ON st.ats_key = s.ats_key
       GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms
       ORDER BY s.display_name ASC;
     `
@@ -651,6 +662,8 @@ async function getPostgresAtsAdmin(pool) {
     enabled: Boolean(row?.enabled),
     default_ttl_seconds: Number(row?.default_ttl_seconds || 0),
     rate_limit_ms: Number(row?.rate_limit_ms || 0),
+    last_success_epoch: Number(row?.last_success_epoch || 0),
+    last_failure_epoch: Number(row?.last_failure_epoch || 0),
     company_count: Number(row?.company_count || 0)
   }));
 }
@@ -659,9 +672,19 @@ async function getPostgresParserAdmin(pool, atsKey) {
   const normalizedAtsKey = normalizeAtsKey(atsKey);
   const source = await pool.query(
     `
-      SELECT ats_key, display_name, enabled, default_ttl_seconds, rate_limit_ms
-      FROM ats_sources
-      WHERE ats_key = $1;
+      SELECT
+        s.ats_key,
+        s.display_name,
+        s.enabled,
+        s.default_ttl_seconds,
+        s.rate_limit_ms,
+        MAX(st.last_success_epoch)::bigint AS last_success_epoch,
+        MAX(st.last_failure_epoch)::bigint AS last_failure_epoch
+      FROM ats_sources s
+      LEFT JOIN company_sync_state st
+        ON st.ats_key = s.ats_key
+      WHERE s.ats_key = $1
+      GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms;
     `,
     [normalizedAtsKey]
   );
@@ -685,8 +708,11 @@ async function getPostgresParserAdmin(pool, atsKey) {
     enabled: Boolean(source.rows[0].enabled),
     default_ttl_seconds: Number(source.rows[0].default_ttl_seconds || 0),
     rate_limit_ms: Number(source.rows[0].rate_limit_ms || 0),
+    last_success_epoch: Number(source.rows[0].last_success_epoch || 0),
+    last_failure_epoch: Number(source.rows[0].last_failure_epoch || 0),
     parser_version: "postgres-adapter-v1",
     fixture_status: metadata.fixtureStatus,
+    parser_fixture_status: metadata.parserFixtureStatus,
     confidence: metadata.confidence,
     tier: metadata.tier,
     parse_strategy: metadata.parseStrategy,
@@ -890,9 +916,14 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         position_name: title,
         apply_url: String(posting?.apply_url || canonicalUrl),
         location_text: location,
+        city: String(posting?.city || ""),
         country,
         region,
         remote_type: remoteType,
+        department: String(posting?.department || ""),
+        employment_type: String(posting?.employment_type || ""),
+        description_plain: String(posting?.description_plain || ""),
+        description_html: String(posting?.description_html || ""),
         ats_key: atsKey,
         last_seen_epoch: nowEpoch,
         posted_at_epoch: posting?.posted_at_epoch || posting?.posting_date_epoch || null,
@@ -902,15 +933,17 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
       await client.query(
         `
           INSERT INTO postings (
-            canonical_url, company_name, position_name, apply_url, location_text, country, region,
-            remote_type, industry, ats_key, source_job_id, posting_date, posted_at_epoch,
-            first_seen_epoch, last_seen_epoch, hidden, parser_version, confidence, updated_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,$16,$17,now())
+            canonical_url, company_name, position_name, apply_url, location_text, city, country, region,
+            remote_type, industry, department, employment_type, description_plain, description_html,
+            ats_key, source_job_id, posting_date, posted_at_epoch, first_seen_epoch, last_seen_epoch,
+            hidden, parser_version, confidence, updated_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false,$21,$22,now())
           ON CONFLICT(canonical_url) DO UPDATE SET
             company_name = EXCLUDED.company_name,
             position_name = EXCLUDED.position_name,
             apply_url = EXCLUDED.apply_url,
             location_text = COALESCE(EXCLUDED.location_text, postings.location_text),
+            city = COALESCE(NULLIF(EXCLUDED.city, ''), postings.city),
             country = COALESCE(NULLIF(EXCLUDED.country, ''), postings.country),
             region = COALESCE(NULLIF(EXCLUDED.region, ''), postings.region),
             remote_type = CASE
@@ -918,6 +951,10 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
               ELSE EXCLUDED.remote_type
             END,
             industry = EXCLUDED.industry,
+            department = COALESCE(NULLIF(EXCLUDED.department, ''), postings.department),
+            employment_type = COALESCE(NULLIF(EXCLUDED.employment_type, ''), postings.employment_type),
+            description_plain = COALESCE(NULLIF(EXCLUDED.description_plain, ''), postings.description_plain),
+            description_html = COALESCE(NULLIF(EXCLUDED.description_html, ''), postings.description_html),
             ats_key = EXCLUDED.ats_key,
             source_job_id = COALESCE(NULLIF(EXCLUDED.source_job_id, ''), postings.source_job_id),
             posting_date = COALESCE(EXCLUDED.posting_date, postings.posting_date),
@@ -935,10 +972,15 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           title,
           String(posting?.apply_url || canonicalUrl),
           location || null,
+          String(posting?.city || ""),
           country,
           region,
           remoteType,
           String(posting?.industry || ""),
+          String(posting?.department || ""),
+          String(posting?.employment_type || ""),
+          String(posting?.description_plain || ""),
+          String(posting?.description_html || ""),
           atsKey,
           String(posting?.source_job_id || ""),
           posting?.posting_date || null,
