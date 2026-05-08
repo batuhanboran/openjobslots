@@ -329,6 +329,67 @@ test("source id extraction covers high-volume ATS URL shapes", () => {
   assert.equal(extractSourceIdFromPostingUrl("https://acme.teamtailor.com/jobs/5842331-support-engineer", "teamtailor"), "5842331-support-engineer");
 });
 
+test("careerplug raw fixture parses valid jobs and rejects placeholder or missing required fields", () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, "careerplug-postings.json"), "utf8"));
+  const adapter = adapters.get("careerplug");
+  assert.ok(adapter, "expected careerplug adapter");
+
+  const parsed = parseCareerplugPostingsFromHtml(
+    fixture.company.company_name,
+    fixture.config,
+    fixture.raw_html
+  );
+  const normalizedRows = parsed.map((posting) => {
+    const normalized = adapter.normalize(posting, fixture.company);
+    return {
+      normalized,
+      validation: validatePosting(normalized)
+    };
+  });
+
+  const validRows = normalizedRows
+    .filter((row) => row.validation.ok)
+    .map((row) => ({
+      source_job_id: row.normalized.source_job_id,
+      ats_key: row.normalized.ats_key,
+      company: row.normalized.company,
+      title: row.normalized.title,
+      location_text: row.normalized.location_text,
+      country: row.normalized.country,
+      region: row.normalized.region,
+      city: row.normalized.city,
+      remote_type: row.normalized.remote_type,
+      employment_type: row.normalized.employment_type,
+      canonical_url: row.normalized.canonical_url,
+      apply_url: row.normalized.apply_url,
+      posted_at: row.normalized.posted_at,
+      posted_at_epoch: row.normalized.posted_at_epoch,
+      parser_version: row.normalized.parser_version
+    }));
+
+  assert.deepEqual(validRows, fixture.expected);
+
+  for (const expected of fixture.expected_rejections) {
+    const row = normalizedRows.find((item) => item.normalized.source_job_id === expected.source_job_id);
+    assert.ok(row, `expected rejected CareerPlug row ${expected.source_job_id}`);
+    assert.equal(row.validation.ok, false);
+    assert.equal(row.validation.error, expected.reason);
+  }
+
+  for (const title of fixture.expected_skipped_titles) {
+    assert.equal(parsed.some((posting) => posting.position_name === title), false, `${title} should be skipped without a usable URL`);
+  }
+
+  const missingCompanyParsed = parseCareerplugPostingsFromHtml(
+    "",
+    fixture.config,
+    fixture.raw_html
+  )[0];
+  const missingCompany = adapter.normalize(missingCompanyParsed, { company_name: "" });
+  assert.equal(validatePosting(missingCompany).ok, false);
+  assert.equal(validatePosting(missingCompany).error, "missing company_name");
+});
+
 test("implemented HTML/API parsers preserve source ids from source payloads and URLs", () => {
   const jobvite = normalizeParsed(
     "jobvite",

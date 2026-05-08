@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const {
   getPostgresSyncStatus,
+  getPostgresParserAttentionByAts,
   getRetentionConfig,
   getRetentionCutoffs,
   hydratePostgresPostings,
@@ -136,6 +137,43 @@ async function testSyncStatusDefaultsToPostgresSyncControlQueue() {
       process.env.OPENJOBSLOTS_QUEUE_BACKEND = previousQueueBackend;
     }
   }
+}
+
+async function testParserAttentionGroupsCareerplugRejectionReasons() {
+  let captured = null;
+  const pool = {
+    async query(sql, params = []) {
+      captured = { sql, params };
+      return {
+        rows: [{
+          ats_key: "careerplug",
+          error_count: 2,
+          latest_error_at: "2026-05-08T12:00:00.000Z",
+          latest_error: "placeholder position_name",
+          reasons: [
+            { reason: "placeholder position_name", count: 1 },
+            { reason: "missing position_name", count: 1 }
+          ]
+        }]
+      };
+    }
+  };
+
+  const result = await getPostgresParserAttentionByAts(pool, 100);
+
+  assert.match(captured.sql, /jsonb_agg/);
+  assert.match(captured.sql, /GROUP BY e3\.error_message/);
+  assert.deepEqual(captured.params, [100]);
+  assert.deepEqual(result, [{
+    ats_key: "careerplug",
+    error_count: 2,
+    latest_error_at: "2026-05-08T12:00:00.000Z",
+    latest_error: "placeholder position_name",
+    reasons: [
+      { reason: "placeholder position_name", count: 1 },
+      { reason: "missing position_name", count: 1 }
+    ]
+  }]);
 }
 
 async function testHydratePostgresPostingsKeepsSafetyAndFilterGuards() {
@@ -699,6 +737,7 @@ async function main() {
   await testSyncStatusReportsQueuedSeparatelyFromRunning();
   await testSyncStatusReportsRunningForActiveWorkerOnly();
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
+  await testParserAttentionGroupsCareerplugRejectionReasons();
   await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();

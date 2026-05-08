@@ -195,7 +195,18 @@ test("fixture-backed adapter metadata points to saved fixtures", () => {
 test("strict parser-backed metadata is separate from normalized fixture coverage", () => {
   assert.deepEqual(
     Array.from(PARSER_FIXTURE_BACKED).sort(),
-    ["adp_workforcenow", "applicantpro", "applitrack", "fountain", "icims", "oracle", "paylocity", "pinpointhq", "recruitcrm"].sort()
+    [
+      "adp_workforcenow",
+      "applicantpro",
+      "applitrack",
+      "careerplug",
+      "fountain",
+      "icims",
+      "oracle",
+      "paylocity",
+      "pinpointhq",
+      "recruitcrm"
+    ].sort()
   );
   for (const atsKey of PARSER_FIXTURE_BACKED) {
     const metadata = getAdapterMetadata(atsKey);

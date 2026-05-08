@@ -128,6 +128,17 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("url-or-title-inference", "applyFor/listing URL id is recoverable.")
     }
   },
+  careerplug: {
+    sourcePattern: "CareerPlug public jobs HTML at https://{tenant}.careerplug.com/jobs with /jobs/{id} posting links.",
+    parserPath: "server/index.js parseCareerplugPostingsFromHtml",
+    requiredFixtures: ["list/source fixture", "placeholder title fixture", "expected normalized fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw fixture covers .job-location parsing and US state-code geo normalization."),
+      date: decision("source-absent", "Saved CareerPlug list fixture contains no posting date; leave posted_at null unless a future detail fixture proves source dates."),
+      remote: decision("url-or-title-inference", "Use explicit list/detail title or location text such as Remote/Hybrid only; do not invent remote state."),
+      sourceId: decision("url-or-title-inference", "Stable source id comes from /jobs/{id} canonical URL.")
+    }
+  },
   applicantpro: {
     priority: "P2",
     sourcePattern: "ApplicantPro board HTML domain-id discovery plus core jobs JSON.",

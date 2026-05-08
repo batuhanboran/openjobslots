@@ -95,7 +95,8 @@ const FIXTURE_BACKED = new Set([
   "fountain",
   "paylocity",
   "oracle",
-  "adp_workforcenow"
+  "adp_workforcenow",
+  "careerplug"
 ]);
 
 const PARSER_FIXTURE_BACKED = new Set([
@@ -107,7 +108,8 @@ const PARSER_FIXTURE_BACKED = new Set([
   "oracle",
   "paylocity",
   "pinpointhq",
-  "recruitcrm"
+  "recruitcrm",
+  "careerplug"
 ]);
 
 const FUTURE_DIRECT_SOURCE_CANDIDATES = Object.freeze([
