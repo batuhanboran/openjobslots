@@ -58,7 +58,7 @@ These notes are for Codex and subagents working in this repository.
 ## Operating And Version Policy
 
 - May 8 lesson: keep this stabilization line in `v1.5.x`. Search, parser, and storage hardening are not a `v2` product rewrite.
-- Current stabilization checkpoint is `v1.5.13`; the next stabilization update should increment the patch version unless it is a deliberate product rewrite.
+- Current stabilization checkpoint is `v1.5.14`; the next stabilization update should increment the patch version unless it is a deliberate product rewrite.
 - Current stabilization priority order: parser normalization first, Meilisearch reindex/cleanup second, production parity tests third, image/build cache later.
 - Future-use Codex skills installed: `playwright`, `security-best-practices`, and `security-threat-model`. A Codex restart may be needed before newly installed skills load.
 

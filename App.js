@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.13";
+const PUBLIC_APP_VERSION = "1.5.14";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.14",
+    date: "May 8, 2026",
+    title: "ATS parser certification pass",
+    summary:
+      "Improved Workday, BambooHR, Taleo, ApplyToJob, Breezy, Recruitee, iCIMS, and Applitrack field extraction, added direct ATS quality auditing, and hardened deploy verification."
+  },
   {
     version: "1.5.13",
     date: "May 8, 2026",

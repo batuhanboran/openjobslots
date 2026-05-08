@@ -9,7 +9,7 @@ const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
 const { getAdapterMetadata, isAtsEnabledByDefault } = require("./ingestion/adapter-metadata");
-const { isPlaceholderCompanyName } = require("./ingestion/posting");
+const { isPlaceholderCompanyName, normalizeCountryFromLocation } = require("./ingestion/posting");
 const {
   createPostgresPool,
   ensurePostgresSchema,
@@ -134,6 +134,8 @@ const PAYLOCITY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
+const APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const USAJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -2675,6 +2677,100 @@ function inferWorkdayLocationFromJobUrl(jobPostingUrl) {
   }
 }
 
+function extractWorkdaySourceJobId(posting, jobPostingUrl) {
+  const source = posting && typeof posting === "object" ? posting : {};
+  const direct = String(
+    source?.id ||
+      source?.jobId ||
+      source?.jobID ||
+      source?.jobReqId ||
+      source?.jobRequisitionId ||
+      source?.requisitionId ||
+      source?.requisition_id ||
+      ""
+  ).trim();
+  if (direct) return direct;
+
+  const externalPath = String(source?.externalPath || "").trim();
+  const fromExternalPath = externalPath.match(/_([A-Za-z0-9-]+)$/)?.[1] || "";
+  if (fromExternalPath) return fromExternalPath;
+
+  try {
+    const parsed = new URL(String(jobPostingUrl || ""));
+    const lastPart = decodeURIComponent(parsed.pathname.split("/").filter(Boolean).pop() || "");
+    return String(lastPart.match(/_([A-Za-z0-9-]+)$/)?.[1] || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function collectWorkdayLocationValues(posting, jobPostingUrl) {
+  const source = posting && typeof posting === "object" ? posting : {};
+  const values = [];
+  const pushValue = (value) => {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      for (const item of value) pushValue(item);
+      return;
+    }
+    if (typeof value === "object") {
+      pushValue(value.descriptor);
+      pushValue(value.location);
+      pushValue(value.locationName);
+      pushValue(value.displayName);
+      pushValue(value.name);
+      pushValue(value.text);
+      pushValue(value.label);
+      pushValue(value.city);
+      pushValue([value.city, value.state || value.region || value.province, value.country || value.countryName].filter(Boolean).join(", "));
+      return;
+    }
+    const text = String(value || "").trim();
+    if (!text) return;
+    const normalized = text.toLowerCase();
+    if (values.some((existing) => existing.toLowerCase() === normalized)) return;
+    values.push(text);
+  };
+
+  pushValue(source.locationsText);
+  pushValue(source.locationText);
+  pushValue(source.primaryLocation);
+  pushValue(source.location);
+  pushValue(source.locations);
+  pushValue(source.jobLocation);
+  pushValue(source.bulletFields);
+  pushValue(inferWorkdayLocationFromJobUrl(jobPostingUrl));
+
+  return values.filter(Boolean);
+}
+
+function extractWorkdayLocationLabel(posting, jobPostingUrl) {
+  const values = collectWorkdayLocationValues(posting, jobPostingUrl);
+  return values.length > 0 ? values.join(" / ") : null;
+}
+
+function extractWorkdayRemoteSignal(posting, jobPostingUrl) {
+  const source = posting && typeof posting === "object" ? posting : {};
+  return [
+    source?.remoteType,
+    source?.remote_type,
+    source?.workplaceType,
+    source?.workplace_type,
+    source?.locationType,
+    source?.timeType,
+    source?.isRemote === true ? "remote" : "",
+    source?.remote === true ? "remote" : "",
+    source?.title,
+    source?.locationsText,
+    source?.locationText,
+    source?.externalPath,
+    inferWorkdayLocationFromJobUrl(jobPostingUrl)
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
 function inferPostingLocationFromJobUrl(jobPostingUrl) {
   const url = String(jobPostingUrl || "").trim();
   if (!url) return null;
@@ -4200,6 +4296,48 @@ function extractTaleoLocationLabel(value) {
   return text;
 }
 
+function isBooleanLikeTaleoValue(value) {
+  return /^(?:true|false)$/i.test(String(value || "").trim());
+}
+
+function isLikelyTaleoDateValue(value) {
+  const text = String(value || "").trim();
+  if (!text || isBooleanLikeTaleoValue(text)) return false;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text)) return true;
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return true;
+  if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b/i.test(text)) return true;
+  if (/^(?:posted\s+)?(?:today|yesterday)$/i.test(text)) return true;
+  if (/^(?:posted\s+)?\d+\s+(?:hour|day)s?\s+ago$/i.test(text)) return true;
+  return false;
+}
+
+function isLikelyTaleoLocationValue(value) {
+  const text = extractTaleoLocationLabel(value);
+  if (!text || isBooleanLikeTaleoValue(text) || isLikelyTaleoDateValue(text)) return false;
+  if (normalizeCountryFromLocation(text)) return true;
+  if (/\b(remote|hybrid|onsite|on-site|work from home|telework|virtual)\b/i.test(text)) return true;
+  if (/\b[A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\b/.test(text)) return true;
+  return false;
+}
+
+function pickTaleoDate(columns) {
+  for (const value of columns) {
+    const text = String(value || "").trim();
+    if (isLikelyTaleoDateValue(text)) return text;
+  }
+  return null;
+}
+
+function pickTaleoLocation(columns, title = "") {
+  const normalizedTitle = String(title || "").trim().toLowerCase();
+  for (const value of columns) {
+    const location = extractTaleoLocationLabel(value);
+    if (!location || location.toLowerCase() === normalizedTitle) continue;
+    if (isLikelyTaleoLocationValue(location)) return location;
+  }
+  return null;
+}
+
 function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitions) {
   const items = Array.isArray(requisitions) ? requisitions : [];
   const postings = [];
@@ -4210,8 +4348,8 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
 
     const columns = Array.isArray(requisition?.column) ? requisition.column : [];
     const title = String(columns[0] || "").trim() || "Untitled Position";
-    const location = extractTaleoLocationLabel(columns[2] || "");
-    const postingDate = String(columns[4] || "").trim() || null;
+    const location = pickTaleoLocation(columns, title);
+    const postingDate = pickTaleoDate(columns);
     const contestNo = String(requisition?.contestNo || "").trim();
     const detailRef = contestNo || jobId;
     const jobUrl = detailRef
@@ -4222,6 +4360,7 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: detailRef,
       position_name: title,
       job_posting_url: jobUrl,
       posting_date: postingDate,
@@ -4275,11 +4414,12 @@ function extractTaleoPostingsFromAjax(companyNameForPostings, config, ajaxText) 
     seenKeys.add(dedupeKey);
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: detailRef,
       position_name: title,
       job_posting_url: `${config.baseSectionUrl}/jobdetail.ftl?job=${encodeURIComponent(
         detailRef
       )}&lang=${encodeURIComponent(config.lang)}`,
-      posting_date: postedDate || null,
+      posting_date: isLikelyTaleoDateValue(postedDate) ? postedDate : null,
       location
     });
   }
@@ -5664,15 +5804,61 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
 
     const locationObject = item?.location && typeof item.location === "object" ? item.location : {};
     const atsLocationObject = item?.atsLocation && typeof item.atsLocation === "object" ? item.atsLocation : {};
+    const rawLocationText = typeof item?.location === "string" ? String(item.location || "").trim() : "";
+    const rawAtsLocationText = typeof item?.atsLocation === "string" ? String(item.atsLocation || "").trim() : "";
     const city = String(locationObject?.city || atsLocationObject?.city || "").trim();
-    const state = String(locationObject?.state || atsLocationObject?.state || atsLocationObject?.province || "").trim();
-    const country = String(locationObject?.country || atsLocationObject?.country || locationObject?.countryName || atsLocationObject?.countryName || "").trim();
-    const locationName = String(locationObject?.name || atsLocationObject?.name || "").trim();
+    const state = String(
+      locationObject?.state ||
+        locationObject?.province ||
+        locationObject?.region ||
+        atsLocationObject?.state ||
+        atsLocationObject?.province ||
+        atsLocationObject?.region ||
+        ""
+    ).trim();
+    const country = String(
+      locationObject?.country ||
+        atsLocationObject?.country ||
+        locationObject?.countryName ||
+        atsLocationObject?.countryName ||
+        locationObject?.countryCode ||
+        atsLocationObject?.countryCode ||
+        ""
+    ).trim();
+    const locationName = String(
+      locationObject?.name ||
+        atsLocationObject?.name ||
+        locationObject?.label ||
+        atsLocationObject?.label ||
+        locationObject?.displayName ||
+        atsLocationObject?.displayName ||
+        ""
+    ).trim();
     const structuredLocation = [city, state, country].filter(Boolean).join(", ");
-    const location = structuredLocation || locationName || (item?.isRemote ? "Remote" : null);
+    const location =
+      structuredLocation ||
+      locationName ||
+      rawLocationText ||
+      rawAtsLocationText ||
+      String(item?.employmentLocation || item?.workplaceLocation || "").trim() ||
+      (item?.isRemote ? "Remote" : null);
 
     const postingDate =
-      String(item?.postingDate || item?.postedDate || item?.publishDate || item?.createdDate || item?.updatedDate || "").trim() ||
+      String(
+        item?.postingDate ||
+          item?.postedDate ||
+          item?.postedAt ||
+          item?.publishedAt ||
+          item?.publishDate ||
+          item?.datePosted ||
+          item?.createdDate ||
+          item?.createdAt ||
+          item?.updatedDate ||
+          item?.updatedAt ||
+          item?.openedDate ||
+          item?.openDate ||
+          ""
+      ).trim() ||
       null;
 
     postings.push({
@@ -5686,6 +5872,9 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
       country: country || null,
       remote: item?.isRemote === true,
       is_remote: item?.isRemote === true,
+      workplaceType:
+        String(item?.workplaceType || item?.workplace_type || item?.remoteStatus || item?.locationType || "").trim() ||
+        (item?.isRemote === true ? "remote" : null),
       department: String(item?.departmentLabel || item?.department || "").trim() || null,
       employment_type: String(item?.employmentStatusLabel || item?.employmentStatus || "").trim() || null
     });
@@ -7013,6 +7202,33 @@ function cleanApplyToJobText(value) {
     .trim();
 }
 
+function extractApplyToJobIconField(cardHtml, iconNames) {
+  const source = String(cardHtml || "");
+  const names = Array.isArray(iconNames) ? iconNames : [iconNames];
+  const escaped = names.map((name) => String(name || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  if (!escaped) return null;
+  const pattern = new RegExp(
+    `<i[^>]*class=["'][^"']*(?:${escaped})[^"']*["'][^>]*>\\s*<\\/i>\\s*([\\s\\S]{0,300})`,
+    "i"
+  );
+  const match = source.match(pattern);
+  if (!match?.[1]) return null;
+  const untilNextIcon = String(match[1] || "").split(/<i\b/i)[0];
+  const text = cleanApplyToJobText(untilNextIcon);
+  return text || null;
+}
+
+function extractApplyToJobLabeledField(cardHtml, labels) {
+  const text = cleanApplyToJobText(cardHtml);
+  const labelPattern = (Array.isArray(labels) ? labels : [labels])
+    .map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .filter(Boolean)
+    .join("|");
+  if (!text || !labelPattern) return null;
+  const match = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^|•\\n]{2,120})`, "i"));
+  return match?.[1] ? cleanApplyToJobText(match[1]) : null;
+}
+
 function extractApplyToJobSourceId(urlValue) {
   try {
     const parsed = new URL(String(urlValue || ""));
@@ -7034,8 +7250,8 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     /<li[^>]*class=["'][^"']*\blist-group-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
   const listHeadingPattern =
     /<h3[^>]*class=["'][^"']*\blist-group-item-heading\b[^"']*["'][^>]*>[\s\S]*?<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
-  const listLocationPattern = /fa-map-marker[^>]*><\/i>\s*([^<]+)/i;
-  const listDatePattern = /fa-(?:calendar|clock)[^>]*><\/i>\s*([^<]+)/i;
+  const listLocationPattern = /fa-(?:map-marker|map-marker-alt|location-dot)[^>]*><\/i>\s*([^<]+)/i;
+  const listDatePattern = /fa-(?:calendar|calendar-alt|clock)[^>]*><\/i>\s*([^<]+)/i;
 
   let listItemMatch = listItemPattern.exec(source);
   while (listItemMatch) {
@@ -7054,9 +7270,16 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     }
 
     const locationMatch = itemHtml.match(listLocationPattern);
-    const location = locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null;
+    const location =
+      (locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null) ||
+      extractApplyToJobIconField(itemHtml, ["fa-map-marker", "fa-map-marker-alt", "fa-location-dot"]) ||
+      extractApplyToJobLabeledField(itemHtml, ["Location", "Job Location", "Office"]);
     const dateMatch = itemHtml.match(listDatePattern);
-    const postingDate = dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null;
+    const postingDate =
+      (dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null) ||
+      extractApplyToJobIconField(itemHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]) ||
+      extractApplyToJobLabeledField(itemHtml, ["Posted", "Date Posted", "Posting Date"]);
+    const department = extractApplyToJobLabeledField(itemHtml, ["Department", "Category", "Team"]);
 
     postings.push({
       company_name: companyNameForPostings,
@@ -7064,7 +7287,8 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       position_name: cleanApplyToJobText(headingMatch[2]) || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
-      location
+      location,
+      department
     });
     seenUrls.add(absoluteUrl);
 
@@ -7090,9 +7314,16 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     const searchEnd = Math.min(nextStart, currentEnd + 2500);
     const contextHtml = source.slice(currentEnd, searchEnd);
     const locationMatch = contextHtml.match(legacyLocationPattern);
-    const location = locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null;
+    const location =
+      (locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null) ||
+      extractApplyToJobIconField(contextHtml, ["fa-map-marker", "fa-map-marker-alt", "fa-location-dot"]) ||
+      extractApplyToJobLabeledField(contextHtml, ["Location", "Job Location", "Office"]);
     const dateMatch = contextHtml.match(legacyDatePattern);
-    const postingDate = dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null;
+    const postingDate =
+      (dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null) ||
+      extractApplyToJobIconField(contextHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]) ||
+      extractApplyToJobLabeledField(contextHtml, ["Posted", "Date Posted", "Posting Date"]);
+    const department = extractApplyToJobLabeledField(contextHtml, ["Department", "Category", "Team"]);
 
     postings.push({
       company_name: companyNameForPostings,
@@ -7100,7 +7331,8 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       position_name: cleanApplyToJobText(match?.[2]) || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
-      location
+      location,
+      department
     });
     seenUrls.add(absoluteUrl);
   }
@@ -7269,6 +7501,17 @@ function extractBreezySourceId(urlValue) {
   }
 }
 
+function extractBreezyLabeledField(cardHtml, labels) {
+  const text = cleanBreezyText(cardHtml);
+  const labelPattern = (Array.isArray(labels) ? labels : [labels])
+    .map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .filter(Boolean)
+    .join("|");
+  if (!text || !labelPattern) return null;
+  const match = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^|•\\n]{2,140})`, "i"));
+  return match?.[1] ? cleanBreezyText(match[1]) : null;
+}
+
 function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
@@ -7276,11 +7519,11 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
 
   const linkPattern =
     /<a[^>]*href=["']((?:https?:\/\/[^"'<>]+)?\/p\/[^"'<>]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  const titlePattern = /<h2[^>]*>([\s\S]*?)<\/h2>/i;
+  const titlePattern = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i;
   const locationPattern =
-    /<li[^>]*class=["'][^"']*\blocation\b[^"']*["'][^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/i;
+    /<li[^>]*class=["'][^"']*\blocation\b[^"']*["'][^>]*>[\s\S]*?(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/li>/i;
   const postedPattern =
-    /<li[^>]*class=["'][^"']*(?:posted|created|date)[^"']*["'][^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/i;
+    /<li[^>]*class=["'][^"']*(?:posted|created|date)[^"']*["'][^>]*>[\s\S]*?(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/li>/i;
   const departmentPattern =
     /<h2[^>]*class=["'][^"']*\bgroup-header\b[^"']*["'][^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/gi;
 
@@ -7315,8 +7558,14 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
       source_job_id: extractBreezySourceId(absoluteUrl),
       position_name: title || "Untitled Position",
       job_posting_url: absoluteUrl,
-      posting_date: cleanBreezyText(postedMatch?.[1] || "") || null,
-      location: cleanBreezyText(locationMatch?.[1] || "") || null,
+      posting_date:
+        cleanBreezyText(postedMatch?.[1] || "") ||
+        extractBreezyLabeledField(linkBody, ["Posted", "Date Posted", "Created"]) ||
+        null,
+      location:
+        cleanBreezyText(locationMatch?.[1] || "") ||
+        extractBreezyLabeledField(linkBody, ["Location", "Office", "Workplace"]) ||
+        null,
       department: department || null
     });
     seenUrls.add(absoluteUrl);
@@ -7623,6 +7872,51 @@ function extractIcimsSourceJobId(urlValue) {
   return String(match?.[1] || "").trim();
 }
 
+function extractIcimsLocationFromTitleOrUrl(positionName, jobUrl = "") {
+  const title = cleanIcimsText(positionName);
+  const candidates = [];
+
+  for (const match of title.matchAll(/\(([^)]+)\)/g)) {
+    if (match?.[1]) candidates.push(match[1]);
+  }
+
+  const dashParts = title
+    .split(/\s+[-–—]{1,2}\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (dashParts.length > 1) {
+    candidates.push(dashParts[dashParts.length - 1]);
+  }
+
+  try {
+    const parsed = new URL(String(jobUrl || ""));
+    const parts = parsed.pathname.split("/").map((part) => decodeURIComponent(part)).filter(Boolean);
+    const jobsIndex = parts.findIndex((part) => part.toLowerCase() === "jobs");
+    if (jobsIndex >= 0 && parts[jobsIndex + 2]) {
+      candidates.push(
+        parts[jobsIndex + 2]
+          .replace(/%2c/gi, ",")
+          .replace(/%26/gi, "&")
+          .replace(/[-_]+/g, " ")
+      );
+    }
+  } catch {
+    // Ignore malformed URL fallback.
+  }
+
+  for (const candidate of candidates) {
+    const cleaned = cleanIcimsText(candidate);
+    if (!cleaned || cleaned.length > 100) continue;
+    if (normalizeCountryFromLocation(cleaned)) return cleaned;
+    if (/\b(remote|hybrid|work from home|telework|virtual)\b/i.test(cleaned)) return cleaned;
+    if (/\b[A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(?:\s*-\s*US)?\b/.test(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  return null;
+}
+
 function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
@@ -7667,7 +7961,7 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
       position_name: positionName,
       job_posting_url: absoluteUrl,
       posting_date: extractIcimsPostingDateFromHtml(cardHtml),
-      location: extractIcimsLocationFromHtml(cardHtml)
+      location: extractIcimsLocationFromHtml(cardHtml) || extractIcimsLocationFromTitleOrUrl(positionName, absoluteUrl)
     });
     seenUrls.add(absoluteUrl);
     cardMatch = cardPattern.exec(source);
@@ -7699,7 +7993,7 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
       position_name: positionName,
       job_posting_url: absoluteUrl,
       posting_date: extractIcimsPostingDateFromHtml(contextHtml),
-      location: extractIcimsLocationFromHtml(contextHtml)
+      location: extractIcimsLocationFromHtml(contextHtml) || extractIcimsLocationFromTitleOrUrl(positionName, absoluteUrl)
     });
     seenUrls.add(absoluteUrl);
     fallbackMatch = fallbackLinkPattern.exec(source);
@@ -7796,12 +8090,101 @@ function extractRecruiteeTitle(offer, preferredLangCode = "") {
   return title || "Untitled Position";
 }
 
+function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, response) {
+  const source = response && typeof response === "object" ? response : {};
+  const appConfig = source?.appConfig && typeof source.appConfig === "object" ? source.appConfig : source;
+  const preferredLangCode = String(appConfig?.primaryLangCode || appConfig?.defaultLangCode || "").trim();
+  const offers = Array.isArray(appConfig?.offers) ? appConfig.offers : [];
+  const locations = Array.isArray(appConfig?.locations) ? appConfig.locations : [];
+  const departments = Array.isArray(appConfig?.departments) ? appConfig.departments : [];
+
+  const locationById = new Map();
+  for (const location of locations) {
+    const id = String(location?.id ?? location?.uuid ?? "").trim();
+    if (!id) continue;
+    const label = buildRecruiteeLocationLabel(location, preferredLangCode);
+    if (label) locationById.set(id, label);
+  }
+
+  const departmentById = new Map();
+  for (const department of departments) {
+    const id = String(department?.id ?? department?.uuid ?? "").trim();
+    if (!id) continue;
+    const translation = pickRecruiteeTranslation(department?.translations, preferredLangCode);
+    const label = String(translation?.name || department?.name || department?.label || "").trim();
+    if (label) departmentById.set(id, label);
+  }
+
+  const postings = [];
+  const seenUrls = new Set();
+  for (const offer of offers) {
+    const slug = String(offer?.slug || "").trim();
+    const offerId = String(offer?.id ?? offer?.uuid ?? offer?.guid ?? slug).trim();
+    const jobUrl = slug ? `${config.baseUrl}/o/${slug}` : offerId ? `${config.baseUrl}/o/${offerId}` : config.baseUrl;
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    const publishedValue =
+      offer?.publishedAt ??
+      offer?.published_at ??
+      offer?.createdAt ??
+      offer?.created_at ??
+      offer?.updatedAt ??
+      offer?.updated_at;
+    let postingDate = null;
+    if (typeof publishedValue === "string" && publishedValue.trim()) {
+      postingDate = publishedValue.trim();
+    } else if (typeof publishedValue === "number" && Number.isFinite(publishedValue) && publishedValue > 0) {
+      postingDate = new Date(publishedValue).toISOString();
+    }
+
+    const locationIds = Array.isArray(offer?.locationIds) ? offer.locationIds : Array.isArray(offer?.locations) ? offer.locations.map((item) => item?.id ?? item) : [];
+    const locationNames = locationIds
+      .map((locationId) => locationById.get(String(locationId ?? "").trim()) || "")
+      .filter(Boolean);
+    const directLocation = buildRecruiteeLocationLabel(offer?.location || {}, preferredLangCode);
+    if (directLocation) locationNames.push(directLocation);
+
+    const departmentId = String(offer?.departmentId ?? offer?.department_id ?? offer?.department?.id ?? "").trim();
+    const department = departmentById.get(departmentId) || String(offer?.department?.name || offer?.departmentName || "").trim() || null;
+
+    postings.push({
+      company_name: companyNameForPostings,
+      source_job_id: offerId,
+      id: offerId,
+      position_name: extractRecruiteeTitle(offer, preferredLangCode),
+      job_posting_url: jobUrl,
+      posting_date: postingDate,
+      location: locationNames.length > 0 ? [...new Set(locationNames)].join(" / ") : null,
+      department,
+      remote:
+        offer?.remote === true ||
+        offer?.isRemote === true ||
+        offer?.location?.remote === true ||
+        offer?.location?.isRemote === true,
+      workplaceType:
+        String(offer?.workplaceType || offer?.workplace_type || offer?.remoteStatus || offer?.locationType || "").trim() ||
+        (offer?.remote === true || offer?.isRemote === true ? "remote" : null)
+    });
+    seenUrls.add(jobUrl);
+  }
+
+  return postings;
+}
+
 function buildRecruiteeLocationLabel(location, preferredLangCode = "") {
   const translation = pickRecruiteeTranslation(location?.translations, preferredLangCode);
-  const name = String(translation?.name || translation?.city || location?.name || "").trim();
-  const country = String(translation?.country || "").trim();
-  if (name && country) return `${name}, ${country}`;
-  return name || country || null;
+  const name = String(translation?.name || translation?.city || location?.name || location?.city || location?.label || "").trim();
+  const region = String(location?.region || location?.state || location?.province || "").trim();
+  const country = String(
+    translation?.country ||
+      location?.country ||
+      location?.countryName ||
+      location?.countryCode ||
+      location?.isoCountry ||
+      ""
+  ).trim();
+  const values = [name, region, country].filter(Boolean);
+  return values.length > 0 ? values.join(", ") : null;
 }
 
 function buildAshbyJobUrl(organizationHostedJobsPageName, jobId) {
@@ -9546,6 +9929,7 @@ async function collectTodayPostingsForWorkdayCompany(company) {
   if (!config) return [];
 
   const collected = [];
+  const seenUrls = new Set();
   let offset = 0;
 
   for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
@@ -9553,22 +9937,32 @@ async function collectTodayPostingsForWorkdayCompany(company) {
     const postings = Array.isArray(response?.jobPostings) ? response.jobPostings : [];
     if (postings.length === 0) break;
 
-    let todaysOnPage = 0;
     for (const posting of postings) {
-      if (!isPostedToday(posting?.postedOn)) continue;
-      todaysOnPage += 1;
       const jobUrl = buildJobUrl(config.companyBaseUrl, posting?.externalPath);
-      if (!jobUrl) continue;
+      if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
       collected.push({
         company_name: company.company_name,
+        source_job_id: extractWorkdaySourceJobId(posting, jobUrl),
         position_name: String(posting?.title || "").trim() || "Untitled Position",
         job_posting_url: jobUrl,
-        posting_date: String(posting?.postedOn || "").trim() || null
+        posting_date:
+          String(
+            posting?.postedOn ||
+              posting?.postedOnDate ||
+              posting?.postedDate ||
+              posting?.postingDate ||
+              posting?.externalPostedOn ||
+              posting?.updatedOn ||
+              ""
+          ).trim() || null,
+        location: extractWorkdayLocationLabel(posting, jobUrl),
+        workplaceType: extractWorkdayRemoteSignal(posting, jobUrl)
       });
+      seenUrls.add(jobUrl);
     }
 
-    if (todaysOnPage === 0 || postings.length < WORKDAY_PAGE_SIZE) break;
+    if (postings.length < WORKDAY_PAGE_SIZE) break;
     offset += WORKDAY_PAGE_SIZE;
   }
 
@@ -9811,6 +10205,7 @@ async function collectPostingsForIcimsCompany(company) {
   const collected = [];
   const seenPostingUrls = new Set();
   const seenPageUrls = new Set();
+  let detailFetches = 0;
 
   for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
     const normalizedPageUrl = ensureIcimsIframeUrl(pageUrl);
@@ -9819,10 +10214,29 @@ async function collectPostingsForIcimsCompany(company) {
 
     const pageHtml = await fetchIcimsPage(normalizedPageUrl);
     const batch = parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml);
-    for (const posting of batch) {
+    for (let posting of batch) {
       const postingUrl = String(posting?.job_posting_url || "").trim();
       if (!postingUrl || seenPostingUrls.has(postingUrl)) continue;
       seenPostingUrls.add(postingUrl);
+      if (
+        detailFetches < ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY &&
+        (!String(posting?.location || "").trim() || !String(posting?.posting_date || "").trim())
+      ) {
+        try {
+          const detailHtml = await fetchIcimsPage(postingUrl);
+          detailFetches += 1;
+          posting = {
+            ...posting,
+            posting_date: posting.posting_date || extractIcimsPostingDateFromHtml(detailHtml),
+            location:
+              posting.location ||
+              extractIcimsLocationFromHtml(detailHtml) ||
+              extractIcimsLocationFromTitleOrUrl(posting.position_name, postingUrl)
+          };
+        } catch {
+          detailFetches += 1;
+        }
+      }
       collected.push(posting);
     }
 
@@ -10176,6 +10590,57 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   return postings;
 }
 
+function extractApplitrackDetailFields(detailHtml) {
+  const source = String(detailHtml || "");
+  const text = decodeHtmlEntities(
+    source
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:tr|td|th|div|p|li|span)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+  )
+    .replace(/\u00a0/g, " ")
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+
+  const pickLabel = (labels) => {
+    const labelPattern = labels.map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    if (!labelPattern) return null;
+    const inlineMatch = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^\\n]{2,140})`, "i"));
+    if (inlineMatch?.[1]) return inlineMatch[1].trim();
+
+    const lines = text.split(/\n+/);
+    for (let index = 0; index < lines.length - 1; index += 1) {
+      if (new RegExp(`^(?:${labelPattern})\\s*:?$`, "i").test(lines[index])) {
+        return lines[index + 1]?.trim() || null;
+      }
+    }
+    return null;
+  };
+
+  return {
+    posting_date:
+      pickLabel(["Date Posted", "Posted", "Posting Date", "Date Available"]) ||
+      text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/)?.[0] ||
+      null,
+    location: pickLabel(["Location", "School", "Site", "Campus", "Work Location", "Job Location"]),
+    department: pickLabel(["Position Type", "Category", "Department"])
+  };
+}
+
+async function fetchApplitrackDetailFields(jobUrl) {
+  const res = await fetchWithAtsRateLimit("applitrack", APPLITRACK_RATE_LIMIT_WAIT_MS, jobUrl, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    }
+  });
+  if (!res.ok) return {};
+  return extractApplitrackDetailFields(await res.text());
+}
+
 async function collectPostingsForApplitrackCompany(company) {
   const siteRoot = normalizeApplitrackUrl(company?.url_string);
   const outputUrl = new URL("jobpostings/Output.asp?all=1", siteRoot).toString();
@@ -10194,7 +10659,22 @@ async function collectPostingsForApplitrackCompany(company) {
 
   const pageHtml = await res.text();
   const companyName = String(company?.company_name || "").trim() || "Unknown Company";
-  return parseApplitrackPostings(pageHtml, siteRoot, companyName);
+  const postings = parseApplitrackPostings(pageHtml, siteRoot, companyName);
+  let detailFetches = 0;
+  for (const posting of postings) {
+    if (detailFetches >= APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY) break;
+    if (String(posting?.location || "").trim() && String(posting?.posting_date || "").trim()) continue;
+    try {
+      const detail = await fetchApplitrackDetailFields(posting.job_posting_url);
+      detailFetches += 1;
+      posting.location = posting.location || detail.location || null;
+      posting.posting_date = posting.posting_date || detail.posting_date || null;
+      posting.department = posting.department || detail.department || null;
+    } catch {
+      detailFetches += 1;
+    }
+  }
+  return postings;
 }
 
 function parseHibobCompany(url) {
@@ -10872,55 +11352,13 @@ async function collectPostingsForRecruiteeCompany(company) {
   if (!config) return [];
 
   const response = await fetchRecruiteePublicApp(config.baseUrl);
-  const appConfig = response?.appConfig && typeof response.appConfig === "object" ? response.appConfig : {};
-  const preferredLangCode = String(appConfig?.primaryLangCode || "").trim();
-  const offers = Array.isArray(appConfig?.offers) ? appConfig.offers : [];
-  const locations = Array.isArray(appConfig?.locations) ? appConfig.locations : [];
-
-  const locationById = new Map();
-  for (const location of locations) {
-    const id = String(location?.id ?? "").trim();
-    if (!id) continue;
-    const label = buildRecruiteeLocationLabel(location, preferredLangCode);
-    if (label) locationById.set(id, label);
-  }
-
   const normalizedCompanyName = String(company?.company_name || "").trim();
   const companyNameForPostings =
     normalizedCompanyName && normalizedCompanyName.toLowerCase() !== "recruitee"
       ? normalizedCompanyName
       : config.subdomain;
 
-  const collected = [];
-  for (const offer of offers) {
-    const slug = String(offer?.slug || "").trim();
-    const jobUrl = slug ? `${config.baseUrl}/o/${slug}` : config.baseUrl;
-    if (!jobUrl) continue;
-
-    const publishedValue =
-      offer?.publishedAt ?? offer?.published_at ?? offer?.createdAt ?? offer?.created_at ?? offer?.updatedAt;
-    let postingDate = null;
-    if (typeof publishedValue === "string" && publishedValue.trim()) {
-      postingDate = publishedValue.trim();
-    } else if (typeof publishedValue === "number" && Number.isFinite(publishedValue) && publishedValue > 0) {
-      postingDate = new Date(publishedValue).toISOString();
-    }
-
-    const locationIds = Array.isArray(offer?.locationIds) ? offer.locationIds : [];
-    const locationNames = locationIds
-      .map((locationId) => locationById.get(String(locationId ?? "").trim()) || "")
-      .filter(Boolean);
-
-    collected.push({
-      company_name: companyNameForPostings,
-      position_name: extractRecruiteeTitle(offer, preferredLangCode),
-      job_posting_url: jobUrl,
-      posting_date: postingDate,
-      location: locationNames.length > 0 ? locationNames.join(" / ") : null
-    });
-  }
-
-  return collected;
+  return parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, response);
 }
 
 function extractUltiProLocationName(opportunity) {
@@ -16227,6 +16665,10 @@ module.exports = {
   normalizeSyncEnabledAts,
   nowEpochSeconds,
   extractAdpWorkforcenowCompanyName,
+  extractApplitrackDetailFields,
+  extractTaleoPostingsFromRest,
+  extractWorkdayLocationLabel,
+  extractWorkdaySourceJobId,
   parseAdpWorkforcenowPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
@@ -16239,6 +16681,7 @@ module.exports = {
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
+  parseRecruiteePostingsFromPublicApp,
   resolveAdpWorkforcenowCompanyName,
   runWorkdaySync,
   upsertPostings

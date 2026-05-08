@@ -7,8 +7,10 @@ BRANCH="${BRANCH:-main}"
 LOCK_FILE="${LOCK_FILE:-/var/lock/openjobslots-deploy.lock}"
 LOG_FILE="${LOG_FILE:-/var/log/openjobslots-deploy.log}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8081/health}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:8081}"
 DEPLOY_KEY="${DEPLOY_KEY:-REDACTED}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
+FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-3}"
 
 if [[ -f "$DEPLOY_KEY" && -z "${GIT_SSH_COMMAND:-}" ]]; then
   export GIT_SSH_COMMAND="ssh -i ${DEPLOY_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
@@ -30,11 +32,25 @@ cd "$APP_DIR"
 LOCAL_SHA="$(git rev-parse HEAD)"
 log "checking $REMOTE/$BRANCH from $LOCAL_SHA"
 
-if ! git fetch --prune "$REMOTE" "$BRANCH:refs/remotes/$REMOTE/$BRANCH"; then
-  log "fetch failed; GitHub deploy key may not be registered yet"
+REMOTE_REF="refs/remotes/$REMOTE/$BRANCH"
+FETCH_REFSPEC="+refs/heads/$BRANCH:$REMOTE_REF"
+REMOTE_SHA=""
+for attempt in $(seq 1 "$FETCH_ATTEMPTS"); do
+  if git fetch --no-tags "$REMOTE" "$FETCH_REFSPEC"; then
+    if REMOTE_SHA="$(git rev-parse --verify "${REMOTE_REF}^{commit}" 2>/dev/null)"; then
+      break
+    fi
+    log "fetch attempt $attempt did not produce $REMOTE_REF"
+  else
+    log "fetch attempt $attempt failed"
+  fi
+  sleep 2
+done
+
+if [[ -z "$REMOTE_SHA" ]]; then
+  log "fetch failed after $FETCH_ATTEMPTS attempts; check deploy key, repo access, and remote branch"
   exit 0
 fi
-REMOTE_SHA="$(git rev-parse "refs/remotes/$REMOTE/$BRANCH")"
 
 if [[ "$LOCAL_SHA" == "$REMOTE_SHA" && "$FORCE_DEPLOY" != "1" ]]; then
   log "already current at $LOCAL_SHA"
@@ -48,11 +64,19 @@ log "deploying $REMOTE_SHA"
 git reset --hard "$REMOTE_SHA"
 git clean -fd -e .env -e data -e .deploy-backups -e "docker-compose.yml.bak*"
 
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
+
+verify_deploy() {
+  curl -fsS "$HEALTH_URL" >/dev/null
+  curl -fsS "$BASE_URL/sync/status" >/dev/null
+  curl -fsS "$BASE_URL/ingestion/status" >/dev/null
+  curl -fsS "$BASE_URL/postings?search=Director%20United%20States&limit=5" >/dev/null
+  curl -fsS "$BASE_URL/postings?search=remote%20engineer&limit=5" >/dev/null
+}
 
 for attempt in $(seq 1 30); do
-  if curl -fsS "$HEALTH_URL" >/dev/null; then
-    log "health check passed at $REMOTE_SHA"
+  if verify_deploy; then
+    log "post-deploy checks passed at $REMOTE_SHA"
     exit 0
   fi
   sleep 2
@@ -61,4 +85,7 @@ done
 log "health check failed after deploy to $REMOTE_SHA"
 docker compose ps >> "$LOG_FILE" 2>&1 || true
 docker compose logs --tail=80 openjobslots-app >> "$LOG_FILE" 2>&1 || true
+log "rolling back to $LOCAL_SHA"
+git reset --hard "$LOCAL_SHA"
+docker compose up -d --build openjobslots-app openjobslots-worker >> "$LOG_FILE" 2>&1 || true
 exit 1
