@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.17";
+const PUBLIC_APP_VERSION = "1.5.18";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.18",
+    date: "May 8, 2026",
+    title: "Parser backfill stabilization",
+    summary:
+      "Improved production normalization backfill for source posting dates, preserved stronger source IDs and remote classifications during sync, and tightened parser tests for physical job locations."
+  },
   {
     version: "1.5.17",
     date: "May 8, 2026",
