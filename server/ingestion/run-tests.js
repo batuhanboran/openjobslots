@@ -2,6 +2,7 @@ require("./cache.test");
 require("./dataQuality.test");
 require("./dataQualityAudit.test");
 require("./backfill/geoRemotePlanner.test");
+require("./detailRefetch/detailRefetchPlanner.test");
 require("./parserContract.test");
 require("./adapters.test");
 require("./ats-certification.test");

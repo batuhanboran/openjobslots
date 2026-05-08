@@ -226,6 +226,57 @@ Post-apply verification:
 npm.cmd run audit:data-quality -- --by-source --by-parser --json
 ```
 
+## Guarded iCIMS/Applitrack Detail Refetch
+
+iCIMS and Applitrack list/import rows often omit location or remote evidence. Use the detail refetch tooling only for bounded, polite repair batches.
+
+Dry-run candidate planning and detail parsing:
+
+```powershell
+npm.cmd run refetch:details:dry-run -- --source=icims --limit=50 --company-limit=5 --sample=10 --json
+```
+
+```powershell
+npm.cmd run refetch:details:dry-run -- --source=applitrack --limit=50 --company-limit=5 --sample=10 --output=C:\tmp\openjobslots-detail-refetch.json
+```
+
+Local fixture-only smoke tests can pass `--fixture-dir=<path>` with files named `<ats>-<source_job_id>.html` or `<ats>-detail-<source_job_id>.html`.
+
+The dry-run command performs no writes. It reports:
+
+- candidate rows prioritized by missing geo plus weak/unknown remote state;
+- candidates grouped by ATS/source host;
+- HTTP status counts when details are fetched;
+- parser success/failure counts;
+- before/after samples with rule names and confidence;
+- blocked or failed URLs with backoff metadata.
+
+Guarded apply requires all safety flags and must be run only after a production backup exists:
+
+```powershell
+npm.cmd run refetch:details -- --source=icims --limit=50 --company-limit=5 --apply --confirm-production --backup-confirmed --max-updates=25 --batch-size=10 --json
+```
+
+Safety rules:
+
+- Fetches run sequentially with delay and jitter; default concurrency is 1.
+- Candidate rows are grouped by source host and capped with `--company-limit`.
+- Only iCIMS and Applitrack are supported.
+- Rows must be visible, valid, and missing geo or weak remote evidence.
+- Existing nonblank country, region, city, source id, posting date, department, and explicit remote/hybrid/onsite values are not overwritten.
+- `remote_type` is set only from explicit detail evidence.
+- `city` is set only when the detail parser exposes city-level evidence through the normalizer.
+- Failed/blocked URLs are audited with HTTP status and parser failure reason.
+
+Audit tables created during guarded apply:
+
+- `detail_refetch_runs`
+- `detail_refetch_changes`
+
+The audit rows include run id, source ATS, company, canonical URL, detail URL, HTTP status, field changed, old/new values, rule name, confidence, source evidence summary, parser status/failure reason, and applied flag.
+
+The older `backfill:detail-pages` command is retained only for compatibility. New work should use `refetch:details:dry-run` and guarded `refetch:details`.
+
 ## Known Limitations
 
 - Existing rows may have `legacy-adapter-v1` parser metadata until a safe backfill runs.
