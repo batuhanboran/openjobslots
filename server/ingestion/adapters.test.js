@@ -18,10 +18,10 @@ const {
 } = require("./adapter-metadata");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("./posting");
 
-test("canonicalizePostingUrl removes fragments but preserves query strings", () => {
+test("canonicalizePostingUrl removes fragments and tracking query noise", () => {
   assert.equal(
-    canonicalizePostingUrl("https://example.com/jobs/123?lang=en#apply"),
-    "https://example.com/jobs/123?lang=en"
+    canonicalizePostingUrl("https://example.com/jobs/123?jobId=abc&utm_source=test&source=openjobslots#apply"),
+    "https://example.com/jobs/123?jobId=abc"
   );
 });
 
@@ -199,18 +199,24 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "adp_workforcenow",
       "applicantpro",
       "applitrack",
+      "ashby",
       "applytojob",
       "bamboohr",
       "breezy",
       "careerplug",
       "fountain",
+      "greenhouse",
       "icims",
+      "lever",
       "manatal",
       "oracle",
       "paylocity",
       "pinpointhq",
       "recruitcrm",
       "recruitee",
+      "smartrecruiters",
+      "taleo",
+      "workday",
       "zoho"
     ].sort()
   );
@@ -218,7 +224,7 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
     const metadata = getAdapterMetadata(atsKey);
     assert.equal(metadata.parserFixtureStatus, "parser-fixture-backed");
   }
-  assert.equal(getAdapterMetadata("greenhouse").parserFixtureStatus, "normalized-fixture-only");
+  assert.equal(getAdapterMetadata("teamtailor").parserFixtureStatus, "pending-parser-fixture");
 });
 
 test("dayforcehcm is configured but disabled until parser certification exists", () => {

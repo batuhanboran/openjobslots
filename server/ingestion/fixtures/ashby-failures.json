@@ -1,0 +1,42 @@
+{
+  "ats_key": "ashby",
+  "company_name_for_postings": "Fixture Ashby",
+  "company": {
+    "company_name": "Fixture Ashby",
+    "ATS_name": "Ashby"
+  },
+  "config": {},
+  "raw_response": {
+    "jobs": [
+      {
+        "id": "ash-placeholder",
+        "title": "",
+        "location": "Remote - United States",
+        "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-placeholder"
+      }
+    ]
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "ash-placeholder",
+      "reason": "placeholder position_name"
+    }
+  ],
+  "missing_company_raw_response": {
+    "jobs": [
+      {
+        "id": "ash-missing-company",
+        "title": "Support Engineer",
+        "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-missing-company"
+      }
+    ]
+  },
+  "missing_url_raw_response": {
+    "jobs": [
+      {
+        "id": "ash-missing-url",
+        "title": "Support Engineer"
+      }
+    ]
+  }
+}

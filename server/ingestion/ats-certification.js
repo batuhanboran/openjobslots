@@ -247,6 +247,30 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Lever id is available.")
     }
   },
+  smartrecruiters: {
+    priority: "P1",
+    sourcePattern: "SmartRecruiters public search JSON and Posting API where credentials exist.",
+    parserPath: "server/index.js parseSmartRecruitersPostingsFromApi",
+    requiredFixtures: ["content[] response fixture", "missing-title fixture", "missing-url fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved content[] fixture covers shortLocation/location city, region, and country fields."),
+      date: decision("list-payload", "releasedDate/updatedOn/createdOn expose posting dates when source includes them."),
+      remote: decision("list-payload", "remote/isRemote/workplaceType/locationType fields expose remote or hybrid evidence when present."),
+      sourceId: decision("list-payload", "SmartRecruiters id/uuid/refNumber is available and must be preserved.")
+    }
+  },
+  taleo: {
+    priority: "P1",
+    sourcePattern: "Taleo bootstrap, REST requisition search, and AJAX fallback.",
+    parserPath: "server/index.js extractTaleoPostingsFromRest",
+    requiredFixtures: ["REST requisition fixture", "missing-title fixture", "missing-url fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved REST fixture scans source columns for country, city/state, or remote location evidence."),
+      date: decision("list-payload", "Saved REST fixture accepts only date-like source columns and rejects boolean-like values."),
+      remote: decision("url-or-title-inference", "Remote/hybrid is inferred only from explicit source location/title text."),
+      sourceId: decision("list-payload", "jobId/contestNo is available and must be preserved.")
+    }
+  },
   dayforcehcm: {
     priority: "P4",
     sourcePattern: "Unsupported until a stable public Dayforce source is certified.",

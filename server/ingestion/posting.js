@@ -3,7 +3,35 @@ function normalizePostingValue(value) {
 }
 
 function canonicalizePostingUrl(value) {
-  return normalizePostingValue(value).replace(/#.*$/, "");
+  const raw = normalizePostingValue(value);
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    parsed.hash = "";
+    for (const key of Array.from(parsed.searchParams.keys())) {
+      const normalizedKey = key.toLowerCase();
+      if (
+        normalizedKey.startsWith("utm_") ||
+        [
+          "_ga",
+          "_gl",
+          "gh_src",
+          "iis",
+          "iisn",
+          "lever-source",
+          "ref",
+          "referrer",
+          "source",
+          "src"
+        ].includes(normalizedKey)
+      ) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return raw.replace(/#.*$/, "");
+  }
 }
 
 function normalizeSearchText(value) {

@@ -1,4 +1,6 @@
-const ADAPTER_METADATA_VERSION = "adapter-certification-v2";
+const { NORMALIZED_POSTING_FIELDS } = require("./parserContract");
+
+const ADAPTER_METADATA_VERSION = "adapter-certification-v3";
 
 const DIRECT_JSON_STABLE = [
   "greenhouse",
@@ -97,27 +99,110 @@ const FIXTURE_BACKED = new Set([
   "oracle",
   "adp_workforcenow",
   "careerplug",
-  "manatal"
+  "manatal",
+  "workday",
+  "taleo"
 ]);
 
 const PARSER_FIXTURE_BACKED = new Set([
   "adp_workforcenow",
   "applicantpro",
   "applitrack",
+  "ashby",
   "applytojob",
   "bamboohr",
   "breezy",
   "fountain",
+  "greenhouse",
   "icims",
+  "lever",
   "oracle",
   "paylocity",
   "pinpointhq",
   "recruitcrm",
   "recruitee",
+  "smartrecruiters",
   "careerplug",
   "manatal",
-  "zoho"
+  "zoho",
+  "workday",
+  "taleo"
 ]);
+
+const ADAPTER_CERTIFICATION_DETAILS = Object.freeze({
+  greenhouse: {
+    sourceEndpointPattern: "GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true",
+    paginationBehavior: "Single list response with jobs[] and meta.total.",
+    detailPageRequirement: "Not required for core fields; retrieve-job endpoint can enrich questions/pay transparency.",
+    dateParsingRule: "Use updated_at, then first_published when present.",
+    locationParsingRule: "Use location.name; office.location can provide country evidence.",
+    remoteParsingRule: "Infer from title/location/description evidence; Greenhouse does not expose a universal remote flag.",
+    canonicalUrlRule: "Use absolute_url and strip fragments/tracking query params while preserving gh_jid/job id.",
+    expectedFailureModes: ["missing absolute_url", "blank title", "prospect posts with null internal job id"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "medium"
+  },
+  lever: {
+    sourceEndpointPattern: "GET https://api.lever.co/v0/postings/{site}?mode=json",
+    paginationBehavior: "Supports skip/limit; current collector uses one public list response.",
+    detailPageRequirement: "Not required; list JSON includes id, hostedUrl, applyUrl, categories, descriptions, createdAt.",
+    dateParsingRule: "Convert createdAt epoch milliseconds when present.",
+    locationParsingRule: "Use categories.allLocations, then categories.location, plus country code when present.",
+    remoteParsingRule: "Use workplaceType and location/title evidence.",
+    canonicalUrlRule: "Use hostedUrl and strip tracking query params such as lever-source.",
+    expectedFailureModes: ["missing hostedUrl", "blank text title", "missing company context"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "medium"
+  },
+  ashby: {
+    sourceEndpointPattern: "Current collector POSTs https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobBoardWithTeams; official public API is https://api.ashbyhq.com/posting-api/job-board/{JOB_BOARD_NAME}.",
+    paginationBehavior: "Current GraphQL response is one jobPostings[] list; official public API returns jobs[].",
+    detailPageRequirement: "Not required for core public fields when source exposes jobUrl/applyUrl/location/description.",
+    dateParsingRule: "Use official publishedAt/createdAt when present; current hosted GraphQL query omits dates.",
+    locationParsingRule: "Use locationName/location/address plus secondaryLocations.",
+    remoteParsingRule: "Use workplaceType and isRemote.",
+    canonicalUrlRule: "Use jobUrl when present, otherwise jobs.ashbyhq.com/{board}/{id}.",
+    expectedFailureModes: ["missing jobUrl with missing id", "blank title", "missing company context"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "medium"
+  },
+  smartrecruiters: {
+    sourceEndpointPattern: "Public search JSON at https://jobs.smartrecruiters.com/sr-jobs/search and SmartRecruiters Posting API where credentials exist.",
+    paginationBehavior: "Public search supports limit; authenticated API supports paged job search.",
+    detailPageRequirement: "Not required for list-visible fields; detail pages may enrich descriptions.",
+    dateParsingRule: "Use releasedDate/updatedOn/createdOn when present.",
+    locationParsingRule: "Use shortLocation or location.city/region/country.",
+    remoteParsingRule: "Use remote/isRemote/workplaceType/locationType plus text evidence.",
+    canonicalUrlRule: "Use applyUrl/ref/jobUrl/url and strip tracking fragments/query params.",
+    expectedFailureModes: ["missing applyUrl/ref URL", "blank title", "missing company context"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "medium"
+  },
+  workday: {
+    sourceEndpointPattern: "POST {origin}/wday/cxs/{tenant}/{site}/jobs",
+    paginationBehavior: "CXS limit/offset pagination.",
+    detailPageRequirement: "Not required for list-visible source id/location/date; detail can enrich descriptions.",
+    dateParsingRule: "Use postedOn/postedOnDate/postedDate/postingDate/externalPostedOn/updatedOn.",
+    locationParsingRule: "Use Workday location fields plus URL location segment fallback.",
+    remoteParsingRule: "Use remoteType/workplaceType/locationType/timeType/URL evidence.",
+    canonicalUrlRule: "Build URL from companyBaseUrl plus externalPath.",
+    expectedFailureModes: ["missing externalPath", "blank title", "generic postedOn text without exact date"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "medium"
+  },
+  taleo: {
+    sourceEndpointPattern: "Taleo careersection REST/AJAX jobsearch endpoints.",
+    paginationBehavior: "Tokenized REST/AJAX pages; shape varies by tenant.",
+    detailPageRequirement: "May be required when list columns omit date/location.",
+    dateParsingRule: "Scan columns and accept only date-like values; reject boolean values.",
+    locationParsingRule: "Scan columns for country, remote, or state/city evidence.",
+    remoteParsingRule: "Infer from picked location/title evidence.",
+    canonicalUrlRule: "Build jobdetail.ftl?job={contestNo|jobId}&lang={lang}.",
+    expectedFailureModes: ["unstable column order", "boolean columns mistaken for dates", "missing job id"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "low"
+  }
+});
 
 const FUTURE_DIRECT_SOURCE_CANDIDATES = Object.freeze([
   {
@@ -253,6 +338,7 @@ function getAdapterParseStrategy(atsKey) {
 
 function getAdapterMetadata(atsKey, displayName = "") {
   const key = String(atsKey || "").trim().toLowerCase();
+  const certification = ADAPTER_CERTIFICATION_DETAILS[key] || null;
   return {
     key,
     displayName: String(displayName || key).trim(),
@@ -261,35 +347,10 @@ function getAdapterMetadata(atsKey, displayName = "") {
     fixtureStatus: getFixtureStatus(key),
     parserFixtureStatus: getParserFixtureStatus(key),
     enabledByDefault: isAtsEnabledByDefault(key),
-    confidence: getDefaultConfidence(key),
+    confidence: certification?.confidenceLevel || getDefaultConfidence(key),
     parseStrategy: getAdapterParseStrategy(key),
-    normalizedShape: [
-      "source_job_id",
-      "canonical_url",
-      "apply_url",
-      "title",
-      "company",
-      "location_text",
-      "country",
-      "region",
-      "city",
-      "remote_type",
-      "department",
-      "employment_type",
-      "description_plain",
-      "description_html",
-      "industry",
-      "posted_at",
-      "posted_at_epoch",
-      "first_seen",
-      "first_seen_epoch",
-      "last_seen",
-      "last_seen_epoch",
-      "ats_key",
-      "parser_version",
-      "raw_hash",
-      "parser_confidence"
-    ]
+    certification,
+    normalizedShape: NORMALIZED_POSTING_FIELDS
   };
 }
 
@@ -306,6 +367,7 @@ module.exports = {
   PUBLIC_SECTOR_EDUCATION,
   UNSUPPORTED_ATS,
   VENDOR_SPECIFIC,
+  ADAPTER_CERTIFICATION_DETAILS,
   getFixtureStatus,
   getParserFixtureStatus,
   getAdapterMetadata,

@@ -2993,20 +2993,40 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
   }
 }
 
+function pushUniqueText(values, value) {
+  const text = String(value || "").trim();
+  if (!text) return;
+  if (values.some((existing) => existing.toLowerCase() === text.toLowerCase())) return;
+  values.push(text);
+}
+
+function buildAddressLocationLabel(address) {
+  const postalAddress = address?.postalAddress && typeof address.postalAddress === "object"
+    ? address.postalAddress
+    : address && typeof address === "object"
+      ? address
+      : {};
+  const city = String(postalAddress?.addressLocality || postalAddress?.city || "").trim();
+  const state = String(postalAddress?.addressRegion || postalAddress?.state || postalAddress?.region || "").trim();
+  const country = String(postalAddress?.addressCountry || postalAddress?.country || "").trim();
+  const parts = [city, state, country].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "";
+}
+
 function extractAshbyLocationName(posting) {
   const names = [];
-  const primary = String(posting?.locationName || "").trim();
-  if (primary) names.push(primary);
+  pushUniqueText(names, posting?.locationName);
+  pushUniqueText(names, posting?.location);
+  pushUniqueText(names, buildAddressLocationLabel(posting?.address));
 
   const secondary = Array.isArray(posting?.secondaryLocations) ? posting.secondaryLocations : [];
   for (const location of secondary) {
-    const name = String(location?.locationName || "").trim();
-    if (!name) continue;
-    if (names.some((existing) => existing.toLowerCase() === name.toLowerCase())) continue;
-    names.push(name);
+    pushUniqueText(names, location?.locationName);
+    pushUniqueText(names, location?.location);
+    pushUniqueText(names, buildAddressLocationLabel(location?.address));
   }
 
-  return names.length > 0 ? names.join(", ") : null;
+  return names.length > 0 ? names.join(" / ") : null;
 }
 
 function parseAshbyCompany(urlString) {
@@ -10187,33 +10207,96 @@ async function collectTodayPostingsForWorkdayCompany(company) {
     const postings = Array.isArray(response?.jobPostings) ? response.jobPostings : [];
     if (postings.length === 0) break;
 
-    for (const posting of postings) {
-      const jobUrl = buildJobUrl(config.companyBaseUrl, posting?.externalPath);
-      if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-      collected.push({
-        company_name: company.company_name,
-        source_job_id: extractWorkdaySourceJobId(posting, jobUrl),
-        position_name: String(posting?.title || "").trim() || "Untitled Position",
-        job_posting_url: jobUrl,
-        posting_date:
-          String(
-            posting?.postedOn ||
-              posting?.postedOnDate ||
-              posting?.postedDate ||
-              posting?.postingDate ||
-              posting?.externalPostedOn ||
-              posting?.updatedOn ||
-              ""
-          ).trim() || null,
-        location: extractWorkdayLocationLabel(posting, jobUrl),
-        workplaceType: extractWorkdayRemoteSignal(posting, jobUrl)
-      });
-      seenUrls.add(jobUrl);
+    for (const parsedPosting of parseWorkdayPostingsFromApi(company.company_name, config, response)) {
+      if (!parsedPosting.job_posting_url || seenUrls.has(parsedPosting.job_posting_url)) continue;
+      collected.push(parsedPosting);
+      seenUrls.add(parsedPosting.job_posting_url);
     }
 
     if (postings.length < WORKDAY_PAGE_SIZE) break;
     offset += WORKDAY_PAGE_SIZE;
+  }
+
+  return collected;
+}
+
+function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
+  const postings = Array.isArray(response?.jobPostings) ? response.jobPostings : [];
+  const companyName = String(companyNameForPostings || "").trim();
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const posting of postings) {
+    const jobUrl = buildJobUrl(config?.companyBaseUrl, posting?.externalPath);
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    collected.push({
+      company_name: companyName,
+      source_job_id: extractWorkdaySourceJobId(posting, jobUrl),
+      id: String(posting?.id || posting?.jobId || "").trim() || undefined,
+      position_name: String(posting?.title || "").trim() || "Untitled Position",
+      job_posting_url: jobUrl,
+      posting_date:
+        String(
+          posting?.postedOn ||
+            posting?.postedOnDate ||
+            posting?.postedDate ||
+            posting?.postingDate ||
+            posting?.externalPostedOn ||
+            posting?.updatedOn ||
+            ""
+        ).trim() || null,
+      location: extractWorkdayLocationLabel(posting, jobUrl),
+      workplaceType: extractWorkdayRemoteSignal(posting, jobUrl)
+    });
+    seenUrls.add(jobUrl);
+  }
+
+  return collected;
+}
+
+function parseAshbyPostingsFromApi(companyNameForPostings, config, response) {
+  const graphQlJobBoard = response?.data?.jobBoard;
+  const jobPostings = Array.isArray(graphQlJobBoard?.jobPostings)
+    ? graphQlJobBoard.jobPostings
+    : Array.isArray(response?.jobs)
+      ? response.jobs
+      : [];
+  const teams = Array.isArray(graphQlJobBoard?.teams) ? graphQlJobBoard.teams : [];
+  const teamNameById = new Map(
+    teams
+      .map((team) => [String(team?.id || "").trim(), String(team?.externalName || team?.name || "").trim()])
+      .filter(([id, name]) => id && name)
+  );
+  const companyName = String(companyNameForPostings || config?.organizationHostedJobsPageNameLower || "").trim();
+  const collected = [];
+  const seenUrls = new Set();
+
+  for (const posting of jobPostings) {
+    const jobId = String(posting?.id || "").trim();
+    const jobUrl = String(posting?.jobUrl || "").trim() || buildAshbyJobUrl(config?.organizationHostedJobsPageName, jobId);
+    if (!jobUrl || seenUrls.has(jobUrl)) continue;
+
+    collected.push({
+      company_name: companyName,
+      source_job_id: jobId || extractSourceIdFromPostingUrl(jobUrl, "ashby"),
+      id: jobId || undefined,
+      position_name: String(posting?.title || "").trim() || "Untitled Position",
+      job_posting_url: jobUrl,
+      apply_url: String(posting?.applyUrl || "").trim() || jobUrl,
+      posting_date: String(posting?.publishedAt || posting?.createdAt || "").trim() || null,
+      location: extractAshbyLocationName(posting),
+      workplaceType: String(posting?.workplaceType || "").trim() || (posting?.isRemote === true ? "Remote" : null),
+      remote: posting?.isRemote === true,
+      employment_type: String(posting?.employmentType || "").trim() || null,
+      department:
+        String(posting?.department || posting?.team || "").trim() ||
+        teamNameById.get(String(posting?.teamId || "").trim()) ||
+        null,
+      description_html: String(posting?.descriptionHtml || "").trim() || null,
+      description_plain: String(posting?.descriptionPlain || "").trim() || null
+    });
+    seenUrls.add(jobUrl);
   }
 
   return collected;
@@ -10224,39 +10307,7 @@ async function collectPostingsForAshbyCompany(company) {
   if (!config) return [];
 
   const response = await fetchAshbyJobBoard(config.organizationHostedJobsPageName);
-  const jobPostings = Array.isArray(response?.data?.jobBoard?.jobPostings)
-    ? response.data.jobBoard.jobPostings
-    : [];
-  const teams = Array.isArray(response?.data?.jobBoard?.teams) ? response.data.jobBoard.teams : [];
-  const teamNameById = new Map(
-    teams
-      .map((team) => [String(team?.id || "").trim(), String(team?.externalName || team?.name || "").trim()])
-      .filter(([id, name]) => id && name)
-  );
-
-  const collected = [];
-  for (const posting of jobPostings) {
-    const jobId = String(posting?.id || "").trim();
-    if (!jobId) continue;
-
-    const jobUrl = buildAshbyJobUrl(config.organizationHostedJobsPageName, jobId);
-    if (!jobUrl) continue;
-
-    collected.push({
-      company_name: company.company_name,
-      source_job_id: jobId,
-      id: jobId,
-      position_name: String(posting?.title || "").trim() || "Untitled Position",
-      job_posting_url: jobUrl,
-      posting_date: null,
-      location: extractAshbyLocationName(posting),
-      workplaceType: String(posting?.workplaceType || "").trim() || null,
-      employment_type: String(posting?.employmentType || "").trim() || null,
-      department: teamNameById.get(String(posting?.teamId || "").trim()) || null
-    });
-  }
-
-  return collected;
+  return parseAshbyPostingsFromApi(company.company_name, config, response);
 }
 
 function extractGreenhouseLocationName(posting) {
@@ -10272,12 +10323,16 @@ async function collectPostingsForGreenhouseCompany(company) {
   if (!config) return [];
 
   const response = await fetchGreenhouseJobBoard(config.boardToken);
+  return parseGreenhousePostingsFromApi(company.company_name, config, response);
+}
+
+function parseGreenhousePostingsFromApi(companyNameForPostings, config, response) {
   const jobPostings = Array.isArray(response?.jobs) ? response.jobs : [];
-  const normalizedCompanyName = String(company?.company_name || "").trim();
-  const companyNameForPostings =
+  const normalizedCompanyName = String(companyNameForPostings || "").trim();
+  const resolvedCompanyName =
     normalizedCompanyName && normalizedCompanyName.toLowerCase() !== "job-boards"
       ? normalizedCompanyName
-      : config.boardTokenLower;
+      : config?.boardTokenLower;
 
   const collected = [];
   for (const posting of jobPostings) {
@@ -10285,14 +10340,17 @@ async function collectPostingsForGreenhouseCompany(company) {
     if (!jobUrl) continue;
 
     collected.push({
-      company_name: companyNameForPostings,
+      company_name: resolvedCompanyName,
       source_job_id: String(posting?.id ?? posting?.internal_job_id ?? "").trim() || extractSourceIdFromPostingUrl(jobUrl, "greenhouse"),
       id: String(posting?.id ?? "").trim() || undefined,
       position_name: String(posting?.title || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
+      apply_url: jobUrl,
       posting_date: String(posting?.updated_at || posting?.first_published || "").trim() || null,
       location: extractGreenhouseLocationName(posting),
-      department: String(posting?.departments?.[0]?.name || posting?.metadata?.[0]?.value || "").trim() || null
+      country: String(posting?.offices?.[0]?.location || "").trim() || null,
+      department: String(posting?.departments?.[0]?.name || posting?.metadata?.[0]?.value || "").trim() || null,
+      description_html: String(posting?.content || "").trim() || null
     });
   }
 
@@ -10317,12 +10375,16 @@ async function collectPostingsForLeverCompany(company) {
   if (!config) return [];
 
   const response = await fetchLeverJobBoard(config.organization);
+  return parseLeverPostingsFromApi(company.company_name, config, response);
+}
+
+function parseLeverPostingsFromApi(companyNameForPostings, config, response) {
   const jobPostings = Array.isArray(response) ? response : [];
-  const normalizedCompanyName = String(company?.company_name || "").trim();
-  const companyNameForPostings =
+  const normalizedCompanyName = String(companyNameForPostings || "").trim();
+  const resolvedCompanyName =
     normalizedCompanyName && normalizedCompanyName.toLowerCase() !== "jobs"
       ? normalizedCompanyName
-      : config.organizationLower;
+      : config?.organizationLower;
 
   const collected = [];
   for (const posting of jobPostings) {
@@ -10334,15 +10396,20 @@ async function collectPostingsForLeverCompany(company) {
       Number.isFinite(createdAt) && createdAt > 0 ? new Date(createdAt).toISOString() : null;
 
     collected.push({
-      company_name: companyNameForPostings,
+      company_name: resolvedCompanyName,
       source_job_id: String(posting?.id || "").trim() || extractSourceIdFromPostingUrl(jobUrl, "lever"),
       id: String(posting?.id || "").trim() || undefined,
       position_name: String(posting?.text || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
+      apply_url: String(posting?.applyUrl || "").trim() || jobUrl,
       posting_date: postingDate,
       location: extractLeverLocationName(posting),
+      country: String(posting?.country || "").trim() || null,
+      workplaceType: String(posting?.workplaceType || "").trim() || null,
       department: String(posting?.categories?.team || posting?.categories?.department || "").trim() || null,
-      employment_type: String(posting?.categories?.commitment || "").trim() || null
+      employment_type: String(posting?.categories?.commitment || "").trim() || null,
+      description_html: String(posting?.description || posting?.opening || "").trim() || null,
+      description_plain: String(posting?.descriptionPlain || posting?.openingPlain || "").trim() || null
     });
   }
 
@@ -11985,6 +12052,67 @@ function buildSmartRecruitersLocationLabel(locationObj, shortLocation) {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, payload) {
+  const contentItems = Array.isArray(payload?.content)
+    ? payload.content
+    : Array.isArray(payload?.jobs)
+      ? payload.jobs
+      : Array.isArray(payload)
+        ? payload
+        : [];
+  const postings = [];
+  const seenUrls = new Set();
+
+  for (const item of contentItems) {
+    if (!item || typeof item !== "object") continue;
+
+    const rawJobUrl =
+      cleanSmartRecruitersText(item.applyUrl) ||
+      cleanSmartRecruitersText(item.ref) ||
+      cleanSmartRecruitersText(item.jobUrl) ||
+      cleanSmartRecruitersText(item.url);
+    if (!rawJobUrl || seenUrls.has(rawJobUrl)) continue;
+
+    const company = item.company && typeof item.company === "object" ? item.company : {};
+    const companyName =
+      cleanSmartRecruitersText(companyNameForPostings) ||
+      cleanSmartRecruitersText(company.name) ||
+      cleanSmartRecruitersText(config?.companySlug);
+    const title = cleanSmartRecruitersText(item.name || item.title) || "Untitled Position";
+    const location = buildSmartRecruitersLocationLabel(item.location, item.shortLocation);
+    const postedDate = cleanSmartRecruitersText(item.releasedDate || item.updatedOn || item.createdOn) || null;
+    const department =
+      cleanSmartRecruitersText(item.department?.label || item.department?.name || item.department) || null;
+    const employmentType =
+      cleanSmartRecruitersText(item.typeOfEmployment?.label || item.typeOfEmployment?.name || item.typeOfEmployment || item.employmentType) || null;
+    const jobAdSections = item.jobAd?.sections && typeof item.jobAd.sections === "object" ? item.jobAd.sections : {};
+
+    postings.push({
+      company_name: companyName,
+      source_job_id:
+        String(item?.id ?? item?.uuid ?? item?.refNumber ?? "").trim() ||
+        extractSourceIdFromPostingUrl(rawJobUrl, "smartrecruiters"),
+      id: String(item?.id ?? "").trim() || undefined,
+      position_name: title,
+      job_posting_url: rawJobUrl,
+      posting_date: postedDate,
+      location,
+      department,
+      employment_type: employmentType,
+      workplaceType:
+        cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
+        (item.remote === true ? "remote" : null),
+      remote: item.remote === true || item.isRemote === true,
+      industry: cleanSmartRecruitersText(item.industry?.label || item.industry?.name || item.industry) || null,
+      description_html: cleanSmartRecruitersText(jobAdSections.jobDescription || item.descriptionHtml) || null,
+      description_plain: cleanSmartRecruitersText(item.descriptionPlain || item.description) || null
+    });
+    seenUrls.add(rawJobUrl);
+  }
+
+  return postings;
+}
+
 async function collectPostingsForSmartRecruitersDynamic(limit = 100) {
   const cappedLimit = Math.max(1, Math.min(100, Number(limit) || 100));
   const endpoint = new URL("https://jobs.smartrecruiters.com/sr-jobs/search");
@@ -12010,35 +12138,7 @@ async function collectPostingsForSmartRecruitersDynamic(limit = 100) {
   }
 
   const payload = await res.json();
-  const contentItems = Array.isArray(payload?.content) ? payload.content : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const item of contentItems) {
-    if (!item || typeof item !== "object") continue;
-
-    const jobUrl = cleanSmartRecruitersText(item.applyUrl);
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-    const company = item.company && typeof item.company === "object" ? item.company : {};
-    const companyName = cleanSmartRecruitersText(company.name) || "Unknown Company";
-    const title = cleanSmartRecruitersText(item.name) || "Untitled Position";
-    const location = buildSmartRecruitersLocationLabel(item.location, item.shortLocation);
-    const postedDate = cleanSmartRecruitersText(item.releasedDate) || null;
-
-    postings.push({
-      company_name: companyName,
-      source_job_id: String(item?.id ?? item?.uuid ?? "").trim() || extractSourceIdFromPostingUrl(jobUrl, "smartrecruiters"),
-      id: String(item?.id ?? "").trim() || undefined,
-      position_name: title,
-      job_posting_url: jobUrl,
-      posting_date: postedDate,
-      location
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return postings;
+  return parseSmartRecruitersPostingsFromApi("", {}, payload);
 }
 
 function cleanPoliceappText(value) {
@@ -17092,21 +17192,26 @@ module.exports = {
   parseApplicantProPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
+  parseAshbyPostingsFromApi,
   parseAshbyCompany,
   parseBambooHrPostingsFromApi,
   parseBreezyPostingsFromHtml,
   parseCareerplugPostingsFromHtml,
   parseFountainPostingsFromApi,
+  parseGreenhousePostingsFromApi,
   parseHrmDirectPostingsFromHtml,
   parseIcimsPostingsFromHtml,
   parseJobvitePostingsFromHtml,
+  parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
   parseRecruiteePostingsFromPublicApp,
+  parseSmartRecruitersPostingsFromApi,
   parseTeamtailorPostingsFromHtml,
+  parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName,
   runWorkdaySync,

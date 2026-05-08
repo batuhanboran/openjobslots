@@ -1,0 +1,38 @@
+{
+  "ats_key": "lever",
+  "company_name_for_postings": "Fixture Lever",
+  "company": {
+    "company_name": "Fixture Lever",
+    "ATS_name": "Lever"
+  },
+  "config": {},
+  "raw_response": [
+    {
+      "id": "lev-placeholder",
+      "text": "",
+      "hostedUrl": "https://jobs.lever.co/fixtureco/lev-placeholder",
+      "categories": {
+        "location": "Remote - United States"
+      }
+    }
+  ],
+  "expected_rejections": [
+    {
+      "source_job_id": "lev-placeholder",
+      "reason": "placeholder position_name"
+    }
+  ],
+  "missing_company_raw_response": [
+    {
+      "id": "lev-missing-company",
+      "text": "Support Engineer",
+      "hostedUrl": "https://jobs.lever.co/fixtureco/lev-missing-company"
+    }
+  ],
+  "missing_url_raw_response": [
+    {
+      "id": "lev-missing-url",
+      "text": "Support Engineer"
+    }
+  ]
+}

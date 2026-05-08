@@ -1,0 +1,40 @@
+{
+  "ats_key": "taleo",
+  "company_name_for_postings": "Fixture Taleo",
+  "company": {
+    "company_name": "Fixture Taleo",
+    "company_url": "https://fixture.taleo.net/careersection/001/jobsearch.ftl?lang=en",
+    "ATS_name": "Taleo"
+  },
+  "config": {
+    "baseSectionUrl": "https://fixture.taleo.net/careersection/001",
+    "lang": "en"
+  },
+  "raw_response": [
+    {
+      "jobId": "146407",
+      "contestNo": "146407",
+      "column": [
+        "Kearney Finance Supervisor",
+        "false",
+        "Dubai, United Arab Emirates",
+        "Full-time",
+        "May 8, 2026"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "ats_key": "taleo",
+      "source_job_id": "146407",
+      "company_name": "Fixture Taleo",
+      "position_name": "Kearney Finance Supervisor",
+      "job_posting_url": "https://fixture.taleo.net/careersection/001/jobdetail.ftl?job=146407&lang=en",
+      "country": "United Arab Emirates",
+      "region": "EMEA",
+      "remote_type": "onsite",
+      "posting_date": "May 8, 2026",
+      "parser_confidence": 0.35
+    }
+  ]
+}

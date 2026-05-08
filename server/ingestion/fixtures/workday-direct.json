@@ -1,0 +1,38 @@
+{
+  "ats_key": "workday",
+  "company_name_for_postings": "Fixture Workday",
+  "company": {
+    "company_name": "Fixture Workday",
+    "company_url": "https://fixture.wd1.myworkdayjobs.com/Careers",
+    "ATS_name": "Workday"
+  },
+  "config": {
+    "companyBaseUrl": "https://fixture.wd1.myworkdayjobs.com/Careers"
+  },
+  "raw_response": {
+    "jobPostings": [
+      {
+        "id": "JR15792",
+        "title": "Bodily Injury Claim Specialist - Meemic",
+        "externalPath": "/job/MI-HMMI-Empl-Work-From-Home/Bodily-Injury-Claim-Specialist---Meemic_JR15792",
+        "postedOn": "Posted Today",
+        "locationsText": "MI HMMI Empl Work From Home",
+        "remoteType": "Work From Home"
+      }
+    ]
+  },
+  "expected": [
+    {
+      "ats_key": "workday",
+      "source_job_id": "JR15792",
+      "company_name": "Fixture Workday",
+      "position_name": "Bodily Injury Claim Specialist - Meemic",
+      "job_posting_url": "https://fixture.wd1.myworkdayjobs.com/Careers/job/MI-HMMI-Empl-Work-From-Home/Bodily-Injury-Claim-Specialist---Meemic_JR15792",
+      "country": "United States",
+      "region": "North America",
+      "remote_type": "remote",
+      "posting_date": "Posted Today",
+      "parser_confidence": 0.75
+    }
+  ]
+}
