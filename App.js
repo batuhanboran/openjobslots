@@ -24,6 +24,7 @@ import {
   fetchMcpCandidates,
   fetchMcpSettings,
   fetchPostingFilterOptions,
+  fetchPostingDiagnostics,
   fetchPersonalInformation,
   fetchPostings,
   fetchSearchSuggestions,
@@ -1159,6 +1160,10 @@ function PostingCard({
   ignoringPostingIds,
   blockedCompanyNames,
   blockingCompanyNames,
+  diagnostics,
+  diagnosticsOpen,
+  diagnosticsLoading,
+  onToggleDiagnostics,
   showAdminActions = false
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1187,6 +1192,14 @@ function PostingCard({
   const postingDateLabel = sanitizeDisplayText(item?.posting_date, "Posting date unavailable");
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
   const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
+  const diagnosticsItem = diagnostics?.item?.diagnostics || null;
+  const diagnosticsFlags = Array.isArray(diagnosticsItem?.quality_flags) ? diagnosticsItem.quality_flags.slice(0, 4) : [];
+  const diagnosticsQuality = Number.isFinite(Number(diagnosticsItem?.quality_score))
+    ? `${Number(diagnosticsItem.quality_score)}/100`
+    : "Not scored";
+  const diagnosticsConfidence = Number.isFinite(Number(diagnosticsItem?.confidence_score))
+    ? Number(diagnosticsItem.confidence_score).toFixed(2)
+    : "Unknown";
 
   return (
     <View style={styles.card} testID="posting-card">
@@ -1288,6 +1301,48 @@ function PostingCard({
           </View>
         ) : null}
       </View>
+      <View style={styles.postingCardSourceRow}>
+        <Pressable
+          onPress={() => onToggleDiagnostics?.(item)}
+          style={({ pressed }) => [styles.postingCardSourceButton, pressed ? styles.buttonPressed : null]}
+          testID="posting-card-source-toggle"
+          accessibilityRole="button"
+          accessibilityLabel="Show posting source and quality details"
+        >
+          <Text style={styles.postingCardSourceButtonText}>{diagnosticsOpen ? "Hide source" : "Source"}</Text>
+        </Pressable>
+      </View>
+      {diagnosticsOpen ? (
+        <View style={styles.postingCardSourcePanel} testID="posting-card-source-panel">
+          {diagnosticsLoading ? (
+            <Text style={styles.postingCardSourceText}>Loading source details...</Text>
+          ) : diagnostics?.ok === false ? (
+            <Text style={styles.postingCardSourceText}>{diagnostics.error || "Source details are unavailable."}</Text>
+          ) : diagnosticsItem ? (
+            <>
+              <Text style={styles.postingCardSourceText}>
+                Source: {sanitizeDisplayText(diagnosticsItem.source_ats || item?.ats || atsLabel, "Unknown")}
+              </Text>
+              <Text style={styles.postingCardSourceText}>
+                Last seen: {formatEpochSeconds(diagnosticsItem.last_seen_epoch, "Not available")}
+              </Text>
+              <Text style={styles.postingCardSourceText}>
+                Quality: {diagnosticsQuality} - Confidence: {diagnosticsConfidence}
+              </Text>
+              <Text style={styles.postingCardSourceText}>
+                Parser: {sanitizeDisplayText(diagnosticsItem.parser_key || diagnosticsItem.parser_version, "Unknown")}
+              </Text>
+              {diagnosticsFlags.length > 0 ? (
+                <Text style={styles.postingCardSourceFlags}>Flags: {diagnosticsFlags.join(", ")}</Text>
+              ) : (
+                <Text style={styles.postingCardSourceFlags}>No quality warnings recorded.</Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.postingCardSourceText}>Source details are unavailable.</Text>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1567,6 +1622,9 @@ export default function App() {
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
   const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
+  const [postingDiagnosticsOpenUrl, setPostingDiagnosticsOpenUrl] = useState("");
+  const [postingDiagnosticsByUrl, setPostingDiagnosticsByUrl] = useState({});
+  const [postingDiagnosticsLoadingByUrl, setPostingDiagnosticsLoadingByUrl] = useState({});
   const [showScrollTopButton, setShowScrollTopButton] = useState(false);
   const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
@@ -2073,6 +2131,37 @@ export default function App() {
       }
     }
   }, [queueFrontendLog]);
+
+  const togglePostingDiagnostics = useCallback(async (item) => {
+    const postingUrl = String(item?.job_posting_url || "").trim();
+    if (!postingUrl) return;
+    if (postingDiagnosticsOpenUrl === postingUrl) {
+      setPostingDiagnosticsOpenUrl("");
+      return;
+    }
+    setPostingDiagnosticsOpenUrl(postingUrl);
+    if (postingDiagnosticsByUrl[postingUrl] || postingDiagnosticsLoadingByUrl[postingUrl]) {
+      return;
+    }
+    setPostingDiagnosticsLoadingByUrl((prev) => ({ ...prev, [postingUrl]: true }));
+    try {
+      const response = await fetchPostingDiagnostics(postingUrl);
+      setPostingDiagnosticsByUrl((prev) => ({
+        ...prev,
+        [postingUrl]: response?.ok === false
+          ? { ok: false, error: "Source details are not available for this posting yet." }
+          : { ok: true, item: response?.item || null }
+      }));
+    } catch (e) {
+      setPostingDiagnosticsByUrl((prev) => ({
+        ...prev,
+        [postingUrl]: { ok: false, error: "Source details are temporarily unavailable." }
+      }));
+      queueFrontendLog("warn", "posting_diagnostics_failed", String(e?.message || e), { posting_url: postingUrl });
+    } finally {
+      setPostingDiagnosticsLoadingByUrl((prev) => ({ ...prev, [postingUrl]: false }));
+    }
+  }, [postingDiagnosticsByUrl, postingDiagnosticsLoadingByUrl, postingDiagnosticsOpenUrl, queueFrontendLog]);
 
   const loadPostingFilterOptions = useCallback(async () => {
     setPostingFilterOptionsLoading(true);
@@ -3887,6 +3976,10 @@ export default function App() {
                     ignoringPostingIds={ignoringPostingIds}
                     blockedCompanyNames={blockedCompanyNames}
                     blockingCompanyNames={blockingCompanyNamesSet}
+                    diagnosticsOpen={postingDiagnosticsOpenUrl === String(item?.job_posting_url || "").trim()}
+                    diagnosticsLoading={Boolean(postingDiagnosticsLoadingByUrl[String(item?.job_posting_url || "").trim()])}
+                    diagnostics={postingDiagnosticsByUrl[String(item?.job_posting_url || "").trim()]}
+                    onToggleDiagnostics={togglePostingDiagnostics}
                   />
                 ))
               )}
@@ -5743,6 +5836,43 @@ const styles = StyleSheet.create({
   },
   postingCardMainPressAreaPressed: {
     opacity: 0.78
+  },
+  postingCardSourceRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "flex-start"
+  },
+  postingCardSourceButton: {
+    borderWidth: 1,
+    borderColor: OJS_COLORS.border,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: OJS_COLORS.surfaceMuted
+  },
+  postingCardSourceButtonText: {
+    fontSize: 12,
+    color: OJS_COLORS.text,
+    fontWeight: "600"
+  },
+  postingCardSourcePanel: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: OJS_COLORS.surfaceMuted
+  },
+  postingCardSourceText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: OJS_COLORS.text
+  },
+  postingCardSourceFlags: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    color: OJS_COLORS.muted
   },
   postingCardMenuAnchor: {
     position: "relative",

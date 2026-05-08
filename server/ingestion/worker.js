@@ -9,6 +9,7 @@ const {
 } = require("../index");
 const { getAdapterForCompany } = require("./adapters");
 const { hashPayload, writePostingCache } = require("./cache");
+const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
 const { DEFAULT_TTL_SECONDS, ensureIngestionTables, seedAtsSources } = require("./schema");
 const {
   createPostgresPool,
@@ -843,10 +844,23 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
   const rawPayloadHash = hashPayload(posting || {});
   if (!canonicalUrl) return { cached: false, changed: false, hash: rawPayloadHash };
+  const validationStatus = validation.ok ? "valid" : "invalid";
+  const validationError = String(validation.error || "");
+  const quality = buildStoredQualityFields(
+    {
+      ...posting,
+      validation_status: validationStatus,
+      validation_error: validationError,
+      parser_version: parserVersion,
+      raw_payload_hash: rawPayloadHash,
+      last_seen_epoch: nowEpoch
+    },
+    { nowEpoch }
+  );
 
   const existing = await pool.query(
     `
-      SELECT raw_payload_hash, parser_version, validation_status, validation_error
+      SELECT raw_payload_hash, parser_version, quality_score, quality_flags, rejection_reason, validation_status, validation_error
       FROM posting_cache
       WHERE canonical_url = $1;
     `,
@@ -855,11 +869,12 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
     ]
   );
   const existingRow = existing.rows[0] || null;
-  const validationStatus = validation.ok ? "valid" : "invalid";
-  const validationError = String(validation.error || "");
   const changed = !existingRow ||
     String(existingRow?.raw_payload_hash || "") !== rawPayloadHash ||
     String(existingRow?.parser_version || "") !== parserVersion ||
+    Number(existingRow?.quality_score || 0) !== Number(quality.quality_score || 0) ||
+    JSON.stringify(parseQualityFlags(existingRow?.quality_flags)) !== String(quality.quality_flags || "[]") ||
+    String(existingRow?.rejection_reason || "") !== String(quality.rejection_reason || "") ||
     String(existingRow?.validation_status || "") !== validationStatus ||
     String(existingRow?.validation_error || "") !== validationError;
 
@@ -903,11 +918,14 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
         last_seen_epoch,
         parser_version,
         confidence,
+        quality_score,
+        quality_flags,
+        rejection_reason,
         validation_status,
         validation_error,
         raw_metadata,
         updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,now())
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25::jsonb,$26,$27,$28,$29::jsonb,now())
       ON CONFLICT(canonical_url) DO UPDATE SET
         ats_key = EXCLUDED.ats_key,
         company_name = EXCLUDED.company_name,
@@ -930,6 +948,9 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
         last_seen_epoch = EXCLUDED.last_seen_epoch,
         parser_version = EXCLUDED.parser_version,
         confidence = EXCLUDED.confidence,
+        quality_score = EXCLUDED.quality_score,
+        quality_flags = EXCLUDED.quality_flags,
+        rejection_reason = EXCLUDED.rejection_reason,
         validation_status = EXCLUDED.validation_status,
         validation_error = EXCLUDED.validation_error,
         raw_metadata = EXCLUDED.raw_metadata,
@@ -959,6 +980,9 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
       nowEpoch,
       parserVersion,
       Number(posting?.confidence || 0.5),
+      quality.quality_score,
+      quality.quality_flags,
+      quality.rejection_reason,
       validationStatus,
       validationError,
       JSON.stringify({

@@ -10,8 +10,12 @@ test.describe("openjobslots API compatibility", () => {
       { path: "/sync/status" },
       { path: "/ingestion/status" },
       { path: "/postings", params: { search: "remote jobs", limit: "10" } },
+      { path: "/postings/diagnostics", params: { url: "https://boards.greenhouse.io/openjobslotsqa/jobs/1001" } },
       { path: "/postings/filter-options" },
-      { path: "/search/suggest", params: { search: "tur", limit: "5" } }
+      { path: "/search/suggest", params: { search: "tur", limit: "5" } },
+      { path: "/ingestion/quality/summary" },
+      { path: "/ingestion/rejections" },
+      { path: "/ingestion/parser-stats" }
     ];
 
     for (const check of publicChecks) {
@@ -138,5 +142,61 @@ test.describe("openjobslots API compatibility", () => {
       expect(body).toMatch(/Admin token required|Admin endpoint requires/i);
       expect(body).not.toMatch(/postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_|OPENJOBSLOTS_SEARCH_|stack trace/i);
     }
+  });
+
+  test("data quality diagnostics are bounded and explainable", async ({ request }) => {
+    const diagnostics = await request.get(`${apiBaseUrl}/postings/diagnostics`, {
+      params: { url: "https://boards.greenhouse.io/openjobslotsqa/jobs/1001" }
+    });
+    expect(diagnostics.ok()).toBeTruthy();
+    const diagnosticsPayload = await diagnostics.json();
+    expect(diagnosticsPayload).toEqual(expect.objectContaining({ ok: true, item: expect.any(Object) }));
+    expect(diagnosticsPayload.item.diagnostics).toEqual(
+      expect.objectContaining({
+        quality_score: expect.any(Number),
+        quality_flags: expect.any(Array),
+        parser_key: expect.any(String),
+        parser_version: expect.any(String),
+        source_ats: expect.any(String),
+        source_url: expect.any(String),
+        normalized_location: expect.any(Object),
+        freshness: expect.any(Object)
+      })
+    );
+    expect(JSON.stringify(diagnosticsPayload)).not.toMatch(/raw_payload|stack trace|MEILI_|postgres:\/\//i);
+
+    const summary = await request.get(`${apiBaseUrl}/ingestion/quality/summary`, {
+      params: { limit: "10" }
+    });
+    expect(summary.ok()).toBeTruthy();
+    const summaryPayload = await summary.json();
+    expect(summaryPayload.ok).toBe(true);
+    expect(Array.isArray(summaryPayload.items)).toBeTruthy();
+    expect(summaryPayload.items.length).toBeGreaterThan(0);
+    expect(summaryPayload.items[0]).toEqual(
+      expect.objectContaining({
+        ats_key: expect.any(String),
+        total_postings: expect.any(Number),
+        avg_quality_score: expect.any(Number),
+        flag_counts: expect.any(Object)
+      })
+    );
+
+    const rejections = await request.get(`${apiBaseUrl}/ingestion/rejections`, {
+      params: { limit: "10" }
+    });
+    expect(rejections.ok()).toBeTruthy();
+    const rejectionsPayload = await rejections.json();
+    expect(rejectionsPayload.ok).toBe(true);
+    expect(Array.isArray(rejectionsPayload.items)).toBeTruthy();
+    expect(rejectionsPayload.items.some((item) => /missing required title|missing title/i.test(item.rejection_reason))).toBeTruthy();
+
+    const parserStats = await request.get(`${apiBaseUrl}/ingestion/parser-stats`, {
+      params: { limit: "10" }
+    });
+    expect(parserStats.ok()).toBeTruthy();
+    const statsPayload = await parserStats.json();
+    expect(statsPayload.ok).toBe(true);
+    expect(Array.isArray(statsPayload.items)).toBeTruthy();
   });
 });

@@ -53,6 +53,9 @@ async function ensureIngestionTables(db) {
       first_seen_epoch INTEGER NOT NULL,
       last_seen_epoch INTEGER NOT NULL,
       parser_version TEXT NOT NULL,
+      quality_score INTEGER NOT NULL DEFAULT 0,
+      quality_flags TEXT NOT NULL DEFAULT '[]',
+      rejection_reason TEXT NOT NULL DEFAULT '',
       validation_status TEXT NOT NULL,
       validation_error TEXT NOT NULL DEFAULT '',
       raw_metadata TEXT NOT NULL DEFAULT '{}',
@@ -104,6 +107,9 @@ async function ensureIngestionTables(db) {
   `);
 
   await ensureColumn(db, "ingestion_run_errors", "error_type", "TEXT NOT NULL DEFAULT 'unknown'");
+  await ensureColumn(db, "posting_cache", "quality_score", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(db, "posting_cache", "quality_flags", "TEXT NOT NULL DEFAULT '[]'");
+  await ensureColumn(db, "posting_cache", "rejection_reason", "TEXT NOT NULL DEFAULT ''");
   await ensureColumn(db, "ingestion_runs", "rejected_count", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(db, "ingestion_runs", "duplicate_count", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(db, "ingestion_runs", "db_busy_count", "INTEGER NOT NULL DEFAULT 0");

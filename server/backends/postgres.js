@@ -101,6 +101,9 @@ async function ensurePostgresSchema(pool) {
       source_company_url TEXT NOT NULL DEFAULT '',
       parser_version TEXT NOT NULL,
       confidence REAL NOT NULL DEFAULT 0,
+      quality_score INTEGER NOT NULL DEFAULT 0,
+      quality_flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      rejection_reason TEXT NOT NULL DEFAULT '',
       validation_status TEXT NOT NULL,
       validation_error TEXT NOT NULL DEFAULT '',
       raw_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -117,7 +120,10 @@ async function ensurePostgresSchema(pool) {
       ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS employment_type TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS description_plain TEXT NOT NULL DEFAULT '',
-      ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT '';
+      ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS quality_score INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS quality_flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS rejection_reason TEXT NOT NULL DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS postings (
       canonical_url TEXT PRIMARY KEY,
@@ -144,6 +150,9 @@ async function ensurePostgresSchema(pool) {
       hidden BOOLEAN NOT NULL DEFAULT false,
       parser_version TEXT NOT NULL,
       confidence REAL NOT NULL DEFAULT 0,
+      quality_score INTEGER NOT NULL DEFAULT 0,
+      quality_flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      rejection_reason TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -171,7 +180,10 @@ async function ensurePostgresSchema(pool) {
       ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS employment_type TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS description_plain TEXT NOT NULL DEFAULT '',
-      ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT '';
+      ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS quality_score INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS quality_flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS rejection_reason TEXT NOT NULL DEFAULT '';
 
     CREATE EXTENSION IF NOT EXISTS pg_trgm;
     CREATE EXTENSION IF NOT EXISTS unaccent;

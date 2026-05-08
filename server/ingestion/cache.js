@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { buildStoredQualityFields } = require("./dataQuality");
 
 function stableStringify(value) {
   if (value === null || value === undefined) return "null";
@@ -27,13 +28,24 @@ async function writePostingCache(db, posting, options = {}) {
   const validationError = String(validation.error || "");
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
   const rawPayloadHash = hashPayload(posting || {});
+  const quality = buildStoredQualityFields(
+    {
+      ...posting,
+      validation_status: validationStatus,
+      validation_error: validationError,
+      parser_version: parserVersion,
+      raw_payload_hash: rawPayloadHash,
+      last_seen_epoch: nowEpoch
+    },
+    { nowEpoch }
+  );
   if (!canonicalUrl) {
     return { cached: false, changed: false, hash: rawPayloadHash };
   }
 
   const existing = await db.get(
     `
-      SELECT raw_payload_hash, parser_version, validation_status, validation_error
+      SELECT raw_payload_hash, parser_version, quality_score, quality_flags, rejection_reason, validation_status, validation_error
       FROM posting_cache
       WHERE canonical_url = ?;
     `,
@@ -42,6 +54,9 @@ async function writePostingCache(db, posting, options = {}) {
   const changed = !existing ||
     String(existing?.raw_payload_hash || "") !== rawPayloadHash ||
     String(existing?.parser_version || "") !== parserVersion ||
+    Number(existing?.quality_score || 0) !== Number(quality.quality_score || 0) ||
+    String(existing?.quality_flags || "") !== String(quality.quality_flags || "") ||
+    String(existing?.rejection_reason || "") !== String(quality.rejection_reason || "") ||
     String(existing?.validation_status || "") !== validationStatus ||
     String(existing?.validation_error || "") !== validationError;
 
@@ -73,11 +88,14 @@ async function writePostingCache(db, posting, options = {}) {
         first_seen_epoch,
         last_seen_epoch,
         parser_version,
+        quality_score,
+        quality_flags,
+        rejection_reason,
         validation_status,
         validation_error,
         raw_metadata,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(canonical_url) DO UPDATE SET
         ats_key = excluded.ats_key,
         company_name = excluded.company_name,
@@ -88,6 +106,9 @@ async function writePostingCache(db, posting, options = {}) {
         source_company_url = excluded.source_company_url,
         last_seen_epoch = excluded.last_seen_epoch,
         parser_version = excluded.parser_version,
+        quality_score = excluded.quality_score,
+        quality_flags = excluded.quality_flags,
+        rejection_reason = excluded.rejection_reason,
         validation_status = excluded.validation_status,
         validation_error = excluded.validation_error,
         raw_metadata = excluded.raw_metadata,
@@ -105,6 +126,9 @@ async function writePostingCache(db, posting, options = {}) {
       nowEpoch,
       nowEpoch,
       parserVersion,
+      quality.quality_score,
+      quality.quality_flags,
+      quality.rejection_reason,
       validationStatus,
       validationError,
       JSON.stringify({

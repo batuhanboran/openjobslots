@@ -11,6 +11,11 @@ const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
 const { getAdapterMetadata, isAtsEnabledByDefault } = require("./ingestion/adapter-metadata");
 const { isPlaceholderCompanyName, normalizeCountryFromLocation, normalizeCountryName } = require("./ingestion/posting");
 const {
+  buildQualityMetadata,
+  buildStoredQualityFields,
+  parseQualityFlags
+} = require("./ingestion/dataQuality");
+const {
   createPostgresPool,
   ensurePostgresSchema,
   seedPostgresAtsSources
@@ -23,13 +28,17 @@ const {
   getPostgresAtsFieldQualityByAts,
   getPostgresCounts,
   getPostgresFilterOptions,
+  getPostgresParserStats,
   getPostgresParserAdmin,
   getPostgresParserAttentionByAts,
+  getPostgresPostingDiagnostics,
+  getPostgresQualitySummary,
   getPostgresSuggestions,
   getPostgresSyncStatus,
   listPostgresIngestionErrors,
   listPostgresIngestionRuns,
   listPostgresIngestionSources,
+  listPostgresRejections,
   listPostgresPostings,
   requestSyncStart,
   requestSyncStop
@@ -794,6 +803,241 @@ function sanitizePublicPostingItem(posting) {
 
 function sanitizePublicPostings(items) {
   return (Array.isArray(items) ? items : []).map(sanitizePublicPostingItem);
+}
+
+function sqlitePostingRowToQualityInput(row = {}) {
+  const jobPostingUrl = String(row?.job_posting_url || row?.canonical_url || "").trim();
+  const atsKey = String(row?.ats || row?.ats_key || inferAtsFromJobPostingUrl(jobPostingUrl)).trim();
+  return {
+    ...row,
+    canonical_url: jobPostingUrl,
+    job_posting_url: jobPostingUrl,
+    company_name: row?.company_name,
+    position_name: row?.position_name,
+    location: row?.location,
+    location_text: row?.location,
+    ats_key: atsKey,
+    source_job_id: String(row?.source_job_id || extractSourceIdFromPostingUrl(jobPostingUrl, atsKey) || "").trim(),
+    parser_version: String(row?.parser_version || "legacy-adapter-v1"),
+    confidence: Number(row?.confidence || 0),
+    quality_score: Number(row?.quality_score || 0),
+    quality_flags: row?.quality_flags,
+    rejection_reason: row?.rejection_reason,
+    first_seen_epoch: Number(row?.first_seen_epoch || 0),
+    last_seen_epoch: Number(row?.last_seen_epoch || 0)
+  };
+}
+
+async function getSqlitePostingDiagnostics(options = {}) {
+  const canonicalUrl = String(options.canonicalUrl || options.url || "").trim();
+  const id = Number(options.id || 0);
+  if (!canonicalUrl && (!Number.isFinite(id) || id <= 0)) return null;
+  const row = await db.get(
+    `
+      SELECT
+        p.id,
+        p.company_name,
+        p.position_name,
+        p.job_posting_url,
+        p.location,
+        p.posting_date,
+        p.first_seen_epoch,
+        p.last_seen_epoch,
+        p.source_job_id,
+        p.parser_version,
+        p.confidence,
+        p.quality_score,
+        p.quality_flags,
+        p.rejection_reason,
+        p.hidden,
+        pc.source_company_url,
+        pc.raw_payload_hash,
+        pc.validation_status,
+        pc.validation_error,
+        pc.updated_at AS cache_updated_at
+      FROM Postings p
+      LEFT JOIN posting_cache pc
+        ON pc.canonical_url = p.job_posting_url
+      WHERE ${canonicalUrl ? "p.job_posting_url = ?" : "p.id = ?"}
+      LIMIT 1;
+    `,
+    [canonicalUrl || id]
+  );
+  if (!row) return null;
+  const atsKey = inferAtsFromJobPostingUrl(row.job_posting_url);
+  let duplicateOf = "";
+  if (String(row.source_job_id || "").trim()) {
+    const duplicate = await db.get(
+      `
+        SELECT job_posting_url
+        FROM Postings
+        WHERE source_job_id = ?
+          AND job_posting_url <> ?
+        ORDER BY COALESCE(last_seen_epoch, 0) DESC
+        LIMIT 1;
+      `,
+      [row.source_job_id, row.job_posting_url]
+    );
+    duplicateOf = String(duplicate?.job_posting_url || "");
+  }
+  const diagnostics = buildQualityMetadata(
+    {
+      ...sqlitePostingRowToQualityInput({ ...row, ats: atsKey }),
+      raw_payload_hash: row.raw_payload_hash,
+      validation_status: row.validation_status,
+      validation_error: row.validation_error
+    },
+    { duplicateOf }
+  );
+  return {
+    id: Number(row.id || 0),
+    canonical_url: String(row.job_posting_url || ""),
+    title: String(row.position_name || ""),
+    company: String(row.company_name || ""),
+    diagnostics
+  };
+}
+
+async function getSqliteQualitySummary(limit = 100) {
+  const rows = await db.all(
+    `
+      SELECT
+        id,
+        company_name,
+        position_name,
+        job_posting_url,
+        location,
+        posting_date,
+        first_seen_epoch,
+        last_seen_epoch,
+        source_job_id,
+        parser_version,
+        confidence,
+        quality_score,
+        quality_flags,
+        rejection_reason
+      FROM Postings
+      WHERE COALESCE(hidden, 0) = 0
+      LIMIT 100000;
+    `
+  );
+  const byAts = new Map();
+  for (const row of rows) {
+    const atsKey = inferAtsFromJobPostingUrl(row.job_posting_url) || "unknown";
+    const quality = buildQualityMetadata(sqlitePostingRowToQualityInput({ ...row, ats: atsKey }));
+    const bucket = byAts.get(atsKey) || {
+      ats_key: atsKey,
+      total_postings: 0,
+      quality_score_total: 0,
+      low_quality_count: 0,
+      flag_counts: {}
+    };
+    bucket.total_postings += 1;
+    bucket.quality_score_total += Number(quality.quality_score || 0);
+    if (Number(quality.quality_score || 0) < 60) bucket.low_quality_count += 1;
+    for (const flag of quality.quality_flags || []) {
+      bucket.flag_counts[flag] = Number(bucket.flag_counts[flag] || 0) + 1;
+    }
+    byAts.set(atsKey, bucket);
+  }
+  return Array.from(byAts.values())
+    .map((bucket) => ({
+      ats_key: bucket.ats_key,
+      total_postings: bucket.total_postings,
+      avg_quality_score: bucket.total_postings > 0 ? Math.round(bucket.quality_score_total / bucket.total_postings) : 0,
+      low_quality_count: bucket.low_quality_count,
+      flag_counts: bucket.flag_counts
+    }))
+    .sort((a, b) => b.low_quality_count - a.low_quality_count || b.total_postings - a.total_postings)
+    .slice(0, Math.max(1, Math.min(250, Number(limit || 100))));
+}
+
+async function listSqliteRejections(limit = 50) {
+  const cappedLimit = Math.max(1, Math.min(250, Number(limit || 50)));
+  const rows = await db.all(
+    `
+      SELECT
+        canonical_url,
+        ats_key,
+        company_name,
+        position_name,
+        source_company_url,
+        validation_status,
+        validation_error,
+        quality_flags,
+        rejection_reason,
+        updated_at
+      FROM posting_cache
+      WHERE validation_status <> 'valid'
+         OR TRIM(COALESCE(rejection_reason, '')) <> ''
+      ORDER BY updated_at DESC
+      LIMIT ?;
+    `,
+    [cappedLimit]
+  );
+  const items = rows.map((row) => ({
+    type: "posting_cache",
+    canonical_url: String(row?.canonical_url || ""),
+    ats_key: String(row?.ats_key || ""),
+    company_name: String(row?.company_name || ""),
+    position_name: String(row?.position_name || ""),
+    source_url: String(row?.source_company_url || ""),
+    rejection_reason: String(row?.rejection_reason || row?.validation_error || ""),
+    quality_flags: parseQualityFlags(row?.quality_flags),
+    updated_at: String(row?.updated_at || "")
+  }));
+  const remaining = cappedLimit - items.length;
+  if (remaining > 0) {
+    const errors = await db.all(
+      `
+        SELECT run_id, ats_key, company_url, company_name, error_type, error_message, http_status, created_at
+        FROM ingestion_run_errors
+        WHERE error_type LIKE 'parser_%'
+        ORDER BY id DESC
+        LIMIT ?;
+      `,
+      [remaining]
+    );
+    items.push(...errors.map((row) => ({
+      type: "ingestion_run_error",
+      canonical_url: "",
+      ats_key: String(row?.ats_key || ""),
+      company_name: String(row?.company_name || ""),
+      position_name: "",
+      source_url: String(row?.company_url || ""),
+      rejection_reason: String(row?.error_message || row?.error_type || ""),
+      quality_flags: ["rejected"],
+      http_status: row?.http_status == null ? null : Number(row.http_status),
+      updated_at: String(row?.created_at || "")
+    })));
+  }
+  return items;
+}
+
+async function getSqliteParserStats(limit = 100) {
+  const [quality, attentionRows] = await Promise.all([
+    getSqliteQualitySummary(limit),
+    db.all(
+      `
+        SELECT ats_key, COUNT(*) AS error_count, MAX(created_at) AS latest_error_at
+        FROM ingestion_run_errors
+        WHERE error_type LIKE 'parser_%'
+        GROUP BY ats_key
+        ORDER BY error_count DESC, latest_error_at DESC
+        LIMIT ?;
+      `,
+      [Math.max(1, Math.min(250, Number(limit || 100)))]
+    )
+  ]);
+  const attentionByAts = new Map(attentionRows.map((row) => [String(row.ats_key || ""), row]));
+  return quality.map((item) => {
+    const attention = attentionByAts.get(item.ats_key) || {};
+    return {
+      ...item,
+      parser_attention_count: Number(attention.error_count || 0),
+      latest_parser_error_at: String(attention.latest_error_at || "")
+    };
+  });
 }
 
 function parseCsvEnv(value) {
@@ -13507,6 +13751,12 @@ async function createCanonicalPostingsTable() {
       posting_date TEXT,
       first_seen_epoch INTEGER,
       last_seen_epoch INTEGER,
+      source_job_id TEXT NOT NULL DEFAULT '',
+      parser_version TEXT NOT NULL DEFAULT 'legacy-adapter-v1',
+      confidence REAL NOT NULL DEFAULT 0,
+      quality_score INTEGER NOT NULL DEFAULT 0,
+      quality_flags TEXT NOT NULL DEFAULT '[]',
+      rejection_reason TEXT NOT NULL DEFAULT '',
       hidden INTEGER NOT NULL DEFAULT 0,
       hidden_at_epoch INTEGER
     );
@@ -13586,6 +13836,30 @@ async function ensurePostingsTable() {
 
   if (!existingColumns.has("location")) {
     await db.exec(`ALTER TABLE Postings ADD COLUMN location TEXT;`);
+  }
+
+  if (!existingColumns.has("source_job_id")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN source_job_id TEXT NOT NULL DEFAULT '';`);
+  }
+
+  if (!existingColumns.has("parser_version")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN parser_version TEXT NOT NULL DEFAULT 'legacy-adapter-v1';`);
+  }
+
+  if (!existingColumns.has("confidence")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN confidence REAL NOT NULL DEFAULT 0;`);
+  }
+
+  if (!existingColumns.has("quality_score")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN quality_score INTEGER NOT NULL DEFAULT 0;`);
+  }
+
+  if (!existingColumns.has("quality_flags")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN quality_flags TEXT NOT NULL DEFAULT '[]';`);
+  }
+
+  if (!existingColumns.has("rejection_reason")) {
+    await db.exec(`ALTER TABLE Postings ADD COLUMN rejection_reason TEXT NOT NULL DEFAULT '';`);
   }
 
   await db.run(`UPDATE Postings SET last_seen_epoch = ? WHERE last_seen_epoch IS NULL;`, [nowEpochSeconds()]);
@@ -15378,12 +15652,37 @@ async function upsertPostings(postings, lastSeenEpoch) {
   try {
     for (const posting of postings) {
       const companyName = String(posting.company_name || "").trim();
-      const positionName = String(posting.position_name || "").trim() || "Untitled Position";
+      const positionName = String(posting.position_name || "").trim();
       const jobPostingUrl = String(posting.job_posting_url || "").trim();
-      if (!jobPostingUrl) continue;
+      if (!companyName || !positionName || !jobPostingUrl) continue;
       const location = String(posting.location || "").trim() || null;
       const postingDateRaw = String(posting.posting_date ?? "").trim();
       const postingDate = postingDateRaw || null;
+      const atsKey = String(posting.ats_key || posting.ATS_name || inferAtsFromJobPostingUrl(jobPostingUrl)).trim();
+      const sourceJobId = String(
+        posting.source_job_id ||
+          extractSourceIdFromPostingUrl(jobPostingUrl, atsKey) ||
+          ""
+      ).trim();
+      const parserVersion = String(posting.parser_version || "legacy-adapter-v1").trim();
+      const confidence = Number(posting.confidence || posting.parser_confidence || 0.5);
+      const quality = buildStoredQualityFields(
+        {
+          ...posting,
+          company_name: companyName,
+          position_name: positionName,
+          job_posting_url: jobPostingUrl,
+          canonical_url: jobPostingUrl,
+          source_job_id: sourceJobId,
+          ats_key: atsKey,
+          location,
+          posting_date: postingDate,
+          parser_version: parserVersion,
+          confidence,
+          last_seen_epoch: seenEpoch
+        },
+        { nowEpoch: seenEpoch }
+      );
 
       await db.run(
         `
@@ -15394,17 +15693,29 @@ async function upsertPostings(postings, lastSeenEpoch) {
             location,
             posting_date,
             first_seen_epoch,
+            source_job_id,
+            parser_version,
+            confidence,
+            quality_score,
+            quality_flags,
+            rejection_reason,
             hidden,
             hidden_at_epoch,
             last_seen_epoch
           )
-          VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
           ON CONFLICT(job_posting_url) DO UPDATE SET
             company_name = excluded.company_name,
             position_name = excluded.position_name,
             location = COALESCE(excluded.location, Postings.location),
             posting_date = COALESCE(excluded.posting_date, Postings.posting_date),
             first_seen_epoch = COALESCE(Postings.first_seen_epoch, Postings.last_seen_epoch, excluded.first_seen_epoch),
+            source_job_id = COALESCE(NULLIF(excluded.source_job_id, ''), Postings.source_job_id),
+            parser_version = excluded.parser_version,
+            confidence = excluded.confidence,
+            quality_score = excluded.quality_score,
+            quality_flags = excluded.quality_flags,
+            rejection_reason = excluded.rejection_reason,
             last_seen_epoch = excluded.last_seen_epoch
           WHERE COALESCE(Postings.hidden, 0) = 0;
         `,
@@ -15415,6 +15726,12 @@ async function upsertPostings(postings, lastSeenEpoch) {
           location,
           postingDate,
           seenEpoch,
+          sourceJobId,
+          parserVersion,
+          Number.isFinite(confidence) ? confidence : 0.5,
+          quality.quality_score,
+          quality.quality_flags,
+          quality.rejection_reason,
           seenEpoch
         ]
       );
@@ -16173,6 +16490,84 @@ function createServer() {
           write_pressure: getWritePressure(status),
           parser_attention_by_ats: parserAttentionByAts
         }
+      });
+    });
+  });
+
+  app.get("/postings/diagnostics", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const canonicalUrl = String(req.query.url || "").trim();
+      const item = DB_BACKEND === "postgres"
+        ? await getPostgresPostingDiagnostics(postgresPool, { canonicalUrl })
+        : await getSqlitePostingDiagnostics({ canonicalUrl });
+      if (!item) {
+        return {
+          ok: false,
+          error: "Posting diagnostics not found"
+        };
+      }
+      return sanitizeFrontendValue({ ok: true, item });
+    });
+  });
+
+  app.get("/postings/:id/diagnostics", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const id = Number(req.params.id || 0);
+      const item = DB_BACKEND === "postgres"
+        ? null
+        : await getSqlitePostingDiagnostics({ id });
+      if (!item) {
+        return {
+          ok: false,
+          error: "Posting diagnostics not found"
+        };
+      }
+      return sanitizeFrontendValue({ ok: true, item });
+    });
+  });
+
+  app.get("/ingestion/quality/summary", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const limit = Number(req.query.limit || 100);
+      const items = DB_BACKEND === "postgres"
+        ? await getPostgresQualitySummary(postgresPool, limit)
+        : await getSqliteQualitySummary(limit);
+      return sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        items,
+        count: items.length
+      });
+    });
+  });
+
+  app.get("/ingestion/rejections", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const limit = Number(req.query.limit || 50);
+      const items = DB_BACKEND === "postgres"
+        ? await listPostgresRejections(postgresPool, limit)
+        : await listSqliteRejections(limit);
+      return sanitizeFrontendValue({
+        ok: true,
+        items,
+        count: items.length
+      });
+    });
+  });
+
+  app.get("/ingestion/parser-stats", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const limit = Number(req.query.limit || 100);
+      const items = DB_BACKEND === "postgres"
+        ? await getPostgresParserStats(postgresPool, limit)
+        : await getSqliteParserStats(limit);
+      return sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        items,
+        count: items.length
       });
     });
   });

@@ -7,6 +7,11 @@ const {
 const searchConfig = require("../search/config");
 const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
 const {
+  buildQualityMetadata,
+  buildStoredQualityFields,
+  parseQualityFlags
+} = require("../ingestion/dataQuality");
+const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
   normalizeRemoteTypeFromEvidence,
@@ -973,6 +978,175 @@ async function listPostgresIngestionSources(pool, limit = 100) {
   }));
 }
 
+async function getPostgresPostingDiagnostics(pool, options = {}) {
+  const canonicalUrl = String(options.canonicalUrl || options.url || "").trim();
+  if (!canonicalUrl) return null;
+  const result = await pool.query(
+    `
+      SELECT
+        p.canonical_url,
+        p.company_name,
+        p.position_name,
+        p.location_text,
+        p.city,
+        p.country,
+        p.region,
+        p.remote_type,
+        p.ats_key,
+        p.source_job_id,
+        p.posting_date,
+        p.posted_at_epoch,
+        p.first_seen_epoch,
+        p.last_seen_epoch,
+        p.hidden,
+        p.parser_version,
+        p.confidence,
+        p.quality_score,
+        p.quality_flags,
+        p.rejection_reason,
+        pc.source_company_url,
+        pc.raw_payload_hash,
+        pc.validation_status,
+        pc.validation_error,
+        pc.updated_at AS cache_updated_at
+      FROM postings p
+      LEFT JOIN posting_cache pc
+        ON pc.canonical_url = p.canonical_url
+      WHERE p.canonical_url = $1
+      LIMIT 1;
+    `,
+    [canonicalUrl]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  let duplicateOf = "";
+  if (String(row.source_job_id || "").trim()) {
+    const duplicate = await pool.query(
+      `
+        SELECT canonical_url
+        FROM postings
+        WHERE ats_key = $1
+          AND source_job_id = $2
+          AND canonical_url <> $3
+        ORDER BY last_seen_epoch DESC
+        LIMIT 1;
+      `,
+      [row.ats_key, row.source_job_id, row.canonical_url]
+    );
+    duplicateOf = String(duplicate.rows[0]?.canonical_url || "");
+  }
+  const metadata = buildQualityMetadata(
+    {
+      ...row,
+      canonical_url: row.canonical_url,
+      job_posting_url: row.canonical_url,
+      company_name: row.company_name,
+      position_name: row.position_name,
+      location: row.location_text,
+      raw_payload_hash: row.raw_payload_hash,
+      validation_status: row.validation_status,
+      validation_error: row.validation_error
+    },
+    { duplicateOf }
+  );
+  return {
+    canonical_url: String(row.canonical_url || ""),
+    title: String(row.position_name || ""),
+    company: String(row.company_name || ""),
+    diagnostics: metadata
+  };
+}
+
+async function getPostgresQualitySummary(pool, limit = 100) {
+  const result = await pool.query(
+    `
+      SELECT
+        ats_key,
+        COUNT(*)::int AS total_postings,
+        ROUND(AVG(quality_score))::int AS avg_quality_score,
+        COUNT(*) FILTER (WHERE quality_score < 60)::int AS low_quality_count,
+        COUNT(*) FILTER (WHERE quality_flags ? 'missing_country')::int AS missing_country_count,
+        COUNT(*) FILTER (WHERE quality_flags ? 'missing_region')::int AS missing_region_count,
+        COUNT(*) FILTER (WHERE quality_flags ? 'missing_city')::int AS missing_city_count,
+        COUNT(*) FILTER (WHERE quality_flags ? 'weak_remote_classification')::int AS weak_remote_count,
+        COUNT(*) FILTER (WHERE quality_flags ? 'missing_posted_at')::int AS missing_posted_at_count,
+        COUNT(*) FILTER (WHERE quality_flags ? 'missing_source_job_id')::int AS missing_source_job_id_count
+      FROM postings
+      WHERE hidden = false
+      GROUP BY ats_key
+      ORDER BY low_quality_count DESC, total_postings DESC, ats_key ASC
+      LIMIT $1;
+    `,
+    [Math.max(1, Math.min(250, Number(limit || 100)))]
+  );
+  return result.rows.map((row) => ({
+    ats_key: String(row?.ats_key || ""),
+    total_postings: Number(row?.total_postings || 0),
+    avg_quality_score: Number(row?.avg_quality_score || 0),
+    low_quality_count: Number(row?.low_quality_count || 0),
+    flag_counts: {
+      missing_country: Number(row?.missing_country_count || 0),
+      missing_region: Number(row?.missing_region_count || 0),
+      missing_city: Number(row?.missing_city_count || 0),
+      weak_remote_classification: Number(row?.weak_remote_count || 0),
+      missing_posted_at: Number(row?.missing_posted_at_count || 0),
+      missing_source_job_id: Number(row?.missing_source_job_id_count || 0)
+    }
+  }));
+}
+
+async function listPostgresRejections(pool, limit = 50) {
+  const cappedLimit = Math.max(1, Math.min(250, Number(limit || 50)));
+  const result = await pool.query(
+    `
+      SELECT
+        canonical_url,
+        ats_key,
+        company_name,
+        position_name,
+        source_company_url,
+        validation_status,
+        validation_error,
+        rejection_reason,
+        quality_flags,
+        updated_at
+      FROM posting_cache
+      WHERE validation_status <> 'valid'
+         OR btrim(coalesce(rejection_reason, '')) <> ''
+      ORDER BY updated_at DESC
+      LIMIT $1;
+    `,
+    [cappedLimit]
+  );
+  return result.rows.map((row) => ({
+    type: "posting_cache",
+    canonical_url: String(row?.canonical_url || ""),
+    ats_key: String(row?.ats_key || ""),
+    company_name: String(row?.company_name || ""),
+    position_name: String(row?.position_name || ""),
+    source_url: String(row?.source_company_url || ""),
+    rejection_reason: String(row?.rejection_reason || row?.validation_error || ""),
+    quality_flags: parseQualityFlags(row?.quality_flags),
+    updated_at: row?.updated_at ? new Date(row.updated_at).toISOString() : ""
+  }));
+}
+
+async function getPostgresParserStats(pool, limit = 100) {
+  const [quality, attention] = await Promise.all([
+    getPostgresQualitySummary(pool, limit),
+    getPostgresParserAttentionByAts(pool, limit)
+  ]);
+  const attentionByAts = new Map(attention.map((item) => [String(item.ats_key || ""), item]));
+  return quality.map((item) => {
+    const attentionItem = attentionByAts.get(item.ats_key) || {};
+    return {
+      ...item,
+      parser_attention_count_24h: Number(attentionItem.error_count || 0),
+      latest_parser_error: String(attentionItem.last_error || "")
+    };
+  });
+}
+
 async function getSyncControl(pool) {
   const result = await pool.query("SELECT * FROM sync_control WHERE id = 1;");
   return result.rows[0] || { status: "idle" };
@@ -1159,6 +1333,15 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         hidden: false
       };
       if (!validatePosting(normalizedPosting).ok) continue;
+      const quality = buildStoredQualityFields(
+        {
+          ...normalizedPosting,
+          parser_version: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
+          confidence: Number(posting?.confidence || posting?.parser_confidence || 0.5),
+          raw_payload_hash: String(posting?.raw_hash || posting?.raw_payload_hash || "")
+        },
+        { nowEpoch }
+      );
       normalizedForSearchIndex.push(normalizedPosting);
       await client.query(
         `
@@ -1166,8 +1349,8 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
             canonical_url, company_name, position_name, apply_url, location_text, city, country, region,
             remote_type, industry, department, employment_type, description_plain, description_html,
             ats_key, source_job_id, posting_date, posted_at_epoch, first_seen_epoch, last_seen_epoch,
-            hidden, parser_version, confidence, updated_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false,$21,$22,now())
+            hidden, parser_version, confidence, quality_score, quality_flags, rejection_reason, updated_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false,$21,$22,$23,$24::jsonb,$25,now())
           ON CONFLICT(canonical_url) DO UPDATE SET
             company_name = EXCLUDED.company_name,
             position_name = EXCLUDED.position_name,
@@ -1194,6 +1377,9 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
             hidden = false,
             parser_version = EXCLUDED.parser_version,
             confidence = EXCLUDED.confidence,
+            quality_score = EXCLUDED.quality_score,
+            quality_flags = EXCLUDED.quality_flags,
+            rejection_reason = EXCLUDED.rejection_reason,
             updated_at = now();
         `,
         [
@@ -1218,7 +1404,10 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           nowEpoch,
           nowEpoch,
           String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
-          Number(posting?.confidence || 0.5)
+          Number(posting?.confidence || posting?.parser_confidence || 0.5),
+          quality.quality_score,
+          quality.quality_flags,
+          quality.rejection_reason
         ]
       );
     }
@@ -1430,8 +1619,11 @@ module.exports = {
   getPostgresAtsFieldQualityByAts,
   getPostgresCounts,
   getPostgresFilterOptions,
+  getPostgresParserStats,
   getPostgresParserAdmin,
   getPostgresParserAttentionByAts,
+  getPostgresPostingDiagnostics,
+  getPostgresQualitySummary,
   getPostgresSuggestions,
   getPostgresSyncStatus,
   hydratePostgresPostings,
@@ -1441,6 +1633,7 @@ module.exports = {
   listPostgresIngestionRuns,
   listPostgresIngestionErrors,
   listPostgresIngestionSources,
+  listPostgresRejections,
   listPostgresPostings,
   normalizeAtsKey,
   processPostgresSearchIndexOutbox,
