@@ -1,240 +1,139 @@
-﻿# OpenJobSlots
+# OpenJobSlots
 
-OpenJobSlots is a public ATS job search engine. The current production architecture uses a Node app, ingestion worker, Postgres source-of-truth database, and Meilisearch public search index.
+OpenJobSlots is a public job-search engine that collects public ATS job postings, normalizes them into one schema, and serves fast search/filter results through a web UI.
 
-Over **78000+** companies from multiple ATSs all sourced into 1 location!
+The current production direction is:
 
-Over **500000+** fresh jobs on average **DAILY**!
+- Node/Express API serving public endpoints and static web assets.
+- Separate ingestion worker for ATS sync, parsing, cache updates, and maintenance.
+- Postgres as the source-of-truth database.
+- Meilisearch as the public search index.
+- SQLite kept for local fallback, import/migration paths, and isolated tests.
 
-## Youtube Video
-[![OpenPostings Discussion](https://img.youtube.com/vi/5sVIhhwx3Yk/0.jpg)](https://www.youtube.com/watch?v=5sVIhhwx3Yk)
+## Documentation Map
 
-## Diagram
-![Web UI Screenshot](README-Images/OpenPostings_Diagram.png)
+Read these first:
+
+- Operator instructions: [AGENTS.md](AGENTS.md)
+- Current state: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
+- Deployment runbook: [docs/reference/deployment.md](docs/reference/deployment.md)
+- QA runbook: [docs/reference/QA_RUNBOOK.md](docs/reference/QA_RUNBOOK.md)
+
+Detailed references:
+
+- Search quality: [docs/reference/search-quality-runbook.md](docs/reference/search-quality-runbook.md)
+- Ingestion: [docs/reference/ingestion-runbook.md](docs/reference/ingestion-runbook.md)
+- ATS parser matrix: [docs/reference/ats-adapter-matrix.md](docs/reference/ats-adapter-matrix.md)
+- Parser certification: [docs/reference/parser-certification.md](docs/reference/parser-certification.md)
+- ATS source certification: [docs/reference/ats-source-certification.md](docs/reference/ats-source-certification.md)
+- Data quality: [docs/reference/data-quality-runbook.md](docs/reference/data-quality-runbook.md)
+- Retention: [docs/reference/data-retention.md](docs/reference/data-retention.md)
+- Historical plans: [docs/archive/](docs/archive/)
+- End-user docs site: [docs-site/](docs-site/)
 
 ## Features
 
-It combines:
-- A React Native client (`Web`, `Android`, `Windows`)
-- A local Node/Express API
-- A local SQLite database
-- An MCP apply-agent server for agent-assisted workflows
+- Search public postings by title, company, location, country, region, ATS/source, and remote mode.
+- Normalize jobs from many ATS sources into one posting schema.
+- Track ingestion/cache state and parser attention for diagnostics.
+- Keep public UI search-first while preserving admin/internal diagnostics behind API boundaries.
+- Support Meilisearch for typo-tolerant search and Postgres fallback/parity checks.
 
+For the current ATS list and certification state, use [docs/reference/ats-adapter-matrix.md](docs/reference/ats-adapter-matrix.md).
 
-- Pulls jobs from **multiple ATS** providers into one local database.
-- Filters postings by **search text, ATS, industry, region (AMER/EMEA/APAC), country, state, county, and remote mode**.
-- Tracks **applied/ignored** posting state and application lifecycle status.
-<br>
-<img src="README-Images/apply_or_ignore.png" alt="Applications" width="25%" />
-<br>
-<img src="README-Images/applications.png" alt="Applications" width="70%" />
-- Stores applicant profile and MCP agent settings in SQLite.
-- Exposes MCP tools for **candidate selection, cover-letter drafting, and result recording.**
+## Architecture Summary
 
-## Supported ATS
+Production compose is expected to run four OpenJobSlots services:
 
-Current sync support includes:
+- `openjobslots-app`: Node API plus built web app.
+- `openjobslots-worker`: ingestion worker.
+- `openjobslots-postgres`: source-of-truth database.
+- `openjobslots-meilisearch`: public search index.
 
-- `ADP MyJobs`
-- `ADP Workforce Now`
-- `ApplicantAI`
-- `ApplicantPro`
-- `ApplyToJob`
-- `Ashby`
-- `BambooHR`
-- `BrassRing`
-- `BreezyHR`
-- `CareerPlug`
-- `CareerPuck`
-- `CareersPage`
-- `Dayforce`
-- `Eightfold`
-- `Fountain`
-- `Freshteam`
-- `Gem`
-- `Getro`
-- `Greenhouse`
-- `Hirebridge`
-- `HRMDirect`
-- `iCIMS`
-- `JobAps`
-- `Jobvite`
-- `JOIN`
-- `Lever`
-- `Loxo`
-- `Manatal`
-- `Oracle Cloud`
-- `PageUp`
-- `Paylocity`
-- `PeopleForce`
-- `PinpointHQ`
-- `RecruitCRM`
-- `Recruitee`
-- `Rippling`
-- `SageHR`
-- `SAP HR Cloud`
-- `Simplicant`
-- `Talentlyft`
-- `TalentReef`
-- `Taleo`
-- `Talexio`
-- `Teamtailor`
-- `The Applicant Manager`
-- `UltiPro`
-- `Workday`
-- `Zoho`
-- `governmentjobs`
-- `smartrecruiters`
-- `hibob`
-- `isolvisolvedhire`
-- `policeapp`
-- `usajobs`
-- `k12jobspot`
-- `schoolspring`
-- `calcareers`
-- `calopps`
-- `statejobsny`
+Nginx Proxy Manager / Cloudflare are external ingress pieces, not app services in this repo.
 
-<br>
-<img src="README-Images/ATS_list.png" alt="Applications" width="70%" />
+## Local Setup
 
-OVER **78000+** companies in total. All gathered from search engine data like Google and DuckDuckGo and also using subdomain searching techniques and directory searching techniques. 
-<br>
-<img src="README-Images/company_amount.png" alt="Applications" width="25%" />
-<br>
-It pulls in new job data at random from companies and stores it in the database. If the posting has lasted longer than 24 hours in the database its no longer used/deleted. 
+Requirements:
 
-## Windows Installer Setup (Windows 10/11) (Easiest Setup But Still WIP and may have some bugs)
-Download the latest installer from the github releases page and run it. It will guide you through installation and setup.
-- https://github.com/Masterjx9/OpenPostings/releases/download/v1.0.5/openpostings-1.0.5-x64.msi
+- Node.js 18+ or newer compatible with the current Expo/React Native stack.
+- npm.
+- Docker only when testing the production-like stack locally.
 
-Choose the setup type during install:
-- `Typical`: Installs the standard OpenPostings app setup (Includes the backend service worker, recommended for most users).
-- `Complete`: Installs all available OpenPostings features. (Includes the backend service worker and MCP apply agent server, which may not be needed for all users).
-- `Custom`: Lets you choose exactly which features to install (for example, whether to include the backend service worker and MCP apply agent server).
-<img src="README-Images/windows_setup_type.png" alt="windows install setup types" width="70%" />
-
-Once the installation is complete, you can launch OpenPostings from the start menu. 
-
-## Docs
-- Search quality runbook: [docs/search-quality-runbook.md](docs/search-quality-runbook.md)
-- ATS parser matrix: [docs/ats-adapter-matrix.md](docs/ats-adapter-matrix.md)
-- ATS certification: [docs/ats-source-certification.md](docs/ats-source-certification.md)
-- Data retention: [docs/data-retention.md](docs/data-retention.md)
-- Deployment: [docs/deployment.md](docs/deployment.md)
-
-## Source Installation Setup (Best Stability & Compatibility)
-
-### Requirements
-
-- Node.js 18+ and npm
-  - https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
-- For Windows target: React Native Windows prerequisites
-  - https://microsoft.github.io/react-native-windows/
-- For Android target: Android Studio/emulator or device
-  - https://developer.android.com/studio
-
-### Installation
+Install dependencies:
 
 ```powershell
 cd OpenPostings
 npm install
 ```
 
-### Quick Start (Web)
-
-Terminal 1:
+Start the API locally:
 
 ```powershell
-cd OpenPostings
 npm run server
 ```
 
-Terminal 2:
+Start the web UI locally:
 
 ```powershell
-cd OpenPostings
 npm run web
 ```
 
-Access the Web UI
-- `http://localhost:8081`
+Default local endpoints:
 
-Default API base URL behavior:
-- Web/Windows: `http://localhost:8787`
-- Android emulator: `http://10.0.2.2:8787`
+- Web UI: `http://localhost:8081`
+- API: `http://localhost:8787`
 
-
-### You can run this Windows or Android as well!
+Run the ingestion worker locally only when you intentionally want local sync behavior:
 
 ```powershell
-npm run windows (For windows)
-npm run android (For Android)
+npm run ingestion:worker
 ```
 
+## Useful Scripts
 
-## REST API (Summary)
+```powershell
+npm run test:backend
+npm run test:api
+npm run test:parsers
+npm run test:e2e
+npm run quality:gate
+npm run search:parity
+npm run reindex:meili -- --check
+npm run audit:ats-quality
+npm run backfill:normalization -- --dry-run
+```
 
-Core:
+Use `docs/reference/QA_RUNBOOK.md` before running E2E/API tests that need an isolated DB or test stack.
+
+## Public API Summary
+
+Public-compatible routes:
 
 - `GET /health`
-- `GET /sync/status`
-- `POST /sync/ats` (`?wait=1` optional)
-- `POST /sync/workday` (alias route)
-
-Postings:
-
 - `GET /postings`
 - `GET /postings/filter-options`
-- `POST /postings/ignore`
+- `GET /search/suggest`
+- `GET /sync/status`
+- `GET /ingestion/status`
 
-Applications:
+Admin/control/diagnostic routes exist in the server, but public UI work should not require protected settings or raw diagnostics. See `AGENTS.md` and `docs/PROJECT_STATE.md` before changing API boundaries.
 
-- `GET /applications`
-- `POST /applications`
-- `PATCH /applications/:id`
-- `DELETE /applications/:id`
+## Data Safety
 
-Settings:
+Do not commit runtime data:
 
-- `GET /settings/personal-information`
-- `PUT /settings/personal-information`
-- `GET /settings/mcp`
-- `PUT /settings/mcp`
+- `jobs.db`
+- `jobs.db-shm`
+- `jobs.db-wal`
+- `data/`
+- database dumps
+- backups
+- `.env`
+- deployment logs
 
-MCP helper endpoints:
+Production data belongs on the server and in Docker volumes. Repository fixtures should be small, non-sensitive samples used for tests.
 
-- `GET /mcp/candidates`
-- `POST /mcp/cover-letter-draft`
-- `POST /mcp/applications/complete`
+## Legacy Client And Docs Site
 
-## MCP Apply Agent Server
-
-You can have Codex/Claude/Gemini/Qwen/LLMs do the following for you:
-- Get your applicantee information `get_applicant_context`
-- Find the latest relevant jobs for you. `find_posting_candidates`
-- Apply to those jobs (As long as your LLM model has access to a browser)
-- Build a dynamic cover letter for you that relates to your resume, experience and the job you are applying for. `draft_cover_letter`
-- Update job application tracking for you. `record_application_result`
-
-To turn on the MCP server so your model can interact with OpenPostings run:
-
-```powershell
-cd OpenPostings
-npm run mcp:apply-agent
-```
-
-MCP server setup for your Codex (If you use a different LLM, ask it to setup an MCP setup for you):
-```
-[mcp_servers.openpostings-apply]
-command = "node"
-args = ['C:\Users\<path to where you cloned the repo>\OpenPostings\server\mcp-apply-server.js']
-```
-
-
-## Security Notes
-
-This is designed for local/self-hosted usage.
-
-- MCP credentials/settings are stored in local SQLite fields.
-- If you need stricter controls, add OS-level secret storage, DB encryption-at-rest, and tighter filesystem permissions.
+This repository still contains legacy Windows/Android/MCP/apply-agent surfaces and a `docs-site/` tree. They are preserved, but the active public product direction is the hosted search engine described above.

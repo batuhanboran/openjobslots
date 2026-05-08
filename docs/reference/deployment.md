@@ -24,6 +24,10 @@ The server uses `/root/.ssh/openjobslots_deploy` as a read-only GitHub deploy ke
 
 Use read-only access. Write access is not needed.
 
+Recorded public key for this deployment identity:
+
+`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINaPPI85y7u/XcHIlczDKuCp6amyhbQyvE+w+4BqQxdr openjobslots-ltx100-deploy`
+
 ## Useful Commands
 
 ```bash
