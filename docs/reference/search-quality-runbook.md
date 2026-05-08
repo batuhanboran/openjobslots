@@ -45,20 +45,38 @@ Expected Meili settings:
 Reindex verification:
 
 ```bash
-npm run reindex:meili -- --check
+npm run search:reindex:check
 npm run search:parity -- --limit=20 --query="turkish jobs" --query="turkyie" --query="remote jobs"
 ```
 
-Only run a replace reindex after parser/backfill changes have been tested and the check command reports settings mismatches or document-field drift that a normal outbox catch-up cannot fix:
+Only run a replace reindex after parser/backfill/refetch changes have been tested and the check command reports settings mismatches, stale documents, count drift, or remote facet drift that a normal outbox catch-up cannot fix. Replace mode builds a temporary index, applies the production settings, loads Postgres-visible/indexable rows, validates count/facets/sample searches, and swaps only after validation passes. The previous live index remains preserved at the temporary UID after the swap.
 
 ```bash
-npm run reindex:meili -- --replace
+npm run search:reindex:replace -- --dry-run --temp-index-suffix=v161-preflight
+npm run search:reindex:replace -- --apply --confirm-production --temp-index-suffix=v161-YYYYMMDD-HHMM
 ```
+
+Replace-mode validation fails before swap when:
+
+- temp index settings differ from `server/search/config.js`;
+- temp document count differs from Postgres visible/indexable count;
+- `remote_type` facet distribution differs from Postgres;
+- sampled Postgres rows differ from their temp-index Meili documents;
+- sample searches fail against the temp index.
+
+`/sync/status`, `/ingestion/status`, and `/admin/storage` expose bounded `search_reindex` status:
+
+- current index UID;
+- last settings apply;
+- last replace reindex state;
+- last count delta;
+- last remote facet delta;
+- last task error.
 
 Diagnosing Meili versus SQLite/Postgres differences:
 
 1. Check `/admin/storage` for `db_backend`, `search_backend`, and `search_settings.last_error`.
-2. Run `npm run reindex:meili -- --check` to verify settings, document count, and indexed fields.
+2. Run `npm run search:reindex:check` to verify settings, document count, remote facets, sample searches, and indexed fields.
 3. Run `npm run search:parity` with the exact query and filters.
 4. If SQLite fallback differs, check whether `server/index.js`, `server/backends/postgresStore.js`, and `server/search/meili.js` all use `server/search/config.js` token and alias helpers.
 5. If Meili returns stale URLs, repair through the durable outbox or replace reindex; do not manually delete documents without a follow-up parity run.

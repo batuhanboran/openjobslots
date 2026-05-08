@@ -48,6 +48,7 @@ const {
   requestSyncStop
 } = require("./backends/postgresStore");
 const { ensureMeiliPostingsIndex, getMeiliSettingsStatus } = require("./search/meili");
+const { readMeiliReindexStatus } = require("./search/reindexStatus");
 
 const PORT = Number(process.env.PORT || 8787);
 const NODE_ENV = String(process.env.NODE_ENV || "development").trim().toLowerCase();
@@ -16396,6 +16397,7 @@ function createServer() {
         ]);
         return sanitizeFrontendValue({
           ...status,
+          search_reindex: readMeiliReindexStatus(),
           write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
           parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
           parser_attention_by_ats: parserAttentionByAts,
@@ -16418,6 +16420,7 @@ function createServer() {
         ...counts,
         db_backend: DB_BACKEND,
         search_backend: SEARCH_BACKEND,
+        search_reindex: readMeiliReindexStatus(),
         queue_backend: QUEUE_BACKEND,
         legacy_api_sync: true,
         write_pressure: getWritePressure(ingestionWorker),
@@ -16444,6 +16447,7 @@ function createServer() {
             ...(status.ingestion_worker || {}),
             db_backend: DB_BACKEND,
             search_backend: SEARCH_BACKEND,
+            search_reindex: readMeiliReindexStatus(),
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
             parser_attention_by_ats: parserAttentionByAts
@@ -16461,6 +16465,7 @@ function createServer() {
           ...status,
           db_backend: DB_BACKEND,
           search_backend: SEARCH_BACKEND,
+          search_reindex: readMeiliReindexStatus(),
           queue_backend: QUEUE_BACKEND,
           write_pressure: getWritePressure(status),
           parser_attention_by_ats: parserAttentionByAts
@@ -16595,6 +16600,7 @@ function createServer() {
       primary_store: DB_BACKEND === "postgres" ? "postgres" : "sqlite",
       search_store: SEARCH_BACKEND === "meili" ? "meilisearch" : "sqlite",
       search_settings: getMeiliSettingsStatus(),
+      search_reindex: readMeiliReindexStatus(),
       sqlite_path: DB_BACKEND === "postgres" ? "backup/import only" : DB_PATH,
       ...counts
     }));
