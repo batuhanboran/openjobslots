@@ -99,7 +99,9 @@ const FIXTURE_BACKED = new Set([
 
 const PARSER_FIXTURE_BACKED = new Set([
   "adp_workforcenow",
+  "applitrack",
   "fountain",
+  "icims",
   "oracle",
   "paylocity",
   "pinpointhq",

@@ -58,10 +58,10 @@ These notes are for Codex and subagents working in this repository.
 ## Operating And Version Policy
 
 - May 8 lesson: keep this stabilization line in `v1.5.x`. Search, parser, and storage hardening are not a `v2` product rewrite.
-- Current stabilization checkpoint is `v1.5.18`; the next stabilization update should increment the patch version unless it is a deliberate product rewrite.
+- Current stabilization checkpoint is `v1.5.19`; the next stabilization update should increment the patch version unless it is a deliberate product rewrite.
 - Current stabilization priority order: parser normalization first, Meilisearch reindex/cleanup second, production parity tests third, image/build cache later.
 - After a full Meilisearch replace reindex, mark pre-reindex `search_index_outbox` rows processed so the worker does not replay hundreds of thousands of already-indexed writes.
-- Future-use Codex skills installed: `playwright`, `security-best-practices`, `security-threat-model`, `openjobslots-postgres-audit`, `ats-parser-certification`, and `openjobslots-search-parity-corpus`. A Codex restart may be needed before newly installed skills load.
+- Future-use Codex skills installed: `playwright`, `security-best-practices`, `security-threat-model`, `openjobslots-postgres-audit`, `ats-parser-certification`, `openjobslots-search-parity-corpus`, and `openjobslots-detail-page-certifier`. A Codex restart may be needed before newly installed skills load.
 - Parser/data incidents must use the OpenJobSlots skills together: `ats-parser-certification` for raw source evidence, `openjobslots-postgres-audit` for production DB/Meili/API parity, and `openjobslots-search-parity-corpus` for large title/filter matrices.
 
 ## Search Quality Incident Lessons
@@ -95,4 +95,4 @@ These notes are for Codex and subagents working in this repository.
 - `dayforcehcm` is configured but disabled by default until parser certification exists.
 - Freshness and pruning must use `last_seen_epoch`, not `first_seen_epoch`.
 - Default hot/searchable posting window: 90 days after last seen.
-- v1.5.17 adds the ATS certification workbench. v1.5.18 stabilizes parser normalization backfill for source date epochs and conservative onsite classification from concrete physical locations. Do not mark an ATS as parser-certified unless saved raw fixtures and tests prove geo, date, remote, and source-id behavior, or prove the source omitted a nullable field.
+- v1.5.17 adds the ATS certification workbench. v1.5.18 stabilizes parser normalization backfill for source date epochs and conservative onsite classification from concrete physical locations. v1.5.19 adds iCIMS/Applitrack saved raw detail fixtures, iCIMS country-code location parsing, explicit iCIMS remote header parsing, Applitrack detail URL certification, and a dry-run-first detail-page backfill tool. Do not mark an ATS as parser-certified unless saved raw fixtures and tests prove geo, date, remote, and source-id behavior, or prove the source omitted a nullable field.

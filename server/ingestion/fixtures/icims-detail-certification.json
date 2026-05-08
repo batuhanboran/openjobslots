@@ -1,0 +1,31 @@
+{
+  "ats_key": "icims",
+  "company_name_for_postings": "Fixture iCIMS",
+  "config": {
+    "origin": "https://fixtureco.icims.com"
+  },
+  "list_html": "\n    <ul>\n      <li class=\"iCIMS_JobCardItem\">\n        <a href=\"/jobs/1001/technical-support-engineer/job\"><h3>Technical Support Engineer</h3></a>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>US-PA-Philadelphia</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      </li>\n      <li class=\"iCIMS_JobCardItem\">\n        <a href=\"/jobs/1002/remote-data-analyst/job\"><h3>Remote Data Analyst</h3></a>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>CA-ON-Toronto</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>Yes</span></dd>\n      </li>\n    </ul>\n  ",
+  "detail_html_no_date": "\n    <section>\n      <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>US-PA-Philadelphia</span></dd>\n      <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      <p>This public detail page intentionally has no Date Posted field.</p>\n    </section>\n  ",
+  "expected": [
+    {
+      "source_job_id": "1001",
+      "title": "Technical Support Engineer",
+      "location_text": "US-PA-Philadelphia",
+      "country": "United States",
+      "region": "North America",
+      "remote_type": "onsite",
+      "posting_date": null,
+      "posted_at_epoch": null
+    },
+    {
+      "source_job_id": "1002",
+      "title": "Remote Data Analyst",
+      "location_text": "CA-ON-Toronto",
+      "country": "Canada",
+      "region": "North America",
+      "remote_type": "remote",
+      "posting_date": null,
+      "posted_at_epoch": null
+    }
+  ]
+}
