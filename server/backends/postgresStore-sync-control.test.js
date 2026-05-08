@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const {
   getPostgresSyncStatus,
+  getPostgresAtsFieldQualityByAts,
   getPostgresParserAttentionByAts,
   getRetentionConfig,
   getRetentionCutoffs,
@@ -9,7 +10,8 @@ const {
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
   requestSyncStart,
-  requestSyncStop
+  requestSyncStop,
+  upsertPostgresPostings
 } = require("./postgresStore");
 const { searchMeiliPostings, toMeiliPostingDocument } = require("../search/meili");
 
@@ -174,6 +176,42 @@ async function testParserAttentionGroupsCareerplugRejectionReasons() {
       { reason: "missing position_name", count: 1 }
     ]
   }]);
+}
+
+async function testAtsFieldQualityReportsFieldGapsByAts() {
+  let captured = null;
+  const pool = {
+    async query(sql, params = []) {
+      captured = { sql, params };
+      return {
+        rows: [{
+          ats_key: "icims",
+          total_postings: 100,
+          missing_country_count: 79,
+          missing_region_count: 79,
+          missing_city_count: 100,
+          missing_region_or_city_count: 100,
+          missing_remote_type_count: 80,
+          missing_posted_at_count: 99,
+          missing_department_count: 100,
+          missing_employment_type_count: 100,
+          missing_description_plain_count: 100,
+          parser_attention_count_24h: 2,
+          impact_score: 739
+        }]
+      };
+    }
+  };
+
+  const result = await getPostgresAtsFieldQualityByAts(pool, ["icims"]);
+
+  assert.match(captured.sql, /COUNT\(\*\) FILTER/);
+  assert.match(captured.sql, /missing_description_plain_count/);
+  assert.deepEqual(captured.params, [["icims"]]);
+  assert.equal(result[0].ats_key, "icims");
+  assert.equal(result[0].missing_country_pct, 79);
+  assert.equal(result[0].missing_region_or_city_count, 100);
+  assert.equal(result[0].parser_attention_count_24h, 2);
 }
 
 async function testHydratePostgresPostingsKeepsSafetyAndFilterGuards() {
@@ -565,6 +603,43 @@ async function testPublicPostingReadsDoNotWrite() {
   }
 }
 
+async function testPostgresUpsertRejectsInvalidPostingsBeforeStorage() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "sqlite";
+  const calls = [];
+  const client = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      return { rows: [], rowCount: 0 };
+    },
+    release() {}
+  };
+  const pool = {
+    async connect() {
+      return client;
+    }
+  };
+
+  try {
+    await upsertPostgresPostings(pool, [
+      { canonical_url: "", company_name: "Bad Co", position_name: "Engineer" },
+      { canonical_url: "ftp://example.com/jobs/1", company_name: "Bad Co", position_name: "Engineer" },
+      { canonical_url: "https://example.com/jobs/2", company_name: "Bad Co", position_name: "Untitled Position" },
+      { canonical_url: "https://example.com/jobs/3", company_name: "", position_name: "Engineer" }
+    ]);
+
+    assert.ok(calls.some((call) => /^BEGIN$/i.test(call.sql)));
+    assert.ok(calls.some((call) => /^COMMIT$/i.test(call.sql)));
+    assert.equal(calls.some((call) => /INSERT INTO postings/i.test(call.sql)), false);
+  } finally {
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 function testMeiliDocumentsCarryHiddenFlagSafely() {
   assert.equal(toMeiliPostingDocument({ canonical_url: "a", hidden: "false" }).hidden, false);
   assert.equal(toMeiliPostingDocument({ canonical_url: "b", hidden: "1" }).hidden, true);
@@ -738,12 +813,14 @@ async function main() {
   await testSyncStatusReportsRunningForActiveWorkerOnly();
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
   await testParserAttentionGroupsCareerplugRejectionReasons();
+  await testAtsFieldQualityReportsFieldGapsByAts();
   await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchReturnsFastZero();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
   await testPublicPostingReadsDoNotWrite();
+  await testPostgresUpsertRejectsInvalidPostingsBeforeStorage();
   testMeiliDocumentsCarryHiddenFlagSafely();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
   await testMeiliHideNoDateUsesPostingDatePresence();

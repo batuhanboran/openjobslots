@@ -24,6 +24,7 @@
       "region": "North America",
       "remote_type": "onsite",
       "industry": "Operations",
+      "department": "Operations",
       "is_remote": false
     }
   ]

@@ -9,7 +9,7 @@
   "config": {
     "baseOrigin": "https://fixtureco.applytojob.com"
   },
-  "raw_response": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/abc123/Customer-Support-Representative#apply\">Customer Support Representative</a></h3><i class=\"fa fa-map-marker\"></i> Istanbul, Turkiye <i class=\"fa fa-calendar\"></i> 2026-05-06 <span>Department: Support</span></li></ul>",
+  "raw_response": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/abc123/Customer-Support-Representative#apply\">Customer Support Representative</a></h3><i class=\"fa fa-map-marker\"></i> Istanbul, Turkiye <i class=\"fa fa-calendar\"></i> 2026-05-06 <span>Department: Support</span> <span>Employment Type: Full-time</span></li></ul>",
   "expected": [
     {
       "ats_key": "applytojob",
@@ -22,6 +22,8 @@
       "remote_type": "onsite",
       "posting_date": "2026-05-06",
       "industry": "Support",
+      "department": "Support",
+      "employment_type": "Full-time",
       "parser_confidence": 0.75
     }
   ]

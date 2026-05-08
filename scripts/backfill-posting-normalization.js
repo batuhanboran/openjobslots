@@ -196,6 +196,38 @@ function shouldReplaceStoredCountry(row, normalizedCountry) {
   return false;
 }
 
+function deriveApplitrackDepartmentFromTitle(row) {
+  if (String(row.ats_key || "").trim().toLowerCase() !== "applitrack") return "";
+  const title = String(row.position_name || "").trim();
+  const parts = title.split(/\s+-\s+/).map((part) => part.trim()).filter(Boolean);
+  const department = parts.length > 1 ? parts[0] : "";
+  if (!department || department.length > 80) return "";
+  if (/^(job|position|opening|unknown|untitled|n\/?a)$/i.test(department)) return "";
+  return department;
+}
+
+function deriveDepartmentForBackfill(row, normalized) {
+  const current = String(row.department || "").trim();
+  if (current) return current;
+  const fromNormalized = String(normalized.department || "").trim();
+  if (fromNormalized) return fromNormalized;
+  const fromSourceCategory = String(row.industry || "").trim();
+  if (fromSourceCategory) return fromSourceCategory;
+  return deriveApplitrackDepartmentFromTitle(row);
+}
+
+function deriveEmploymentTypeForBackfill(row, normalized) {
+  const current = String(row.employment_type || "").trim();
+  if (current) return current;
+  return String(normalized.employment_type || "").trim();
+}
+
+function deriveDescriptionPlainForBackfill(row, normalized) {
+  const current = String(row.description_plain || "").trim();
+  if (current) return current;
+  return String(normalized.description_plain || "").trim();
+}
+
 function shouldChange(row, normalized) {
   const currentCountry = String(row.country || "").trim();
   const currentRegion = String(row.region || "").trim();
@@ -206,6 +238,9 @@ function shouldChange(row, normalized) {
   const currentPostingDateRaw = String(row.posting_date || "").trim();
   const currentPostingDate = normalizePostingDateForBackfill(row.posting_date);
   const currentPostedAtEpoch = Number(row.posted_at_epoch || 0) || null;
+  const currentDepartment = String(row.department || "").trim();
+  const currentEmploymentType = String(row.employment_type || "").trim();
+  const currentDescriptionPlain = String(row.description_plain || "").trim();
   const normalizedCountry = String(normalized.country || "").trim();
   const nextCountry =
     shouldReplaceStoredCountry(row, normalizedCountry) || !currentCountry
@@ -227,6 +262,9 @@ function shouldChange(row, normalized) {
     currentPostedAtEpoch ||
     Number(normalized.posted_at_epoch || normalized.posting_date_epoch || 0) ||
     (nextPostingDate ? postedEpochFromBackfillDate(nextPostingDate, row.last_seen_epoch) : null);
+  const nextDepartment = deriveDepartmentForBackfill(row, normalized);
+  const nextEmploymentType = deriveEmploymentTypeForBackfill(row, normalized);
+  const nextDescriptionPlain = deriveDescriptionPlainForBackfill(row, normalized);
 
   return {
     changed:
@@ -237,7 +275,10 @@ function shouldChange(row, normalized) {
       nextLocationText !== currentLocationText ||
       nextSourceJobId !== currentSourceJobId ||
       (currentPostingDateRaw && nextPostingDate !== currentPostingDateRaw) ||
-      nextPostedAtEpoch !== currentPostedAtEpoch,
+      nextPostedAtEpoch !== currentPostedAtEpoch ||
+      nextDepartment !== currentDepartment ||
+      nextEmploymentType !== currentEmploymentType ||
+      nextDescriptionPlain !== currentDescriptionPlain,
     nextCountry,
     nextRegion,
     nextCity,
@@ -245,7 +286,10 @@ function shouldChange(row, normalized) {
     nextLocationText,
     nextSourceJobId,
     nextPostingDate,
-    nextPostedAtEpoch
+    nextPostedAtEpoch,
+    nextDepartment,
+    nextEmploymentType,
+    nextDescriptionPlain
   };
 }
 
@@ -266,7 +310,10 @@ function toSearchPayload(row, next) {
     posting_date: next.nextPostingDate,
     posted_at_epoch: next.nextPostedAtEpoch || row.posted_at_epoch,
     last_seen_epoch: row.last_seen_epoch,
-    hidden: row.hidden
+    hidden: row.hidden,
+    department: next.nextDepartment || row.department,
+    employment_type: next.nextEmploymentType || row.employment_type,
+    description_plain: next.nextDescriptionPlain || row.description_plain
   };
 }
 
@@ -306,7 +353,10 @@ function getChangedFields(row, next) {
     ["remote_type", String(row.remote_type || "unknown").trim() || "unknown", next.nextRemoteType],
     ["source_job_id", String(row.source_job_id || "").trim(), next.nextSourceJobId],
     ["posting_date", String(row.posting_date || "").trim(), next.nextPostingDate],
-    ["posted_at_epoch", Number(row.posted_at_epoch || 0) || null, next.nextPostedAtEpoch]
+    ["posted_at_epoch", Number(row.posted_at_epoch || 0) || null, next.nextPostedAtEpoch],
+    ["department", String(row.department || "").trim(), next.nextDepartment],
+    ["employment_type", String(row.employment_type || "").trim(), next.nextEmploymentType],
+    ["description_plain", String(row.description_plain || "").trim(), next.nextDescriptionPlain]
   ];
   for (const [field, before, after] of checks) {
     if (String(before ?? "") !== String(after ?? "")) fields.push(field);
@@ -386,6 +436,9 @@ async function writeBatchWithRetry(pool, rows, summary, options) {
                 source_job_id = $7,
                 posting_date = $8,
                 posted_at_epoch = $9,
+                department = $10,
+                employment_type = $11,
+                description_plain = $12,
                 updated_at = now()
             WHERE canonical_url = $1;
           `,
@@ -398,7 +451,10 @@ async function writeBatchWithRetry(pool, rows, summary, options) {
             next.nextRemoteType,
             next.nextSourceJobId,
             next.nextPostingDate,
-            next.nextPostedAtEpoch
+            next.nextPostedAtEpoch,
+            next.nextDepartment,
+            next.nextEmploymentType,
+            next.nextDescriptionPlain
           ]
         );
         await client.query(
@@ -412,6 +468,9 @@ async function writeBatchWithRetry(pool, rows, summary, options) {
                 source_job_id = $7,
                 posting_date = $8,
                 posted_at_epoch = $9,
+                department = $10,
+                employment_type = $11,
+                description_plain = $12,
                 updated_at = now()
             WHERE canonical_url = $1;
           `,
@@ -424,7 +483,10 @@ async function writeBatchWithRetry(pool, rows, summary, options) {
             next.nextRemoteType,
             next.nextSourceJobId,
             next.nextPostingDate,
-            next.nextPostedAtEpoch
+            next.nextPostedAtEpoch,
+            next.nextDepartment,
+            next.nextEmploymentType,
+            next.nextDescriptionPlain
           ]
         );
         await client.query(
@@ -478,6 +540,10 @@ function buildCandidateQuery(atsFilter) {
       region,
       remote_type,
       industry,
+      department,
+      employment_type,
+      description_plain,
+      description_html,
       ats_key,
       source_job_id,
       posting_date,
@@ -500,6 +566,13 @@ function buildCandidateQuery(atsFilter) {
         OR city = ''
         OR remote_type = 'unknown'
         OR source_job_id = ''
+        OR (
+          btrim(coalesce(department, '')) = ''
+          AND (
+            btrim(coalesce(industry, '')) <> ''
+            OR ats_key = 'applitrack'
+          )
+        )
         OR posting_date in ('false', 'true', 'null', 'undefined')
         OR (
           posted_at_epoch IS NULL

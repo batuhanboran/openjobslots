@@ -3,6 +3,7 @@ const test = require("node:test");
 const {
   parseBackfillArgs,
   runBackfill,
+  normalizeRowForBackfill,
   shouldChange,
   toSearchPayload
 } = require("./backfill-posting-normalization");
@@ -19,6 +20,10 @@ function sampleRow(overrides = {}) {
     region: "",
     remote_type: "unknown",
     industry: "",
+    department: "",
+    employment_type: "",
+    description_plain: "",
+    description_html: "",
     ats_key: "exampleats",
     source_job_id: "",
     posting_date: "2026-05-01",
@@ -107,6 +112,36 @@ test("backfill dry-run reports changes without writes", async () => {
   assert.equal(pool.calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)), false);
 });
 
+test("backfill dry-run fills source-backed department from stored category", async () => {
+  const pool = createDryRunPool([sampleRow({
+    industry: "Operations",
+    department: "",
+    location_text: "Remote"
+  })]);
+  const summary = await runBackfill(
+    pool,
+    parseBackfillArgs(["--limit=1", "--sample-limit=1"], {}),
+    { ensureSchema: async () => {}, logger: () => {} }
+  );
+
+  assert.equal(summary.changed, 1);
+  assert.equal(summary.changed_by_field.department, 1);
+  assert.equal(summary.samples[0].after.department, "Operations");
+});
+
+test("backfill does not turn generic multi-location text into a city", () => {
+  const row = sampleRow({
+    location_text: "(Multiple states)",
+    country: "",
+    region: "",
+    city: "",
+    remote_type: "unknown"
+  });
+  const next = shouldChange(row, normalizeRowForBackfill(row));
+
+  assert.equal(next.nextCity, "");
+});
+
 test("backfill write mode updates normalized fields and queues Meili outbox", async () => {
   const pool = createWritePool([sampleRow()]);
   const summary = await runBackfill(
@@ -119,6 +154,7 @@ test("backfill write mode updates normalized fields and queues Meili outbox", as
   assert.equal(summary.changed, 1);
   assert.ok(pool.calls.some((call) => /^BEGIN$/i.test(call.sql)));
   assert.ok(pool.calls.some((call) => /UPDATE postings/i.test(call.sql)));
+  assert.ok(pool.calls.some((call) => /department = \$10/i.test(call.sql)));
   assert.ok(pool.calls.some((call) => /UPDATE posting_cache/i.test(call.sql)));
   assert.ok(pool.calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)));
   assert.ok(pool.calls.some((call) => /^COMMIT$/i.test(call.sql)));
@@ -142,4 +178,23 @@ test("backfill change detection includes city and search payload preserves it", 
   assert.equal(next.nextCity, "Istanbul");
   assert.equal(payload.city, "Istanbul");
   assert.equal(payload.country, "Turkey");
+});
+
+test("backfill search payload includes source-backed optional fields", () => {
+  const row = sampleRow({ industry: "Customer Success", department: "" });
+  const next = shouldChange(row, {
+    country: "Turkey",
+    region: "EMEA",
+    city: "Istanbul",
+    remote_type: "onsite",
+    location_text: "Istanbul, Turkey",
+    source_job_id: "123",
+    posted_at_epoch: 1770000000,
+    posting_date: "2026-05-01",
+    department: ""
+  });
+  const payload = toSearchPayload(row, next);
+
+  assert.equal(next.nextDepartment, "Customer Success");
+  assert.equal(payload.department, "Customer Success");
 });

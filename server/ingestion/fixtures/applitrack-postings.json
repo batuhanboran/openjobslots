@@ -10,7 +10,8 @@
       "position_name": "Teaching - Math Teacher",
       "job_posting_url": "https://www.applitrack.com/fixtureco/onlineapp/default.aspx?JobID=1001",
       "posting_date": null,
-      "location": null
+      "location": null,
+      "department": "Teaching"
     }
   ],
   "expected": [
@@ -21,6 +22,7 @@
       "job_posting_url": "https://www.applitrack.com/fixtureco/onlineapp/default.aspx?JobID=1001",
       "country": "",
       "remote_type": "unknown",
+      "department": "Teaching",
       "is_remote": false
     }
   ]
