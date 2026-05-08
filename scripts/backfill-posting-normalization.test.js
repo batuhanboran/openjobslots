@@ -1,0 +1,145 @@
+const assert = require("node:assert/strict");
+const test = require("node:test");
+const {
+  parseBackfillArgs,
+  runBackfill,
+  shouldChange,
+  toSearchPayload
+} = require("./backfill-posting-normalization");
+
+function sampleRow(overrides = {}) {
+  return {
+    canonical_url: "https://example.com/jobs/123",
+    company_name: "Example Co",
+    position_name: "Software Engineer",
+    apply_url: "https://example.com/jobs/123/apply",
+    location_text: "Istanbul, Turkey",
+    city: "",
+    country: "",
+    region: "",
+    remote_type: "unknown",
+    industry: "",
+    ats_key: "exampleats",
+    source_job_id: "",
+    posting_date: "2026-05-01",
+    posted_at_epoch: null,
+    first_seen_epoch: 1770000000,
+    last_seen_epoch: 1770000000,
+    hidden: false,
+    parser_version: "test-v1",
+    confidence: 0.8,
+    ...overrides
+  };
+}
+
+function createDryRunPool(rows) {
+  let queried = false;
+  const calls = [];
+  return {
+    calls,
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (/FROM postings/i.test(sql)) {
+        if (queried) return { rows: [] };
+        queried = true;
+        return { rows };
+      }
+      return { rows: [] };
+    },
+    connect() {
+      throw new Error("dry-run should not open write client");
+    },
+    async end() {}
+  };
+}
+
+function createWritePool(rows) {
+  let queried = false;
+  const calls = [];
+  const client = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      return { rows: [], rowCount: 1 };
+    },
+    release() {
+      calls.push({ sql: "RELEASE", params: [] });
+    }
+  };
+  return {
+    calls,
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (/FROM postings/i.test(sql)) {
+        if (queried) return { rows: [] };
+        queried = true;
+        return { rows };
+      }
+      return { rows: [] };
+    },
+    async connect() {
+      return client;
+    },
+    async end() {}
+  };
+}
+
+test("backfill defaults to dry-run and requires explicit write mode", () => {
+  assert.equal(parseBackfillArgs([], {}).dryRun, true);
+  assert.equal(parseBackfillArgs([], {}).write, false);
+  assert.equal(parseBackfillArgs(["--write"], {}).dryRun, false);
+  assert.deepEqual(parseBackfillArgs(["--ats=icims,applitrack"], {}).atsFilter, ["icims", "applitrack"]);
+});
+
+test("backfill dry-run reports changes without writes", async () => {
+  const pool = createDryRunPool([sampleRow()]);
+  const summary = await runBackfill(
+    pool,
+    parseBackfillArgs(["--limit=1", "--sample-limit=1"], {}),
+    { ensureSchema: async () => {}, logger: () => {} }
+  );
+
+  assert.equal(summary.dry_run, true);
+  assert.equal(summary.scanned, 1);
+  assert.equal(summary.changed, 1);
+  assert.equal(summary.changed_by_field.country, 1);
+  assert.equal(summary.changed_by_field.city, 1);
+  assert.equal(pool.calls.some((call) => /UPDATE postings/i.test(call.sql)), false);
+  assert.equal(pool.calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)), false);
+});
+
+test("backfill write mode updates normalized fields and queues Meili outbox", async () => {
+  const pool = createWritePool([sampleRow()]);
+  const summary = await runBackfill(
+    pool,
+    parseBackfillArgs(["--write", "--limit=1"], {}),
+    { ensureSchema: async () => {}, logger: () => {} }
+  );
+
+  assert.equal(summary.dry_run, false);
+  assert.equal(summary.changed, 1);
+  assert.ok(pool.calls.some((call) => /^BEGIN$/i.test(call.sql)));
+  assert.ok(pool.calls.some((call) => /UPDATE postings/i.test(call.sql)));
+  assert.ok(pool.calls.some((call) => /UPDATE posting_cache/i.test(call.sql)));
+  assert.ok(pool.calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)));
+  assert.ok(pool.calls.some((call) => /^COMMIT$/i.test(call.sql)));
+});
+
+test("backfill change detection includes city and search payload preserves it", () => {
+  const row = sampleRow();
+  const next = shouldChange(row, {
+    country: "Turkey",
+    region: "EMEA",
+    city: "Istanbul",
+    remote_type: "onsite",
+    location_text: "Istanbul, Turkey",
+    source_job_id: "123",
+    posted_at_epoch: 1770000000,
+    posting_date: "2026-05-01"
+  });
+  const payload = toSearchPayload(row, next);
+
+  assert.equal(next.changed, true);
+  assert.equal(next.nextCity, "Istanbul");
+  assert.equal(payload.city, "Istanbul");
+  assert.equal(payload.country, "Turkey");
+});

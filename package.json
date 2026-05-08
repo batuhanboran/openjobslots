@@ -1,6 +1,6 @@
 {
   "name": "openjobslots",
-  "version": "1.5.22",
+  "version": "1.5.23",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -27,7 +27,7 @@
     "test:e2e": "playwright test tests/e2e",
     "test:e2e:ui": "playwright test tests/e2e --ui",
     "test:search-corpus": "node --check server/search/search-corpus-fixtures.js && node --check server/search/search-corpus.test.js && node server/search/search-corpus.test.js",
-    "test:backend": "node --check server/index.js && node --check server/mcp-apply-server.js && node --check server/backends/postgres.js && node --check server/backends/postgresStore.js && node --check server/backends/postgresStore-sync-control.test.js && node --check server/search/meili.js && node --check server/search/search-corpus-fixtures.js && node --check server/search/search-corpus.test.js && node --check server/queue/pgBoss.js && node --check server/ingestion/adapters.js && node --check server/ingestion/cache.js && node --check server/ingestion/posting.js && node --check server/ingestion/schema.js && node --check server/ingestion/worker.js && node --check server/ingestion/worker-concurrency.test.js && node --check scripts/migrate-sqlite-to-postgres.js && node --check scripts/reindex-meili-from-postgres.js && node --check scripts/backfill-posting-normalization.js && node --check scripts/backfill-ats-detail-pages.js && node --check scripts/audit-ats-quality.js && node --check scripts/test/setup-e2e-db.js && node --check scripts/test/e2e-stack.js && node server/backends/postgresStore-sync-control.test.js && npm run test:search-corpus && npm run test:parsers"
+    "test:backend": "node --check server/index.js && node --check server/mcp-apply-server.js && node --check server/backends/postgres.js && node --check server/backends/postgresStore.js && node --check server/backends/postgresStore-sync-control.test.js && node --check server/search/meili.js && node --check server/search/search-corpus-fixtures.js && node --check server/search/search-corpus.test.js && node --check server/queue/pgBoss.js && node --check server/ingestion/adapters.js && node --check server/ingestion/cache.js && node --check server/ingestion/posting.js && node --check server/ingestion/schema.js && node --check server/ingestion/worker.js && node --check server/ingestion/worker-concurrency.test.js && node --check scripts/migrate-sqlite-to-postgres.js && node --check scripts/reindex-meili-from-postgres.js && node --check scripts/reindex-meili-from-postgres.test.js && node scripts/reindex-meili-from-postgres.test.js && node --check scripts/backfill-posting-normalization.js && node --check scripts/backfill-posting-normalization.test.js && node scripts/backfill-posting-normalization.test.js && node --check scripts/backfill-ats-detail-pages.js && node --check scripts/audit-ats-quality.js && node --check scripts/test/setup-e2e-db.js && node --check scripts/test/e2e-stack.js && node server/backends/postgresStore-sync-control.test.js && npm run test:search-corpus && npm run test:parsers"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

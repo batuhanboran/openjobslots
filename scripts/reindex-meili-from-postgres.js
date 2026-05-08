@@ -1,12 +1,39 @@
 const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
-const { ensureMeiliPostingsIndex, getMeiliConfig, upsertMeiliPostings } = require("../server/search/meili");
+const {
+  ensureMeiliPostingsIndex,
+  getMeiliConfig,
+  toMeiliDocumentId,
+  toMeiliPostingDocument,
+  upsertMeiliPostings
+} = require("../server/search/meili");
 
-const BATCH_SIZE = Math.max(100, Math.min(5000, Number(process.env.OPENJOBSLOTS_REINDEX_BATCH_SIZE || 1000)));
-const REPLACE_INDEX = String(process.env.OPENJOBSLOTS_REINDEX_REPLACE || "").trim() === "1";
-const UPSERT_TASK_TIMEOUT_MS = Math.max(
-  30000,
-  Math.min(300000, Number(process.env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000))
-);
+function parseNumberOption(value, fallback, min, max) {
+  const parsed = Number(value);
+  const numeric = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.max(min, Math.min(max, numeric));
+}
+
+function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
+  const options = {
+    batchSize: parseNumberOption(env.OPENJOBSLOTS_REINDEX_BATCH_SIZE || 1000, 1000, 100, 5000),
+    check: String(env.OPENJOBSLOTS_REINDEX_CHECK || "").trim() === "1",
+    replaceIndex: String(env.OPENJOBSLOTS_REINDEX_REPLACE || "").trim() === "1",
+    sampleLimit: parseNumberOption(env.OPENJOBSLOTS_REINDEX_SAMPLE_LIMIT || 25, 25, 0, 200),
+    taskTimeoutMs: parseNumberOption(env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000, 120000, 30000, 300000)
+  };
+
+  for (const arg of argv) {
+    if (arg === "--check" || arg === "--dry-run") options.check = true;
+    if (arg === "--replace") options.replaceIndex = true;
+    if (arg.startsWith("--batch-size=")) {
+      options.batchSize = parseNumberOption(arg.slice("--batch-size=".length), options.batchSize, 100, 5000);
+    }
+    if (arg.startsWith("--sample-limit=")) {
+      options.sampleLimit = parseNumberOption(arg.slice("--sample-limit=".length), options.sampleLimit, 0, 200);
+    }
+  }
+  return options;
+}
 
 async function meiliRequest(config, path, options = {}) {
   const response = await fetch(`${config.host}${path}`, {
@@ -41,9 +68,8 @@ async function waitForMeiliTask(config, task, timeoutMs = 60000) {
   throw new Error(`Meilisearch task ${taskUid} did not finish within ${timeoutMs}ms`);
 }
 
-async function resetMeiliIndexIfRequested() {
-  if (!REPLACE_INDEX) return;
-  const config = getMeiliConfig();
+async function resetMeiliIndexIfRequested(config, replaceIndex) {
+  if (!replaceIndex) return;
   if (!config.enabled) return;
   const deleteTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`, {
     method: "DELETE",
@@ -53,16 +79,141 @@ async function resetMeiliIndexIfRequested() {
   console.log(`Deleted Meilisearch index ${config.indexName} before rebuild`);
 }
 
-async function main() {
-  const pool = createPostgresPool();
+function indexablePostingsWhereClause() {
+  return `
+    hidden = false
+    AND btrim(coalesce(canonical_url, '')) ~* '^https?://'
+    AND btrim(coalesce(position_name, '')) <> ''
+    AND btrim(coalesce(company_name, '')) <> ''
+    AND position_name !~* '^(untitled|unknown|n/?a|not available|job opening|new job|open position|position)$'
+  `;
+}
+
+async function getMeiliStats(config) {
+  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/stats`, { allowNotFound: true });
+}
+
+function comparableDocumentFields(postgresRow) {
+  const document = toMeiliPostingDocument(postgresRow);
+  return {
+    canonical_url: document.canonical_url,
+    title: document.title,
+    company: document.company,
+    location: document.location,
+    city: document.city,
+    country: document.country,
+    region: document.region,
+    remote_type: document.remote_type,
+    ats_key: document.ats_key,
+    source_job_id: document.source_job_id,
+    posted_at_epoch: document.posted_at_epoch,
+    hidden: document.hidden
+  };
+}
+
+function compareMeiliDocument(postgresRow, meiliDocument) {
+  const expected = comparableDocumentFields(postgresRow);
+  const mismatches = [];
+  for (const [field, expectedValue] of Object.entries(expected)) {
+    const actualValue = meiliDocument?.[field];
+    if (String(actualValue ?? "") !== String(expectedValue ?? "")) {
+      mismatches.push({ field, expected: expectedValue, actual: actualValue ?? null });
+    }
+  }
+  return mismatches;
+}
+
+async function checkMeiliParity(pool, config, options) {
+  const countResult = await pool.query(`SELECT COUNT(*)::int AS count FROM postings WHERE ${indexablePostingsWhereClause()};`);
+  const badRowsResult = await pool.query(
+    `
+      SELECT COUNT(*)::int AS count
+      FROM postings
+      WHERE hidden = false
+        AND NOT (${indexablePostingsWhereClause()});
+    `
+  );
+  const stats = config.enabled ? await getMeiliStats(config) : { skipped: true, numberOfDocuments: 0 };
+  const sampleResult = await pool.query(
+    `
+      SELECT
+        canonical_url,
+        company_name,
+        position_name,
+        apply_url,
+        location_text,
+        city,
+        country,
+        region,
+        remote_type,
+        industry,
+        department,
+        employment_type,
+        description_plain,
+        ats_key,
+        source_job_id,
+        posting_date,
+        posted_at_epoch,
+        last_seen_epoch,
+        hidden
+      FROM postings
+      WHERE ${indexablePostingsWhereClause()}
+      ORDER BY last_seen_epoch DESC, canonical_url ASC
+      LIMIT $1;
+    `,
+    [options.sampleLimit]
+  );
+
+  const samples = [];
+  if (config.enabled) {
+    for (const row of sampleResult.rows || []) {
+      const id = toMeiliDocumentId(row.canonical_url);
+      let document = null;
+      let missing = false;
+      try {
+        document = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents/${encodeURIComponent(id)}`);
+      } catch {
+        missing = true;
+      }
+      const mismatches = missing ? [{ field: "id", expected: id, actual: null }] : compareMeiliDocument(row, document);
+      if (mismatches.length > 0) {
+        samples.push({
+          canonical_url: row.canonical_url,
+          ats_key: row.ats_key,
+          mismatches
+        });
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    check: true,
+    postgres_indexable_count: Number(countResult.rows[0]?.count || 0),
+    postgres_bad_visible_rows_excluded: Number(badRowsResult.rows[0]?.count || 0),
+    meili_document_count: Number(stats?.numberOfDocuments || 0),
+    count_delta: Number(countResult.rows[0]?.count || 0) - Number(stats?.numberOfDocuments || 0),
+    sampled: sampleResult.rows.length,
+    sample_mismatches: samples
+  };
+}
+
+async function runReindex(pool, options = parseReindexArgs()) {
+  const config = getMeiliConfig();
   let indexed = 0;
   let lastCanonicalUrl = "";
 
   try {
+    if (options.check) {
+      const checkResult = await checkMeiliParity(pool, config, options);
+      console.log(JSON.stringify(checkResult));
+      return checkResult;
+    }
+
     await ensurePostgresSchema(pool);
     const reindexStartedAtResult = await pool.query("SELECT now() AS started_at");
     const reindexStartedAt = reindexStartedAtResult.rows[0]?.started_at;
-    await resetMeiliIndexIfRequested();
+    await resetMeiliIndexIfRequested(config, options.replaceIndex);
     await ensureMeiliPostingsIndex();
 
     while (true) {
@@ -89,7 +240,7 @@ async function main() {
             last_seen_epoch,
             hidden
           FROM postings
-          WHERE hidden = false
+          WHERE ${indexablePostingsWhereClause()}
             AND canonical_url > $1
           ORDER BY canonical_url ASC
           LIMIT $2;
@@ -99,14 +250,14 @@ async function main() {
 
       if (result.rows.length === 0) break;
       const task = await upsertMeiliPostings(result.rows);
-      await waitForMeiliTask(getMeiliConfig(), task, UPSERT_TASK_TIMEOUT_MS);
+      await waitForMeiliTask(config, task, options.taskTimeoutMs);
       indexed += result.rows.length;
       lastCanonicalUrl = String(result.rows[result.rows.length - 1].canonical_url || "");
       console.log(`Indexed ${indexed} postings into Meilisearch`);
     }
 
     console.log(`Reindexed ${indexed} visible postings into Meilisearch`);
-    if (REPLACE_INDEX && reindexStartedAt) {
+    if (options.replaceIndex && reindexStartedAt) {
       const processed = await pool.query(
         `
           UPDATE search_index_outbox
@@ -118,9 +269,15 @@ async function main() {
       );
       console.log(`Marked ${processed.rowCount || 0} pre-reindex search outbox rows as processed`);
     }
+    return { ok: true, check: false, indexed };
   } finally {
-    await pool.end();
+    if (typeof pool.end === "function") await pool.end();
   }
+}
+
+async function main() {
+  const pool = createPostgresPool();
+  await runReindex(pool, parseReindexArgs());
 }
 
 if (require.main === module) {
@@ -129,3 +286,12 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+module.exports = {
+  checkMeiliParity,
+  comparableDocumentFields,
+  compareMeiliDocument,
+  indexablePostingsWhereClause,
+  parseReindexArgs,
+  runReindex
+};
