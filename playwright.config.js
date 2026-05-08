@@ -12,6 +12,7 @@ module.exports = defineConfig({
   },
   outputDir: "test-results/e2e",
   fullyParallel: false,
+  retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   use: {
     baseURL,
