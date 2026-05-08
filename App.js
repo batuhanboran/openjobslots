@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.20";
+const PUBLIC_APP_VERSION = "1.5.21";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.21",
+    date: "May 8, 2026",
+    title: "Parser contract and diagnostics",
+    summary:
+      "Expanded normalized ATS output fields, added ApplicantPro raw parser certification, and added parser diagnostics for the full ATS catalog."
+  },
   {
     version: "1.5.20",
     date: "May 8, 2026",

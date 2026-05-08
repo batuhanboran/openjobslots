@@ -473,6 +473,60 @@ async function testPostgresStructuredFiltersUseConservativeLocationFallbacks() {
   }
 }
 
+async function testPublicPostingReadsDoNotWrite() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "sqlite";
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) return { rows: [{ count: 1 }] };
+      if (/SELECT\s+row_number\(\) OVER/i.test(sql)) {
+        return {
+          rows: [{
+            id: 1,
+            canonical_url: "https://example.com/jobs/1",
+            company_name: "Read Co",
+            position_name: "Support Engineer",
+            location_text: "Remote - Istanbul, Turkey",
+            country: "Turkey",
+            region: "EMEA",
+            remote_type: "remote",
+            ats_key: "fixture",
+            last_seen_epoch: 1778205600,
+            applied: false,
+            ignored: false
+          }]
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "support",
+      countries: ["Turkey"],
+      remote: "remote",
+      limit: 10,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+    assert.equal(result.items.length, 1);
+    assert.ok(calls.length >= 2);
+    for (const call of calls) {
+      assert.match(call.sql.trim(), /^SELECT/i, `read endpoint query should be SELECT-only: ${call.sql}`);
+    }
+  } finally {
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 function testMeiliDocumentsCarryHiddenFlagSafely() {
   assert.equal(toMeiliPostingDocument({ canonical_url: "a", hidden: "false" }).hidden, false);
   assert.equal(toMeiliPostingDocument({ canonical_url: "b", hidden: "1" }).hidden, true);
@@ -485,11 +539,19 @@ function testMeiliDocumentsInferMissingSearchFacetsFromLocation() {
     position_name: "Technical Support Engineer",
     company_name: "Support Co",
     location_text: "Remote - Istanbul, T\u00fcrkiye",
-    remote_type: "unknown"
+    remote_type: "unknown",
+    city: "Istanbul",
+    department: "Support",
+    employment_type: "Full-time",
+    description_plain: "Support customers in Turkey."
   });
+  assert.equal(document.city, "Istanbul");
   assert.equal(document.country, "Turkey");
   assert.equal(document.region, "EMEA");
   assert.equal(document.remote_type, "remote");
+  assert.equal(document.department, "Support");
+  assert.equal(document.employment_type, "Full-time");
+  assert.equal(document.description_plain, "Support customers in Turkey.");
 }
 
 async function testMeiliHideNoDateUsesPostingDatePresence() {
@@ -642,6 +704,7 @@ async function main() {
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchReturnsFastZero();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
+  await testPublicPostingReadsDoNotWrite();
   testMeiliDocumentsCarryHiddenFlagSafely();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
   await testMeiliHideNoDateUsesPostingDatePresence();

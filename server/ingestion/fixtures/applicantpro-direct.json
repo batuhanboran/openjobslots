@@ -1,0 +1,50 @@
+{
+  "ats_key": "applicantpro",
+  "company_name_for_postings": "Fixture ApplicantPro",
+  "company": {
+    "company_name": "Fixture ApplicantPro",
+    "company_url": "https://fixtureco.applicantpro.com/jobs/",
+    "ATS_name": "ApplicantPro"
+  },
+  "config": {
+    "origin": "https://fixtureco.applicantpro.com",
+    "jobsUrl": "https://fixtureco.applicantpro.com/jobs/",
+    "subdomainLower": "fixtureco"
+  },
+  "raw_response": {
+    "success": true,
+    "data": {
+      "jobs": [
+        {
+          "id": 445566,
+          "title": "Remote Technical Support Engineer",
+          "jobUrl": "/jobs/445566",
+          "startDateRef": "2026-05-08",
+          "jobLocation": "",
+          "city": "Istanbul",
+          "abbreviation": "",
+          "iso3": "TUR",
+          "department": "Support",
+          "employmentType": "Full-time"
+        }
+      ]
+    }
+  },
+  "expected": [
+    {
+      "ats_key": "applicantpro",
+      "company_name": "Fixture ApplicantPro",
+      "position_name": "Remote Technical Support Engineer",
+      "source_job_id": "445566",
+      "job_posting_url": "https://fixtureco.applicantpro.com/jobs/445566",
+      "location_text": "Istanbul, TUR",
+      "city": "Istanbul",
+      "country": "Turkey",
+      "region": "EMEA",
+      "remote_type": "remote",
+      "posting_date": "2026-05-08",
+      "department": "Support",
+      "employment_type": "Full-time"
+    }
+  ]
+}

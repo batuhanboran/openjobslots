@@ -84,10 +84,15 @@ async function ensurePostgresSchema(pool) {
       source_job_id TEXT NOT NULL DEFAULT '',
       position_name TEXT NOT NULL,
       location_text TEXT,
+      city TEXT NOT NULL DEFAULT '',
       country TEXT NOT NULL DEFAULT '',
       region TEXT NOT NULL DEFAULT '',
       remote_type TEXT NOT NULL DEFAULT 'unknown',
       industry TEXT NOT NULL DEFAULT '',
+      department TEXT NOT NULL DEFAULT '',
+      employment_type TEXT NOT NULL DEFAULT '',
+      description_plain TEXT NOT NULL DEFAULT '',
+      description_html TEXT NOT NULL DEFAULT '',
       posting_date TEXT,
       posted_at_epoch BIGINT,
       first_seen_epoch BIGINT NOT NULL,
@@ -107,6 +112,13 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_posting_cache_last_seen
       ON posting_cache(last_seen_epoch DESC);
 
+    ALTER TABLE IF EXISTS posting_cache
+      ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS employment_type TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS description_plain TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT '';
+
     CREATE TABLE IF NOT EXISTS postings (
       canonical_url TEXT PRIMARY KEY,
       company_id BIGINT REFERENCES companies(id),
@@ -114,10 +126,15 @@ async function ensurePostgresSchema(pool) {
       position_name TEXT NOT NULL,
       apply_url TEXT NOT NULL DEFAULT '',
       location_text TEXT,
+      city TEXT NOT NULL DEFAULT '',
       country TEXT NOT NULL DEFAULT '',
       region TEXT NOT NULL DEFAULT '',
       remote_type TEXT NOT NULL DEFAULT 'unknown',
       industry TEXT NOT NULL DEFAULT '',
+      department TEXT NOT NULL DEFAULT '',
+      employment_type TEXT NOT NULL DEFAULT '',
+      description_plain TEXT NOT NULL DEFAULT '',
+      description_html TEXT NOT NULL DEFAULT '',
       ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
       source_job_id TEXT NOT NULL DEFAULT '',
       posting_date TEXT,
@@ -148,6 +165,13 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_postings_active_remote_seen
       ON postings(remote_type, last_seen_epoch DESC)
       WHERE hidden = false;
+
+    ALTER TABLE IF EXISTS postings
+      ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS employment_type TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS description_plain TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT '';
 
     CREATE EXTENSION IF NOT EXISTS pg_trgm;
     CREATE EXTENSION IF NOT EXISTS unaccent;

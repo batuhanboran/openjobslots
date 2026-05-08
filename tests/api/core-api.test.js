@@ -85,6 +85,7 @@ test.describe("openjobslots API compatibility", () => {
       { method: "get", path: "/admin/services" },
       { method: "get", path: "/admin/storage" },
       { method: "get", path: "/admin/queue" },
+      { method: "get", path: "/admin/parsers" },
       { method: "get", path: "/settings/sync" },
       { method: "get", path: "/settings/personal-information" },
       { method: "get", path: "/settings/mcp" },
