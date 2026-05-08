@@ -69,6 +69,7 @@ const SEARCH_TOKEN_ALIASES = {
   turkiye: ["turkey", "t\u00fcrkiye", "turkish", "istanbul"],
   "t\u00fcrkiye": ["turkey", "turkiye", "turkish", "istanbul"],
   turkey: ["turkiye", "t\u00fcrkiye", "turkish", "istanbul"],
+  turkyie: ["turkey", "turkiye", "t\u00fcrkiye", "turkish"],
   turksih: ["turkey", "turkiye", "t\u00fcrkiye", "turkish"],
   uk: ["united kingdom", "u.k.", "great britain", "london"],
   "u.k.": ["united kingdom", "uk", "great britain", "london"],

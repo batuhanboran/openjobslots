@@ -45,7 +45,7 @@ test.describe("openjobslots API compatibility", () => {
   });
 
   test("postings and filters support Turkish/Turkiye search terms", async ({ request }) => {
-    for (const search of ["turkish jobs", "turksih jobs", "turkiye", "t\u00fcrkiye", "remote jobs", "QA Greenhouse"]) {
+    for (const search of ["turkish jobs", "turksih jobs", "turkyie", "turkiye", "t\u00fcrkiye", "remote jobs", "QA Greenhouse"]) {
       const response = await request.get(`${apiBaseUrl}/postings`, {
         params: {
           search,
@@ -78,6 +78,34 @@ test.describe("openjobslots API compatibility", () => {
     const suggestionPayload = await suggestions.json();
     expect(Array.isArray(suggestionPayload.items)).toBeTruthy();
     expect(suggestionPayload.items.length).toBeGreaterThan(0);
+
+    const combined = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "turkish jobs",
+        countries: "Turkey",
+        limit: "10",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(combined.ok()).toBeTruthy();
+    const combinedPayload = await combined.json();
+    expect(combinedPayload.items.length).toBeGreaterThan(0);
+    expect(combinedPayload.items.every((item) => /Turkey|T\u00fcrkiye|Istanbul/i.test(`${item.location || ""} ${item.country || ""}`))).toBeTruthy();
+
+    const remoteCombined = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "remote jobs",
+        remote: "remote",
+        limit: "10",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(remoteCombined.ok()).toBeTruthy();
+    const remoteCombinedPayload = await remoteCombined.json();
+    expect(remoteCombinedPayload.items.length).toBeGreaterThan(0);
+    expect(remoteCombinedPayload.items.every((item) => /Remote/i.test(`${item.location || ""} ${item.position_name || ""}`))).toBeTruthy();
   });
 
   test("admin and mutation endpoints are protected or absent from public API", async ({ request }) => {

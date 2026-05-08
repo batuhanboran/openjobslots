@@ -9,7 +9,9 @@ const { getMeiliConfig, searchMeiliPostings } = require("../server/search/meili"
 const DEFAULT_CASES = Object.freeze([
   { name: "empty/default", search: "" },
   { name: "turkiye", search: "t\u00fcrkiye" },
+  { name: "turkyie typo", search: "turkyie" },
   { name: "turkish jobs", search: "turkish jobs" },
+  { name: "turksih jobs typo", search: "turksih jobs" },
   { name: "remote", search: "remote", remote: "remote" },
   { name: "software", search: "software" },
   { name: "engineer", search: "engineer" },

@@ -416,6 +416,12 @@ function diacriticAndQuoteCases() {
       expect: { count: 3, every: { title: "Director", country: "Turkey" } }
     },
     {
+      id: "diacritics-turkyie-typo",
+      kind: "diacritics-quotes",
+      search: "Director turkyie",
+      expect: { count: 3, every: { title: "Director", country: "Turkey" } }
+    },
+    {
       id: "quotes-double",
       kind: "diacritics-quotes",
       search: "\"Backend Developer\" \"Deutschland\"",

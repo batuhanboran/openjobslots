@@ -1,60 +1,26 @@
-const MEILI_POSTINGS_INDEX = "postings";
 const crypto = require("crypto");
 const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
   normalizeRemoteType: normalizePostingRemoteType
 } = require("../ingestion/posting");
+const {
+  COUNTRY_FILTER_ALIASES,
+  MEILI_POSTINGS_INDEX,
+  MEILI_POSTINGS_SETTINGS,
+  REGION_FILTER_ALIASES,
+  normalizeAtsKey,
+  normalizeFilterValue,
+  normalizeSearchQuery,
+  normalizeText
+} = require("./config");
 
-const SEARCH_STOP_WORDS = new Set([
-  "job",
-  "jobs",
-  "posting",
-  "postings",
-  "opening",
-  "openings",
-  "career",
-  "careers",
-  "role",
-  "roles",
-  "position",
-  "positions"
-]);
-
-function normalizeText(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function cleanSearchToken(value) {
-  return String(value || "")
-    .trim()
-    .replace(/^[`"“”'‘’]+|[`"“”'‘’]+$/g, "")
-    .replace(/[“”]/g, "")
-    .trim();
-}
-
-function normalizeAtsKey(value) {
-  const normalized = normalizeText(value).replace(/[^a-z0-9]+/g, "");
-  const aliases = {
-    ashbyhq: "ashby",
-    leverco: "lever",
-    greenhouseio: "greenhouse",
-    greenhouse: "greenhouse",
-    breezyhr: "breezy",
-    oraclecloud: "oracle",
-    pinpointhqcom: "pinpointhq",
-    recruitcrmio: "recruitcrm",
-    loxoco: "loxo",
-    icims: "icims",
-    applicantai: "applicantai",
-    workforcenow: "adp_workforcenow"
-  };
-  return aliases[normalized] || normalized;
-}
+let meiliSettingsStatus = {
+  ok: null,
+  indexName: "",
+  applied_at_epoch: 0,
+  last_error: ""
+};
 
 function inferCountryFromLocation(location) {
   return normalizeCountryFromLocation(location);
@@ -73,105 +39,6 @@ function normalizeRemoteType(value, location = "") {
   if (normalized === "remote" || normalized === "hybrid" || normalized === "onsite") return normalized;
   const inferred = inferRemoteTypeFromLocation(location);
   return inferred || "unknown";
-}
-
-function normalizeSearchQuery(value) {
-  const tokens = String(value || "")
-    .trim()
-    .split(/\s+/)
-    .map(cleanSearchToken)
-    .filter(Boolean);
-  if (tokens.length <= 1) return tokens.join(" ");
-  const meaningfulTokens = tokens.filter((token) => !SEARCH_STOP_WORDS.has(normalizeText(token)));
-  return (meaningfulTokens.length > 0 ? meaningfulTokens : tokens).join(" ");
-}
-
-const COUNTRY_FILTER_ALIASES = new Map([
-  ["us", "United States"],
-  ["usa", "United States"],
-  ["u.s.", "United States"],
-  ["u.s.a.", "United States"],
-  ["united states", "United States"],
-  ["united states of america", "United States"],
-  ["uk", "United Kingdom"],
-  ["u.k.", "United Kingdom"],
-  ["gb", "United Kingdom"],
-  ["great britain", "United Kingdom"],
-  ["turkiye", "Turkey"],
-  ["türkiye", "Turkey"],
-  ["turkey", "Turkey"],
-  ["turkish", "Turkey"],
-  ["ca", "Canada"],
-  ["can", "Canada"],
-  ["canada", "Canada"],
-  ["de", "Germany"],
-  ["deutschland", "Germany"],
-  ["germany", "Germany"],
-  ["fr", "France"],
-  ["france", "France"]
-]);
-
-const MEILI_POSTINGS_SETTINGS = Object.freeze({
-  searchableAttributes: [
-    "title",
-    "company",
-    "location",
-    "city",
-    "country",
-    "region",
-    "department",
-    "employment_type",
-    "description_plain",
-    "ats_key"
-  ],
-  filterableAttributes: [
-    "ats_key",
-    "country",
-    "region",
-    "remote_type",
-    "industry",
-    "department",
-    "employment_type",
-    "company",
-    "hidden",
-    "last_seen_epoch",
-    "posted_at_epoch",
-    "posting_date"
-  ],
-  sortableAttributes: ["last_seen_epoch", "posted_at_epoch"],
-  rankingRules: ["sort", "words", "typo", "proximity", "attribute", "exactness"],
-  synonyms: {
-    turkey: ["turkiye", "t\u00fcrkiye", "turkish"],
-    turkiye: ["turkey", "t\u00fcrkiye", "turkish"],
-    "t\u00fcrkiye": ["turkey", "turkiye", "turkish"],
-    turkish: ["turkey", "turkiye", "t\u00fcrkiye"],
-    remote: ["wfh", "work from home", "anywhere"]
-  },
-  typoTolerance: {
-    enabled: true,
-    disableOnAttributes: ["ats_key"]
-  }
-});
-
-const REGION_FILTER_ALIASES = new Map([
-  ["amer", "North America"],
-  ["americas", "North America"],
-  ["america", "North America"],
-  ["north america", "North America"],
-  ["na", "North America"],
-  ["northamerica", "North America"],
-  ["emea", "EMEA"],
-  ["europe", "EMEA"],
-  ["europe middle east africa", "EMEA"],
-  ["apac", "APAC"],
-  ["asia pacific", "APAC"]
-]);
-
-function normalizeFilterValue(value, aliases) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const normalized = normalizeText(raw).replace(/\s+/g, " ");
-  return aliases.get(normalized) || raw;
 }
 
 function getMeiliConfig(env = process.env) {
@@ -216,48 +83,73 @@ async function waitForMeiliTask(config, task, timeoutMs = 30000) {
   throw new Error(`Meilisearch task ${taskUid} did not finish within ${timeoutMs}ms`);
 }
 
+function setMeiliSettingsStatus(nextStatus) {
+  meiliSettingsStatus = {
+    ...meiliSettingsStatus,
+    ...nextStatus,
+    applied_at_epoch: Math.floor(Date.now() / 1000)
+  };
+}
+
+function getMeiliSettingsStatus() {
+  return { ...meiliSettingsStatus };
+}
+
 async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
-  if (!config.enabled) return { ok: true, skipped: true };
+  if (!config.enabled) {
+    setMeiliSettingsStatus({ ok: true, skipped: true, indexName: config.indexName, last_error: "" });
+    return { ok: true, skipped: true };
+  }
 
-  let existingIndex = null;
   try {
-    existingIndex = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`);
-  } catch {
-    existingIndex = null;
-  }
-
-  if (existingIndex && existingIndex.primaryKey && existingIndex.primaryKey !== "id") {
-    const deleteTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`, {
-      method: "DELETE"
-    });
-    await waitForMeiliTask(config, deleteTask);
-    existingIndex = null;
-  }
-
-  if (!existingIndex) {
-    const createTask = await meiliRequest(config, "/indexes", {
-      method: "POST",
-      body: JSON.stringify({
-        uid: config.indexName,
-        primaryKey: "id"
-      })
-    });
+    let existingIndex = null;
     try {
-      await waitForMeiliTask(config, createTask);
-    } catch (error) {
-      if (!/already exists/i.test(String(error?.message || error))) {
-        throw error;
+      existingIndex = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`);
+    } catch {
+      existingIndex = null;
+    }
+
+    if (existingIndex && existingIndex.primaryKey && existingIndex.primaryKey !== "id") {
+      const deleteTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`, {
+        method: "DELETE"
+      });
+      await waitForMeiliTask(config, deleteTask);
+      existingIndex = null;
+    }
+
+    if (!existingIndex) {
+      const createTask = await meiliRequest(config, "/indexes", {
+        method: "POST",
+        body: JSON.stringify({
+          uid: config.indexName,
+          primaryKey: "id"
+        })
+      });
+      try {
+        await waitForMeiliTask(config, createTask);
+      } catch (error) {
+        if (!/already exists/i.test(String(error?.message || error))) {
+          throw error;
+        }
       }
     }
+
+    const settingsTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/settings`, {
+      method: "PATCH",
+      body: JSON.stringify(MEILI_POSTINGS_SETTINGS)
+    });
+    await waitForMeiliTask(config, settingsTask);
+    setMeiliSettingsStatus({ ok: true, skipped: false, indexName: config.indexName, last_error: "" });
+    return { ok: true, indexName: config.indexName };
+  } catch (error) {
+    setMeiliSettingsStatus({
+      ok: false,
+      skipped: false,
+      indexName: config.indexName,
+      last_error: String(error?.message || error).slice(0, 500)
+    });
+    throw error;
   }
-
-  const settingsTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/settings`, {
-    method: "PATCH",
-    body: JSON.stringify(MEILI_POSTINGS_SETTINGS)
-  });
-  await waitForMeiliTask(config, settingsTask);
-
-  return { ok: true, indexName: config.indexName };
 }
 
 function toMeiliDocumentId(value) {
@@ -279,16 +171,22 @@ function normalizeBooleanFlag(value, defaultValue = false) {
 
 function toMeiliPostingDocument(posting) {
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
+  const title = String(posting?.title || posting?.position_name || "").trim();
+  const company = String(posting?.company || posting?.company_name || "").trim();
   const location = String(posting?.location || posting?.location_text || "").trim();
   const country = String(posting?.country || inferCountryFromLocation(location)).trim();
   const region = String(posting?.region || inferRegionFromCountry(country)).trim();
   return {
     id: toMeiliDocumentId(canonicalUrl),
     canonical_url: canonicalUrl,
-    title: String(posting?.title || posting?.position_name || "").trim(),
-    company: String(posting?.company || posting?.company_name || "").trim(),
+    title,
+    title_normalized: normalizeText(title),
+    company,
+    company_normalized: normalizeText(company),
     location,
+    location_normalized: normalizeText(location),
     city: String(posting?.city || "").trim(),
+    state: String(posting?.state || posting?.province || "").trim(),
     country,
     region,
     remote_type: normalizeRemoteType(posting?.remote_type, location),
@@ -374,8 +272,10 @@ module.exports = {
   deleteMeiliPostingsByCanonicalUrls,
   ensureMeiliPostingsIndex,
   getMeiliConfig,
+  getMeiliSettingsStatus,
   searchMeiliPostings,
   toMeiliDocumentId,
   toMeiliPostingDocument,
-  upsertMeiliPostings
+  upsertMeiliPostings,
+  waitForMeiliTask
 };
