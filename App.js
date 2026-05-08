@@ -1593,6 +1593,7 @@ export default function App() {
   const [searchResultsMode, setSearchResultsMode] = useState(false);
   const [coverageDetailsOpen, setCoverageDetailsOpen] = useState(false);
   const [status, setStatus] = useState(null);
+  const [statusError, setStatusError] = useState("");
   const [personalInformation, setPersonalInformation] = useState(createEmptyPersonalInformation);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -1799,6 +1800,24 @@ export default function App() {
   }, [postingFilterOptions.ats]);
 
   const syncStatusDetails = useMemo(() => {
+    if (statusError) {
+      return {
+        summary: "Index coverage is temporarily unavailable.",
+        workerState: "Worker status unavailable",
+        latestRunText: "Retrying status in the background",
+        activeAts: [],
+        metrics: [
+          { label: "Indexed slots", value: "0" },
+          { label: "Seen in 24h", value: "0" },
+          { label: "Sync companies", value: "0" },
+          { label: "Queue due", value: "0" },
+          { label: "Failures", value: "0" },
+          { label: "Parser errors", value: "0" }
+        ],
+        healthNote: "Coverage diagnostics are temporarily unavailable. Search remains usable.",
+        lastError: ""
+      };
+    }
     if (!status) {
       return {
         summary: "Loading sync coverage.",
@@ -1865,7 +1884,7 @@ export default function App() {
       healthNote,
       lastError: sanitizeDisplayText(worker.last_error, "")
     };
-  }, [status]);
+  }, [status, statusError]);
 
   const hasActivePostingFilters = useMemo(() => {
     return (
@@ -2141,6 +2160,7 @@ export default function App() {
   const loadStatus = useCallback(async () => {
     try {
       const response = await fetchSyncStatus();
+      setStatusError("");
       setStatus(response);
       const workerRunning = String(response?.ingestion_worker?.latest_status || "").toLowerCase() === "running";
       const isStopping = Boolean(response?.stopping || response?.cancel_requested);
@@ -2154,7 +2174,7 @@ export default function App() {
       });
       return response;
     } catch (e) {
-      setError(String(e.message || e));
+      setStatusError("unavailable");
       queueFrontendLog("error", "load_status_failed", String(e?.stack || e?.message || e), {});
       return null;
     }
@@ -3102,6 +3122,11 @@ export default function App() {
       const isEditableTarget = tagName === "input" || tagName === "textarea" || Boolean(event?.target?.isContentEditable);
       const targetTestId = String(event?.target?.getAttribute?.("data-testid") || "");
       if (event.key === "Escape") {
+        if (releaseNotesOpen) {
+          event.preventDefault();
+          setReleaseNotesOpen(false);
+          return;
+        }
         if (drawerOpen) {
           event.preventDefault();
           setDrawerOpen(false);
@@ -3129,7 +3154,7 @@ export default function App() {
 
     document.addEventListener("keydown", handleGlobalKeyDown);
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [activePage, clearSearchAndSuggestions, drawerOpen, focusSearch]);
+  }, [activePage, clearSearchAndSuggestions, drawerOpen, focusSearch, releaseNotesOpen]);
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
@@ -3415,6 +3440,7 @@ export default function App() {
         <Pressable
           style={styles.releaseNotesBackdrop}
           onPress={() => setReleaseNotesOpen(false)}
+          testID="release-notes-backdrop"
           accessibilityRole="button"
           accessibilityLabel="Close release notes"
         />
@@ -3433,7 +3459,12 @@ export default function App() {
               <Text style={styles.releaseNotesCloseText}>Close</Text>
             </Pressable>
           </View>
-          <ScrollView style={styles.releaseNotesScroll} contentContainerStyle={styles.releaseNotesScrollContent}>
+          <ScrollView
+            style={styles.releaseNotesScroll}
+            contentContainerStyle={styles.releaseNotesScrollContent}
+            testID="release-notes-scroll"
+            accessibilityLabel="Release notes history"
+          >
             {PUBLIC_RELEASE_NOTES.map((release) => (
               <View key={release.version} style={styles.releaseNoteItem}>
                 <View style={styles.releaseNoteHeadingRow}>
@@ -3589,11 +3620,11 @@ export default function App() {
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={clearAllPostingFilters}
+                  onPress={clearSearchAndSuggestions}
                   style={({ pressed }) => [styles.postingsFiltersClearBtn, pressed ? styles.buttonPressed : null]}
                   testID="postings-filter-clear"
                   accessibilityRole="button"
-                  accessibilityLabel="Clear posting filters"
+                  accessibilityLabel="Clear search and posting filters"
                 >
                   <Text style={styles.postingsFiltersClearText}>Clear</Text>
                 </Pressable>

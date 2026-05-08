@@ -71,6 +71,21 @@ Mobile-only:
 npm.cmd run test:e2e -- --project=chromium-mobile
 ```
 
+Current public UI coverage includes:
+
+- desktop and mobile first-load smoke checks;
+- search typing, Enter submit, Escape clear, `/` focus, and Ctrl/Cmd+K focus;
+- suggestion panel placement;
+- Clear reset behavior;
+- filter open/close, option search, selection, and clearing;
+- combined search and filter states;
+- controlled no-results state;
+- transient database-busy stale-results behavior;
+- status panel success and failure sanitization;
+- release notes open/close behavior on desktop;
+- public-route security checks and raw backend error text checks;
+- mobile horizontal-overflow and tap-target checks.
+
 ## Artifact Inspection
 
 Playwright artifacts are configured in `playwright.config.js`:
@@ -80,6 +95,8 @@ Playwright artifacts are configured in `playwright.config.js`:
 - videos retained on failure;
 - HTML report written to `playwright-report`;
 - raw artifacts written under `test-results/e2e`.
+
+The E2E public-page helpers also record console errors and failed browser requests in their failure arrays. Treat those as UI regressions unless the test deliberately stubs a backend failure.
 
 Inspect the report:
 
