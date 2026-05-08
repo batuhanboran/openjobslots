@@ -66,12 +66,12 @@ test("unsupported dayforcehcm stays disabled until a real parser exists", () => 
 test("lane documentation exists for the 60-source certification program", () => {
   const repoRoot = path.resolve(__dirname, "..", "..");
   const requiredDocs = [
-    "docs/ats-certification/README.md",
+    "docs/reference/ats-certification/README.md",
     "docs/direct-json-api-ats-field-certification.json",
-    "docs/ats-certification/enterprise-direct.md",
-    "docs/ats-certification/embedded-boards.md",
-    "docs/ats-certification/vendor-specific.md",
-    "docs/ats-certification/public-education.md"
+    "docs/reference/ats-certification/enterprise-direct.md",
+    "docs/reference/ats-certification/embedded-boards.md",
+    "docs/reference/ats-certification/vendor-specific.md",
+    "docs/reference/ats-certification/public-education.md"
   ];
   for (const relativePath of requiredDocs) {
     const fullPath = path.join(repoRoot, relativePath);

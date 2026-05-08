@@ -61,14 +61,22 @@ Keep public UI calls on public routes only unless an admin flow is explicitly op
 
 The last production audit recorded the search system as functional but normalized data quality as the main risk.
 
-- Visible/searchable postings: about `725,071`.
-- Missing any normalized geo: about `711,093` / `98.07%`.
-- Missing all geo: about `306,177` / `42.23%`.
-- Weak or unknown remote classification: about `282,748` / `39.00%`.
-- Missing all geo and weak remote: about `266,770` / `36.79%`.
+- Visible/searchable postings: `725,071`.
+- Missing country: `306,727` / `42.30%`.
+- Missing location text: `201,519` / `27.79%`.
+- Missing region/state: `306,727` / `42.30%`.
+- Missing city: `710,543` / `98.00%`.
+- Missing any normalized geo: `711,093` / `98.07%`.
+- Missing all normalized geo: `306,177` / `42.23%`.
+- Missing location and all normalized geo: `201,519` / `27.79%`.
+- Suspicious/unknown geo: `19,704` / `2.72%`.
+- Missing remote type: `0` / `0.00%`.
+- Weak or unknown remote classification: `282,748` / `39.00%`.
+- Missing all normalized geo and weak/unknown remote: `266,770` / `36.79%`.
+- Worst sources include `icims`, `applitrack`, `manatal`, `applytojob`, `hrmdirect`, `recruitee`, `breezy`, `bamboohr`, `ashby`, and `taleo`.
 - Meilisearch and Postgres counts were broadly aligned, with a small known stale/bad-document delta documented in the deployment runbook.
 
-Treat these as the last recorded numbers, not proof of current live state. Re-run `npm run audit:ats-quality` and the production read-only audit before making data-quality claims.
+Treat these as the last recorded numbers, not proof of current live state. Re-run `npm run audit:data-quality -- --by-source --by-parser` and `npm run audit:ats-quality` before making data-quality claims.
 
 ## Known Risks
 
@@ -81,7 +89,7 @@ Treat these as the last recorded numbers, not proof of current live state. Re-ru
 
 ## Next Tasks
 
-1. Run a fresh read-only production data-quality audit by ATS/parser/version.
+1. Run a fresh read-only production data-quality audit by ATS/parser/version with `npm run audit:data-quality -- --by-source --by-parser`.
 2. Prioritize parser/detail-page work by live field gaps, not by UI symptoms.
 3. Add raw fixtures and tests before marking any ATS certified.
 4. Run dry-run normalized backfill and inspect before/after samples.
@@ -101,6 +109,7 @@ npm.cmd run test:e2e
 npm.cmd run quality:gate
 npm.cmd run search:parity
 npm.cmd run reindex:meili -- --check
+npm.cmd run audit:data-quality -- --by-source --by-parser
 npm.cmd run audit:ats-quality
 ```
 

@@ -12,6 +12,10 @@ const {
   parseQualityFlags
 } = require("../ingestion/dataQuality");
 const {
+  getPostgresQualityAudit,
+  makeQualitySummary
+} = require("../ingestion/dataQualityAudit");
+const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
   normalizeRemoteTypeFromEvidence,
@@ -1058,41 +1062,11 @@ async function getPostgresPostingDiagnostics(pool, options = {}) {
 }
 
 async function getPostgresQualitySummary(pool, limit = 100) {
-  const result = await pool.query(
-    `
-      SELECT
-        ats_key,
-        COUNT(*)::int AS total_postings,
-        ROUND(AVG(quality_score))::int AS avg_quality_score,
-        COUNT(*) FILTER (WHERE quality_score < 60)::int AS low_quality_count,
-        COUNT(*) FILTER (WHERE quality_flags ? 'missing_country')::int AS missing_country_count,
-        COUNT(*) FILTER (WHERE quality_flags ? 'missing_region')::int AS missing_region_count,
-        COUNT(*) FILTER (WHERE quality_flags ? 'missing_city')::int AS missing_city_count,
-        COUNT(*) FILTER (WHERE quality_flags ? 'weak_remote_classification')::int AS weak_remote_count,
-        COUNT(*) FILTER (WHERE quality_flags ? 'missing_posted_at')::int AS missing_posted_at_count,
-        COUNT(*) FILTER (WHERE quality_flags ? 'missing_source_job_id')::int AS missing_source_job_id_count
-      FROM postings
-      WHERE hidden = false
-      GROUP BY ats_key
-      ORDER BY low_quality_count DESC, total_postings DESC, ats_key ASC
-      LIMIT $1;
-    `,
-    [Math.max(1, Math.min(250, Number(limit || 100)))]
-  );
-  return result.rows.map((row) => ({
-    ats_key: String(row?.ats_key || ""),
-    total_postings: Number(row?.total_postings || 0),
-    avg_quality_score: Number(row?.avg_quality_score || 0),
-    low_quality_count: Number(row?.low_quality_count || 0),
-    flag_counts: {
-      missing_country: Number(row?.missing_country_count || 0),
-      missing_region: Number(row?.missing_region_count || 0),
-      missing_city: Number(row?.missing_city_count || 0),
-      weak_remote_classification: Number(row?.weak_remote_count || 0),
-      missing_posted_at: Number(row?.missing_posted_at_count || 0),
-      missing_source_job_id: Number(row?.missing_source_job_id_count || 0)
-    }
-  }));
+  const audit = await getPostgresQualityAudit(pool, { limit });
+  return {
+    ...makeQualitySummary(audit.by_source, audit.summary),
+    by_parser: audit.by_parser
+  };
 }
 
 async function listPostgresRejections(pool, limit = 50) {
@@ -1132,15 +1106,16 @@ async function listPostgresRejections(pool, limit = 50) {
 }
 
 async function getPostgresParserStats(pool, limit = 100) {
-  const [quality, attention] = await Promise.all([
-    getPostgresQualitySummary(pool, limit),
+  const [audit, attention] = await Promise.all([
+    getPostgresQualityAudit(pool, { limit }),
     getPostgresParserAttentionByAts(pool, limit)
   ]);
   const attentionByAts = new Map(attention.map((item) => [String(item.ats_key || ""), item]));
-  return quality.map((item) => {
-    const attentionItem = attentionByAts.get(item.ats_key) || {};
+  return audit.by_parser.map((item) => {
+    const attentionItem = attentionByAts.get(item.source_ats || item.ats_key) || {};
     return {
       ...item,
+      flag_counts: item.quality_flag_counts || {},
       parser_attention_count_24h: Number(attentionItem.error_count || 0),
       latest_parser_error: String(attentionItem.last_error || "")
     };
