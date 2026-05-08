@@ -68,6 +68,16 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Israel", ["il", "isr", "israel"]],
   ["United Arab Emirates", ["ae", "are", "uae", "united arab emirates", "dubai", "abu dhabi"]],
   ["Saudi Arabia", ["sa", "sau", "saudi arabia"]],
+  ["Luxembourg", ["lu", "lux", "luxembourg"]],
+  ["Lebanon", ["lb", "lbn", "lebanon"]],
+  ["Jordan", ["jo", "jor", "jordan"]],
+  ["Iraq", ["iq", "irq", "iraq"]],
+  ["Cambodia", ["kh", "khm", "cambodia"]],
+  ["Kenya", ["ke", "ken", "kenya"]],
+  ["Myanmar", ["mm", "mmr", "myanmar", "burma"]],
+  ["North Macedonia", ["mk", "mkd", "macedonia", "north macedonia"]],
+  ["Solomon Islands", ["sb", "slb", "solomon islands"]],
+  ["Mauritius", ["mu", "mus", "mauritius"]],
   ["South Africa", ["za", "zaf", "south africa"]],
   ["Egypt", ["eg", "egy", "egypt"]],
   ["Pakistan", ["pk", "pak", "pakistan"]],
@@ -102,27 +112,40 @@ const COUNTRY_LOCATION_TERMS = Object.freeze([
     "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas",
     "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming"
   ]],
-  ["United Kingdom", ["london", "manchester", "birmingham", "edinburgh", "glasgow", "bristol", "leeds", "cambridge"]],
+  ["United Kingdom", ["london", "manchester", "birmingham", "edinburgh", "glasgow", "bristol", "leeds", "cambridge", "hebburn", "falmouth"]],
   ["Canada", [
     "toronto", "vancouver", "montreal", "ottawa", "calgary", "edmonton", "waterloo", "quebec",
     "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland and labrador", "nova scotia",
     "ontario", "prince edward island", "saskatchewan", "northwest territories", "nunavut", "yukon"
   ]],
-  ["Germany", ["berlin", "munich", "münchen", "hamburg", "frankfurt", "cologne", "stuttgart"]],
+  ["Germany", ["berlin", "munich", "münchen", "hamburg", "frankfurt", "cologne", "stuttgart", "heidelberg"]],
   ["France", ["paris", "lyon", "marseille", "toulouse", "lille"]],
   ["Netherlands", ["amsterdam", "rotterdam", "utrecht", "eindhoven"]],
   ["Spain", ["madrid", "barcelona", "valencia", "malaga"]],
   ["Italy", ["rome", "roma", "milan", "milano", "turin"]],
   ["Ireland", ["dublin", "cork", "galway"]],
   ["India", ["bengaluru", "bangalore", "hyderabad", "pune", "mumbai", "delhi", "gurgaon", "gurugram", "noida", "chennai"]],
-  ["Australia", ["sydney", "melbourne", "brisbane", "perth", "adelaide"]],
+  ["Australia", ["sydney", "melbourne", "brisbane", "perth", "adelaide", "carlton", "victoria"]],
   ["Singapore", ["singapore"]],
   ["Japan", ["tokyo", "osaka", "kyoto"]],
-  ["Brazil", ["sao paulo", "são paulo", "rio de janeiro", "curitiba"]],
+  ["Brazil", ["sao paulo", "são paulo", "rio de janeiro", "curitiba", "nova lima"]],
   ["Mexico", ["mexico city", "ciudad de mexico", "guadalajara", "monterrey"]],
   ["Poland", ["warsaw", "krakow", "kraków", "wroclaw", "wrocław"]],
   ["Portugal", ["lisbon", "lisboa", "porto"]],
   ["United Arab Emirates", ["dubai", "abu dhabi"]],
+  ["Luxembourg", ["luxembourg"]],
+  ["Lebanon", ["beirut", "ajaltoun"]],
+  ["Jordan", ["amman"]],
+  ["Iraq", ["baghdad", "basra"]],
+  ["Cambodia", ["poipet", "phnom penh"]],
+  ["Kenya", ["nairobi", "nairobi area"]],
+  ["Myanmar", ["bago", "yangon", "mandalay"]],
+  ["North Macedonia", ["skopje", "tetovo"]],
+  ["Solomon Islands", ["honiara"]],
+  ["Serbia", ["belgrade"]],
+  ["Romania", ["cluj napoca", "bucharest"]],
+  ["Philippines", ["taguig", "manila"]],
+  ["Mauritius", ["ebene"]],
   ["South Korea", ["seoul", "ulsan", "busan", "incheon"]],
   ["Taiwan", ["taipei", "hsinchu", "hsin chu", "taichung", "kaohsiung", "taiwan"]],
   ["Armenia", ["yerevan"]],
@@ -136,13 +159,37 @@ const US_STATE_ABBREVIATION_PATTERN =
   /(?:^|,\s*|\s-\s)(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(?:\s|,|$)/i;
 const CANADA_PROVINCE_ABBREVIATION_PATTERN =
   /(?:^|,\s*|\s-\s)(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s|,|$)/i;
+const US_STATE_HYPHEN_PREFIX_PATTERN =
+  /^(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)[-\s]/i;
+const CANADA_PROVINCE_HYPHEN_PREFIX_PATTERN =
+  /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)[-\s]/i;
+
+function normalizeCountryFromDelimitedCode(location) {
+  const tokens = String(location || "")
+    .split(/[,\n\r/|;]+/)
+    .map((part) => normalizeSearchText(part).replace(/[^a-z0-9]+/g, " ").trim())
+    .filter(Boolean);
+  for (const token of tokens) {
+    const compact = token.replace(/\s+/g, "");
+    if (compact.length < 2 || compact.length > 3) continue;
+    const country = COUNTRY_ALIASES[compact];
+    if (!country) continue;
+    if (country === "United States" || country === "Canada") continue;
+    return country;
+  }
+  return "";
+}
 
 function normalizeCountryFromLocation(value) {
   const location = normalizePostingValue(value);
   const normalized = normalizeSearchText(location);
   if (!normalized) return "";
   if (US_STATE_ABBREVIATION_PATTERN.test(location)) return "United States";
+  if (US_STATE_HYPHEN_PREFIX_PATTERN.test(location)) return "United States";
   if (CANADA_PROVINCE_ABBREVIATION_PATTERN.test(location)) return "Canada";
+  if (CANADA_PROVINCE_HYPHEN_PREFIX_PATTERN.test(location)) return "Canada";
+  const delimitedCodeCountry = normalizeCountryFromDelimitedCode(location);
+  if (delimitedCodeCountry) return delimitedCodeCountry;
 
   for (const [alias, country] of Object.entries(COUNTRY_ALIASES)) {
     if (alias.length <= 2) continue;
@@ -203,8 +250,19 @@ function normalizeRegionFromCountry(country) {
     "iran",
     "armenia",
     "cyprus",
+    "luxembourg",
+    "lebanon",
+    "jordan",
+    "iraq",
+    "kenya",
+    "north macedonia",
+    "qatar",
+    "kuwait",
+    "bahrain",
+    "oman",
     "united arab emirates",
     "saudi arabia",
+    "mauritius",
     "south africa",
     "egypt"
   ].includes(normalized)) {
@@ -225,10 +283,13 @@ function normalizeRegionFromCountry(country) {
     "taiwan",
     "malaysia",
     "indonesia",
+    "cambodia",
+    "myanmar",
     "philippines",
     "thailand",
     "vietnam",
-    "pakistan"
+    "pakistan",
+    "solomon islands"
   ].includes(normalized)) {
     return "APAC";
   }

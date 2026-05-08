@@ -3,6 +3,10 @@ const { ensureMeiliPostingsIndex, getMeiliConfig, upsertMeiliPostings } = requir
 
 const BATCH_SIZE = Math.max(100, Math.min(5000, Number(process.env.OPENJOBSLOTS_REINDEX_BATCH_SIZE || 1000)));
 const REPLACE_INDEX = String(process.env.OPENJOBSLOTS_REINDEX_REPLACE || "").trim() === "1";
+const UPSERT_TASK_TIMEOUT_MS = Math.max(
+  30000,
+  Math.min(300000, Number(process.env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000))
+);
 
 async function meiliRequest(config, path, options = {}) {
   const response = await fetch(`${config.host}${path}`, {
@@ -90,7 +94,8 @@ async function main() {
       );
 
       if (result.rows.length === 0) break;
-      await upsertMeiliPostings(result.rows);
+      const task = await upsertMeiliPostings(result.rows);
+      await waitForMeiliTask(getMeiliConfig(), task, UPSERT_TASK_TIMEOUT_MS);
       indexed += result.rows.length;
       lastCanonicalUrl = String(result.rows[result.rows.length - 1].canonical_url || "");
       console.log(`Indexed ${indexed} postings into Meilisearch`);

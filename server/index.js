@@ -80,6 +80,9 @@ const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 90));
 const POSTING_TTL_SECONDS = Number(process.env.POSTING_TTL_SECONDS || POSTING_VISIBLE_RETENTION_DAYS * 24 * 60 * 60);
 const SYNC_POSTING_FLUSH_BATCH_SIZE = Number(process.env.SYNC_POSTING_FLUSH_BATCH_SIZE || 200);
+const DEFAULT_BROWSER_USER_AGENT =
+  process.env.OPENJOBSLOTS_BROWSER_USER_AGENT ||
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const WORKDAY_PAGE_SIZE = 20;
 const ULTIPRO_PAGE_SIZE = 50;
 const MAX_PAGES_PER_COMPANY = 25;
@@ -2704,6 +2707,63 @@ function extractWorkdaySourceJobId(posting, jobPostingUrl) {
   }
 }
 
+function extractSourceIdFromPostingUrl(urlValue, atsKey = "") {
+  try {
+    const parsed = new URL(String(urlValue || ""));
+    const path = parsed.pathname || "";
+    const pathParts = path.split("/").filter(Boolean).map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    });
+    const lastPart = String(pathParts[pathParts.length - 1] || "").trim();
+    const queryFirst = (...keys) => {
+      for (const key of keys) {
+        const value = String(parsed.searchParams.get(key) || "").trim();
+        if (value) return value;
+      }
+      return "";
+    };
+    const normalizedAts = String(atsKey || "").trim().toLowerCase();
+
+    if (normalizedAts === "greenhouse") return queryFirst("gh_jid") || path.match(/\/jobs\/(\d+)/i)?.[1] || lastPart;
+    if (normalizedAts === "lever" || normalizedAts === "ashby") return lastPart;
+    if (normalizedAts === "smartrecruiters") return lastPart.match(/^(\d+)/)?.[1] || lastPart;
+    if (normalizedAts === "manatal" || normalizedAts === "careerspage") return path.match(/\/job\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "hrmdirect") return queryFirst("req", "reqid");
+    if (normalizedAts === "zoho") return lastPart;
+    if (normalizedAts === "recruitcrm") return lastPart;
+    if (normalizedAts === "pinpointhq") return path.match(/\/postings\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "jobvite") return path.match(/\/job\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "careerplug") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "teamtailor") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart.match(/^(\d+)/)?.[1] || lastPart;
+    if (normalizedAts === "brassring") return queryFirst("jobid", "jobId", "reqid");
+    if (normalizedAts === "governmentjobs") return path.match(/\/jobs\/(\d+)/i)?.[1] || queryFirst("jobid", "jobId");
+    if (normalizedAts === "jobaps") return queryFirst("JobNum", "jobnum", "JobID", "jobid") || lastPart;
+    if (normalizedAts === "applicantpro") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "talentreef") return queryFirst("jobId", "jobid") || path.match(/\/jobs?\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "oracle") return path.match(/\/job\/([^/]+)/i)?.[1] || queryFirst("job", "jobId", "id") || lastPart;
+    if (normalizedAts === "adp_workforcenow" || normalizedAts === "adpworkforcenow") {
+      return queryFirst("jobId", "jobid", "job") || lastPart;
+    }
+    if (normalizedAts === "adp_myjobs" || normalizedAts === "adpmyjobs") {
+      return queryFirst("jobId", "jobid", "reqId", "reqid") || lastPart;
+    }
+    if (normalizedAts === "paylocity") {
+      return path.match(/\/jobs?\/details\/([^/]+)/i)?.[1] || queryFirst("jobId", "jobid") || lastPart;
+    }
+    if (["ultipro", "pageup", "eightfold", "rippling", "careerpuck", "talentlyft", "talexio", "fountain"].includes(normalizedAts)) {
+      return queryFirst("jobId", "jobid", "id", "reqId", "reqid") || lastPart;
+    }
+    if (lastPart && !["jobs", "careers", "employment", "job-opening.php"].includes(lastPart.toLowerCase())) return lastPart;
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 function collectWorkdayLocationValues(posting, jobPostingUrl) {
   const source = posting && typeof posting === "object" ? posting : {};
   const values = [];
@@ -4471,6 +4531,7 @@ function parseJobvitePostingsFromHtml(companyNameForPostings, config, pageHtml) 
 
       postings.push({
         company_name: companyNameForPostings,
+        source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "jobvite"),
         position_name: cleanJobviteText(rowMatch[2]) || "Untitled Position",
         job_posting_url: absoluteUrl,
         posting_date: null,
@@ -4537,6 +4598,7 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "careerplug"),
       position_name: title || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: null,
@@ -4612,6 +4674,7 @@ function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtm
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(jobUrl, "teamtailor"),
       position_name: title,
       job_posting_url: jobUrl,
       posting_date: null,
@@ -5206,6 +5269,8 @@ function parseManatalPostingsFromApi(companyNameForPostings, config, responseJso
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(jobUrl, "manatal") || String(item?.id ?? item?.hash ?? "").trim(),
+      id: String(item?.id ?? item?.hash ?? "").trim() || undefined,
       position_name: cleanManatalText(item?.position_name || item?.title || "") || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
@@ -6313,6 +6378,10 @@ function parsePinpointHqPostingsFromApi(companyNameForPostings, config, response
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id:
+        String(item?.id ?? item?.uuid ?? item?.job_id ?? item?.jobId ?? "").trim() ||
+        extractSourceIdFromPostingUrl(jobUrl, "pinpointhq"),
+      id: String(item?.id ?? item?.uuid ?? "").trim() || undefined,
       position_name: String(item?.title || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
@@ -6362,6 +6431,10 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id:
+        String(item?.id ?? item?.job_id ?? item?.jobId ?? item?.uuid ?? slug).trim() ||
+        extractSourceIdFromPostingUrl(itemUrl, "recruitcrm"),
+      id: String(item?.id ?? item?.job_id ?? item?.jobId ?? "").trim() || undefined,
       position_name: String(item?.name || "").trim() || "Untitled Position",
       job_posting_url: itemUrl,
       posting_date: postingDate,
@@ -7096,6 +7169,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "hrmdirect"),
       position_name: title || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
@@ -7694,8 +7768,8 @@ function extractZohoHiddenInputValue(pageHtml, inputId) {
   );
   if (!tagMatch?.[0]) return "";
 
-  const valueMatch = tagMatch[0].match(/\bvalue=["']([\s\S]*?)["']/i);
-  return String(valueMatch?.[1] || "").trim();
+  const valueMatch = tagMatch[0].match(/\bvalue=(["'])([\s\S]*?)\1/i);
+  return String(valueMatch?.[2] || "").trim();
 }
 
 function cleanZohoText(value) {
@@ -7776,6 +7850,8 @@ function parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: jobId,
+      id: jobId,
       position_name: title,
       job_posting_url: buildZohoJobUrl(listUrl, jobId),
       posting_date: postingDate || null,
@@ -10036,10 +10112,13 @@ async function collectPostingsForGreenhouseCompany(company) {
 
     collected.push({
       company_name: companyNameForPostings,
+      source_job_id: String(posting?.id ?? posting?.internal_job_id ?? "").trim() || extractSourceIdFromPostingUrl(jobUrl, "greenhouse"),
+      id: String(posting?.id ?? "").trim() || undefined,
       position_name: String(posting?.title || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: String(posting?.updated_at || posting?.first_published || "").trim() || null,
-      location: extractGreenhouseLocationName(posting)
+      location: extractGreenhouseLocationName(posting),
+      department: String(posting?.departments?.[0]?.name || posting?.metadata?.[0]?.value || "").trim() || null
     });
   }
 
@@ -10082,10 +10161,14 @@ async function collectPostingsForLeverCompany(company) {
 
     collected.push({
       company_name: companyNameForPostings,
+      source_job_id: String(posting?.id || "").trim() || extractSourceIdFromPostingUrl(jobUrl, "lever"),
+      id: String(posting?.id || "").trim() || undefined,
       position_name: String(posting?.text || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
-      location: extractLeverLocationName(posting)
+      location: extractLeverLocationName(posting),
+      department: String(posting?.categories?.team || posting?.categories?.department || "").trim() || null,
+      employment_type: String(posting?.categories?.commitment || "").trim() || null
     });
   }
 
@@ -10148,6 +10231,8 @@ async function collectPostingsForApplicantProCompany(company) {
 
     collected.push({
       company_name: companyNameForPostings,
+      source_job_id: fallbackJobId || extractSourceIdFromPostingUrl(absoluteUrl, "applicantpro"),
+      id: fallbackJobId || undefined,
       position_name: String(job?.title || "").trim() || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: String(job?.startDateRef || "").trim() || null,
@@ -10861,6 +10946,8 @@ function parseIsolvisolvedhirePostingsFromApi(companyName, responseJson) {
 
     postings.push({
       company_name: companyName,
+      source_job_id: fallbackJobId || extractSourceIdFromPostingUrl(postingUrl, "applicantpro"),
+      id: fallbackJobId || undefined,
       position_name: cleanText(job.title) || "Untitled Position",
       job_posting_url: postingUrl,
       posting_date: cleanText(job.startDateRef) || null,
@@ -11693,6 +11780,8 @@ async function collectPostingsForSmartRecruitersDynamic(limit = 100) {
 
     postings.push({
       company_name: companyName,
+      source_job_id: String(item?.id ?? item?.uuid ?? "").trim() || extractSourceIdFromPostingUrl(jobUrl, "smartrecruiters"),
+      id: String(item?.id ?? "").trim() || undefined,
       position_name: title,
       job_posting_url: jobUrl,
       posting_date: postedDate,
@@ -16666,6 +16755,7 @@ module.exports = {
   nowEpochSeconds,
   extractAdpWorkforcenowCompanyName,
   extractApplitrackDetailFields,
+  extractSourceIdFromPostingUrl,
   extractTaleoPostingsFromRest,
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
@@ -16675,13 +16765,19 @@ module.exports = {
   parseAshbyCompany,
   parseBambooHrPostingsFromApi,
   parseBreezyPostingsFromHtml,
+  parseCareerplugPostingsFromHtml,
   parseFountainPostingsFromApi,
+  parseHrmDirectPostingsFromHtml,
   parseIcimsPostingsFromHtml,
+  parseJobvitePostingsFromHtml,
+  parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
   parseRecruiteePostingsFromPublicApp,
+  parseTeamtailorPostingsFromHtml,
+  parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName,
   runWorkdaySync,
   upsertPostings

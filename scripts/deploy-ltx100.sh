@@ -49,7 +49,7 @@ done
 
 if [[ -z "$REMOTE_SHA" ]]; then
   log "fetch failed after $FETCH_ATTEMPTS attempts; check deploy key, repo access, and remote branch"
-  exit 0
+  exit 1
 fi
 
 if [[ "$LOCAL_SHA" == "$REMOTE_SHA" && "$FORCE_DEPLOY" != "1" ]]; then
@@ -70,11 +70,12 @@ if ! docker compose up -d --build --remove-orphans; then
 fi
 
 verify_deploy() {
-  curl -fsS "$HEALTH_URL" >/dev/null
-  curl -fsS "$BASE_URL/sync/status" >/dev/null
-  curl -fsS "$BASE_URL/ingestion/status" >/dev/null
-  curl -fsS "$BASE_URL/postings?search=Director%20United%20States&limit=5" >/dev/null
-  curl -fsS "$BASE_URL/postings?search=remote%20engineer&limit=5" >/dev/null
+  curl -fsS "$HEALTH_URL" | grep -q '"ok":true'
+  curl -fsS "$BASE_URL/sync/status" | grep -q '"ok":true'
+  curl -fsS "$BASE_URL/ingestion/status" | grep -q '"ok":true'
+  curl -fsS "$BASE_URL/postings?search=Director%20United%20States&limit=5" | grep -q '"ok":true'
+  curl -fsS "$BASE_URL/postings?search=remote%20engineer&limit=5" | grep -q '"ok":true'
+  [[ "$(git rev-parse HEAD)" == "$REMOTE_SHA" ]]
 }
 
 for attempt in $(seq 1 30); do

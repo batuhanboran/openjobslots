@@ -36,6 +36,16 @@ function extractSourceJobIdFromUrl(row) {
   try {
     const parsed = new URL(String(row.canonical_url || ""));
     const path = parsed.pathname;
+    const pathParts = path.split("/").filter(Boolean).map((part) => decodePathText(part));
+    const lastPathPart = pathParts[pathParts.length - 1] || "";
+    const lastStablePart = String(lastPathPart || "").replace(/\?.*$/, "").trim();
+    const queryFirst = (...keys) => {
+      for (const key of keys) {
+        const value = String(parsed.searchParams.get(key) || "").trim();
+        if (value) return value;
+      }
+      return "";
+    };
     if (atsKey === "workday") return decodePathText(path.split("/").filter(Boolean).pop() || "").match(/_([A-Za-z0-9-]+)$/)?.[1] || "";
     if (atsKey === "taleo") return String(parsed.searchParams.get("job") || "").trim();
     if (atsKey === "applytojob") return path.match(/\/apply\/([^/]+)/i)?.[1] || "";
@@ -44,6 +54,30 @@ function extractSourceJobIdFromUrl(row) {
     if (atsKey === "applitrack") return String(parsed.searchParams.get("JobID") || parsed.searchParams.get("jobid") || "").trim();
     if (atsKey === "bamboohr") return path.match(/\/careers\/([^/]+)/i)?.[1] || "";
     if (atsKey === "recruitee") return path.match(/\/o\/([^/]+)/i)?.[1] || "";
+    if (atsKey === "greenhouse") return queryFirst("gh_jid") || path.match(/\/jobs\/(\d+)/i)?.[1] || lastStablePart;
+    if (atsKey === "lever" || atsKey === "ashby") return lastStablePart;
+    if (atsKey === "smartrecruiters") return lastStablePart.match(/^(\d+)/)?.[1] || lastStablePart;
+    if (atsKey === "manatal" || atsKey === "careerspage") return path.match(/\/job\/([^/]+)/i)?.[1] || lastStablePart;
+    if (atsKey === "hrmdirect") return queryFirst("req", "reqid");
+    if (atsKey === "zoho") return lastStablePart;
+    if (atsKey === "recruitcrm") return lastStablePart;
+    if (atsKey === "pinpointhq") return path.match(/\/postings\/([^/]+)/i)?.[1] || lastStablePart;
+    if (atsKey === "jobvite") return path.match(/\/job\/([^/]+)/i)?.[1] || lastStablePart;
+    if (atsKey === "careerplug") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastStablePart;
+    if (atsKey === "teamtailor") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastStablePart.match(/^(\d+)/)?.[1] || lastStablePart;
+    if (atsKey === "brassring") return queryFirst("jobid", "jobId", "reqid");
+    if (atsKey === "governmentjobs") return path.match(/\/jobs\/(\d+)/i)?.[1] || queryFirst("jobid", "jobId");
+    if (atsKey === "jobaps") return queryFirst("JobNum", "jobnum", "JobID", "jobid") || lastStablePart;
+    if (atsKey === "applicantpro") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastStablePart;
+    if (atsKey === "talentreef") return queryFirst("jobId", "jobid") || path.match(/\/jobs?\/([^/]+)/i)?.[1] || lastStablePart;
+    if (atsKey === "oracle") return path.match(/\/job\/([^/]+)/i)?.[1] || queryFirst("job", "jobId", "id") || lastStablePart;
+    if (atsKey === "adp_workforcenow" || atsKey === "adpworkforcenow") return queryFirst("jobId", "jobid", "job") || lastStablePart;
+    if (atsKey === "adp_myjobs" || atsKey === "adpmyjobs") return queryFirst("jobId", "jobid", "reqId", "reqid") || lastStablePart;
+    if (atsKey === "paylocity") return path.match(/\/jobs?\/details\/([^/]+)/i)?.[1] || queryFirst("jobId", "jobid") || lastStablePart;
+    if (atsKey === "oracle" || atsKey === "ultipro" || atsKey === "pageup" || atsKey === "eightfold") return queryFirst("jobId", "jobid", "id", "reqId", "reqid") || lastStablePart;
+    if (lastStablePart && !["jobs", "careers", "employment", "job-opening.php"].includes(lastStablePart.toLowerCase())) {
+      return lastStablePart;
+    }
   } catch {
     return "";
   }
