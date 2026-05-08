@@ -1,0 +1,28 @@
+{
+  "ats_key": "applytojob",
+  "company_name_for_postings": "Fixture ApplyToJob",
+  "company": {
+    "company_name": "Fixture ApplyToJob",
+    "company_url": "https://fixtureco.applytojob.com/apply",
+    "ATS_name": "ApplyToJob"
+  },
+  "config": {
+    "baseOrigin": "https://fixtureco.applytojob.com"
+  },
+  "raw_response": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/abc123/Customer-Support-Representative#apply\">Customer Support Representative</a></h3><i class=\"fa fa-map-marker\"></i> Istanbul, Turkiye <i class=\"fa fa-calendar\"></i> 2026-05-06 <span>Department: Support</span></li></ul>",
+  "expected": [
+    {
+      "ats_key": "applytojob",
+      "source_job_id": "abc123",
+      "company_name": "Fixture ApplyToJob",
+      "position_name": "Customer Support Representative",
+      "job_posting_url": "https://fixtureco.applytojob.com/apply/abc123/Customer-Support-Representative",
+      "country": "Turkey",
+      "region": "EMEA",
+      "remote_type": "onsite",
+      "posting_date": "2026-05-06",
+      "industry": "Support",
+      "parser_confidence": 0.75
+    }
+  ]
+}

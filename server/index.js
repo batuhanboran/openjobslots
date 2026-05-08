@@ -5890,11 +5890,12 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
     const item = row && typeof row === "object" ? row : {};
     const postingId = String(item?.id || "").trim();
     const itemUrlRaw = String(item?.url || item?.jobUrl || item?.applyUrl || item?.applicationUrl || "").trim();
+    if (!itemUrlRaw && !postingId) continue;
     const jobUrl = itemUrlRaw
       ? new URL(itemUrlRaw, `${config.baseOrigin || config.boardUrl || ""}/`).toString()
       : postingId
         ? `${config.boardUrl}/${encodeURIComponent(postingId)}`
-        : config.boardUrl;
+        : "";
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
     const locationObject = item?.location && typeof item.location === "object" ? item.location : {};
@@ -8301,8 +8302,7 @@ function pickRecruiteeTranslation(translations, preferredLangCode = "") {
 
 function extractRecruiteeTitle(offer, preferredLangCode = "") {
   const translation = pickRecruiteeTranslation(offer?.translations, offer?.primaryLangCode || preferredLangCode);
-  const title = String(translation?.title || translation?.name || offer?.slug || "").trim();
-  return title || "Untitled Position";
+  return String(translation?.title || translation?.name || offer?.title || offer?.name || "").trim();
 }
 
 function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, response) {
@@ -8335,6 +8335,7 @@ function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, res
   for (const offer of offers) {
     const slug = String(offer?.slug || "").trim();
     const offerId = String(offer?.id ?? offer?.uuid ?? offer?.guid ?? slug).trim();
+    if (!slug && !offerId) continue;
     const jobUrl = slug ? `${config.baseUrl}/o/${slug}` : offerId ? `${config.baseUrl}/o/${offerId}` : config.baseUrl;
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 

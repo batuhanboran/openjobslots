@@ -1,0 +1,20 @@
+{
+  "ats_key": "applytojob",
+  "company_name_for_postings": "Fixture ApplyToJob",
+  "company": {
+    "company_name": "Fixture ApplyToJob",
+    "ATS_name": "ApplyToJob"
+  },
+  "config": {
+    "baseOrigin": "https://fixtureco.applytojob.com"
+  },
+  "raw_response": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/bad-title\"></a></h3><i class=\"fa fa-map-marker\"></i> Istanbul, Turkiye</li></ul>",
+  "missing_company_raw_response": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/missing-company/Support-Engineer\">Support Engineer</a></h3><i class=\"fa fa-map-marker\"></i> Istanbul, Turkiye</li></ul>",
+  "missing_url_raw_response": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><span>Missing URL</span></h3><i class=\"fa fa-map-marker\"></i> Istanbul, Turkiye</li></ul>",
+  "expected_rejections": [
+    {
+      "source_job_id": "bad-title",
+      "reason": "placeholder position_name"
+    }
+  ]
+}

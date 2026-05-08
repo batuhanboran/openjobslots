@@ -1,0 +1,20 @@
+{
+  "ats_key": "zoho",
+  "company_name_for_postings": "Fixture Zoho",
+  "company": {
+    "company_name": "Fixture Zoho",
+    "ATS_name": "Zoho"
+  },
+  "config": {
+    "careersUrl": "https://fixtureco.zohorecruit.com/jobs/Careers"
+  },
+  "raw_response": "<input id=\"jobs\" value='[{\"id\":\"bad-title\",\"Posting_Title\":\"\",\"City\":\"Dublin\",\"Country\":\"Ireland\"}]'>",
+  "missing_company_raw_response": "<input id=\"jobs\" value='[{\"id\":\"missing-company\",\"Posting_Title\":\"Support Engineer\",\"City\":\"Dublin\",\"Country\":\"Ireland\"}]'>",
+  "missing_url_raw_response": "<input id=\"jobs\" value='[{\"Posting_Title\":\"Missing URL\",\"City\":\"Dublin\",\"Country\":\"Ireland\"}]'>",
+  "expected_rejections": [
+    {
+      "source_job_id": "bad-title",
+      "reason": "placeholder position_name"
+    }
+  ]
+}

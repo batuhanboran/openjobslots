@@ -104,14 +104,19 @@ const PARSER_FIXTURE_BACKED = new Set([
   "adp_workforcenow",
   "applicantpro",
   "applitrack",
+  "applytojob",
+  "bamboohr",
+  "breezy",
   "fountain",
   "icims",
   "oracle",
   "paylocity",
   "pinpointhq",
   "recruitcrm",
+  "recruitee",
   "careerplug",
-  "manatal"
+  "manatal",
+  "zoho"
 ]);
 
 const FUTURE_DIRECT_SOURCE_CANDIDATES = Object.freeze([

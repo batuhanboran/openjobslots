@@ -41,12 +41,17 @@ const fixtureDir = path.join(__dirname, "fixtures");
 const PARSERS = {
   adp_workforcenow: parseAdpWorkforcenowPostingsFromApi,
   applicantpro: parseApplicantProPostingsFromApi,
+  applytojob: parseApplyToJobPostingsFromHtml,
+  bamboohr: parseBambooHrPostingsFromApi,
+  breezy: parseBreezyPostingsFromHtml,
   fountain: parseFountainPostingsFromApi,
   manatal: parseManatalPostingsFromApi,
   oracle: parseOraclePostingsFromApi,
   paylocity: parsePaylocityPostingsFromPageData,
   pinpointhq: parsePinpointHqPostingsFromApi,
-  recruitcrm: parseRecruitCrmPostingsFromApi
+  recruitcrm: parseRecruitCrmPostingsFromApi,
+  recruitee: parseRecruiteePostingsFromPublicApp,
+  zoho: parseZohoPostingsFromHtml
 };
 
 function normalizeParsed(atsKey, parsed, companyName = "Fixture Company") {
@@ -90,8 +95,63 @@ for (const fileName of fixtureFileNames) {
       }
       assert.equal(item.canonical_url, item.job_posting_url);
       assert.ok(item.parser_version);
+      assert.equal(typeof item.parser_confidence, "number");
       assert.ok(item.raw_hash);
     }
+  });
+}
+
+const newlyCertifiedFailureFixtures = [
+  "applytojob-failures.json",
+  "bamboohr-failures.json",
+  "breezy-failures.json",
+  "recruitee-failures.json",
+  "zoho-failures.json"
+];
+
+for (const fileName of newlyCertifiedFailureFixtures) {
+  test(`${fileName} rejects invalid source shapes before storage`, () => {
+    const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, fileName), "utf8"));
+    const atsKey = String(fixture.ats_key || "");
+    const parse = PARSERS[atsKey];
+    const adapter = adapters.get(atsKey);
+    assert.equal(typeof parse, "function", `missing parser export for ${atsKey}`);
+    assert.ok(adapter, `expected adapter ${atsKey}`);
+
+    const parsed = parse(fixture.company_name_for_postings, fixture.config || {}, fixture.raw_response || {});
+    const normalizedRows = parsed.map((posting) => {
+      const normalized = adapter.normalize(posting, fixture.company || {});
+      return {
+        normalized,
+        validation: validatePosting(normalized)
+      };
+    });
+
+    for (const expected of fixture.expected_rejections || []) {
+      const row = normalizedRows.find((item) => item.normalized.source_job_id === expected.source_job_id);
+      assert.ok(row, `expected rejected ${atsKey} row ${expected.source_job_id}`);
+      assert.equal(row.validation.ok, false);
+      assert.equal(row.validation.error, expected.reason);
+    }
+
+    assert.equal(
+      normalizedRows.filter((row) => row.validation.ok).length,
+      0,
+      `${atsKey} invalid title fixture should not produce a valid posting`
+    );
+
+    const missingCompanyParsed = parse("", fixture.config || {}, fixture.missing_company_raw_response || {});
+    assert.ok(missingCompanyParsed.length > 0, `${atsKey} missing-company probe should parse a row`);
+    const missingCompany = adapter.normalize(missingCompanyParsed[0], {});
+    const missingCompanyValidation = validatePosting(missingCompany);
+    assert.equal(missingCompanyValidation.ok, false);
+    assert.equal(missingCompanyValidation.error, "missing company_name");
+
+    const missingUrlParsed = parse(fixture.company_name_for_postings, fixture.config || {}, fixture.missing_url_raw_response || {});
+    const validMissingUrlRows = missingUrlParsed
+      .map((posting) => adapter.normalize(posting, fixture.company || {}))
+      .filter((posting) => validatePosting(posting).ok);
+    assert.equal(validMissingUrlRows.length, 0, `${atsKey} missing-url fixture should not produce a valid posting`);
   });
 }
 
