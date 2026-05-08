@@ -6,7 +6,13 @@ async function ensureColumn(db, tableName, columnName, definition) {
   const columns = await db.all(`PRAGMA table_info('${tableName}');`);
   const existing = new Set(columns.map((column) => String(column?.name || "")));
   if (existing.has(columnName)) return;
-  await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition};`);
+  try {
+    await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition};`);
+  } catch (error) {
+    const message = String(error?.message || error || "").toLowerCase();
+    if (message.includes("duplicate column name")) return;
+    throw error;
+  }
 }
 
 async function ensureIngestionTables(db) {

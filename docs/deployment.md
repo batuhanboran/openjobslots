@@ -60,3 +60,41 @@ To disable the runtime change, set `OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS=0` fo
 ## Rollback
 
 Each successful deploy creates a git bundle in `/root/OpenJobSlots/.deploy-backups/` before resetting to the new commit. Runtime databases and Docker volumes are not deleted by the deploy watcher.
+
+## v1.6.0 Deployment Note - May 8, 2026
+
+Deployed version: `v1.6.0`.
+
+Pre-final SQLite backup:
+
+`/root/OpenJobSlots/data/jobs.db.backup-v1.6.0-20260508-193325`
+
+Validation run before deployment:
+
+- `npm.cmd run test:backend`
+- `npm.cmd run test:api`
+- `npm.cmd run test:parsers`
+- `npm.cmd run test:e2e`
+- `npm.cmd run build:web`
+- `npm.cmd run quality:gate`
+
+Live endpoints checked after deployment:
+
+- `/health`
+- `/postings/filter-options`
+- `/sync/status`
+- `/ingestion/status`
+- `/postings?search=turkish%20jobs`
+- `/postings?search=t%C3%BCrkiye`
+- `/postings?search=turkiye`
+- `/postings?search=turkyie`
+- `/postings?search=remote%20jobs`
+- `/postings?search=software`
+
+Release verification also checked the public UI at `https://openjobslots.com/`, the `Public v1.6.0` version rail, the `Version 1.6.0` release note, and absence of visible raw SQLite/backend errors.
+
+Known remaining risks:
+
+- Production Meilisearch currently has six stale/bad visible documents beyond the Postgres indexable count; reindex check reports settings valid and the delta is explainable, but a replace-mode reindex should be scheduled after the next normalization backfill.
+- Cloudflare Insights injects a beacon script that is blocked by the app CSP. This does not block the app, but the CSP/Cloudflare analytics configuration should be aligned before public launch analytics are required.
+- Expo reports package compatibility warnings during tests/build. The release is validated, but dependency version alignment should be handled in a separate dependency-maintenance pass.
