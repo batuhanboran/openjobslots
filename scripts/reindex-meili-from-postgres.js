@@ -2,6 +2,7 @@ const { createPostgresPool, ensurePostgresSchema } = require("../server/backends
 const {
   ensureMeiliPostingsIndex,
   getMeiliConfig,
+  MEILI_POSTINGS_SETTINGS,
   toMeiliDocumentId,
   toMeiliPostingDocument,
   upsertMeiliPostings
@@ -93,6 +94,69 @@ async function getMeiliStats(config) {
   return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/stats`, { allowNotFound: true });
 }
 
+async function getMeiliIndex(config) {
+  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`, { allowNotFound: true });
+}
+
+async function getMeiliSettings(config) {
+  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/settings`, { allowNotFound: true });
+}
+
+function normalizeSettingList(value) {
+  return (Array.isArray(value) ? value : []).map((item) => String(item || "")).filter(Boolean).sort();
+}
+
+function compareSettingList(name, actual, expected) {
+  const actualItems = normalizeSettingList(actual);
+  const expectedItems = normalizeSettingList(expected);
+  const actualSet = new Set(actualItems);
+  const expectedSet = new Set(expectedItems);
+  const missing = expectedItems.filter((item) => !actualSet.has(item));
+  const extra = actualItems.filter((item) => !expectedSet.has(item));
+  return missing.length || extra.length ? { setting: name, missing, extra } : null;
+}
+
+function compareSynonyms(actual, expected) {
+  const mismatches = [];
+  const actualSynonyms = actual && typeof actual === "object" ? actual : {};
+  const expectedSynonyms = expected && typeof expected === "object" ? expected : {};
+  for (const [key, expectedValues] of Object.entries(expectedSynonyms)) {
+    const mismatch = compareSettingList(`synonyms.${key}`, actualSynonyms[key], expectedValues);
+    if (mismatch) mismatches.push(mismatch);
+  }
+  return mismatches;
+}
+
+function validateMeiliSettings(index, settings) {
+  const mismatches = [];
+  if (index?.primaryKey !== "id") {
+    mismatches.push({ setting: "primaryKey", expected: "id", actual: index?.primaryKey || null });
+  }
+  for (const key of ["searchableAttributes", "filterableAttributes", "sortableAttributes"]) {
+    const mismatch = compareSettingList(key, settings?.[key], MEILI_POSTINGS_SETTINGS[key]);
+    if (mismatch) mismatches.push(mismatch);
+  }
+  mismatches.push(...compareSynonyms(settings?.synonyms, MEILI_POSTINGS_SETTINGS.synonyms));
+  const actualTypo = settings?.typoTolerance || {};
+  if (actualTypo.enabled !== MEILI_POSTINGS_SETTINGS.typoTolerance.enabled) {
+    mismatches.push({
+      setting: "typoTolerance.enabled",
+      expected: MEILI_POSTINGS_SETTINGS.typoTolerance.enabled,
+      actual: actualTypo.enabled
+    });
+  }
+  const typoMismatch = compareSettingList(
+    "typoTolerance.disableOnAttributes",
+    actualTypo.disableOnAttributes,
+    MEILI_POSTINGS_SETTINGS.typoTolerance.disableOnAttributes
+  );
+  if (typoMismatch) mismatches.push(typoMismatch);
+  return {
+    ok: mismatches.length === 0,
+    mismatches
+  };
+}
+
 function comparableDocumentFields(postgresRow) {
   const document = toMeiliPostingDocument(postgresRow);
   return {
@@ -133,6 +197,21 @@ async function checkMeiliParity(pool, config, options) {
         AND NOT (${indexablePostingsWhereClause()});
     `
   );
+  const missingRequiredResult = await pool.query(
+    `
+      SELECT
+        COUNT(*) FILTER (WHERE btrim(coalesce(canonical_url, '')) = '')::int AS missing_canonical_url,
+        COUNT(*) FILTER (WHERE btrim(coalesce(canonical_url, '')) <> '' AND btrim(coalesce(canonical_url, '')) !~* '^https?://')::int AS invalid_canonical_url,
+        COUNT(*) FILTER (WHERE btrim(coalesce(position_name, '')) = '')::int AS missing_title,
+        COUNT(*) FILTER (WHERE btrim(coalesce(company_name, '')) = '')::int AS missing_company,
+        COUNT(*) FILTER (WHERE lower(btrim(coalesce(position_name, ''))) ~ '^(untitled|unknown|n/?a|not available|job opening|new job|open position|position)$')::int AS placeholder_title
+      FROM postings
+      WHERE hidden = false;
+    `
+  );
+  const index = config.enabled ? await getMeiliIndex(config) : { skipped: true };
+  const settings = config.enabled ? await getMeiliSettings(config) : { skipped: true };
+  const settingsValidation = config.enabled ? validateMeiliSettings(index, settings) : { ok: false, skipped: true, mismatches: [] };
   const stats = config.enabled ? await getMeiliStats(config) : { skipped: true, numberOfDocuments: 0 };
   const sampleResult = await pool.query(
     `
@@ -191,8 +270,11 @@ async function checkMeiliParity(pool, config, options) {
     check: true,
     postgres_indexable_count: Number(countResult.rows[0]?.count || 0),
     postgres_bad_visible_rows_excluded: Number(badRowsResult.rows[0]?.count || 0),
+    postgres_missing_required_fields: missingRequiredResult.rows[0] || {},
     meili_document_count: Number(stats?.numberOfDocuments || 0),
     count_delta: Number(countResult.rows[0]?.count || 0) - Number(stats?.numberOfDocuments || 0),
+    meili_settings_valid: Boolean(settingsValidation.ok),
+    meili_settings_mismatches: settingsValidation.mismatches || [],
     sampled: sampleResult.rows.length,
     sample_mismatches: samples
   };
@@ -291,7 +373,9 @@ module.exports = {
   checkMeiliParity,
   comparableDocumentFields,
   compareMeiliDocument,
+  compareSettingList,
   indexablePostingsWhereClause,
   parseReindexArgs,
-  runReindex
+  runReindex,
+  validateMeiliSettings
 };

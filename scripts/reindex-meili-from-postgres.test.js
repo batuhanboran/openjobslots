@@ -2,10 +2,13 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { toMeiliPostingDocument, upsertMeiliPostings } = require("../server/search/meili");
 const {
+  compareSettingList,
   compareMeiliDocument,
   indexablePostingsWhereClause,
-  parseReindexArgs
+  parseReindexArgs,
+  validateMeiliSettings
 } = require("./reindex-meili-from-postgres");
+const { MEILI_POSTINGS_SETTINGS } = require("../server/search/meili");
 
 function posting(overrides = {}) {
   return {
@@ -101,4 +104,31 @@ test("Meili parity comparison reports field mismatches", () => {
     remote_type: "unknown"
   });
   assert.deepEqual(mismatches.map((item) => item.field), ["country", "remote_type"]);
+});
+
+test("Meili settings validation accepts expected production settings", () => {
+  const result = validateMeiliSettings({ primaryKey: "id" }, MEILI_POSTINGS_SETTINGS);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.mismatches, []);
+});
+
+test("Meili settings validation reports missing filter/sort/search fields", () => {
+  const listMismatch = compareSettingList("filterableAttributes", ["country"], ["country", "hidden"]);
+  assert.deepEqual(listMismatch, { setting: "filterableAttributes", missing: ["hidden"], extra: [] });
+
+  const result = validateMeiliSettings(
+    { primaryKey: "canonical_url" },
+    {
+      ...MEILI_POSTINGS_SETTINGS,
+      filterableAttributes: ["country"],
+      sortableAttributes: ["last_seen_epoch"],
+      synonyms: { turkey: ["turkiye"] },
+      typoTolerance: { enabled: false, disableOnAttributes: [] }
+    }
+  );
+  assert.equal(result.ok, false);
+  assert.ok(result.mismatches.some((item) => item.setting === "primaryKey"));
+  assert.ok(result.mismatches.some((item) => item.setting === "filterableAttributes"));
+  assert.ok(result.mismatches.some((item) => item.setting === "sortableAttributes"));
+  assert.ok(result.mismatches.some((item) => item.setting === "typoTolerance.enabled"));
 });
