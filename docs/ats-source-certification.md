@@ -5,10 +5,10 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 ## Current Coverage
 
 - Configured ATS keys: 60.
-- Normalized fixture-backed ATS keys: 19.
-- Strict saved raw parser-fixture-backed ATS keys: 9 (`adp_workforcenow`, `applicantpro`, `applitrack`, `fountain`, `icims`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`).
+- Normalized fixture-backed ATS keys: 20.
+- Strict saved raw parser-fixture-backed ATS keys: 10 (`adp_workforcenow`, `applicantpro`, `applitrack`, `careerplug`, `fountain`, `icims`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`).
 - Inline direct parser regression coverage also exists for `applytojob`, `bamboohr`, `breezy`, `recruitee`, `taleo`, and `workday`, but those are not counted as strict saved raw fixture certification until their source responses are saved as fixtures.
-- Configured ATS still pending strict raw parser fixtures: 50.
+- Configured ATS still pending strict raw parser fixtures: 49.
 - Disabled unsupported ATS: `dayforcehcm`.
 
 The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires the raw parser fixture.
@@ -94,7 +94,7 @@ Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must sta
 | `applicantpro` | Board HTML discovers domain id, then core jobs JSON. | Domain discovery is still brittle, but the JSON jobs parser now preserves `id`, `city`/`iso3`, `startDateRef`, department, and employment type when source exposes them. | v1.5.21 adds a pure `parseApplicantProPostingsFromApi` parser plus raw API fixture. Next: add board HTML domain-id fixture, `success=false` failure fixture, and live sampled location variants. |
 | `applytojob` | ApplyToJob/Resumator HTML. | Legacy pages may still omit dates or department. | v1.5.14 broadens icon/label extraction for location/date/department and keeps `/apply/{id}` source ids; add detail-page fixtures for list rows that omit fields. |
 | `theapplicantmanager` | Applicant Manager HTML careers page. | Date/location absent; department only. | Add raw fixture and consider detail fetch for date/location. |
-| `careerplug` | CareerPlug jobs HTML. | Date absent; href rule too narrow. | v1.5.16 derives source id from `/jobs/{id}`; add raw fixture for aria/no-aria cards. |
+| `careerplug` | CareerPlug jobs HTML. | Source can omit `.job-title` while keeping the real title in `aria-label`; date absent from saved list fixture. | Raw fixture now covers valid `aria-label` title recovery, placeholder title rejection, missing title rejection, missing URL skipping, and `/jobs/{id}` source id preservation. |
 | `talentreef` | TalentReef alias and search API. | No source id; country blank for state-only rows. | Add alias/search fixtures, set source id from `jobId`, add location tests. |
 | `hirebridge` | Hirebridge list plus detail pages. | Location currently mapped from department; date requires detail page. | Fix department/location split; add list/detail fixtures and `jid` source id. |
 | `hrmdirect` | HRMDirect table rows. | Non-US city/province pairs still need broader country evidence. | v1.5.16 derives source id from `req` and expands global aliases; add raw table fixtures for US and non-US rows. |

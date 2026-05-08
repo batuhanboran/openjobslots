@@ -4571,35 +4571,50 @@ function normalizeCareerplugMeta(value) {
     .trim();
 }
 
+function normalizeCareerplugAriaTitle(value) {
+  const cleaned = cleanCareerplugText(value)
+    .replace(/^\s*(view|open|apply\s+for|view\s+details\s+for)\s+(job|position|role)?\s*[:\-]?\s*/i, "")
+    .replace(/\s+\|\s+.*$/i, "")
+    .trim();
+  return /^(view|open|apply|job|jobs|position|role|details)$/i.test(cleaned) ? "" : cleaned;
+}
+
 function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
   const seenUrls = new Set();
 
-  const rowPattern =
-    /<a[^>]*\baria-label=["'][^"']*["'][^>]*\bhref=["'](\/jobs\/\d+[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const rowPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  const hrefPattern = /\bhref=["'](\/jobs\/\d+[^"']*)["']/i;
+  const ariaPattern = /\baria-label=["']([^"']*)["']/i;
   const titlePattern = /<div[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
   const locationPattern = /<div[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
   const typePattern = /<div[^>]*class=["'][^"']*\bjob-type\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
 
   let rowMatch = rowPattern.exec(source);
   while (rowMatch) {
-    const href = String(rowMatch[1] || "").trim();
+    const attrs = String(rowMatch[1] || "");
+    const href = String(attrs.match(hrefPattern)?.[1] || "").trim();
+    const rowBody = String(rowMatch[2] || "");
+    if (!href && !titlePattern.test(rowBody)) {
+      rowMatch = rowPattern.exec(source);
+      continue;
+    }
     const absoluteUrl = href ? new URL(href, `${config.baseOrigin}/`).toString() : "";
     if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
       rowMatch = rowPattern.exec(source);
       continue;
     }
 
-    const rowBody = String(rowMatch[2] || "");
-    const title = cleanCareerplugText(rowBody.match(titlePattern)?.[1] || "");
+    const title = cleanCareerplugText(rowBody.match(titlePattern)?.[1] || "")
+      || normalizeCareerplugAriaTitle(attrs.match(ariaPattern)?.[1] || "");
     const location = normalizeCareerplugMeta(rowBody.match(locationPattern)?.[1] || "");
     const jobType = normalizeCareerplugMeta(rowBody.match(typePattern)?.[1] || "");
 
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "careerplug"),
-      position_name: title || "Untitled Position",
+      position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: null,
       location: location || null,

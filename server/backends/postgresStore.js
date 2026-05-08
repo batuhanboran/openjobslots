@@ -616,7 +616,20 @@ async function getPostgresParserAttentionByAts(pool, limit = 20) {
             AND e2.error_type LIKE 'parser_%'
           ORDER BY e2.id DESC
           LIMIT 1
-        ) AS latest_error
+        ) AS latest_error,
+        (
+          SELECT jsonb_agg(jsonb_build_object('reason', reason_counts.error_message, 'count', reason_counts.error_count) ORDER BY reason_counts.error_count DESC, reason_counts.error_message ASC)
+          FROM (
+            SELECT e3.error_message, COUNT(*)::int AS error_count
+            FROM ingestion_run_errors e3
+            WHERE e3.ats_key = ingestion_run_errors.ats_key
+              AND e3.created_at >= now() - interval '24 hours'
+              AND e3.error_type LIKE 'parser_%'
+            GROUP BY e3.error_message
+            ORDER BY error_count DESC, e3.error_message ASC
+            LIMIT 5
+          ) reason_counts
+        ) AS reasons
       FROM ingestion_run_errors
       WHERE created_at >= now() - interval '24 hours'
         AND error_type LIKE 'parser_%'
@@ -631,7 +644,13 @@ async function getPostgresParserAttentionByAts(pool, limit = 20) {
     ats_key: String(row?.ats_key || ""),
     error_count: Number(row?.error_count || 0),
     latest_error_at: row?.latest_error_at ? new Date(row.latest_error_at).toISOString() : "",
-    latest_error: String(row?.latest_error || "")
+    latest_error: String(row?.latest_error || ""),
+    reasons: Array.isArray(row?.reasons)
+      ? row.reasons.map((reason) => ({
+          reason: String(reason?.reason || ""),
+          count: Number(reason?.count || 0)
+        }))
+      : []
   }));
 }
 

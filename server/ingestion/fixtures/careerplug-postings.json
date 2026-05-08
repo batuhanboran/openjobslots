@@ -1,0 +1,55 @@
+{
+  "ats_key": "careerplug",
+  "company": {
+    "company_name": "Fixture CareerPlug",
+    "url_string": "https://fixture.careerplug.com/jobs",
+    "ATS_name": "CareerPlug"
+  },
+  "config": {
+    "baseOrigin": "https://fixture.careerplug.com"
+  },
+  "postings": [
+    {
+      "company_name": "Fixture CareerPlug",
+      "source_job_id": "2922288",
+      "position_name": "Customer Support Specialist",
+      "job_posting_url": "https://fixture.careerplug.com/jobs/2922288",
+      "posting_date": null,
+      "location": "OK-Sand Springs-74063",
+      "employment_type": "Full Time"
+    }
+  ],
+  "raw_html": "\n<a aria-label=\"Apply for Customer Support Specialist\" href=\"/jobs/2922288\">\n  <div class=\"job-location\">Location: OK-Sand Springs-74063</div>\n  <div class=\"job-type\">Full / Part Time: Full Time</div>\n</a>\n<a href=\"/jobs/2922299\" aria-label=\"View job\">\n  <div class=\"job-title\">Untitled Position</div>\n  <div class=\"job-location\">Remote</div>\n</a>\n<a aria-label=\"View job\" href=\"/jobs/2922300\">\n  <div class=\"job-location\">Location: Tulsa, OK</div>\n</a>\n<a aria-label=\"Apply for Missing URL Specialist\">\n  <div class=\"job-title\">Missing URL Specialist</div>\n  <div class=\"job-location\">Location: Tulsa, OK</div>\n</a>\n",
+  "expected": [
+    {
+      "source_job_id": "2922288",
+      "ats_key": "careerplug",
+      "company": "Fixture CareerPlug",
+      "title": "Customer Support Specialist",
+      "location_text": "OK-Sand Springs-74063",
+      "country": "United States",
+      "region": "North America",
+      "city": "OK-Sand Springs-74063",
+      "remote_type": "onsite",
+      "employment_type": "Full Time",
+      "canonical_url": "https://fixture.careerplug.com/jobs/2922288",
+      "apply_url": "https://fixture.careerplug.com/jobs/2922288",
+      "posted_at": null,
+      "posted_at_epoch": null,
+      "parser_version": "legacy-adapter-v1"
+    }
+  ],
+  "expected_rejections": [
+    {
+      "source_job_id": "2922299",
+      "reason": "placeholder position_name"
+    },
+    {
+      "source_job_id": "2922300",
+      "reason": "missing position_name"
+    }
+  ],
+  "expected_skipped_titles": [
+    "Missing URL Specialist"
+  ]
+}
