@@ -64,7 +64,10 @@ log "deploying $REMOTE_SHA"
 git reset --hard "$REMOTE_SHA"
 git clean -fd -e .env -e data -e .deploy-backups -e "docker-compose.yml.bak*"
 
-docker compose up -d --build --remove-orphans
+if ! docker compose up -d --build --remove-orphans; then
+  log "compose --remove-orphans unsupported or failed; retrying without it"
+  docker compose up -d --build
+fi
 
 verify_deploy() {
   curl -fsS "$HEALTH_URL" >/dev/null
