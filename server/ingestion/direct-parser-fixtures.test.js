@@ -11,6 +11,7 @@ const {
   parseApplicantProPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
+  parseAshbyPostingsFromApi,
   parseBambooHrPostingsFromApi,
   parseBreezyPostingsFromHtml,
   parseCareerplugPostingsFromHtml,
@@ -23,15 +24,19 @@ const {
   extractIcimsPostingDateFromHtml,
   extractIcimsRemoteTypeFromHtml,
   parseFountainPostingsFromApi,
+  parseGreenhousePostingsFromApi,
   parseHrmDirectPostingsFromHtml,
   parseIcimsPostingsFromHtml,
   parseJobvitePostingsFromHtml,
+  parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
+  parseSmartRecruitersPostingsFromApi,
   parseTeamtailorPostingsFromHtml,
+  parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName
 } = require("../index");
@@ -41,16 +46,22 @@ const fixtureDir = path.join(__dirname, "fixtures");
 const PARSERS = {
   adp_workforcenow: parseAdpWorkforcenowPostingsFromApi,
   applicantpro: parseApplicantProPostingsFromApi,
+  ashby: parseAshbyPostingsFromApi,
   applytojob: parseApplyToJobPostingsFromHtml,
   bamboohr: parseBambooHrPostingsFromApi,
   breezy: parseBreezyPostingsFromHtml,
   fountain: parseFountainPostingsFromApi,
+  greenhouse: parseGreenhousePostingsFromApi,
+  lever: parseLeverPostingsFromApi,
   manatal: parseManatalPostingsFromApi,
   oracle: parseOraclePostingsFromApi,
   paylocity: parsePaylocityPostingsFromPageData,
   pinpointhq: parsePinpointHqPostingsFromApi,
   recruitcrm: parseRecruitCrmPostingsFromApi,
   recruitee: parseRecruiteePostingsFromPublicApp,
+  smartrecruiters: parseSmartRecruitersPostingsFromApi,
+  taleo: extractTaleoPostingsFromRest,
+  workday: parseWorkdayPostingsFromApi,
   zoho: parseZohoPostingsFromHtml
 };
 
@@ -102,10 +113,16 @@ for (const fileName of fixtureFileNames) {
 }
 
 const newlyCertifiedFailureFixtures = [
+  "ashby-failures.json",
   "applytojob-failures.json",
   "bamboohr-failures.json",
   "breezy-failures.json",
+  "greenhouse-failures.json",
+  "lever-failures.json",
   "recruitee-failures.json",
+  "smartrecruiters-failures.json",
+  "taleo-failures.json",
+  "workday-failures.json",
   "zoho-failures.json"
 ];
 

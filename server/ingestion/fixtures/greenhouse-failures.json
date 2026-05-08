@@ -1,0 +1,44 @@
+{
+  "ats_key": "greenhouse",
+  "company_name_for_postings": "Fixture Greenhouse",
+  "company": {
+    "company_name": "Fixture Greenhouse",
+    "ATS_name": "Greenhouse"
+  },
+  "config": {},
+  "raw_response": {
+    "jobs": [
+      {
+        "id": "gh-placeholder",
+        "title": "",
+        "absolute_url": "https://boards.greenhouse.io/fixtureco/jobs/gh-placeholder",
+        "location": {
+          "name": "Remote - United States"
+        }
+      }
+    ]
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "gh-placeholder",
+      "reason": "placeholder position_name"
+    }
+  ],
+  "missing_company_raw_response": {
+    "jobs": [
+      {
+        "id": "gh-missing-company",
+        "title": "Support Engineer",
+        "absolute_url": "https://boards.greenhouse.io/fixtureco/jobs/gh-missing-company"
+      }
+    ]
+  },
+  "missing_url_raw_response": {
+    "jobs": [
+      {
+        "id": "gh-missing-url",
+        "title": "Support Engineer"
+      }
+    ]
+  }
+}

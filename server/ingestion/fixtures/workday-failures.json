@@ -1,0 +1,43 @@
+{
+  "ats_key": "workday",
+  "company_name_for_postings": "Fixture Workday",
+  "company": {
+    "company_name": "Fixture Workday",
+    "ATS_name": "Workday"
+  },
+  "config": {
+    "companyBaseUrl": "https://fixture.wd1.myworkdayjobs.com/Careers"
+  },
+  "raw_response": {
+    "jobPostings": [
+      {
+        "id": "WDPLACEHOLDER",
+        "title": "",
+        "externalPath": "/job/Remote-United-States/Untitled_WDPLACEHOLDER"
+      }
+    ]
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "WDPLACEHOLDER",
+      "reason": "placeholder position_name"
+    }
+  ],
+  "missing_company_raw_response": {
+    "jobPostings": [
+      {
+        "id": "WDMISSINGCOMPANY",
+        "title": "Support Engineer",
+        "externalPath": "/job/Remote-United-States/Support-Engineer_WDMISSINGCOMPANY"
+      }
+    ]
+  },
+  "missing_url_raw_response": {
+    "jobPostings": [
+      {
+        "id": "WDMISSINGURL",
+        "title": "Support Engineer"
+      }
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "ats_key": "greenhouse",
+  "company_name_for_postings": "Fixture Greenhouse",
+  "company": {
+    "company_name": "Fixture Greenhouse",
+    "company_url": "https://boards.greenhouse.io/fixtureco",
+    "ATS_name": "Greenhouse"
+  },
+  "config": {
+    "boardToken": "fixtureco",
+    "boardTokenLower": "fixtureco"
+  },
+  "raw_response": {
+    "jobs": [
+      {
+        "id": 1001,
+        "internal_job_id": 9001,
+        "title": "Turkish Customer Success Specialist",
+        "updated_at": "2026-05-06T08:00:00+03:00",
+        "location": {
+          "name": "Istanbul, T\u00fcrkiye"
+        },
+        "absolute_url": "https://boards.greenhouse.io/fixtureco/jobs/1001?gh_jid=1001&utm_source=openjobslots#app",
+        "departments": [
+          {
+            "id": 10,
+            "name": "Customer Success"
+          }
+        ],
+        "offices": [
+          {
+            "id": 20,
+            "location": "Istanbul, Turkey"
+          }
+        ],
+        "content": "<p>Support customers in Turkish and English.</p>"
+      }
+    ],
+    "meta": {
+      "total": 1
+    }
+  },
+  "expected": [
+    {
+      "ats_key": "greenhouse",
+      "source_job_id": "1001",
+      "company_name": "Fixture Greenhouse",
+      "position_name": "Turkish Customer Success Specialist",
+      "job_posting_url": "https://boards.greenhouse.io/fixtureco/jobs/1001?gh_jid=1001",
+      "country": "Turkey",
+      "region": "EMEA",
+      "remote_type": "onsite",
+      "posting_date": "2026-05-06T08:00:00+03:00",
+      "industry": "Customer Success",
+      "department": "Customer Success",
+      "parser_confidence": 0.75
+    }
+  ]
+}
