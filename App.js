@@ -117,10 +117,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.5.16";
+const PUBLIC_APP_VERSION = "1.5.17";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.5.17",
+    date: "May 8, 2026",
+    title: "ATS certification workbench",
+    summary:
+      "Added a 60-source ATS parser certification registry, field-quality lane notes, and guard tests so parser fixes must prove geo, date, remote, and source ID behavior before certification."
+  },
   {
     version: "1.5.16",
     date: "May 8, 2026",
