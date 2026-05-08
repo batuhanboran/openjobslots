@@ -139,6 +139,7 @@ const MEILI_POSTINGS_SETTINGS = Object.freeze({
     "posting_date"
   ],
   sortableAttributes: ["last_seen_epoch", "posted_at_epoch"],
+  rankingRules: ["sort", "words", "typo", "proximity", "attribute", "exactness"],
   synonyms: {
     turkey: ["turkiye", "t\u00fcrkiye", "turkish"],
     turkiye: ["turkey", "t\u00fcrkiye", "turkish"],

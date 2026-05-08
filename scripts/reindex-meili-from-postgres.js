@@ -132,7 +132,7 @@ function validateMeiliSettings(index, settings) {
   if (index?.primaryKey !== "id") {
     mismatches.push({ setting: "primaryKey", expected: "id", actual: index?.primaryKey || null });
   }
-  for (const key of ["searchableAttributes", "filterableAttributes", "sortableAttributes"]) {
+  for (const key of ["searchableAttributes", "filterableAttributes", "sortableAttributes", "rankingRules"]) {
     const mismatch = compareSettingList(key, settings?.[key], MEILI_POSTINGS_SETTINGS[key]);
     if (mismatch) mismatches.push(mismatch);
   }
