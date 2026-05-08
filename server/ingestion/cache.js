@@ -25,7 +25,7 @@ async function writePostingCache(db, posting, options = {}) {
   const validation = options.validation || { ok: true, error: "" };
   const validationStatus = validation.ok ? "valid" : "invalid";
   const validationError = String(validation.error || "");
-  const canonicalUrl = String(posting?.job_posting_url || "").trim();
+  const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
   const rawPayloadHash = hashPayload(posting || {});
   if (!canonicalUrl) {
     return { cached: false, changed: false, hash: rawPayloadHash };
@@ -33,13 +33,31 @@ async function writePostingCache(db, posting, options = {}) {
 
   const existing = await db.get(
     `
-      SELECT raw_payload_hash
+      SELECT raw_payload_hash, parser_version, validation_status, validation_error
       FROM posting_cache
       WHERE canonical_url = ?;
     `,
     [canonicalUrl]
   );
-  const changed = String(existing?.raw_payload_hash || "") !== rawPayloadHash;
+  const changed = !existing ||
+    String(existing?.raw_payload_hash || "") !== rawPayloadHash ||
+    String(existing?.parser_version || "") !== parserVersion ||
+    String(existing?.validation_status || "") !== validationStatus ||
+    String(existing?.validation_error || "") !== validationError;
+
+  if (existing && !changed) {
+    await db.run(
+      `
+        UPDATE posting_cache
+        SET
+          last_seen_epoch = ?,
+          updated_at = datetime('now')
+        WHERE canonical_url = ?;
+      `,
+      [nowEpoch, canonicalUrl]
+    );
+    return { cached: true, changed: false, hash: rawPayloadHash };
+  }
 
   await db.run(
     `

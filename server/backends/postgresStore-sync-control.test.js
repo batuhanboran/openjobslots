@@ -7,6 +7,8 @@ const {
   getRetentionConfig,
   getRetentionCutoffs,
   hydratePostgresPostings,
+  listPostgresIngestionErrors,
+  listPostgresIngestionSources,
   listPostgresPostings,
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
@@ -41,7 +43,7 @@ function createStatusMockPool(controlStatus = "requested") {
           }]
         };
       }
-      if (/SELECT \* FROM ingestion_runs/i.test(sql)) {
+      if (/SELECT\s+\*\s+FROM ingestion_runs/i.test(sql)) {
         return {
           rows: [{
             id: 42,
@@ -54,6 +56,13 @@ function createStatusMockPool(controlStatus = "requested") {
             cache_hit_count: 3,
             cache_write_count: 4,
             posting_upsert_count: 5,
+            rejected_count: 6,
+            duplicate_count: 1,
+            db_busy_count: 0,
+            current_ats: controlStatus === "running" ? "greenhouse" : "",
+            current_company_url: controlStatus === "running" ? "https://boards.greenhouse.io/acme" : "",
+            current_company_name: controlStatus === "running" ? "Acme" : "",
+            http_status_counts: { 429: 2 },
             active_ats: ["greenhouse"],
             last_error: ""
           }]
@@ -125,6 +134,12 @@ async function testSyncStatusReportsRunningForActiveWorkerOnly() {
   assert.equal(status.queued, false);
   assert.equal(status.running, true);
   assert.equal(status.ingestion_worker.latest_status, "running");
+  assert.equal(status.ingestion_worker.current_ats, "greenhouse");
+  assert.equal(status.ingestion_worker.rejected_count, 6);
+  assert.equal(status.ingestion_worker.duplicate_count, 1);
+  assert.deepEqual(status.ingestion_worker.http_status_counts, { 429: 2 });
+  assert.equal(status.last_sync_summary.cache_writes, 4);
+  assert.equal(status.last_sync_summary.cache_skips, 3);
 }
 
 async function testSyncStatusDefaultsToPostgresSyncControlQueue() {
@@ -213,6 +228,65 @@ async function testAtsFieldQualityReportsFieldGapsByAts() {
   assert.equal(result[0].missing_country_pct, 79);
   assert.equal(result[0].missing_region_or_city_count, 100);
   assert.equal(result[0].parser_attention_count_24h, 2);
+}
+
+async function testIngestionErrorsEndpointQueryIsBounded() {
+  let captured = null;
+  const pool = {
+    async query(sql, params = []) {
+      captured = { sql, params };
+      return {
+        rows: [{
+          id: 7,
+          run_id: 42,
+          ats_key: "greenhouse",
+          company_url: "https://boards.greenhouse.io/acme",
+          company_name: "Acme",
+          error_type: "fetch",
+          error_message: "request failed (429)",
+          http_status: 429,
+          created_at: "2026-05-08T12:00:00.000Z"
+        }]
+      };
+    }
+  };
+
+  const result = await listPostgresIngestionErrors(pool, 5000);
+
+  assert.match(captured.sql, /ORDER BY id DESC/);
+  assert.deepEqual(captured.params, [250]);
+  assert.equal(result[0].http_status, 429);
+}
+
+async function testIngestionSourcesReportDueAndFailurePressure() {
+  let captured = null;
+  const pool = {
+    async query(sql, params = []) {
+      captured = { sql, params };
+      return {
+        rows: [{
+          ats_key: "lever",
+          display_name: "Lever",
+          enabled: true,
+          default_ttl_seconds: 86400,
+          rate_limit_ms: 1000,
+          company_count: 10,
+          due_company_count: 3,
+          last_success_epoch: 100,
+          last_failure_epoch: 90,
+          consecutive_failure_total: 4
+        }]
+      };
+    }
+  };
+
+  const result = await listPostgresIngestionSources(pool, 2);
+
+  assert.match(captured.sql, /due_company_count/);
+  assert.equal(captured.params[1], 2);
+  assert.equal(result[0].ats_key, "lever");
+  assert.equal(result[0].due_company_count, 3);
+  assert.equal(result[0].consecutive_failure_total, 4);
 }
 
 async function testHydratePostgresPostingsKeepsSafetyAndFilterGuards() {
@@ -863,6 +937,8 @@ async function main() {
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
   await testParserAttentionGroupsCareerplugRejectionReasons();
   await testAtsFieldQualityReportsFieldGapsByAts();
+  await testIngestionErrorsEndpointQueryIsBounded();
+  await testIngestionSourcesReportDueAndFailurePressure();
   await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();

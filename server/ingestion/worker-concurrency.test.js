@@ -2,7 +2,17 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
-const { classifyIngestionError, withWriteLock } = require("./worker");
+const {
+  classifyIngestionError,
+  computeRetryEpoch,
+  createRunCounters,
+  dedupeValidPosting,
+  extractHttpStatus,
+  incrementHttpStatusCount,
+  isSqliteBusyError,
+  withTransientWriteRetry,
+  withWriteLock
+} = require("./worker");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,4 +62,62 @@ test("ingestion error classifier separates parser attention from fetch failures"
     classifyIngestionError({ message: "Dayforce missing collector", ingestionErrorType: "parser_adapter_not_implemented" }),
     "parser_adapter_not_implemented"
   );
+});
+
+test("sqlite write retry observes transient busy failures", async () => {
+  let attempts = 0;
+  let busyRetries = 0;
+  const result = await withTransientWriteRetry(async () => {
+    attempts += 1;
+    if (attempts === 1) {
+      const error = new Error("SQLITE_BUSY: database is locked");
+      error.code = "SQLITE_BUSY";
+      throw error;
+    }
+    return "ok";
+  }, {
+    onBusyRetry: () => {
+      busyRetries += 1;
+    }
+  });
+
+  assert.equal(result, "ok");
+  assert.equal(attempts, 2);
+  assert.equal(busyRetries, 1);
+  assert.equal(isSqliteBusyError(Object.assign(new Error("database is busy"), { code: "SQLITE_BUSY" })), true);
+});
+
+test("retry backoff cools down after repeated company failures", () => {
+  const base = 1_000_000;
+  const early = computeRetryEpoch(base, 2);
+  const cooled = computeRetryEpoch(base, 8);
+
+  assert.ok(early > base);
+  assert.ok(early < base + 24 * 60 * 60);
+  assert.ok(cooled >= base + 7 * 24 * 60 * 60);
+});
+
+test("http status metrics are extracted and counted", () => {
+  const counters = createRunCounters();
+  incrementHttpStatusCount(counters, extractHttpStatus(new Error("request failed (429)")));
+  incrementHttpStatusCount(counters, extractHttpStatus({ statusCode: 502 }));
+  incrementHttpStatusCount(counters, extractHttpStatus(new Error("no status")));
+
+  assert.deepEqual(counters.httpStatusCounts, {
+    429: 1,
+    502: 1
+  });
+});
+
+test("duplicate canonical postings are counted before read-model writes", () => {
+  const counters = createRunCounters();
+  const seen = new Set();
+  const first = dedupeValidPosting({ canonical_url: "https://example.com/jobs/1" }, seen, counters);
+  const second = dedupeValidPosting({ job_posting_url: "https://example.com/jobs/1" }, seen, counters);
+  const third = dedupeValidPosting({ job_posting_url: "https://example.com/jobs/2" }, seen, counters);
+
+  assert.equal(first, true);
+  assert.equal(second, false);
+  assert.equal(third, true);
+  assert.equal(counters.duplicateCount, 1);
 });

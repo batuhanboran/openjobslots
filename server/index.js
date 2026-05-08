@@ -27,7 +27,9 @@ const {
   getPostgresParserAttentionByAts,
   getPostgresSuggestions,
   getPostgresSyncStatus,
+  listPostgresIngestionErrors,
   listPostgresIngestionRuns,
+  listPostgresIngestionSources,
   listPostgresPostings,
   requestSyncStart,
   requestSyncStop
@@ -1207,6 +1209,16 @@ function parseJsonArray(value) {
     return parsed.map((item) => String(item || "").trim()).filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+function parseJsonObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value || "{}"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
   }
 }
 
@@ -15785,6 +15797,13 @@ async function getIngestionWorkerStatus() {
         cache_hit_count,
         cache_write_count,
         posting_upsert_count,
+        rejected_count,
+        duplicate_count,
+        db_busy_count,
+        current_ats,
+        current_company_url,
+        current_company_name,
+        http_status_counts,
         active_ats,
         last_error
       FROM ingestion_runs
@@ -15831,8 +15850,15 @@ async function getIngestionWorkerStatus() {
     cache_hit_count: Number(latestRun?.cache_hit_count || 0),
     cache_write_count: Number(latestRun?.cache_write_count || 0),
     posting_upsert_count: Number(latestRun?.posting_upsert_count || 0),
+    rejected_count: Number(latestRun?.rejected_count || 0),
+    duplicate_count: Number(latestRun?.duplicate_count || 0),
+    db_busy_count: Number(latestRun?.db_busy_count || 0),
     queue_due_count: Number(dueRow?.count || 0),
     parser_error_count_24h: Number(parserErrorRow?.count || 0),
+    current_ats: String(latestRun?.current_ats || ""),
+    current_company_url: String(latestRun?.current_company_url || ""),
+    current_company_name: String(latestRun?.current_company_name || ""),
+    http_status_counts: parseJsonObject(latestRun?.http_status_counts),
     active_ats: Array.isArray(activeAts) ? activeAts : [],
     last_error: String(latestRun?.last_error || "")
   };
@@ -16467,6 +16493,13 @@ function createServer() {
           cache_hit_count,
           cache_write_count,
           posting_upsert_count,
+          rejected_count,
+          duplicate_count,
+          db_busy_count,
+          current_ats,
+          current_company_url,
+          current_company_name,
+          http_status_counts,
           active_ats,
           last_error
         FROM ingestion_runs
@@ -16488,10 +16521,111 @@ function createServer() {
         cache_hit_count: Number(row?.cache_hit_count || 0),
         cache_write_count: Number(row?.cache_write_count || 0),
         posting_upsert_count: Number(row?.posting_upsert_count || 0),
+        rejected_count: Number(row?.rejected_count || 0),
+        duplicate_count: Number(row?.duplicate_count || 0),
+        db_busy_count: Number(row?.db_busy_count || 0),
+        current_ats: String(row?.current_ats || ""),
+        current_company_url: String(row?.current_company_url || ""),
+        current_company_name: String(row?.current_company_name || ""),
+        http_status_counts: parseJsonObject(row?.http_status_counts),
         active_ats: parseJsonArray(row?.active_ats),
         last_error: String(row?.last_error || "")
       }))
     });
+  });
+
+  app.get("/admin/ingestion/errors", async (req, res) => {
+    const limit = Math.max(1, Math.min(250, Number(req.query.limit || 50)));
+    if (DB_BACKEND === "postgres") {
+      return res.json(sanitizeFrontendValue({
+        ok: true,
+        items: await listPostgresIngestionErrors(postgresPool, limit)
+      }));
+    }
+
+    const rows = await db.all(
+      `
+        SELECT
+          id,
+          run_id,
+          ats_key,
+          company_url,
+          company_name,
+          error_type,
+          error_message,
+          http_status,
+          created_at
+        FROM ingestion_run_errors
+        ORDER BY id DESC
+        LIMIT ?;
+      `,
+      [limit]
+    );
+    return res.json(sanitizeFrontendValue({
+      ok: true,
+      items: rows.map((row) => ({
+        id: Number(row?.id || 0),
+        run_id: Number(row?.run_id || 0),
+        ats_key: String(row?.ats_key || ""),
+        company_url: String(row?.company_url || ""),
+        company_name: String(row?.company_name || ""),
+        error_type: String(row?.error_type || "unknown"),
+        error_message: String(row?.error_message || ""),
+        http_status: row?.http_status == null ? null : Number(row.http_status),
+        created_at: String(row?.created_at || "")
+      }))
+    }));
+  });
+
+  app.get("/admin/ingestion/sources", async (req, res) => {
+    const limit = Math.max(1, Math.min(250, Number(req.query.limit || 100)));
+    if (DB_BACKEND === "postgres") {
+      return res.json(sanitizeFrontendValue({
+        ok: true,
+        items: await listPostgresIngestionSources(postgresPool, limit)
+      }));
+    }
+
+    const rows = await db.all(
+      `
+        SELECT
+          s.ats_key,
+          s.display_name,
+          s.enabled,
+          s.default_ttl_seconds,
+          s.rate_limit_ms,
+          COUNT(DISTINCT c.id) AS company_count,
+          COUNT(DISTINCT CASE WHEN COALESCE(st.next_sync_epoch, 0) <= ? THEN c.id END) AS due_company_count,
+          MAX(st.last_success_epoch) AS last_success_epoch,
+          MAX(st.last_failure_epoch) AS last_failure_epoch,
+          SUM(COALESCE(st.consecutive_failures, 0)) AS consecutive_failure_total
+        FROM ats_sources s
+        LEFT JOIN companies c
+          ON LOWER(TRIM(c.ATS_name)) = s.ats_key
+        LEFT JOIN company_sync_state st
+          ON st.ats_key = s.ats_key
+          AND st.company_url = c.url_string
+        GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms
+        ORDER BY due_company_count DESC, company_count DESC, s.display_name ASC
+        LIMIT ?;
+      `,
+      [nowEpochSeconds(), limit]
+    );
+    return res.json(sanitizeFrontendValue({
+      ok: true,
+      items: rows.map((row) => ({
+        ats_key: String(row?.ats_key || ""),
+        display_name: String(row?.display_name || ""),
+        enabled: Number(row?.enabled || 0) === 1,
+        default_ttl_seconds: Number(row?.default_ttl_seconds || 0),
+        rate_limit_ms: Number(row?.rate_limit_ms || 0),
+        company_count: Number(row?.company_count || 0),
+        due_company_count: Number(row?.due_company_count || 0),
+        last_success_epoch: Number(row?.last_success_epoch || 0),
+        last_failure_epoch: Number(row?.last_failure_epoch || 0),
+        consecutive_failure_total: Number(row?.consecutive_failure_total || 0)
+      }))
+    }));
   });
 
   app.get("/postings/filter-options", async (req, res) => {

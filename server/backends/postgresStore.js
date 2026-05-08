@@ -863,6 +863,13 @@ async function listPostgresIngestionRuns(pool, limit = 25) {
         cache_hit_count,
         cache_write_count,
         posting_upsert_count,
+        rejected_count,
+        duplicate_count,
+        db_busy_count,
+        current_ats,
+        current_company_url,
+        current_company_name,
+        http_status_counts,
         active_ats,
         last_error
       FROM ingestion_runs
@@ -882,8 +889,87 @@ async function listPostgresIngestionRuns(pool, limit = 25) {
     cache_hit_count: Number(row?.cache_hit_count || 0),
     cache_write_count: Number(row?.cache_write_count || 0),
     posting_upsert_count: Number(row?.posting_upsert_count || 0),
+    rejected_count: Number(row?.rejected_count || 0),
+    duplicate_count: Number(row?.duplicate_count || 0),
+    db_busy_count: Number(row?.db_busy_count || 0),
+    current_ats: String(row?.current_ats || ""),
+    current_company_url: String(row?.current_company_url || ""),
+    current_company_name: String(row?.current_company_name || ""),
+    http_status_counts: row?.http_status_counts && typeof row.http_status_counts === "object" ? row.http_status_counts : {},
     active_ats: Array.isArray(row?.active_ats) ? row.active_ats : [],
     last_error: String(row?.last_error || "")
+  }));
+}
+
+async function listPostgresIngestionErrors(pool, limit = 50) {
+  const rows = await pool.query(
+    `
+      SELECT
+        id,
+        run_id,
+        ats_key,
+        company_url,
+        company_name,
+        error_type,
+        error_message,
+        http_status,
+        created_at
+      FROM ingestion_run_errors
+      ORDER BY id DESC
+      LIMIT $1;
+    `,
+    [Math.max(1, Math.min(250, Number(limit || 50)))]
+  );
+  return rows.rows.map((row) => ({
+    id: Number(row?.id || 0),
+    run_id: Number(row?.run_id || 0),
+    ats_key: String(row?.ats_key || ""),
+    company_url: String(row?.company_url || ""),
+    company_name: String(row?.company_name || ""),
+    error_type: String(row?.error_type || "unknown"),
+    error_message: String(row?.error_message || ""),
+    http_status: row?.http_status == null ? null : Number(row.http_status),
+    created_at: row?.created_at ? new Date(row.created_at).toISOString() : ""
+  }));
+}
+
+async function listPostgresIngestionSources(pool, limit = 100) {
+  const rows = await pool.query(
+    `
+      SELECT
+        s.ats_key,
+        s.display_name,
+        s.enabled,
+        s.default_ttl_seconds,
+        s.rate_limit_ms,
+        COUNT(DISTINCT c.id)::int AS company_count,
+        COUNT(DISTINCT c.id) FILTER (WHERE COALESCE(st.next_sync_epoch, 0) <= $1)::int AS due_company_count,
+        MAX(st.last_success_epoch)::bigint AS last_success_epoch,
+        MAX(st.last_failure_epoch)::bigint AS last_failure_epoch,
+        SUM(COALESCE(st.consecutive_failures, 0))::bigint AS consecutive_failure_total
+      FROM ats_sources s
+      LEFT JOIN companies c
+        ON c.ats_key = s.ats_key
+      LEFT JOIN company_sync_state st
+        ON st.ats_key = c.ats_key
+        AND st.company_url = c.url_string
+      GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms
+      ORDER BY due_company_count DESC, company_count DESC, s.display_name ASC
+      LIMIT $2;
+    `,
+    [Math.floor(Date.now() / 1000), Math.max(1, Math.min(250, Number(limit || 100)))]
+  );
+  return rows.rows.map((row) => ({
+    ats_key: String(row?.ats_key || ""),
+    display_name: String(row?.display_name || ""),
+    enabled: Boolean(row?.enabled),
+    default_ttl_seconds: Number(row?.default_ttl_seconds || 0),
+    rate_limit_ms: Number(row?.rate_limit_ms || 0),
+    company_count: Number(row?.company_count || 0),
+    due_company_count: Number(row?.due_company_count || 0),
+    last_success_epoch: Number(row?.last_success_epoch || 0),
+    last_failure_epoch: Number(row?.last_failure_epoch || 0),
+    consecutive_failure_total: Number(row?.consecutive_failure_total || 0)
   }));
 }
 
@@ -926,10 +1012,19 @@ async function requestSyncStop(pool) {
 }
 
 async function getPostgresSyncStatus(pool) {
-  const [control, counts, latestRun, due, parserErrors] = await Promise.all([
+  const [control, counts, latestRun, latestFailedRun, due, parserErrors] = await Promise.all([
     getSyncControl(pool),
     getPostgresCounts(pool),
     pool.query("SELECT * FROM ingestion_runs ORDER BY id DESC LIMIT 1;"),
+    pool.query(
+      `
+        SELECT *
+        FROM ingestion_runs
+        WHERE failure_count > 0 OR status IN ('failed', 'completed_with_errors', 'interrupted')
+        ORDER BY id DESC
+        LIMIT 1;
+      `
+    ),
     pool.query(
       `
         SELECT COUNT(*)::int AS count
@@ -947,6 +1042,7 @@ async function getPostgresSyncStatus(pool) {
     pool.query("SELECT COUNT(*)::int AS count FROM ingestion_run_errors WHERE created_at >= now() - interval '24 hours' AND error_type LIKE 'parser_%';")
   ]);
   const run = latestRun.rows[0] || {};
+  const failedRun = latestFailedRun.rows[0] || {};
   const status = String(control.status || "idle");
   const queued = status === "requested";
   const running = status === "running" || status === "stopping";
@@ -964,10 +1060,16 @@ async function getPostgresSyncStatus(pool) {
     cancel_requested: Boolean(control.cancel_requested_at_epoch),
     legacy_api_sync: false,
     last_sync_at: run.finished_at_epoch ? new Date(Number(run.finished_at_epoch) * 1000).toISOString() : null,
+    last_failed_sync_at: failedRun.finished_at_epoch ? new Date(Number(failedRun.finished_at_epoch) * 1000).toISOString() : null,
     last_sync_summary: {
       total_companies: Number(run.total_targets || 0),
       failed_companies: Number(run.failure_count || 0),
-      total_postings_stored: Number(run.posting_upsert_count || 0)
+      total_postings_stored: Number(run.posting_upsert_count || 0),
+      cache_writes: Number(run.cache_write_count || 0),
+      cache_skips: Number(run.cache_hit_count || 0),
+      rejected_postings: Number(run.rejected_count || 0),
+      duplicate_postings: Number(run.duplicate_count || 0),
+      db_busy_events: Number(run.db_busy_count || 0)
     },
     db_backend: "postgres",
     search_backend: getMeiliConfig().enabled ? "meili" : "postgres",
@@ -992,8 +1094,15 @@ async function getPostgresSyncStatus(pool) {
       cache_hit_count: Number(run.cache_hit_count || 0),
       cache_write_count: Number(run.cache_write_count || 0),
       posting_upsert_count: Number(run.posting_upsert_count || 0),
+      rejected_count: Number(run.rejected_count || 0),
+      duplicate_count: Number(run.duplicate_count || 0),
+      db_busy_count: Number(run.db_busy_count || 0),
       queue_due_count: Number(due.rows[0]?.count || 0),
       parser_error_count_24h: Number(parserErrors.rows[0]?.count || 0),
+      current_ats: String(run.current_ats || ""),
+      current_company_url: String(run.current_company_url || ""),
+      current_company_name: String(run.current_company_name || ""),
+      http_status_counts: run.http_status_counts && typeof run.http_status_counts === "object" ? run.http_status_counts : {},
       active_ats: Array.isArray(run.active_ats) ? run.active_ats : [],
       last_error: String(run.last_error || "")
     },
@@ -1330,6 +1439,8 @@ module.exports = {
   inferRegion,
   inferRemoteType,
   listPostgresIngestionRuns,
+  listPostgresIngestionErrors,
+  listPostgresIngestionSources,
   listPostgresPostings,
   normalizeAtsKey,
   processPostgresSearchIndexOutbox,
