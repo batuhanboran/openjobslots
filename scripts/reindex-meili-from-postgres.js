@@ -46,6 +46,7 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     taskTimeoutMs: parseNumberOption(env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000, 120000, 30000, 300000),
     tempIndexSuffix: String(env.OPENJOBSLOTS_REINDEX_TEMP_SUFFIX || "").trim(),
     validateOnly: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_VALIDATE_ONLY),
+    skipOutboxUpdate: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_SKIP_OUTBOX_UPDATE),
     writeStatus: true
   };
 
@@ -66,6 +67,7 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
       options.check = true;
       options.validateOnly = true;
     }
+    if (arg === "--skip-outbox-update") options.skipOutboxUpdate = true;
     if (arg.startsWith("--batch-size=")) {
       options.batchSize = parseNumberOption(arg.slice("--batch-size=".length), options.batchSize, 100, 5000);
     }
@@ -651,15 +653,18 @@ async function runReplaceReindex(pool, config, options) {
       sampleLimit: options.sampleLimit,
       sampleSearches: true
     });
-    const processed = await pool.query(
-      `
-        UPDATE search_index_outbox
-        SET processed_at = now()
-        WHERE processed_at IS NULL
-          AND created_at <= to_timestamp($1);
-      `,
-      [startedAtEpoch]
-    );
+    let processed = { rowCount: 0 };
+    if (!options.skipOutboxUpdate) {
+      processed = await pool.query(
+        `
+          UPDATE search_index_outbox
+          SET processed_at = now()
+          WHERE processed_at IS NULL
+            AND created_at <= to_timestamp($1);
+        `,
+        [startedAtEpoch]
+      );
+    }
 
     writeStatusSafe({
       ok: finalValidation.ok,
@@ -674,7 +679,8 @@ async function runReplaceReindex(pool, config, options) {
         temp_index_uid: tempUid,
         previous_index_uid: tempUid,
         indexed,
-        outbox_processed: Number(processed.rowCount || 0)
+        outbox_processed: Number(processed.rowCount || 0),
+        outbox_update_skipped: Boolean(options.skipOutboxUpdate)
       }
     }, options);
 
@@ -687,6 +693,7 @@ async function runReplaceReindex(pool, config, options) {
       previous_index_uid: tempUid,
       temp_index_uid: tempUid,
       outbox_processed: Number(processed.rowCount || 0),
+      outbox_update_skipped: Boolean(options.skipOutboxUpdate),
       validation: finalValidation
     };
   } catch (error) {
