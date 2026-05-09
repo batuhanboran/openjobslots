@@ -314,6 +314,60 @@ test("replace reindex dry-run reports plan without mutating Meili", async () => 
   }
 });
 
+test("replace reindex can skip Postgres outbox mutation after swap", async () => {
+  const mock = installFetchMock((url, options) => {
+    if (url.endsWith("/indexes/postings_skip")) return createResponse(200, { uid: "postings_skip", primaryKey: "id" });
+    if (url.endsWith("/indexes") && options.method === "POST") return createResponse(202, { taskUid: 1 });
+    if (url.endsWith("/tasks/1")) return createResponse(200, { uid: 1, status: "succeeded" });
+    if (url.endsWith("/indexes/postings_skip/settings") && options.method === "PATCH") return createResponse(202, { taskUid: 2 });
+    if (url.endsWith("/tasks/2")) return createResponse(200, { uid: 2, status: "succeeded" });
+    if (url.endsWith("/indexes/postings_skip/documents") && options.method === "POST") return createResponse(202, { taskUid: 3 });
+    if (url.endsWith("/tasks/3")) return createResponse(200, { uid: 3, status: "succeeded" });
+    if (url.endsWith("/indexes/postings_skip/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings_skip/stats")) return createResponse(200, { numberOfDocuments: 1 });
+    if (url.endsWith("/indexes/postings_skip/search")) {
+      return createResponse(200, { facetDistribution: { remote_type: { onsite: 1 } }, hits: [], estimatedTotalHits: 1 });
+    }
+    if (url.endsWith("/swap-indexes")) return createResponse(202, { taskUid: 4 });
+    if (url.endsWith("/tasks/4")) return createResponse(200, { uid: 4, status: "succeeded" });
+    if (url.endsWith("/indexes/postings")) return createResponse(200, { uid: "postings", primaryKey: "id" });
+    if (url.endsWith("/indexes/postings/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings/stats")) return createResponse(200, { numberOfDocuments: 1 });
+    if (url.endsWith("/indexes/postings/search")) {
+      return createResponse(200, { facetDistribution: { remote_type: { onsite: 1 } }, hits: [], estimatedTotalHits: 1 });
+    }
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  const pool = makePool({ count: 1, facet: { onsite: 1 }, rows: [posting()] });
+  try {
+    const result = await withSilencedConsole(() =>
+      runReindex(
+        pool,
+        {
+          replaceMode: true,
+          apply: true,
+          confirmProduction: true,
+          dryRun: false,
+          tempIndexSuffix: "skip",
+          batchSize: 100,
+          sampleLimit: 0,
+          taskTimeoutMs: 1000,
+          skipOutboxUpdate: true,
+          writeStatus: false
+        },
+        { OPENJOBSLOTS_SEARCH_BACKEND: "meili", MEILI_HOST: "http://meili.test" }
+      )
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.swapped, true);
+    assert.equal(result.outbox_update_skipped, true);
+    assert.equal(result.outbox_processed, 0);
+    assert.equal(pool.queries.some((query) => /UPDATE search_index_outbox/i.test(query)), false);
+  } finally {
+    mock.restore();
+  }
+});
+
 test("replace validation catches count mismatch", async () => {
   const mock = installFetchMock((url, options) => {
     if (url.endsWith("/indexes/postings_tmp")) return createResponse(200, { uid: "postings_tmp", primaryKey: "id" });
