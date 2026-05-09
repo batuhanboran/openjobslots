@@ -1273,7 +1273,10 @@ async function runDetailRefetchWithDb(dbHandle, dbBackend, options = {}, env = {
 async function runDetailRefetch(options = {}, env = process.env) {
   const dbBackend = norm(env.OPENJOBSLOTS_DB_BACKEND || "sqlite") === "postgres" ? "postgres" : "sqlite";
   if (dbBackend === "postgres") {
-    const pool = options.pool || createPostgresPool(env);
+    const pool = options.pool || createPostgresPool({
+      enabled: true,
+      connectionString: env.DATABASE_URL || env.POSTGRES_URL || ""
+    });
     try {
       if (getSafetyGate(options).authorized) await ensurePostgresDetailRefetchSchema(pool);
       return await runDetailRefetchWithDb(pool, "postgres", options, env);
