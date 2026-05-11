@@ -16,6 +16,10 @@ const {
   makeQualitySummary
 } = require("../ingestion/dataQualityAudit");
 const {
+  classifySourceProtection,
+  summarizeSourceMetrics
+} = require("../ingestion/sourceQualityPolicy");
+const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
   normalizeRemoteTypeFromEvidence,
@@ -665,6 +669,9 @@ async function getPostgresAtsAdmin(pool) {
         s.ats_key,
         s.display_name,
         s.enabled,
+        s.protection_status,
+        s.disabled_reason,
+        s.disabled_at,
         s.default_ttl_seconds,
         s.rate_limit_ms,
         MAX(st.last_success_epoch)::bigint AS last_success_epoch,
@@ -675,7 +682,7 @@ async function getPostgresAtsAdmin(pool) {
         ON c.ats_key = s.ats_key
       LEFT JOIN company_sync_state st
         ON st.ats_key = s.ats_key
-      GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms
+      GROUP BY s.ats_key, s.display_name, s.enabled, s.protection_status, s.disabled_reason, s.disabled_at, s.default_ttl_seconds, s.rate_limit_ms
       ORDER BY s.display_name ASC;
     `
   );
@@ -683,6 +690,9 @@ async function getPostgresAtsAdmin(pool) {
     ats_key: String(row?.ats_key || ""),
     display_name: String(row?.display_name || ""),
     enabled: Boolean(row?.enabled),
+    protection_status: String(row?.protection_status || "normal"),
+    disabled_reason: String(row?.disabled_reason || ""),
+    disabled_at: row?.disabled_at ? new Date(row.disabled_at).toISOString() : "",
     default_ttl_seconds: Number(row?.default_ttl_seconds || 0),
     rate_limit_ms: Number(row?.rate_limit_ms || 0),
     last_success_epoch: Number(row?.last_success_epoch || 0),
@@ -1254,6 +1264,311 @@ async function getPostgresParserStats(pool, limit = 100) {
   });
 }
 
+async function getPostgresSourceQualityDashboard(pool, limit = 100) {
+  const cappedLimit = Math.max(1, Math.min(250, Number(limit || 100)));
+  const result = await pool.query(
+    `
+      WITH cache AS (
+        SELECT
+          ats_key,
+          COUNT(*) FILTER (WHERE validation_status = 'valid')::bigint AS accepted_rows,
+          COUNT(*) FILTER (WHERE validation_status = 'quarantined')::bigint AS quarantined_rows,
+          COUNT(*) FILTER (WHERE COALESCE(validation_status, '') NOT IN ('valid', 'quarantined'))::bigint AS rejected_rows
+        FROM posting_cache
+        GROUP BY ats_key
+      ),
+      visible AS (
+        SELECT
+          ats_key,
+          COUNT(*)::bigint AS visible_rows,
+          COUNT(*) FILTER (WHERE btrim(coalesce(country, '')) = '')::bigint AS missing_country_count,
+          COUNT(*) FILTER (WHERE btrim(coalesce(city, '')) = '')::bigint AS missing_city_count,
+          COUNT(*) FILTER (WHERE lower(btrim(coalesce(remote_type, ''))) IN ('', 'unknown'))::bigint AS unknown_remote_count
+        FROM postings
+        WHERE hidden = false
+        GROUP BY ats_key
+      ),
+      errors AS (
+        SELECT
+          ats_key,
+          COUNT(*) FILTER (WHERE error_type LIKE 'parser_%')::bigint AS parser_failure_events,
+          COUNT(*) FILTER (WHERE http_status >= 400 OR error_type = 'fetch')::bigint AS http_failure_events
+        FROM ingestion_run_errors
+        WHERE created_at >= now() - interval '24 hours'
+        GROUP BY ats_key
+      ),
+      drift AS (
+        SELECT
+          ats_key,
+          COUNT(*)::bigint AS drift_events_24h,
+          MAX(created_at) AS latest_drift_at
+        FROM parser_drift_events
+        WHERE created_at >= now() - interval '24 hours'
+        GROUP BY ats_key
+      )
+      SELECT
+        s.ats_key,
+        s.display_name,
+        s.enabled,
+        s.protection_status,
+        s.disabled_reason,
+        s.disabled_at,
+        COALESCE(cache.accepted_rows, 0)::bigint AS accepted_rows,
+        COALESCE(cache.quarantined_rows, 0)::bigint AS quarantined_rows,
+        COALESCE(cache.rejected_rows, 0)::bigint AS rejected_rows,
+        COALESCE(visible.visible_rows, 0)::bigint AS visible_rows,
+        COALESCE(visible.missing_country_count, 0)::bigint AS missing_country_count,
+        COALESCE(visible.missing_city_count, 0)::bigint AS missing_city_count,
+        COALESCE(visible.unknown_remote_count, 0)::bigint AS unknown_remote_count,
+        COALESCE(errors.parser_failure_events, 0)::bigint AS parser_failure_events,
+        COALESCE(errors.http_failure_events, 0)::bigint AS http_failure_events,
+        COALESCE(drift.drift_events_24h, 0)::bigint AS drift_events_24h,
+        drift.latest_drift_at
+      FROM ats_sources s
+      LEFT JOIN cache ON cache.ats_key = s.ats_key
+      LEFT JOIN visible ON visible.ats_key = s.ats_key
+      LEFT JOIN errors ON errors.ats_key = s.ats_key
+      LEFT JOIN drift ON drift.ats_key = s.ats_key
+      ORDER BY
+        COALESCE(cache.quarantined_rows, 0) DESC,
+        COALESCE(visible.missing_country_count, 0) DESC,
+        s.ats_key ASC
+      LIMIT $1;
+    `,
+    [cappedLimit]
+  );
+  return result.rows.map((row) => {
+    const metrics = summarizeSourceMetrics(row);
+    const protection = classifySourceProtection(row);
+    return {
+      ats_key: String(row.ats_key || ""),
+      display_name: String(row.display_name || row.ats_key || ""),
+      enabled: Boolean(row.enabled),
+      protection_status: String(row.protection_status || "normal"),
+      disabled_reason: String(row.disabled_reason || ""),
+      disabled_at: row.disabled_at ? new Date(row.disabled_at).toISOString() : "",
+      ...metrics,
+      drift_events_24h: Number(row.drift_events_24h || 0),
+      latest_drift_at: row.latest_drift_at ? new Date(row.latest_drift_at).toISOString() : "",
+      recommended_action: protection.action,
+      recommended_reason: protection.reason
+    };
+  });
+}
+
+async function applyPostgresSourceQualityProtection(pool, options = {}) {
+  const onlyAts = new Set((options.atsKeys || []).map((item) => String(item || "").trim()).filter(Boolean));
+  const rows = await getPostgresSourceQualityDashboard(pool, 250);
+  const actions = [];
+  for (const row of rows) {
+    if (onlyAts.size > 0 && !onlyAts.has(row.ats_key)) continue;
+    const classification = classifySourceProtection(row, { thresholds: options.thresholds });
+    if (classification.action !== "disable") continue;
+    if (String(row.protection_status || "") === "auto_disabled" && !row.enabled) continue;
+    await pool.query(
+      `
+        UPDATE ats_sources
+        SET enabled = false,
+            protection_status = 'auto_disabled',
+            disabled_reason = $2,
+            disabled_at = now(),
+            quality_policy = $3::jsonb,
+            updated_at = now()
+        WHERE ats_key = $1;
+      `,
+      [
+        row.ats_key,
+        classification.reason,
+        JSON.stringify({
+          metrics: classification.metrics,
+          thresholds: classification.thresholds
+        })
+      ]
+    );
+    await pool.query(
+      `
+        INSERT INTO source_quality_events (ats_key, event_type, severity, reason, action, metrics)
+        VALUES ($1, 'source_auto_disabled', 'error', $2, 'disable', $3::jsonb);
+      `,
+      [
+        row.ats_key,
+        classification.reason,
+        JSON.stringify(classification.metrics)
+      ]
+    );
+    actions.push({
+      ats_key: row.ats_key,
+      action: "disabled",
+      reason: classification.reason,
+      metrics: classification.metrics
+    });
+  }
+  return { ok: true, actions };
+}
+
+async function getPostgresQuarantineSummary(pool, limit = 100) {
+  const cappedLimit = Math.max(1, Math.min(250, Number(limit || 100)));
+  const [bySource, byReason, byParser] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          ats_key,
+          COUNT(*)::bigint AS count
+        FROM posting_cache
+        WHERE validation_status = 'quarantined'
+        GROUP BY ats_key
+        ORDER BY count DESC, ats_key ASC
+        LIMIT $1;
+      `,
+      [cappedLimit]
+    ),
+    pool.query(
+      `
+        SELECT
+          COALESCE(NULLIF(btrim(validation_error), ''), COALESCE(NULLIF(btrim(rejection_reason), ''), 'unknown')) AS reason,
+          COUNT(*)::bigint AS count
+        FROM posting_cache
+        WHERE validation_status = 'quarantined'
+        GROUP BY reason
+        ORDER BY count DESC, reason ASC
+        LIMIT $1;
+      `,
+      [cappedLimit]
+    ),
+    pool.query(
+      `
+        SELECT
+          ats_key,
+          parser_version,
+          COUNT(*)::bigint AS count
+        FROM posting_cache
+        WHERE validation_status = 'quarantined'
+        GROUP BY ats_key, parser_version
+        ORDER BY count DESC, ats_key ASC, parser_version ASC
+        LIMIT $1;
+      `,
+      [cappedLimit]
+    )
+  ]);
+  return {
+    by_source: bySource.rows.map((row) => ({
+      ats_key: String(row.ats_key || ""),
+      count: Number(row.count || 0)
+    })),
+    by_reason: byReason.rows.map((row) => ({
+      reason: String(row.reason || "unknown"),
+      count: Number(row.count || 0)
+    })),
+    by_parser: byParser.rows.map((row) => ({
+      ats_key: String(row.ats_key || ""),
+      parser_version: String(row.parser_version || "unknown"),
+      count: Number(row.count || 0)
+    }))
+  };
+}
+
+async function listPostgresParserDriftEvents(pool, limit = 100) {
+  const cappedLimit = Math.max(1, Math.min(250, Number(limit || 100)));
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        ats_key,
+        parser_version,
+        company_url,
+        company_name,
+        shape_hash,
+        baseline_hash,
+        similarity,
+        reason,
+        created_at
+      FROM parser_drift_events
+      ORDER BY id DESC
+      LIMIT $1;
+    `,
+    [cappedLimit]
+  );
+  return result.rows.map((row) => ({
+    id: Number(row.id || 0),
+    ats_key: String(row.ats_key || ""),
+    parser_version: String(row.parser_version || "unknown"),
+    company_url: String(row.company_url || ""),
+    company_name: String(row.company_name || ""),
+    shape_hash: String(row.shape_hash || ""),
+    baseline_hash: String(row.baseline_hash || ""),
+    similarity: Number(row.similarity || 0),
+    reason: String(row.reason || ""),
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : ""
+  }));
+}
+
+async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersion, options = {}) {
+  const { analyzePayloadShape, detectParserDrift } = require("../ingestion/sourceQualityPolicy");
+  const atsKey = String(target?.atsKey || "").trim();
+  const version = String(parserVersion || "unknown");
+  const observed = analyzePayloadShape(raw);
+  const existing = await pool.query(
+    `
+      SELECT shape_hash, shape_paths, observed_count
+      FROM source_payload_shapes
+      WHERE ats_key = $1 AND parser_version = $2;
+    `,
+    [atsKey, version]
+  );
+  const baseline = existing.rows[0] || null;
+  if (!baseline) {
+    await pool.query(
+      `
+        INSERT INTO source_payload_shapes (ats_key, parser_version, shape_hash, shape_paths, observed_count)
+        VALUES ($1, $2, $3, $4::jsonb, 1)
+        ON CONFLICT (ats_key, parser_version) DO NOTHING;
+      `,
+      [atsKey, version, observed.shape_hash, JSON.stringify(observed.shape_paths)]
+    );
+    return { drift: false, bootstrapped: true, observed };
+  }
+  const drift = detectParserDrift(
+    {
+      shape_hash: String(baseline.shape_hash || ""),
+      shape_paths: Array.isArray(baseline.shape_paths) ? baseline.shape_paths : []
+    },
+    observed,
+    options
+  );
+  if (drift.drift) {
+    await pool.query(
+      `
+        INSERT INTO parser_drift_events (
+          ats_key, parser_version, company_url, company_name, shape_hash,
+          baseline_hash, similarity, reason, shape_paths
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb);
+      `,
+      [
+        atsKey,
+        version,
+        String(target?.companyUrl || ""),
+        String(target?.company?.company_name || ""),
+        observed.shape_hash,
+        String(baseline.shape_hash || ""),
+        Number(drift.similarity || 0),
+        drift.reason,
+        JSON.stringify(observed.shape_paths)
+      ]
+    );
+    return { ...drift, observed, baseline };
+  }
+  await pool.query(
+    `
+      UPDATE source_payload_shapes
+      SET observed_count = observed_count + 1,
+          last_seen_at = now()
+      WHERE ats_key = $1 AND parser_version = $2;
+    `,
+    [atsKey, version]
+  );
+  return { ...drift, observed, baseline };
+}
+
 async function getSyncControl(pool) {
   const result = await pool.query("SELECT * FROM sync_control WHERE id = 1;");
   return result.rows[0] || { status: "idle" };
@@ -1779,6 +2094,8 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
 
 module.exports = {
   buildSearchRankSql,
+  applyPostgresSourceQualityProtection,
+  checkAndRecordPostgresPayloadDrift,
   getRetentionConfig,
   getRetentionCutoffs,
   getPostgresAtsAdmin,
@@ -1790,7 +2107,9 @@ module.exports = {
   getPostgresParserAttentionByAts,
   getPostgresPostingDiagnostics,
   getPostgresQualitySummary,
+  getPostgresQuarantineSummary,
   getPostgresSuggestions,
+  getPostgresSourceQualityDashboard,
   getPostgresSyncStatus,
   hydratePostgresPostings,
   inferCountry,
@@ -1799,6 +2118,7 @@ module.exports = {
   listPostgresIngestionRuns,
   listPostgresIngestionErrors,
   listPostgresIngestionSources,
+  listPostgresParserDriftEvents,
   listPostgresRejections,
   listPostgresPostings,
   normalizeAtsKey,

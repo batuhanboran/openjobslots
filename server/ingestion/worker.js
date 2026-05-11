@@ -18,12 +18,15 @@ const {
   seedPostgresAtsSources
 } = require("../backends/postgres");
 const {
+  applyPostgresSourceQualityProtection,
+  checkAndRecordPostgresPayloadDrift,
   normalizeAtsKey,
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
   upsertPostgresPostings
 } = require("../backends/postgresStore");
 const { ensureMeiliPostingsIndex } = require("../search/meili");
+const { getSourceSyncPolicy } = require("./sourceQualityPolicy");
 
 function positiveNumber(value, fallback) {
   const number = Number(value);
@@ -709,6 +712,8 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
           c.company_name,
           c.url_string,
           c.ats_key,
+          s.protection_status,
+          s.disabled_reason,
           s.default_ttl_seconds,
           s.rate_limit_ms,
           COALESCE(st.next_sync_epoch, 0) AS next_sync_epoch,
@@ -723,6 +728,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
           ON st.ats_key = c.ats_key
           AND st.company_url = c.url_string
         WHERE s.enabled = true
+          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
           AND COALESCE(st.next_sync_epoch, 0) <= $1
       )
       SELECT
@@ -730,6 +736,8 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
         company_name,
         url_string,
         ats_key,
+        protection_status,
+        disabled_reason,
         default_ttl_seconds,
         rate_limit_ms,
         next_sync_epoch
@@ -741,7 +749,15 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
   );
 
   const targets = [];
+  const selectedByAts = new Map();
   for (const row of result.rows) {
+    const sourcePolicy = getSourceSyncPolicy(row.ats_key, {
+      protectionStatus: row.protection_status,
+      disabledReason: row.disabled_reason
+    });
+    if (sourcePolicy.mode === "disabled") continue;
+    const selectedCount = Number(selectedByAts.get(row.ats_key) || 0);
+    if (Number.isFinite(sourcePolicy.maxTargetsPerRun) && selectedCount >= sourcePolicy.maxTargetsPerRun) continue;
     const company = {
       id: Number(row.id || 0),
       company_name: String(row.company_name || ""),
@@ -758,9 +774,11 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
       settings: {
         enabled: true,
         defaultTtlSeconds: Number(row.default_ttl_seconds || DEFAULT_TTL_SECONDS),
-        rateLimitMs: Number(row.rate_limit_ms || 0)
+        rateLimitMs: Number(row.rate_limit_ms || 0),
+        sourcePolicy
       }
     });
+    selectedByAts.set(row.ats_key, selectedCount + 1);
   }
   return targets;
 }
@@ -1123,6 +1141,18 @@ async function processPostgresTarget(pool, runId, target, counters) {
       throw error;
     }
 
+    const drift = await checkAndRecordPostgresPayloadDrift(
+      pool,
+      target,
+      raw,
+      target.adapter.parserVersion
+    );
+    if (drift?.drift) {
+      const error = new Error(`parser drift detected: ${drift.reason}`);
+      error.ingestionErrorType = "parser_drift";
+      throw error;
+    }
+
     let parsed;
     try {
       parsed = target.adapter.parse(raw, target.company);
@@ -1247,6 +1277,9 @@ async function runPostgresIngestionOnce(pool, options = {}) {
     try {
       await prunePostgresRetention(pool);
       await processPostgresSearchIndexOutbox(pool);
+      await applyPostgresSourceQualityProtection(pool, {
+        atsKeys: Array.from(new Set(targets.map((target) => target.atsKey)))
+      });
     } catch (maintenanceError) {
       console.warn(`[ingestion] retention/search-index maintenance failed: ${maintenanceError.message}`);
     }

@@ -43,11 +43,14 @@ const {
   getPostgresParserAttentionByAts,
   getPostgresPostingDiagnostics,
   getPostgresQualitySummary,
+  getPostgresQuarantineSummary,
   getPostgresSuggestions,
+  getPostgresSourceQualityDashboard,
   getPostgresSyncStatus,
   listPostgresIngestionErrors,
   listPostgresIngestionRuns,
   listPostgresIngestionSources,
+  listPostgresParserDriftEvents,
   listPostgresRejections,
   listPostgresPostings,
   requestSyncStart,
@@ -16601,10 +16604,11 @@ function createServer() {
   app.get("/ingestion/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts, heavyJob] = await Promise.all([
+        const [status, parserAttentionByAts, heavyJob, sourceQuality] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
           getPostgresParserAttentionByAts(postgresPool),
-          getHeavyJobLockStatus(postgresPool)
+          getHeavyJobLockStatus(postgresPool),
+          getPostgresSourceQualityDashboard(postgresPool, 25)
         ]);
         return sanitizeFrontendValue({
           ok: true,
@@ -16616,7 +16620,8 @@ function createServer() {
             heavy_job: heavyJob,
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
-            parser_attention_by_ats: parserAttentionByAts
+            parser_attention_by_ats: parserAttentionByAts,
+            source_quality: sourceQuality
           }
         });
       }
@@ -16718,6 +16723,52 @@ function createServer() {
         search_backend: SEARCH_BACKEND,
         items,
         count: items.length
+      });
+    });
+  });
+
+  app.get("/ingestion/source-quality", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const limit = Number(req.query.limit || 100);
+      const items = DB_BACKEND === "postgres"
+        ? await getPostgresSourceQualityDashboard(postgresPool, limit)
+        : [];
+      return sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        thresholds: DB_BACKEND === "postgres" ? require("./ingestion/sourceQualityPolicy").readThresholds() : {},
+        items,
+        count: items.length
+      });
+    });
+  });
+
+  app.get("/ingestion/parser-drift", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const limit = Number(req.query.limit || 100);
+      const items = DB_BACKEND === "postgres"
+        ? await listPostgresParserDriftEvents(postgresPool, limit)
+        : [];
+      return sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        items,
+        count: items.length
+      });
+    });
+  });
+
+  app.get("/ingestion/quarantine-summary", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const limit = Number(req.query.limit || 100);
+      const summary = DB_BACKEND === "postgres"
+        ? await getPostgresQuarantineSummary(postgresPool, limit)
+        : { by_source: [], by_reason: [], by_parser: [] };
+      return sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        ...summary
       });
     });
   });

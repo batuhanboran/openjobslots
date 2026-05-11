@@ -54,11 +54,21 @@ async function ensurePostgresSchema(pool) {
       ats_key TEXT PRIMARY KEY,
       display_name TEXT NOT NULL,
       enabled BOOLEAN NOT NULL DEFAULT true,
+      protection_status TEXT NOT NULL DEFAULT 'normal',
+      disabled_reason TEXT NOT NULL DEFAULT '',
+      disabled_at TIMESTAMPTZ,
+      quality_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
       default_ttl_seconds INTEGER NOT NULL DEFAULT 86400,
       rate_limit_ms INTEGER NOT NULL DEFAULT 1000,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    ALTER TABLE IF EXISTS ats_sources
+      ADD COLUMN IF NOT EXISTS protection_status TEXT NOT NULL DEFAULT 'normal',
+      ADD COLUMN IF NOT EXISTS disabled_reason TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS quality_policy JSONB NOT NULL DEFAULT '{}'::jsonb;
 
     CREATE TABLE IF NOT EXISTS companies (
       id BIGSERIAL PRIMARY KEY,
@@ -278,6 +288,48 @@ async function ensurePostgresSchema(pool) {
       ON ingestion_run_errors(ats_key, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_ingestion_run_errors_type_ats
       ON ingestion_run_errors(error_type, ats_key, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS source_quality_events (
+      id BIGSERIAL PRIMARY KEY,
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      event_type TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'warning',
+      reason TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL DEFAULT '',
+      metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_source_quality_events_ats
+      ON source_quality_events(ats_key, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS source_payload_shapes (
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      parser_version TEXT NOT NULL,
+      shape_hash TEXT NOT NULL,
+      shape_paths JSONB NOT NULL DEFAULT '[]'::jsonb,
+      observed_count INTEGER NOT NULL DEFAULT 1,
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (ats_key, parser_version)
+    );
+
+    CREATE TABLE IF NOT EXISTS parser_drift_events (
+      id BIGSERIAL PRIMARY KEY,
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      parser_version TEXT NOT NULL,
+      company_url TEXT NOT NULL DEFAULT '',
+      company_name TEXT NOT NULL DEFAULT '',
+      shape_hash TEXT NOT NULL DEFAULT '',
+      baseline_hash TEXT NOT NULL DEFAULT '',
+      similarity REAL NOT NULL DEFAULT 0,
+      reason TEXT NOT NULL DEFAULT '',
+      shape_paths JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_parser_drift_events_ats
+      ON parser_drift_events(ats_key, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS search_index_outbox (
       id BIGSERIAL PRIMARY KEY,
