@@ -5,8 +5,8 @@ This is the short current-state document for future Codex runs. Detailed runbook
 ## Current Version
 
 - Package/public release line: `v1.6.1`.
-- Last recorded deployed commit: v1.6.1 data-quality tooling release.
-- Last recorded production deployment date: May 9, 2026.
+- Last recorded deployed commit: `1913bc5` (`main`).
+- Last recorded production deployment date: May 11, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 
@@ -59,24 +59,31 @@ Keep public UI calls on public routes only unless an admin flow is explicitly op
 
 ## Last Recorded Data Quality State
 
-The last production audit recorded the search system as functional but normalized data quality as the main risk.
+The last read-only production baseline audit was recorded on May 11, 2026 after the backend stabilization deploy.
+Reports were written on production under `/root/OpenJobSlots/reports/`.
 
-- Visible/searchable postings: `725,071`.
-- Missing country: `306,727` / `42.30%`.
-- Missing location text: `201,519` / `27.79%`.
-- Missing region/state: `306,727` / `42.30%`.
-- Missing city: `710,543` / `98.00%`.
-- Missing any normalized geo: `711,093` / `98.07%`.
-- Missing all normalized geo: `306,177` / `42.23%`.
-- Missing location and all normalized geo: `201,519` / `27.79%`.
-- Suspicious/unknown geo: `19,704` / `2.72%`.
+- Baseline JSON: `/root/OpenJobSlots/reports/production-data-quality-baseline.json`.
+- Baseline Markdown: `/root/OpenJobSlots/reports/production-data-quality-baseline.md`.
+- Meili baseline JSON: `/root/OpenJobSlots/reports/production-meili-baseline.json`.
+- Visible postings: `737,433`.
+- Indexable postings: `737,427`.
+- Missing country: `310,154` / `42.06%`.
+- Missing location text: `202,021` / `27.40%`.
+- Missing region/state: `310,154` / `42.06%`.
+- Missing city: `705,133` / `95.62%`.
+- Missing any normalized geo: `709,884` / `96.26%`.
+- Missing all normalized geo: `305,403` / `41.41%`.
+- Missing location and all normalized geo: `202,021` / `27.40%`.
+- Suspicious/unknown geo: `19,899` / `2.70%`.
 - Missing remote type: `0` / `0.00%`.
-- Weak or unknown remote classification: `282,748` / `39.00%`.
-- Missing all normalized geo and weak/unknown remote: `266,770` / `36.79%`.
-- Worst sources include `icims`, `applitrack`, `manatal`, `applytojob`, `hrmdirect`, `recruitee`, `breezy`, `bamboohr`, `ashby`, and `taleo`.
-- Meilisearch and Postgres counts were broadly aligned, with a small known stale/bad-document delta documented in the deployment runbook.
+- Weak or unknown remote classification: `285,715` / `38.74%`.
+- Missing all normalized geo and weak/unknown remote: `266,010` / `36.07%`.
+- Worst sources by combined geo/remote gaps: `icims`, `applitrack`, `manatal`, `applytojob`, `hrmdirect`, `breezy`, `recruitee`, `taleo`, `ashby`, and `bamboohr`.
+- Meilisearch document count: `737,433`; Postgres indexable count: `737,427`; count delta: `+6` Meili documents.
+- Meili settings matched expected searchable, filterable, sortable, and ranking-rule configuration.
+- Heavy job advisory lock `openjobslots_heavy_job` was available; no guarded backfill runs were active.
 
-Treat these as the last recorded numbers, not proof of current live state. Re-run `npm run audit:data-quality -- --by-source --by-parser` and `npm run audit:ats-quality` before making data-quality claims.
+Treat these as the last recorded numbers, not proof of current live state. Re-run the read-only production baseline audit before making new data-quality claims.
 
 ## Known Risks
 
