@@ -1,4 +1,5 @@
 const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
+const { withHeavyJobLock } = require("../server/backends/heavyJobLock");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -236,9 +237,12 @@ function validateMeiliSettings(index, settings) {
 function indexablePostingsWhereClause() {
   return `
     hidden = false
-    AND btrim(coalesce(canonical_url, '')) ~* '^https?://'
-    AND btrim(coalesce(position_name, '')) <> ''
-    AND btrim(coalesce(company_name, '')) <> ''
+    AND canonical_url > ''
+    AND (canonical_url LIKE 'http://%' OR canonical_url LIKE 'https://%')
+    AND position_name IS NOT NULL
+    AND position_name <> ''
+    AND company_name IS NOT NULL
+    AND company_name <> ''
     AND position_name !~* '^(untitled|unknown|n/?a|not available|job opening|new job|open position|position)$'
   `;
 }
@@ -731,7 +735,10 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
     }
 
     if ((options.replaceMode || options.replaceIndex) && !options.validateOnly) {
-      const result = await runReplaceReindex(pool, config, options);
+      const runReplace = () => runReplaceReindex(pool, config, options);
+      const result = getReplaceSafetyGate(options).authorized
+        ? await withHeavyJobLock(pool, "meili-replace-reindex", runReplace)
+        : await runReplace();
       return writeResultOutput(result, options);
     }
 

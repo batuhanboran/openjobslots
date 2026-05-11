@@ -17674,6 +17674,33 @@ async function start() {
   }
 }
 
+function isRetryableStartupError(error) {
+  const code = String(error?.code || "").toUpperCase();
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    ["EAI_AGAIN", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "ECONNRESET"].includes(code) ||
+    /getaddrinfo|connect econnrefused|connection terminated|timeout|database system is starting up/.test(message)
+  );
+}
+
+async function startWithBackoff() {
+  let attempt = 0;
+  while (true) {
+    try {
+      await start();
+      return;
+    } catch (error) {
+      if (!isRetryableStartupError(error)) throw error;
+      attempt += 1;
+      const delayMs = Math.min(60000, 2000 * Math.pow(2, Math.min(attempt - 1, 5)));
+      console.error(
+        `[openjobslots API] startup dependency unavailable; retrying in ${delayMs}ms: ${error?.message || error}`
+      );
+      await sleep(delayMs);
+    }
+  }
+}
+
 module.exports = {
   ATS_FILTER_OPTION_ITEMS,
   ATS_FILTER_OPTIONS,
@@ -17732,7 +17759,7 @@ module.exports = {
 };
 
 if (require.main === module) {
-  start().catch((error) => {
+  startWithBackoff().catch((error) => {
     console.error("[openjobslots API] startup failed:", error);
     process.exit(1);
   });

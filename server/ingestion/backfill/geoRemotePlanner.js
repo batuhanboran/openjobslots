@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../../backends/postgres");
+const { acquireHeavyJobLock } = require("../../backends/heavyJobLock");
 const { openSqliteReadOnly } = require("../dataQualityAudit");
 const { parseQualityFlags, scorePostingQuality } = require("../dataQuality");
 const {
@@ -1291,7 +1292,11 @@ async function runBackfill(options = parseArgs(process.argv.slice(2)), env = pro
   const safetyGate = getSafetyGate(options);
   if (dbBackend === "postgres") {
     const pool = createPostgresPool({ enabled: true, connectionString: env.DATABASE_URL || env.POSTGRES_URL || "" });
+    let heavyJobLock = null;
     try {
+      if (safetyGate.authorized) {
+        heavyJobLock = await acquireHeavyJobLock(pool, "geo-remote-backfill");
+      }
       rows = await queryPostgresRows(pool, options);
       const plans = rows.map(classifyBackfillCandidate);
       const summary = summarizePlan(rows, options);
@@ -1308,7 +1313,13 @@ async function runBackfill(options = parseArgs(process.argv.slice(2)), env = pro
       if (safetyGate.authorized) {
         applyResult = await applyPostgresPlans(pool, plans, options, summary);
       }
+      if (heavyJobLock) await heavyJobLock.release("succeeded");
+      heavyJobLock = null;
       return { ...reportBase, ...(applyResult || {}) };
+    } catch (error) {
+      if (heavyJobLock) await heavyJobLock.release("failed");
+      heavyJobLock = null;
+      throw error;
     } finally {
       await pool.end();
     }
