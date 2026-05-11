@@ -4,8 +4,8 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Current Version
 
-- Package/public release line: `v1.6.1`.
-- Last recorded deployed commit: `1913bc5` (`main`).
+- Package/public release line: `v1.6.2`.
+- Last recorded deployed commit: current `v1.6.2` release commit on `main`.
 - Last recorded production deployment date: May 11, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
@@ -59,28 +59,29 @@ Keep public UI calls on public routes only unless an admin flow is explicitly op
 
 ## Last Recorded Data Quality State
 
-The last read-only production baseline audit was recorded on May 11, 2026 after the backend stabilization deploy.
+The last production audit was recorded on May 11, 2026 after the guarded backfill/detail-refetch cycle and final replace-mode Meili reindex.
 Reports were written on production under `/root/OpenJobSlots/reports/`.
 
-- Baseline JSON: `/root/OpenJobSlots/reports/production-data-quality-baseline.json`.
-- Baseline Markdown: `/root/OpenJobSlots/reports/production-data-quality-baseline.md`.
-- Meili baseline JSON: `/root/OpenJobSlots/reports/production-meili-baseline.json`.
+- Initial baseline JSON: `/root/OpenJobSlots/reports/production-data-quality-baseline.json`.
+- Final audit JSON: `/root/OpenJobSlots/reports/data-quality-final-after-meili-reindex-20260511T183424Z.json`.
+- Final Meili check JSON: `/root/OpenJobSlots/reports/meili-check-after-final-reindex-20260511T183424Z.json`.
+- Final Meili replace report: `/root/OpenJobSlots/reports/meili-replace-final-reindex-20260511T183424Z.json`.
 - Visible postings: `737,433`.
 - Indexable postings: `737,427`.
-- Missing country: `310,154` / `42.06%`.
-- Missing location text: `202,021` / `27.40%`.
-- Missing region/state: `310,154` / `42.06%`.
-- Missing city: `705,133` / `95.62%`.
-- Missing any normalized geo: `709,884` / `96.26%`.
-- Missing all normalized geo: `305,403` / `41.41%`.
-- Missing location and all normalized geo: `202,021` / `27.40%`.
-- Suspicious/unknown geo: `19,899` / `2.70%`.
+- Missing country: `306,410` / `41.55%`.
+- Missing location text: `199,951` / `27.11%`.
+- Missing region/state: `306,410` / `41.55%`.
+- Missing city: `554,991` / `75.26%`.
+- Missing any normalized geo: `560,188` / `75.96%`.
+- Missing all normalized geo: `301,213` / `40.85%`.
+- Missing location and all normalized geo: `199,951` / `27.11%`.
+- Suspicious/unknown geo: `19,957` / `2.71%`.
 - Missing remote type: `0` / `0.00%`.
-- Weak or unknown remote classification: `285,715` / `38.74%`.
-- Missing all normalized geo and weak/unknown remote: `266,010` / `36.07%`.
-- Worst sources by combined geo/remote gaps: `icims`, `applitrack`, `manatal`, `applytojob`, `hrmdirect`, `breezy`, `recruitee`, `taleo`, `ashby`, and `bamboohr`.
-- Meilisearch document count: `737,433`; Postgres indexable count: `737,427`; count delta: `+6` Meili documents.
-- Meili settings matched expected searchable, filterable, sortable, and ranking-rule configuration.
+- Weak or unknown remote classification: `283,989` / `38.51%`.
+- Missing all normalized geo and weak/unknown remote: `262,542` / `35.60%`.
+- Worst remaining sources by combined geo/remote gaps: `icims`, `applitrack`, `manatal`, `taleo`, `workday`, `hrmdirect`, `breezy`, `ashby`, `smartrecruiters`, and `zoho`.
+- Meilisearch document count: `737,427`; Postgres indexable count: `737,427`; count delta: `0`.
+- Meilisearch remote facets now match the Postgres-derived indexed payload distribution.
 - Heavy job advisory lock `openjobslots_heavy_job` was available; no guarded backfill runs were active.
 
 Treat these as the last recorded numbers, not proof of current live state. Re-run the read-only production baseline audit before making new data-quality claims.
@@ -92,7 +93,7 @@ Treat these as the last recorded numbers, not proof of current live state. Re-ru
 - Parser certification is fixture-backed only for a subset of the configured ATS catalog. Do not claim all 60 ATS are certified.
 - Meilisearch is derived data. Reindex only after check/dry-run mode and with a rollback plan.
 - Production write backfills must be dry-run first, batched, explicit, and approved.
-- v1.6.1 adds guarded apply/rollback tooling, but the deployment step intentionally does not apply production backfills, detail-refetch writes, or replace-mode Meili reindexing.
+- v1.6.2 has applied guarded production repair batches and final replace-mode Meili reindexing; future repair work must still use the same backup, lock, canary, audit, and rollback process.
 - Cloudflare/analytics CSP alignment and dependency version cleanup are separate maintenance tasks.
 
 ## Next Tasks

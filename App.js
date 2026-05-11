@@ -118,10 +118,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.6.1";
+const PUBLIC_APP_VERSION = "1.6.2";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.6.2",
+    date: "May 11, 2026",
+    title: "Data quality repair and search index closure",
+    summary:
+      "Closed the v1.6 data-quality repair cycle with guarded backend job protections, safe existing-evidence geo and remote backfill, bounded iCIMS and Applitrack detail refetch, targeted ATS gap repair, and a final replace-mode Meili rebuild from Postgres. Meili now matches the Postgres indexable count and remote facets."
+  },
   {
     version: "1.6.1",
     date: "May 9, 2026",

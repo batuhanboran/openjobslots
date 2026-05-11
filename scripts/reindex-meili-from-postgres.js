@@ -311,18 +311,32 @@ async function getPostgresIndexableCount(pool) {
   return Number(result.rows[0]?.count || 0);
 }
 
-async function getPostgresRemoteFacet(pool) {
-  const result = await pool.query(
-    `
-      SELECT lower(coalesce(nullif(btrim(remote_type), ''), 'unknown')) AS remote_type,
-             COUNT(*)::int AS count
-      FROM postings
-      WHERE ${indexablePostingsWhereClause()}
-      GROUP BY 1
-      ORDER BY 1;
-    `
-  );
-  return Object.fromEntries((result.rows || []).map((row) => [remoteFacetKey(row.remote_type), Number(row.count || 0)]));
+async function getPostgresRemoteFacet(pool, options = {}) {
+  const facet = {};
+  let lastCanonicalUrl = "";
+  const batchSize = Math.max(100, Math.min(10000, Number(options.batchSize || 5000)));
+  while (true) {
+    const result = await pool.query(
+      `
+        /* meili_remote_facet */
+        SELECT ${postingSelectColumns()}
+        FROM postings
+        WHERE ${indexablePostingsWhereClause()}
+          AND canonical_url > $1
+        ORDER BY canonical_url ASC
+        LIMIT $2;
+      `,
+      [lastCanonicalUrl, batchSize]
+    );
+    if (result.rows.length === 0) break;
+    for (const row of result.rows) {
+      const document = toMeiliPostingDocument(row);
+      const key = remoteFacetKey(document.remote_type);
+      facet[key] = (facet[key] || 0) + 1;
+    }
+    lastCanonicalUrl = String(result.rows[result.rows.length - 1].canonical_url || "");
+  }
+  return facet;
 }
 
 async function getMeiliRemoteFacet(config, indexName = config.indexName) {
@@ -452,7 +466,7 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
   const settings = config.enabled ? await getMeiliSettings(config, indexName) : { skipped: true };
   const settingsValidation = config.enabled ? validateMeiliSettings(index, settings) : { ok: false, skipped: true, mismatches: [] };
   const stats = config.enabled ? await getMeiliStats(config, indexName) : { skipped: true, numberOfDocuments: 0 };
-  const postgresRemoteFacet = await getPostgresRemoteFacet(pool);
+  const postgresRemoteFacet = await getPostgresRemoteFacet(pool, options);
   const meiliRemoteFacet = config.enabled && index?.uid ? await getMeiliRemoteFacet(config, indexName) : {};
   const remoteFacetComparison = compareFacetDistributions(postgresRemoteFacet, meiliRemoteFacet);
   const samples = config.enabled && index?.uid

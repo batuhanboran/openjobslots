@@ -119,7 +119,7 @@ async function expectSearchEngineVisualContract(page) {
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
   if (viewport.width >= 768) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
-    await expect(page.getByText("Public v1.6.1")).toBeVisible();
+    await expect(page.getByText("Public v1.6.2")).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
     const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
     await expect(attributionLink).toBeVisible();

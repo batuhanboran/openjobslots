@@ -208,12 +208,34 @@ function makePool({ count = 1, facet = { remote: 1 }, rows = [] } = {}) {
   let selectCalls = 0;
   const pool = {
     queries: [],
-    async query(sql) {
+    async query(sql, params = []) {
       const queryText = String(sql || "");
       this.queries.push(queryText);
       if (/pg_try_advisory_lock/i.test(queryText)) return { rows: [{ locked: true }] };
       if (/pg_advisory_unlock/i.test(queryText)) return { rows: [{ unlocked: true }] };
       if (/UPDATE search_index_outbox/i.test(queryText)) return { rowCount: 0, rows: [] };
+      if (/meili_remote_facet/i.test(queryText)) {
+        const lastCanonicalUrl = String(params?.[0] || "");
+        const limit = Math.max(1, Number(params?.[1] || 1000));
+        const facetRows = [];
+        const facetEntries = Object.entries(facet || {}).sort(([left], [right]) => left.localeCompare(right));
+        for (const [remoteType, countValue] of facetEntries) {
+          for (let index = 0; index < Number(countValue || 0); index += 1) {
+            const canonicalUrl = `https://example.com/jobs/${remoteType}-${String(index).padStart(8, "0")}`;
+            if (canonicalUrl <= lastCanonicalUrl) continue;
+            facetRows.push(posting({
+              canonical_url: canonicalUrl,
+              remote_type: remoteType,
+              location_text: remoteType === "onsite" ? "Istanbul, Turkey" : "",
+              city: remoteType === "onsite" ? "Istanbul" : "",
+              country: remoteType === "onsite" ? "Turkey" : "",
+              region: remoteType === "onsite" ? "EMEA" : ""
+            }));
+            if (facetRows.length >= limit) return { rows: facetRows };
+          }
+        }
+        return { rows: facetRows };
+      }
       if (/GROUP BY 1/i.test(queryText)) {
         return { rows: Object.entries(facet).map(([remote_type, value]) => ({ remote_type, count: value })) };
       }

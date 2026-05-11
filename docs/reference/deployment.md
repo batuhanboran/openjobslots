@@ -142,3 +142,62 @@ Release scope:
 - Safe Meili replace-mode reindex checks.
 
 This deployment does not apply production data backfill, does not apply production detail-refetch writes, and does not run a production Meili replace reindex.
+
+## v1.6.2 Deployment Note - May 11, 2026
+
+Deployed version: `v1.6.2`.
+
+Production backups used during the guarded repair cycle:
+
+- `/root/OpenJobSlots/backups/postgres-openjobslots-pre-safe-backfill-20260511T134757Z.dump`
+- `/root/OpenJobSlots/backups/postgres-openjobslots-pre-icims-refetch-20260511T143123Z.dump`
+- `/root/OpenJobSlots/backups/postgres-openjobslots-pre-applitrack-refetch-20260511T152424Z.dump`
+- `/root/OpenJobSlots/backups/postgres-openjobslots-pre-ats-gap-repair-20260511T153524Z.dump`
+
+Production repair run ids:
+
+- Existing-evidence safe backfill: `geo-remote-1778316380890-8c4fe406`
+- iCIMS detail refetch: `detail-refetch-1778510197418-e8ac10d8`
+- Applitrack detail refetch: `detail-refetch-1778513106495-94ce31bb`, `detail-refetch-1778513243719-53235def`
+- Manatal/source gap repair: `geo-remote-1778513767362-f270034e`
+
+Final report paths:
+
+- `/root/OpenJobSlots/reports/data-quality-before-final-meili-reindex-20260511T183424Z.json`
+- `/root/OpenJobSlots/reports/meili-check-before-final-reindex-20260511T183424Z.json`
+- `/root/OpenJobSlots/reports/meili-replace-final-reindex-20260511T183424Z.json`
+- `/root/OpenJobSlots/reports/meili-check-after-final-reindex-20260511T183424Z.json`
+- `/root/OpenJobSlots/reports/data-quality-final-after-meili-reindex-20260511T183424Z.json`
+
+Validation run before release metadata deployment:
+
+- `npm.cmd run test:backend`
+
+Live endpoints checked after final reindex:
+
+- `/health`
+- `/postings/filter-options`
+- `/sync/status`
+- `/ingestion/status`
+- `/ingestion/quality/summary`
+- `/ingestion/parser-stats`
+- `/postings?search=turkish%20jobs`
+- `/postings?search=t%C3%BCrkiye`
+- `/postings?search=turkiye`
+- `/postings?search=remote%20jobs`
+
+Final data/search state:
+
+- Visible postings: `737,433`.
+- Postgres indexable postings: `737,427`.
+- Meilisearch documents: `737,427`.
+- Meili/Postgres count delta: `0`.
+- Meili remote facets match the Postgres-derived indexed payload distribution.
+- Missing country improved from `310,154` to `306,410`.
+- Missing city improved from `705,133` to `554,991`.
+- Missing any normalized geo improved from `709,884` to `560,188`.
+- Missing all normalized geo improved from `305,403` to `301,213`.
+- Weak/unknown remote improved from `285,715` to `283,989`.
+- Missing all geo plus weak/unknown remote improved from `266,010` to `262,542`.
+
+The final replace-mode Meili reindex used a temp index, validated document count and remote facets before swap, and did not delete the live index before validation passed.
