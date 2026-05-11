@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../../backends/postgres");
+const { acquireHeavyJobLock } = require("../../backends/heavyJobLock");
 const { openSqliteReadOnly } = require("../dataQualityAudit");
 const { buildStoredQualityFields, parseQualityFlags } = require("../dataQuality");
 const {
@@ -1277,9 +1278,21 @@ async function runDetailRefetch(options = {}, env = process.env) {
       enabled: true,
       connectionString: env.DATABASE_URL || env.POSTGRES_URL || ""
     });
+    let heavyJobLock = null;
     try {
-      if (getSafetyGate(options).authorized) await ensurePostgresDetailRefetchSchema(pool);
-      return await runDetailRefetchWithDb(pool, "postgres", options, env);
+      const safetyGate = getSafetyGate(options);
+      if (safetyGate.authorized) {
+        heavyJobLock = await acquireHeavyJobLock(pool, "detail-refetch");
+        await ensurePostgresDetailRefetchSchema(pool);
+      }
+      const report = await runDetailRefetchWithDb(pool, "postgres", options, env);
+      if (heavyJobLock) await heavyJobLock.release("succeeded");
+      heavyJobLock = null;
+      return report;
+    } catch (error) {
+      if (heavyJobLock) await heavyJobLock.release("failed");
+      heavyJobLock = null;
+      throw error;
     } finally {
       if (!options.pool) await pool.end();
     }

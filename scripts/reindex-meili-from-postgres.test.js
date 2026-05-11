@@ -211,6 +211,8 @@ function makePool({ count = 1, facet = { remote: 1 }, rows = [] } = {}) {
     async query(sql) {
       const queryText = String(sql || "");
       this.queries.push(queryText);
+      if (/pg_try_advisory_lock/i.test(queryText)) return { rows: [{ locked: true }] };
+      if (/pg_advisory_unlock/i.test(queryText)) return { rows: [{ unlocked: true }] };
       if (/UPDATE search_index_outbox/i.test(queryText)) return { rowCount: 0, rows: [] };
       if (/GROUP BY 1/i.test(queryText)) {
         return { rows: Object.entries(facet).map(([remote_type, value]) => ({ remote_type, count: value })) };

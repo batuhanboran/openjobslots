@@ -1416,8 +1416,33 @@ async function startWorker() {
   }
 }
 
+function isRetryableStartupError(error) {
+  const code = String(error?.code || "").toUpperCase();
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    ["EAI_AGAIN", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "ECONNRESET"].includes(code) ||
+    /getaddrinfo|connect econnrefused|connection terminated|timeout|database system is starting up/.test(message)
+  );
+}
+
+async function startWorkerWithBackoff() {
+  let attempt = 0;
+  while (true) {
+    try {
+      await startWorker();
+      return;
+    } catch (error) {
+      if (!isRetryableStartupError(error)) throw error;
+      attempt += 1;
+      const delayMs = Math.min(60000, 2000 * Math.pow(2, Math.min(attempt - 1, 5)));
+      console.error(`[${WORKER_NAME}] startup dependency unavailable; retrying in ${delayMs}ms: ${error?.message || error}`);
+      await sleep(delayMs);
+    }
+  }
+}
+
 if (require.main === module) {
-  startWorker().catch((error) => {
+  startWorkerWithBackoff().catch((error) => {
     console.error(`[${WORKER_NAME}] failed:`, error);
     process.exit(1);
   });
@@ -1437,6 +1462,7 @@ module.exports = {
   selectDueTargets,
   selectPostgresDueTargets,
   startWorker,
+  startWorkerWithBackoff,
   withTransientWriteRetry,
   withWriteLock
 };
