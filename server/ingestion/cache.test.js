@@ -109,3 +109,42 @@ test("changed posting cache payload preserves first seen and updates normalized 
     await db.close();
   }
 });
+
+test("posting cache stores quarantined visibility evidence", async () => {
+  const db = await open({
+    filename: ":memory:",
+    driver: sqlite3.Database
+  });
+  try {
+    await ensureIngestionTables(db);
+    await writePostingCache(db, {
+      ats_key: "fixture",
+      company_name: "Acme",
+      position_name: "Engineer",
+      job_posting_url: "https://example.com/jobs/quarantine"
+    }, {
+      nowEpoch: 100,
+      parserVersion: "parser-v1",
+      validation: {
+        ok: false,
+        status: "quarantined",
+        error: "no_geo_unknown_remote",
+        reason_codes: ["no_geo_unknown_remote"],
+        evidence: { country: { present: false } },
+        retry_detail_refetch_eligible: true
+      }
+    });
+    const row = await db.get("SELECT validation_status, validation_error, raw_metadata FROM posting_cache WHERE canonical_url = ?;", [
+      "https://example.com/jobs/quarantine"
+    ]);
+    const metadata = JSON.parse(row.raw_metadata);
+
+    assert.equal(row.validation_status, "quarantined");
+    assert.equal(row.validation_error, "no_geo_unknown_remote");
+    assert.deepEqual(metadata.reason_codes, ["no_geo_unknown_remote"]);
+    assert.equal(metadata.retry_detail_refetch_eligible, true);
+    assert.equal(metadata.evidence.country.present, false);
+  } finally {
+    await db.close();
+  }
+});

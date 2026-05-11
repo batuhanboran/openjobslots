@@ -116,7 +116,8 @@ function getQualityFlags(posting = {}, options = {}) {
     "invalid_posted_at"
   );
   addFlag(flags, lastSeenEpoch > 0 && lastSeenEpoch < nowEpoch - STALE_CACHE_DAYS * DAY_SECONDS, "stale_cache");
-  addFlag(flags, validationStatus === "invalid" || Boolean(validationError), "rejected");
+  addFlag(flags, validationStatus === "quarantined", "quarantined");
+  addFlag(flags, validationStatus === "invalid" || validationStatus === "rejected" || Boolean(validationError), "rejected");
   addFlag(flags, Boolean(options.duplicateOf || posting.duplicate_of), "duplicate");
   addFlag(flags, Boolean(posting.hidden), "hidden");
 
@@ -129,6 +130,7 @@ function scorePostingQuality(flagsInput, posting = {}) {
     missing_title: 35,
     missing_company: 30,
     missing_url: 35,
+    quarantined: 30,
     rejected: 35,
     duplicate: 20,
     invalid_posted_at: 25,
@@ -169,7 +171,9 @@ function buildQualityMetadata(posting = {}, options = {}) {
   const firstSeenEpoch = asNumber(posting.first_seen_epoch, 0);
   const cacheState =
     asString(posting.cache_state) ||
-    (asString(posting.validation_status) === "invalid"
+    (asString(posting.validation_status) === "quarantined"
+      ? "quarantined"
+      : asString(posting.validation_status) === "invalid"
       ? "rejected"
       : asString(posting.raw_payload_hash || posting.raw_hash)
         ? "cached"

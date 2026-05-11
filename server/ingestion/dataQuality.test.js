@@ -86,3 +86,26 @@ test("stored quality fields serialize stable flags", () => {
     "weak_remote_classification"
   ]);
 });
+
+test("quality metadata exposes quarantined cache state", () => {
+  const metadata = buildQualityMetadata(
+    {
+      canonical_url: "https://example.test/jobs/quarantine",
+      company_name: "Example",
+      position_name: "Support Engineer",
+      ats_key: "fixture",
+      validation_status: "quarantined",
+      validation_error: "no_geo_unknown_remote",
+      remote_type: "unknown",
+      parser_version: "fixture-v1",
+      confidence: 0.7
+    },
+    { nowEpoch: 1778198400 }
+  );
+
+  assert.equal(metadata.cache_state, "quarantined");
+  assert.ok(metadata.quality_flags.includes("quarantined"));
+  assert.ok(metadata.quality_flags.includes("rejected"));
+  assert.equal(metadata.rejection_reason, "no_geo_unknown_remote");
+  assert.ok(metadata.quality_score < 100);
+});

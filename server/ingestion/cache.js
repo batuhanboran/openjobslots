@@ -24,7 +24,7 @@ async function writePostingCache(db, posting, options = {}) {
   const parserVersion = String(options.parserVersion || "unknown");
   const sourceCompanyUrl = String(options.sourceCompanyUrl || "").trim();
   const validation = options.validation || { ok: true, error: "" };
-  const validationStatus = validation.ok ? "valid" : "invalid";
+  const validationStatus = String(validation.status || (validation.ok ? "valid" : "invalid"));
   const validationError = String(validation.error || "");
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
   const rawPayloadHash = hashPayload(posting || {});
@@ -133,7 +133,11 @@ async function writePostingCache(db, posting, options = {}) {
       validationError,
       JSON.stringify({
         source_company_url: sourceCompanyUrl,
-        parser_version: parserVersion
+        parser_version: parserVersion,
+        visibility_status: validationStatus,
+        reason_codes: Array.isArray(validation.reason_codes) ? validation.reason_codes : [],
+        retry_detail_refetch_eligible: Boolean(validation.retry_detail_refetch_eligible),
+        evidence: validation.evidence || options.evidence || null
       })
     ]
   );

@@ -10,6 +10,7 @@ const {
 const { getAdapterForCompany } = require("./adapters");
 const { hashPayload, writePostingCache } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
+const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
 const { DEFAULT_TTL_SECONDS, ensureIngestionTables, seedAtsSources } = require("./schema");
 const {
   createPostgresPool,
@@ -152,6 +153,9 @@ function classifyIngestionError(error, fallback = "fetch") {
   const explicit = String(error?.ingestionErrorType || error?.errorType || "").trim();
   if (explicit) return explicit;
   const message = String(error?.message || error || "").toLowerCase();
+  if (message.includes("no_geo_unknown_remote") || message.includes("ambiguous_geo") || message.includes("weak_remote_evidence")) {
+    return "parser_quarantine";
+  }
   if (message.includes("placeholder company_name")) return "source_discovery";
   if (message.includes("missing ") || message.includes("placeholder ") || message.includes("invalid job_posting_url")) {
     return "parser_validation";
@@ -190,6 +194,7 @@ function createRunCounters() {
     cacheWriteCount: 0,
     postingUpsertCount: 0,
     rejectedCount: 0,
+    quarantinedCount: 0,
     duplicateCount: 0,
     dbBusyCount: 0,
     httpStatusCounts: {},
@@ -206,6 +211,28 @@ function dedupeValidPosting(posting, seenCanonicalUrls, counters) {
   }
   seenCanonicalUrls.add(canonicalUrl);
   return true;
+}
+
+function evaluateIngestionVisibility(posting, validation, parserVersion) {
+  if (!validation?.ok) {
+    return {
+      gate: null,
+      validation,
+      publicPosting: false
+    };
+  }
+  const gate = evaluatePublicPosting(
+    {
+      ...posting,
+      parser_version: posting?.parser_version || parserVersion
+    },
+    { parserVersion }
+  );
+  return {
+    gate,
+    validation: validationFromGate(gate),
+    publicPosting: gate.status === "accepted"
+  };
 }
 
 async function loadAtsSourceSettings(db) {
@@ -505,22 +532,26 @@ async function processTarget(db, runId, target, counters) {
         await recordRunError(db, runId, target, error, null, "parser_normalize");
         continue;
       }
-      const validation = target.adapter.validate(normalized);
+      const adapterValidation = target.adapter.validate(normalized);
+      const visibility = evaluateIngestionVisibility(normalized, adapterValidation, target.adapter.parserVersion);
+      const validation = visibility.validation;
       const cacheResult = await withWriteLock(() => writePostingCache(db, normalized, {
         nowEpoch,
         parserVersion: target.adapter.parserVersion,
         sourceCompanyUrl: target.companyUrl,
-        validation
+        validation,
+        evidence: visibility.gate?.evidence || null
       }), {
         onBusyRetry: () => incrementDbBusyCount(counters)
       });
       if (cacheResult.cached && cacheResult.changed) counters.cacheWriteCount += 1;
       if (cacheResult.cached && !cacheResult.changed) counters.cacheHitCount += 1;
-      if (validation.ok) {
+      if (visibility.publicPosting) {
         if (dedupeValidPosting(normalized, seenCanonicalUrls, counters)) {
           validPostings.push(normalized);
         }
       } else {
+        if (validation.status === "quarantined") counters.quarantinedCount += 1;
         counters.rejectedCount += 1;
         await recordRunError(db, runId, target, new Error(validation.error), null, classifyIngestionError(validation.error, "parser_validation"));
       }
@@ -844,7 +875,7 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
   const rawPayloadHash = hashPayload(posting || {});
   if (!canonicalUrl) return { cached: false, changed: false, hash: rawPayloadHash };
-  const validationStatus = validation.ok ? "valid" : "invalid";
+  const validationStatus = String(validation.status || (validation.ok ? "valid" : "invalid"));
   const validationError = String(validation.error || "");
   const quality = buildStoredQualityFields(
     {
@@ -987,7 +1018,11 @@ async function writePostgresPostingCache(pool, posting, options = {}) {
       validationError,
       JSON.stringify({
         source_company_url: sourceCompanyUrl,
-        parser_version: parserVersion
+        parser_version: parserVersion,
+        visibility_status: validationStatus,
+        reason_codes: Array.isArray(validation.reason_codes) ? validation.reason_codes : [],
+        retry_detail_refetch_eligible: Boolean(validation.retry_detail_refetch_eligible),
+        evidence: validation.evidence || options.evidence || null
       })
     ]
   );
@@ -1110,20 +1145,24 @@ async function processPostgresTarget(pool, runId, target, counters) {
         await recordPostgresRunError(pool, runId, target, error, null, "parser_normalize");
         continue;
       }
-      const validation = target.adapter.validate(normalized);
+      const adapterValidation = target.adapter.validate(normalized);
+      const visibility = evaluateIngestionVisibility(normalized, adapterValidation, target.adapter.parserVersion);
+      const validation = visibility.validation;
       const cacheResult = await writePostgresPostingCache(pool, normalized, {
         nowEpoch,
         parserVersion: target.adapter.parserVersion,
         sourceCompanyUrl: target.companyUrl,
-        validation
+        validation,
+        evidence: visibility.gate?.evidence || null
       });
       if (cacheResult.cached && cacheResult.changed) counters.cacheWriteCount += 1;
       if (cacheResult.cached && !cacheResult.changed) counters.cacheHitCount += 1;
-      if (validation.ok) {
+      if (visibility.publicPosting) {
         if (dedupeValidPosting(normalized, seenCanonicalUrls, counters)) {
           validPostings.push(normalized);
         }
       } else {
+        if (validation.status === "quarantined") counters.quarantinedCount += 1;
         counters.rejectedCount += 1;
         await recordPostgresRunError(pool, runId, target, new Error(validation.error), null, classifyIngestionError(validation.error, "parser_validation"));
       }

@@ -21,6 +21,7 @@ const {
   normalizeRemoteTypeFromEvidence,
   validatePosting
 } = require("../ingestion/posting");
+const { evaluatePublicPosting } = require("../ingestion/publicPostingGate");
 
 const DAY_SECONDS = 24 * 60 * 60;
 
@@ -1062,10 +1063,106 @@ async function getPostgresPostingDiagnostics(pool, options = {}) {
 }
 
 async function getPostgresQualitySummary(pool, limit = 100) {
-  const audit = await getPostgresQualityAudit(pool, { limit });
+  const [audit, visibility] = await Promise.all([
+    getPostgresQualityAudit(pool, { limit }),
+    getPostgresCacheVisibilitySummary(pool, limit)
+  ]);
   return {
     ...makeQualitySummary(audit.by_source, audit.summary),
-    by_parser: audit.by_parser
+    by_parser: audit.by_parser,
+    visibility
+  };
+}
+
+async function getPostgresCacheVisibilitySummary(pool, limit = 100) {
+  const cappedLimit = Math.max(1, Math.min(1000, Number(limit || 100)));
+  const [statusResult, reasonResult, sourceResult, parserResult, parserReasonResult] = await Promise.all([
+    pool.query(`
+      SELECT COALESCE(NULLIF(btrim(validation_status), ''), 'unknown') AS status, COUNT(*)::bigint AS count
+      FROM posting_cache
+      GROUP BY status
+      ORDER BY count DESC, status ASC;
+    `),
+    pool.query(`
+      SELECT
+        COALESCE(NULLIF(btrim(validation_error), ''), COALESCE(NULLIF(btrim(rejection_reason), ''), 'unknown')) AS reason,
+        COUNT(*)::bigint AS count
+      FROM posting_cache
+      WHERE validation_status = 'quarantined'
+      GROUP BY reason
+      ORDER BY count DESC, reason ASC
+      LIMIT $1;
+    `, [cappedLimit]),
+    pool.query(`
+      SELECT
+        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS source_ats,
+        COUNT(*) FILTER (WHERE validation_status = 'valid')::bigint AS accepted_count,
+        COUNT(*) FILTER (WHERE validation_status = 'quarantined')::bigint AS quarantined_count,
+        COUNT(*) FILTER (WHERE COALESCE(validation_status, '') NOT IN ('valid', 'quarantined'))::bigint AS rejected_count
+      FROM posting_cache
+      GROUP BY source_ats
+      ORDER BY quarantined_count DESC, rejected_count DESC, source_ats ASC
+      LIMIT $1;
+    `, [cappedLimit]),
+    pool.query(`
+      SELECT
+        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS source_ats,
+        COALESCE(NULLIF(btrim(parser_version), ''), 'unknown') AS parser_version,
+        COUNT(*) FILTER (WHERE validation_status = 'valid')::bigint AS accepted_count,
+        COUNT(*) FILTER (WHERE validation_status = 'quarantined')::bigint AS quarantined_count,
+        COUNT(*) FILTER (WHERE COALESCE(validation_status, '') NOT IN ('valid', 'quarantined'))::bigint AS rejected_count
+      FROM posting_cache
+      GROUP BY source_ats, parser_version
+      ORDER BY quarantined_count DESC, rejected_count DESC, source_ats ASC, parser_version ASC
+      LIMIT $1;
+    `, [cappedLimit]),
+    pool.query(`
+      SELECT
+        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS source_ats,
+        COALESCE(NULLIF(btrim(parser_version), ''), 'unknown') AS parser_version,
+        COALESCE(NULLIF(btrim(validation_error), ''), COALESCE(NULLIF(btrim(rejection_reason), ''), 'unknown')) AS reason,
+        COUNT(*)::bigint AS count
+      FROM posting_cache
+      WHERE validation_status = 'quarantined'
+      GROUP BY source_ats, parser_version, reason
+      ORDER BY count DESC, source_ats ASC, parser_version ASC
+      LIMIT $1;
+    `, [cappedLimit])
+  ]);
+  const byStatus = {};
+  for (const row of statusResult.rows) {
+    byStatus[String(row.status || "unknown")] = Number(row.count || 0);
+  }
+  return {
+    accepted_count: Number(byStatus.valid || 0),
+    quarantined_count: Number(byStatus.quarantined || 0),
+    rejected_count: Object.entries(byStatus)
+      .filter(([status]) => status !== "valid" && status !== "quarantined")
+      .reduce((sum, [, count]) => sum + Number(count || 0), 0),
+    by_status: byStatus,
+    quarantine_by_reason: reasonResult.rows.map((row) => ({
+      reason: String(row.reason || "unknown"),
+      count: Number(row.count || 0)
+    })),
+    by_source: sourceResult.rows.map((row) => ({
+      source_ats: String(row.source_ats || "unknown"),
+      accepted_count: Number(row.accepted_count || 0),
+      quarantined_count: Number(row.quarantined_count || 0),
+      rejected_count: Number(row.rejected_count || 0)
+    })),
+    by_parser: parserResult.rows.map((row) => ({
+      source_ats: String(row.source_ats || "unknown"),
+      parser_version: String(row.parser_version || "unknown"),
+      accepted_count: Number(row.accepted_count || 0),
+      quarantined_count: Number(row.quarantined_count || 0),
+      rejected_count: Number(row.rejected_count || 0)
+    })),
+    quarantine_reasons_by_parser: parserReasonResult.rows.map((row) => ({
+      source_ats: String(row.source_ats || "unknown"),
+      parser_version: String(row.parser_version || "unknown"),
+      reason: String(row.reason || "unknown"),
+      count: Number(row.count || 0)
+    }))
   };
 }
 
@@ -1106,16 +1203,51 @@ async function listPostgresRejections(pool, limit = 50) {
 }
 
 async function getPostgresParserStats(pool, limit = 100) {
-  const [audit, attention] = await Promise.all([
+  const [audit, attention, visibility] = await Promise.all([
     getPostgresQualityAudit(pool, { limit }),
-    getPostgresParserAttentionByAts(pool, limit)
+    getPostgresParserAttentionByAts(pool, limit),
+    getPostgresCacheVisibilitySummary(pool, limit)
   ]);
   const attentionByAts = new Map(attention.map((item) => [String(item.ats_key || ""), item]));
-  return audit.by_parser.map((item) => {
+  const visibilityByParser = new Map((visibility.by_parser || []).map((item) => [
+    `${item.source_ats}\u0000${item.parser_version}`,
+    item
+  ]));
+  const reasonsByParser = new Map();
+  for (const item of visibility.quarantine_reasons_by_parser || []) {
+    const key = `${item.source_ats}\u0000${item.parser_version}`;
+    const existing = reasonsByParser.get(key) || {};
+    existing[item.reason] = Number(item.count || 0);
+    reasonsByParser.set(key, existing);
+  }
+  const rowsByKey = new Map(audit.by_parser.map((item) => [`${item.source_ats}\u0000${item.parser_version}`, item]));
+  for (const item of visibility.by_parser || []) {
+    const key = `${item.source_ats}\u0000${item.parser_version}`;
+    if (!rowsByKey.has(key)) {
+      rowsByKey.set(key, {
+        source_ats: item.source_ats,
+        ats_key: item.source_ats,
+        parser_key: item.parser_version,
+        parser_version: item.parser_version,
+        total_visible_rows: 0,
+        total_postings: 0,
+        avg_quality_score: 0,
+        low_quality_count: 0,
+        quality_flag_counts: {},
+        flag_counts: {}
+      });
+    }
+  }
+  return Array.from(rowsByKey.values()).map((item) => {
     const attentionItem = attentionByAts.get(item.source_ats || item.ats_key) || {};
+    const visibilityItem = visibilityByParser.get(`${item.source_ats}\u0000${item.parser_version}`) || {};
     return {
       ...item,
       flag_counts: item.quality_flag_counts || {},
+      accepted_count: Number(visibilityItem.accepted_count || 0),
+      quarantined_count: Number(visibilityItem.quarantined_count || 0),
+      rejected_count: Number(visibilityItem.rejected_count || item.rejection_count || 0),
+      quarantine_reasons: reasonsByParser.get(`${item.source_ats}\u0000${item.parser_version}`) || {},
       parser_attention_count_24h: Number(attentionItem.error_count || 0),
       latest_parser_error: String(attentionItem.last_error || "")
     };
@@ -1308,11 +1440,70 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         hidden: false
       };
       if (!validatePosting(normalizedPosting).ok) continue;
+      const gate = evaluatePublicPosting(
+        {
+          ...normalizedPosting,
+          parser_version: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
+          parser_confidence: Number(posting?.confidence || posting?.parser_confidence || 0.5)
+        },
+        { parserVersion: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1") }
+      );
+      if (gate.status !== "accepted") {
+        const quarantineQuality = buildStoredQualityFields(
+          {
+            ...normalizedPosting,
+            validation_status: gate.status,
+            validation_error: gate.reason,
+            parser_version: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
+            confidence: Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
+            raw_payload_hash: String(posting?.raw_hash || posting?.raw_payload_hash || "")
+          },
+          { nowEpoch }
+        );
+        const hidden = await client.query(
+          `
+            UPDATE postings
+            SET hidden = true,
+                parser_version = $2,
+                confidence = $3,
+                quality_score = $4,
+                quality_flags = $5::jsonb,
+                rejection_reason = $6,
+                updated_at = now()
+            WHERE canonical_url = $1;
+          `,
+          [
+            canonicalUrl,
+            String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
+            Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
+            quarantineQuality.quality_score,
+            quarantineQuality.quality_flags,
+            gate.reason
+          ]
+        );
+        if (Number(hidden.rowCount || 0) > 0) {
+          await client.query(
+            `
+              INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
+              VALUES ($1, 'delete', $2::jsonb, now());
+            `,
+            [
+              canonicalUrl,
+              JSON.stringify({
+                reason: "quarantined",
+                canonical_url: canonicalUrl,
+                reason_codes: gate.reason_codes || []
+              })
+            ]
+          );
+        }
+        continue;
+      }
       const quality = buildStoredQualityFields(
         {
           ...normalizedPosting,
           parser_version: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
-          confidence: Number(posting?.confidence || posting?.parser_confidence || 0.5),
+          confidence: Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
           raw_payload_hash: String(posting?.raw_hash || posting?.raw_payload_hash || "")
         },
         { nowEpoch }
@@ -1379,7 +1570,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           nowEpoch,
           nowEpoch,
           String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
-          Number(posting?.confidence || posting?.parser_confidence || 0.5),
+          Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
           quality.quality_score,
           quality.quality_flags,
           quality.rejection_reason
