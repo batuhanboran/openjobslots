@@ -17,6 +17,7 @@ const {
   parseCareerplugPostingsFromHtml,
   parseRecruiteePostingsFromPublicApp,
   extractSourceIdFromPostingUrl,
+  extractTaleoPostingsFromAjax,
   extractTaleoPostingsFromRest,
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
@@ -30,6 +31,7 @@ const {
   parseJobvitePostingsFromHtml,
   parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
+  parseManatalPostingsFromHtml,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
@@ -348,6 +350,7 @@ test("iCIMS raw detail fixtures certify ATS code locations and remote header evi
   }, fixture.company_name_for_postings);
   assert.equal(jsonLdNormalized.country, fixture.expected_jsonld.country);
   assert.equal(jsonLdNormalized.region, fixture.expected_jsonld.region);
+  assert.equal(jsonLdNormalized.city, fixture.expected_jsonld.city);
 });
 
 test("Applitrack detail fixtures recover location, date, remote evidence, and detail URL", () => {
@@ -361,6 +364,15 @@ test("Applitrack detail fixtures recover location, date, remote evidence, and de
   const detailUrl = buildApplitrackDetailUrl(fixture.site_root, parsed[0].source_job_id, parsed[0].job_posting_url);
   assert.equal(detailUrl, fixture.expected_detail_url);
 
+  const doubleQuoteParsed = parseApplitrackPostings(
+    fixture.output_html_double_quote,
+    fixture.site_root,
+    fixture.company_name_for_postings
+  );
+  assert.equal(doubleQuoteParsed.length, 1);
+  assert.equal(doubleQuoteParsed[0].source_job_id, fixture.expected_double_quote.source_job_id);
+  assert.equal(doubleQuoteParsed[0].position_name, fixture.expected_double_quote.title);
+
   const detail = extractApplitrackDetailFields(fixture.detail_html);
   const normalized = normalizeParsed("applitrack", {
     ...parsed[0],
@@ -372,6 +384,20 @@ test("Applitrack detail fixtures recover location, date, remote evidence, and de
 
   for (const [key, value] of Object.entries(fixture.expected)) {
     assert.equal(normalized[key], value, `Applitrack ${key} should match`);
+  }
+
+  const locationOnlyDetail = extractApplitrackDetailFields(fixture.detail_html_location_only);
+  const locationOnlyNormalized = normalizeParsed("applitrack", {
+    company_name: fixture.company_name_for_postings,
+    source_job_id: "5503513",
+    position_name: "Teacher - Campus Support",
+    job_posting_url: "https://www.applitrack.com/fixtureco/onlineapp/default.aspx?JobID=5503513",
+    location: locationOnlyDetail.location,
+    posting_date: locationOnlyDetail.posting_date,
+    remote_type: locationOnlyDetail.remote_type
+  }, fixture.company_name_for_postings);
+  for (const [key, value] of Object.entries(fixture.expected_location_only)) {
+    assert.equal(locationOnlyNormalized[key], value, `Applitrack location-only ${key} should match`);
   }
 
   const districtDetail = extractApplitrackDetailFields(fixture.detail_html_district_wide);
@@ -387,6 +413,31 @@ test("Applitrack detail fixtures recover location, date, remote evidence, and de
   for (const [key, value] of Object.entries(fixture.expected_district_wide)) {
     assert.equal(districtNormalized[key], value, `Applitrack district-wide ${key} should match`);
   }
+});
+
+test("Manatal HTML fallback preserves source id, geo, department, and remote evidence", () => {
+  const parsed = parseManatalPostingsFromHtml(
+    "Fixture Manatal",
+    { boardUrl: "https://www.careers-page.com/fixture-manatal/" },
+    `
+      <article class="job-card">
+        <a class="job-title-link" href="/fixture-manatal/job/HTMLHASH">
+          <h3 class="job-title">Hybrid Customer Support</h3>
+        </a>
+        <ul><li><span>Hybrid - London, United Kingdom</span></li></ul>
+      </article>
+    `
+  );
+  assert.equal(parsed.length, 1);
+  const normalized = normalizeParsed("manatal", {
+    ...parsed[0],
+    remote_type: "hybrid"
+  }, "Fixture Manatal");
+  assert.equal(normalized.source_job_id, "HTMLHASH");
+  assert.equal(normalized.country, "United Kingdom");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.city, "London");
+  assert.equal(normalized.remote_type, "hybrid");
 });
 
 test("Workday parser helpers recover source id, location, and remote evidence from CXS fields and URLs", () => {
@@ -430,6 +481,21 @@ test("Taleo REST parser scans unstable columns and rejects boolean dates", () =>
   assert.equal(normalized.country, "United Arab Emirates");
   assert.equal(normalized.region, "EMEA");
   assert.equal(normalized.posting_date, "May 8, 2026");
+});
+
+test("Taleo AJAX parser recovers id, title, location, and date from token streams", () => {
+  const parsed = extractTaleoPostingsFromAjax(
+    "Fixture Taleo",
+    { baseSectionUrl: "https://fixture.taleo.net/careersection/001", lang: "en" },
+    "200003!|!Customer Success Manager!|!!|!!|!!|!REQ-200003!|!Toronto, ON, Canada!|!!|!!|!!|!!|!!|!05/08/2026!|!!|!Apply for this position (Customer Success Manager)"
+  );
+  assert.equal(parsed.length, 1);
+  const normalized = normalizeParsed("taleo", parsed[0], "Fixture Taleo");
+  assert.equal(normalized.source_job_id, "REQ-200003");
+  assert.equal(normalized.title, "Customer Success Manager");
+  assert.equal(normalized.country, "Canada");
+  assert.equal(normalized.city, "Toronto");
+  assert.equal(normalized.posting_date, "05/08/2026");
 });
 
 test("Recruitee PublicApp parser preserves localized countries, departments, source id, and remote hints", () => {

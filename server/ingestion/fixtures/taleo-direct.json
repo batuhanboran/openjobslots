@@ -21,6 +21,16 @@
         "Full-time",
         "May 8, 2026"
       ]
+    },
+    {
+      "jobId": "146408",
+      "contestNo": "146408",
+      "column": [
+        "Remote Support Analyst",
+        "Remote - United States",
+        "Full-time",
+        "May 9, 2026"
+      ]
     }
   ],
   "expected": [
@@ -34,6 +44,18 @@
       "region": "EMEA",
       "remote_type": "onsite",
       "posting_date": "May 8, 2026",
+      "parser_confidence": 0.35
+    },
+    {
+      "ats_key": "taleo",
+      "source_job_id": "146408",
+      "company_name": "Fixture Taleo",
+      "position_name": "Remote Support Analyst",
+      "job_posting_url": "https://fixture.taleo.net/careersection/001/jobdetail.ftl?job=146408&lang=en",
+      "country": "United States",
+      "region": "North America",
+      "remote_type": "remote",
+      "posting_date": "May 9, 2026",
       "parser_confidence": 0.35
     }
   ]

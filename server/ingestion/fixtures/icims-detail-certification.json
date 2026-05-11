@@ -11,7 +11,8 @@
     "location": "Shanghai, China",
     "posting_date": "2026-02-03T05:00:00.000Z",
     "country": "China",
-    "region": "APAC"
+    "region": "APAC",
+    "city": "Shanghai"
   },
   "expected": [
     {
@@ -20,6 +21,7 @@
       "location_text": "US-PA-Philadelphia",
       "country": "United States",
       "region": "North America",
+      "city": "Philadelphia",
       "remote_type": "onsite",
       "posting_date": null,
       "posted_at_epoch": null
@@ -30,6 +32,7 @@
       "location_text": "CA-ON-Toronto",
       "country": "Canada",
       "region": "North America",
+      "city": "Toronto",
       "remote_type": "remote",
       "posting_date": null,
       "posted_at_epoch": null

@@ -325,6 +325,7 @@ function buildNormalizedFromDetail(row, detail) {
     isWeakRemoteType(row?.remote_type) && EXPLICIT_REMOTE_TYPES.has(norm(detail?.remote_type))
       ? norm(detail.remote_type)
       : clean(row?.remote_type || "unknown") || "unknown";
+  const evidenceLocation = clean(detail?.location) || clean(row.location_text);
   const normalized = normalizePosting(
     {
       ...row,
@@ -333,8 +334,8 @@ function buildNormalizedFromDetail(row, detail) {
       job_posting_url: canonicalUrlForRow(row),
       apply_url: clean(row.apply_url) || canonicalUrlForRow(row),
       source_job_id: clean(row.source_job_id) || clean(detail?.source_job_id),
-      location_text: clean(row.location_text) || clean(detail?.location),
-      location: clean(row.location_text) || clean(detail?.location),
+      location_text: evidenceLocation,
+      location: evidenceLocation,
       posting_date: clean(row.posting_date) || clean(detail?.posting_date),
       remote_type: nextRemote,
       department: clean(row.department) || clean(detail?.department)
@@ -419,6 +420,7 @@ function canApplyDetailPlan(plan) {
     if (!WRITABLE_FIELDS.includes(item.field)) return false;
     if (["location_text", "country", "region", "city", "source_job_id", "posting_date", "department"].includes(item.field) && clean(item.before)) return false;
     if (item.field === "city" && !clean(item.after)) return false;
+    if (item.field === "city" && /^[A-Z]{2,3}[-\s][A-Z]{2,3}[-\s]/.test(clean(item.after))) return false;
     if (item.field === "remote_type" && (!EXPLICIT_REMOTE_TYPES.has(norm(item.after)) || EXPLICIT_REMOTE_TYPES.has(norm(item.before)))) return false;
     if (item.field === "posted_at_epoch" && Number(item.before || 0) > 0) return false;
   }

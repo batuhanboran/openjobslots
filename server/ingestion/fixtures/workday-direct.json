@@ -18,6 +18,17 @@
         "postedOn": "Posted Today",
         "locationsText": "MI HMMI Empl Work From Home",
         "remoteType": "Work From Home"
+      },
+      {
+        "jobId": "JR20001",
+        "title": "Hybrid Finance Analyst",
+        "externalPath": "/job/London-United-Kingdom/Hybrid-Finance-Analyst_JR20001",
+        "postedOnDate": "2026-05-08",
+        "location": {
+          "city": "London",
+          "countryName": "United Kingdom"
+        },
+        "workplaceType": "Hybrid"
       }
     ]
   },
@@ -32,6 +43,19 @@
       "region": "North America",
       "remote_type": "remote",
       "posting_date": "Posted Today",
+      "parser_confidence": 0.75
+    },
+    {
+      "ats_key": "workday",
+      "source_job_id": "JR20001",
+      "company_name": "Fixture Workday",
+      "position_name": "Hybrid Finance Analyst",
+      "job_posting_url": "https://fixture.wd1.myworkdayjobs.com/Careers/job/London-United-Kingdom/Hybrid-Finance-Analyst_JR20001",
+      "country": "United Kingdom",
+      "region": "EMEA",
+      "city": "London",
+      "remote_type": "hybrid",
+      "posting_date": "2026-05-08",
       "parser_confidence": 0.75
     }
   ]

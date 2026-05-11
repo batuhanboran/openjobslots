@@ -2848,6 +2848,7 @@ function shouldStorePostingByDate(postingDate, referenceEpoch = nowEpochSeconds(
 
 function buildJobUrl(companyBaseUrl, externalPath) {
   if (typeof externalPath !== "string" || !externalPath.trim()) return "";
+  if (/^https?:\/\//i.test(externalPath.trim())) return externalPath.trim();
   const normalizedPath = externalPath.startsWith("/") ? externalPath : `/${externalPath}`;
   return `${companyBaseUrl}${normalizedPath}`;
 }
@@ -2886,20 +2887,22 @@ function inferWorkdayLocationFromJobUrl(jobPostingUrl) {
 
 function extractWorkdaySourceJobId(posting, jobPostingUrl) {
   const source = posting && typeof posting === "object" ? posting : {};
+  const externalPath = String(source?.externalPath || "").trim();
+  const fromExternalPath = externalPath.match(/_([A-Za-z0-9-]+)$/)?.[1] || "";
+  if (fromExternalPath && /^(?:jr|req|r)-?[a-z0-9-]+$/i.test(fromExternalPath)) return fromExternalPath;
+
   const direct = String(
-    source?.id ||
-      source?.jobId ||
-      source?.jobID ||
+    source?.jobRequisitionId ||
       source?.jobReqId ||
-      source?.jobRequisitionId ||
       source?.requisitionId ||
       source?.requisition_id ||
+      source?.jobId ||
+      source?.jobID ||
+      source?.id ||
       ""
   ).trim();
   if (direct) return direct;
 
-  const externalPath = String(source?.externalPath || "").trim();
-  const fromExternalPath = externalPath.match(/_([A-Za-z0-9-]+)$/)?.[1] || "";
   if (fromExternalPath) return fromExternalPath;
 
   try {
@@ -3011,6 +3014,27 @@ function collectWorkdayLocationValues(posting, jobPostingUrl) {
 function extractWorkdayLocationLabel(posting, jobPostingUrl) {
   const values = collectWorkdayLocationValues(posting, jobPostingUrl);
   return values.length > 0 ? values.join(" / ") : null;
+}
+
+function extractWorkdayStructuredLocation(posting) {
+  const source = posting && typeof posting === "object" ? posting : {};
+  const candidates = [
+    source.primaryLocation,
+    source.location,
+    Array.isArray(source.locations) ? source.locations[0] : source.locations,
+    source.jobLocation
+  ];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const city = String(candidate.city || "").trim();
+    const state = String(candidate.state || candidate.region || candidate.province || "").trim();
+    const country = String(candidate.country || candidate.countryName || "").trim();
+    const label = String(candidate.descriptor || candidate.displayName || candidate.locationName || candidate.name || "").trim();
+    if (city || state || country || label) {
+      return { city, state, country, label };
+    }
+  }
+  return { city: "", state: "", country: "", label: "" };
 }
 
 function extractWorkdayRemoteSignal(posting, jobPostingUrl) {
@@ -4562,6 +4586,21 @@ function buildTaleoAjaxPayload(lang = "en", csrfToken = "") {
 }
 
 function extractTaleoLocationLabel(value) {
+  if (Array.isArray(value)) {
+    const normalized = value.map((item) => extractTaleoLocationLabel(item)).filter(Boolean);
+    return normalized.length > 0 ? normalized.join(" / ") : null;
+  }
+  if (value && typeof value === "object") {
+    return extractTaleoLocationLabel(
+      value.label ||
+      value.name ||
+      value.text ||
+      value.value ||
+      value.descriptor ||
+      value.displayName ||
+      ""
+    );
+  }
   const text = String(value || "").trim();
   if (!text) return null;
 
@@ -4577,7 +4616,7 @@ function extractTaleoLocationLabel(value) {
     }
   }
 
-  return text;
+  return cleanIcimsText(text);
 }
 
 function isBooleanLikeTaleoValue(value) {
@@ -4588,6 +4627,8 @@ function isLikelyTaleoDateValue(value) {
   const text = String(value || "").trim();
   if (!text || isBooleanLikeTaleoValue(text)) return false;
   if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text)) return true;
+  if (/^\d{1,2}[-.](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*[-.]\d{2,4}$/i.test(text)) return true;
+  if (/^\d{1,2}[./]\d{1,2}[./]\d{4}$/.test(text)) return true;
   if (/^\d{4}-\d{2}-\d{2}/.test(text)) return true;
   if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b/i.test(text)) return true;
   if (/^(?:posted\s+)?(?:today|yesterday)$/i.test(text)) return true;
@@ -4599,7 +4640,9 @@ function isLikelyTaleoLocationValue(value) {
   const text = extractTaleoLocationLabel(value);
   if (!text || isBooleanLikeTaleoValue(text) || isLikelyTaleoDateValue(text)) return false;
   if (normalizeCountryFromLocation(text)) return true;
-  if (/\b(remote|hybrid|onsite|on-site|work from home|telework|virtual)\b/i.test(text)) return true;
+  if (/^(?:remote|hybrid|onsite|on-site|work from home|telework|virtual)$/i.test(text)) return true;
+  if (/^(?:remote|hybrid|onsite|on-site|work from home|telework|virtual)\s*[-,]\s+\S+/i.test(text)) return true;
+  if (/\S+\s*[-,]\s*(?:remote|hybrid|onsite|on-site|work from home|telework|virtual)$/i.test(text)) return true;
   if (/\b[A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\b/.test(text)) return true;
   return false;
 }
@@ -4622,6 +4665,26 @@ function pickTaleoLocation(columns, title = "") {
   return null;
 }
 
+function pickTaleoTitle(requisition, columns) {
+  const direct = String(
+    requisition?.title ||
+    requisition?.jobTitle ||
+    requisition?.requisitionTitle ||
+    requisition?.jobName ||
+    requisition?.name ||
+    ""
+  ).trim();
+  if (direct) return direct;
+
+  for (const value of columns) {
+    const text = cleanIcimsText(value);
+    if (!text || isBooleanLikeTaleoValue(text) || isLikelyTaleoDateValue(text) || isLikelyTaleoLocationValue(text)) continue;
+    if (/^(?:full[- ]?time|part[- ]?time|regular|temporary|contract|internship)$/i.test(text)) continue;
+    return text;
+  }
+  return "";
+}
+
 function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitions) {
   const items = Array.isArray(requisitions) ? requisitions : [];
   const postings = [];
@@ -4631,7 +4694,7 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
     if (!jobId) continue;
 
     const columns = Array.isArray(requisition?.column) ? requisition.column : [];
-    const title = String(columns[0] || "").trim() || "Untitled Position";
+    const title = pickTaleoTitle(requisition, columns) || "Untitled Position";
     const location = pickTaleoLocation(columns, title);
     const postingDate = pickTaleoDate(columns);
     const contestNo = String(requisition?.contestNo || "").trim();
@@ -5598,10 +5661,12 @@ function parseManatalPostingsFromHtml(companyNameForPostings, config, pageHtml) 
     const location = cleanManatalText(cardHtml.match(/<li[^>]*>[\s\S]*?<span>\s*([\s\S]*?)\s*<\/span>\s*<\/li>/i)?.[1] || "");
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(jobUrl, "manatal"),
       position_name: title || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: null,
       location: location || null,
+      remote_type: normalizeExplicitRemoteValue([title, location].filter(Boolean).join(" ")) || null,
       department: null
     });
     seenUrls.add(jobUrl);
@@ -5647,10 +5712,12 @@ function parseManatalPostingsFromHtml(companyNameForPostings, config, pageHtml) 
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(jobUrl, "manatal"),
       position_name: title || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: null,
       location: location || null,
+      remote_type: normalizeExplicitRemoteValue([title, location].filter(Boolean).join(" ")) || null,
       department: department || null
     });
     seenUrls.add(jobUrl);
@@ -8327,6 +8394,7 @@ function normalizeExplicitRemoteValue(value) {
   const raw = cleanIcimsText(value);
   const normalized = normalizeSearchText(raw);
   if (!normalized) return null;
+  if (/\b(not|non|no)\s+(?:a\s+)?(?:remote|hybrid|telework|work from home|wfh)\b/.test(normalized)) return "onsite";
   if (/^(yes|true|y|1)$/.test(normalized)) return "remote";
   if (/^(no|false|n|0)$/.test(normalized)) return "onsite";
   if (/\bhybrid\b/.test(normalized)) return "hybrid";
@@ -10446,6 +10514,7 @@ function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
   for (const posting of postings) {
     const jobUrl = buildJobUrl(config?.companyBaseUrl, posting?.externalPath);
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
+    const structuredLocation = extractWorkdayStructuredLocation(posting);
 
     collected.push({
       company_name: companyName,
@@ -10464,6 +10533,9 @@ function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
             ""
         ).trim() || null,
       location: extractWorkdayLocationLabel(posting, jobUrl),
+      city: structuredLocation.city || null,
+      state: structuredLocation.state || null,
+      country: structuredLocation.country || null,
       workplaceType: extractWorkdayRemoteSignal(posting, jobUrl)
     });
     seenUrls.add(jobUrl);
@@ -10773,7 +10845,11 @@ async function collectPostingsForIcimsCompany(company) {
       seenPostingUrls.add(postingUrl);
       if (
         detailFetches < ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY &&
-        (!String(posting?.location || "").trim() || !String(posting?.posting_date || "").trim())
+        (
+          !String(posting?.location || "").trim() ||
+          !String(posting?.posting_date || "").trim() ||
+          !String(posting?.remote_type || "").trim()
+        )
       ) {
         try {
           const detailHtml = await fetchIcimsPage(postingUrl);
@@ -11072,9 +11148,13 @@ function normalizeApplitrackUrl(url) {
 
   const base = `${parsed.protocol}//${parsed.host}`;
   const pathValue = String(parsed.pathname || "/");
-  const rootPath = pathValue.endsWith("default.aspx")
-    ? pathValue.slice(0, -1 * "default.aspx".length)
-    : pathValue;
+  const lowerPath = pathValue.toLowerCase();
+  const onlineAppIndex = lowerPath.indexOf("/onlineapp/");
+  const rootPath = onlineAppIndex >= 0
+    ? pathValue.slice(0, onlineAppIndex + "/onlineapp/".length)
+    : pathValue.endsWith("default.aspx")
+      ? pathValue.slice(0, -1 * "default.aspx".length)
+      : pathValue;
   const normalizedRootPath = rootPath.endsWith("/") ? rootPath : `${rootPath}/`;
   return `${base}${normalizedRootPath}`;
 }
@@ -11083,7 +11163,7 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   const page = String(outputHtml || "").replace(/\\'/g, "'");
   const postings = [];
   const seenIds = new Set();
-  const applyPattern = /applyFor\(\s*'(?<job_id>\d+)'\s*,\s*'(?<category>[^']*)'\s*,\s*'(?<specialty>[^']*)'\s*\)/gi;
+  const applyPattern = /applyFor\(\s*["'](\d+)["']\s*,\s*["']([^"']*)["']\s*,\s*["']([^"']*)["'][^)]*\)/gi;
   let match = applyPattern.exec(page);
 
   const extractRowContext = (matchIndex) => {
@@ -11122,15 +11202,14 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   };
 
   while (match) {
-    const groups = match.groups || {};
-    const jobId = cleanSmartRecruitersText(groups.job_id);
+    const jobId = cleanSmartRecruitersText(match[1]);
     if (!jobId || seenIds.has(jobId)) {
       match = applyPattern.exec(page);
       continue;
     }
 
-    const category = cleanSmartRecruitersText(groups.category);
-    const specialty = cleanSmartRecruitersText(groups.specialty);
+    const category = cleanSmartRecruitersText(match[2]);
+    const specialty = cleanSmartRecruitersText(match[3]);
     const title = [category, specialty].filter(Boolean).join(" - ") || `Job ${jobId}`;
     const jobUrl = new URL(`default.aspx?JobID=${encodeURIComponent(jobId)}`, siteRoot).toString();
     const rowContext = extractRowContext(Number(match.index || 0));
@@ -11179,6 +11258,10 @@ function extractApplitrackDetailFields(detailHtml) {
     "Campus",
     "Work Location",
     "Job Location",
+    "Location(s)",
+    "Building",
+    "Worksite",
+    "Assignment Location",
     "Closing Date",
     "Position Type",
     "Category",
@@ -11192,7 +11275,8 @@ function extractApplitrackDetailFields(detailHtml) {
     .replace(/\s*&nbsp;\s*/gi, " ")
     .trim();
   const pickLabel = (labels) => {
-    const labelPattern = labels.map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const sortedLabels = [...labels].sort((left, right) => String(right || "").length - String(left || "").length);
+    const labelPattern = sortedLabels.map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
     if (!labelPattern) return null;
     const stopPattern = stopLabels
       .filter((label) => !labels.includes(label))
@@ -11213,7 +11297,7 @@ function extractApplitrackDetailFields(detailHtml) {
     const match = text.match(/\b([A-Z][A-Za-z .'-]+,\s*(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\s+\d{5})\b/);
     return match?.[1] ? cleanDetailValue(match[1]) : null;
   };
-  const rawLocation = pickLabel(["Location", "School", "Site", "Campus", "Work Location", "Job Location"]);
+  const rawLocation = pickLabel(["Location", "Location(s)", "School", "Site", "Campus", "Building", "Worksite", "Assignment Location", "Work Location", "Job Location"]);
   const genericLocation = /^(district\s*wide|various|multiple|tbd|n\/a|to be determined)$/i.test(cleanDetailValue(rawLocation));
   const footerAddress = extractFooterAddressLocation();
 
@@ -17732,6 +17816,7 @@ module.exports = {
   extractIcimsRemoteTypeFromHtml,
   extractSourceIdFromPostingUrl,
   extractTaleoPostingsFromRest,
+  extractTaleoPostingsFromAjax,
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
   parseAdpWorkforcenowPostingsFromApi,
@@ -17750,6 +17835,7 @@ module.exports = {
   parseJobvitePostingsFromHtml,
   parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
+  parseManatalPostingsFromHtml,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,

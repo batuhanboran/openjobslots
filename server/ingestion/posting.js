@@ -496,9 +496,17 @@ function extractCityText(posting, location, country) {
 
   const locationText = normalizePostingValue(location);
   if (!locationText || /^(remote|worldwide|anywhere)$/i.test(locationText)) return "";
-  const firstSegment = locationText.split(/\s*,\s*|\s+-\s+|\s+\|\s+/)[0]?.trim() || "";
+  const atsCodeCity = extractCityFromAtsCodeLocation(locationText);
+  if (atsCodeCity) return atsCodeCity;
+  const locationWithoutModePrefix = locationText.replace(
+    /^(?:remote|hybrid|onsite|on[- ]?site|work from home|wfh|virtual|telework)\s*[-:,]\s*/i,
+    ""
+  );
+  const firstSegment = locationWithoutModePrefix.split(/\s*,\s*|\s+-\s+|\s+\|\s+/)[0]?.trim() || "";
   if (!firstSegment || firstSegment.length > 80) return "";
   if (/^(remote|hybrid|onsite|on[- ]?site|work from home|wfh|worldwide|anywhere)$/i.test(firstSegment)) return "";
+  if (/\b(?:work from home|home based|remote|hybrid)\b/i.test(firstSegment)) return "";
+  if (/^[A-Z]{2}\s+[A-Z0-9]{2,}\s+.*\bwork from home\b/i.test(firstSegment)) return "";
   if (/^\(?\s*(multiple|various|several|all)\s+(locations|states|sites|schools|campuses)\s*\)?$/i.test(firstSegment)) return "";
   if (/^(district[- ]?wide|statewide|nationwide|tbd|n\/?a|unknown)$/i.test(firstSegment)) return "";
   const normalizedFirst = normalizeSearchText(firstSegment);
@@ -506,6 +514,16 @@ function extractCityText(posting, location, country) {
   if (normalizedCountry && normalizedFirst === normalizedCountry) return "";
   if (COUNTRY_ALIASES[normalizedFirst]) return "";
   return firstSegment;
+}
+
+function extractCityFromAtsCodeLocation(value) {
+  const location = normalizePostingValue(value);
+  const match = location.match(/^([A-Z]{2,3})[-\s]([A-Z]{2,3})[-\s](.+)$/i);
+  if (!match?.[1] || !match?.[3]) return "";
+  if (!normalizeCountryFromAtsCodeLocation(location)) return "";
+  const city = normalizePostingValue(match[3]).replace(/[-_]+/g, " ");
+  if (!city || /^(remote|hybrid|virtual|work from home|wfh)$/i.test(city)) return "";
+  return city;
 }
 
 function pushUniqueText(values, candidate) {
