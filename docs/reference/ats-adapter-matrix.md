@@ -159,3 +159,50 @@ This table is intentionally conservative. `certified` means the ATS has raw pars
 Wave 1 candidates must be certified before enabling: Personio XML feed, Trakstar Hire / Recruiterbox frontend API, and JobScore feed API. Wave 2 candidates are Workable, Bullhorn, and Comeet after public token/config handling is reviewed. Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must stay separate from direct ATS adapters.
 
 Detailed certification requirements live in [ATS Source Certification](./ats-source-certification.md). Data freshness and pruning rules live in [Data Retention](./data-retention.md).
+
+## ATS Certification Workbench (v1.6.2)
+
+The canonical evidence scoreboard lives in [ats-workbench/scoreboard.md](./ats-workbench/scoreboard.md) and [ats-workbench/scoreboard.json](./ats-workbench/scoreboard.json). Regenerate it with:
+
+```bash
+npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreboard.json --markdown-output=docs/reference/ats-workbench/scoreboard.md
+```
+
+The workbench is read-only. It merges configured adapter metadata with production/test field-quality stats and adds `wave_priority`, `certification_blockers`, `exact_next_parser_action`, and `should_be_public_enabled` for every configured ATS key.
+
+Current generated status counts:
+
+- Configured ATS keys: 60.
+- Certified: 22.
+- Partial: 1.
+- Fallback/pending: 36.
+- Unsupported/disabled: 1 (`dayforcehcm`).
+
+Top quality-risk sources from the latest read-only production snapshot:
+
+| Rank | ats_key | status | rows | missing any geo % | weak remote % | public-enabled recommendation | wave priority | exact next action |
+| ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 1 | `brassring` | fallback | 1531 | 100 | 98.04 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 2 | `teamtailor` | fallback | 2839 | 99.33 | 66.11 | no | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 3 | `applitrack` | certified | 70598 | 100 | 99.98 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 4 | `hirebridge` | fallback | 3284 | 95.43 | 77.5 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 5 | `peopleforce` | fallback | 461 | 92.19 | 65.94 | no | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 6 | `icims` | certified | 183222 | 95.7 | 78.24 | yes, quality debt | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 7 | `pageup` | fallback | 462 | 93.94 | 71.43 | no | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 8 | `careerspage` | fallback | 1875 | 94.03 | 32.37 | yes, quality debt | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 9 | `applicantai` | fallback | 146 | 98.63 | 4.79 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 10 | `talentlyft` | fallback | 2041 | 94.12 | 3.04 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 11 | `gem` | fallback | 3493 | 96.54 | 19.24 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 12 | `jobvite` | fallback | 10090 | 95.64 | 12.71 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 13 | `jobaps` | fallback | 1256 | 67.12 | 60.83 | yes, quality debt | wave-2-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 14 | `talexio` | fallback | 262 | 85.88 | 27.86 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
+| 15 | `recruitcrm` | certified | 2795 | 93.49 | 23.94 | yes, quality debt | wave-2-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+
+Quarantine/disable recommendation until source-backed parser evidence improves: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`, plus no-row unproven sources that are currently enabled by configuration but lack strict raw parser fixtures (`adp_myjobs`, `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `saphrcloud`, `statejobsny`, `theapplicantmanager`, `usajobs`). `dayforcehcm` remains unsupported/disabled.
+
+Work-packet review notes from this pass:
+
+- Direct JSON/API wave: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, and `bamboohr` are parser-fixture-backed. `teamtailor`, `freshteam`, and `getro` still need raw fixture certification. `fountain`, `pinpointhq`, and `recruitcrm` are certified but need path/pagination/sparse-field variants; `fountain` should preserve opening id as `source_job_id`.
+- Enterprise/brittle wave: `workday`, `taleo`, `oracle`, `paylocity`, and `adp_workforcenow` have raw fixture coverage, but `oracle`, `paylocity`, and `adp_workforcenow` still need source-id assertions in parser tests. `adp_myjobs`, `eightfold`, `saphrcloud`, `ultipro`, `pageup`, and `brassring` remain unproven. `dayforcehcm` stays disabled.
+- Embedded/HTML wave: `icims` and `applitrack` are certified but remain large live field-gap sources that require bounded detail-refetch certification. `careerplug`, `applicantpro`, `applytojob`, `breezy`, and `zoho` have raw parser fixtures. `jobvite`, `theapplicantmanager`, `talentreef`, `hirebridge`, and `isolvisolvedhire` need raw fixture certification.
+- Vendor/public-sector wave: `manatal` is parser-fixture-backed. Most vendor-specific and public-sector sources remain fallback/pending until raw fixtures prove source id, canonical URL, geo, date, and remote behavior.

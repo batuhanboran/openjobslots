@@ -62,6 +62,33 @@ Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must sta
 
 ## 60-Source Certification Backlog
 
+### v1.6.2 ATS Workbench
+
+The current per-source scoreboard is generated in [ats-workbench/scoreboard.md](./ats-workbench/scoreboard.md). Use it as the first stop before parser work because it combines configured adapter status with live/test quality counters.
+
+Regeneration command:
+
+```bash
+npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreboard.json --markdown-output=docs/reference/ats-workbench/scoreboard.md
+```
+
+The command is read-only and includes every configured ATS key, including sources with no visible rows. The generated fields now include wave priority, certification blockers, exact next parser action, public-enabled recommendation, source-id reliability, canonical URL reliability, and detail-refetch requirement.
+
+Current workbench counts: 60 configured ATS, 22 strict parser-fixture-backed, 1 partial (`hrmdirect`), 36 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
+
+Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
+
+- Disable/hold public exposure until raw fixture and field evidence improves: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
+- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `adp_myjobs`, `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `saphrcloud`, `statejobsny`, `theapplicantmanager`, `usajobs`.
+- Keep disabled: `dayforcehcm`.
+
+Subagent/work-packet findings in this certification pass:
+
+- Direct JSON/API: `teamtailor`, `freshteam`, and `getro` are the main certification gaps. `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
+- Enterprise/brittle: `oracle`, `paylocity`, and `adp_workforcenow` need source-id assertions despite raw fixture coverage. `adp_myjobs`, `eightfold`, `saphrcloud`, `ultipro`, `pageup`, and `brassring` need raw parser fixtures before public enablement can be called safe.
+- Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `jobvite`, `theapplicantmanager`, `talentreef`, `hirebridge`, and `isolvisolvedhire` remain raw-fixture blockers.
+- Vendor/public-sector: `manatal` is certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs`, `calopps`, and `policeapp` must stop fabricated recency before public confidence can be raised.
+
 | ATS | Current source/parser path | Field gaps seen | Certification action |
 | --- | --- | --- | --- |
 | `greenhouse` | Greenhouse Job Board API JSON. | Remote is inferred only from explicit text because the source has no universal remote flag. | v1.6 adds raw `jobs[]` fixture with location, office country, department, content, source id, and tracking-query canonicalization; add retrieve-job fixture only if detail-only fields become indexed. |
