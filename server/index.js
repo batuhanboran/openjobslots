@@ -16524,6 +16524,7 @@ function createServer() {
         summary: report.summary,
         by_source: report.by_source,
         by_parser: report.by_parser || [],
+        visibility: report.visibility || {},
         items: report.items || report.by_source || [],
         count: Number(report.count || (report.items || report.by_source || []).length)
       });
