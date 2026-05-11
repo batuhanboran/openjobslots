@@ -1281,8 +1281,13 @@ async function runDetailRefetch(options = {}, env = process.env) {
     let heavyJobLock = null;
     try {
       const safetyGate = getSafetyGate(options);
+      if (!options.pool) {
+        heavyJobLock = await acquireHeavyJobLock(
+          pool,
+          safetyGate.authorized ? "detail-refetch" : "detail-refetch-dry-run"
+        );
+      }
       if (safetyGate.authorized) {
-        heavyJobLock = await acquireHeavyJobLock(pool, "detail-refetch");
         await ensurePostgresDetailRefetchSchema(pool);
       }
       const report = await runDetailRefetchWithDb(pool, "postgres", options, env);

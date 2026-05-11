@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const { createPostgresPool } = require("../server/backends/postgres");
+const { withHeavyJobLock } = require("../server/backends/heavyJobLock");
 const {
   getPostgresQualityAudit,
   getSqliteQualityAudit,
@@ -81,7 +82,11 @@ async function runAudit(options = parseArgs(process.argv.slice(2)), env = proces
   if (dbBackend === "postgres") {
     const pool = createPostgresPool({ enabled: true, connectionString: env.DATABASE_URL || env.POSTGRES_URL || "" });
     try {
-      const audit = await getPostgresQualityAudit(pool, { limit: options.limit });
+      const audit = await withHeavyJobLock(
+        pool,
+        "data-quality-audit",
+        () => getPostgresQualityAudit(pool, { limit: options.limit })
+      );
       return {
         ok: true,
         db_backend: "postgres",

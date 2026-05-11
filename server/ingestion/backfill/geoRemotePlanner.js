@@ -1294,9 +1294,10 @@ async function runBackfill(options = parseArgs(process.argv.slice(2)), env = pro
     const pool = createPostgresPool({ enabled: true, connectionString: env.DATABASE_URL || env.POSTGRES_URL || "" });
     let heavyJobLock = null;
     try {
-      if (safetyGate.authorized) {
-        heavyJobLock = await acquireHeavyJobLock(pool, "geo-remote-backfill");
-      }
+      heavyJobLock = await acquireHeavyJobLock(
+        pool,
+        safetyGate.authorized ? "geo-remote-backfill" : "geo-remote-backfill-dry-run"
+      );
       rows = await queryPostgresRows(pool, options);
       const plans = rows.map(classifyBackfillCandidate);
       const summary = summarizePlan(rows, options);
@@ -1355,8 +1356,16 @@ async function runDryRun(options = parseArgs(process.argv.slice(2)), env = proce
   let rows = [];
   if (dbBackend === "postgres") {
     const pool = createPostgresPool({ enabled: true, connectionString: env.DATABASE_URL || env.POSTGRES_URL || "" });
+    let heavyJobLock = null;
     try {
+      heavyJobLock = await acquireHeavyJobLock(pool, "geo-remote-backfill-dry-run");
       rows = await queryPostgresRows(pool, options);
+      if (heavyJobLock) await heavyJobLock.release("succeeded");
+      heavyJobLock = null;
+    } catch (error) {
+      if (heavyJobLock) await heavyJobLock.release("failed");
+      heavyJobLock = null;
+      throw error;
     } finally {
       await pool.end();
     }

@@ -24,6 +24,7 @@ const {
   ensurePostgresSchema,
   seedPostgresAtsSources
 } = require("./backends/postgres");
+const { getHeavyJobLockStatus } = require("./backends/heavyJobLock");
 const {
   expandSearchTokens
 } = require("./search/config");
@@ -16391,13 +16392,15 @@ function createServer() {
   app.get("/sync/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts] = await Promise.all([
+        const [status, parserAttentionByAts, heavyJob] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
-          getPostgresParserAttentionByAts(postgresPool)
+          getPostgresParserAttentionByAts(postgresPool),
+          getHeavyJobLockStatus(postgresPool)
         ]);
         return sanitizeFrontendValue({
           ...status,
           search_reindex: readMeiliReindexStatus(),
+          heavy_job: heavyJob,
           write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
           parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
           parser_attention_by_ats: parserAttentionByAts,
@@ -16437,9 +16440,10 @@ function createServer() {
   app.get("/ingestion/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts] = await Promise.all([
+        const [status, parserAttentionByAts, heavyJob] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
-          getPostgresParserAttentionByAts(postgresPool)
+          getPostgresParserAttentionByAts(postgresPool),
+          getHeavyJobLockStatus(postgresPool)
         ]);
         return sanitizeFrontendValue({
           ok: true,
@@ -16448,6 +16452,7 @@ function createServer() {
             db_backend: DB_BACKEND,
             search_backend: SEARCH_BACKEND,
             search_reindex: readMeiliReindexStatus(),
+            heavy_job: heavyJob,
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
             parser_attention_by_ats: parserAttentionByAts

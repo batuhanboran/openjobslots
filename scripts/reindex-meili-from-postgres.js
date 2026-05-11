@@ -757,7 +757,11 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
     }
 
     if (options.check || options.validateOnly) {
-      const checkResult = await checkMeiliParity(pool, config, options);
+      const checkResult = await withHeavyJobLock(
+        pool,
+        options.validateOnly ? "meili-validate-only" : "meili-reindex-check",
+        () => checkMeiliParity(pool, config, options)
+      );
       writeStatusSafe({
         ok: checkResult.ok,
         current_index_uid: config.indexName,

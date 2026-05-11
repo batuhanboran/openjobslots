@@ -1,4 +1,5 @@
 const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
+const { acquireHeavyJobLock } = require("../server/backends/heavyJobLock");
 const {
   normalizePosting,
   normalizePostingDate,
@@ -721,6 +722,7 @@ function mergeExistingRejectedRows(summary, rows) {
 async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
   const logger = deps.logger || console.log;
   const ensureSchema = deps.ensureSchema || ensurePostgresSchema;
+  const useHeavyJobLock = deps.useHeavyJobLock === true;
   const summary = {
     ok: true,
     scanned: 0,
@@ -742,8 +744,16 @@ async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
     samples: []
   };
   let lastCanonicalUrl = String(options.startAfter || "");
+  let heavyJobLock = null;
+  let failed = false;
 
   try {
+    if (useHeavyJobLock) {
+      heavyJobLock = await acquireHeavyJobLock(
+        pool,
+        options.write ? "normalization-backfill" : "normalization-backfill-dry-run"
+      );
+    }
     if (options.write) await ensureSchema(pool);
     mergeExistingRejectedRows(summary, await loadExistingRejectedRows(pool, options));
 
@@ -774,7 +784,12 @@ async function runBackfill(pool, options = parseBackfillArgs(), deps = {}) {
     const finalSummary = formatSummary(summary, false);
     logger(JSON.stringify(finalSummary));
     return finalSummary;
+  } catch (error) {
+    summary.ok = false;
+    failed = true;
+    throw error;
   } finally {
+    if (heavyJobLock) await heavyJobLock.release(failed ? "failed" : "succeeded");
     if (typeof pool.end === "function") await pool.end();
   }
 }
@@ -809,7 +824,7 @@ function formatSummary(summary, compact = false) {
 
 async function main() {
   const pool = createPostgresPool();
-  await runBackfill(pool, parseBackfillArgs());
+  await runBackfill(pool, parseBackfillArgs(), { useHeavyJobLock: true });
 }
 
 if (require.main === module) {

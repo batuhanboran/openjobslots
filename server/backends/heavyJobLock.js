@@ -1,4 +1,5 @@
 const HEAVY_JOB_LOCK_NAME = "openjobslots_heavy_job";
+const MAX_STATUS_LOCKS = 20;
 
 function bool(value) {
   return value === true || value === "t" || value === "true" || value === 1 || value === "1";
@@ -52,8 +53,58 @@ async function withHeavyJobLock(pool, jobName, callback, options = {}) {
   }
 }
 
+async function getHeavyJobLockStatus(pool, options = {}) {
+  if (!pool || typeof pool.query !== "function") {
+    return { lock_name: String(options.lockName || HEAVY_JOB_LOCK_NAME), active: false, locks: [] };
+  }
+  const lockName = String(options.lockName || HEAVY_JOB_LOCK_NAME);
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          l.pid,
+          a.application_name,
+          a.state,
+          extract(epoch from now() - coalesce(a.xact_start, a.query_start, a.backend_start))::bigint AS age_seconds,
+          a.wait_event_type,
+          a.wait_event,
+          a.client_addr::text AS client_addr
+        FROM pg_locks l
+        LEFT JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory'
+          AND l.granted = true
+        ORDER BY age_seconds DESC NULLS LAST
+        LIMIT $1;
+      `,
+      [MAX_STATUS_LOCKS]
+    );
+    const locks = (result.rows || []).map((row) => ({
+      pid: Number(row.pid || 0),
+      application_name: String(row.application_name || ""),
+      state: String(row.state || ""),
+      age_seconds: Number(row.age_seconds || 0),
+      wait_event_type: String(row.wait_event_type || ""),
+      wait_event: String(row.wait_event || ""),
+      client_addr: String(row.client_addr || "")
+    }));
+    return {
+      lock_name: lockName,
+      active: locks.length > 0,
+      locks
+    };
+  } catch (error) {
+    return {
+      lock_name: lockName,
+      active: false,
+      locks: [],
+      error: String(error?.message || error).slice(0, 300)
+    };
+  }
+}
+
 module.exports = {
   HEAVY_JOB_LOCK_NAME,
   acquireHeavyJobLock,
+  getHeavyJobLockStatus,
   withHeavyJobLock
 };

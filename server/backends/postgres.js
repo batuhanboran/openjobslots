@@ -9,16 +9,34 @@ function getPostgresConfig(env = process.env) {
   };
 }
 
+function parsePositiveInteger(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.floor(number) : fallback;
+}
+
 function createPostgresPool(config = getPostgresConfig()) {
   if (!config.enabled) return null;
   if (!config.connectionString) {
     throw new Error("OPENJOBSLOTS_DB_BACKEND=postgres requires DATABASE_URL");
   }
   const { Pool } = require("pg");
+  const env = config.env || process.env;
+  const statementTimeoutMs = parsePositiveInteger(
+    env.POSTGRES_STATEMENT_TIMEOUT_MS || env.OPENJOBSLOTS_POSTGRES_STATEMENT_TIMEOUT_MS,
+    120_000
+  );
+  const queryTimeoutMs = parsePositiveInteger(
+    env.POSTGRES_QUERY_TIMEOUT_MS || env.OPENJOBSLOTS_POSTGRES_QUERY_TIMEOUT_MS,
+    statementTimeoutMs + 10_000
+  );
   return new Pool({
     connectionString: config.connectionString,
-    max: Number(process.env.POSTGRES_POOL_SIZE || 10),
-    idleTimeoutMillis: 30_000
+    max: parsePositiveInteger(env.POSTGRES_POOL_SIZE, 10),
+    idleTimeoutMillis: parsePositiveInteger(env.POSTGRES_IDLE_TIMEOUT_MS, 30_000),
+    connectionTimeoutMillis: parsePositiveInteger(env.POSTGRES_CONNECTION_TIMEOUT_MS, 10_000),
+    statement_timeout: statementTimeoutMs,
+    query_timeout: queryTimeoutMs,
+    application_name: String(env.POSTGRES_APPLICATION_NAME || env.OPENJOBSLOTS_SERVICE_NAME || "openjobslots").slice(0, 60)
   });
 }
 
