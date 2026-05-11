@@ -114,6 +114,7 @@ const PARSER_FIXTURE_BACKED = new Set([
   "breezy",
   "fountain",
   "greenhouse",
+  "hrmdirect",
   "icims",
   "lever",
   "oracle",

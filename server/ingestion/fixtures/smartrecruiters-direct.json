@@ -33,6 +33,28 @@
             "jobDescription": "<p>Own public search quality.</p>"
           }
         }
+      },
+      {
+        "id": "743999999996",
+        "name": "Remote Customer Success Manager",
+        "applyUrl": "https://jobs.smartrecruiters.com/FixtureCo/743999999996-customer-success",
+        "company": {
+          "name": "Fixture SmartRecruiters"
+        },
+        "shortLocation": "Remote - US",
+        "location": {
+          "city": "New York",
+          "region": "NY",
+          "country": "United States"
+        },
+        "releasedDate": "2026-05-07T08:00:00-04:00",
+        "workplaceType": "remote",
+        "department": {
+          "label": "Customer Success"
+        },
+        "typeOfEmployment": {
+          "label": "Full-time"
+        }
       }
     ]
   },
@@ -45,10 +67,27 @@
       "job_posting_url": "https://jobs.smartrecruiters.com/FixtureCo/743999999999-search-engineer",
       "country": "Turkey",
       "region": "EMEA",
+      "city": "Istanbul",
       "remote_type": "remote",
       "posting_date": "2026-05-06T08:00:00+03:00",
       "industry": "Engineering",
       "department": "Engineering",
+      "employment_type": "Full-time",
+      "parser_confidence": 0.75
+    },
+    {
+      "ats_key": "smartrecruiters",
+      "source_job_id": "743999999996",
+      "company_name": "Fixture SmartRecruiters",
+      "position_name": "Remote Customer Success Manager",
+      "job_posting_url": "https://jobs.smartrecruiters.com/FixtureCo/743999999996-customer-success",
+      "country": "United States",
+      "region": "North America",
+      "city": "New York",
+      "remote_type": "remote",
+      "posting_date": "2026-05-07T08:00:00-04:00",
+      "industry": "Customer Success",
+      "department": "Customer Success",
       "employment_type": "Full-time",
       "parser_confidence": 0.75
     }

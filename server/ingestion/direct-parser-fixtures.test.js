@@ -54,6 +54,7 @@ const PARSERS = {
   breezy: parseBreezyPostingsFromHtml,
   fountain: parseFountainPostingsFromApi,
   greenhouse: parseGreenhousePostingsFromApi,
+  hrmdirect: parseHrmDirectPostingsFromHtml,
   lever: parseLeverPostingsFromApi,
   manatal: parseManatalPostingsFromApi,
   oracle: parseOraclePostingsFromApi,
@@ -120,6 +121,7 @@ const newlyCertifiedFailureFixtures = [
   "bamboohr-failures.json",
   "breezy-failures.json",
   "greenhouse-failures.json",
+  "hrmdirect-failures.json",
   "lever-failures.json",
   "recruitee-failures.json",
   "smartrecruiters-failures.json",
@@ -540,6 +542,7 @@ test("source id extraction covers high-volume ATS URL shapes", () => {
   assert.equal(extractSourceIdFromPostingUrl("https://acme.careers-page.com/job/QW12V3", "manatal"), "QW12V3");
   assert.equal(extractSourceIdFromPostingUrl("https://acme.pinpointhq.com/en/postings/7ca2c3f3-123", "pinpointhq"), "7ca2c3f3-123");
   assert.equal(extractSourceIdFromPostingUrl("https://jobs.recruitcrm.io/acme/vacancy/slug-123", "recruitcrm"), "slug-123");
+  assert.equal(extractSourceIdFromPostingUrl("https://acme.bamboohr.com/careers/1002", "bamboohr"), "1002");
   assert.equal(extractSourceIdFromPostingUrl("https://acme.hrmdirect.com/employment/job-opening.php?req=3020632", "hrmdirect"), "3020632");
   assert.equal(extractSourceIdFromPostingUrl("https://careers.zohorecruit.com/jobs/Careers/123456789", "zoho"), "123456789");
   assert.equal(extractSourceIdFromPostingUrl("https://jobs.jobvite.com/acme/job/o0W5zfw8", "jobvite"), "o0W5zfw8");

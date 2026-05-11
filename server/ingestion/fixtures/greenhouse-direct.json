@@ -17,6 +17,7 @@
         "internal_job_id": 9001,
         "title": "Turkish Customer Success Specialist",
         "updated_at": "2026-05-06T08:00:00+03:00",
+        "first_published": "2026-05-05T08:00:00+03:00",
         "location": {
           "name": "Istanbul, T\u00fcrkiye"
         },
@@ -49,8 +50,9 @@
       "job_posting_url": "https://boards.greenhouse.io/fixtureco/jobs/1001?gh_jid=1001",
       "country": "Turkey",
       "region": "EMEA",
+      "city": "Istanbul",
       "remote_type": "onsite",
-      "posting_date": "2026-05-06T08:00:00+03:00",
+      "posting_date": "2026-05-05T08:00:00+03:00",
       "industry": "Customer Success",
       "department": "Customer Success",
       "parser_confidence": 0.75

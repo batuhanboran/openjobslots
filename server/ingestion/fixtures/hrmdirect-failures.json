@@ -1,0 +1,20 @@
+{
+  "ats_key": "hrmdirect",
+  "company_name_for_postings": "Fixture HRMDirect",
+  "company": {
+    "company_name": "Fixture HRMDirect",
+    "ATS_name": "HRMDirect"
+  },
+  "config": {
+    "baseOrigin": "https://fixtureco.hrmdirect.com"
+  },
+  "raw_response": "<table><tr class=\"reqitem\"><td class=\"posTitle\"><a href=\"job-opening.php?req=bad-title\"></a></td><td class=\"cities\">Dublin</td><td class=\"state\">Ireland</td></tr></table>",
+  "missing_company_raw_response": "<table><tr class=\"reqitem\"><td class=\"posTitle\"><a href=\"job-opening.php?req=missing-company\">Support Engineer</a></td><td class=\"cities\">Dublin</td><td class=\"state\">Ireland</td></tr></table>",
+  "missing_url_raw_response": "<table><tr class=\"reqitem\"><td class=\"posTitle\"><span>Missing URL</span></td><td class=\"cities\">Dublin</td><td class=\"state\">Ireland</td></tr></table>",
+  "expected_rejections": [
+    {
+      "source_job_id": "bad-title",
+      "reason": "missing position_name"
+    }
+  ]
+}
