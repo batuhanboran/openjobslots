@@ -44,6 +44,7 @@ const {
   getPostgresPostingDiagnostics,
   getPostgresQualitySummary,
   getPostgresQuarantineSummary,
+  getPostgresSourceRunStatus,
   getPostgresSuggestions,
   getPostgresSourceQualityDashboard,
   getPostgresSyncStatus,
@@ -16604,11 +16605,12 @@ function createServer() {
   app.get("/ingestion/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts, heavyJob, sourceQuality] = await Promise.all([
+        const [status, parserAttentionByAts, heavyJob, sourceQuality, sourceRuns] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
           getPostgresParserAttentionByAts(postgresPool),
           getHeavyJobLockStatus(postgresPool),
-          getPostgresSourceQualityDashboard(postgresPool, 25)
+          getPostgresSourceQualityDashboard(postgresPool, 25),
+          getPostgresSourceRunStatus(postgresPool, 10)
         ]);
         return sanitizeFrontendValue({
           ok: true,
@@ -16621,7 +16623,8 @@ function createServer() {
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
             parser_attention_by_ats: parserAttentionByAts,
-            source_quality: sourceQuality
+            source_quality: sourceQuality,
+            source_jobs: sourceRuns
           }
         });
       }

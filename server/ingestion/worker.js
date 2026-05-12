@@ -56,6 +56,14 @@ const AUTO_SYNC_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(
   process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN,
   50
 )));
+const SOURCE_DAILY_TARGET_BUDGET = Math.floor(nonNegativeNumber(
+  process.env.INGESTION_SOURCE_DAILY_TARGET_BUDGET,
+  100
+));
+const PER_HOST_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(
+  process.env.INGESTION_PER_HOST_CONCURRENCY,
+  1
+)));
 const PG_STAT_STATEMENTS_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS ?? "1").trim().toLowerCase()
 );
@@ -214,6 +222,14 @@ function dedupeValidPosting(posting, seenCanonicalUrls, counters) {
   }
   seenCanonicalUrls.add(canonicalUrl);
   return true;
+}
+
+function sourceHost(value) {
+  try {
+    return new URL(String(value || "")).host.toLowerCase();
+  } catch {
+    return "";
+  }
 }
 
 function evaluateIngestionVisibility(posting, validation, parserVersion) {
@@ -700,6 +716,7 @@ async function ensurePostgresObservability(pool) {
 
 async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
   const nowEpoch = nowEpochSeconds();
+  const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
   const targetLimit = Math.max(1, Math.min(
     MAX_TARGETS_PER_RUN,
     Math.floor(positiveNumber(limit, MAX_TARGETS_PER_RUN))
@@ -750,6 +767,21 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
 
   const targets = [];
   const selectedByAts = new Map();
+  const sourceBudgetUsedToday = new Map();
+  if (SOURCE_DAILY_TARGET_BUDGET > 0) {
+    const budgetRows = await pool.query(
+      `
+        SELECT ats_key, COUNT(*)::int AS count
+        FROM company_sync_state
+        WHERE last_success_epoch >= $1
+        GROUP BY ats_key;
+      `,
+      [dayStartEpoch]
+    );
+    for (const row of budgetRows.rows || []) {
+      sourceBudgetUsedToday.set(String(row.ats_key || ""), Number(row.count || 0));
+    }
+  }
   for (const row of result.rows) {
     const sourcePolicy = getSourceSyncPolicy(row.ats_key, {
       protectionStatus: row.protection_status,
@@ -758,6 +790,8 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
     if (sourcePolicy.mode === "disabled") continue;
     const selectedCount = Number(selectedByAts.get(row.ats_key) || 0);
     if (Number.isFinite(sourcePolicy.maxTargetsPerRun) && selectedCount >= sourcePolicy.maxTargetsPerRun) continue;
+    const startedToday = Number(sourceBudgetUsedToday.get(row.ats_key) || 0);
+    if (SOURCE_DAILY_TARGET_BUDGET > 0 && startedToday + selectedCount >= SOURCE_DAILY_TARGET_BUDGET) continue;
     const company = {
       id: Number(row.id || 0),
       company_name: String(row.company_name || ""),
@@ -1252,6 +1286,24 @@ async function runPostgresIngestionOnce(pool, options = {}) {
   try {
     let nextIndex = 0;
     const workerCount = Math.min(WORKER_CONCURRENCY, Math.max(1, targets.length));
+    const activeHosts = new Map();
+    const waitForHostSlot = async (target) => {
+      const host = sourceHost(target?.companyUrl);
+      if (!host) return "";
+      while (Number(activeHosts.get(host) || 0) >= PER_HOST_CONCURRENCY) {
+        if (await postgresStopRequested(pool)) {
+          cancelled = true;
+          return host;
+        }
+        await sleep(100);
+      }
+      activeHosts.set(host, Number(activeHosts.get(host) || 0) + 1);
+      return host;
+    };
+    const releaseHostSlot = (host) => {
+      if (!host) return;
+      activeHosts.set(host, Math.max(0, Number(activeHosts.get(host) || 0) - 1));
+    };
     const runWorker = async () => {
       while (nextIndex < targets.length) {
         if (await postgresStopRequested(pool)) {
@@ -1260,16 +1312,22 @@ async function runPostgresIngestionOnce(pool, options = {}) {
         }
         const target = targets[nextIndex];
         nextIndex += 1;
-        await updatePostgresRunCurrentTarget(pool, runId, target, counters);
-        const result = await processPostgresTarget(pool, runId, target, counters);
-        if (result === "cancelled") {
-          cancelled = true;
-          return;
+        const host = await waitForHostSlot(target);
+        try {
+          if (cancelled) return;
+          await updatePostgresRunCurrentTarget(pool, runId, target, counters);
+          const result = await processPostgresTarget(pool, runId, target, counters);
+          if (result === "cancelled") {
+            cancelled = true;
+            return;
+          }
+          await updatePostgresRun(pool, runId, {
+            ...counters,
+            status: "running"
+          });
+        } finally {
+          releaseHostSlot(host);
         }
-        await updatePostgresRun(pool, runId, {
-          ...counters,
-          status: "running"
-        });
       }
     };
     await Promise.all(Array.from({ length: workerCount }, () => runWorker()));

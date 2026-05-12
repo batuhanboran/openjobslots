@@ -33,6 +33,7 @@ Expected OpenJobSlots services:
 - Active DB backend: Postgres in production.
 - Active search backend: Meilisearch in production.
 - Queue/control model: Postgres-backed sync/control state; pg-boss code exists but is not the primary production queue path unless deployment config says otherwise.
+- Source-job control model: source-specific dry-run/canary/apply work must use the global heavy-job advisory lock and the `ats_source_runs` audit tables.
 - SQLite role: local fallback, import source, isolated tests, and legacy compatibility.
 - Meilisearch role: derived public search index. Postgres remains source of truth.
 
@@ -57,6 +58,7 @@ Internal/admin diagnostics may include:
 - `/ingestion/source-quality`
 - `/ingestion/parser-drift`
 - `/ingestion/quarantine-summary`
+- `/ingestion/status` includes the global heavy-job lock and recent ATS source-job run state.
 
 Keep public UI calls on public routes only unless an admin flow is explicitly opened.
 
@@ -133,6 +135,9 @@ npm.cmd run refetch:details:dry-run -- --source=applitrack --limit=5000 --json -
 npm.cmd run search:reindex:check -- --json --output=reports/meili-reindex-check.json
 npm.cmd run audit:data-quality -- --by-source --by-parser
 npm.cmd run audit:ats-quality
+npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=25 --json
+npm.cmd run ats:source:canary -- --source=greenhouse --limit=25 --json
+npm.cmd run ats:source:apply -- --source=greenhouse --apply --confirm-production --max-updates=100 --json
 ```
 
 Docs-only work normally needs only:

@@ -331,6 +331,69 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_parser_drift_events_ats
       ON parser_drift_events(ats_key, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS ats_source_runs (
+      id BIGSERIAL PRIMARY KEY,
+      run_key TEXT NOT NULL DEFAULT '',
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      mode TEXT NOT NULL DEFAULT 'dry-run',
+      status TEXT NOT NULL DEFAULT 'running',
+      requested_limit INTEGER NOT NULL DEFAULT 0,
+      max_updates INTEGER NOT NULL DEFAULT 0,
+      source_host_count INTEGER NOT NULL DEFAULT 0,
+      fetch_count INTEGER NOT NULL DEFAULT 0,
+      parse_count INTEGER NOT NULL DEFAULT 0,
+      accepted_count INTEGER NOT NULL DEFAULT 0,
+      quarantined_count INTEGER NOT NULL DEFAULT 0,
+      rejected_count INTEGER NOT NULL DEFAULT 0,
+      public_write_count INTEGER NOT NULL DEFAULT 0,
+      quarantine_write_count INTEGER NOT NULL DEFAULT 0,
+      http_status_counts JSONB NOT NULL DEFAULT '{}'::jsonb,
+      parser_failure_reasons JSONB NOT NULL DEFAULT '{}'::jsonb,
+      average_latency_ms INTEGER NOT NULL DEFAULT 0,
+      stop_reason TEXT NOT NULL DEFAULT '',
+      error_message TEXT NOT NULL DEFAULT '',
+      started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ats_source_runs_status
+      ON ats_source_runs(status, started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_ats_source_runs_ats
+      ON ats_source_runs(ats_key, started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ats_source_run_errors (
+      id BIGSERIAL PRIMARY KEY,
+      source_run_id BIGINT REFERENCES ats_source_runs(id),
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      source_host TEXT NOT NULL DEFAULT '',
+      source_url TEXT NOT NULL DEFAULT '',
+      error_type TEXT NOT NULL DEFAULT 'unknown',
+      error_message TEXT NOT NULL DEFAULT '',
+      http_status INTEGER,
+      parser_reason TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_errors_run
+      ON ats_source_run_errors(source_run_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_errors_ats
+      ON ats_source_run_errors(ats_key, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ats_source_run_metrics (
+      id BIGSERIAL PRIMARY KEY,
+      source_run_id BIGINT REFERENCES ats_source_runs(id),
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      metric_name TEXT NOT NULL,
+      metric_value DOUBLE PRECISION NOT NULL DEFAULT 0,
+      labels JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_metrics_run
+      ON ats_source_run_metrics(source_run_id, metric_name);
+
     CREATE TABLE IF NOT EXISTS search_index_outbox (
       id BIGSERIAL PRIMARY KEY,
       canonical_url TEXT NOT NULL,

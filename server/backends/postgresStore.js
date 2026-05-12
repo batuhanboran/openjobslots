@@ -1467,6 +1467,68 @@ async function getPostgresQuarantineSummary(pool, limit = 100) {
   };
 }
 
+async function getPostgresSourceRunStatus(pool, limit = 10) {
+  const cappedLimit = Math.max(1, Math.min(50, Number(limit || 10)));
+  const [active, latest] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          id, ats_key, mode, status, requested_limit, max_updates,
+          fetch_count, parse_count, accepted_count, quarantined_count, rejected_count,
+          public_write_count, quarantine_write_count, average_latency_ms,
+          stop_reason, error_message, started_at, updated_at
+        FROM ats_source_runs
+        WHERE status = 'running'
+        ORDER BY started_at DESC
+        LIMIT $1;
+      `,
+      [cappedLimit]
+    ),
+    pool.query(
+      `
+        SELECT
+          id, ats_key, mode, status, requested_limit, max_updates,
+          fetch_count, parse_count, accepted_count, quarantined_count, rejected_count,
+          public_write_count, quarantine_write_count, http_status_counts,
+          parser_failure_reasons, average_latency_ms, stop_reason, error_message,
+          started_at, finished_at
+        FROM ats_source_runs
+        ORDER BY id DESC
+        LIMIT $1;
+      `,
+      [cappedLimit]
+    )
+  ]);
+  const normalize = (row) => ({
+    id: Number(row.id || 0),
+    ats_key: String(row.ats_key || ""),
+    mode: String(row.mode || ""),
+    status: String(row.status || ""),
+    requested_limit: Number(row.requested_limit || 0),
+    max_updates: Number(row.max_updates || 0),
+    fetch_count: Number(row.fetch_count || 0),
+    parse_count: Number(row.parse_count || 0),
+    accepted_count: Number(row.accepted_count || 0),
+    quarantined_count: Number(row.quarantined_count || 0),
+    rejected_count: Number(row.rejected_count || 0),
+    public_write_count: Number(row.public_write_count || 0),
+    quarantine_write_count: Number(row.quarantine_write_count || 0),
+    http_status_counts: row.http_status_counts && typeof row.http_status_counts === "object" ? row.http_status_counts : {},
+    parser_failure_reasons: row.parser_failure_reasons && typeof row.parser_failure_reasons === "object" ? row.parser_failure_reasons : {},
+    average_latency_ms: Number(row.average_latency_ms || 0),
+    stop_reason: String(row.stop_reason || ""),
+    error_message: String(row.error_message || ""),
+    started_at: row.started_at ? new Date(row.started_at).toISOString() : "",
+    finished_at: row.finished_at ? new Date(row.finished_at).toISOString() : "",
+    updated_at: row.updated_at ? new Date(row.updated_at).toISOString() : ""
+  });
+  return {
+    active_count: active.rows.length,
+    active: active.rows.map(normalize),
+    latest: latest.rows.map(normalize)
+  };
+}
+
 async function listPostgresParserDriftEvents(pool, limit = 100) {
   const cappedLimit = Math.max(1, Math.min(250, Number(limit || 100)));
   const result = await pool.query(
@@ -2108,6 +2170,7 @@ module.exports = {
   getPostgresPostingDiagnostics,
   getPostgresQualitySummary,
   getPostgresQuarantineSummary,
+  getPostgresSourceRunStatus,
   getPostgresSuggestions,
   getPostgresSourceQualityDashboard,
   getPostgresSyncStatus,

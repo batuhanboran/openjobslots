@@ -10,6 +10,7 @@ This runbook covers the v1.6 ingestion worker path. It is operational documentat
 - Meilisearch is the public search index when `OPENJOBSLOTS_SEARCH_BACKEND=meili`.
 - SQLite remains the local/test fallback and still uses WAL plus `busy_timeout`.
 - Sync control is stored in Postgres `sync_control`; pg-boss code exists but is not the active queue path.
+- Heavy source jobs use the global `openjobslots_heavy_job` advisory lock plus `ats_source_runs` audit tables.
 
 ## Sync Flow
 
@@ -21,6 +22,18 @@ This runbook covers the v1.6 ingestion worker path. It is operational documentat
 6. Failed targets schedule retry with exponential backoff, then a longer cooldown after repeated failures.
 7. The worker records `ingestion_runs` counters and bounded `ingestion_run_errors`.
 8. Retention and Meilisearch outbox maintenance are worker jobs, not public API reads.
+
+## Guarded ATS Source Runs
+
+Use the source runner for source-specific parser repair, not ad hoc fetch loops:
+
+```powershell
+npm.cmd run ats:source:dry-run -- --source=<ats> --limit=25 --json
+npm.cmd run ats:source:canary -- --source=<ats> --limit=25 --json
+npm.cmd run ats:source:apply -- --source=<ats> --apply --confirm-production --max-updates=100 --json
+```
+
+The runner acquires the global heavy-job lock, uses bounded Postgres statement timeouts, serializes fetches per host, records canary/apply metrics in `ats_source_runs`, and refuses writes without explicit production flags. Dry-run mode does not write public postings.
 
 ## Cache Freshness Rules
 
@@ -65,6 +78,8 @@ Useful fields:
 - `db_busy_count`: transient SQLite busy retries observed by the worker.
 - `http_status_counts`: bounded HTTP status buckets from fetch failures.
 - `current_ats`, `current_company_url`, `current_company_name`: latest safe worker target state.
+- `heavy_job`: advisory lock visibility for heavy backfill/refetch/reindex/source-run jobs.
+- `source_jobs`: active and recent guarded ATS source canary/apply runs.
 
 ## Diagnosing A Failed ATS Or Company
 
