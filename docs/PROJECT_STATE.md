@@ -68,26 +68,28 @@ The last production audit was recorded on May 12, 2026 after the certified-sourc
 Reports were written on production under `/root/OpenJobSlots/reports/`.
 
 - Certified rebuild backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`.
-- Final data-quality audit JSON: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-audit-data-quality-before-reindex.json`.
-- Final source quality JSON: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-source-quality.json`.
+- Final data-quality audit JSON: `/root/OpenJobSlots/reports/v180-final-20260512-175855-data-quality.json`.
+- Final ATS quality audit JSON: `/root/OpenJobSlots/reports/v180-final-20260512-175855-ats-quality.json`.
+- Final source quality JSON: `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_source-quality.json`.
+- Final quarantine summary JSON: `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_quarantine-summary.json`.
 - Final Meili replace report: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`.
-- Final Meili post-check JSON: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-check.json`.
-- Visible postings: `47,270`.
-- Indexable postings: `47,269`.
-- Missing country: `3,096` / `6.55%`.
+- Final Meili post-check JSON: `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-meili-check.json`.
+- Visible postings: `47,396`.
+- Indexable postings: `47,395`.
+- Missing country: `3,113` / `6.57%`.
 - Missing location text: `51` / `0.11%`.
-- Missing region/state: `3,096` / `6.55%`.
-- Missing city: `5,032` / `10.65%`.
-- Missing any normalized geo: `6,801` / `14.39%`.
-- Missing all normalized geo: `1,327` / `2.81%`.
+- Missing region/state: `3,113` / `6.57%`.
+- Missing city: `5,039` / `10.63%`.
+- Missing any normalized geo: `6,824` / `14.40%`.
+- Missing all normalized geo: `1,328` / `2.80%`.
 - Missing location and all normalized geo: `44` / `0.09%`.
 - Suspicious/unknown geo: `1,431` / `3.03%`.
 - Missing remote type: `0` / `0.00%`.
-- Weak or unknown remote classification: `1,837` / `3.89%`.
+- Weak or unknown remote classification: `1,855` / `3.91%`.
 - Missing all normalized geo and weak/unknown remote: `22` / `0.05%`.
 - Source states: `20` public-enabled, `6` quarantine-only, `36` disabled.
 - Quarantine-only sources: `recruitee`, `applitrack`, `icims`, `recruitcrm`, `taleo`, and `zoho`.
-- Meilisearch document count: `47,269`; Postgres indexable count: `47,269`; count delta: `0`.
+- Meilisearch document count: `47,395`; Postgres indexable count: `47,395`; count delta: `0`.
 - Meilisearch remote facets now match the Postgres-derived indexed payload distribution.
 - Heavy job advisory lock `openjobslots_heavy_job` was available after the final reindex.
 - `recruitee`, `applitrack`, `icims`, `recruitcrm`, `taleo`, and `zoho` are quarantine-only by source-quality protection.

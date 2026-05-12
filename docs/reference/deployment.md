@@ -225,19 +225,23 @@ Final report paths:
 - `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-audit-data-quality-before-reindex.json`
 - `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-source-quality.json`
 - `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`
-- `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-check.json`
+- `/root/OpenJobSlots/reports/v180-final-20260512-175855-data-quality.json`
+- `/root/OpenJobSlots/reports/v180-final-20260512-175855-ats-quality.json`
+- `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_source-quality.json`
+- `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_quarantine-summary.json`
+- `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-meili-check.json`
 
 Final data/search state:
 
-- Visible postings: `47,270`.
-- Postgres indexable postings: `47,269`.
-- Meilisearch documents: `47,269`.
+- Visible postings: `47,396`.
+- Postgres indexable postings: `47,395`.
+- Meilisearch documents: `47,395`.
 - Meili/Postgres count delta: `0`.
-- Missing country: `3,096` / `6.55%`.
-- Missing city: `5,032` / `10.65%`.
-- Missing any normalized geo: `6,801` / `14.39%`.
-- Missing all normalized geo: `1,327` / `2.81%`.
-- Weak/unknown remote: `1,837` / `3.89%`.
+- Missing country: `3,113` / `6.57%`.
+- Missing city: `5,039` / `10.63%`.
+- Missing any normalized geo: `6,824` / `14.40%`.
+- Missing all normalized geo: `1,328` / `2.80%`.
+- Weak/unknown remote: `1,855` / `3.91%`.
 - Missing all geo plus weak/unknown remote: `22` / `0.05%`.
 - Source states: `20` public-enabled, `6` quarantine-only, `36` disabled.
 - Quarantine-only sources: `recruitee`, `applitrack`, `icims`, `recruitcrm`, `taleo`, and `zoho`.
