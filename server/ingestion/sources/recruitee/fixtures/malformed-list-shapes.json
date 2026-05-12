@@ -1,0 +1,35 @@
+{
+  "ats_key": "recruitee",
+  "description": "Malformed or unsupported Recruitee list payload shapes should parse to no postings instead of fabricating rows.",
+  "cases": [
+    {
+      "name": "null payload",
+      "payload": null,
+      "expected_count": 0
+    },
+    {
+      "name": "offers is not an array",
+      "payload": {
+        "appConfig": {
+          "offers": {
+            "id": 3001,
+            "slug": "not-an-array"
+          }
+        }
+      },
+      "expected_count": 0
+    },
+    {
+      "name": "unsupported jobs key from another source family",
+      "payload": {
+        "jobs": [
+          {
+            "id": 3002,
+            "title": "Unsupported Jobs Payload"
+          }
+        ]
+      },
+      "expected_count": 0
+    }
+  ]
+}

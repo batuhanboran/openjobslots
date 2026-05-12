@@ -1,45 +1,77 @@
 {
-  "appConfig": {
-    "primaryLangCode": "nl",
-    "locations": [
-      {
-        "id": 10,
-        "city": "Amsterdam",
-        "country": "Nederland",
-        "translations": {
-          "nl": {
-            "name": "Amsterdam",
-            "country": "Nederland"
-          }
+  "offers": [
+    {
+      "id": 1001,
+      "slug": "hybrid-product-manager",
+      "title": "Hybrid Product Manager",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "country_code": "NL",
+      "location": "Amsterdam, Netherlands",
+      "locations": [
+        {
+          "id": 10,
+          "name": "Amsterdam Office",
+          "city": "Amsterdam",
+          "country": "Netherlands",
+          "country_code": "NL"
         }
-      }
-    ],
-    "departments": [
-      {
+      ],
+      "department": {
         "id": 5,
-        "translations": {
-          "nl": {
-            "name": "Product"
-          }
+        "name": "Product"
+      },
+      "remote": false,
+      "hybrid": true,
+      "on_site": true,
+      "published_at": "2026-05-06T08:00:00+03:00",
+      "careers_url": "https://fixture.recruitee.com/o/hybrid-product-manager",
+      "careers_apply_url": "https://fixture.recruitee.com/o/hybrid-product-manager/c/new"
+    },
+    {
+      "id": 1002,
+      "slug": "remote-platform-engineer",
+      "title": "Remote Platform Engineer",
+      "department": {
+        "id": 6,
+        "name": "Engineering"
+      },
+      "remote": true,
+      "hybrid": false,
+      "on_site": false,
+      "published_at": "2026-05-07T09:30:00+03:00",
+      "careers_url": "https://fixture.recruitee.com/o/remote-platform-engineer",
+      "careers_apply_url": "https://fixture.recruitee.com/o/remote-platform-engineer/c/new"
+    },
+    {
+      "id": 1003,
+      "slug": "onsite-operations-coordinator",
+      "title": "Onsite Operations Coordinator",
+      "city": "Austin",
+      "state_name": "TX",
+      "country": "United States",
+      "country_code": "US",
+      "location": "Austin, TX, United States",
+      "locations": [
+        {
+          "id": 20,
+          "name": "Austin Operations Center",
+          "city": "Austin",
+          "state": "TX",
+          "country": "United States",
+          "country_code": "US"
         }
-      }
-    ],
-    "offers": [
-      {
-        "id": 1001,
-        "slug": "hybrid-product-manager",
-        "locationIds": [
-          10
-        ],
-        "departmentId": 5,
-        "workplaceType": "hybrid",
-        "publishedAt": "2026-05-06T08:00:00+03:00",
-        "translations": {
-          "nl": {
-            "title": "Hybrid Product Manager"
-          }
-        }
-      }
-    ]
-  }
+      ],
+      "department": {
+        "id": 7,
+        "name": "Operations"
+      },
+      "remote": false,
+      "hybrid": false,
+      "on_site": true,
+      "created_at": "2026-05-08T10:45:00+03:00",
+      "careers_url": "https://fixture.recruitee.com/o/onsite-operations-coordinator",
+      "careers_apply_url": "https://fixture.recruitee.com/o/onsite-operations-coordinator/c/new"
+    }
+  ]
 }

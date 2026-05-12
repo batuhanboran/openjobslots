@@ -8775,7 +8775,75 @@ function pickRecruiteeTranslation(translations, preferredLangCode = "") {
 
 function extractRecruiteeTitle(offer, preferredLangCode = "") {
   const translation = pickRecruiteeTranslation(offer?.translations, offer?.primaryLangCode || preferredLangCode);
-  return String(translation?.title || translation?.name || offer?.title || offer?.name || "").trim();
+  return String(
+    translation?.title ||
+      translation?.name ||
+      offer?.title ||
+      offer?.sharing_title ||
+      offer?.name ||
+      ""
+  ).trim();
+}
+
+function pushUniqueRecruiteeValue(values, value) {
+  const cleaned = String(value || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return;
+  const normalized = normalizeSearchText(cleaned);
+  if (!normalized) return;
+  if (values.some((existing) => normalizeSearchText(existing) === normalized)) return;
+  values.push(cleaned);
+}
+
+function collectRecruiteeLocationsFromOffer(offer, locationById, preferredLangCode = "") {
+  const values = [];
+  const locationIds = Array.isArray(offer?.locationIds)
+    ? offer.locationIds
+    : Array.isArray(offer?.location_ids)
+      ? offer.location_ids
+      : [];
+  for (const locationId of locationIds) {
+    pushUniqueRecruiteeValue(values, locationById.get(String(locationId ?? "").trim()) || "");
+  }
+
+  if (Array.isArray(offer?.locations)) {
+    for (const location of offer.locations) {
+      if (location && typeof location === "object") {
+        const id = String(location?.id ?? location?.uuid ?? "").trim();
+        pushUniqueRecruiteeValue(values, id ? locationById.get(id) : "");
+        pushUniqueRecruiteeValue(values, buildRecruiteeLocationLabel(location, preferredLangCode));
+      } else {
+        pushUniqueRecruiteeValue(values, locationById.get(String(location ?? "").trim()) || location);
+      }
+    }
+  }
+
+  pushUniqueRecruiteeValue(values, buildRecruiteeLocationLabel(offer?.location || {}, preferredLangCode));
+  pushUniqueRecruiteeValue(values, buildRecruiteeLocationLabel({
+    city: offer?.city,
+    state: offer?.state_name || offer?.state,
+    province: offer?.province,
+    country: offer?.country,
+    countryCode: offer?.country_code
+  }, preferredLangCode));
+
+  return values;
+}
+
+function normalizeRecruiteeWorkplaceType(offer = {}) {
+  const explicit = String(
+    offer?.workplaceType ||
+      offer?.workplace_type ||
+      offer?.remoteStatus ||
+      offer?.locationType ||
+      offer?.location_type ||
+      ""
+  ).trim();
+  if (explicit) return explicit;
+  if (offer?.hybrid === true) return "hybrid";
+  if (offer?.remote === true || offer?.isRemote === true) return "remote";
+  if (offer?.on_site === true || offer?.onSite === true) return "onsite";
+  if (offer?.location?.remote === true || offer?.location?.isRemote === true) return "remote";
+  return null;
 }
 
 function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, response) {
@@ -8826,33 +8894,36 @@ function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, res
       postingDate = new Date(publishedValue).toISOString();
     }
 
-    const locationIds = Array.isArray(offer?.locationIds) ? offer.locationIds : Array.isArray(offer?.locations) ? offer.locations.map((item) => item?.id ?? item) : [];
-    const locationNames = locationIds
-      .map((locationId) => locationById.get(String(locationId ?? "").trim()) || "")
-      .filter(Boolean);
-    const directLocation = buildRecruiteeLocationLabel(offer?.location || {}, preferredLangCode);
-    if (directLocation) locationNames.push(directLocation);
+    const locationNames = collectRecruiteeLocationsFromOffer(offer, locationById, preferredLangCode);
 
     const departmentId = String(offer?.departmentId ?? offer?.department_id ?? offer?.department?.id ?? "").trim();
-    const department = departmentById.get(departmentId) || String(offer?.department?.name || offer?.departmentName || "").trim() || null;
+    const department = departmentById.get(departmentId) || String(
+      offer?.department?.name ||
+        offer?.departmentName ||
+        offer?.category_code ||
+        ""
+    ).trim() || null;
 
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: offerId,
       id: offerId,
       position_name: extractRecruiteeTitle(offer, preferredLangCode),
-      job_posting_url: jobUrl,
+      job_posting_url: offer?.careers_url || jobUrl,
+      apply_url: offer?.careers_apply_url || offer?.apply_url || offer?.application_url || null,
       posting_date: postingDate,
       location: locationNames.length > 0 ? [...new Set(locationNames)].join(" / ") : null,
+      city: String(offer?.city || "").trim(),
+      country: String(offer?.country || offer?.country_code || "").trim(),
       department,
+      employment_type: String(offer?.employment_type_code || offer?.contract_type || "").trim(),
+      description_html: String(offer?.description || offer?.requirements || "").trim(),
       remote:
         offer?.remote === true ||
         offer?.isRemote === true ||
         offer?.location?.remote === true ||
         offer?.location?.isRemote === true,
-      workplaceType:
-        String(offer?.workplaceType || offer?.workplace_type || offer?.remoteStatus || offer?.locationType || "").trim() ||
-        (offer?.remote === true || offer?.isRemote === true ? "remote" : null)
+      workplaceType: normalizeRecruiteeWorkplaceType(offer)
     });
     seenUrls.add(jobUrl);
   }
@@ -8861,18 +8932,21 @@ function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, res
 }
 
 function buildRecruiteeLocationLabel(location, preferredLangCode = "") {
+  if (typeof location === "string") return String(location || "").replace(/\s+/g, " ").trim() || null;
   const translation = pickRecruiteeTranslation(location?.translations, preferredLangCode);
-  const name = String(translation?.name || translation?.city || location?.name || location?.city || location?.label || "").trim();
-  const region = String(location?.region || location?.state || location?.province || "").trim();
+  const city = String(translation?.city || location?.city || "").trim();
+  const name = String(translation?.name || location?.name || location?.label || "").trim();
+  const region = String(location?.state_name || location?.region || location?.state || location?.province || "").trim();
   const country = String(
     translation?.country ||
       location?.country ||
       location?.countryName ||
+      location?.country_code ||
       location?.countryCode ||
       location?.isoCountry ||
       ""
   ).trim();
-  const values = [name, region, country].filter(Boolean);
+  const values = [city || name, region, country].filter(Boolean);
   return values.length > 0 ? values.join(", ") : null;
 }
 

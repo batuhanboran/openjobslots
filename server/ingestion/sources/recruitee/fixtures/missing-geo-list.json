@@ -1,0 +1,13 @@
+{
+  "offers": [
+    {
+      "id": 2001,
+      "slug": "unlocated-generalist",
+      "title": "Unlocated Generalist",
+      "remote": false,
+      "hybrid": false,
+      "published_at": "2026-05-09T11:00:00+03:00",
+      "careers_url": "https://fixture.recruitee.com/o/unlocated-generalist"
+    }
+  ]
+}

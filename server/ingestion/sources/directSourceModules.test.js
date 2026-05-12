@@ -86,3 +86,91 @@ for (const atsKey of PRIMARY_DIRECT_SOURCES) {
     }
   });
 }
+
+function readRecruiteeFixture(fileName) {
+  return readJson(path.join(__dirname, "recruitee", "fixtures", fileName));
+}
+
+function recruiteeFixtureContext() {
+  return {
+    source: getSourceModule("recruitee"),
+    company: readRecruiteeFixture("company.json")
+  };
+}
+
+test("recruitee source module parses raw list variants for remote, hybrid, and onsite jobs", () => {
+  const { source, company } = recruiteeFixtureContext();
+  const rawList = readRecruiteeFixture("list.json");
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(normalized.length, 3);
+
+  const hybrid = byId.get("1001");
+  assert.equal(hybrid.position_name, "Hybrid Product Manager");
+  assert.equal(hybrid.location_text, "Amsterdam, Netherlands");
+  assert.equal(hybrid.city, "Amsterdam");
+  assert.equal(hybrid.country, "Netherlands");
+  assert.equal(hybrid.region, "EMEA");
+  assert.equal(hybrid.remote_type, "hybrid");
+  assert.equal(hybrid.department, "Product");
+  assert.equal(hybrid.posting_date, "2026-05-06T08:00:00+03:00");
+  assert.equal(source.validatePublic(hybrid).status, "accepted");
+
+  const remote = byId.get("1002");
+  assert.equal(remote.position_name, "Remote Platform Engineer");
+  assert.equal(remote.location_text, null);
+  assert.equal(remote.country, "");
+  assert.equal(remote.region, "");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(remote.department, "Engineering");
+  assert.equal(remote.posting_date, "2026-05-07T09:30:00+03:00");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const onsite = byId.get("1003");
+  assert.equal(onsite.position_name, "Onsite Operations Coordinator");
+  assert.equal(onsite.location_text, "Austin, TX, United States");
+  assert.equal(onsite.city, "Austin");
+  assert.equal(onsite.country, "United States");
+  assert.equal(onsite.region, "North America");
+  assert.equal(onsite.remote_type, "onsite");
+  assert.equal(onsite.department, "Operations");
+  assert.equal(onsite.posting_date, "2026-05-08T10:45:00+03:00");
+  assert.equal(source.validatePublic(onsite).status, "accepted");
+});
+
+test("recruitee source module quarantines raw list rows with missing geo and no remote evidence", () => {
+  const { source, company } = recruiteeFixtureContext();
+  const rawList = readRecruiteeFixture("missing-geo-list.json");
+  const parsed = source.parse(rawList, company);
+  assert.equal(parsed.length, 1);
+
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(source.validate(normalized).ok, true);
+  assert.equal(normalized.source_job_id, "2001");
+  assert.equal(normalized.position_name, "Unlocated Generalist");
+  assert.equal(normalized.location_text, null);
+  assert.equal(normalized.country, "");
+  assert.equal(normalized.remote_type, "unknown");
+
+  const gate = source.validatePublic(normalized);
+  assert.equal(gate.status, "quarantined");
+  assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
+});
+
+test("recruitee source module ignores malformed or unsupported raw list shapes", () => {
+  const { source, company } = recruiteeFixtureContext();
+  const malformed = readRecruiteeFixture("malformed-list-shapes.json");
+
+  for (const item of malformed.cases) {
+    const parsed = source.parse(item.payload, company);
+    assert.equal(parsed.length, item.expected_count, item.name);
+  }
+});
+
+test("recruitee source module does not require a detail response fixture", async () => {
+  const { source, company } = recruiteeFixtureContext();
+  const detail = await source.fetchDetail(company, { source_job_id: "1001" });
+  assert.equal(detail, null);
+});
