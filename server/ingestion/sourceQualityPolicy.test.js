@@ -4,10 +4,11 @@ const {
   classifySourceProtection,
   detectParserDrift,
   getSourceSyncPolicy,
+  SOURCE_QUALITY_STATES,
   shapeSimilarity
 } = require("./sourceQualityPolicy");
 
-function testBadSourceAutoDisables() {
+function testBadSourceAutoQuarantines() {
   const result = classifySourceProtection({
     ats_key: "dirty",
     accepted_rows: 10,
@@ -27,16 +28,21 @@ function testBadSourceAutoDisables() {
       maxUnknownRemotePct: 95,
       maxParserFailurePct: 50,
       maxHttpFailurePct: 50,
+      maxMissingAnyGeoPct: 95,
+      maxMissingAllGeoUnknownRemotePct: 5,
       parserFailureMinEvents: 10
     }
   });
-  assert.equal(result.action, "disable");
+  assert.equal(result.action, "quarantine_only");
+  assert.equal(result.source_quality_state, SOURCE_QUALITY_STATES.QUARANTINE_ONLY);
   assert.ok(result.reason.includes("quarantine_pct"));
 }
 
 function testCertifiedSourceGetsNormalBudget() {
   const policy = getSourceSyncPolicy("greenhouse");
   assert.equal(policy.mode, "normal");
+  assert.equal(policy.source_quality_state, SOURCE_QUALITY_STATES.PUBLIC_ENABLED);
+  assert.equal(policy.public_writes_allowed, true);
   assert.equal(policy.maxTargetsPerRun, Infinity);
 }
 
@@ -45,6 +51,7 @@ function testPartialSourceGetsCanaryBudget() {
     metadata: { parserFixtureStatus: "normalized-fixture-only" }
   });
   assert.equal(policy.mode, "canary");
+  assert.equal(policy.source_quality_state, SOURCE_QUALITY_STATES.CANARY_ONLY);
   assert.ok(policy.maxTargetsPerRun > 0);
   assert.ok(Number.isFinite(policy.maxTargetsPerRun));
 }
@@ -54,6 +61,7 @@ function testFallbackSourceDisabled() {
     metadata: { parserFixtureStatus: "pending-parser-fixture" }
   });
   assert.equal(policy.mode, "disabled");
+  assert.equal(policy.source_quality_state, SOURCE_QUALITY_STATES.DISABLED);
   assert.equal(policy.maxTargetsPerRun, 0);
 }
 
@@ -99,9 +107,11 @@ function testWorkerSpinGuardInputs() {
     }
   });
   assert.equal(httpFailed.action, "disable");
+  assert.equal(httpFailed.source_quality_state, SOURCE_QUALITY_STATES.DISABLED);
+  assert.ok(httpFailed.reason.includes("http_blocked"));
 }
 
-testBadSourceAutoDisables();
+testBadSourceAutoQuarantines();
 testCertifiedSourceGetsNormalBudget();
 testPartialSourceGetsCanaryBudget();
 testFallbackSourceDisabled();

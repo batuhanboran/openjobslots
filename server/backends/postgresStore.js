@@ -1283,6 +1283,17 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
           COUNT(*)::bigint AS visible_rows,
           COUNT(*) FILTER (WHERE btrim(coalesce(country, '')) = '')::bigint AS missing_country_count,
           COUNT(*) FILTER (WHERE btrim(coalesce(city, '')) = '')::bigint AS missing_city_count,
+          COUNT(*) FILTER (
+            WHERE btrim(coalesce(country, '')) = ''
+               OR btrim(coalesce(region, '')) = ''
+               OR btrim(coalesce(city, '')) = ''
+          )::bigint AS missing_any_geo_count,
+          COUNT(*) FILTER (
+            WHERE btrim(coalesce(country, '')) = ''
+              AND btrim(coalesce(region, '')) = ''
+              AND btrim(coalesce(city, '')) = ''
+              AND lower(btrim(coalesce(remote_type, ''))) IN ('', 'unknown')
+          )::bigint AS missing_all_geo_unknown_remote_count,
           COUNT(*) FILTER (WHERE lower(btrim(coalesce(remote_type, ''))) IN ('', 'unknown'))::bigint AS unknown_remote_count
         FROM postings
         WHERE hidden = false
@@ -1319,6 +1330,8 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
         COALESCE(visible.visible_rows, 0)::bigint AS visible_rows,
         COALESCE(visible.missing_country_count, 0)::bigint AS missing_country_count,
         COALESCE(visible.missing_city_count, 0)::bigint AS missing_city_count,
+        COALESCE(visible.missing_any_geo_count, 0)::bigint AS missing_any_geo_count,
+        COALESCE(visible.missing_all_geo_unknown_remote_count, 0)::bigint AS missing_all_geo_unknown_remote_count,
         COALESCE(visible.unknown_remote_count, 0)::bigint AS unknown_remote_count,
         COALESCE(errors.parser_failure_events, 0)::bigint AS parser_failure_events,
         COALESCE(errors.http_failure_events, 0)::bigint AS http_failure_events,
@@ -1338,20 +1351,25 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
     [cappedLimit]
   );
   return result.rows.map((row) => {
+    const metadata = getAdapterMetadata(row.ats_key, row.display_name);
     const metrics = summarizeSourceMetrics(row);
-    const protection = classifySourceProtection(row);
+    const protection = classifySourceProtection(row, { metadata });
     return {
       ats_key: String(row.ats_key || ""),
       display_name: String(row.display_name || row.ats_key || ""),
+      source_family: protection.source_family,
+      adapter_tier: metadata.tier,
       enabled: Boolean(row.enabled),
       protection_status: String(row.protection_status || "normal"),
+      source_quality_state: protection.source_quality_state,
       disabled_reason: String(row.disabled_reason || ""),
       disabled_at: row.disabled_at ? new Date(row.disabled_at).toISOString() : "",
       ...metrics,
       drift_events_24h: Number(row.drift_events_24h || 0),
       latest_drift_at: row.latest_drift_at ? new Date(row.latest_drift_at).toISOString() : "",
       recommended_action: protection.action,
-      recommended_reason: protection.reason
+      recommended_reason: protection.reason,
+      family_thresholds: protection.family_thresholds
     };
   });
 }
@@ -1363,15 +1381,18 @@ async function applyPostgresSourceQualityProtection(pool, options = {}) {
   for (const row of rows) {
     if (onlyAts.size > 0 && !onlyAts.has(row.ats_key)) continue;
     const classification = classifySourceProtection(row, { thresholds: options.thresholds });
-    if (classification.action !== "disable") continue;
-    if (String(row.protection_status || "") === "auto_disabled" && !row.enabled) continue;
+    if (!["disable", "quarantine_only"].includes(classification.action)) continue;
+    if (classification.action === "disable" && String(row.protection_status || "") === "auto_disabled" && !row.enabled) continue;
+    if (classification.action === "quarantine_only" && String(row.protection_status || "") === "quarantine_only") continue;
+    const nextStatus = classification.action === "disable" ? "auto_disabled" : "quarantine_only";
+    const nextEnabled = classification.action === "disable" ? false : true;
     await pool.query(
       `
         UPDATE ats_sources
-        SET enabled = false,
-            protection_status = 'auto_disabled',
+        SET enabled = $4,
+            protection_status = $5,
             disabled_reason = $2,
-            disabled_at = now(),
+            disabled_at = CASE WHEN $5 = 'auto_disabled' THEN now() ELSE disabled_at END,
             quality_policy = $3::jsonb,
             updated_at = now()
         WHERE ats_key = $1;
@@ -1381,24 +1402,31 @@ async function applyPostgresSourceQualityProtection(pool, options = {}) {
         classification.reason,
         JSON.stringify({
           metrics: classification.metrics,
-          thresholds: classification.thresholds
-        })
+          thresholds: classification.thresholds,
+          source_quality_state: classification.source_quality_state,
+          source_family: classification.source_family
+        }),
+        nextEnabled,
+        nextStatus
       ]
     );
     await pool.query(
       `
         INSERT INTO source_quality_events (ats_key, event_type, severity, reason, action, metrics)
-        VALUES ($1, 'source_auto_disabled', 'error', $2, 'disable', $3::jsonb);
+        VALUES ($1, $4, $5, $2, $6, $3::jsonb);
       `,
       [
         row.ats_key,
         classification.reason,
-        JSON.stringify(classification.metrics)
+        JSON.stringify(classification.metrics),
+        classification.action === "disable" ? "source_auto_disabled" : "source_quarantine_only",
+        classification.action === "disable" ? "error" : "warning",
+        classification.action
       ]
     );
     actions.push({
       ats_key: row.ats_key,
-      action: "disabled",
+      action: classification.action === "disable" ? "disabled" : "quarantine_only",
       reason: classification.reason,
       metrics: classification.metrics
     });

@@ -44,7 +44,7 @@
     {
       "name": "missing location with unknown remote",
       "expected": "quarantined",
-      "reason": "no_geo_unknown_remote",
+      "reason": "no_geo_no_remote",
       "posting": {
         "company_name": "Fixture adp_myjobs",
         "source_job_id": "adp_myjobs-missing-location",
@@ -57,7 +57,7 @@
     {
       "name": "ambiguous location",
       "expected": "quarantined",
-      "reason": "ambiguous_geo",
+      "reason": "ambiguous_location",
       "posting": {
         "company_name": "Fixture adp_myjobs",
         "source_job_id": "adp_myjobs-ambiguous-location",
@@ -70,7 +70,7 @@
     {
       "name": "vague remote marketing text",
       "expected": "quarantined",
-      "reason": "no_geo_unknown_remote",
+      "reason": "no_geo_no_remote",
       "posting": {
         "company_name": "Fixture adp_myjobs",
         "source_job_id": "adp_myjobs-vague-remote",

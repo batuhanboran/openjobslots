@@ -128,8 +128,8 @@ test("posting cache stores quarantined visibility evidence", async () => {
       validation: {
         ok: false,
         status: "quarantined",
-        error: "no_geo_unknown_remote",
-        reason_codes: ["no_geo_unknown_remote"],
+        error: "no_geo_no_remote",
+        reason_codes: ["no_geo_no_remote"],
         evidence: { country: { present: false } },
         retry_detail_refetch_eligible: true
       }
@@ -140,8 +140,8 @@ test("posting cache stores quarantined visibility evidence", async () => {
     const metadata = JSON.parse(row.raw_metadata);
 
     assert.equal(row.validation_status, "quarantined");
-    assert.equal(row.validation_error, "no_geo_unknown_remote");
-    assert.deepEqual(metadata.reason_codes, ["no_geo_unknown_remote"]);
+    assert.equal(row.validation_error, "no_geo_no_remote");
+    assert.deepEqual(metadata.reason_codes, ["no_geo_no_remote"]);
     assert.equal(metadata.retry_detail_refetch_eligible, true);
     assert.equal(metadata.evidence.country.present, false);
   } finally {

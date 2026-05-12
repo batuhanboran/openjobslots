@@ -74,7 +74,7 @@ function getLocationText(posting = {}) {
 }
 
 function getParserVersion(posting = {}) {
-  return asString(posting.parser_version || posting.parser_key || "unknown");
+  return asString(posting.parser_version);
 }
 
 function getParserKey(posting = {}) {
@@ -83,6 +83,25 @@ function getParserKey(posting = {}) {
 
 function getConfidence(posting = {}) {
   return asNumber(posting.parser_confidence ?? posting.confidence ?? posting.confidence_score, 0.5);
+}
+
+function getQualityScore(posting = {}, fallbackConfidence = 0.5) {
+  const explicit = asNumber(posting.quality_score ?? posting.qualityScore, NaN);
+  if (Number.isFinite(explicit)) return Math.max(0, Math.min(100, Math.round(explicit)));
+  return Math.max(0, Math.min(100, Math.round(asNumber(fallbackConfidence, 0.5) * 100)));
+}
+
+function getPublicThresholds(options = {}, env = process.env) {
+  return {
+    minQualityScore: Math.max(0, Math.min(100, asNumber(
+      options.minQualityScore ?? env.OPENJOBSLOTS_PUBLIC_MIN_QUALITY_SCORE,
+      35
+    ))),
+    minConfidenceScore: Math.max(0, Math.min(1, asNumber(
+      options.minConfidenceScore ?? env.OPENJOBSLOTS_PUBLIC_MIN_CONFIDENCE_SCORE,
+      0.35
+    )))
+  };
 }
 
 function hasValue(value) {
@@ -156,7 +175,15 @@ function buildEvidenceMetadata(posting = {}, options = {}) {
   const locationText = getLocationText(posting);
   const remoteType = normalizeRemoteType(posting.remote_type);
   const confidence = Math.max(0, Math.min(1, getConfidence(posting)));
-  const sourceJobId = asString(posting.source_job_id || posting.job_id || posting.id);
+  const qualityScore = getQualityScore(posting, confidence);
+  const sourceJobId = asString(
+    posting.source_job_id ||
+    posting.source_derived_id ||
+    posting.stable_source_id ||
+    posting.job_id ||
+    posting.id
+  );
+  const parserVersion = asString(options.parserVersion || getParserVersion(posting));
   return {
     title: createEvidence(getTitle(posting), "normalized_title"),
     company: createEvidence(getCompany(posting), "normalized_company"),
@@ -174,17 +201,30 @@ function buildEvidenceMetadata(posting = {}, options = {}) {
     }),
     posting_date: createEvidence(posting.posted_at || posting.posting_date || posting.posted_at_epoch || posting.posting_date_epoch, "source_posting_date"),
     parser_key: createEvidence(getParserKey(posting), "parser"),
-    parser_version: createEvidence(options.parserVersion || getParserVersion(posting), "parser"),
+    parser_version: createEvidence(parserVersion, "parser"),
     confidence: {
       present: true,
       value: confidence,
       source: "parser_confidence"
+    },
+    confidence_score: {
+      present: true,
+      value: confidence,
+      source: "parser_confidence"
+    },
+    quality_score: {
+      present: true,
+      value: qualityScore,
+      source: Number.isFinite(asNumber(posting.quality_score ?? posting.qualityScore, NaN))
+        ? "stored_quality_score"
+        : "confidence_fallback"
     }
   };
 }
 
 function evaluatePublicPosting(posting = {}, options = {}) {
   const evidence = buildEvidenceMetadata(posting, options);
+  const thresholds = getPublicThresholds(options);
   const reasonCodes = [];
   const requiredMissing = [];
 
@@ -208,20 +248,32 @@ function evaluatePublicPosting(posting = {}, options = {}) {
   const remoteType = evidence.remote_type.normalized || "unknown";
   const usefulGeo = hasUsefulGeoEvidence(posting);
   const explicitRemote = remoteType !== "unknown" && evidence.remote_type.explicit;
+  const missingSourceJobId = !evidence.source_job_id.present;
+  const missingParserKey = !evidence.parser_key.present;
+  const missingParserVersion = !evidence.parser_version.present;
+  const confidenceScore = Number(evidence.confidence_score.value || 0);
+  const qualityScore = Number(evidence.quality_score.value || 0);
+
+  if (missingSourceJobId) reasonCodes.push("missing_source_job_id");
+  if (missingParserKey) reasonCodes.push("missing_parser_key");
+  if (missingParserVersion) reasonCodes.push("missing_parser_version");
+  if (qualityScore < thresholds.minQualityScore) reasonCodes.push("low_quality_score");
+  if (confidenceScore < thresholds.minConfidenceScore) reasonCodes.push("low_parser_confidence");
+
   if (evidence.location_text.ambiguous && !(explicitRemote && (remoteType === "remote" || remoteType === "hybrid"))) {
-    reasonCodes.push("ambiguous_geo");
+    reasonCodes.push("ambiguous_location");
   }
 
   if (!usefulGeo && remoteType === "unknown") {
-    reasonCodes.push("no_geo_unknown_remote");
+    reasonCodes.push("no_geo_no_remote");
   }
   if ((remoteType === "remote" || remoteType === "hybrid") && !explicitRemote) {
     reasonCodes.push("weak_remote_evidence");
   }
 
-  const missingSourceJobId = !evidence.source_job_id.present;
   let confidence = Number(evidence.confidence.value || 0.5);
   if (missingSourceJobId) confidence -= 0.1;
+  if (missingParserKey || missingParserVersion) confidence -= 0.1;
   if (!evidence.posting_date.present) confidence -= 0.04;
   confidence = Math.max(0, Math.min(1, Number(confidence.toFixed(3))));
 
@@ -242,8 +294,8 @@ function evaluatePublicPosting(posting = {}, options = {}) {
     status: "accepted",
     public: true,
     ok: true,
-    reason_codes: missingSourceJobId ? ["missing_source_job_id"] : [],
-    reason: missingSourceJobId ? "missing_source_job_id" : "",
+    reason_codes: [],
+    reason: "",
     evidence,
     retry_detail_refetch_eligible: false,
     confidence
@@ -265,6 +317,7 @@ function validationFromGate(gateResult) {
 module.exports = {
   buildEvidenceMetadata,
   evaluatePublicPosting,
+  getPublicThresholds,
   hasExplicitRemoteEvidence,
   hasUsefulGeoEvidence,
   normalizeRemoteType,

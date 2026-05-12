@@ -95,7 +95,7 @@ test("quality metadata exposes quarantined cache state", () => {
       position_name: "Support Engineer",
       ats_key: "fixture",
       validation_status: "quarantined",
-      validation_error: "no_geo_unknown_remote",
+      validation_error: "no_geo_no_remote",
       remote_type: "unknown",
       parser_version: "fixture-v1",
       confidence: 0.7
@@ -106,6 +106,6 @@ test("quality metadata exposes quarantined cache state", () => {
   assert.equal(metadata.cache_state, "quarantined");
   assert.ok(metadata.quality_flags.includes("quarantined"));
   assert.ok(metadata.quality_flags.includes("rejected"));
-  assert.equal(metadata.rejection_reason, "no_geo_unknown_remote");
+  assert.equal(metadata.rejection_reason, "no_geo_no_remote");
   assert.ok(metadata.quality_score < 100);
 });

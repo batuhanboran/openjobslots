@@ -6,6 +6,7 @@ const { getAdapterForCompany } = require("./adapters");
 const { hashPayload } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
 const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
+const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
 
 const DEFAULT_SOURCE_RUN_LIMIT = 25;
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
@@ -131,6 +132,10 @@ async function discoverSourceTargets(pool, options = {}) {
       url_string: String(row.url_string || ""),
       ATS_name: String(row.ats_key || "")
     };
+    const sourcePolicy = getSourceSyncPolicy(source, {
+      protectionStatus: row.protection_status,
+      disabledReason: row.disabled_reason
+    });
     return {
       company,
       atsKey: source,
@@ -141,8 +146,11 @@ async function discoverSourceTargets(pool, options = {}) {
         enabled: Boolean(row.enabled),
         protection_status: String(row.protection_status || "normal"),
         disabled_reason: String(row.disabled_reason || ""),
-        rate_limit_ms: Number(row.rate_limit_ms || 0)
-      }
+        rate_limit_ms: Number(row.rate_limit_ms || 0),
+        quality_state: sourcePolicy.source_quality_state,
+        policy: sourcePolicy
+      },
+      sourcePolicy
     };
   }).filter((target) => target.adapter);
 }
@@ -437,8 +445,20 @@ async function processTarget(pool, target, options, summary, runId) {
       },
       { parserVersion: target.adapter.parserVersion }
     );
-    const validation = adapterValidation?.ok ? validationFromGate(gate) : adapterValidation;
-    const status = adapterValidation?.ok ? gate.status : "rejected";
+    const quarantineOnly = target.sourcePolicy?.source_quality_state === SOURCE_QUALITY_STATES.QUARANTINE_ONLY;
+    let validation = adapterValidation?.ok ? validationFromGate(gate) : adapterValidation;
+    let status = adapterValidation?.ok ? gate.status : "rejected";
+    if (adapterValidation?.ok && gate.status === "accepted" && quarantineOnly) {
+      status = "quarantined";
+      validation = {
+        ok: false,
+        status: "quarantined",
+        error: "source_disabled_by_threshold",
+        reason_codes: ["source_disabled_by_threshold"],
+        evidence: gate.evidence,
+        retry_detail_refetch_eligible: false
+      };
+    }
     if (status === "accepted") {
       summary.accepted_count += 1;
       accepted.push(normalized);

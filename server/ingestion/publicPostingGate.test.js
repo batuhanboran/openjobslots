@@ -47,7 +47,7 @@ test("public posting gate quarantines rows with missing geo and unknown remote",
   }));
 
   assert.equal(result.status, "quarantined");
-  assert.ok(result.reason_codes.includes("no_geo_unknown_remote"));
+  assert.ok(result.reason_codes.includes("no_geo_no_remote"));
   assert.equal(result.retry_detail_refetch_eligible, true);
 });
 
@@ -61,7 +61,7 @@ test("public posting gate quarantines ambiguous country-code-only locations", ()
   }));
 
   assert.equal(result.status, "quarantined");
-  assert.ok(result.reason_codes.includes("ambiguous_geo"));
+  assert.ok(result.reason_codes.includes("ambiguous_location"));
 });
 
 test("public posting gate accepts explicit remote and hybrid rows without geo", () => {
@@ -91,10 +91,10 @@ test("public posting gate does not accept vague remote marketing text as explici
   }));
 
   assert.equal(result.status, "quarantined");
-  assert.ok(result.reason_codes.includes("no_geo_unknown_remote"));
+  assert.ok(result.reason_codes.includes("no_geo_no_remote"));
 });
 
-test("public posting gate preserves canonical and source id evidence", () => {
+test("public posting gate quarantines missing source id even when canonical URL is stable", () => {
   const posting = basePosting({
     source_job_id: "",
     canonical_url: "https://example.com/jobs/stable",
@@ -107,9 +107,46 @@ test("public posting gate preserves canonical and source id evidence", () => {
 
   assert.equal(evidence.canonical_url.value, "https://example.com/jobs/stable");
   assert.equal(evidence.source_job_id.present, false);
-  assert.equal(result.status, "accepted");
+  assert.equal(result.status, "quarantined");
   assert.ok(result.reason_codes.includes("missing_source_job_id"));
   assert.ok(result.confidence < posting.parser_confidence);
+});
+
+test("public posting gate accepts stable source-derived ids", () => {
+  const result = evaluatePublicPosting(basePosting({
+    source_job_id: "",
+    source_derived_id: "fixture-derived-1",
+    location_text: "Berlin, Germany",
+    country: "Germany",
+    remote_type: "unknown"
+  }));
+
+  assert.equal(result.status, "accepted");
+  assert.deepEqual(result.reason_codes, []);
+});
+
+test("public posting gate applies configured quality and confidence thresholds", () => {
+  const lowConfidence = evaluatePublicPosting(basePosting({
+    location_text: "Berlin, Germany",
+    country: "Germany",
+    remote_type: "unknown",
+    parser_confidence: 0.2
+  }), {
+    minConfidenceScore: 0.35
+  });
+  const lowQuality = evaluatePublicPosting(basePosting({
+    location_text: "Berlin, Germany",
+    country: "Germany",
+    remote_type: "unknown",
+    quality_score: 20
+  }), {
+    minQualityScore: 35
+  });
+
+  assert.equal(lowConfidence.status, "quarantined");
+  assert.ok(lowConfidence.reason_codes.includes("low_parser_confidence"));
+  assert.equal(lowQuality.status, "quarantined");
+  assert.ok(lowQuality.reason_codes.includes("low_quality_score"));
 });
 
 test("public posting gate rejects rows missing required identity fields", () => {

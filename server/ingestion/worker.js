@@ -26,7 +26,7 @@ const {
   upsertPostgresPostings
 } = require("../backends/postgresStore");
 const { ensureMeiliPostingsIndex } = require("../search/meili");
-const { getSourceSyncPolicy } = require("./sourceQualityPolicy");
+const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
 
 function positiveNumber(value, fallback) {
   const number = Number(value);
@@ -164,7 +164,7 @@ function classifyIngestionError(error, fallback = "fetch") {
   const explicit = String(error?.ingestionErrorType || error?.errorType || "").trim();
   if (explicit) return explicit;
   const message = String(error?.message || error || "").toLowerCase();
-  if (message.includes("no_geo_unknown_remote") || message.includes("ambiguous_geo") || message.includes("weak_remote_evidence")) {
+  if (message.includes("no_geo_no_remote") || message.includes("ambiguous_location") || message.includes("weak_remote_evidence")) {
     return "parser_quarantine";
   }
   if (message.includes("placeholder company_name")) return "source_discovery";
@@ -174,6 +174,24 @@ function classifyIngestionError(error, fallback = "fetch") {
   if (message.includes("parse") || message.includes("json")) return "parser_parse";
   if (message.includes("timeout") || message.includes("rate limit") || message.includes("request failed")) return "fetch";
   return fallback;
+}
+
+function forceSourceQuarantineIfNeeded(target, visibility) {
+  const state = target?.settings?.sourcePolicy?.source_quality_state;
+  if (state !== SOURCE_QUALITY_STATES.QUARANTINE_ONLY) return visibility;
+  if (!visibility?.publicPosting) return visibility;
+  return {
+    gate: visibility.gate,
+    publicPosting: false,
+    validation: {
+      ok: false,
+      status: "quarantined",
+      error: "source_disabled_by_threshold",
+      reason_codes: ["source_disabled_by_threshold"],
+      evidence: visibility.gate?.evidence || {},
+      retry_detail_refetch_eligible: false
+    }
+  };
 }
 
 function extractHttpStatus(error) {
@@ -552,7 +570,10 @@ async function processTarget(db, runId, target, counters) {
         continue;
       }
       const adapterValidation = target.adapter.validate(normalized);
-      const visibility = evaluateIngestionVisibility(normalized, adapterValidation, target.adapter.parserVersion);
+      const visibility = forceSourceQuarantineIfNeeded(
+        target,
+        evaluateIngestionVisibility(normalized, adapterValidation, target.adapter.parserVersion)
+      );
       const validation = visibility.validation;
       const cacheResult = await withWriteLock(() => writePostingCache(db, normalized, {
         nowEpoch,
@@ -1210,7 +1231,10 @@ async function processPostgresTarget(pool, runId, target, counters) {
         continue;
       }
       const adapterValidation = target.adapter.validate(normalized);
-      const visibility = evaluateIngestionVisibility(normalized, adapterValidation, target.adapter.parserVersion);
+      const visibility = forceSourceQuarantineIfNeeded(
+        target,
+        evaluateIngestionVisibility(normalized, adapterValidation, target.adapter.parserVersion)
+      );
       const validation = visibility.validation;
       const cacheResult = await writePostgresPostingCache(pool, normalized, {
         nowEpoch,
