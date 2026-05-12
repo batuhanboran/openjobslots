@@ -4,6 +4,8 @@ This directory is the evidence scoreboard for ATS parser certification. It is ge
 
 - `scoreboard.json`: machine-readable ATS scoreboard for all configured ATS keys.
 - `scoreboard.md`: human-readable ATS scoreboard with wave priority, blockers, exact parser action, and public-enabled recommendation.
+- `index.json`: canonical ATS-specific workbench index generated from scoreboard, adapter metadata, certification records, and fixture inventory.
+- `sources/<ats>.json`: one structured work packet per ATS with fetch method, parser method, fixture state, quality threshold, public/quarantine decision, and failure log.
 
 ## Work Packet Coverage
 
@@ -26,6 +28,14 @@ Run directly against the configured Postgres database:
 
 ```bash
 npm run audit:ats-quality -- --json --output=reports/ats-quality-scoreboard.json --markdown-output=reports/ats-quality-scoreboard.md
+```
+
+Generate the ATS-specific workbench files from the latest scoreboard snapshot:
+
+```bash
+npm run ats:workbench
+npm run ats:workbench -- --source=greenhouse --json
+npm run ats:workbench -- --json
 ```
 
 The command is read-only. It does not backfill, refetch detail pages, or reindex Meilisearch.

@@ -1,0 +1,77 @@
+{
+  "ats_key": "workday",
+  "display_name": "Workday",
+  "current_status": "certified",
+  "source_family": "enterprise_api",
+  "official_public_docs_or_observed_endpoint": "POST {origin}/wday/cxs/{tenant}/{site}/jobs",
+  "source_discovery_method": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
+  "list_fetch_method": "bounded API request to candidate/search endpoint through source runner",
+  "detail_fetch_method": "Not required for list-visible source id/location/date; detail can enrich descriptions.",
+  "pagination_method": "CXS limit/offset pagination.",
+  "canonical_url_rule": "Build URL from companyBaseUrl plus externalPath.",
+  "source_job_id_rule": "preserve strongest raw id, requisition id, job id, vacancy id, or stable URL id",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "list-payload: CXS fields and job URL often carry location labels.",
+  "country_region_city_rule": "list-payload: CXS fields and job URL often carry location labels.",
+  "remote_type_rule": "Use remoteType/workplaceType/locationType/timeType/URL evidence.",
+  "posting_date_rule": "Use postedOn/postedOnDate/postedDate/postingDate/externalPostedOn/updatedOn.",
+  "rate_limit": "conservative tenant-level budget, per-host serialization, retry/backoff on 429/5xx",
+  "parser_fixtures": {
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/fixtures/workday-direct.json",
+      "server/ingestion/fixtures/workday-failures.json"
+    ],
+    "present": [
+      "server/ingestion/fixtures/workday-direct.json",
+      "server/ingestion/fixtures/workday-failures.json"
+    ],
+    "missing": []
+  },
+  "quality_threshold": {
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+  },
+  "public_enabled": true,
+  "quarantine_reason": "",
+  "failure_log": {
+    "known_failure_modes": [
+      "missing externalPath",
+      "blank title",
+      "generic postedOn text without exact date"
+    ],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 20356,
+    "missing_country_pct": 39.2,
+    "missing_city_pct": 77.59,
+    "missing_any_geo_pct": 83.85,
+    "weak_remote_pct": 46.96,
+    "risk_score": 142.68,
+    "wave_priority": "wave-2-live-gap",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/index.js Workday CXS collector/helpers",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
+  },
+  "runner_interface": {
+    "discover": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
+    "fetchList": "bounded API request to candidate/search endpoint through source runner",
+    "fetchDetail": "Not required for list-visible source id/location/date; detail can enrich descriptions.",
+    "parseList": "server/index.js Workday CXS collector/helpers",
+    "parseDetail": "server/index.js Workday CXS collector/helpers",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "high missing normalized geo"
+}

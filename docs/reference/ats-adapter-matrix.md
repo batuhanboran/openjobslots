@@ -173,10 +173,12 @@ The workbench is read-only. It merges configured adapter metadata with productio
 Current generated status counts:
 
 - Configured ATS keys: 60.
-- Certified: 22.
-- Partial: 1.
+- Certified: 23.
+- Partial: 0.
 - Fallback/pending: 36.
 - Unsupported/disabled: 1 (`dayforcehcm`).
+
+ATS-specific fetch/parser work packets are generated with `npm run ats:workbench`; the canonical index is `docs/reference/ats-workbench/index.json` and per-source records live under `docs/reference/ats-workbench/sources/`.
 
 Top quality-risk sources from the latest read-only production snapshot:
 

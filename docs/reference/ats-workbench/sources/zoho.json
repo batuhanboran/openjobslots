@@ -1,0 +1,75 @@
+{
+  "ats_key": "zoho",
+  "display_name": "Zoho Recruit",
+  "current_status": "certified",
+  "source_family": "embedded_json",
+  "official_public_docs_or_observed_endpoint": "Observed Zoho Recruit hidden jobs JSON in careers page.",
+  "source_discovery_method": "fetch public board HTML and extract embedded JSON or domain id before parsing",
+  "list_fetch_method": "fetch public board or discovered JSON endpoint with bounded response size",
+  "detail_fetch_method": "optional detail fetch only when list evidence is insufficient and fixture-backed",
+  "pagination_method": "follow documented list or embedded next-page data; avoid unbounded DOM crawling",
+  "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
+  "source_job_id_rule": "url-or-title-inference: Use stable URL id when raw row id is absent.",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "detail-page: List cards may omit geo; detail fixture decides whether detail fetch is required.",
+  "country_region_city_rule": "detail-page: List cards may omit geo; detail fixture decides whether detail fetch is required.",
+  "remote_type_rule": "url-or-title-inference: Only infer remote/hybrid from explicit card/detail text.",
+  "posting_date_rule": "detail-page: List cards often omit date; detail fixture decides whether date exists.",
+  "rate_limit": "one host request at a time with source daily budget and block-rate stop",
+  "parser_fixtures": {
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/fixtures/zoho-direct.json",
+      "server/ingestion/fixtures/zoho-failures.json",
+      "server/ingestion/fixtures/zoho-postings.json"
+    ],
+    "present": [
+      "server/ingestion/fixtures/zoho-direct.json",
+      "server/ingestion/fixtures/zoho-failures.json",
+      "server/ingestion/fixtures/zoho-postings.json"
+    ],
+    "missing": []
+  },
+  "quality_threshold": {
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+  },
+  "public_enabled": true,
+  "quarantine_reason": "",
+  "failure_log": {
+    "known_failure_modes": [],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 9114,
+    "missing_country_pct": 33.3,
+    "missing_city_pct": 87.16,
+    "missing_any_geo_pct": 87.16,
+    "weak_remote_pct": 22.02,
+    "risk_score": 132.02,
+    "wave_priority": "wave-2-live-gap",
+    "detail_refetch_needed": true
+  },
+  "parser_method": {
+    "path": "server/index.js parseZohoPostingsFromHtml",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
+  },
+  "runner_interface": {
+    "discover": "fetch public board HTML and extract embedded JSON or domain id before parsing",
+    "fetchList": "fetch public board or discovered JSON endpoint with bounded response size",
+    "fetchDetail": "optional detail fetch only when list evidence is insufficient and fixture-backed",
+    "parseList": "server/index.js parseZohoPostingsFromHtml",
+    "parseDetail": "server/index.js parseZohoPostingsFromHtml",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
+  "certification_blockers": "high missing normalized geo"
+}

@@ -1,0 +1,79 @@
+{
+  "ats_key": "smartrecruiters",
+  "display_name": "SmartRecruiters",
+  "current_status": "certified",
+  "source_family": "direct_json",
+  "official_public_docs_or_observed_endpoint": "https://developers.smartrecruiters.com/docs/endpoints",
+  "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+  "list_fetch_method": "bounded GET/POST to source JSON list endpoint through the source runner",
+  "detail_fetch_method": "Not required for list-visible fields; detail pages may enrich descriptions.",
+  "pagination_method": "Public search supports limit; authenticated API supports paged job search.",
+  "canonical_url_rule": "Use applyUrl/ref/jobUrl/url and strip tracking fragments/query params.",
+  "source_job_id_rule": "preserve strongest raw id, requisition id, job id, vacancy id, or stable URL id",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "list-payload: Saved content[] fixture covers shortLocation/location city, region, and country fields.",
+  "country_region_city_rule": "list-payload: Saved content[] fixture covers shortLocation/location city, region, and country fields.",
+  "remote_type_rule": "Use remote/isRemote/workplaceType/locationType plus text evidence.",
+  "posting_date_rule": "Use releasedDate/updatedOn/createdOn when present.",
+  "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
+  "parser_fixtures": {
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/fixtures/smartrecruiters-direct.json",
+      "server/ingestion/fixtures/smartrecruiters-failures.json",
+      "server/ingestion/fixtures/smartrecruiters-postings.json"
+    ],
+    "present": [
+      "server/ingestion/fixtures/smartrecruiters-direct.json",
+      "server/ingestion/fixtures/smartrecruiters-failures.json",
+      "server/ingestion/fixtures/smartrecruiters-postings.json"
+    ],
+    "missing": []
+  },
+  "quality_threshold": {
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+  },
+  "public_enabled": true,
+  "quarantine_reason": "",
+  "failure_log": {
+    "known_failure_modes": [
+      "missing applyUrl/ref URL",
+      "blank title",
+      "missing company context"
+    ],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 5033,
+    "missing_country_pct": 45.62,
+    "missing_city_pct": 100,
+    "missing_any_geo_pct": 100,
+    "weak_remote_pct": 41.31,
+    "risk_score": 152.01,
+    "wave_priority": "wave-2-live-gap",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/index.js parseSmartRecruitersPostingsFromApi",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
+  },
+  "runner_interface": {
+    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
+    "fetchDetail": "Not required for list-visible fields; detail pages may enrich descriptions.",
+    "parseList": "server/index.js parseSmartRecruitersPostingsFromApi",
+    "parseDetail": "server/index.js parseSmartRecruitersPostingsFromApi",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "high missing normalized geo"
+}

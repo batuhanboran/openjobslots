@@ -1,0 +1,71 @@
+{
+  "ats_key": "getro",
+  "display_name": "Getro",
+  "current_status": "fallback",
+  "source_family": "direct_json",
+  "official_public_docs_or_observed_endpoint": "Observed Getro Next.js __NEXT_DATA__ jobs payload.",
+  "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+  "list_fetch_method": "bounded GET/POST to source JSON list endpoint through the source runner",
+  "detail_fetch_method": "not required for core fields unless the list payload omits description or normalized geo evidence",
+  "pagination_method": "use source offset/limit/page cursor when documented; otherwise cap single-list fetches",
+  "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
+  "source_job_id_rule": "list-payload: Use raw id/job id when available; fall back to stable canonical URL id.",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "list-payload: Public JSON/list payload usually exposes location fields; raw fixture must prove variants.",
+  "country_region_city_rule": "list-payload: Public JSON/list payload usually exposes location fields; raw fixture must prove variants.",
+  "remote_type_rule": "list-payload: Use explicit workplace/remote fields first, then conservative title/location text.",
+  "posting_date_rule": "list-payload: Use source date fields when present; otherwise document source absence.",
+  "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
+  "parser_fixtures": {
+    "status": "pending-parser-fixture",
+    "files": [],
+    "present": [],
+    "missing": [
+      "raw source fixture",
+      "expected normalized fixture",
+      "parser rejection tests"
+    ]
+  },
+  "quality_threshold": {
+    "mode": "quarantine_or_canary",
+    "minimum_confidence": 0.85,
+    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+  },
+  "public_enabled": true,
+  "quarantine_reason": "",
+  "failure_log": {
+    "known_failure_modes": [],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 1136,
+    "missing_country_pct": 14.79,
+    "missing_city_pct": 30.72,
+    "missing_any_geo_pct": 31.25,
+    "weak_remote_pct": 22.71,
+    "risk_score": 105.03,
+    "wave_priority": "wave-3-certification",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/index.js parseGetroPostingsFromHtml",
+    "parser_version_status": "pending-parser-fixture",
+    "confidence": "medium-pending-fixture"
+  },
+  "runner_interface": {
+    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
+    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
+    "parseList": "server/index.js parseGetroPostingsFromHtml",
+    "parseDetail": "server/index.js parseGetroPostingsFromHtml",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
+  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+}

@@ -1,0 +1,71 @@
+{
+  "ats_key": "isolvisolvedhire",
+  "display_name": "isolvedhire",
+  "current_status": "fallback",
+  "source_family": "embedded_json",
+  "official_public_docs_or_observed_endpoint": "Observed iSolved Hire board domain id plus core jobs API.",
+  "source_discovery_method": "fetch public board HTML and extract embedded JSON or domain id before parsing",
+  "list_fetch_method": "fetch public board or discovered JSON endpoint with bounded response size",
+  "detail_fetch_method": "optional detail fetch only when list evidence is insufficient and fixture-backed",
+  "pagination_method": "follow documented list or embedded next-page data; avoid unbounded DOM crawling",
+  "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
+  "source_job_id_rule": "url-or-title-inference: Use stable URL id when raw row id is absent.",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "detail-page: List cards may omit geo; detail fixture decides whether detail fetch is required.",
+  "country_region_city_rule": "detail-page: List cards may omit geo; detail fixture decides whether detail fetch is required.",
+  "remote_type_rule": "url-or-title-inference: Only infer remote/hybrid from explicit card/detail text.",
+  "posting_date_rule": "detail-page: List cards often omit date; detail fixture decides whether date exists.",
+  "rate_limit": "one host request at a time with source daily budget and block-rate stop",
+  "parser_fixtures": {
+    "status": "pending-parser-fixture",
+    "files": [],
+    "present": [],
+    "missing": [
+      "raw source fixture",
+      "expected normalized fixture",
+      "parser rejection tests"
+    ]
+  },
+  "quality_threshold": {
+    "mode": "quarantine_or_canary",
+    "minimum_confidence": 0.85,
+    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+  },
+  "public_enabled": false,
+  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven",
+  "failure_log": {
+    "known_failure_modes": [],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 0,
+    "missing_country_pct": 0,
+    "missing_city_pct": 0,
+    "missing_any_geo_pct": 0,
+    "weak_remote_pct": 0,
+    "risk_score": 35,
+    "wave_priority": "wave-4-fixture",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/index.js parseIsolvisolvedhirePostingsFromApi",
+    "parser_version_status": "pending-parser-fixture",
+    "confidence": "pending-fixture"
+  },
+  "runner_interface": {
+    "discover": "fetch public board HTML and extract embedded JSON or domain id before parsing",
+    "fetchList": "fetch public board or discovered JSON endpoint with bounded response size",
+    "fetchDetail": "optional detail fetch only when list evidence is insufficient and fixture-backed",
+    "parseList": "server/index.js parseIsolvisolvedhirePostingsFromApi",
+    "parseDetail": "server/index.js parseIsolvisolvedhirePostingsFromApi",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
+  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+}

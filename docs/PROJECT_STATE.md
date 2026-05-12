@@ -135,6 +135,7 @@ npm.cmd run refetch:details:dry-run -- --source=applitrack --limit=5000 --json -
 npm.cmd run search:reindex:check -- --json --output=reports/meili-reindex-check.json
 npm.cmd run audit:data-quality -- --by-source --by-parser
 npm.cmd run audit:ats-quality
+npm.cmd run ats:workbench
 npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=25 --json
 npm.cmd run ats:source:canary -- --source=greenhouse --limit=25 --json
 npm.cmd run ats:source:apply -- --source=greenhouse --apply --confirm-production --max-updates=100 --json

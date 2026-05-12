@@ -70,3 +70,4 @@ public/static/
 .tmp/
 playwright-report/
 test-results/
+reports/

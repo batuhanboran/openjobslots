@@ -1,0 +1,79 @@
+{
+  "ats_key": "lever",
+  "display_name": "Lever",
+  "current_status": "certified",
+  "source_family": "direct_json",
+  "official_public_docs_or_observed_endpoint": "https://github.com/lever/postings-api",
+  "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+  "list_fetch_method": "bounded GET/POST to source JSON list endpoint through the source runner",
+  "detail_fetch_method": "Not required; list JSON includes id, hostedUrl, applyUrl, categories, descriptions, createdAt.",
+  "pagination_method": "Supports skip/limit; current collector uses one public list response.",
+  "canonical_url_rule": "Use hostedUrl and strip tracking query params such as lever-source.",
+  "source_job_id_rule": "preserve strongest raw id, requisition id, job id, vacancy id, or stable URL id",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "list-payload: categories.location/allLocations expose location text; broad regions remain country-null.",
+  "country_region_city_rule": "list-payload: categories.location/allLocations expose location text; broad regions remain country-null.",
+  "remote_type_rule": "Use workplaceType and location/title evidence.",
+  "posting_date_rule": "Convert createdAt epoch milliseconds when present.",
+  "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
+  "parser_fixtures": {
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/fixtures/lever-direct.json",
+      "server/ingestion/fixtures/lever-failures.json",
+      "server/ingestion/fixtures/lever-postings.json"
+    ],
+    "present": [
+      "server/ingestion/fixtures/lever-direct.json",
+      "server/ingestion/fixtures/lever-failures.json",
+      "server/ingestion/fixtures/lever-postings.json"
+    ],
+    "missing": []
+  },
+  "quality_threshold": {
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+  },
+  "public_enabled": true,
+  "quarantine_reason": "",
+  "failure_log": {
+    "known_failure_modes": [
+      "missing hostedUrl",
+      "blank text title",
+      "missing company context"
+    ],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 2769,
+    "missing_country_pct": 14.19,
+    "missing_city_pct": 53.27,
+    "missing_any_geo_pct": 53.3,
+    "weak_remote_pct": 18.2,
+    "risk_score": 89.81,
+    "wave_priority": "monitor",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/index.js Lever collector",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
+  },
+  "runner_interface": {
+    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
+    "fetchDetail": "Not required; list JSON includes id, hostedUrl, applyUrl, categories, descriptions, createdAt.",
+    "parseList": "server/index.js Lever collector",
+    "parseDetail": "server/index.js Lever collector",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "high missing normalized geo"
+}

@@ -315,6 +315,24 @@ async function loadQualityData(options) {
   }
 
   const pool = createPostgresPool();
+  if (!pool) {
+    return {
+      qualitySummary: {
+        ok: false,
+        warning: "Postgres is not configured; ATS quality audit is using configured adapter metadata without live row counts.",
+        by_source: [],
+        by_parser: [],
+        summary: {},
+        count: 0
+      },
+      parserStats: {
+        ok: false,
+        warning: "Postgres is not configured; parser stats are unavailable.",
+        items: [],
+        count: 0
+      }
+    };
+  }
   try {
     const audit = await getPostgresQualityAudit(pool, { limit: options.limit });
     return {

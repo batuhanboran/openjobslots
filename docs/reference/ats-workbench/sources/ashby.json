@@ -1,0 +1,79 @@
+{
+  "ats_key": "ashby",
+  "display_name": "Ashby",
+  "current_status": "certified",
+  "source_family": "direct_json",
+  "official_public_docs_or_observed_endpoint": "https://developers.ashbyhq.com/docs/public-job-posting-api",
+  "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+  "list_fetch_method": "bounded GET/POST to source JSON list endpoint through the source runner",
+  "detail_fetch_method": "Not required for core public fields when source exposes jobUrl/applyUrl/location/description.",
+  "pagination_method": "Current GraphQL response is one jobPostings[] list; official public API returns jobs[].",
+  "canonical_url_rule": "Use jobUrl when present, otherwise jobs.ashbyhq.com/{board}/{id}.",
+  "source_job_id_rule": "preserve strongest raw id or URL id; Use jobUrl when present, otherwise jobs.ashbyhq.com/{board}/{id}.",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "list-payload: GraphQL locations expose country/location text but can be broad regional lists.",
+  "country_region_city_rule": "list-payload: GraphQL locations expose country/location text but can be broad regional lists.",
+  "remote_type_rule": "Use workplaceType and isRemote.",
+  "posting_date_rule": "Use official publishedAt/createdAt when present; current hosted GraphQL query omits dates.",
+  "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
+  "parser_fixtures": {
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/fixtures/ashby-direct.json",
+      "server/ingestion/fixtures/ashby-failures.json",
+      "server/ingestion/fixtures/ashby-postings.json"
+    ],
+    "present": [
+      "server/ingestion/fixtures/ashby-direct.json",
+      "server/ingestion/fixtures/ashby-failures.json",
+      "server/ingestion/fixtures/ashby-postings.json"
+    ],
+    "missing": []
+  },
+  "quality_threshold": {
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+  },
+  "public_enabled": true,
+  "quarantine_reason": "",
+  "failure_log": {
+    "known_failure_modes": [
+      "missing jobUrl with missing id",
+      "blank title",
+      "missing company context"
+    ],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 26620,
+    "missing_country_pct": 16.8,
+    "missing_city_pct": 60.88,
+    "missing_any_geo_pct": 60.95,
+    "weak_remote_pct": 16.42,
+    "risk_score": 106.3,
+    "wave_priority": "monitor",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/index.js Ashby collector",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
+  },
+  "runner_interface": {
+    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
+    "fetchDetail": "Not required for core public fields when source exposes jobUrl/applyUrl/location/description.",
+    "parseList": "server/index.js Ashby collector",
+    "parseDetail": "server/index.js Ashby collector",
+    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "high missing normalized geo"
+}
