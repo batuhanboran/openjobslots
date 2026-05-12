@@ -353,6 +353,39 @@ test("iCIMS raw detail fixtures certify ATS code locations and remote header evi
   assert.equal(jsonLdNormalized.country, fixture.expected_jsonld.country);
   assert.equal(jsonLdNormalized.region, fixture.expected_jsonld.region);
   assert.equal(jsonLdNormalized.city, fixture.expected_jsonld.city);
+
+  assert.equal(extractIcimsLocationFromHtml(fixture.detail_html_jsonld_missing_location), fixture.expected_jsonld_missing_location.location);
+  assert.equal(extractIcimsPostingDateFromHtml(fixture.detail_html_jsonld_missing_location), fixture.expected_jsonld_missing_location.posting_date);
+  assert.equal(extractIcimsRemoteTypeFromHtml(fixture.detail_html_jsonld_missing_location), fixture.expected_jsonld_missing_location.remote_type);
+  const jsonLdMissingLocationNormalized = normalizeParsed("icims", {
+    company_name: fixture.company_name_for_postings,
+    source_job_id: "4101",
+    position_name: "Operations Manager",
+    job_posting_url: "https://fixtureco.icims.com/jobs/4101/operations-manager/job",
+    posting_date: extractIcimsPostingDateFromHtml(fixture.detail_html_jsonld_missing_location),
+    remote_type: extractIcimsRemoteTypeFromHtml(fixture.detail_html_jsonld_missing_location),
+    location: extractIcimsLocationFromHtml(fixture.detail_html_jsonld_missing_location)
+  }, fixture.company_name_for_postings);
+  assert.equal(jsonLdMissingLocationNormalized.country, fixture.expected_jsonld_missing_location.country);
+  assert.equal(jsonLdMissingLocationNormalized.region, fixture.expected_jsonld_missing_location.region);
+  assert.equal(jsonLdMissingLocationNormalized.city, fixture.expected_jsonld_missing_location.city);
+  assert.equal(jsonLdMissingLocationNormalized.remote_type, fixture.expected_jsonld_missing_location.remote_type);
+
+  assert.equal(extractIcimsLocationFromHtml(fixture.detail_html_data_label_remote), fixture.expected_data_label_remote.location);
+  assert.equal(extractIcimsPostingDateFromHtml(fixture.detail_html_data_label_remote), fixture.expected_data_label_remote.posting_date);
+  assert.equal(extractIcimsRemoteTypeFromHtml(fixture.detail_html_data_label_remote), fixture.expected_data_label_remote.remote_type);
+  const dataLabelRemoteNormalized = normalizeParsed("icims", {
+    company_name: fixture.company_name_for_postings,
+    source_job_id: "4201",
+    position_name: "Hybrid Support Lead",
+    job_posting_url: "https://fixtureco.icims.com/jobs/4201/hybrid-support-lead/job",
+    posting_date: extractIcimsPostingDateFromHtml(fixture.detail_html_data_label_remote),
+    remote_type: extractIcimsRemoteTypeFromHtml(fixture.detail_html_data_label_remote),
+    location: extractIcimsLocationFromHtml(fixture.detail_html_data_label_remote)
+  }, fixture.company_name_for_postings);
+  assert.equal(dataLabelRemoteNormalized.country, fixture.expected_data_label_remote.country);
+  assert.equal(dataLabelRemoteNormalized.region, fixture.expected_data_label_remote.region);
+  assert.equal(dataLabelRemoteNormalized.remote_type, fixture.expected_data_label_remote.remote_type);
 });
 
 test("Applitrack detail fixtures recover location, date, remote evidence, and detail URL", () => {

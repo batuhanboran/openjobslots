@@ -1,0 +1,29 @@
+{
+  "description": "Malformed or unsupported iCIMS tenant payload shapes should parse to no postings instead of fabricating rows.",
+  "cases": [
+    {
+      "name": "empty wrapper page without job links",
+      "payload": {
+        "html": "<html><body><div id=\"icims_content_iframe\"></div><p>No open jobs are available.</p></body></html>"
+      }
+    },
+    {
+      "name": "unsupported search API object shape",
+      "payload": {
+        "jobs": [
+          {
+            "id": "9001",
+            "title": "Unsupported API Row",
+            "url": "https://fixtureco.icims.com/api/jobs/9001"
+          }
+        ]
+      }
+    },
+    {
+      "name": "intro and non-job links only",
+      "payload": {
+        "html": "<a href=\"/jobs/intro\">Intro</a><a href=\"/about-us\">About</a>"
+      }
+    }
+  ]
+}

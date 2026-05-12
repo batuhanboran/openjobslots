@@ -13,6 +13,9 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(dryRun.limit, 5);
   assert.equal(getSafetyGate(dryRun).authorized, false);
 
+  const companyLimitAlias = parseArgs(["--source=icims", "--company-limit=7"]);
+  assert.equal(companyLimitAlias.limit, 7);
+
   const missingMax = parseArgs(["--source=greenhouse", "--apply", "--confirm-production"]);
   const missingMaxGate = getSafetyGate(missingMax);
   assert.equal(missingMaxGate.authorized, false);

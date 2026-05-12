@@ -7,12 +7,29 @@
   "list_html": "\n    <ul>\n      <li class=\"iCIMS_JobCardItem\">\n        <a href=\"/jobs/1001/technical-support-engineer/job\"><h3>Technical Support Engineer</h3></a>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>US-PA-Philadelphia</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      </li>\n      <li class=\"iCIMS_JobCardItem\">\n        <a href=\"/jobs/1002/remote-data-analyst/job\"><h3>Remote Data Analyst</h3></a>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>CA-ON-Toronto</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>Yes</span></dd>\n      </li>\n    </ul>\n  ",
   "detail_html_no_date": "\n    <section>\n      <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>US-PA-Philadelphia</span></dd>\n      <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      <p>This public detail page intentionally has no Date Posted field.</p>\n    </section>\n  ",
   "detail_html_jsonld": "\n    <html><head>\n      <title>Business Development Manager - Sustainability Business in Shanghai</title>\n      <script type=\"application/ld+json\">\n        {\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Business Development Manager - Sustainability Business\",\"datePosted\":\"2026-02-03T05:00:00.000Z\",\"jobLocation\":[{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"Shanghai\",\"addressRegion\":\"UNAVAILABLE\",\"addressCountry\":\"CN\",\"postalCode\":\"UNAVAILABLE\",\"streetAddress\":\"UNAVAILABLE\"}}]}\n      </script>\n    </head><body><h1>Business Development Manager - Sustainability Business</h1></body></html>\n  ",
+  "detail_html_jsonld_missing_location": "\n    <html><head>\n      <title>Operations Manager in Kozhikode</title>\n      <script type=\"application/ld+json\">\n        {\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Operations Manager\",\"datePosted\":\"2026-03-15\"}\n      </script>\n    </head><body>\n      <section>\n        <dt><span class=\"field-label\">Location</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>IN-KL-Kozhikode</span></dd>\n        <dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd>\n      </section>\n    </body></html>\n  ",
+  "detail_html_data_label_remote": "\n    <html><body>\n      <div data-label=\"primary-location\">Remote - United States</div>\n      <div data-label=\"workplace-type\">Hybrid</div>\n      <div data-label=\"date-posted\">2026-04-12</div>\n    </body></html>\n  ",
   "expected_jsonld": {
     "location": "Shanghai, China",
     "posting_date": "2026-02-03T05:00:00.000Z",
     "country": "China",
     "region": "APAC",
     "city": "Shanghai"
+  },
+  "expected_jsonld_missing_location": {
+    "location": "IN-KL-Kozhikode",
+    "posting_date": "2026-03-15",
+    "country": "India",
+    "region": "APAC",
+    "city": "Kozhikode",
+    "remote_type": "onsite"
+  },
+  "expected_data_label_remote": {
+    "location": "Remote - United States",
+    "posting_date": "2026-04-12",
+    "country": "United States",
+    "region": "North America",
+    "remote_type": "hybrid"
   },
   "expected": [
     {

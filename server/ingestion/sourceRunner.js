@@ -33,6 +33,17 @@ function clean(value, max = 1000) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function postingSourceFailureReasons(posting = {}) {
+  const values = Array.isArray(posting?.source_failure_reasons)
+    ? posting.source_failure_reasons
+    : [
+        posting?.source_failure_reason,
+        posting?.parser_failure_reason,
+        posting?.icims_failure_reason
+      ];
+  return Array.from(new Set(values.map((value) => clean(value, 120)).filter(Boolean)));
+}
+
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
     mode: String(env.OPENJOBSLOTS_ATS_SOURCE_MODE || "dry-run").trim().toLowerCase(),
@@ -63,6 +74,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     else if (arg.startsWith("--mode=")) options.mode = String(arg.slice("--mode=".length)).trim().toLowerCase();
     else if (arg.startsWith("--source=")) options.source = String(arg.slice("--source=".length)).trim().toLowerCase();
     else if (arg.startsWith("--limit=")) options.limit = asInt(arg.slice("--limit=".length), options.limit, 1, MAX_RUN_LIMIT);
+    else if (arg.startsWith("--company-limit=")) options.limit = asInt(arg.slice("--company-limit=".length), options.limit, 1, MAX_RUN_LIMIT);
     else if (arg.startsWith("--batch-size=")) options.batchSize = asInt(arg.slice("--batch-size=".length), options.batchSize, 1, 1000);
     else if (arg.startsWith("--concurrency=")) options.concurrency = asInt(arg.slice("--concurrency=".length), options.concurrency, 1, MAX_CONCURRENCY);
     else if (arg.startsWith("--host-concurrency=")) options.hostConcurrency = asInt(arg.slice("--host-concurrency=".length), options.hostConcurrency, 1, MAX_CONCURRENCY);
@@ -457,6 +469,17 @@ async function processTarget(pool, target, options, summary, runId) {
         reason_codes: ["source_disabled_by_threshold"],
         evidence: gate.evidence,
         retry_detail_refetch_eligible: false
+      };
+    }
+    const sourceFailureReasons = postingSourceFailureReasons(normalized);
+    if (adapterValidation?.ok && status === "quarantined" && sourceFailureReasons.length > 0) {
+      validation = {
+        ...validation,
+        error: sourceFailureReasons[0],
+        reason_codes: Array.from(new Set([
+          ...sourceFailureReasons,
+          ...(Array.isArray(validation?.reason_codes) ? validation.reason_codes : [])
+        ]))
       };
     }
     if (status === "accepted") {

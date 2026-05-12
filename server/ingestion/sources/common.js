@@ -14,6 +14,9 @@ const {
   parseGreenhousePostingsFromApi,
   parseHirebridgePostingsFromHtml,
   parseHrmDirectPostingsFromHtml,
+  extractIcimsLocationFromHtml,
+  extractIcimsPostingDateFromHtml,
+  extractIcimsRemoteTypeFromHtml,
   parseIcimsPostingsFromHtml,
   parseJobvitePostingsFromHtml,
   parseLeverPostingsFromApi,
@@ -133,6 +136,300 @@ function fetchJson(url, init = {}) {
     if (contentType.includes("application/json")) return response.json();
     return response.text();
   });
+}
+
+function makeSourceFetchError(code, message, detail = {}) {
+  const error = new Error(message || code);
+  error.ingestionErrorType = code;
+  if (detail.status) error.status = detail.status;
+  if (detail.url) error.url = detail.url;
+  return error;
+}
+
+function classifyPublicRouteStatus(status, fallbackCode = "fetch_failed") {
+  const value = Number(status || 0);
+  if (value === 404 || value === 410) return "detail_404_or_410";
+  if (value === 401 || value === 403 || value === 429) return "blocked_or_rate_limited";
+  return fallbackCode;
+}
+
+async function fetchText(url, options = {}) {
+  if (options.fetcher) {
+    const response = await options.fetcher(url, options.target || {});
+    if (typeof response === "string") return { text: response, finalUrl: url, status: 200 };
+    if (response && typeof response === "object") {
+      if (typeof response.text === "function") {
+        return {
+          text: await response.text(),
+          finalUrl: response.url || url,
+          status: Number(response.status || 200)
+        };
+      }
+      if (typeof response.html === "string" || typeof response.body === "string") {
+        return {
+          text: String(response.html || response.body || ""),
+          finalUrl: response.url || url,
+          status: Number(response.status || 200)
+        };
+      }
+    }
+    return { text: String(response || ""), finalUrl: url, status: 200 };
+  }
+  if (typeof fetch !== "function") {
+    throw new Error("global fetch is unavailable for source fetch");
+  }
+  const response = await fetch(url, {
+    headers: {
+      accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5",
+      "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)"
+    },
+    ...(options.fetchOptions || {})
+  });
+  if (!response.ok) {
+    const code = classifyPublicRouteStatus(response.status, "fetch_failed");
+    throw makeSourceFetchError(code, `iCIMS public route failed with HTTP ${response.status}`, {
+      status: response.status,
+      url
+    });
+  }
+  return {
+    text: await response.text(),
+    finalUrl: response.url || url,
+    status: response.status
+  };
+}
+
+function ensureIcimsIframeUrl(urlString) {
+  const parsed = asUrl(urlString);
+  if (!parsed) return clean(urlString);
+  parsed.searchParams.set("in_iframe", "1");
+  return parsed.toString();
+}
+
+function parseIcimsPublicCompany(urlString) {
+  const parsed = asUrl(urlString);
+  if (!parsed) return null;
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".icims.com")) return null;
+  const [tenant = ""] = host.split(".");
+  if (!tenant) return null;
+  const searchUrl = new URL(parsed.toString());
+  searchUrl.pathname = "/jobs/search";
+  if (!searchUrl.searchParams.has("ss")) searchUrl.searchParams.set("ss", "1");
+  searchUrl.searchParams.delete("in_iframe");
+  return {
+    tenant,
+    host,
+    origin: `${parsed.protocol}//${parsed.host}`,
+    searchUrl: searchUrl.toString()
+  };
+}
+
+function extractIcimsIframeUrlFromHtml(pageHtml, baseUrl) {
+  const source = String(pageHtml || "");
+  const patterns = [
+    /icimsFrame\.src\s*=\s*'([^']+)'/i,
+    /icimsFrame\.src\s*=\s*"([^"]+)"/i,
+    /<iframe[^>]*id=["']icims_content_iframe["'][^>]*src=["']([^"']+)["']/i
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    const rawValue = clean(match?.[1]);
+    if (!rawValue) continue;
+    let candidate = rawValue.replace(/&amp;/g, "&").replace(/\\\//g, "/");
+    if (candidate.startsWith("//")) {
+      const parsedBase = asUrl(baseUrl);
+      candidate = `${parsedBase?.protocol || "https:"}${candidate}`;
+    } else if (!/^https?:\/\//i.test(candidate)) {
+      try {
+        candidate = new URL(candidate, baseUrl).toString();
+      } catch {
+        continue;
+      }
+    }
+    return ensureIcimsIframeUrl(candidate);
+  }
+  return ensureIcimsIframeUrl(baseUrl);
+}
+
+function extractIcimsNextPageUrlFromHtml(pageHtml, currentUrl) {
+  const source = String(pageHtml || "");
+  const patterns = [
+    /<link[^>]*rel=["']next["'][^>]*href=["']([^"']+)["']/i,
+    /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']next["'][^>]*>/i,
+    /<a[^>]*(?:aria-label|title)=["']next["'][^>]*href=["']([^"']+)["'][^>]*>/i,
+    /<a[^>]*href=["']([^"']+)["'][^>]*>[\s\S]*?\bnext\b[\s\S]*?<\/a>/i
+  ];
+  const current = asUrl(currentUrl);
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    const rawValue = clean(match?.[1]);
+    if (!rawValue) continue;
+    let candidate = rawValue.replace(/&amp;/g, "&").replace(/\\\//g, "/");
+    if (candidate.startsWith("//")) {
+      candidate = `${current?.protocol || "https:"}${candidate}`;
+    } else if (!/^https?:\/\//i.test(candidate)) {
+      try {
+        candidate = new URL(candidate, currentUrl).toString();
+      } catch {
+        continue;
+      }
+    }
+    const parsedCandidate = asUrl(candidate);
+    if (!parsedCandidate || !current || parsedCandidate.host !== current.host) continue;
+    const normalized = ensureIcimsIframeUrl(candidate);
+    if (normalized && normalized !== clean(currentUrl)) return normalized;
+  }
+  return "";
+}
+
+function icimsDetailUrl(urlString) {
+  const parsed = asUrl(urlString);
+  if (!parsed || !String(parsed.hostname || "").toLowerCase().endsWith(".icims.com")) return "";
+  return ensureIcimsIframeUrl(parsed.toString());
+}
+
+function icimsDetailEvidenceKind(detailHtml, field) {
+  const source = String(detailHtml || "");
+  if (field === "location" && /application\/ld\+json/i.test(source) && /jobLocation/i.test(source)) {
+    return "json_ld_joblocation";
+  }
+  if (field === "date" && /application\/ld\+json/i.test(source) && /datePosted/i.test(source)) {
+    return "json_ld_dateposted";
+  }
+  if (field === "remote" && /data-(?:field|label)=["'](?:remote|workplace-type|location-type)["']/i.test(source)) {
+    return "data_label_remote";
+  }
+  return `labeled_detail_${field}`;
+}
+
+function hasIcimsPublicPostingEvidence(posting = {}) {
+  return Boolean(clean(posting.location) || clean(posting.location_text) || clean(posting.remote_type));
+}
+
+async function fetchIcimsSourceList(company = {}, target = {}, options = {}) {
+  const discovered = target && target.list_url ? target : SOURCE_SPECS.icims.discover(company);
+  const route = parseIcimsPublicCompany(discovered.list_url || company.url_string);
+  if (!route) {
+    throw makeSourceFetchError("no_public_portal_route", "iCIMS source has no public *.icims.com portal route", {
+      url: company.url_string
+    });
+  }
+
+  const companyName = normalizeCompanyName(company, route.tenant);
+  const wrapper = await fetchText(route.searchUrl, { ...options, target: discovered });
+  const firstPageUrl = extractIcimsIframeUrlFromHtml(wrapper.text, wrapper.finalUrl || route.searchUrl);
+  const pages = [];
+  const seenPageUrls = new Set();
+  const maxPages = Math.max(1, Math.min(5, Number(process.env.OPENJOBSLOTS_ICIMS_SOURCE_MAX_PAGES || 2)));
+  let pageUrl = firstPageUrl;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const normalizedPageUrl = ensureIcimsIframeUrl(pageUrl);
+    if (!normalizedPageUrl || seenPageUrls.has(normalizedPageUrl)) break;
+    seenPageUrls.add(normalizedPageUrl);
+    const pageResponse = normalizedPageUrl === wrapper.finalUrl || normalizedPageUrl === route.searchUrl
+      ? wrapper
+      : await fetchText(normalizedPageUrl, { ...options, target: discovered });
+    pages.push({ url: normalizedPageUrl, html: pageResponse.text });
+    const nextPageUrl = extractIcimsNextPageUrlFromHtml(pageResponse.text, normalizedPageUrl);
+    if (!nextPageUrl) break;
+    pageUrl = nextPageUrl;
+  }
+
+  const postings = [];
+  const seenPostingUrls = new Set();
+  for (const page of pages) {
+    for (const posting of parseIcimsPostingsFromHtml(companyName, route, page.html)) {
+      const postingUrl = clean(posting?.job_posting_url);
+      if (!postingUrl || seenPostingUrls.has(postingUrl)) continue;
+      seenPostingUrls.add(postingUrl);
+      postings.push({
+        ...posting,
+        source_evidence: {
+          list_url: page.url,
+          route_kind: "icims_public_iframe_list"
+        }
+      });
+    }
+  }
+
+  if (postings.length === 0) {
+    throw makeSourceFetchError("portal_search_empty", "iCIMS public portal search returned no parseable jobs", {
+      url: route.searchUrl
+    });
+  }
+
+  const detailLimit = Math.max(0, Math.min(100, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 20)));
+  let detailFetches = 0;
+  const enriched = [];
+  for (const posting of postings) {
+    let enrichedPosting = posting;
+    const needsDetail =
+      detailFetches < detailLimit &&
+      (!clean(posting.location) || !clean(posting.posting_date) || !clean(posting.remote_type));
+    if (needsDetail) {
+      const detailUrl = icimsDetailUrl(posting.job_posting_url);
+      if (!detailUrl) {
+        enrichedPosting = {
+          ...posting,
+          source_failure_reasons: ["no_public_portal_route"]
+        };
+      } else {
+        try {
+          const detail = await fetchText(detailUrl, { ...options, target: discovered });
+          detailFetches += 1;
+          const detailLocation = extractIcimsLocationFromHtml(detail.text);
+          const detailRemoteType = extractIcimsRemoteTypeFromHtml(detail.text);
+          const detailPostingDate = extractIcimsPostingDateFromHtml(detail.text);
+          const sourceEvidence = {
+            ...(posting.source_evidence || {}),
+            detail_url: detailUrl,
+            detail_fetch_status: detail.status,
+            location_source: detailLocation ? icimsDetailEvidenceKind(detail.text, "location") : "",
+            remote_source: detailRemoteType ? icimsDetailEvidenceKind(detail.text, "remote") : "",
+            posting_date_source: detailPostingDate ? icimsDetailEvidenceKind(detail.text, "date") : ""
+          };
+          enrichedPosting = {
+            ...posting,
+            location: clean(posting.location) || detailLocation || null,
+            remote_type: clean(posting.remote_type) || detailRemoteType || null,
+            posting_date: clean(posting.posting_date) || detailPostingDate || null,
+            source_evidence: sourceEvidence
+          };
+        } catch (error) {
+          detailFetches += 1;
+          const statusCode = Number(error?.status || 0);
+          enrichedPosting = {
+            ...posting,
+            source_failure_reasons: [classifyPublicRouteStatus(statusCode, "unsupported_tenant_shape")]
+          };
+        }
+      }
+    }
+
+    if (!hasIcimsPublicPostingEvidence(enrichedPosting)) {
+      enrichedPosting = {
+        ...enrichedPosting,
+        source_failure_reasons: Array.from(new Set([
+          ...(Array.isArray(enrichedPosting.source_failure_reasons) ? enrichedPosting.source_failure_reasons : []),
+          "no_structured_location",
+          "no_explicit_remote_evidence"
+        ]))
+      };
+    }
+
+    enriched.push(enrichedPosting);
+  }
+
+  return {
+    __legacyParsed: enriched,
+    __sourceConfig: {
+      ...route,
+      list_pages_fetched: pages.length,
+      detail_fetch_count: detailFetches
+    }
+  };
 }
 
 const SOURCE_SPECS = Object.freeze({
@@ -319,12 +616,20 @@ const SOURCE_SPECS = Object.freeze({
     confidence: 0.55,
     parser: (companyName, config, payload) => parseIcimsPostingsFromHtml(companyName, config, payload?.html || payload),
     officialDocs: "iCIMS Job Portal/Search API and public portal detail pages",
+    fetchList: fetchIcimsSourceList,
     discover(company) {
-      const parsed = asUrl(company.url_string);
-      const origin = parsed ? parsed.origin : "";
+      const route = parseIcimsPublicCompany(company.url_string);
       return {
-        config: { origin },
-        listUrl: clean(company.url_string)
+        config: route
+          ? {
+              tenant: route.tenant,
+              host: route.host,
+              origin: route.origin,
+              searchUrl: route.searchUrl,
+              routeKind: "icims_public_portal"
+            }
+          : {},
+        listUrl: route?.searchUrl || clean(company.url_string)
       };
     }
   },
@@ -642,6 +947,9 @@ function createSourceModule(atsKey) {
 
   async function fetchList(company = {}, options = {}) {
     const target = discover(company);
+    if (typeof spec.fetchList === "function") {
+      return spec.fetchList(buildCompanyContext(company), target, options);
+    }
     if (!target.list_url) {
       return {
         __legacyParsed: await collectPostingsForCompany({

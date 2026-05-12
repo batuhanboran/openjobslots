@@ -1,0 +1,16 @@
+{
+  "wrapper_url": "https://fixtureco.icims.com/jobs/search?ss=1",
+  "iframe_url": "https://fixtureco.icims.com/jobs/search?ss=1&in_iframe=1",
+  "detail_url": "https://fixtureco.icims.com/jobs/7001/platform-engineer/job?in_iframe=1",
+  "wrapper_html": "<html><body><iframe id=\"icims_content_iframe\" src=\"/jobs/search?ss=1\"></iframe></body></html>",
+  "list_html": "<html><body><ul><li class=\"iCIMS_JobCardItem\"><a href=\"/jobs/7001/platform-engineer/job\"><h3>Platform Engineer</h3></a></li></ul></body></html>",
+  "detail_html": "<html><head><script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Platform Engineer\",\"datePosted\":\"2026-05-10\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"Austin\",\"addressRegion\":\"TX\",\"addressCountry\":\"US\"}}}</script></head><body><dt><span class=\"field-label\">Remote</span></dt><dd class=\"iCIMS_JobHeaderData\"><span>No</span></dd></body></html>",
+  "expected": {
+    "source_job_id": "7001",
+    "position_name": "Platform Engineer",
+    "country": "United States",
+    "city": "Austin",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-10"
+  }
+}

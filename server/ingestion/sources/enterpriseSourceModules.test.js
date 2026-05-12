@@ -87,3 +87,48 @@ for (const atsKey of ENTERPRISE_SOURCES) {
     }
   });
 }
+
+test("icims source module ignores malformed or unsupported raw list shapes", () => {
+  const source = getSourceModule("icims");
+  const sourceDir = path.join(__dirname, "icims");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const malformed = readJson(path.join(sourceDir, "fixtures", "malformed-list-shapes.json"));
+
+  for (const item of malformed.cases) {
+    const parsed = source.parse(item.payload, company);
+    assert.equal(parsed.length, 0, `icims ${item.name} should not produce postings`);
+  }
+});
+
+test("icims source module follows wrapper iframe and enriches from public detail", async () => {
+  const source = getSourceModule("icims");
+  const sourceDir = path.join(__dirname, "icims");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const fixture = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+  const responses = new Map([
+    [fixture.wrapper_url, fixture.wrapper_html],
+    [fixture.iframe_url, fixture.list_html],
+    [fixture.detail_url, fixture.detail_html]
+  ]);
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      assert.ok(responses.has(url), `unexpected iCIMS fixture fetch ${url}`);
+      return responses.get(url);
+    }
+  });
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].source_evidence?.route_kind, "icims_public_iframe_list");
+  assert.equal(parsed[0].source_evidence?.location_source, "json_ld_joblocation");
+
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.position_name, fixture.expected.position_name);
+  assert.equal(normalized.country, fixture.expected.country);
+  assert.equal(normalized.city, fixture.expected.city);
+  assert.equal(normalized.remote_type, fixture.expected.remote_type);
+  assert.equal(normalized.posting_date, fixture.expected.posting_date);
+  const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
+  assert.equal(gate.status, "accepted");
+});
