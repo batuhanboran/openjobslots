@@ -15,6 +15,7 @@
     "audit:ats-quality": "node scripts/audit-ats-quality.js",
     "ats:workbench": "node scripts/ats-workbench.js",
     "audit:data-quality": "node scripts/audit-data-quality.js",
+    "source-quality:apply": "node scripts/apply-source-quality-protection.js",
     "ats:source:dry-run": "node scripts/ats-source-job.js --mode=dry-run",
     "ats:source:canary": "node scripts/ats-source-job.js --mode=canary",
     "ats:source:apply": "node scripts/ats-source-job.js --mode=apply",
