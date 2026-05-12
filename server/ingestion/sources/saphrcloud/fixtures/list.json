@@ -1,0 +1,22 @@
+{
+  "jobSearchResult": [
+    {
+      "response": {
+        "id": "5001",
+        "unifiedStandardTitle": "Remote Basis Consultant",
+        "jobUrl": "https://jobs.sap.com/job/Remote-Basis-Consultant/5001-en_US",
+        "unifiedStandardStart": "2026-05-08",
+        "jobLocationShort": [
+          {
+            "value": "Remote - United States"
+          }
+        ],
+        "filter8": [
+          {
+            "value": "Consulting"
+          }
+        ]
+      }
+    }
+  ]
+}

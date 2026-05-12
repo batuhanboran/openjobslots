@@ -19,10 +19,18 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/adp_workforcenow-direct.json"
+      "server/ingestion/fixtures/adp_workforcenow-direct.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/company.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/expected-normalized.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/list.json"
     ],
     "present": [
-      "server/ingestion/fixtures/adp_workforcenow-direct.json"
+      "server/ingestion/fixtures/adp_workforcenow-direct.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/company.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/expected-normalized.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/adp_workforcenow/fixtures/list.json"
     ],
     "missing": []
   },

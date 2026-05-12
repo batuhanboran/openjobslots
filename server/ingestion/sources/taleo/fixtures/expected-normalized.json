@@ -1,0 +1,21 @@
+[
+  {
+    "source_job_id": "5001",
+    "company_name": "Fixture Taleo",
+    "position_name": "Remote Support Analyst",
+    "country": "United States",
+    "remote_type": "remote",
+    "posting_date": "May 8, 2026",
+    "parser_confidence": 0.35
+  },
+  {
+    "source_job_id": "5002",
+    "company_name": "Fixture Taleo",
+    "position_name": "Hybrid Finance Lead",
+    "country": "United Kingdom",
+    "city": "London",
+    "remote_type": "hybrid",
+    "posting_date": "May 9, 2026",
+    "parser_confidence": 0.35
+  }
+]

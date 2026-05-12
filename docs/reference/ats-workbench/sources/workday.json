@@ -20,11 +20,19 @@
     "status": "parser-fixture-backed",
     "files": [
       "server/ingestion/fixtures/workday-direct.json",
-      "server/ingestion/fixtures/workday-failures.json"
+      "server/ingestion/fixtures/workday-failures.json",
+      "server/ingestion/sources/workday/fixtures/company.json",
+      "server/ingestion/sources/workday/fixtures/expected-normalized.json",
+      "server/ingestion/sources/workday/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/workday/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/workday-direct.json",
-      "server/ingestion/fixtures/workday-failures.json"
+      "server/ingestion/fixtures/workday-failures.json",
+      "server/ingestion/sources/workday/fixtures/company.json",
+      "server/ingestion/sources/workday/fixtures/expected-normalized.json",
+      "server/ingestion/sources/workday/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/workday/fixtures/list.json"
     ],
     "missing": []
   },

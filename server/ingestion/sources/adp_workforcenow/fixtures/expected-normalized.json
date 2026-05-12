@@ -1,0 +1,12 @@
+[
+  {
+    "source_job_id": "REQ-5001",
+    "company_name": "Fixture ADP WFN",
+    "position_name": "Hybrid Payroll Analyst",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-08T08:00:00+03:00",
+    "parser_confidence": 0.65
+  }
+]

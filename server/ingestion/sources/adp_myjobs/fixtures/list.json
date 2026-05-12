@@ -1,0 +1,26 @@
+{
+  "jobRequisitions": [
+    {
+      "reqId": "REQ-5001",
+      "publishedJobTitle": "Onsite Operations Coordinator",
+      "postingDate": "2026-05-08",
+      "url": "https://myjobs.adp.com/acme/cx/job-details?reqId=REQ-5001",
+      "requisitionLocations": [
+        {
+          "nameCode": {
+            "longName": "Toronto Office"
+          },
+          "address": {
+            "cityName": "Toronto",
+            "countrySubdivisionLevel1": {
+              "codeValue": "ON"
+            },
+            "country": {
+              "longName": "Canada"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

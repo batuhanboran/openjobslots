@@ -20,11 +20,19 @@
     "status": "parser-fixture-backed",
     "files": [
       "server/ingestion/fixtures/taleo-direct.json",
-      "server/ingestion/fixtures/taleo-failures.json"
+      "server/ingestion/fixtures/taleo-failures.json",
+      "server/ingestion/sources/taleo/fixtures/company.json",
+      "server/ingestion/sources/taleo/fixtures/expected-normalized.json",
+      "server/ingestion/sources/taleo/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/taleo/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/taleo-direct.json",
-      "server/ingestion/fixtures/taleo-failures.json"
+      "server/ingestion/fixtures/taleo-failures.json",
+      "server/ingestion/sources/taleo/fixtures/company.json",
+      "server/ingestion/sources/taleo/fixtures/expected-normalized.json",
+      "server/ingestion/sources/taleo/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/taleo/fixtures/list.json"
     ],
     "missing": []
   },

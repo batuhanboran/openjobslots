@@ -1,0 +1,12 @@
+[
+  {
+    "source_job_id": "5001",
+    "company_name": "Fixture Paylocity",
+    "position_name": "Hybrid Benefits Specialist",
+    "country": "Germany",
+    "city": "Berlin",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-08T08:00:00+03:00",
+    "parser_confidence": 0.65
+  }
+]

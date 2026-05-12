@@ -1,0 +1,16 @@
+{
+  "Jobs": [
+    {
+      "JobId": "5001",
+      "JobTitle": "Hybrid Benefits Specialist",
+      "PublishedDate": "2026-05-08T08:00:00+03:00",
+      "HiringDepartment": "People",
+      "IsRemote": false,
+      "JobLocation": {
+        "City": "Berlin",
+        "State": "",
+        "Country": "Germany"
+      }
+    }
+  ]
+}

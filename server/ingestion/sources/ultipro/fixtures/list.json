@@ -1,0 +1,22 @@
+{
+  "opportunities": [
+    {
+      "Id": "OPP-5001",
+      "Title": "Onsite Warehouse Supervisor",
+      "PostedDate": "2026-05-08",
+      "Locations": [
+        {
+          "Address": {
+            "City": "Dallas",
+            "State": {
+              "Code": "TX"
+            },
+            "Country": {
+              "Name": "United States"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

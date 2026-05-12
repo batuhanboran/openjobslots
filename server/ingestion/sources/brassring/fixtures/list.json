@@ -1,0 +1,30 @@
+{
+  "Jobs": {
+    "Job": [
+      {
+        "Questions": [
+          {
+            "QuestionName": "reqid",
+            "Value": "BR-5001"
+          },
+          {
+            "QuestionName": "jobtitle",
+            "Value": "Hybrid Systems Analyst"
+          },
+          {
+            "QuestionName": "location",
+            "Value": "Toronto, ON, Canada"
+          },
+          {
+            "QuestionName": "lastupdated",
+            "Value": "2026-05-08"
+          },
+          {
+            "QuestionName": "department",
+            "Value": "IT"
+          }
+        ]
+      }
+    ]
+  }
+}

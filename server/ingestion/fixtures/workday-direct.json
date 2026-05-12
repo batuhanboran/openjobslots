@@ -43,7 +43,7 @@
       "region": "North America",
       "remote_type": "remote",
       "posting_date": "Posted Today",
-      "parser_confidence": 0.75
+      "parser_confidence": 0.65
     },
     {
       "ats_key": "workday",
@@ -56,7 +56,7 @@
       "city": "London",
       "remote_type": "hybrid",
       "posting_date": "2026-05-08",
-      "parser_confidence": 0.75
+      "parser_confidence": 0.65
     }
   ]
 }

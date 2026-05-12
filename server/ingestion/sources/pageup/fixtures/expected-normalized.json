@@ -1,0 +1,11 @@
+[
+  {
+    "source_job_id": "5001",
+    "company_name": "Fixture PageUp",
+    "position_name": "Hybrid Project Manager",
+    "country": "Australia",
+    "city": "Melbourne",
+    "remote_type": "hybrid",
+    "parser_confidence": 0.55
+  }
+]

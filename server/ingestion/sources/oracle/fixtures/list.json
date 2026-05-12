@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "requisitionList": [
+        {
+          "Id": "REQ-5001",
+          "Title": "Principal Cloud Engineer",
+          "PostedDate": "2026-05-08T08:00:00+03:00",
+          "Department": "Engineering",
+          "WorkplaceType": "Remote",
+          "workLocation": [
+            {
+              "TownOrCity": "Istanbul",
+              "Country": "Turkiye"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

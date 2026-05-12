@@ -1,0 +1,23 @@
+{
+  "jobPostings": [
+    {
+      "id": "JR5001",
+      "title": "Remote Claims Analyst",
+      "externalPath": "/job/Remote-US/Remote-Claims-Analyst_JR5001",
+      "postedOnDate": "2026-05-08",
+      "locationsText": "Remote - United States",
+      "remoteType": "Remote"
+    },
+    {
+      "jobId": "JR5002",
+      "title": "Hybrid Finance Manager",
+      "externalPath": "/job/London-United-Kingdom/Hybrid-Finance-Manager_JR5002",
+      "postingDate": "2026-05-09",
+      "location": {
+        "city": "London",
+        "countryName": "United Kingdom"
+      },
+      "workplaceType": "Hybrid"
+    }
+  ]
+}

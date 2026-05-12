@@ -19,10 +19,18 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/paylocity-direct.json"
+      "server/ingestion/fixtures/paylocity-direct.json",
+      "server/ingestion/sources/paylocity/fixtures/company.json",
+      "server/ingestion/sources/paylocity/fixtures/expected-normalized.json",
+      "server/ingestion/sources/paylocity/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/paylocity/fixtures/list.json"
     ],
     "present": [
-      "server/ingestion/fixtures/paylocity-direct.json"
+      "server/ingestion/fixtures/paylocity-direct.json",
+      "server/ingestion/sources/paylocity/fixtures/company.json",
+      "server/ingestion/sources/paylocity/fixtures/expected-normalized.json",
+      "server/ingestion/sources/paylocity/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/paylocity/fixtures/list.json"
     ],
     "missing": []
   },

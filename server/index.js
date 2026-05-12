@@ -2972,7 +2972,7 @@ function extractSourceIdFromPostingUrl(urlValue, atsKey = "") {
       return path.match(/\/jobs?\/details\/([^/]+)/i)?.[1] || queryFirst("jobId", "jobid") || lastPart;
     }
     if (["ultipro", "pageup", "eightfold", "rippling", "careerpuck", "talentlyft", "talexio", "fountain"].includes(normalizedAts)) {
-      return queryFirst("jobId", "jobid", "id", "reqId", "reqid") || lastPart;
+      return queryFirst("opportunityId", "opportunityid", "jobId", "jobid", "id", "reqId", "reqid") || lastPart;
     }
     if (lastPart && !["jobs", "careers", "employment", "job-opening.php"].includes(lastPart.toLowerCase())) return lastPart;
   } catch {
@@ -5901,6 +5901,8 @@ function parsePaylocityPostingsFromPageData(companyNameForPostings, config, page
 
     postings.push({
       company_name: effectiveCompanyName,
+      source_job_id: jobId,
+      id: jobId,
       position_name: cleanPaylocityText(job?.JobTitle || "") || "Untitled Position",
       job_posting_url: `${String(config?.siteBaseUrl || "").replace(/\/+$/, "")}/Recruiting/Jobs/Details/${encodeURIComponent(jobId)}`,
       posting_date: cleanPaylocityText(job?.PublishedDate || "") || null,
@@ -6134,6 +6136,8 @@ function parseOraclePostingsFromApi(companyNameForPostings, config, responseJson
 
       postings.push({
         company_name: effectiveCompanyName,
+        source_job_id: requisitionId || undefined,
+        id: requisitionId || undefined,
         position_name: cleanOracleText(row?.Title || row?.title || "") || "Untitled Position",
         job_posting_url: postingUrl,
         posting_date: postingDate,
@@ -6334,7 +6338,10 @@ function extractAdpMyjobsLocationParts(locationItem) {
   const addressValue = [city, state, country].filter(Boolean).join(", ");
   return {
     locationName,
-    addressValue
+    addressValue,
+    city,
+    state,
+    country
   };
 }
 
@@ -6374,6 +6381,12 @@ function parseAdpMyjobsPostingsFromApi(companyNameForPostings, config, responseJ
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
     const postingDate = String(item?.postingDate || "").trim() || null;
+    const firstLocation =
+      (Array.isArray(item?.requisitionLocations) && item.requisitionLocations[0]) ||
+      (Array.isArray(item?.workLocations) && item.workLocations[0]) ||
+      (Array.isArray(item?.postingLocations) && item.postingLocations[0]) ||
+      null;
+    const firstLocationParts = extractAdpMyjobsLocationParts(firstLocation);
     const departmentValues = Array.isArray(item?.organizationalUnits)
       ? item.organizationalUnits
           .map((unit) => String(unit?.nameCode?.longName || unit?.name || "").trim())
@@ -6382,10 +6395,15 @@ function parseAdpMyjobsPostingsFromApi(companyNameForPostings, config, responseJ
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: reqId || undefined,
+      id: reqId || undefined,
       position_name: String(item?.publishedJobTitle || item?.jobTitle || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
       location: formatAdpMyjobsLocation(item),
+      city: firstLocationParts.city || null,
+      state: firstLocationParts.state || null,
+      country: firstLocationParts.country || null,
       department: departmentValues.length > 0 ? departmentValues.join(" / ") : null,
       employment_type: String(item?.type || "").trim() || null
     });
@@ -6570,6 +6588,23 @@ function extractAdpWorkforcenowLocation(job) {
   return values.length > 0 ? values.join(" / ") : null;
 }
 
+function extractAdpWorkforcenowStructuredLocation(job) {
+  const item = job && typeof job === "object" ? job : {};
+  const locations = Array.isArray(item?.requisitionLocations) ? item.requisitionLocations : [];
+  const location = locations[0] && typeof locations[0] === "object" ? locations[0] : {};
+  const address = location?.address && typeof location.address === "object" ? location.address : {};
+  const stateData =
+    address?.countrySubdivisionLevel1 && typeof address.countrySubdivisionLevel1 === "object"
+      ? address.countrySubdivisionLevel1
+      : {};
+  const countryData = address?.country && typeof address.country === "object" ? address.country : {};
+  return {
+    city: String(address?.cityName || "").trim(),
+    state: String(stateData?.codeValue || stateData?.longName || "").trim(),
+    country: String(countryData?.longName || countryData?.codeValue || "").trim()
+  };
+}
+
 function buildAdpWorkforcenowPostingUrl(item, config) {
   const job = item && typeof item === "object" ? item : {};
   const links = Array.isArray(job?.links) ? job.links : [];
@@ -6602,13 +6637,19 @@ function parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, res
 
     const jobUrl = buildAdpWorkforcenowPostingUrl(item, config);
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
+    const structuredLocation = extractAdpWorkforcenowStructuredLocation(item);
 
     postings.push({
       company_name: effectiveCompanyName,
+      source_job_id: itemId || undefined,
+      id: itemId || undefined,
       position_name: String(item?.requisitionTitle || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: String(item?.postDate || "").trim() || null,
       location: extractAdpWorkforcenowLocation(item),
+      city: structuredLocation.city || null,
+      state: structuredLocation.state || null,
+      country: structuredLocation.country || null,
       employment_type: String(item?.workLevelCode?.shortName || "").trim() || null,
       department: null
     });
@@ -6702,6 +6743,8 @@ function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJ
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: reqId || undefined,
+      id: reqId || undefined,
       position_name: extractBrassringQuestionValue(item, "jobtitle") || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: extractBrassringQuestionValue(item, "lastupdated") || null,
@@ -6920,6 +6963,17 @@ function parseTalexioPostingsFromApi(companyNameForPostings, config, responseJso
 }
 
 function cleanSapHrCloudText(value) {
+  if (value && typeof value === "object") {
+    return cleanSapHrCloudText(
+      value.value ||
+        value.label ||
+        value.name ||
+        value.defaultValue ||
+        value.localizedValue ||
+        value.externalName ||
+        ""
+    );
+  }
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .replace(/\s*,\s*/g, ", ")
@@ -7003,6 +7057,8 @@ function parseSapHrCloudPostingsFromApi(companyNameForPostings, config, response
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: cleanSapHrCloudText(item?.id || "") || undefined,
+      id: cleanSapHrCloudText(item?.id || "") || undefined,
       position_name:
         cleanSapHrCloudText(item?.unifiedStandardTitle || item?.title || item?.urlTitle || "") || "Untitled Position",
       job_posting_url: jobUrl,
@@ -12175,6 +12231,34 @@ function extractUltiProLocationName(opportunity) {
   return values.length > 0 ? values.join(" / ") : null;
 }
 
+function parseUltiProPostingsFromApi(companyNameForPostings, config, responseJson) {
+  const opportunities = Array.isArray(responseJson?.opportunities) ? responseJson.opportunities : [];
+  const postings = [];
+  const seenIds = new Set();
+  const companyName = String(companyNameForPostings || config?.tenantLower || "").trim();
+
+  for (const opportunity of opportunities) {
+    const item = opportunity && typeof opportunity === "object" ? opportunity : {};
+    const opportunityId = String(item?.Id || item?.OpportunityId || item?.opportunityId || "").trim();
+    if (!opportunityId || seenIds.has(opportunityId)) continue;
+
+    postings.push({
+      company_name: companyName,
+      source_job_id: opportunityId,
+      id: opportunityId,
+      position_name: String(item?.Title || item?.title || "").trim() || "Untitled Position",
+      job_posting_url: `${String(config?.baseBoardUrl || "").replace(/\/+$/, "")}/OpportunityDetail?opportunityId=${encodeURIComponent(opportunityId)}`,
+      posting_date: String(item?.PostedDate || item?.postedDate || item?.CreatedDate || "").trim() || null,
+      location: extractUltiProLocationName(item),
+      employment_type: String(item?.JobType || item?.EmploymentType || item?.JobCategory || "").trim() || null,
+      department: String(item?.Department || item?.DepartmentName || "").trim() || null
+    });
+    seenIds.add(opportunityId);
+  }
+
+  return postings;
+}
+
 async function collectPostingsForUltiProCompany(company) {
   const config = parseUltiProCompany(company.url_string);
   if (!config) return [];
@@ -12190,17 +12274,10 @@ async function collectPostingsForUltiProCompany(company) {
     const opportunities = Array.isArray(response?.opportunities) ? response.opportunities : [];
     if (opportunities.length === 0) break;
 
-    for (const opportunity of opportunities) {
-      const opportunityId = String(opportunity?.Id || "").trim();
+    for (const posting of parseUltiProPostingsFromApi(companyNameForPostings, config, response)) {
+      const opportunityId = String(posting?.source_job_id || "").trim();
       if (!opportunityId || seenIds.has(opportunityId)) continue;
-
-      postings.push({
-        company_name: companyNameForPostings,
-        position_name: String(opportunity?.Title || "").trim() || "Untitled Position",
-        job_posting_url: `${config.baseBoardUrl}/OpportunityDetail?opportunityId=${encodeURIComponent(opportunityId)}`,
-        posting_date: String(opportunity?.PostedDate || "").trim() || null,
-        location: extractUltiProLocationName(opportunity)
-      });
+      postings.push(posting);
       seenIds.add(opportunityId);
     }
 
@@ -17965,12 +18042,14 @@ module.exports = {
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
   parseAdpWorkforcenowPostingsFromApi,
+  parseAdpMyjobsPostingsFromApi,
   parseApplicantProPostingsFromApi,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
   parseAshbyPostingsFromApi,
   parseAshbyCompany,
   parseBambooHrPostingsFromApi,
+  parseBrassringPostingsFromApi,
   parseBreezyPostingsFromHtml,
   parseCareerplugPostingsFromHtml,
   parseFountainPostingsFromApi,
@@ -17982,12 +18061,15 @@ module.exports = {
   parseManatalPostingsFromApi,
   parseManatalPostingsFromHtml,
   parseOraclePostingsFromApi,
+  parsePageupPostingsFromResults,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
   parseRecruiteePostingsFromPublicApp,
+  parseSapHrCloudPostingsFromApi,
   parseSmartRecruitersPostingsFromApi,
   parseTeamtailorPostingsFromHtml,
+  parseUltiProPostingsFromApi,
   parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName,

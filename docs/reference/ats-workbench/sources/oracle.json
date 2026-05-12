@@ -19,10 +19,18 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/oracle-direct.json"
+      "server/ingestion/fixtures/oracle-direct.json",
+      "server/ingestion/sources/oracle/fixtures/company.json",
+      "server/ingestion/sources/oracle/fixtures/expected-normalized.json",
+      "server/ingestion/sources/oracle/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/oracle/fixtures/list.json"
     ],
     "present": [
-      "server/ingestion/fixtures/oracle-direct.json"
+      "server/ingestion/fixtures/oracle-direct.json",
+      "server/ingestion/sources/oracle/fixtures/company.json",
+      "server/ingestion/sources/oracle/fixtures/expected-normalized.json",
+      "server/ingestion/sources/oracle/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/oracle/fixtures/list.json"
     ],
     "missing": []
   },

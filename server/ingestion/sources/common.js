@@ -1,15 +1,26 @@
 const {
   collectPostingsForCompany,
+  extractTaleoPostingsFromRest,
   parseAshbyPostingsFromApi,
   parseBambooHrPostingsFromApi,
+  parseAdpMyjobsPostingsFromApi,
+  parseAdpWorkforcenowPostingsFromApi,
+  parseBrassringPostingsFromApi,
   parseFountainPostingsFromApi,
   parseGreenhousePostingsFromApi,
+  parseIcimsPostingsFromHtml,
   parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
+  parseOraclePostingsFromApi,
+  parsePageupPostingsFromResults,
+  parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
   parseRecruiteePostingsFromPublicApp,
+  parseSapHrCloudPostingsFromApi,
   parseSmartRecruitersPostingsFromApi,
+  parseUltiProPostingsFromApi,
+  parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml
 } = require("../../index");
 const { validateNormalizedPostingContract } = require("../parserContract");
@@ -20,6 +31,10 @@ const DEFAULT_PARSER_CONFIDENCE = 0.75;
 const DEFAULT_RATE_LIMIT = Object.freeze({
   requestsPerMinute: 30,
   strategy: "direct-json-api-per-host-serialized"
+});
+const ENTERPRISE_RATE_LIMIT = Object.freeze({
+  requestsPerMinute: 8,
+  strategy: "enterprise-brittle-per-host-serialized"
 });
 
 function clean(value) {
@@ -47,6 +62,18 @@ function hostSlug(value) {
   const parts = host.split(".");
   if (parts.length <= 2) return firstPathSegment(value);
   return parts[0];
+}
+
+function queryParam(value, name) {
+  const parsed = asUrl(value);
+  if (!parsed) return "";
+  return clean(parsed.searchParams.get(name));
+}
+
+function parsePathParts(value) {
+  const parsed = asUrl(value);
+  if (!parsed) return [];
+  return parsed.pathname.split("/").map((part) => clean(part)).filter(Boolean);
 }
 
 function buildCompanyContext(company = {}) {
@@ -85,6 +112,8 @@ function fetchJson(url, init = {}) {
 
 const SOURCE_SPECS = Object.freeze({
   greenhouse: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseGreenhousePostingsFromApi,
     officialDocs: "https://developer.greenhouse.io/job-board.html",
     discover(company) {
@@ -96,6 +125,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   lever: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseLeverPostingsFromApi,
     officialDocs: "https://github.com/lever/postings-api",
     discover(company) {
@@ -107,6 +138,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   ashby: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseAshbyPostingsFromApi,
     officialDocs: "https://developers.ashbyhq.com/docs/public-job-posting-api",
     discover(company) {
@@ -123,6 +156,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   smartrecruiters: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseSmartRecruitersPostingsFromApi,
     officialDocs: "https://developers.smartrecruiters.com/docs/endpoints",
     discover(company) {
@@ -134,6 +169,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   recruitee: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseRecruiteePostingsFromPublicApp,
     officialDocs: "https://docs.recruitee.com/reference/intro-to-careers-site-api",
     discover(company) {
@@ -146,6 +183,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   bamboohr: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseBambooHrPostingsFromApi,
     officialDocs: "https://documentation.bamboohr.com/reference/get-company-report-1",
     discover(company) {
@@ -159,6 +198,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   manatal: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseManatalPostingsFromApi,
     officialDocs: "observed public careers-page JSON endpoint",
     discover(company) {
@@ -173,6 +214,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   recruitcrm: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseRecruitCrmPostingsFromApi,
     officialDocs: "observed Recruit CRM public jobs endpoint",
     discover(company) {
@@ -184,6 +227,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   pinpointhq: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parsePinpointHqPostingsFromApi,
     officialDocs: "observed Pinpoint public postings JSON endpoint",
     discover(company) {
@@ -197,6 +242,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   fountain: {
+    sourceFamily: "direct_json",
+    confidence: 0.75,
     parser: parseFountainPostingsFromApi,
     officialDocs: "observed Fountain public openings JSON endpoint",
     discover(company) {
@@ -208,6 +255,8 @@ const SOURCE_SPECS = Object.freeze({
     }
   },
   zoho: {
+    sourceFamily: "embedded_json",
+    confidence: 0.75,
     parser: parseZohoPostingsFromHtml,
     officialDocs: "observed Zoho Recruit public careers page embedded payload",
     discover(company) {
@@ -215,6 +264,205 @@ const SOURCE_SPECS = Object.freeze({
       return {
         config: { careersUrl },
         listUrl: careersUrl
+      };
+    }
+  },
+  workday: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.65,
+    parser: parseWorkdayPostingsFromApi,
+    officialDocs: "observed Workday CXS public jobs endpoint",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      const parts = parsePathParts(company.url_string);
+      const jobsIndex = parts.findIndex((part) => part.toLowerCase() === "jobs");
+      const site = jobsIndex > 0 ? parts[jobsIndex - 1] : parts[parts.length - 1] || "";
+      const tenant = parsed?.hostname?.split(".")[0] || "";
+      const origin = parsed ? parsed.origin : "";
+      return {
+        config: {
+          tenant,
+          site,
+          companyBaseUrl: clean(company.url_string).replace(/\/+$/, "")
+        },
+        listUrl: origin && tenant && site ? `${origin}/wday/cxs/${encodeURIComponent(tenant)}/${encodeURIComponent(site)}/jobs` : ""
+      };
+    }
+  },
+  icims: {
+    sourceFamily: "html_detail",
+    confidence: 0.55,
+    parser: (companyName, config, payload) => parseIcimsPostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "iCIMS Job Portal/Search API and public portal detail pages",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      const origin = parsed ? parsed.origin : "";
+      return {
+        config: { origin },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  taleo: {
+    sourceFamily: "brittle",
+    confidence: 0.35,
+    parser: (companyName, config, payload) =>
+      extractTaleoPostingsFromRest(companyName, config, Array.isArray(payload) ? payload : payload?.requisitionList || []),
+    officialDocs: "observed Taleo careersection REST/AJAX public endpoints",
+    discover(company) {
+      const url = clean(company.url_string);
+      const parsed = asUrl(url);
+      const lang = parsed?.searchParams?.get("lang") || "en";
+      const baseSectionUrl = url.replace(/\/(?:jobsearch|jobdetail)\.ftl.*$/i, "");
+      return {
+        config: { baseSectionUrl, lang },
+        listUrl: url
+      };
+    }
+  },
+  oracle: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.65,
+    parser: parseOraclePostingsFromApi,
+    officialDocs: "Oracle HCM Candidate Experience public requisitions endpoint",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      const parts = parsePathParts(company.url_string);
+      const languageIndex = parts.findIndex((part) => part.toLowerCase() === "candidateexperience");
+      const language = languageIndex >= 0 ? parts[languageIndex + 1] || "en" : "en";
+      const sitesIndex = parts.findIndex((part) => part.toLowerCase() === "sites");
+      const siteNumber = sitesIndex >= 0 ? parts[sitesIndex + 1] || "CX_1" : "CX_1";
+      const siteBaseUrl = parsed ? parsed.origin : "";
+      return {
+        config: {
+          siteBaseUrl,
+          language,
+          siteNumber,
+          boardUrl: clean(company.url_string)
+        },
+        listUrl: siteBaseUrl ? `${siteBaseUrl}/hcmRestApi/resources/latest/recruitingCEJobRequisitions` : ""
+      };
+    }
+  },
+  paylocity: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.65,
+    parser: parsePaylocityPostingsFromPageData,
+    officialDocs: "observed Paylocity public recruiting page data",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      const parts = parsePathParts(company.url_string);
+      const companyId = parts[parts.length - 1] || "";
+      return {
+        config: {
+          companyId,
+          siteBaseUrl: parsed ? parsed.origin : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  adp_workforcenow: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.65,
+    parser: parseAdpWorkforcenowPostingsFromApi,
+    officialDocs: "observed ADP Workforce Now public recruitment endpoint",
+    discover(company) {
+      return {
+        config: {
+          cid: queryParam(company.url_string, "cid"),
+          ccId: queryParam(company.url_string, "ccId"),
+          boardUrl: clean(company.url_string)
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  adp_myjobs: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.6,
+    parser: parseAdpMyjobsPostingsFromApi,
+    officialDocs: "observed ADP MyJobs public requisitions endpoint",
+    discover(company) {
+      const companyName = firstPathSegment(company.url_string) || hostSlug(company.url_string);
+      return {
+        config: {
+          companyName,
+          boardUrl: clean(company.url_string)
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  ultipro: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.55,
+    parser: parseUltiProPostingsFromApi,
+    officialDocs: "observed UKG/UltiPro public JobBoard LoadSearchResults endpoint",
+    discover(company) {
+      const parts = parsePathParts(company.url_string);
+      const tenant = parts[0] || "";
+      const boardId = parts.find((part) => /^[0-9a-f-]{12,}$/i.test(part)) || parts[2] || "";
+      const boardUrl = clean(company.url_string).replace(/\/+$/, "");
+      return {
+        config: {
+          tenant,
+          boardId,
+          tenantLower: tenant.toLowerCase(),
+          baseBoardUrl: boardUrl
+        },
+        listUrl: tenant && boardId ? `https://recruiting.ultipro.com/${encodeURIComponent(tenant)}/JobBoard/${encodeURIComponent(boardId)}/JobBoardView/LoadSearchResults` : boardUrl
+      };
+    }
+  },
+  pageup: {
+    sourceFamily: "html_detail",
+    confidence: 0.55,
+    parser: (companyName, config, payload) => parsePageupPostingsFromResults(companyName, config, payload?.html || payload),
+    officialDocs: "observed PageUp public job listing pages",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : "",
+          boardUrl: clean(company.url_string)
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  saphrcloud: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.55,
+    parser: parseSapHrCloudPostingsFromApi,
+    officialDocs: "observed SAP SuccessFactors Recruiting Marketing public search payload",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : "",
+          boardUrl: clean(company.url_string),
+          localeFromUrl: queryParam(company.url_string, "locale") || "en_US"
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  brassring: {
+    sourceFamily: "brittle",
+    confidence: 0.35,
+    parser: parseBrassringPostingsFromApi,
+    officialDocs: "observed BrassRing public TGNewUI search API",
+    discover(company) {
+      const partnerId = queryParam(company.url_string, "partnerid");
+      const siteId = queryParam(company.url_string, "siteid");
+      return {
+        config: {
+          partnerId,
+          siteId,
+          boardUrl: clean(company.url_string)
+        },
+        listUrl: clean(company.url_string)
       };
     }
   }
@@ -235,7 +483,7 @@ function createSourceModule(atsKey) {
     const discovered = spec.discover(context) || {};
     return {
       ats_key: key,
-      source_family: key === "zoho" ? "embedded_json" : "direct_json",
+      source_family: spec.sourceFamily || (key === "zoho" ? "embedded_json" : "direct_json"),
       docs_url: spec.officialDocs,
       company: context,
       list_url: clean(discovered.listUrl),
@@ -281,12 +529,12 @@ function createSourceModule(atsKey) {
   function normalize(posting, company = {}, options = {}) {
     const normalized = normalizePosting(posting, company, key, {
       parserVersion,
-      confidence: options.confidence || DEFAULT_PARSER_CONFIDENCE,
+      confidence: options.confidence || spec.confidence || DEFAULT_PARSER_CONFIDENCE,
       ...options
     });
     normalized.parser_key = key;
     normalized.parser_version = parserVersion;
-    normalized.parser_confidence = Number(normalized.parser_confidence || DEFAULT_PARSER_CONFIDENCE);
+    normalized.parser_confidence = Number(normalized.parser_confidence || spec.confidence || DEFAULT_PARSER_CONFIDENCE);
     normalized.confidence_score = normalized.parser_confidence;
     normalized.canonical_url = canonicalizePostingUrl(normalized.canonical_url || normalized.job_posting_url);
     normalized.job_posting_url = normalized.canonical_url;
@@ -311,13 +559,15 @@ function createSourceModule(atsKey) {
   }
 
   function rateLimit() {
-    return DEFAULT_RATE_LIMIT;
+    return ["enterprise_api", "html_detail", "brittle"].includes(spec.sourceFamily)
+      ? ENTERPRISE_RATE_LIMIT
+      : DEFAULT_RATE_LIMIT;
   }
 
   function qualityThreshold() {
     return {
-      parse_success_minimum_pct: 95,
-      max_batch_bad_row_pct: 5,
+      parse_success_minimum_pct: spec.sourceFamily === "brittle" ? 90 : 95,
+      max_batch_bad_row_pct: spec.sourceFamily === "brittle" ? 10 : 5,
       requires_title_company_canonical_url: true,
       public_requires_geo_or_explicit_remote: true,
       ambiguous_rows: "quarantine"

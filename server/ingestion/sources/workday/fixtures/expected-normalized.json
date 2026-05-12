@@ -1,0 +1,21 @@
+[
+  {
+    "source_job_id": "JR5001",
+    "company_name": "Fixture Workday",
+    "position_name": "Remote Claims Analyst",
+    "country": "United States",
+    "remote_type": "remote",
+    "posting_date": "2026-05-08",
+    "parser_confidence": 0.65
+  },
+  {
+    "source_job_id": "JR5002",
+    "company_name": "Fixture Workday",
+    "position_name": "Hybrid Finance Manager",
+    "country": "United Kingdom",
+    "city": "London",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-09",
+    "parser_confidence": 0.65
+  }
+]

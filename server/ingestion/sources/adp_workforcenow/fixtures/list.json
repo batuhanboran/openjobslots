@@ -1,0 +1,31 @@
+{
+  "jobRequisitions": [
+    {
+      "itemID": "REQ-5001",
+      "requisitionTitle": "Hybrid Payroll Analyst",
+      "postDate": "2026-05-08T08:00:00+03:00",
+      "workLevelCode": {
+        "shortName": "Hybrid"
+      },
+      "links": [
+        {
+          "href": "https://workforcenow.adp.com/jobs/apply/posting.html?client=ACME-FOODS&jobId=REQ-5001#apply"
+        }
+      ],
+      "requisitionLocations": [
+        {
+          "nameCode": {
+            "shortName": "Istanbul Office"
+          },
+          "address": {
+            "cityName": "Istanbul",
+            "country": {
+              "codeValue": "TR",
+              "longName": "Turkiye"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

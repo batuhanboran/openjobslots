@@ -1,0 +1,85 @@
+{
+  "ats_key": "saphrcloud",
+  "description": "Invalid source-shape fixtures for enterprise source validation and quarantine.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture saphrcloud",
+        "source_job_id": "saphrcloud-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://example.com/saphrcloud/valid-missing-title",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing canonical URL",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Fixture saphrcloud",
+        "source_job_id": "saphrcloud-missing-url",
+        "position_name": "Valid Title",
+        "job_posting_url": "",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture saphrcloud",
+        "source_job_id": "",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://example.com/saphrcloud/jobs/",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing location with unknown remote",
+      "expected": "quarantined",
+      "reason": "no_geo_unknown_remote",
+      "posting": {
+        "company_name": "Fixture saphrcloud",
+        "source_job_id": "saphrcloud-missing-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://example.com/saphrcloud/missing-location",
+        "location": "",
+        "remote_type": "unknown"
+      }
+    },
+    {
+      "name": "ambiguous location",
+      "expected": "quarantined",
+      "reason": "ambiguous_geo",
+      "posting": {
+        "company_name": "Fixture saphrcloud",
+        "source_job_id": "saphrcloud-ambiguous-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://example.com/saphrcloud/ambiguous-location",
+        "location": "Multiple Locations",
+        "remote_type": "unknown"
+      }
+    },
+    {
+      "name": "vague remote marketing text",
+      "expected": "quarantined",
+      "reason": "no_geo_unknown_remote",
+      "posting": {
+        "company_name": "Fixture saphrcloud",
+        "source_job_id": "saphrcloud-vague-remote",
+        "position_name": "Flexible Workplace Engineer",
+        "job_posting_url": "https://example.com/saphrcloud/vague-remote",
+        "location": "",
+        "description_plain": "Our culture supports remote collaboration when needed.",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}

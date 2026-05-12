@@ -18,8 +18,18 @@
   "rate_limit": "conservative tenant-level budget, per-host serialization, retry/backoff on 429/5xx",
   "parser_fixtures": {
     "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
+    "files": [
+      "server/ingestion/sources/pageup/fixtures/company.json",
+      "server/ingestion/sources/pageup/fixtures/expected-normalized.json",
+      "server/ingestion/sources/pageup/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/pageup/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/pageup/fixtures/company.json",
+      "server/ingestion/sources/pageup/fixtures/expected-normalized.json",
+      "server/ingestion/sources/pageup/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/pageup/fixtures/list.json"
+    ],
     "missing": [
       "raw source fixture",
       "expected normalized fixture",

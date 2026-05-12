@@ -18,8 +18,18 @@
   "rate_limit": "conservative tenant-level budget, per-host serialization, retry/backoff on 429/5xx",
   "parser_fixtures": {
     "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
+    "files": [
+      "server/ingestion/sources/adp_myjobs/fixtures/company.json",
+      "server/ingestion/sources/adp_myjobs/fixtures/expected-normalized.json",
+      "server/ingestion/sources/adp_myjobs/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/adp_myjobs/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/adp_myjobs/fixtures/company.json",
+      "server/ingestion/sources/adp_myjobs/fixtures/expected-normalized.json",
+      "server/ingestion/sources/adp_myjobs/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/adp_myjobs/fixtures/list.json"
+    ],
     "missing": [
       "raw source fixture",
       "expected normalized fixture",

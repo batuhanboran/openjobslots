@@ -22,13 +22,21 @@
       "server/ingestion/fixtures/detail-refetch/icims-detail-geo.html",
       "server/ingestion/fixtures/detail-refetch/icims-detail-remote.html",
       "server/ingestion/fixtures/icims-detail-certification.json",
-      "server/ingestion/fixtures/icims-postings.json"
+      "server/ingestion/fixtures/icims-postings.json",
+      "server/ingestion/sources/icims/fixtures/company.json",
+      "server/ingestion/sources/icims/fixtures/expected-normalized.json",
+      "server/ingestion/sources/icims/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/icims/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/detail-refetch/icims-detail-geo.html",
       "server/ingestion/fixtures/detail-refetch/icims-detail-remote.html",
       "server/ingestion/fixtures/icims-detail-certification.json",
-      "server/ingestion/fixtures/icims-postings.json"
+      "server/ingestion/fixtures/icims-postings.json",
+      "server/ingestion/sources/icims/fixtures/company.json",
+      "server/ingestion/sources/icims/fixtures/expected-normalized.json",
+      "server/ingestion/sources/icims/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/icims/fixtures/list.json"
     ],
     "missing": []
   },

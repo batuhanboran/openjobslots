@@ -78,14 +78,14 @@ Current workbench counts: 60 configured ATS, 23 strict parser-fixture-backed, 0 
 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
-- Disable/hold public exposure until raw fixture and field evidence improves: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
-- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `adp_myjobs`, `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `saphrcloud`, `statejobsny`, `theapplicantmanager`, `usajobs`.
+- Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
+- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `statejobsny`, `theapplicantmanager`, `usajobs`.
 - Keep disabled: `dayforcehcm`.
 
 Subagent/work-packet findings in this certification pass:
 
 - Direct JSON/API: `teamtailor`, `freshteam`, and `getro` are the main certification gaps. `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
-- Enterprise/brittle: `oracle`, `paylocity`, and `adp_workforcenow` need source-id assertions despite raw fixture coverage. `adp_myjobs`, `eightfold`, `saphrcloud`, `ultipro`, `pageup`, and `brassring` need raw parser fixtures before public enablement can be called safe.
+- Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module fixtures and invalid-shape tests. `eightfold` still needs raw parser fixtures before public enablement can be called safe. `taleo` and `brassring` remain low-confidence; `pageup`, `saphrcloud`, and `ultipro` need live canaries before promotion.
 - Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `jobvite`, `theapplicantmanager`, `talentreef`, `hirebridge`, and `isolvisolvedhire` remain raw-fixture blockers.
 - Vendor/public-sector: `manatal` is certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs`, `calopps`, and `policeapp` must stop fabricated recency before public confidence can be raised.
 
@@ -104,15 +104,15 @@ Subagent/work-packet findings in this certification pass:
 | `fountain` | Fountain board `.json`. | Department can still be absent; URL parsing depends on `/c/{company}`. | Parser now carries `id`/`opening_id`/`to_param` as `source_job_id`; add path, pagination, and sparse location fixtures before broad source expansion. |
 | `getro` | Getro Next.js `__NEXT_DATA__`. | Per-job company may be ignored; canonical/apply URL distinction weak. | Add saved Next.js fixture for `initialState.jobs.found`. |
 | `workday` | Workday CXS job postings API. | Relative posting-date labels depend on fetch time; descriptions often require detail pages. | Wave A preserves structured CXS city/country, absolute external paths, and JR source ids while preventing Work From Home URL fragments from becoming city values; add pagination and detail-description fixtures next. |
-| `oracle` | Oracle CandidateExperience requisition API. | Source id not set; skips no-date rows; site/language discovery brittle. | Carry `Id`; add alternate site/language, no-primary-location, `hasMore` fixtures. |
-| `adp_myjobs` | ADP MyJobs token then `apply-custom-filters`. | Token discovery can silently empty; `reqId` not source id. | Export parser, add direct fixture, token-missing test, pagination and location variants. |
-| `adp_workforcenow` | ADP Workforce Now content links and requisitions. | `itemID` not source id; department absent. | Carry item id and add multi-location/no-content-links fixtures. |
-| `paylocity` | Paylocity embedded `window.pageData.Jobs`. | `JobId` not source id; missing `PublishedDate` drops rows. | Carry job id; add remote, country-only, malformed Jobs fixtures. |
+| `oracle` | Oracle CandidateExperience requisition API. | Skips no-date rows; site/language discovery brittle. | Source module now carries `Id`; add alternate site/language, no-primary-location, `hasMore` fixtures. |
+| `adp_myjobs` | ADP MyJobs token then `apply-custom-filters`. | Token discovery can silently empty; tenant arrays vary. | Parser now exports through source module, emits `reqId`, and preserves structured city/state/country; add token-missing, pagination, and multi-location variants. |
+| `adp_workforcenow` | ADP Workforce Now content links and requisitions. | Department absent and source company inference can vary. | Parser now carries `itemID` and structured city/state/country; add multi-location/no-content-links fixtures. |
+| `paylocity` | Paylocity embedded `window.pageData.Jobs`. | Missing `PublishedDate` can drop rows; embedded shape can drift. | Parser now carries `JobId`; add remote, country-only, malformed Jobs fixtures. |
 | `dayforcehcm` | Configured only; no collector implementation. | Unsupported by design. | Keep disabled until a parser, raw fixture, and validation tests exist. |
 | `eightfold` | Careers HTML plus Eightfold search API. | No pagination beyond start zero; group-id extraction brittle; source id absent. | Export parser, add API fixture, source id, pagination, missing group-id test. |
-| `saphrcloud` | SAP SuccessFactors HTML parser; API parser unused. | Locale/date/location brittle; source id absent. | Certify direct `/services/recruiting/v1/jobs` path or HTML fallback with fixtures. |
-| `ultipro` | UKG/UltiPro search results API. | Inline parser; `Id` not source id; remote weak. | Extract parser, add `opportunities` fixture, source id, pagination. |
-| `pageup` | PageUp board HTML plus AJAX search/detail pages. | Detail fetch failures skip jobs; external id not source id. | Add two-part search/detail fixtures and listing-date fallback. |
+| `saphrcloud` | SAP SuccessFactors API/HTML parser. | Locale/date/location brittle; HTML fallback still needs fixture. | API source module handles object-valued text arrays and carries `id`; add HTML fallback and pagination fixtures. |
+| `ultipro` | UKG/UltiPro search results API. | Tenant/board id parsing varies; remote weak. | Source module carries `Id`/`opportunityId`; add pagination/count and remote/hybrid variants. |
+| `pageup` | PageUp board HTML plus AJAX search/detail pages. | Detail fetch failures can skip jobs; detail fields vary. | Source module certifies list-row fixture and URL id preservation; add two-part search/detail fixtures and listing-date fallback. |
 | `jobvite` | Jobvite careers HTML tables. | Date absent; department only from grouping. | v1.5.16 carries source id from URL; add raw HTML fixture with grouped departments and date/detail-page evidence if available. |
 | `icims` | iCIMS wrapper page, iframe, paged cards, and public job detail pages. | Public posted dates are frequently absent from visible labels but can appear in JobPosting JSON-LD; blank location cards still require sampled detail fetch. | Wave A derives city from source-backed `CC-state-city` values, keeps JSON-LD `datePosted`/postal-address parsing, and lets guarded detail refetch normalize from detail location evidence without overwriting stronger stored `location_text`. Continue bounded detail probes for blank-location tenants and next-page variants. |
 | `zoho` | Zoho hidden `jobs` JSON in careers page. | Hidden job id, city/state/country, date opened, and industry are certified when present; missing id rows are skipped and missing-title rows are rejected. | v1.5.24 adds saved raw hidden-input fixture and failure fixture. Wave B emits explicit city/state/country and guards hidden list URLs so off-host metadata cannot redirect parsing. Next: add malformed JSON and unpublished-job variants. |
@@ -140,7 +140,7 @@ Subagent/work-packet findings in this certification pass:
 | `talentlyft` | TalentLyft landing config plus paged fragments. | Date absent; `data-job-id` not stored. | Add landing plus fragment fixtures and source id. |
 | `talexio` | Talexio jobs JSON. | ID/reference not source id; remote weak. | Add API fixture for pagination, country normalization, remote/hybrid. |
 | `taleo` | Taleo bootstrap, REST search JSON, AJAX fallback. | Portal/token/column assumptions remain brittle; REST/AJAX fixtures cover only sampled column shapes. | Wave A adds AJAX token-stream coverage, extra date formats, and title/location disambiguation so `Remote Support Analyst` is not treated as a remote location. Keep low confidence until more tenant-specific variants pass. |
-| `brassring` | BrassRing board tokens/cookies plus matched jobs JSON. | Date is last-updated; company can be unknown; req id dropped. | Keep low confidence; add paired board/API fixtures and reqid source id. |
+| `brassring` | BrassRing board tokens/cookies plus matched jobs JSON. | Date is last-updated; company can be unknown; source shape remains brittle. | Low-confidence source module now carries `reqid`; add paired board/API variants before public promotion. |
 | `governmentjobs` | GovernmentJobs AJAX HTML. | Invents `Posted Today`; no source id; location basic. | Stop invented dates; parse real date or null; add raw fixture and URL id. |
 | `usajobs` | USAJobs landing token plus search POST. | Remote flags and DocumentID not carried. | Add raw fixture and map `DocumentID` to source id. |
 | `k12jobspot` | K12JobSpot JSON API. | US state/country normalization weak; source id absent. | Add fixture and map job id; improve US location normalization. |
