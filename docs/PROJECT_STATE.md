@@ -102,6 +102,29 @@ Important interpretation:
 - Future work must not treat lower coverage as quality progress.
 - Treat the last recorded `47,396` visible postings as the coverage floor until a fresh read-only production baseline replaces it.
 
+## Latest ATS Recovery Snapshot
+
+Recruitee recovery was applied on May 12, 2026 after a fresh production baseline and backup.
+
+- Deployed recovery code commit: `aa94cae`.
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-recruitee-recovery-20260512-203839.dump`.
+- Baseline reports: `/root/OpenJobSlots/reports/recruitee-recovery-before-20260512-203621-*`.
+- Write/canary reports: `/root/OpenJobSlots/reports/recruitee-recovery-write-20260512-203839-*`.
+- After/guard reports: `/root/OpenJobSlots/reports/recruitee-recovery-final2-20260512-204443-*`.
+- Visible postings: `47,938 -> 48,042`.
+- Recruitee accepted public rows: `0 -> 76`.
+- Recruitee source state: `canary_only`.
+- Recruitee candidate tenants: `2,734`; manual bounded apply considered `25`, fetched `6`, parsed `107`, and wrote `75` accepted public rows.
+- A cancelled worker restart attempt added `1` additional Recruitee public row and `29` non-Recruitee public rows after the manual Recruitee guard. No rows were deleted.
+- New Recruitee `no_geo_no_remote` public rows: `0`.
+- Recruitee missing all normalized geo: `0 -> 0`.
+- Recruitee weak/unknown remote: `0 -> 0`.
+- Meili/Postgres delta after bounded writes: `0`.
+- `ats:recovery:guard` passed with `0` failures.
+
+Recruitee is no longer quarantine-only. It is recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
+The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks.
+
 ## Post-v1.8.0 Recovery Strategy
 
 The next phase is ATS-by-ATS recovery, not another broad cleanup or rebuild.
