@@ -1,0 +1,45 @@
+{
+  "appConfig": {
+    "primaryLangCode": "nl",
+    "locations": [
+      {
+        "id": 10,
+        "city": "Amsterdam",
+        "country": "Nederland",
+        "translations": {
+          "nl": {
+            "name": "Amsterdam",
+            "country": "Nederland"
+          }
+        }
+      }
+    ],
+    "departments": [
+      {
+        "id": 5,
+        "translations": {
+          "nl": {
+            "name": "Product"
+          }
+        }
+      }
+    ],
+    "offers": [
+      {
+        "id": 1001,
+        "slug": "hybrid-product-manager",
+        "locationIds": [
+          10
+        ],
+        "departmentId": 5,
+        "workplaceType": "hybrid",
+        "publishedAt": "2026-05-06T08:00:00+03:00",
+        "translations": {
+          "nl": {
+            "title": "Hybrid Product Manager"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "result": [
+    {
+      "id": "1001",
+      "jobOpeningName": "Remote Payroll Specialist",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1001?source=openjobslots#details",
+      "location": {
+        "name": "Remote - United States",
+        "city": "Remote"
+      },
+      "atsLocation": {
+        "country": "United States"
+      },
+      "isRemote": true,
+      "postingDate": "2026-05-06T08:00:00+03:00",
+      "department": "Finance"
+    },
+    {
+      "jobOpeningName": "Office Operations Coordinator",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1002",
+      "location": {
+        "city": "Austin",
+        "state": "TX",
+        "country": "United States"
+      },
+      "isRemote": false,
+      "postingDate": "2026-05-07",
+      "department": "Operations"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "ats_key": "lever",
+    "source_job_id": "lev-1001",
+    "company_name": "Fixture Lever",
+    "position_name": "Remote Backend Engineer",
+    "job_posting_url": "https://jobs.lever.co/fixtureco/lev-1001",
+    "country": "Turkey",
+    "region": "EMEA",
+    "remote_type": "remote",
+    "posting_date": "2026-05-06T05:00:00.000Z",
+    "industry": "Engineering",
+    "department": "Engineering",
+    "employment_type": "Full-time",
+    "parser_confidence": 0.75
+  }
+]

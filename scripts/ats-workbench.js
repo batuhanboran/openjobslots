@@ -15,6 +15,20 @@ const {
 const DEFAULT_WORKBENCH_DIR = path.join("docs", "reference", "ats-workbench");
 const DEFAULT_SCOREBOARD_PATH = path.join(DEFAULT_WORKBENCH_DIR, "scoreboard.json");
 const FIXTURE_DIR = path.join("server", "ingestion", "fixtures");
+const SOURCE_MODULE_DIR = path.join("server", "ingestion", "sources");
+const DIRECT_JSON_API_REPAIR_SOURCES = new Set([
+  "greenhouse",
+  "lever",
+  "ashby",
+  "smartrecruiters",
+  "recruitee",
+  "bamboohr",
+  "manatal",
+  "recruitcrm",
+  "pinpointhq",
+  "fountain",
+  "zoho"
+]);
 
 const OFFICIAL_DOCS = Object.freeze({
   ashby: "https://developers.ashbyhq.com/docs/public-job-posting-api",
@@ -104,8 +118,11 @@ function readJsonIfExists(filePath) {
 
 function fixtureInventory(rootDir = FIXTURE_DIR) {
   const resolved = path.resolve(rootDir);
-  if (!fs.existsSync(resolved)) return [];
-  const stack = [resolved];
+  const sourceResolved = path.resolve(SOURCE_MODULE_DIR);
+  const stack = [];
+  if (fs.existsSync(resolved)) stack.push(resolved);
+  if (fs.existsSync(sourceResolved)) stack.push(sourceResolved);
+  if (stack.length === 0) return [];
   const files = [];
   while (stack.length) {
     const current = stack.pop();
@@ -229,7 +246,12 @@ function qualityThresholdFor(row) {
 }
 
 function fixtureStatusFor(atsKey, metadata, fixtures) {
-  const ownFixtures = fixtures.filter((file) => path.basename(file).toLowerCase().includes(atsKey));
+  const normalizedKey = String(atsKey || "").toLowerCase();
+  const ownFixtures = fixtures.filter((file) => {
+    const normalizedFile = String(file || "").replace(/\\/g, "/").toLowerCase();
+    return path.basename(normalizedFile).includes(normalizedKey) ||
+      normalizedFile.includes(`/sources/${normalizedKey}/fixtures/`);
+  });
   const hasRawFixture = metadata.parserFixtureStatus === "parser-fixture-backed";
   const missing = [];
   if (!hasRawFixture) missing.push("raw source fixture");
@@ -265,6 +287,10 @@ function buildSourceWorkbenchRecord({ item, row, record, metadata, fixtures }) {
   const certification = ADAPTER_CERTIFICATION_DETAILS[atsKey] || metadata.certification || null;
   const fixtureStatus = fixtureStatusFor(atsKey, metadata, fixtures);
   const publicEnabled = Boolean(row.should_be_public_enabled && isAtsEnabledByDefault(atsKey));
+  const hasDedicatedSourceModule = DIRECT_JSON_API_REPAIR_SOURCES.has(atsKey);
+  const sourceModulePath = hasDedicatedSourceModule
+    ? `server/ingestion/sources/${atsKey}/index.js`
+    : "";
   return {
     ats_key: atsKey,
     display_name: item.label || atsKey,
@@ -284,6 +310,12 @@ function buildSourceWorkbenchRecord({ item, row, record, metadata, fixtures }) {
     posting_date_rule: certification?.dateParsingRule || ruleFromCertification(record, "date", "parse posted_at only from trustworthy source date fields; otherwise leave null"),
     rate_limit: method.rate_limit,
     parser_fixtures: fixtureStatus,
+    source_module: {
+      present: hasDedicatedSourceModule,
+      path: sourceModulePath,
+      fixtures_dir: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/fixtures` : "",
+      parser_version: hasDedicatedSourceModule ? `source-${atsKey}-v1` : ""
+    },
     quality_threshold: qualityThresholdFor(row),
     public_enabled: publicEnabled,
     quarantine_reason: publicEnabled ? "" : row.reason,
@@ -310,13 +342,13 @@ function buildSourceWorkbenchRecord({ item, row, record, metadata, fixtures }) {
       confidence: row.parser_confidence || metadata.confidence
     },
     runner_interface: {
-      discover: method.source_discovery_method,
-      fetchList: method.list_fetch_method,
-      fetchDetail: certification?.detailPageRequirement || method.detail_fetch_method,
-      parseList: record.parserPath,
-      parseDetail: record.parserPath,
-      normalize: "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-      validate: "server/ingestion/publicPostingGate.js row-level quality gate",
+      discover: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/discover.js` : method.source_discovery_method,
+      fetchList: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/fetchList.js` : method.list_fetch_method,
+      fetchDetail: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/fetchDetail.js` : certification?.detailPageRequirement || method.detail_fetch_method,
+      parseList: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/parse.js` : record.parserPath,
+      parseDetail: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/parse.js` : record.parserPath,
+      normalize: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/normalize.js` : "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+      validate: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/validate.js` : "server/ingestion/publicPostingGate.js row-level quality gate",
       writeAccepted: "source runner accepted path updates public read model only after validation",
       writeQuarantine: "source runner quarantine path records reason and keeps row out of public index"
     },

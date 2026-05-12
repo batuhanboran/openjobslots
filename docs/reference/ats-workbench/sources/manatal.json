@@ -20,13 +20,27 @@
     "status": "parser-fixture-backed",
     "files": [
       "server/ingestion/fixtures/manatal-direct.json",
-      "server/ingestion/fixtures/manatal-failures.json"
+      "server/ingestion/fixtures/manatal-failures.json",
+      "server/ingestion/sources/manatal/fixtures/company.json",
+      "server/ingestion/sources/manatal/fixtures/expected-normalized.json",
+      "server/ingestion/sources/manatal/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/manatal/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/manatal-direct.json",
-      "server/ingestion/fixtures/manatal-failures.json"
+      "server/ingestion/fixtures/manatal-failures.json",
+      "server/ingestion/sources/manatal/fixtures/company.json",
+      "server/ingestion/sources/manatal/fixtures/expected-normalized.json",
+      "server/ingestion/sources/manatal/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/manatal/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/manatal/index.js",
+    "fixtures_dir": "server/ingestion/sources/manatal/fixtures",
+    "parser_version": "source-manatal-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -58,13 +72,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseManatalPostingsFromApi and fallback HTML parser",
-    "parseDetail": "server/index.js parseManatalPostingsFromApi and fallback HTML parser",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/manatal/discover.js",
+    "fetchList": "server/ingestion/sources/manatal/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/manatal/fetchDetail.js",
+    "parseList": "server/ingestion/sources/manatal/parse.js",
+    "parseDetail": "server/ingestion/sources/manatal/parse.js",
+    "normalize": "server/ingestion/sources/manatal/normalize.js",
+    "validate": "server/ingestion/sources/manatal/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

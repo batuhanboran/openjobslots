@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/lever-direct.json",
       "server/ingestion/fixtures/lever-failures.json",
-      "server/ingestion/fixtures/lever-postings.json"
+      "server/ingestion/fixtures/lever-postings.json",
+      "server/ingestion/sources/lever/fixtures/company.json",
+      "server/ingestion/sources/lever/fixtures/expected-normalized.json",
+      "server/ingestion/sources/lever/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/lever/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/lever-direct.json",
       "server/ingestion/fixtures/lever-failures.json",
-      "server/ingestion/fixtures/lever-postings.json"
+      "server/ingestion/fixtures/lever-postings.json",
+      "server/ingestion/sources/lever/fixtures/company.json",
+      "server/ingestion/sources/lever/fixtures/expected-normalized.json",
+      "server/ingestion/sources/lever/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/lever/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/lever/index.js",
+    "fixtures_dir": "server/ingestion/sources/lever/fixtures",
+    "parser_version": "source-lever-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -64,13 +78,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "Not required; list JSON includes id, hostedUrl, applyUrl, categories, descriptions, createdAt.",
-    "parseList": "server/index.js Lever collector",
-    "parseDetail": "server/index.js Lever collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/lever/discover.js",
+    "fetchList": "server/ingestion/sources/lever/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/lever/fetchDetail.js",
+    "parseList": "server/ingestion/sources/lever/parse.js",
+    "parseDetail": "server/ingestion/sources/lever/parse.js",
+    "normalize": "server/ingestion/sources/lever/normalize.js",
+    "validate": "server/ingestion/sources/lever/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

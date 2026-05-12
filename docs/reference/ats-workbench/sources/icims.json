@@ -32,6 +32,12 @@
     ],
     "missing": []
   },
+  "source_module": {
+    "present": false,
+    "path": "",
+    "fixtures_dir": "",
+    "parser_version": ""
+  },
   "quality_threshold": {
     "mode": "public_enabled",
     "minimum_confidence": 0.7,

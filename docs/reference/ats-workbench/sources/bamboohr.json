@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/bamboohr-direct.json",
       "server/ingestion/fixtures/bamboohr-failures.json",
-      "server/ingestion/fixtures/bamboohr-postings.json"
+      "server/ingestion/fixtures/bamboohr-postings.json",
+      "server/ingestion/sources/bamboohr/fixtures/company.json",
+      "server/ingestion/sources/bamboohr/fixtures/expected-normalized.json",
+      "server/ingestion/sources/bamboohr/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/bamboohr/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/bamboohr-direct.json",
       "server/ingestion/fixtures/bamboohr-failures.json",
-      "server/ingestion/fixtures/bamboohr-postings.json"
+      "server/ingestion/fixtures/bamboohr-postings.json",
+      "server/ingestion/sources/bamboohr/fixtures/company.json",
+      "server/ingestion/sources/bamboohr/fixtures/expected-normalized.json",
+      "server/ingestion/sources/bamboohr/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/bamboohr/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/bamboohr/index.js",
+    "fixtures_dir": "server/ingestion/sources/bamboohr/fixtures",
+    "parser_version": "source-bamboohr-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -60,13 +74,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseBambooHrPostingsFromApi",
-    "parseDetail": "server/index.js parseBambooHrPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/bamboohr/discover.js",
+    "fetchList": "server/ingestion/sources/bamboohr/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/bamboohr/fetchDetail.js",
+    "parseList": "server/ingestion/sources/bamboohr/parse.js",
+    "parseDetail": "server/ingestion/sources/bamboohr/parse.js",
+    "normalize": "server/ingestion/sources/bamboohr/normalize.js",
+    "validate": "server/ingestion/sources/bamboohr/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

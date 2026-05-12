@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/zoho-direct.json",
       "server/ingestion/fixtures/zoho-failures.json",
-      "server/ingestion/fixtures/zoho-postings.json"
+      "server/ingestion/fixtures/zoho-postings.json",
+      "server/ingestion/sources/zoho/fixtures/company.json",
+      "server/ingestion/sources/zoho/fixtures/expected-normalized.json",
+      "server/ingestion/sources/zoho/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/zoho/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/zoho-direct.json",
       "server/ingestion/fixtures/zoho-failures.json",
-      "server/ingestion/fixtures/zoho-postings.json"
+      "server/ingestion/fixtures/zoho-postings.json",
+      "server/ingestion/sources/zoho/fixtures/company.json",
+      "server/ingestion/sources/zoho/fixtures/expected-normalized.json",
+      "server/ingestion/sources/zoho/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/zoho/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/zoho/index.js",
+    "fixtures_dir": "server/ingestion/sources/zoho/fixtures",
+    "parser_version": "source-zoho-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -60,13 +74,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and extract embedded JSON or domain id before parsing",
-    "fetchList": "fetch public board or discovered JSON endpoint with bounded response size",
-    "fetchDetail": "optional detail fetch only when list evidence is insufficient and fixture-backed",
-    "parseList": "server/index.js parseZohoPostingsFromHtml",
-    "parseDetail": "server/index.js parseZohoPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/zoho/discover.js",
+    "fetchList": "server/ingestion/sources/zoho/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/zoho/fetchDetail.js",
+    "parseList": "server/ingestion/sources/zoho/parse.js",
+    "parseDetail": "server/ingestion/sources/zoho/parse.js",
+    "normalize": "server/ingestion/sources/zoho/normalize.js",
+    "validate": "server/ingestion/sources/zoho/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

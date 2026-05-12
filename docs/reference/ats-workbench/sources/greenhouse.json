@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/greenhouse-direct.json",
       "server/ingestion/fixtures/greenhouse-failures.json",
-      "server/ingestion/fixtures/greenhouse-postings.json"
+      "server/ingestion/fixtures/greenhouse-postings.json",
+      "server/ingestion/sources/greenhouse/fixtures/company.json",
+      "server/ingestion/sources/greenhouse/fixtures/expected-normalized.json",
+      "server/ingestion/sources/greenhouse/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/greenhouse/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/greenhouse-direct.json",
       "server/ingestion/fixtures/greenhouse-failures.json",
-      "server/ingestion/fixtures/greenhouse-postings.json"
+      "server/ingestion/fixtures/greenhouse-postings.json",
+      "server/ingestion/sources/greenhouse/fixtures/company.json",
+      "server/ingestion/sources/greenhouse/fixtures/expected-normalized.json",
+      "server/ingestion/sources/greenhouse/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/greenhouse/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/greenhouse/index.js",
+    "fixtures_dir": "server/ingestion/sources/greenhouse/fixtures",
+    "parser_version": "source-greenhouse-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -64,13 +78,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "Not required for core fields; retrieve-job endpoint can enrich questions/pay transparency.",
-    "parseList": "server/index.js Greenhouse collector",
-    "parseDetail": "server/index.js Greenhouse collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/greenhouse/discover.js",
+    "fetchList": "server/ingestion/sources/greenhouse/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/greenhouse/fetchDetail.js",
+    "parseList": "server/ingestion/sources/greenhouse/parse.js",
+    "parseDetail": "server/ingestion/sources/greenhouse/parse.js",
+    "normalize": "server/ingestion/sources/greenhouse/normalize.js",
+    "validate": "server/ingestion/sources/greenhouse/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

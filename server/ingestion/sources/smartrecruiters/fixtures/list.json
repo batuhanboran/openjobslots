@@ -1,0 +1,51 @@
+{
+  "content": [
+    {
+      "id": "743999999999",
+      "name": "Senior Search Engineer",
+      "applyUrl": "https://jobs.smartrecruiters.com/FixtureCo/743999999999-search-engineer?utm_source=openjobslots#apply",
+      "company": {
+        "name": "Fixture SmartRecruiters"
+      },
+      "location": {
+        "city": "Istanbul",
+        "country": "Turkiye"
+      },
+      "releasedDate": "2026-05-06T08:00:00+03:00",
+      "department": {
+        "label": "Engineering"
+      },
+      "typeOfEmployment": {
+        "label": "Full-time"
+      },
+      "remote": true,
+      "jobAd": {
+        "sections": {
+          "jobDescription": "<p>Own public search quality.</p>"
+        }
+      }
+    },
+    {
+      "id": "743999999996",
+      "name": "Remote Customer Success Manager",
+      "applyUrl": "https://jobs.smartrecruiters.com/FixtureCo/743999999996-customer-success",
+      "company": {
+        "name": "Fixture SmartRecruiters"
+      },
+      "shortLocation": "Remote - US",
+      "location": {
+        "city": "New York",
+        "region": "NY",
+        "country": "United States"
+      },
+      "releasedDate": "2026-05-07T08:00:00-04:00",
+      "workplaceType": "remote",
+      "department": {
+        "label": "Customer Success"
+      },
+      "typeOfEmployment": {
+        "label": "Full-time"
+      }
+    }
+  ]
+}

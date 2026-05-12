@@ -19,12 +19,26 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/pinpointhq-direct.json"
+      "server/ingestion/fixtures/pinpointhq-direct.json",
+      "server/ingestion/sources/pinpointhq/fixtures/company.json",
+      "server/ingestion/sources/pinpointhq/fixtures/expected-normalized.json",
+      "server/ingestion/sources/pinpointhq/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/pinpointhq/fixtures/list.json"
     ],
     "present": [
-      "server/ingestion/fixtures/pinpointhq-direct.json"
+      "server/ingestion/fixtures/pinpointhq-direct.json",
+      "server/ingestion/sources/pinpointhq/fixtures/company.json",
+      "server/ingestion/sources/pinpointhq/fixtures/expected-normalized.json",
+      "server/ingestion/sources/pinpointhq/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/pinpointhq/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/pinpointhq/index.js",
+    "fixtures_dir": "server/ingestion/sources/pinpointhq/fixtures",
+    "parser_version": "source-pinpointhq-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -56,13 +70,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parsePinpointHqPostingsFromApi",
-    "parseDetail": "server/index.js parsePinpointHqPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/pinpointhq/discover.js",
+    "fetchList": "server/ingestion/sources/pinpointhq/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/pinpointhq/fetchDetail.js",
+    "parseList": "server/ingestion/sources/pinpointhq/parse.js",
+    "parseDetail": "server/ingestion/sources/pinpointhq/parse.js",
+    "normalize": "server/ingestion/sources/pinpointhq/normalize.js",
+    "validate": "server/ingestion/sources/pinpointhq/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

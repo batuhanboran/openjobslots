@@ -19,6 +19,18 @@
           "remote": "1",
           "employment_type": "Full time",
           "department": "Talent"
+        },
+        {
+          "id": "rc-2002",
+          "name": "Onsite Support Analyst",
+          "slug": "onsite-support-analyst",
+          "posted_at": "2026-05-07",
+          "remote": "0",
+          "city": "Toronto",
+          "state": "ON",
+          "country": "Canada",
+          "employment_type": "Full time",
+          "department": "Support"
         }
       ]
     }
@@ -34,6 +46,19 @@
       "remote_type": "remote",
       "industry": "Talent",
       "is_remote": true
+    },
+    {
+      "ats_key": "recruitcrm",
+      "company_name": "Fixture RecruitCRM",
+      "position_name": "Onsite Support Analyst",
+      "source_job_id": "rc-2002",
+      "job_posting_url": "https://recruitcrm.io/jobs/fixtureco/onsite-support-analyst",
+      "country": "Canada",
+      "region": "North America",
+      "city": "Toronto",
+      "remote_type": "onsite",
+      "industry": "Support",
+      "is_remote": false
     }
   ]
 }

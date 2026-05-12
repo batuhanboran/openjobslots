@@ -6200,6 +6200,10 @@ function parseFountainPostingsFromApi(companyNameForPostings, config, responseJs
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id:
+        String(item?.id ?? item?.opening_id ?? item?.openingId ?? item?.uuid ?? toParam).trim() ||
+        extractSourceIdFromPostingUrl(itemUrl, "fountain"),
+      id: String(item?.id ?? item?.opening_id ?? item?.openingId ?? item?.uuid ?? "").trim() || undefined,
       position_name: String(item?.title || "").trim() || "Untitled Position",
       job_posting_url: itemUrl,
       posting_date:
@@ -6764,8 +6768,10 @@ function parsePinpointHqPostingsFromApi(companyNameForPostings, config, response
 function formatRecruitCrmLocation(item) {
   const city = String(item?.city || "").trim();
   const locality = String(item?.locality || "").trim();
+  const state = String(item?.state || item?.province || item?.region || item?.state_name || "").trim();
+  const country = String(item?.country || item?.country_name || item?.countryCode || item?.country_code || "").trim();
   const postalCode = String(item?.postalcode || "").trim();
-  const parts = [city, locality, postalCode].filter(Boolean);
+  const parts = [city, locality, state, country, postalCode].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
@@ -6792,7 +6798,11 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
           item?.updatedon ||
           ""
       ).trim() || null;
-    const isRemote = String(item?.remote || "").trim() === "1";
+    const isRemote = String(item?.remote || item?.is_remote || item?.isRemote || "").trim().toLowerCase();
+    const remoteType = ["1", "true", "yes", "remote"].includes(isRemote) ? "remote" : String(item?.workplace_type || item?.workplaceType || "").trim();
+    const sourceCountry = String(item?.country || item?.country_name || item?.countryCode || item?.country_code || "").trim();
+    const sourceCity = String(item?.city || "").trim();
+    const sourceState = String(item?.state || item?.province || item?.region || item?.state_name || "").trim();
 
     postings.push({
       company_name: companyNameForPostings,
@@ -6803,7 +6813,11 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
       position_name: String(item?.name || "").trim() || "Untitled Position",
       job_posting_url: itemUrl,
       posting_date: postingDate,
-      location: isRemote ? "Remote" : formatRecruitCrmLocation(item),
+      location: remoteType === "remote" ? "Remote" : formatRecruitCrmLocation(item),
+      city: sourceCity || null,
+      state: sourceState || null,
+      country: normalizeCountryName(sourceCountry) || normalizeCountryFromLocation(sourceCountry) || null,
+      remote_type: remoteType || null,
       employment_type: String(item?.employment_type || "").trim() || null,
       department: String(item?.department || "").trim() || null
     });

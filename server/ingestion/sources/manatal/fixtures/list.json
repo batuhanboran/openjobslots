@@ -1,0 +1,44 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 3844354,
+      "hash": "4R846955",
+      "position_name": "Appointment Setter (WFH)",
+      "description": "<p>Fully remote with structured training.</p>",
+      "country": "Canada",
+      "state": "BC",
+      "city": "Victoria",
+      "address": "",
+      "zipcode": "",
+      "location_display": "Victoria, BC, Canada",
+      "organization_name": "Sales",
+      "job_type": "Full-time"
+    },
+    {
+      "id": 3844355,
+      "hash": "DATEHASH",
+      "title": "Hybrid Operations Lead",
+      "description": "<p>Hybrid schedule from our Phnom Penh office.</p>",
+      "country": "Cambodia",
+      "state": "",
+      "city": "Phnom Penh",
+      "location_display": "Phnom Penh, Cambodia",
+      "workplace_type": "Hybrid",
+      "last_published_at": "2026-05-08T09:30:00Z",
+      "department": "Operations",
+      "employment_type": "Full-time"
+    },
+    {
+      "id": 3844356,
+      "hash": "REMOTECA",
+      "position_name": "Remote Support Specialist",
+      "description": "<p>Remote work within Canada.</p>",
+      "location_display": "Remote - Canada",
+      "remote_status": "Remote",
+      "published_at": "2026-05-07"
+    }
+  ]
+}

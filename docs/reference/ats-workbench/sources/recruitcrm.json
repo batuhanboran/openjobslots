@@ -19,12 +19,26 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/recruitcrm-direct.json"
+      "server/ingestion/fixtures/recruitcrm-direct.json",
+      "server/ingestion/sources/recruitcrm/fixtures/company.json",
+      "server/ingestion/sources/recruitcrm/fixtures/expected-normalized.json",
+      "server/ingestion/sources/recruitcrm/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/recruitcrm/fixtures/list.json"
     ],
     "present": [
-      "server/ingestion/fixtures/recruitcrm-direct.json"
+      "server/ingestion/fixtures/recruitcrm-direct.json",
+      "server/ingestion/sources/recruitcrm/fixtures/company.json",
+      "server/ingestion/sources/recruitcrm/fixtures/expected-normalized.json",
+      "server/ingestion/sources/recruitcrm/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/recruitcrm/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/recruitcrm/index.js",
+    "fixtures_dir": "server/ingestion/sources/recruitcrm/fixtures",
+    "parser_version": "source-recruitcrm-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -56,13 +70,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseRecruitCrmPostingsFromApi",
-    "parseDetail": "server/index.js parseRecruitCrmPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/recruitcrm/discover.js",
+    "fetchList": "server/ingestion/sources/recruitcrm/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/recruitcrm/fetchDetail.js",
+    "parseList": "server/ingestion/sources/recruitcrm/parse.js",
+    "parseDetail": "server/ingestion/sources/recruitcrm/parse.js",
+    "normalize": "server/ingestion/sources/recruitcrm/normalize.js",
+    "validate": "server/ingestion/sources/recruitcrm/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

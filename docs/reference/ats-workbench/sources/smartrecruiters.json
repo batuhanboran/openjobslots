@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/smartrecruiters-direct.json",
       "server/ingestion/fixtures/smartrecruiters-failures.json",
-      "server/ingestion/fixtures/smartrecruiters-postings.json"
+      "server/ingestion/fixtures/smartrecruiters-postings.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/company.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/expected-normalized.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/smartrecruiters-direct.json",
       "server/ingestion/fixtures/smartrecruiters-failures.json",
-      "server/ingestion/fixtures/smartrecruiters-postings.json"
+      "server/ingestion/fixtures/smartrecruiters-postings.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/company.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/expected-normalized.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/smartrecruiters/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/smartrecruiters/index.js",
+    "fixtures_dir": "server/ingestion/sources/smartrecruiters/fixtures",
+    "parser_version": "source-smartrecruiters-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -64,13 +78,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "Not required for list-visible fields; detail pages may enrich descriptions.",
-    "parseList": "server/index.js parseSmartRecruitersPostingsFromApi",
-    "parseDetail": "server/index.js parseSmartRecruitersPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/smartrecruiters/discover.js",
+    "fetchList": "server/ingestion/sources/smartrecruiters/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/smartrecruiters/fetchDetail.js",
+    "parseList": "server/ingestion/sources/smartrecruiters/parse.js",
+    "parseDetail": "server/ingestion/sources/smartrecruiters/parse.js",
+    "normalize": "server/ingestion/sources/smartrecruiters/normalize.js",
+    "validate": "server/ingestion/sources/smartrecruiters/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

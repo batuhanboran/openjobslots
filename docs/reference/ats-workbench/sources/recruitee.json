@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/recruitee-direct.json",
       "server/ingestion/fixtures/recruitee-failures.json",
-      "server/ingestion/fixtures/recruitee-postings.json"
+      "server/ingestion/fixtures/recruitee-postings.json",
+      "server/ingestion/sources/recruitee/fixtures/company.json",
+      "server/ingestion/sources/recruitee/fixtures/expected-normalized.json",
+      "server/ingestion/sources/recruitee/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/recruitee/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/recruitee-direct.json",
       "server/ingestion/fixtures/recruitee-failures.json",
-      "server/ingestion/fixtures/recruitee-postings.json"
+      "server/ingestion/fixtures/recruitee-postings.json",
+      "server/ingestion/sources/recruitee/fixtures/company.json",
+      "server/ingestion/sources/recruitee/fixtures/expected-normalized.json",
+      "server/ingestion/sources/recruitee/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/recruitee/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/recruitee/index.js",
+    "fixtures_dir": "server/ingestion/sources/recruitee/fixtures",
+    "parser_version": "source-recruitee-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -60,13 +74,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseRecruiteePostingsFromPublicApp",
-    "parseDetail": "server/index.js parseRecruiteePostingsFromPublicApp",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/recruitee/discover.js",
+    "fetchList": "server/ingestion/sources/recruitee/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/recruitee/fetchDetail.js",
+    "parseList": "server/ingestion/sources/recruitee/parse.js",
+    "parseDetail": "server/ingestion/sources/recruitee/parse.js",
+    "normalize": "server/ingestion/sources/recruitee/normalize.js",
+    "validate": "server/ingestion/sources/recruitee/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

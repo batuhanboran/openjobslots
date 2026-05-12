@@ -1,0 +1,15 @@
+[
+  {
+    "ats_key": "recruitee",
+    "source_job_id": "1001",
+    "company_name": "Fixture Recruitee",
+    "position_name": "Hybrid Product Manager",
+    "job_posting_url": "https://fixture.recruitee.com/o/hybrid-product-manager",
+    "country": "Netherlands",
+    "region": "EMEA",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-06T08:00:00+03:00",
+    "industry": "Product",
+    "parser_confidence": 0.75
+  }
+]

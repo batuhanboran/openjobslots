@@ -1,0 +1,49 @@
+[
+  {
+    "ats_key": "manatal",
+    "company_name": "Fixture Manatal",
+    "position_name": "Appointment Setter (WFH)",
+    "source_job_id": "4R846955",
+    "job_posting_url": "https://www.careers-page.com/fixture-manatal/job/4R846955",
+    "location_text": "Victoria, BC, Canada",
+    "city": "Victoria",
+    "country": "Canada",
+    "region": "North America",
+    "remote_type": "remote",
+    "posting_date": null,
+    "posted_at_epoch": null,
+    "department": "Sales",
+    "employment_type": "Full-time",
+    "description_plain": "Fully remote with structured training."
+  },
+  {
+    "ats_key": "manatal",
+    "company_name": "Fixture Manatal",
+    "position_name": "Hybrid Operations Lead",
+    "source_job_id": "DATEHASH",
+    "job_posting_url": "https://www.careers-page.com/fixture-manatal/job/DATEHASH",
+    "location_text": "Phnom Penh, Cambodia",
+    "city": "Phnom Penh",
+    "country": "Cambodia",
+    "region": "APAC",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-08T09:30:00Z",
+    "posted_at_epoch": 1778232600,
+    "department": "Operations",
+    "employment_type": "Full-time",
+    "description_plain": "Hybrid schedule from our Phnom Penh office."
+  },
+  {
+    "ats_key": "manatal",
+    "company_name": "Fixture Manatal",
+    "position_name": "Remote Support Specialist",
+    "source_job_id": "REMOTECA",
+    "job_posting_url": "https://www.careers-page.com/fixture-manatal/job/REMOTECA",
+    "location_text": "Remote - Canada",
+    "city": "",
+    "country": "Canada",
+    "region": "North America",
+    "remote_type": "remote",
+    "posting_date": "2026-05-07"
+  }
+]

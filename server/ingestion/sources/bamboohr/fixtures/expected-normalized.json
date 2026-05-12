@@ -1,0 +1,29 @@
+[
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1001",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Remote Payroll Specialist",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1001",
+    "country": "United States",
+    "region": "North America",
+    "remote_type": "remote",
+    "posting_date": "2026-05-06T08:00:00+03:00",
+    "industry": "Finance",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1002",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Office Operations Coordinator",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1002",
+    "country": "United States",
+    "region": "North America",
+    "city": "Austin",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-07",
+    "industry": "Operations",
+    "parser_confidence": 0.75
+  }
+]

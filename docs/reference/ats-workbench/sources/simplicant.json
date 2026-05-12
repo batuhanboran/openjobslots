@@ -26,6 +26,12 @@
       "parser rejection tests"
     ]
   },
+  "source_module": {
+    "present": false,
+    "path": "",
+    "fixtures_dir": "",
+    "parser_version": ""
+  },
   "quality_threshold": {
     "mode": "quarantine_or_canary",
     "minimum_confidence": 0.85,

@@ -1,0 +1,29 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "ash-1001",
+      "title": "Hybrid Platform Engineer",
+      "location": "Ankara, Turkey",
+      "secondaryLocations": [
+        {
+          "location": "Istanbul",
+          "address": {
+            "addressLocality": "Istanbul",
+            "addressCountry": "TUR"
+          }
+        }
+      ],
+      "department": "Product",
+      "team": "Growth",
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "descriptionHtml": "<p>Build platform tooling.</p>",
+      "descriptionPlain": "Build platform tooling.",
+      "publishedAt": "2026-05-06T08:00:00+03:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1001?utm_source=openjobslots#job",
+      "applyUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1001/application"
+    }
+  ]
+}

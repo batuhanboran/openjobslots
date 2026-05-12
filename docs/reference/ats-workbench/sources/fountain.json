@@ -19,12 +19,26 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/fountain-direct.json"
+      "server/ingestion/fixtures/fountain-direct.json",
+      "server/ingestion/sources/fountain/fixtures/company.json",
+      "server/ingestion/sources/fountain/fixtures/expected-normalized.json",
+      "server/ingestion/sources/fountain/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/fountain/fixtures/list.json"
     ],
     "present": [
-      "server/ingestion/fixtures/fountain-direct.json"
+      "server/ingestion/fixtures/fountain-direct.json",
+      "server/ingestion/sources/fountain/fixtures/company.json",
+      "server/ingestion/sources/fountain/fixtures/expected-normalized.json",
+      "server/ingestion/sources/fountain/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/fountain/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/fountain/index.js",
+    "fixtures_dir": "server/ingestion/sources/fountain/fixtures",
+    "parser_version": "source-fountain-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -56,13 +70,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseFountainPostingsFromApi",
-    "parseDetail": "server/index.js parseFountainPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/fountain/discover.js",
+    "fetchList": "server/ingestion/sources/fountain/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/fountain/fetchDetail.js",
+    "parseList": "server/ingestion/sources/fountain/parse.js",
+    "parseDetail": "server/ingestion/sources/fountain/parse.js",
+    "normalize": "server/ingestion/sources/fountain/normalize.js",
+    "validate": "server/ingestion/sources/fountain/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

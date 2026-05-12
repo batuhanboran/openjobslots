@@ -21,14 +21,28 @@
     "files": [
       "server/ingestion/fixtures/ashby-direct.json",
       "server/ingestion/fixtures/ashby-failures.json",
-      "server/ingestion/fixtures/ashby-postings.json"
+      "server/ingestion/fixtures/ashby-postings.json",
+      "server/ingestion/sources/ashby/fixtures/company.json",
+      "server/ingestion/sources/ashby/fixtures/expected-normalized.json",
+      "server/ingestion/sources/ashby/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/ashby/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/ashby-direct.json",
       "server/ingestion/fixtures/ashby-failures.json",
-      "server/ingestion/fixtures/ashby-postings.json"
+      "server/ingestion/fixtures/ashby-postings.json",
+      "server/ingestion/sources/ashby/fixtures/company.json",
+      "server/ingestion/sources/ashby/fixtures/expected-normalized.json",
+      "server/ingestion/sources/ashby/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/ashby/fixtures/list.json"
     ],
     "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/ashby/index.js",
+    "fixtures_dir": "server/ingestion/sources/ashby/fixtures",
+    "parser_version": "source-ashby-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -64,13 +78,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "Not required for core public fields when source exposes jobUrl/applyUrl/location/description.",
-    "parseList": "server/index.js Ashby collector",
-    "parseDetail": "server/index.js Ashby collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/ashby/discover.js",
+    "fetchList": "server/ingestion/sources/ashby/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/ashby/fetchDetail.js",
+    "parseList": "server/ingestion/sources/ashby/parse.js",
+    "parseDetail": "server/ingestion/sources/ashby/parse.js",
+    "normalize": "server/ingestion/sources/ashby/normalize.js",
+    "validate": "server/ingestion/sources/ashby/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

@@ -2,6 +2,7 @@
   "schema": "openjobslots.ats-field-certification.v1",
   "scope": "direct-json-api-ats",
   "updated": "2026-05-08",
+  "superseded_by": "docs/reference/ats-workbench/index.json and server/ingestion/sources/<ats>/fixtures for the direct JSON/API repair wave",
   "decision_legend": {
     "list": "Field is available from the list/API payload or board listing currently fetched.",
     "detail": "Field requires a per-job detail fetch or detail payload.",

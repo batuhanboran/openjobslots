@@ -1,0 +1,22 @@
+[
+  {
+    "id": "lev-1001",
+    "text": "Remote Backend Engineer",
+    "createdAt": 1778043600000,
+    "categories": {
+      "location": "Remote - EMEA",
+      "allLocations": [
+        "Remote - EMEA",
+        "Istanbul, Turkey"
+      ],
+      "team": "Engineering",
+      "department": "Engineering",
+      "commitment": "Full-time"
+    },
+    "country": "TR",
+    "workplaceType": "remote",
+    "hostedUrl": "https://jobs.lever.co/fixtureco/lev-1001?lever-source=test&utm_campaign=openjobslots#apply",
+    "applyUrl": "https://jobs.lever.co/fixtureco/lev-1001/apply",
+    "descriptionPlain": "Build backend search services."
+  }
+]

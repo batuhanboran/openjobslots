@@ -1,0 +1,26 @@
+{
+  "data": {
+    "jobs": [
+      {
+        "name": "Remote Talent Partner",
+        "slug": "remote-talent-partner",
+        "posted_at": "2026-05-06",
+        "remote": "1",
+        "employment_type": "Full time",
+        "department": "Talent"
+      },
+      {
+        "id": "rc-2002",
+        "name": "Onsite Support Analyst",
+        "slug": "onsite-support-analyst",
+        "posted_at": "2026-05-07",
+        "remote": "0",
+        "city": "Toronto",
+        "state": "ON",
+        "country": "Canada",
+        "employment_type": "Full time",
+        "department": "Support"
+      }
+    ]
+  }
+}
