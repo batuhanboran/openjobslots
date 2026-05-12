@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { createPostgresPool, ensurePostgresSchema } = require("../server/backends/postgres");
+const { createPostgresPool, ensurePostgresSchema, getPostgresConfig } = require("../server/backends/postgres");
 const {
   applyPostgresSourceQualityProtection,
   getPostgresSourceQualityDashboard
@@ -27,7 +27,8 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 async function main() {
   const options = parseArgs();
-  const pool = createPostgresPool({ enabled: true });
+  const pool = createPostgresPool(getPostgresConfig());
+  if (!pool) throw new Error("source-quality protection requires OPENJOBSLOTS_DB_BACKEND=postgres");
   try {
     await ensurePostgresSchema(pool);
     if (!options.apply) {
