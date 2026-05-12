@@ -96,6 +96,55 @@ Reports were written on production under `/root/OpenJobSlots/reports/`.
 
 Treat these as the last recorded numbers, not proof of current live state. Re-run the read-only production baseline audit before making new data-quality claims.
 
+Important interpretation:
+
+- `v1.8.0` improved many quality percentages mostly by shrinking the public dataset during the certified-source rebuild.
+- Future work must not treat lower coverage as quality progress.
+- Treat the last recorded `47,396` visible postings as the coverage floor until a fresh read-only production baseline replaces it.
+
+## Post-v1.8.0 Recovery Strategy
+
+The next phase is ATS-by-ATS recovery, not another broad cleanup or rebuild.
+
+Hard rules:
+
+- Do not run a clean public dataset rebuild.
+- Do not truncate `postings`, `posting_cache`, the active Meili index, source configuration, company configuration, or source quality state.
+- Do not lower visible count.
+- Do not disable or quarantine-only a source if doing so removes existing public rows.
+- Do not restore dirty backup rows from `v1.6.2`, `v1.8.0`, or their reports into public search. Use those reports only as reference evidence.
+- Keep Postgres as source of truth. Meili is derived data and should be reindexed only after source recovery writes improve Postgres/source data.
+
+Recovery model:
+
+- Work one ATS at a time.
+- Prefer tenant/source-level recovery over source-wide disabling.
+- Ambiguous rows should be skipped and logged, not used as a reason to fail the whole task.
+- If a source cannot be recovered, keep it quarantine-only and record tenant-level failure reasons plus the exact next parser evidence needed.
+
+Success criteria for every ATS recovery task:
+
+- Accepted public rows for that ATS increase.
+- Visible count does not decrease.
+- Missing geo/remote decreases for existing rows, or newly accepted rows do not add bad `no_geo_no_remote` rows.
+- If no improvement is possible, report exact tenant/source/error reasons.
+
+Non-success criteria:
+
+- Parser fixtures alone are not success.
+- Tests alone are not success.
+- A source wave is successful only if production accepted public rows increase or source-level missing geo/remote improves without decreasing visible count.
+
+## Next Prompt Contract
+
+Each future prompt/run must:
+
+1. Read `handoff.md` and `docs/PROJECT_STATE.md` first.
+2. Run a fresh current live baseline before making data-quality claims.
+3. Compare before/after visible count and source-level quality.
+4. Preserve coverage; visible count must not decrease for ATS recovery work.
+5. Update `handoff.md` with the latest source recovery status.
+
 ## Known Risks
 
 - Some rebuilt rows still need parser-backed normalization or detail-page refetch before country, region, city, remote mode, date, department, and employment fields are fully reliable.
@@ -103,18 +152,22 @@ Treat these as the last recorded numbers, not proof of current live state. Re-ru
 - Parser certification is fixture-backed only for a subset of the configured ATS catalog. Do not claim all 60 ATS are certified.
 - Meilisearch is derived data. Reindex only after check/dry-run mode and with a rollback plan.
 - Production write backfills must be dry-run first, batched, explicit, and approved.
-- v1.8.0 has applied the certified-source public dataset rebuild, threshold indexing cleanup, quarantine-only source enforcement, and final replace-mode Meili reindexing. Future repair work must still use the same backup, lock, canary, audit, and rollback process.
+- `v1.8.0` has applied the certified-source public dataset rebuild, threshold indexing cleanup, quarantine-only source enforcement, and final replace-mode Meili reindexing. Do not repeat that rebuild strategy.
+- Source disable/quarantine changes can reduce coverage. Block them when they would remove existing public rows.
+- Future repair work must use the same backup, lock, canary, audit, and rollback process, but the success target is source recovery without visible-count loss.
 - Cloudflare/analytics CSP alignment and dependency version cleanup are separate maintenance tasks.
 
 ## Next Tasks
 
-1. Run a fresh read-only production data-quality audit by ATS/parser/version with `npm run audit:data-quality -- --by-source --by-parser`.
-2. Prioritize parser/detail-page work by live field gaps, not by UI symptoms.
-3. Add raw fixtures and tests before marking any ATS certified.
-4. Run dry-run normalized backfill and inspect before/after samples.
-5. Run Meilisearch check-mode parity before any replace reindex.
-6. Keep public search parity tests active for Turkey/Turkiye/Türkiye, remote, common title/country combinations, and pagination uniqueness.
-7. Keep documentation changes consolidated in this file plus `docs/reference/`.
+1. Read `handoff.md` and this file before planning any source or data-quality work.
+2. Run a fresh read-only production baseline: visible count, accepted public rows by source, source-level geo/remote gaps, quarantine reasons, and Meili/Postgres delta.
+3. Prioritize ATS-by-ATS source recovery by live field gaps and recoverable tenant/source evidence.
+4. For each ATS recovery task, prove accepted public rows increased or source-level missing geo/remote improved without decreasing visible count.
+5. Skip and log ambiguous rows instead of failing the whole task.
+6. For unrecovered sources, keep quarantine-only and record tenant-level failure reasons plus exact parser/detail evidence needed next.
+7. Run Meilisearch check-mode parity only after source recovery writes improve Postgres/source data; replace reindex remains a controlled follow-up, not the recovery mechanism.
+8. Keep public search parity tests active for Turkey/Turkiye/Türkiye, remote, common title/country combinations, and pagination uniqueness.
+9. Keep documentation changes consolidated in this file plus `handoff.md` and `docs/reference/`.
 
 ## Baseline Validation Commands
 
@@ -138,8 +191,9 @@ npm.cmd run audit:ats-quality
 npm.cmd run ats:workbench
 npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=25 --json
 npm.cmd run ats:source:canary -- --source=greenhouse --limit=25 --json
-npm.cmd run ats:source:apply -- --source=greenhouse --apply --confirm-production --max-updates=100 --json
 ```
+
+Use production apply commands only inside a scoped ATS recovery task after the fresh baseline, dry-run/canary evidence, heavy-job lock check, and before/after acceptance criteria are ready.
 
 Docs-only work normally needs only:
 
