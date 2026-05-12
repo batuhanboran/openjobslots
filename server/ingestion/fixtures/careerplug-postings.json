@@ -36,7 +36,7 @@
       "apply_url": "https://fixture.careerplug.com/jobs/2922288",
       "posted_at": null,
       "posted_at_epoch": null,
-      "parser_version": "legacy-adapter-v1"
+      "parser_version": "source-careerplug-v1"
     }
   ],
   "expected_rejections": [

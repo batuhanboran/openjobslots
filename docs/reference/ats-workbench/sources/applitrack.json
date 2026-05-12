@@ -22,21 +22,29 @@
       "server/ingestion/fixtures/applitrack-detail-certification.json",
       "server/ingestion/fixtures/applitrack-postings.json",
       "server/ingestion/fixtures/detail-refetch/applitrack-detail-geo.html",
-      "server/ingestion/fixtures/detail-refetch/applitrack-detail-remote.html"
+      "server/ingestion/fixtures/detail-refetch/applitrack-detail-remote.html",
+      "server/ingestion/sources/applitrack/fixtures/company.json",
+      "server/ingestion/sources/applitrack/fixtures/expected-normalized.json",
+      "server/ingestion/sources/applitrack/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/applitrack/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/applitrack-detail-certification.json",
       "server/ingestion/fixtures/applitrack-postings.json",
       "server/ingestion/fixtures/detail-refetch/applitrack-detail-geo.html",
-      "server/ingestion/fixtures/detail-refetch/applitrack-detail-remote.html"
+      "server/ingestion/fixtures/detail-refetch/applitrack-detail-remote.html",
+      "server/ingestion/sources/applitrack/fixtures/company.json",
+      "server/ingestion/sources/applitrack/fixtures/expected-normalized.json",
+      "server/ingestion/sources/applitrack/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/applitrack/fixtures/list.json"
     ],
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/applitrack/index.js",
+    "fixtures_dir": "server/ingestion/sources/applitrack/fixtures",
+    "parser_version": "source-applitrack-v1"
   },
   "quality_threshold": {
     "mode": "certified_but_quarantine_risk",
@@ -68,13 +76,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "use configured agency/board URL and official/list endpoint where visible",
-    "fetchList": "bounded public-sector feed/API/HTML list request",
-    "fetchDetail": "detail fetch for date/location only when fixture-backed and polite",
-    "parseList": "server/index.js parseApplitrackPostings and extractApplitrackDetailFields",
-    "parseDetail": "server/index.js parseApplitrackPostings and extractApplitrackDetailFields",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/applitrack/discover.js",
+    "fetchList": "server/ingestion/sources/applitrack/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/applitrack/fetchDetail.js",
+    "parseList": "server/ingestion/sources/applitrack/parse.js",
+    "parseDetail": "server/ingestion/sources/applitrack/parse.js",
+    "normalize": "server/ingestion/sources/applitrack/normalize.js",
+    "validate": "server/ingestion/sources/applitrack/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

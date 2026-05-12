@@ -21,20 +21,28 @@
     "files": [
       "server/ingestion/fixtures/applytojob-direct.json",
       "server/ingestion/fixtures/applytojob-failures.json",
-      "server/ingestion/fixtures/applytojob-postings.json"
+      "server/ingestion/fixtures/applytojob-postings.json",
+      "server/ingestion/sources/applytojob/fixtures/company.json",
+      "server/ingestion/sources/applytojob/fixtures/expected-normalized.json",
+      "server/ingestion/sources/applytojob/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/applytojob/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/applytojob-direct.json",
       "server/ingestion/fixtures/applytojob-failures.json",
-      "server/ingestion/fixtures/applytojob-postings.json"
+      "server/ingestion/fixtures/applytojob-postings.json",
+      "server/ingestion/sources/applytojob/fixtures/company.json",
+      "server/ingestion/sources/applytojob/fixtures/expected-normalized.json",
+      "server/ingestion/sources/applytojob/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/applytojob/fixtures/list.json"
     ],
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/applytojob/index.js",
+    "fixtures_dir": "server/ingestion/sources/applytojob/fixtures",
+    "parser_version": "source-applytojob-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -66,13 +74,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseApplyToJobPostingsFromHtml",
-    "parseDetail": "server/index.js parseApplyToJobPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/applytojob/discover.js",
+    "fetchList": "server/ingestion/sources/applytojob/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/applytojob/fetchDetail.js",
+    "parseList": "server/ingestion/sources/applytojob/parse.js",
+    "parseDetail": "server/ingestion/sources/applytojob/parse.js",
+    "normalize": "server/ingestion/sources/applytojob/normalize.js",
+    "validate": "server/ingestion/sources/applytojob/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

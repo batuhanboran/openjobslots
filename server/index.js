@@ -2955,6 +2955,7 @@ function extractSourceIdFromPostingUrl(urlValue, atsKey = "") {
     if (normalizedAts === "pinpointhq") return path.match(/\/postings\/([^/]+)/i)?.[1] || lastPart;
     if (normalizedAts === "jobvite") return path.match(/\/job\/([^/]+)/i)?.[1] || lastPart;
     if (normalizedAts === "careerplug") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart;
+    if (normalizedAts === "hirebridge") return queryFirst("jid", "jobId", "jobid") || lastPart;
     if (normalizedAts === "teamtailor") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart.match(/^(\d+)/)?.[1] || lastPart;
     if (normalizedAts === "brassring") return queryFirst("jobid", "jobId", "reqid");
     if (normalizedAts === "governmentjobs") return path.match(/\/jobs\/(\d+)/i)?.[1] || queryFirst("jobid", "jobId");
@@ -2971,7 +2972,7 @@ function extractSourceIdFromPostingUrl(urlValue, atsKey = "") {
     if (normalizedAts === "paylocity") {
       return path.match(/\/jobs?\/details\/([^/]+)/i)?.[1] || queryFirst("jobId", "jobid") || lastPart;
     }
-    if (["ultipro", "pageup", "eightfold", "rippling", "careerpuck", "talentlyft", "talexio", "fountain"].includes(normalizedAts)) {
+    if (["ultipro", "pageup", "eightfold", "rippling", "careerpuck", "talentlyft", "talexio", "fountain", "isolvisolvedhire"].includes(normalizedAts)) {
       return queryFirst("opportunityId", "opportunityid", "jobId", "jobid", "id", "reqId", "reqid") || lastPart;
     }
     if (lastPart && !["jobs", "careers", "employment", "job-opening.php"].includes(lastPart.toLowerCase())) return lastPart;
@@ -5307,6 +5308,7 @@ function parseHirebridgePostingsFromHtml(companyNameForPostings, config, pageHtm
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "hirebridge"),
       position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: null,
@@ -7468,9 +7470,14 @@ function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, confi
     const location = [city, state].filter(Boolean).join(", ");
     const department = String(source?.department?.name || source?.category || "").trim();
     const postingDate = String(source?.createdDate || source?.startDate || source?.updatedDate || "").trim() || null;
+    const sourceJobId =
+      String(source?.jobId || source?.id || hit?._id || "").trim() ||
+      extractSourceIdFromPostingUrl(postingUrl, "talentreef");
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: sourceJobId,
+      id: sourceJobId || undefined,
       position_name: String(source?.title || source?.positionType || "").trim() || "Untitled Position",
       job_posting_url: postingUrl,
       posting_date: postingDate,
@@ -11692,11 +11699,15 @@ function parseIsolvisolvedhirePostingsFromApi(companyName, responseJson) {
     if (!job || typeof job !== "object") continue;
     const postingUrl = cleanText(job.jobUrl) || "";
     if (!postingUrl || seenUrls.has(postingUrl)) continue;
+    const sourceJobId =
+      cleanText(job.id) ||
+      cleanText(job.jobId) ||
+      extractSourceIdFromPostingUrl(postingUrl, "isolvisolvedhire");
 
     postings.push({
       company_name: companyName,
-      source_job_id: fallbackJobId || extractSourceIdFromPostingUrl(postingUrl, "applicantpro"),
-      id: fallbackJobId || undefined,
+      source_job_id: sourceJobId,
+      id: sourceJobId || undefined,
       position_name: cleanText(job.title) || "Untitled Position",
       job_posting_url: postingUrl,
       posting_date: cleanText(job.startDateRef) || null,
@@ -18055,6 +18066,7 @@ module.exports = {
   parseFountainPostingsFromApi,
   parseGreenhousePostingsFromApi,
   parseHrmDirectPostingsFromHtml,
+  parseHirebridgePostingsFromHtml,
   parseIcimsPostingsFromHtml,
   parseJobvitePostingsFromHtml,
   parseLeverPostingsFromApi,
@@ -18068,6 +18080,7 @@ module.exports = {
   parseRecruiteePostingsFromPublicApp,
   parseSapHrCloudPostingsFromApi,
   parseSmartRecruitersPostingsFromApi,
+  parseTalentreefPostingsFromSearchResponse,
   parseTeamtailorPostingsFromHtml,
   parseUltiProPostingsFromApi,
   parseWorkdayPostingsFromApi,

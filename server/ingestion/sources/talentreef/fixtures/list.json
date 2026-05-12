@@ -1,0 +1,31 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "_id": "tr-1001",
+        "_source": {
+          "jobId": "TR1001",
+          "title": "Shift Lead",
+          "url": "/fixture/jobs/TR1001?source=feed",
+          "address": { "city": "Istanbul" },
+          "stateOrProvinceFull": "Türkiye",
+          "department": { "name": "Operations" },
+          "createdDate": "2026-05-07",
+          "contractType": "Full Time"
+        }
+      },
+      {
+        "_id": "tr-1002",
+        "_source": {
+          "jobId": "TR1002",
+          "title": "Remote Restaurant Support",
+          "url": "/fixture/jobs/TR1002",
+          "address": { "city": "" },
+          "stateOrProvinceFull": "",
+          "department": { "name": "Support" },
+          "createdDate": "2026-05-08"
+        }
+      }
+    ]
+  }
+}

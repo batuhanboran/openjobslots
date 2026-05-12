@@ -35,10 +35,10 @@
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/paylocity/index.js",
+    "fixtures_dir": "server/ingestion/sources/paylocity/fixtures",
+    "parser_version": "source-paylocity-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -70,13 +70,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
-    "fetchList": "bounded API request to candidate/search endpoint through source runner",
-    "fetchDetail": "detail fetch only when list response lacks geo/date/remote and parser certification covers detail shape",
-    "parseList": "server/index.js parsePaylocityPostingsFromPageData",
-    "parseDetail": "server/index.js parsePaylocityPostingsFromPageData",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/paylocity/discover.js",
+    "fetchList": "server/ingestion/sources/paylocity/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/paylocity/fetchDetail.js",
+    "parseList": "server/ingestion/sources/paylocity/parse.js",
+    "parseDetail": "server/ingestion/sources/paylocity/parse.js",
+    "normalize": "server/ingestion/sources/paylocity/normalize.js",
+    "validate": "server/ingestion/sources/paylocity/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

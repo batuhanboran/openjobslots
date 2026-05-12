@@ -35,10 +35,10 @@
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/oracle/index.js",
+    "fixtures_dir": "server/ingestion/sources/oracle/fixtures",
+    "parser_version": "source-oracle-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -70,13 +70,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
-    "fetchList": "bounded API request to candidate/search endpoint through source runner",
-    "fetchDetail": "detail fetch only when list response lacks geo/date/remote and parser certification covers detail shape",
-    "parseList": "server/index.js parseOraclePostingsFromApi",
-    "parseDetail": "server/index.js parseOraclePostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/oracle/discover.js",
+    "fetchList": "server/ingestion/sources/oracle/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/oracle/fetchDetail.js",
+    "parseList": "server/ingestion/sources/oracle/parse.js",
+    "parseDetail": "server/ingestion/sources/oracle/parse.js",
+    "normalize": "server/ingestion/sources/oracle/normalize.js",
+    "validate": "server/ingestion/sources/oracle/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

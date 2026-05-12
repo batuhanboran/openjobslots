@@ -1,0 +1,3 @@
+{
+  "html": "<table><tr><td>Technology</td><td>Location: Remote</td><td>Date Posted: 05/08/2026</td><td><a href=\"#\" onclick=\"applyFor('12345','Technology','Remote Support Specialist')\">Apply</a></td></tr><tr><td>Teaching</td><td>Location: Istanbul, Türkiye</td><td>Date Posted: 05/09/2026</td><td><a href=\"#\" onclick=\"applyFor('12346','Teaching','Math Teacher')\">Apply</a></td></tr></table>"
+}

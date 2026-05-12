@@ -1,14 +1,21 @@
 const {
   collectPostingsForCompany,
   extractTaleoPostingsFromRest,
+  parseApplitrackPostings,
+  parseApplyToJobPostingsFromHtml,
   parseAshbyPostingsFromApi,
   parseBambooHrPostingsFromApi,
   parseAdpMyjobsPostingsFromApi,
   parseAdpWorkforcenowPostingsFromApi,
   parseBrassringPostingsFromApi,
+  parseBreezyPostingsFromHtml,
+  parseCareerplugPostingsFromHtml,
   parseFountainPostingsFromApi,
   parseGreenhousePostingsFromApi,
+  parseHirebridgePostingsFromHtml,
+  parseHrmDirectPostingsFromHtml,
   parseIcimsPostingsFromHtml,
+  parseJobvitePostingsFromHtml,
   parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
@@ -19,6 +26,7 @@ const {
   parseRecruiteePostingsFromPublicApp,
   parseSapHrCloudPostingsFromApi,
   parseSmartRecruitersPostingsFromApi,
+  parseTalentreefPostingsFromSearchResponse,
   parseUltiProPostingsFromApi,
   parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml
@@ -74,6 +82,23 @@ function parsePathParts(value) {
   const parsed = asUrl(value);
   if (!parsed) return [];
   return parsed.pathname.split("/").map((part) => clean(part)).filter(Boolean);
+}
+
+function applitrackSiteRoot(value) {
+  const parsed = asUrl(value);
+  if (!parsed) return "";
+  const pathValue = String(parsed.pathname || "/");
+  const lowerPath = pathValue.toLowerCase();
+  const onlineAppIndex = lowerPath.indexOf("/onlineapp/");
+  const rootPath = onlineAppIndex >= 0
+    ? pathValue.slice(0, onlineAppIndex + "/onlineapp/".length)
+    : pathValue.endsWith("/default.aspx")
+      ? pathValue.slice(0, -1 * "default.aspx".length)
+      : pathValue.endsWith("/")
+        ? pathValue
+        : `${pathValue.replace(/[^/]*$/, "")}`;
+  const normalizedRootPath = rootPath.endsWith("/") ? rootPath : `${rootPath}/`;
+  return `${parsed.protocol}//${parsed.host}${normalizedRootPath}`;
 }
 
 function buildCompanyContext(company = {}) {
@@ -465,6 +490,129 @@ const SOURCE_SPECS = Object.freeze({
         listUrl: clean(company.url_string)
       };
     }
+  },
+  applitrack: {
+    sourceFamily: "public_sector",
+    confidence: 0.55,
+    parser: (companyName, config, payload) => parseApplitrackPostings(payload?.html || payload, config.siteRoot, companyName),
+    officialDocs: "observed Applitrack Output.asp list and JobPostings/view.asp detail pages",
+    discover(company) {
+      const siteRoot = applitrackSiteRoot(company.url_string);
+      return {
+        config: { siteRoot },
+        listUrl: siteRoot ? new URL("jobpostings/Output.asp?all=1", siteRoot).toString() : ""
+      };
+    }
+  },
+  hirebridge: {
+    sourceFamily: "html_detail",
+    confidence: 0.45,
+    parser: (companyName, config, payload) => parseHirebridgePostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed Hirebridge public list HTML and detail pages",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : "",
+          cid: queryParam(company.url_string, "cid"),
+          detailsBaseUrl: parsed ? `${parsed.origin}/v3/CareerCenter/v2/details.aspx` : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  jobvite: {
+    sourceFamily: "html_detail",
+    confidence: 0.55,
+    parser: (companyName, config, payload) => parseJobvitePostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed Jobvite public job-list HTML",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  careerplug: {
+    sourceFamily: "html_detail",
+    confidence: 0.75,
+    parser: (companyName, config, payload) => parseCareerplugPostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed CareerPlug public jobs HTML",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  talentreef: {
+    sourceFamily: "html_detail",
+    confidence: 0.55,
+    parser: parseTalentreefPostingsFromSearchResponse,
+    officialDocs: "observed TalentReef public career-page alias and posting search response",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      const companyName = firstPathSegment(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : "",
+          companyName,
+          boardUrl: clean(company.url_string)
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  hrmdirect: {
+    sourceFamily: "html_detail",
+    confidence: 0.75,
+    parser: (companyName, config, payload) => parseHrmDirectPostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed HRMDirect public job-openings table HTML",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  breezy: {
+    sourceFamily: "html_detail",
+    confidence: 0.75,
+    parser: (companyName, config, payload) => parseBreezyPostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed Breezy public portal HTML",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          origin: parsed ? parsed.origin : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  applytojob: {
+    sourceFamily: "html_detail",
+    confidence: 0.75,
+    parser: (companyName, config, payload) => parseApplyToJobPostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed ApplyToJob public list HTML",
+    discover(company) {
+      const parsed = asUrl(company.url_string);
+      return {
+        config: {
+          baseOrigin: parsed ? parsed.origin : ""
+        },
+        listUrl: clean(company.url_string)
+      };
+    }
   }
 });
 
@@ -559,7 +707,7 @@ function createSourceModule(atsKey) {
   }
 
   function rateLimit() {
-    return ["enterprise_api", "html_detail", "brittle"].includes(spec.sourceFamily)
+    return ["enterprise_api", "html_detail", "public_sector", "brittle"].includes(spec.sourceFamily)
       ? ENTERPRISE_RATE_LIMIT
       : DEFAULT_RATE_LIMIT;
   }

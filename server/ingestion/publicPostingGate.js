@@ -28,6 +28,8 @@ const BLANK_VALUES = new Set([
 const AMBIGUOUS_LOCATION_VALUES = new Set([
   "all locations",
   "anywhere",
+  "district wide",
+  "districtwide",
   "global",
   "multiple",
   "multiple locations",

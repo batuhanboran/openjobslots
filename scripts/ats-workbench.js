@@ -287,7 +287,7 @@ function buildSourceWorkbenchRecord({ item, row, record, metadata, fixtures }) {
   const certification = ADAPTER_CERTIFICATION_DETAILS[atsKey] || metadata.certification || null;
   const fixtureStatus = fixtureStatusFor(atsKey, metadata, fixtures);
   const publicEnabled = Boolean(row.should_be_public_enabled && isAtsEnabledByDefault(atsKey));
-  const hasDedicatedSourceModule = DIRECT_JSON_API_REPAIR_SOURCES.has(atsKey);
+  const hasDedicatedSourceModule = fs.existsSync(path.join(SOURCE_MODULE_DIR, atsKey, "index.js"));
   const sourceModulePath = hasDedicatedSourceModule
     ? `server/ingestion/sources/${atsKey}/index.js`
     : "";

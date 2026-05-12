@@ -37,10 +37,10 @@
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/taleo/index.js",
+    "fixtures_dir": "server/ingestion/sources/taleo/fixtures",
+    "parser_version": "source-taleo-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -76,13 +76,13 @@
     "confidence": "low"
   },
   "runner_interface": {
-    "discover": "manual source-specific discovery required before public enablement",
-    "fetchList": "brittle source-specific fetch only in canary mode until certified",
-    "fetchDetail": "May be required when list columns omit date/location.",
-    "parseList": "server/index.js extractTaleoPostingsFromRest",
-    "parseDetail": "server/index.js extractTaleoPostingsFromRest",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/taleo/discover.js",
+    "fetchList": "server/ingestion/sources/taleo/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/taleo/fetchDetail.js",
+    "parseList": "server/ingestion/sources/taleo/parse.js",
+    "parseDetail": "server/ingestion/sources/taleo/parse.js",
+    "normalize": "server/ingestion/sources/taleo/normalize.js",
+    "validate": "server/ingestion/sources/taleo/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

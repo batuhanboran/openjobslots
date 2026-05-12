@@ -1,0 +1,19 @@
+[
+  {
+    "source_job_id": "12345",
+    "company_name": "Fixture Applitrack",
+    "position_name": "Technology - Remote Support Specialist",
+    "remote_type": "remote",
+    "parser_confidence": 0.55,
+    "posting_date": "05/08/2026"
+  },
+  {
+    "source_job_id": "12346",
+    "company_name": "Fixture Applitrack",
+    "position_name": "Teaching - Math Teacher",
+    "country": "Turkey",
+    "remote_type": "unknown",
+    "parser_confidence": 0.55,
+    "posting_date": "05/09/2026"
+  }
+]

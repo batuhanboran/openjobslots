@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-05-12T13:21:27.154Z",
+  "generated_at": "2026-05-12T14:21:39.933Z",
   "ats_count": 60,
   "status_counts": {
-    "fallback": 36,
-    "certified": 23,
+    "fallback": 33,
+    "certified": 26,
     "unsupported": 1
   },
   "source_family_counts": {
@@ -183,6 +183,15 @@
       "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
     },
     {
+      "ats_key": "jobvite",
+      "easiest_improvement_score": 339.99,
+      "status": "certified",
+      "rows": 10090,
+      "missing_any_geo_pct": 95.64,
+      "weak_remote_pct": 12.71,
+      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
+    },
+    {
       "ats_key": "breezy",
       "easiest_improvement_score": 321.57,
       "status": "certified",
@@ -219,6 +228,15 @@
       "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
     },
     {
+      "ats_key": "talentreef",
+      "easiest_improvement_score": 301.67,
+      "status": "certified",
+      "rows": 19973,
+      "missing_any_geo_pct": 83.51,
+      "weak_remote_pct": 0,
+      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
+    },
+    {
       "ats_key": "recruitcrm",
       "easiest_improvement_score": 300.37,
       "status": "certified",
@@ -252,24 +270,6 @@
       "rows": 26620,
       "missing_any_geo_pct": 60.95,
       "weak_remote_pct": 16.42,
-      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
-    },
-    {
-      "ats_key": "pinpointhq",
-      "easiest_improvement_score": 233.22,
-      "status": "certified",
-      "rows": 11204,
-      "missing_any_geo_pct": 67.11,
-      "weak_remote_pct": 3.39,
-      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
-    },
-    {
-      "ats_key": "greenhouse",
-      "easiest_improvement_score": 212.68,
-      "status": "certified",
-      "rows": 4891,
-      "missing_any_geo_pct": 63.77,
-      "weak_remote_pct": 11.33,
       "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
     }
   ],
@@ -355,7 +355,7 @@
     },
     {
       "ats_key": "hirebridge",
-      "status": "fallback",
+      "status": "certified",
       "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
     },
     {
@@ -537,15 +537,6 @@
       "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
     },
     {
-      "ats_key": "hirebridge",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
       "ats_key": "isolvisolvedhire",
       "missing": [
         "raw source fixture",
@@ -556,15 +547,6 @@
     },
     {
       "ats_key": "jobaps",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "jobvite",
       "missing": [
         "raw source fixture",
         "expected normalized fixture",
@@ -688,15 +670,6 @@
         "parser rejection tests"
       ],
       "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "talentreef",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
     },
     {
       "ats_key": "talexio",
@@ -940,7 +913,7 @@
     {
       "ats_key": "hirebridge",
       "file": "sources/hirebridge.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
       "public_enabled": false,
       "risk_score": 202.61
@@ -980,7 +953,7 @@
     {
       "ats_key": "jobvite",
       "file": "sources/jobvite.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
       "public_enabled": true,
       "risk_score": 162.33
@@ -1156,7 +1129,7 @@
     {
       "ats_key": "talentreef",
       "file": "sources/talentreef.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
       "public_enabled": true,
       "risk_score": 144.81

@@ -41,10 +41,10 @@
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/icims/index.js",
+    "fixtures_dir": "server/ingestion/sources/icims/fixtures",
+    "parser_version": "source-icims-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -76,13 +76,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseIcimsPostingsFromHtml plus detail helpers",
-    "parseDetail": "server/index.js parseIcimsPostingsFromHtml plus detail helpers",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/icims/discover.js",
+    "fetchList": "server/ingestion/sources/icims/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/icims/fetchDetail.js",
+    "parseList": "server/ingestion/sources/icims/parse.js",
+    "parseDetail": "server/ingestion/sources/icims/parse.js",
+    "normalize": "server/ingestion/sources/icims/normalize.js",
+    "validate": "server/ingestion/sources/icims/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

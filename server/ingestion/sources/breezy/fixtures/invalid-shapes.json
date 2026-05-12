@@ -1,0 +1,12 @@
+{
+  "ats_key": "breezy",
+  "description": "Invalid Breezy source-shape fixtures for rejection and quarantine.",
+  "cases": [
+    { "name": "missing title", "expected": "rejected", "reason": "missing position_name|missing title", "posting": { "company_name": "Fixture Breezy", "source_job_id": "brz-missing-title", "position_name": "", "job_posting_url": "https://fixture.breezy.hr/p/brz-missing-title", "location": "Istanbul, Turkey", "remote_type": "onsite" } },
+    { "name": "missing canonical URL", "expected": "rejected", "reason": "missing job_posting_url|missing canonical_url", "posting": { "company_name": "Fixture Breezy", "source_job_id": "brz-missing-url", "position_name": "Valid Title", "job_posting_url": "", "location": "Istanbul, Turkey", "remote_type": "onsite" } },
+    { "name": "missing source id", "expected": "rejected", "reason": "missing source_job_id", "posting": { "company_name": "Fixture Breezy", "source_job_id": "", "position_name": "Valid Title", "job_posting_url": "https://fixture.breezy.hr/p/", "location": "Istanbul, Turkey", "remote_type": "onsite" } },
+    { "name": "missing location with unknown remote", "expected": "quarantined", "reason": "no_geo_unknown_remote", "posting": { "company_name": "Fixture Breezy", "source_job_id": "brz-no-location", "position_name": "Valid Title", "job_posting_url": "https://fixture.breezy.hr/p/brz-no-location", "location": "", "remote_type": "unknown" } },
+    { "name": "multiple locations", "expected": "quarantined", "reason": "ambiguous_geo", "posting": { "company_name": "Fixture Breezy", "source_job_id": "brz-multi", "position_name": "Valid Title", "job_posting_url": "https://fixture.breezy.hr/p/brz-multi", "location": "Multiple Locations", "remote_type": "unknown" } },
+    { "name": "vague remote marketing text", "expected": "quarantined", "reason": "no_geo_unknown_remote", "posting": { "company_name": "Fixture Breezy", "source_job_id": "brz-vague-remote", "position_name": "Flexible Workplace Specialist", "job_posting_url": "https://fixture.breezy.hr/p/brz-remote", "location": "", "description_plain": "Remote collaboration is supported.", "remote_type": "unknown" } }
+  ]
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "source_job_id": "HB1001",
+    "company_name": "Fixture Hirebridge",
+    "position_name": "Support Engineer",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.45
+  },
+  {
+    "source_job_id": "HB1002",
+    "company_name": "Fixture Hirebridge",
+    "position_name": "Remote QA Analyst",
+    "remote_type": "remote",
+    "parser_confidence": 0.45
+  }
+]

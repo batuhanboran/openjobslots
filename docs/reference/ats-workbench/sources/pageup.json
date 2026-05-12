@@ -37,10 +37,10 @@
     ]
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/pageup/index.js",
+    "fixtures_dir": "server/ingestion/sources/pageup/fixtures",
+    "parser_version": "source-pageup-v1"
   },
   "quality_threshold": {
     "mode": "quarantine_or_canary",
@@ -72,13 +72,13 @@
     "confidence": "medium-low-pending-fixture"
   },
   "runner_interface": {
-    "discover": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
-    "fetchList": "bounded API request to candidate/search endpoint through source runner",
-    "fetchDetail": "detail fetch only when list response lacks geo/date/remote and parser certification covers detail shape",
-    "parseList": "server/index.js parsePageupPostingsFromResults",
-    "parseDetail": "server/index.js parsePageupPostingsFromResults",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/pageup/discover.js",
+    "fetchList": "server/ingestion/sources/pageup/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/pageup/fetchDetail.js",
+    "parseList": "server/ingestion/sources/pageup/parse.js",
+    "parseDetail": "server/ingestion/sources/pageup/parse.js",
+    "normalize": "server/ingestion/sources/pageup/normalize.js",
+    "validate": "server/ingestion/sources/pageup/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

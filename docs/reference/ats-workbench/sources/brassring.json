@@ -37,10 +37,10 @@
     ]
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/brassring/index.js",
+    "fixtures_dir": "server/ingestion/sources/brassring/fixtures",
+    "parser_version": "source-brassring-v1"
   },
   "quality_threshold": {
     "mode": "quarantine_or_canary",
@@ -72,13 +72,13 @@
     "confidence": "low"
   },
   "runner_interface": {
-    "discover": "manual source-specific discovery required before public enablement",
-    "fetchList": "brittle source-specific fetch only in canary mode until certified",
-    "fetchDetail": "disabled unless raw fixture and parser test prove detail extraction",
-    "parseList": "server/index.js BrassRing collector/API mapping",
-    "parseDetail": "server/index.js BrassRing collector/API mapping",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/brassring/discover.js",
+    "fetchList": "server/ingestion/sources/brassring/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/brassring/fetchDetail.js",
+    "parseList": "server/ingestion/sources/brassring/parse.js",
+    "parseDetail": "server/ingestion/sources/brassring/parse.js",
+    "normalize": "server/ingestion/sources/brassring/normalize.js",
+    "validate": "server/ingestion/sources/brassring/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

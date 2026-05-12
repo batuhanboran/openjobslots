@@ -1,7 +1,7 @@
 {
   "ats_key": "talentreef",
   "display_name": "TalentReef",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "html_detail",
   "official_public_docs_or_observed_endpoint": "Observed TalentReef alias/search API.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
@@ -17,25 +17,31 @@
   "posting_date_rule": "detail-page: List cards often omit date; detail fixture decides whether date exists.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/talentreef/fixtures/company.json",
+      "server/ingestion/sources/talentreef/fixtures/expected-normalized.json",
+      "server/ingestion/sources/talentreef/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/talentreef/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/talentreef/fixtures/company.json",
+      "server/ingestion/sources/talentreef/fixtures/expected-normalized.json",
+      "server/ingestion/sources/talentreef/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/talentreef/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/talentreef/index.js",
+    "fixtures_dir": "server/ingestion/sources/talentreef/fixtures",
+    "parser_version": "source-talentreef-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
   "public_enabled": true,
   "quarantine_reason": "",
@@ -58,17 +64,17 @@
   },
   "parser_method": {
     "path": "server/index.js parseTalentreefPostingsFromSearchResponse",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseTalentreefPostingsFromSearchResponse",
-    "parseDetail": "server/index.js parseTalentreefPostingsFromSearchResponse",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/talentreef/discover.js",
+    "fetchList": "server/ingestion/sources/talentreef/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/talentreef/fetchDetail.js",
+    "parseList": "server/ingestion/sources/talentreef/parse.js",
+    "parseDetail": "server/ingestion/sources/talentreef/parse.js",
+    "normalize": "server/ingestion/sources/talentreef/normalize.js",
+    "validate": "server/ingestion/sources/talentreef/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

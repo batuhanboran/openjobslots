@@ -21,20 +21,28 @@
     "files": [
       "server/ingestion/fixtures/breezy-direct.json",
       "server/ingestion/fixtures/breezy-failures.json",
-      "server/ingestion/fixtures/breezy-postings.json"
+      "server/ingestion/fixtures/breezy-postings.json",
+      "server/ingestion/sources/breezy/fixtures/company.json",
+      "server/ingestion/sources/breezy/fixtures/expected-normalized.json",
+      "server/ingestion/sources/breezy/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/breezy/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/breezy-direct.json",
       "server/ingestion/fixtures/breezy-failures.json",
-      "server/ingestion/fixtures/breezy-postings.json"
+      "server/ingestion/fixtures/breezy-postings.json",
+      "server/ingestion/sources/breezy/fixtures/company.json",
+      "server/ingestion/sources/breezy/fixtures/expected-normalized.json",
+      "server/ingestion/sources/breezy/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/breezy/fixtures/list.json"
     ],
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/breezy/index.js",
+    "fixtures_dir": "server/ingestion/sources/breezy/fixtures",
+    "parser_version": "source-breezy-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -66,13 +74,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseBreezyPostingsFromHtml",
-    "parseDetail": "server/index.js parseBreezyPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/breezy/discover.js",
+    "fetchList": "server/ingestion/sources/breezy/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/breezy/fetchDetail.js",
+    "parseList": "server/ingestion/sources/breezy/parse.js",
+    "parseDetail": "server/ingestion/sources/breezy/parse.js",
+    "normalize": "server/ingestion/sources/breezy/normalize.js",
+    "validate": "server/ingestion/sources/breezy/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

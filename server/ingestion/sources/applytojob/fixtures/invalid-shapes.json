@@ -1,0 +1,12 @@
+{
+  "ats_key": "applytojob",
+  "description": "Invalid ApplyToJob source-shape fixtures for rejection and quarantine.",
+  "cases": [
+    { "name": "missing title", "expected": "rejected", "reason": "missing position_name|missing title", "posting": { "company_name": "Fixture ApplyToJob", "source_job_id": "ATJ-missing-title", "position_name": "", "job_posting_url": "https://fixture.applytojob.com/apply/ATJ-missing-title", "location": "Istanbul, Turkey", "remote_type": "onsite" } },
+    { "name": "missing canonical URL", "expected": "rejected", "reason": "missing job_posting_url|missing canonical_url", "posting": { "company_name": "Fixture ApplyToJob", "source_job_id": "ATJ-missing-url", "position_name": "Valid Title", "job_posting_url": "", "location": "Istanbul, Turkey", "remote_type": "onsite" } },
+    { "name": "missing source id", "expected": "rejected", "reason": "missing source_job_id", "posting": { "company_name": "Fixture ApplyToJob", "source_job_id": "", "position_name": "Valid Title", "job_posting_url": "https://fixture.applytojob.com/apply/", "location": "Istanbul, Turkey", "remote_type": "onsite" } },
+    { "name": "missing location with unknown remote", "expected": "quarantined", "reason": "no_geo_unknown_remote", "posting": { "company_name": "Fixture ApplyToJob", "source_job_id": "ATJ-no-location", "position_name": "Valid Title", "job_posting_url": "https://fixture.applytojob.com/apply/ATJ-no-location", "location": "", "remote_type": "unknown" } },
+    { "name": "multiple locations", "expected": "quarantined", "reason": "ambiguous_geo", "posting": { "company_name": "Fixture ApplyToJob", "source_job_id": "ATJ-multi", "position_name": "Valid Title", "job_posting_url": "https://fixture.applytojob.com/apply/ATJ-multi", "location": "Multiple Locations", "remote_type": "unknown" } },
+    { "name": "vague remote marketing text", "expected": "quarantined", "reason": "no_geo_unknown_remote", "posting": { "company_name": "Fixture ApplyToJob", "source_job_id": "ATJ-vague-remote", "position_name": "Flexible Workplace Specialist", "job_posting_url": "https://fixture.applytojob.com/apply/ATJ-remote", "location": "", "description_plain": "Remote collaboration is supported.", "remote_type": "unknown" } }
+  ]
+}

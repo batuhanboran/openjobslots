@@ -21,20 +21,28 @@
     "files": [
       "server/ingestion/fixtures/hrmdirect-direct.json",
       "server/ingestion/fixtures/hrmdirect-failures.json",
-      "server/ingestion/fixtures/hrmdirect-postings.json"
+      "server/ingestion/fixtures/hrmdirect-postings.json",
+      "server/ingestion/sources/hrmdirect/fixtures/company.json",
+      "server/ingestion/sources/hrmdirect/fixtures/expected-normalized.json",
+      "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/hrmdirect/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/fixtures/hrmdirect-direct.json",
       "server/ingestion/fixtures/hrmdirect-failures.json",
-      "server/ingestion/fixtures/hrmdirect-postings.json"
+      "server/ingestion/fixtures/hrmdirect-postings.json",
+      "server/ingestion/sources/hrmdirect/fixtures/company.json",
+      "server/ingestion/sources/hrmdirect/fixtures/expected-normalized.json",
+      "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/hrmdirect/fixtures/list.json"
     ],
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/hrmdirect/index.js",
+    "fixtures_dir": "server/ingestion/sources/hrmdirect/fixtures",
+    "parser_version": "source-hrmdirect-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -66,13 +74,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseHrmDirectPostingsFromHtml",
-    "parseDetail": "server/index.js parseHrmDirectPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/hrmdirect/discover.js",
+    "fetchList": "server/ingestion/sources/hrmdirect/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/hrmdirect/fetchDetail.js",
+    "parseList": "server/ingestion/sources/hrmdirect/parse.js",
+    "parseDetail": "server/ingestion/sources/hrmdirect/parse.js",
+    "normalize": "server/ingestion/sources/hrmdirect/normalize.js",
+    "validate": "server/ingestion/sources/hrmdirect/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

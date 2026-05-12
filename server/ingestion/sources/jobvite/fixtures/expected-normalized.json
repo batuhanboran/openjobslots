@@ -1,0 +1,18 @@
+[
+  {
+    "source_job_id": "oABCxfw9",
+    "company_name": "Fixture Jobvite",
+    "position_name": "Software Engineer",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "oDEFxfw8",
+    "company_name": "Fixture Jobvite",
+    "position_name": "Remote Product Analyst",
+    "remote_type": "remote",
+    "parser_confidence": 0.55
+  }
+]

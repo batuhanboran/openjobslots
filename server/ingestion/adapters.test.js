@@ -184,8 +184,9 @@ test("fixture-backed adapter metadata points to saved fixtures", () => {
   for (const atsKey of FIXTURE_BACKED) {
     const directFixture = path.join(__dirname, "fixtures", `${atsKey}-direct.json`);
     const postingsFixture = path.join(__dirname, "fixtures", `${atsKey}-postings.json`);
+    const sourceFixture = path.join(__dirname, "sources", atsKey, "fixtures", "expected-normalized.json");
     assert.ok(
-      fs.existsSync(directFixture) || fs.existsSync(postingsFixture),
+      fs.existsSync(directFixture) || fs.existsSync(postingsFixture) || fs.existsSync(sourceFixture),
       `${atsKey} should have a saved parser fixture`
     );
     assert.equal(getAdapterMetadata(atsKey).fixtureStatus, "fixture-backed");
@@ -206,8 +207,10 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "careerplug",
       "fountain",
       "greenhouse",
+      "hirebridge",
       "hrmdirect",
       "icims",
+      "jobvite",
       "lever",
       "manatal",
       "oracle",
@@ -216,6 +219,7 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "recruitcrm",
       "recruitee",
       "smartrecruiters",
+      "talentreef",
       "taleo",
       "workday",
       "zoho"

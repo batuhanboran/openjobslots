@@ -1,7 +1,7 @@
 {
   "ats_key": "hirebridge",
   "display_name": "Hirebridge",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "html_detail",
   "official_public_docs_or_observed_endpoint": "Observed Hirebridge list HTML plus detail pages.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
@@ -17,25 +17,31 @@
   "posting_date_rule": "detail-page: List cards often omit date; detail fixture decides whether date exists.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/hirebridge/fixtures/company.json",
+      "server/ingestion/sources/hirebridge/fixtures/expected-normalized.json",
+      "server/ingestion/sources/hirebridge/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/hirebridge/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/hirebridge/fixtures/company.json",
+      "server/ingestion/sources/hirebridge/fixtures/expected-normalized.json",
+      "server/ingestion/sources/hirebridge/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/hirebridge/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/hirebridge/index.js",
+    "fixtures_dir": "server/ingestion/sources/hirebridge/fixtures",
+    "parser_version": "source-hirebridge-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
   "public_enabled": false,
   "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven",
@@ -58,17 +64,17 @@
   },
   "parser_method": {
     "path": "server/index.js parseHirebridgePostingsFromHtml",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseHirebridgePostingsFromHtml",
-    "parseDetail": "server/index.js parseHirebridgePostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/hirebridge/discover.js",
+    "fetchList": "server/ingestion/sources/hirebridge/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/hirebridge/fetchDetail.js",
+    "parseList": "server/ingestion/sources/hirebridge/parse.js",
+    "parseDetail": "server/ingestion/sources/hirebridge/parse.js",
+    "normalize": "server/ingestion/sources/hirebridge/normalize.js",
+    "validate": "server/ingestion/sources/hirebridge/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

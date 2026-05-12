@@ -99,7 +99,10 @@ const FIXTURE_BACKED = new Set([
   "oracle",
   "adp_workforcenow",
   "careerplug",
+  "hirebridge",
+  "jobvite",
   "manatal",
+  "talentreef",
   "workday",
   "taleo"
 ]);
@@ -124,7 +127,10 @@ const PARSER_FIXTURE_BACKED = new Set([
   "recruitee",
   "smartrecruiters",
   "careerplug",
+  "hirebridge",
+  "jobvite",
   "manatal",
+  "talentreef",
   "zoho",
   "workday",
   "taleo"

@@ -37,10 +37,10 @@
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/workday/index.js",
+    "fixtures_dir": "server/ingestion/sources/workday/fixtures",
+    "parser_version": "source-workday-v1"
   },
   "quality_threshold": {
     "mode": "public_enabled",
@@ -76,13 +76,13 @@
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
-    "fetchList": "bounded API request to candidate/search endpoint through source runner",
-    "fetchDetail": "Not required for list-visible source id/location/date; detail can enrich descriptions.",
-    "parseList": "server/index.js Workday CXS collector/helpers",
-    "parseDetail": "server/index.js Workday CXS collector/helpers",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/workday/discover.js",
+    "fetchList": "server/ingestion/sources/workday/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/workday/fetchDetail.js",
+    "parseList": "server/ingestion/sources/workday/parse.js",
+    "parseDetail": "server/ingestion/sources/workday/parse.js",
+    "normalize": "server/ingestion/sources/workday/normalize.js",
+    "validate": "server/ingestion/sources/workday/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

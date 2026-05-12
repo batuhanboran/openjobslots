@@ -1,0 +1,20 @@
+[
+  {
+    "source_job_id": "HRM1001",
+    "company_name": "Fixture HRMDirect",
+    "position_name": "Data Analyst",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "posting_date": "05/07/2026",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "HRM1002",
+    "company_name": "Fixture HRMDirect",
+    "position_name": "Remote Support Engineer",
+    "remote_type": "remote",
+    "posting_date": "05/08/2026",
+    "parser_confidence": 0.75
+  }
+]
