@@ -201,3 +201,44 @@ Final data/search state:
 - Missing all geo plus weak/unknown remote improved from `266,010` to `262,542`.
 
 The final replace-mode Meili reindex used a temp index, validated document count and remote facets before swap, and did not delete the live index before validation passed.
+
+## v1.7.0 Deployment Note - May 12, 2026
+
+Deployed version: `v1.7.0`.
+
+Release scope:
+
+- Parser quality gate for public-row acceptance versus quarantine/rejection.
+- ATS certification workbench and source quality scoreboard.
+- Wave A parser repairs for iCIMS, Applitrack, Manatal, Taleo, and Workday.
+- Wave B parser repairs for the next highest-impact certified/partial sources.
+- Controlled clean public dataset rebuild from certified/public-enabled sources.
+- Continuous source quality protection with bad-row thresholds and parser drift diagnostics.
+- Final replace-mode Meili reindex and Postgres/Meili parity verification.
+
+Final report paths:
+
+- `/root/OpenJobSlots/reports/final-data-quality-audit-20260512-105705.json`
+- `/root/OpenJobSlots/reports/final-ats-quality-audit-20260512-105705.json`
+- `/root/OpenJobSlots/reports/final-parser-stats-20260512-105705.json`
+- `/root/OpenJobSlots/reports/final-quarantine-summary-20260512-105705.json`
+- `/root/OpenJobSlots/reports/final-source-quality-20260512-105705.json`
+- `/root/OpenJobSlots/reports/meili-check-before-v170-20260512-105758.json`
+- `/root/OpenJobSlots/reports/meili-replace-v170-20260512-105758.json`
+- `/root/OpenJobSlots/reports/meili-check-after-v170-20260512-105758.json`
+
+Final data/search state:
+
+- Visible postings: `65,251`.
+- Postgres indexable postings: `65,251`.
+- Meilisearch documents: `65,251`.
+- Meili/Postgres count delta: `0`.
+- Missing country: `11,610` / `17.79%`.
+- Missing city: `10,565` / `16.19%`.
+- Missing any normalized geo: `19,223` / `29.46%`.
+- Missing all normalized geo: `2,952` / `4.52%`.
+- Weak/unknown remote: `8,452` / `12.95%`.
+- Missing all geo plus weak/unknown remote: `189` / `0.29%`.
+- Accepted/quarantined/rejected rows are tracked by source quality diagnostics; Applitrack is auto-disabled by the source-quality policy.
+
+The final replace-mode Meili reindex used a temp index, validated document count and remote facets before swap, and did not delete the live index before validation passed.
