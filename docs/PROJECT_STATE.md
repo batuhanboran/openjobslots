@@ -4,8 +4,8 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Current Version
 
-- Package/public release line: `v1.7.0`.
-- Last recorded deployed commit: current `v1.7.0` release commit on `main`.
+- Package/public release line: `v1.8.0`.
+- Last recorded deployed commit: current `v1.8.0` release commit on `main`.
 - Last recorded production deployment date: May 12, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
@@ -64,35 +64,33 @@ Keep public UI calls on public routes only unless an admin flow is explicitly op
 
 ## Last Recorded Data Quality State
 
-The last production audit was recorded on May 12, 2026 after the clean public dataset rebuild, continuous source-quality protection rollout, and final replace-mode Meili reindex.
+The last production audit was recorded on May 12, 2026 after the certified-source public dataset rebuild, threshold indexing cleanup, and final replace-mode Meili reindex.
 Reports were written on production under `/root/OpenJobSlots/reports/`.
 
-- Final data-quality audit JSON: `/root/OpenJobSlots/reports/final-data-quality-audit-20260512-105705.json`.
-- Final ATS quality audit JSON: `/root/OpenJobSlots/reports/final-ats-quality-audit-20260512-105705.json`.
-- Final parser stats JSON: `/root/OpenJobSlots/reports/final-parser-stats-20260512-105705.json`.
-- Final quarantine summary JSON: `/root/OpenJobSlots/reports/final-quarantine-summary-20260512-105705.json`.
-- Final source quality JSON: `/root/OpenJobSlots/reports/final-source-quality-20260512-105705.json`.
-- Final Meili pre-check JSON: `/root/OpenJobSlots/reports/meili-check-before-v170-20260512-105758.json`.
-- Final Meili replace report: `/root/OpenJobSlots/reports/meili-replace-v170-20260512-105758.json`.
-- Final Meili post-check JSON: `/root/OpenJobSlots/reports/meili-check-after-v170-20260512-105758.json`.
-- Visible postings: `65,251`.
-- Indexable postings: `65,251`.
-- Missing country: `11,610` / `17.79%`.
-- Missing location text: `184` / `0.28%`.
-- Missing region/state: `11,610` / `17.79%`.
-- Missing city: `10,565` / `16.19%`.
-- Missing any normalized geo: `19,223` / `29.46%`.
-- Missing all normalized geo: `2,952` / `4.52%`.
-- Missing location and all normalized geo: `184` / `0.28%`.
-- Suspicious/unknown geo: `2,344` / `3.59%`.
+- Certified rebuild backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`.
+- Final data-quality audit JSON: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-audit-data-quality-before-reindex.json`.
+- Final source quality JSON: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-source-quality.json`.
+- Final Meili replace report: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`.
+- Final Meili post-check JSON: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-check.json`.
+- Visible postings: `47,270`.
+- Indexable postings: `47,269`.
+- Missing country: `3,096` / `6.55%`.
+- Missing location text: `51` / `0.11%`.
+- Missing region/state: `3,096` / `6.55%`.
+- Missing city: `5,032` / `10.65%`.
+- Missing any normalized geo: `6,801` / `14.39%`.
+- Missing all normalized geo: `1,327` / `2.81%`.
+- Missing location and all normalized geo: `44` / `0.09%`.
+- Suspicious/unknown geo: `1,431` / `3.03%`.
 - Missing remote type: `0` / `0.00%`.
-- Weak or unknown remote classification: `8,452` / `12.95%`.
-- Missing all normalized geo and weak/unknown remote: `189` / `0.29%`.
-- Worst remaining sources by combined geo/remote gaps: `workday`, `recruitcrm`, `applitrack`, `greenhouse`, `ashby`, `icims`, `manatal`, `lever`, `oracle`, and `fountain`.
-- Meilisearch document count: `65,251`; Postgres indexable count: `65,251`; count delta: `0`.
+- Weak or unknown remote classification: `1,837` / `3.89%`.
+- Missing all normalized geo and weak/unknown remote: `22` / `0.05%`.
+- Source states: `20` public-enabled, `6` quarantine-only, `36` disabled.
+- Quarantine-only sources: `recruitee`, `applitrack`, `icims`, `recruitcrm`, `taleo`, and `zoho`.
+- Meilisearch document count: `47,269`; Postgres indexable count: `47,269`; count delta: `0`.
 - Meilisearch remote facets now match the Postgres-derived indexed payload distribution.
 - Heavy job advisory lock `openjobslots_heavy_job` was available after the final reindex.
-- Applitrack is auto-disabled by source-quality protection because its current rebuilt rows exceed the bad-row threshold.
+- `recruitee`, `applitrack`, `icims`, `recruitcrm`, `taleo`, and `zoho` are quarantine-only by source-quality protection.
 
 Treat these as the last recorded numbers, not proof of current live state. Re-run the read-only production baseline audit before making new data-quality claims.
 
@@ -103,7 +101,7 @@ Treat these as the last recorded numbers, not proof of current live state. Re-ru
 - Parser certification is fixture-backed only for a subset of the configured ATS catalog. Do not claim all 60 ATS are certified.
 - Meilisearch is derived data. Reindex only after check/dry-run mode and with a rollback plan.
 - Production write backfills must be dry-run first, batched, explicit, and approved.
-- v1.7.0 has applied the clean public dataset rebuild, continuous source-quality protection, Applitrack auto-disablement, and final replace-mode Meili reindexing. Future repair work must still use the same backup, lock, canary, audit, and rollback process.
+- v1.8.0 has applied the certified-source public dataset rebuild, threshold indexing cleanup, quarantine-only source enforcement, and final replace-mode Meili reindexing. Future repair work must still use the same backup, lock, canary, audit, and rollback process.
 - Cloudflare/analytics CSP alignment and dependency version cleanup are separate maintenance tasks.
 
 ## Next Tasks

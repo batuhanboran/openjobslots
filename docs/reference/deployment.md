@@ -202,6 +202,48 @@ Final data/search state:
 
 The final replace-mode Meili reindex used a temp index, validated document count and remote facets before swap, and did not delete the live index before validation passed.
 
+## v1.8.0 Deployment Note - May 12, 2026
+
+Deployed version: `v1.8.0`.
+
+Release scope:
+
+- ATS-specific source modules and source-runner controls.
+- Certification workbench coverage for the configured ATS catalog.
+- Direct JSON/API, enterprise/detail, and HTML/public-sector parser waves.
+- Threshold-based indexing: public rows require parser/source quality evidence, while failing rows are quarantined.
+- Certified-source public dataset rebuild from source-specific scripts.
+- Quarantine-only enforcement for sources failing source-quality thresholds.
+- Final replace-mode Meili reindex with Postgres parity verification.
+
+Backup:
+
+- `/root/OpenJobSlots/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`
+
+Final report paths:
+
+- `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-audit-data-quality-before-reindex.json`
+- `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-source-quality.json`
+- `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`
+- `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-check.json`
+
+Final data/search state:
+
+- Visible postings: `47,270`.
+- Postgres indexable postings: `47,269`.
+- Meilisearch documents: `47,269`.
+- Meili/Postgres count delta: `0`.
+- Missing country: `3,096` / `6.55%`.
+- Missing city: `5,032` / `10.65%`.
+- Missing any normalized geo: `6,801` / `14.39%`.
+- Missing all normalized geo: `1,327` / `2.81%`.
+- Weak/unknown remote: `1,837` / `3.89%`.
+- Missing all geo plus weak/unknown remote: `22` / `0.05%`.
+- Source states: `20` public-enabled, `6` quarantine-only, `36` disabled.
+- Quarantine-only sources: `recruitee`, `applitrack`, `icims`, `recruitcrm`, `taleo`, and `zoho`.
+
+The final replace-mode Meili reindex used a temp index, validated document count and remote facets before swap, and did not delete the live index before validation passed.
+
 ## v1.7.0 Deployment Note - May 12, 2026
 
 Deployed version: `v1.7.0`.

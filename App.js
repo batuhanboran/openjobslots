@@ -118,10 +118,17 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.7.0";
+const PUBLIC_APP_VERSION = "1.8.0";
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
+  {
+    version: "1.8.0",
+    date: "May 12, 2026",
+    title: "Certified-source indexing release",
+    summary:
+      "Closed the ATS-specific fetch/parser/index cycle with source-specific modules, certification workbench coverage, direct JSON/API, enterprise/detail, and HTML/public-sector parser waves, threshold-based indexing, a certified-source public dataset rebuild, and final Meili/Postgres parity."
+  },
   {
     version: "1.7.0",
     date: "May 12, 2026",
