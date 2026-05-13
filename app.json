@@ -2,7 +2,7 @@
   "expo": {
     "name": "openjobslots",
     "slug": "openjobslots",
-    "version": "1.6.1",
+    "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./ojs-favicon.png",
     "platforms": [

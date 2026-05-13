@@ -4,9 +4,9 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Current Version
 
-- Package/public release line: `v1.8.0`.
-- Last recorded production checkout: `5a59375` on `codex/production-baseline-audit` after the Taleo canary deployment.
-- Latest recovery branch: `codex/production-baseline-audit`; tested Taleo code commits were `3b01427` and `5a59375`.
+- Package/public release line: `v1.9.0`.
+- Last recorded production checkout: `v1.9.0` tag target on `codex/production-baseline-audit` after the ATS recovery closeout.
+- Latest recovery branch: `codex/production-baseline-audit`; closeout commit is the `v1.9.0` tag target.
 - Last recorded production deployment date: May 13, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
@@ -265,6 +265,63 @@ Public-enabled source growth ran on May 13, 2026 after a fresh production audit 
 - Meili/Postgres delta remained `-1`, so `ats:recovery:guard` did not pass and no larger bounded apply was run after canary.
 
 The worker remains stopped, app/Postgres/Meili were healthy in the public-enabled growth final checks, and the production auto-deploy timer is stopped/inactive. Use `50,300` as the latest observed visible-count floor, but reconcile the `-1` Meili/Postgres derived-index delta before any larger source apply.
+
+## v1.9.0 Recovery Cycle Closeout
+
+The recovery cycle was closed on May 13, 2026 after final production audits, live endpoint checks, test validation, and a safe derived-index repair.
+
+- Report prefix: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-*`.
+- Final data quality: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-data-quality.json`.
+- Final ATS quality: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-ats-quality.json`.
+- Final source quality: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-source-quality.json`.
+- Final quarantine summary: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-quarantine-summary.json`.
+- Final Meili check: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-meili-check-final.json`.
+- Visible postings: `47,396 -> 50,300` since the v1.8.0 prompt-1 baseline.
+- Accepted/public rows: `47,396 -> 50,300`.
+- Public row gain: `2,904`.
+- Indexable rows: `50,298`; Meili documents: `50,298`; Meili/Postgres delta: `0`.
+- Quarantined rows: `4,531 -> 6,496`; rejected rows remain `0`.
+- Missing country: `3,113 -> 4,075`.
+- Missing city: `5,039 -> 5,226`.
+- Missing any normalized geo: `6,824 -> 7,903`.
+- Missing all normalized geo: `1,328 -> 1,398`.
+- Weak/unknown remote: `1,855 -> 2,142`.
+- Missing all geo plus weak/unknown remote: `22 -> 23`.
+- Final source states: `17` public-enabled, `2` canary-only, `4` quarantine-only, and `39` disabled/auto-disabled.
+- Canary-only sources: `zoho`, `taleo`.
+- Quarantine-only sources with accepted public rows preserved: `recruitee`, `applitrack`, `icims`, `recruitcrm`.
+- Top final quarantine reasons: `no_geo_no_remote` (`4,866`), `no_structured_location` (`813`), `source_disabled_by_threshold` (`711`), `ambiguous_location` (`80`), `unsupported_tenant_shape` (`19`), and `no_normalized_geo_or_explicit_remote` (`6`).
+- `search:reindex:check` initially found the known `-1` Meili/Postgres delta and no pending search outbox rows. A safe replace-mode temp-index reindex was run, validated before swap, and final `search:reindex:check` passed with `count_delta=0`.
+- No source recovery writes ran during closeout. No clean rebuild ran. No public rows were truncated, deleted, or hidden.
+
+Recovered ATS/public-row gains in this cycle:
+
+- `recruitee`: `0 -> 519` accepted public rows across initial and expansion waves. Current source state is `quarantine_only` because historical quarantine volume still fails policy.
+- `icims`: `20 -> 64` in the iCIMS recovery report (`+44`); current source state remains `quarantine_only`.
+- `applitrack`: `0 -> 237` across initial and expansion waves; current source state is `quarantine_only` because source-level geo/remote quality is still below policy.
+- `zoho`: `0 -> 440`; current source state is `canary_only`.
+- `recruitcrm`: `0 -> 522`; current source state is `quarantine_only` because accepted rate and geo quality are still below policy.
+- `taleo`: `0 -> 111`; current source state is `canary_only`.
+- Public-enabled growth added `59` rows across `applytojob`, `bamboohr`, `lever`, `greenhouse`, and `careerplug`.
+
+Validation passed:
+
+- `npm run test:backend`
+- `npm run test:parsers`
+- `npm run test:api` after sandbox `spawn EPERM` rerun
+- `npm run quality:gate` after sandbox rerun
+- Live `/health`, `/postings/filter-options`, `/sync/status`, `/ingestion/status`, `/ingestion/quality/summary`, `/ingestion/source-quality`, `/ingestion/quarantine-summary`, and representative `/postings` searches
+
+Operational final state:
+
+- Worker stopped; auto-deploy timer inactive.
+- App/Postgres/Meili healthy.
+- Active Postgres queries: `0`.
+- Heavy/advisory locks: `0`.
+- Pending search outbox rows: `0`.
+- Idle service stats: app `0.00% CPU / 128.7MiB`, worker stopped, Postgres `0.00% CPU / 724.8MiB`, Meili `0.14% CPU / 2.167GiB`.
+
+Use `50,300` as the current visible-count floor. Future work must remain ATS-by-ATS or source-by-source recovery and must not repeat the v1.8.0 clean-rebuild/shrink-public-dataset strategy.
 
 ## Post-v1.8.0 Recovery Strategy
 
