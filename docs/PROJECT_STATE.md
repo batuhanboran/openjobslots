@@ -122,7 +122,23 @@ Recruitee recovery was applied on May 12, 2026 after a fresh production baseline
 - Meili/Postgres delta after bounded writes: `0`.
 - `ats:recovery:guard` passed with `0` failures.
 
-Recruitee is no longer quarantine-only. It is recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
+Recruitee expansion was applied on May 13, 2026 after a fresh production baseline and backup.
+
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-recruitee-expansion-20260513-085800.dump`.
+- Reports: `/root/OpenJobSlots/reports/recruitee-expansion-20260513-085800-*`.
+- Visible postings for the expansion write window: `48,296 -> 48,721`.
+- Recruitee accepted public rows: `85 -> 510`.
+- Public row gain: `425`.
+- Recruitee source state: `canary_only`.
+- Dry-run considered `100` tenants, fetched `100`, parsed `1,759`, accepted `1,759`, and reported no parser failures.
+- Canary plus bounded apply parsed `998` production rows and wrote `550` public rows, including `425` newly accepted rows.
+- New Recruitee `no_geo_no_remote` public rows: `0`.
+- Recruitee missing all normalized geo: `0 -> 0`.
+- Recruitee weak/unknown remote rows: `0 -> 0`.
+- Meili/Postgres delta after bounded writes: `0`.
+- `ats:recovery:guard` passed with `0` failures.
+
+Recruitee is recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics. Remaining historical Recruitee quarantine reasons are `no_geo_no_remote` (`1,993`) and `source_disabled_by_threshold` (`365`).
 Applitrack recovery was applied on May 13, 2026 after a fresh production baseline and backup.
 
 - Deployed recovery code commit: `f93147a`.
@@ -140,8 +156,46 @@ Applitrack recovery was applied on May 13, 2026 after a fresh production baselin
 - Meili/Postgres delta after bounded writes: `0`.
 - `ats:recovery:guard` passed with `0` failures.
 
-Applitrack is no longer quarantine-only. It is recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
-The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. Use the `48,091` pre-write baseline as the Applitrack recovery floor.
+Applitrack expansion was applied on May 13, 2026 after a fresh production baseline and backup.
+
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-applitrack-expansion-20260513-101744.dump`.
+- Report prefix: `/root/OpenJobSlots/reports/applitrack-expansion-20260513-101744-*`.
+- Source recovery report: `/root/OpenJobSlots/reports/applitrack-expansion-20260513-101744-source-recovery-report.json`.
+- Visible postings for the Applitrack expansion window: `48,721 -> 48,873`.
+- Applitrack accepted public rows: `85 -> 237`.
+- Public row gain: `152`.
+- Applitrack source state: `canary_only`.
+- Applitrack configured targets: `1,323`; bounded dry-run considered `40`, fetched `37`, parsed `2,384`, accepted `1,065`, and quarantined `1,319` without writing.
+- Canary plus bounded apply fetched `13` tenants, parsed `627` rows, wrote `280` public rows, wrote `270` quarantine rows, and produced `152` newly accepted public rows after existing-row refreshes.
+- New Applitrack `no_geo_no_remote` public rows: `0`.
+- Applitrack missing all normalized geo: `0 -> 0`.
+- Applitrack weak/unknown remote rows: `85 -> 235`; accepted rows have city/region evidence, so missing-all-geo plus weak/unknown remote stayed `0`.
+- Meili/Postgres delta after bounded writes: `0`.
+- `ats:recovery:guard` passed with `0` failures.
+- Successful expansion districts include `ycsk12` (`42` accepted), `yorkcountyschools` (`35`), `Zion6` (`32`), `youngstown` (`30`), `yisd` (`26`), `zionsville` (`25`), `yssd` (`23`), and `yarmouthschools` (`15`).
+- Remaining expansion failure evidence is historical `no_geo_no_remote` (`1,070`) and `source_disabled_by_threshold` (`314`), plus bounded-run `no_structured_location` (`291`) and `no_normalized_geo_or_explicit_remote` (`6`).
+
+Zoho recovery was applied on May 13, 2026 after a fresh production baseline and backup.
+
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-zoho-recovery-20260513-104733.dump`.
+- Report prefix: `/root/OpenJobSlots/reports/zoho-recovery-20260513-104733-*`.
+- Source recovery report: `/root/OpenJobSlots/reports/zoho-recovery-20260513-104733-source-recovery-report.json`.
+- Visible postings for the Zoho write window: `48,873 -> 49,277`.
+- Zoho accepted public rows: `0 -> 404`.
+- Public row gain: `404`.
+- Zoho source state: `canary_only`.
+- Zoho candidate tenants: `1,751`; bounded dry-run considered `100`, fetched `100`, parsed `1,179`, accepted `1,064`, and quarantined `115` without writing.
+- Canary plus bounded apply fetched `67` tenants, parsed `630` rows, wrote `427` public rows, wrote `108` quarantine rows, and produced `404` newly accepted public rows after existing-row refreshes.
+- New Zoho `no_geo_no_remote` public rows: `0`.
+- Zoho missing all normalized geo: `0 -> 6`; those accepted rows have explicit remote evidence, so `no_geo_no_remote` stayed `0`.
+- Zoho weak/unknown remote rows: `0 -> 7`; all weak/unknown accepted rows have useful geo evidence.
+- Meili/Postgres delta after bounded writes: `0`.
+- `ats:recovery:guard` passed with `0` failures.
+- Successful Zoho tenants include `ubuntuimpact` (`89` accepted), `restore-talent` (`71`), `careerbridge` (`35`), `metasource` (`28`), `amc-travaux` (`25`), `kn-it` (`18`), `umanrecrutement` (`16`), and `yinternational` (`16`).
+- Remaining Zoho quarantine evidence is `no_geo_no_remote` (`65`), `ambiguous_location` (`57`), and `source_disabled_by_threshold` (`37`).
+
+Applitrack and Zoho are no longer quarantine-only. They are recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
+The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. Use the `49,277` post-Zoho visible count as the latest recovery floor.
 
 ## Post-v1.8.0 Recovery Strategy
 

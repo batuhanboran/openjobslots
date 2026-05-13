@@ -87,6 +87,124 @@ for (const atsKey of PRIMARY_DIRECT_SOURCES) {
   });
 }
 
+function zohoFixtureContext() {
+  return {
+    source: getSourceModule("zoho"),
+    company: readJson(path.join(__dirname, "zoho", "fixtures", "company.json"))
+  };
+}
+
+test("zoho source module parses hidden JSON variants for localized geo and remote evidence", () => {
+  const { source, company } = zohoFixtureContext();
+  const rawList = readJson(path.join(__dirname, "zoho", "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(normalized.length, 5);
+
+  const remote = byId.get("476000000001002");
+  assert.equal(remote.position_name, "Remote Customer Advocate");
+  assert.equal(remote.location_text, "Remote");
+  assert.equal(remote.country, "");
+  assert.equal(remote.city, "");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const hybrid = byId.get("476000000001003");
+  assert.equal(hybrid.position_name, "Hybrid Implementation Lead");
+  assert.equal(hybrid.location_text, "Hybrid");
+  assert.equal(hybrid.remote_type, "hybrid");
+  assert.equal(source.validatePublic(hybrid).status, "accepted");
+
+  const localized = byId.get("476000000001004");
+  assert.equal(localized.position_name, "Localized Country Analyst");
+  assert.equal(localized.country, "Turkey");
+  assert.equal(localized.city, "Istanbul");
+  assert.equal(localized.remote_type, "onsite");
+  assert.equal(localized.posting_date, "2026-05-09");
+  assert.equal(source.validatePublic(localized).status, "accepted");
+
+  const sparseDate = byId.get("476000000001005");
+  assert.equal(sparseDate.position_name, "Sparse Date Operations");
+  assert.equal(sparseDate.country, "Portugal");
+  assert.equal(sparseDate.posting_date, null);
+  assert.equal(source.validatePublic(sparseDate).status, "accepted");
+});
+
+test("zoho source module ignores malformed hidden JSON and rows without source ids", () => {
+  const { source, company } = zohoFixtureContext();
+
+  assert.deepEqual(
+    source.parse("<input id=\"jobs\" value='not-json'>", company),
+    []
+  );
+  assert.deepEqual(
+    source.parse("<input id=\"jobs\" value='[{\"Posting_Title\":\"Missing ID\",\"City\":\"Dublin\",\"Country\":\"Ireland\"}]'>", company),
+    []
+  );
+});
+
+function recruitCrmFixtureContext() {
+  return {
+    source: getSourceModule("recruitcrm"),
+    company: readJson(path.join(__dirname, "recruitcrm", "fixtures", "company.json"))
+  };
+}
+
+test("recruitcrm source module discovers the public jobs API route", () => {
+  const { source, company } = recruitCrmFixtureContext();
+  const discovered = source.discover(company);
+
+  assert.equal(
+    discovered.list_url,
+    "https://albatross.recruitcrm.io/v1/external-pages/jobs-by-account/get?account=fixtureco&batch=true"
+  );
+  assert.equal(discovered.config.publicJobsUrl, "https://recruitcrm.io/jobs/fixtureco");
+});
+
+test("recruitcrm source module keeps remote evidence source-specific", () => {
+  const { source, company } = recruitCrmFixtureContext();
+  const rawList = readJson(path.join(__dirname, "recruitcrm", "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const remote = byId.get("remote-talent-partner");
+  assert.equal(remote.location_text, "Remote");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const onsite = byId.get("rc-2002");
+  assert.equal(onsite.city, "Toronto");
+  assert.equal(onsite.country, "Canada");
+  assert.equal(onsite.remote_type, "onsite");
+  assert.equal(source.validatePublic(onsite).status, "accepted");
+});
+
+test("recruitcrm source module quarantines malformed or unsupported raw list shapes", () => {
+  const { source, company } = recruitCrmFixtureContext();
+  const malformed = readJson(path.join(__dirname, "recruitcrm", "fixtures", "malformed-list-shapes.json"));
+
+  for (const item of malformed.cases) {
+    const parsed = source.parse(item.payload, company);
+    assert.equal(parsed.length, item.expected_count, item.name);
+    if (item.expected_count === 0) continue;
+
+    const normalized = source.normalize(parsed[0], company);
+    const gate = source.validatePublic(normalized);
+    if (item.expected_reason === "no_structured_location") {
+      assert.ok(
+        normalized.source_failure_reasons.includes(item.expected_reason),
+        `${item.name} should include source failure ${item.expected_reason}`
+      );
+      continue;
+    }
+    assert.equal(gate.status, item.expected_status, item.name);
+    assert.ok(gate.reason_codes.includes(item.expected_reason), `${item.name} should include ${item.expected_reason}`);
+  }
+});
+
 function readRecruiteeFixture(fileName) {
   return readJson(path.join(__dirname, "recruitee", "fixtures", fileName));
 }

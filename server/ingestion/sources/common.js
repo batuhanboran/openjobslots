@@ -228,6 +228,83 @@ function parseIcimsPublicCompany(urlString) {
   };
 }
 
+function parseRecruitCrmPublicCompany(urlString) {
+  const parsed = asUrl(urlString);
+  if (!parsed) return null;
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host !== "recruitcrm.io" && !host.endsWith(".recruitcrm.io")) return null;
+
+  const pathParts = parsePathParts(urlString);
+  let account = "";
+  if (pathParts.length >= 2 && pathParts[0].toLowerCase() === "jobs") {
+    account = pathParts[1];
+  } else {
+    account = queryParam(urlString, "account");
+  }
+  if (!account) return null;
+
+  return {
+    account,
+    publicJobsUrl: `https://recruitcrm.io/jobs/${encodeURIComponent(account)}`,
+    apiUrl: `https://albatross.recruitcrm.io/v1/external-pages/jobs-by-account/get?account=${encodeURIComponent(account)}&batch=true`
+  };
+}
+
+async function fetchRecruitCrmSourceList(company = {}, target = {}, options = {}) {
+  const config = target?.config?.apiUrl ? target.config : parseRecruitCrmPublicCompany(company.url_string);
+  if (!config?.apiUrl) {
+    throw makeSourceFetchError("no_public_jobs_route", "RecruitCRM source has no public jobs route", {
+      url: company.url_string
+    });
+  }
+
+  const jobs = [];
+  const seen = new Set();
+  const limit = 100;
+  const maxPages = Math.max(1, Math.min(5, Number(process.env.OPENJOBSLOTS_RECRUITCRM_SOURCE_MAX_PAGES || 5)));
+  for (let page = 0; page < maxPages; page += 1) {
+    const offset = page * limit;
+    const body = JSON.stringify({
+      limit,
+      offset,
+      search_data: "",
+      onlyJobs: true
+    });
+    const payload = options.fetcher
+      ? await options.fetcher(config.apiUrl, { ...target, method: "POST", body })
+      : await fetchJson(config.apiUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            Origin: "https://recruitcrm.io",
+            Referer: config.publicJobsUrl,
+            "User-Agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)"
+          },
+          body
+        });
+    const data = typeof payload === "string" ? JSON.parse(payload) : payload;
+    const batch = Array.isArray(data?.data?.jobs)
+      ? data.data.jobs
+      : Array.isArray(data?.jobs)
+        ? data.jobs
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+    for (const item of batch) {
+      const key = clean(item?.id || item?.job_id || item?.jobId || item?.uuid || item?.jobcode || item?.slug || item?.url);
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      jobs.push(item);
+    }
+    if (batch.length < limit) break;
+  }
+  return {
+    data: { jobs },
+    __sourceConfig: config
+  };
+}
+
 function extractIcimsIframeUrlFromHtml(pageHtml, baseUrl) {
   const source = String(pageHtml || "");
   const patterns = [
@@ -683,10 +760,18 @@ const SOURCE_SPECS = Object.freeze({
     parser: parseRecruitCrmPostingsFromApi,
     officialDocs: "observed Recruit CRM public jobs endpoint",
     discover(company) {
-      const publicJobsUrl = clean(company.url_string).replace(/\/$/, "");
+      const config = parseRecruitCrmPublicCompany(company.url_string) || {};
       return {
-        config: { publicJobsUrl },
-        listUrl: publicJobsUrl ? `${publicJobsUrl}/api/jobs` : ""
+        config,
+        listUrl: config.apiUrl || ""
+      };
+    },
+    fetchList: fetchRecruitCrmSourceList,
+    postNormalize(normalized, posting) {
+      if (clean(posting?.remote_type)) return {};
+      return {
+        remote_type: "unknown",
+        is_remote: false
       };
     }
   },
@@ -1139,6 +1224,11 @@ function createSourceModule(atsKey) {
     normalized.job_posting_url = normalized.canonical_url;
     normalized.apply_url = canonicalizePostingUrl(normalized.apply_url || normalized.canonical_url);
     normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion });
+    if (typeof spec.postNormalize === "function") {
+      const patch = spec.postNormalize(normalized, posting, company, options) || {};
+      Object.assign(normalized, patch);
+      normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion });
+    }
     return normalized;
   }
 

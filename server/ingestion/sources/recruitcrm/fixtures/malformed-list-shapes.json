@@ -1,0 +1,68 @@
+{
+  "ats_key": "recruitcrm",
+  "description": "RecruitCRM raw API variants that must stay bounded by source evidence.",
+  "cases": [
+    {
+      "name": "missing geo and no remote evidence",
+      "expected_count": 1,
+      "expected_status": "quarantined",
+      "expected_reason": "no_geo_no_remote",
+      "payload": {
+        "data": {
+          "jobs": [
+            {
+              "id": "rc-missing-geo",
+              "name": "Unlocated Coordinator",
+              "slug": "unlocated-coordinator",
+              "remote": "",
+              "posted_at": "2026-05-08"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "onsite flag without structured location",
+      "expected_count": 1,
+      "expected_status": "quarantined",
+      "expected_reason": "no_structured_location",
+      "payload": {
+        "data": {
+          "jobs": [
+            {
+              "id": "rc-onsite-missing-geo",
+              "name": "Onsite Coordinator",
+              "slug": "onsite-coordinator",
+              "remote": "0",
+              "posted_at": "2026-05-08"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing source id and url",
+      "expected_count": 0,
+      "payload": {
+        "data": {
+          "jobs": [
+            {
+              "name": "Missing URL",
+              "remote": "1",
+              "posted_at": "2026-05-08"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "malformed response",
+      "expected_count": 0,
+      "payload": {
+        "data": {
+          "jobs": null
+        }
+      }
+    }
+  ]
+}

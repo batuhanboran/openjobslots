@@ -6827,9 +6827,45 @@ function formatRecruitCrmLocation(item) {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+function normalizeRecruitCrmJobUrl(config = {}, itemUrlRaw, slug) {
+  const publicJobsUrl = String(config.publicJobsUrl || "").replace(/\/+$/, "");
+  const rawUrl = String(itemUrlRaw || "").trim();
+  if (rawUrl) {
+    const parsed = parseUrl(rawUrl);
+    if (parsed?.protocol && parsed?.host) return parsed.toString();
+    if (publicJobsUrl && rawUrl.startsWith("/")) {
+      try {
+        return new URL(rawUrl, `${publicJobsUrl}/`).toString();
+      } catch {
+        // Fall through to slug fallback.
+      }
+    }
+  }
+  const stableSlug = String(slug || "").trim();
+  return publicJobsUrl && stableSlug ? `${publicJobsUrl}/${encodeURIComponent(stableSlug)}` : "";
+}
+
+function normalizeRecruitCrmRemoteType(item = {}) {
+  const rawRemote = String(item?.remote ?? item?.is_remote ?? item?.isRemote ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "remote"].includes(rawRemote)) return "remote";
+  if (["0", "false", "no", "onsite", "on-site", "non-remote"].includes(rawRemote)) return "onsite";
+
+  const workplaceType = String(item?.workplace_type || item?.workplaceType || item?.workplace_type_text || "").trim().toLowerCase();
+  if (["remote", "hybrid", "onsite", "on-site"].includes(workplaceType)) {
+    return workplaceType === "on-site" ? "onsite" : workplaceType;
+  }
+  return "";
+}
+
 function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, responseJson) {
   const data = responseJson?.data;
-  const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+  const jobs = Array.isArray(data?.jobs)
+    ? data.jobs
+    : Array.isArray(responseJson?.jobs)
+      ? responseJson.jobs
+      : Array.isArray(data)
+        ? data
+        : [];
   const postings = [];
   const seenUrls = new Set();
 
@@ -6837,7 +6873,7 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
     const item = row && typeof row === "object" ? row : {};
     const slug = String(item?.slug || "").trim();
     const itemUrlRaw = String(item?.url || "").trim();
-    const itemUrl = itemUrlRaw || (slug ? `${config.publicJobsUrl}/${slug}` : "");
+    const itemUrl = normalizeRecruitCrmJobUrl(config, itemUrlRaw, slug);
     if (!itemUrl || seenUrls.has(itemUrl)) continue;
 
     const postingDate =
@@ -6850,17 +6886,24 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
           item?.updatedon ||
           ""
       ).trim() || null;
-    const isRemote = String(item?.remote || item?.is_remote || item?.isRemote || "").trim().toLowerCase();
-    const remoteType = ["1", "true", "yes", "remote"].includes(isRemote) ? "remote" : String(item?.workplace_type || item?.workplaceType || "").trim();
+    const remoteType = normalizeRecruitCrmRemoteType(item);
     const sourceCountry = String(item?.country || item?.country_name || item?.countryCode || item?.country_code || "").trim();
     const sourceCity = String(item?.city || "").trim();
     const sourceState = String(item?.state || item?.province || item?.region || item?.state_name || "").trim();
+    const sourceLocality = String(item?.locality || "").trim();
+    const sourcePostalCode = String(item?.postalcode || "").trim();
+    const hasStructuredGeo = Boolean(sourceCity || sourceLocality || sourceState || sourceCountry || sourcePostalCode);
+    const sourceFailureReasons = [];
+    if (remoteType === "onsite" && !hasStructuredGeo) {
+      sourceFailureReasons.push("no_structured_location");
+    }
+    const sourceJobId =
+      String(item?.id ?? item?.job_id ?? item?.jobId ?? item?.uuid ?? item?.jobcode ?? slug).trim() ||
+      extractSourceIdFromPostingUrl(itemUrl, "recruitcrm");
 
     postings.push({
       company_name: companyNameForPostings,
-      source_job_id:
-        String(item?.id ?? item?.job_id ?? item?.jobId ?? item?.uuid ?? slug).trim() ||
-        extractSourceIdFromPostingUrl(itemUrl, "recruitcrm"),
+      source_job_id: sourceJobId,
       id: String(item?.id ?? item?.job_id ?? item?.jobId ?? "").trim() || undefined,
       position_name: String(item?.name || "").trim() || "Untitled Position",
       job_posting_url: itemUrl,
@@ -6871,7 +6914,8 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
       country: normalizeCountryName(sourceCountry) || normalizeCountryFromLocation(sourceCountry) || null,
       remote_type: remoteType || null,
       employment_type: String(item?.employment_type || "").trim() || null,
-      department: String(item?.department || "").trim() || null
+      department: String(item?.department || "").trim() || null,
+      source_failure_reasons: sourceFailureReasons
     });
     seenUrls.add(itemUrl);
   }
