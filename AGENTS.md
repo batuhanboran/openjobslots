@@ -66,6 +66,7 @@ Use the smallest safe test set that proves the change:
 ## Implementation Rules
 
 - Keep public UI search-first. Do not expose admin controls, protected settings, raw API addresses, stack traces, or internal parser errors on the public page.
+- Any ATS/parser/source-quality/data-quality recovery prompt must explicitly say: "Use the openjobslots-ats-recovery skill."
 - Preserve public endpoint compatibility unless the user explicitly asks for a breaking change:
   - `/health`
   - `/postings`
