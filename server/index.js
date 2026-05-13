@@ -6857,6 +6857,12 @@ function normalizeRecruitCrmRemoteType(item = {}) {
   return "";
 }
 
+function isRecruitCrmPlaceholderTitle(value) {
+  return /^(untitled|unknown|n\/?a|not available|job opening|new job|open position|position)$/i.test(
+    String(value || "").replace(/\s+/g, " ").trim()
+  );
+}
+
 function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, responseJson) {
   const data = responseJson?.data;
   const jobs = Array.isArray(data?.jobs)
@@ -6900,12 +6906,13 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
     const sourceJobId =
       String(item?.id ?? item?.job_id ?? item?.jobId ?? item?.uuid ?? item?.jobcode ?? slug).trim() ||
       extractSourceIdFromPostingUrl(itemUrl, "recruitcrm");
+    const rawTitle = String(item?.name || "").trim();
 
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: sourceJobId,
       id: String(item?.id ?? item?.job_id ?? item?.jobId ?? "").trim() || undefined,
-      position_name: String(item?.name || "").trim() || "Untitled Position",
+      position_name: rawTitle && !isRecruitCrmPlaceholderTitle(rawTitle) ? rawTitle : "Untitled Position",
       job_posting_url: itemUrl,
       posting_date: postingDate,
       location: remoteType === "remote" ? "Remote" : formatRecruitCrmLocation(item),

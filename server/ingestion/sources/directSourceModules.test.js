@@ -192,6 +192,12 @@ test("recruitcrm source module quarantines malformed or unsupported raw list sha
     if (item.expected_count === 0) continue;
 
     const normalized = source.normalize(parsed[0], company);
+    const basic = source.validate(normalized);
+    if (item.expected_status === "rejected") {
+      assert.equal(basic.ok, false, `${item.name} should fail source validation`);
+      assert.match(basic.error, new RegExp(item.expected_reason), item.name);
+      continue;
+    }
     const gate = source.validatePublic(normalized);
     if (item.expected_reason === "no_structured_location") {
       assert.ok(

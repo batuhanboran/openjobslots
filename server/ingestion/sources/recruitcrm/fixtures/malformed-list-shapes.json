@@ -56,6 +56,25 @@
       }
     },
     {
+      "name": "placeholder title",
+      "expected_count": 1,
+      "expected_status": "rejected",
+      "expected_reason": "placeholder position_name",
+      "payload": {
+        "data": {
+          "jobs": [
+            {
+              "id": "rc-placeholder-title",
+              "name": "New job",
+              "slug": "new-job",
+              "remote": "1",
+              "posted_at": "2026-05-08"
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "malformed response",
       "expected_count": 0,
       "payload": {
