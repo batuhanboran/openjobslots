@@ -319,7 +319,8 @@ Operational final state:
 - Active Postgres queries: `0`.
 - Heavy/advisory locks: `0`.
 - Pending search outbox rows: `0`.
-- Idle service stats: app `0.00% CPU / 128.7MiB`, worker stopped, Postgres `0.00% CPU / 724.8MiB`, Meili `0.14% CPU / 2.167GiB`.
+- The app container was rebuilt and restarted after tagging so the running package metadata reports `1.9.0`; the worker was not started.
+- Idle service stats after the v1.9.0 app restart: app `0.00% CPU / 133.2MiB`, worker stopped, Postgres `2.30% CPU / 562.8MiB`, Meili `0.12% CPU / 2.949GiB`.
 
 Use `50,300` as the current visible-count floor. Future work must remain ATS-by-ATS or source-by-source recovery and must not repeat the v1.8.0 clean-rebuild/shrink-public-dataset strategy.
 
