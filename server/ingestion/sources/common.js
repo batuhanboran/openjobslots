@@ -683,10 +683,15 @@ function taleoHasExplicitWorkMode(posting = {}, normalized = {}) {
 function taleoSourceFailureReasons(posting = {}, normalized = {}) {
   const target = normalized && Object.keys(normalized).length > 0 ? normalized : posting;
   const reasons = [];
+  const title = clean(target.position_name || target.title || posting.position_name || posting.title);
+  const sourceJobId = clean(target.source_job_id || posting.source_job_id || posting.jobId || posting.contestNo);
   const location = clean(target.location_text || target.location || posting.location_text || posting.location);
   const usefulGeo = hasUsefulGeoEvidence(target);
   const explicitWorkMode = taleoHasExplicitWorkMode(posting, target);
 
+  if (/^\d{4,}$/.test(title) || (sourceJobId && title.toLowerCase() === sourceJobId.toLowerCase())) {
+    reasons.push("unsupported_tenant_shape");
+  }
   if (isTaleoAmbiguousLocation(location) && !explicitWorkMode) reasons.push("ambiguous_location");
   if (!usefulGeo && !explicitWorkMode) {
     reasons.push("no_structured_location");

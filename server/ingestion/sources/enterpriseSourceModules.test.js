@@ -167,6 +167,15 @@ test("taleo source module parses AJAX fallback fixture and rejects unsupported s
   assert.equal(hybrid.remote_type, "hybrid");
   assert.equal(source.validatePublic(hybrid).status, "accepted");
 
+  const numericTitle = source.normalize({
+    company_name: "Fixture Taleo",
+    source_job_id: "7003",
+    position_name: "7003",
+    job_posting_url: "https://fixture.taleo.net/careersection/001/jobdetail.ftl?job=7003&lang=en",
+    location: "Austin, TX, United States"
+  }, company);
+  assert.ok(numericTitle.source_failure_reasons.includes("unsupported_tenant_shape"));
+
   for (const item of unsupported.cases) {
     assert.equal(source.parse(item.payload, company).length, item.expected_count, item.name);
   }
