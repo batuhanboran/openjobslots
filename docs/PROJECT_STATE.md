@@ -5,8 +5,8 @@ This is the short current-state document for future Codex runs. Detailed runbook
 ## Current Version
 
 - Package/public release line: `v1.8.0`.
-- Last recorded production checkout: `7596fa2` on `main` after auto-deploy reverted the tested recovery branch.
-- Latest RecruitCRM recovery branch: `codex/production-baseline-audit`; tested code commit before docs-only updates was `46e2f3e`.
+- Last recorded production checkout: `5a59375` on `codex/production-baseline-audit` after the Taleo canary deployment.
+- Latest recovery branch: `codex/production-baseline-audit`; tested Taleo code commits were `3b01427` and `5a59375`.
 - Last recorded production deployment date: May 13, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
@@ -16,7 +16,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Production host: production / `public-services`.
 - Production checkout: `/root/OpenJobSlots`.
 - Deployment source: private GitHub repository `batuhanboran/openjobslots`, branch `main`.
-- Auto-deploy: `openjobslots-deploy.timer`.
+- Auto-deploy: `openjobslots-deploy.timer`, stopped/inactive after the Taleo canary to prevent another recovery-branch rollback.
 - Deploy log: `/var/log/openjobslots-deploy.log`.
 - Deployment details and rollback notes: `docs/reference/deployment.md`.
 
@@ -219,6 +219,29 @@ RecruitCRM recovery was applied on May 13, 2026 after a fresh production backup 
 
 Applitrack and Zoho are no longer quarantine-only. RecruitCRM now has accepted public rows but remains quarantine-only for future automatic writes until source-level quality improves. Old quarantine cache rows remain for historical diagnostics.
 The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. During RecruitCRM recovery, Compose and the production auto-deploy timer again started the worker despite the intended source-only scope; ingestion run `13` was cancelled after `63` posting upserts, and runs `14`, `15`, and `16` completed with `146`, `289`, and `514` posting upserts across non-RecruitCRM sources. No rows were deleted or hidden, but those out-of-scope automatic source writes did occur. The final production auto-deploy timer reverted the checkout to `origin/main` at `7596fa2`; the recovery branch remains pushed as `codex/production-baseline-audit`. Use the `50,130` final visible count as the latest observed recovery floor.
+
+Taleo recovery ran on May 13, 2026 after a fresh production backup and source-specific REST/AJAX career-section parser hardening.
+
+- Deployed recovery code commits: `3b01427` and `5a59375`.
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-taleo-recovery-20260513-121337.dump`.
+- Report prefix: `/root/OpenJobSlots/reports/taleo-recovery-20260513-121337-*`.
+- Source recovery report: `/root/OpenJobSlots/reports/taleo-recovery-20260513-121337-source-recovery-report.json`.
+- Global visible postings for the Taleo canary window: `50,130 -> 50,241`.
+- Taleo accepted public rows: `0 -> 111`.
+- Public row gain: `111`.
+- Taleo source state: `canary_only` after a temporary bounded write window.
+- Taleo candidate tenants/source hosts: `554`; bounded dry-run considered `5`, fetched `3`, parsed `141`, accepted `111`, and quarantined `30` without writing.
+- Canary wrote `111` accepted public rows and `30` quarantine rows. No larger bounded apply was run after the guard found a global Meili/Postgres count delta.
+- New Taleo `no_geo_no_remote` public rows: `0`.
+- Taleo missing all normalized geo: `0 -> 0`.
+- Taleo missing any normalized geo: `0 -> 1`.
+- Taleo weak/unknown remote rows: `0 -> 0`.
+- Meili/Postgres delta after bounded outbox check: `-1`; the bounded Taleo outbox processor selected `0` pending Taleo upserts.
+- `ats:recovery:guard` did not pass; its only failure was `meili_postgres_delta_nonzero` with delta `-1`.
+- Supported Taleo shapes now include REST career-section payloads and AJAX/list text payloads where stable job identity plus structured/labeled location evidence are present.
+- Unsupported/quarantined Taleo evidence is `zionsbancorp` `no_structured_location` (`11`), `zionsbancorp` `unsupported_tenant_shape` (`19`), `xoriant` `portal_search_empty` (`1`), and `xl` `portal_search_empty` (`1`).
+
+The worker remains stopped, app/Postgres/Meili were healthy in the Taleo final checks, and the production auto-deploy timer is stopped/inactive. No non-Taleo source apply ran during the Taleo prompt. Use `50,241` as the latest observed visible-count floor, but reconcile the `-1` Meili/Postgres derived-index delta before the next larger apply wave.
 
 ## Post-v1.8.0 Recovery Strategy
 
