@@ -204,7 +204,7 @@ RecruitCRM recovery was applied on May 13, 2026 after a fresh production backup 
 - RecruitCRM write-window visible postings after the deployment auto-sync interruption: `49,310 -> 49,832`.
 - RecruitCRM accepted public rows: `0 -> 522`.
 - Public row gain: `522`.
-- RecruitCRM source state: `canary_only`.
+- RecruitCRM source state: temporary canary write window; final `protection_status` is back to `quarantine_only` because accepted rate is `52.2% < 60%`.
 - RecruitCRM candidate tenants/source hosts: `26`; dry-run fetched all `26`, parsed `1,400`, accepted `908`, quarantined `491`, and rejected `1` without writing.
 - Canary plus bounded apply wrote `522` accepted public rows and `478` quarantine rows; bounded apply stopped at `max_updates_reached`.
 - New RecruitCRM `no_geo_no_remote` public rows: `0`.
@@ -212,10 +212,11 @@ RecruitCRM recovery was applied on May 13, 2026 after a fresh production backup 
 - RecruitCRM weak/unknown remote rows: `0 -> 10`; those rows have useful geo evidence.
 - Meili/Postgres delta after bounded writes and final check: `0`.
 - `ats:recovery:guard` passed with `0` failures.
+- Future RecruitCRM work should keep the source quarantine-only until remaining tenant failures improve enough for source-quality policy to allow broader writes.
 - Successful RecruitCRM tenants include `somewhere` (`308` accepted), `rcrm` (`53`), `Talentbank_1_jobs` (`45`), `TLNT_Group_jobs` (`29`), `talentsource` (`25`), `jobsnvisa` (`24`), and `Ensitech_Careers` (`17`).
 - Remaining RecruitCRM failure evidence is `no_structured_location` (`457`), `no_geo_no_remote` (`20`), `ambiguous_location` (`1`), and `missing_title` (`1`).
 
-Applitrack, Zoho, and RecruitCRM are no longer quarantine-only. They are recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
+Applitrack and Zoho are no longer quarantine-only. RecruitCRM now has accepted public rows but remains quarantine-only for future automatic writes until source-level quality improves. Old quarantine cache rows remain for historical diagnostics.
 The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. During RecruitCRM recovery, Compose again started the worker despite the intended source-only scope; ingestion run `13` was cancelled after `63` posting upserts, and ingestion run `14` completed with `146` posting upserts across non-RecruitCRM sources. No rows were deleted or hidden, but those out-of-scope automatic source writes did occur. Use the `49,919` final visible count as the latest recovery floor.
 
 ## Post-v1.8.0 Recovery Strategy
