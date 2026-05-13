@@ -472,6 +472,22 @@ async function processTarget(pool, target, options, summary, runId) {
       };
     }
     const sourceFailureReasons = postingSourceFailureReasons(normalized);
+    if (normalized?.source_requires_normalized_geo_or_remote === true) {
+      const hasNormalizedGeo = Boolean(clean(normalized.country) || clean(normalized.region) || clean(normalized.city));
+      const hasExplicitRemote = ["remote", "hybrid", "onsite"].includes(clean(normalized.remote_type).toLowerCase());
+      if (!hasNormalizedGeo && !hasExplicitRemote) sourceFailureReasons.push("no_normalized_geo_or_explicit_remote");
+    }
+    if (adapterValidation?.ok && status === "accepted" && sourceFailureReasons.length > 0) {
+      status = "quarantined";
+      validation = {
+        ok: false,
+        status: "quarantined",
+        error: sourceFailureReasons[0],
+        reason_codes: Array.from(new Set(sourceFailureReasons)),
+        evidence: gate.evidence,
+        retry_detail_refetch_eligible: false
+      };
+    }
     if (adapterValidation?.ok && status === "quarantined" && sourceFailureReasons.length > 0) {
       validation = {
         ...validation,

@@ -1,0 +1,32 @@
+{
+  "company": {
+    "company_name": "Fixture Applitrack District",
+    "ATS_name": "applitrack",
+    "url_string": "https://www.applitrack.com/fixturedistrict/onlineapp/default.aspx?all=1"
+  },
+  "output_html": "<table><tr><td>Certified</td><td><a href=\"JobPostings/view.asp?AppliTrackJobId=7001&AppliTrackLayoutMode=detail\">Math Teacher</a></td><td><script>applyFor('7001','Certified','Math Teacher')</script></td></tr><tr><td>Technology</td><td><a href=\"ApplyForJob.aspx?JobID=7002&posFirstChoice=Technology&posSpecialty=Remote%20Analyst\">Apply</a></td></tr><tr><td>Substitute</td><td><script>applyFor('7003','Substitute','District Support')</script></td></tr></table>",
+  "details": {
+    "7001": "<article><span class=\"label\">Date Posted:</span><span class=\"normal\">05/10/2026</span><span class=\"label\">Location:</span><span class=\"normal\">Chicago, IL</span><span class=\"label\">Position Type:</span><span class=\"normal\">Certified/Math Teacher</span></article>",
+    "7002": "<article><div>Posting Date: 05/11/2026</div><div>Location: Remote - United States</div><div>Work Location Type: Remote</div></article>",
+    "7003": "<article><div>Date Posted: 05/12/2026</div><div>Location: District Wide</div><p>For accommodation, contact the district office, 100 Main Street, Westminster, CO 80030.</p></article>"
+  },
+  "stale_detail_status": 410,
+  "unsupported_shape_html": "<html><body><p>No Applitrack jobs here.</p></body></html>",
+  "expected": {
+    "7001": {
+      "country": "United States",
+      "city": "Chicago",
+      "remote_type": "onsite",
+      "posting_date": "05/10/2026"
+    },
+    "7002": {
+      "country": "United States",
+      "remote_type": "remote",
+      "posting_date": "05/11/2026"
+    },
+    "7003": {
+      "status": "quarantined",
+      "reason": "district_wide_ambiguous"
+    }
+  }
+}

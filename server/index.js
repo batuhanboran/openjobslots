@@ -2313,7 +2313,13 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("recruit.hirebridge.com/v3/jobs/jobdetails.aspx")) return "hirebridge";
   if (url.includes("recruit.hirebridge.com/v3/careercenter/v2/details.aspx")) return "hirebridge";
   if (url.includes("sjobs.brassring.com/tgnewui/search/home/homewithpreload")) return "brassring";
-  if (url.includes(".applitrack.com/") && (url.includes("/onlineapp/default.aspx") || url.includes("/jobpostings/output.asp") || url.includes("/default.aspx?jobid="))) {
+  if (url.includes(".applitrack.com/") && (
+    url.includes("/onlineapp/default.aspx") ||
+    url.includes("/jobpostings/output.asp") ||
+    url.includes("/jobpostings/view.asp") ||
+    url.includes("/applyforjob.aspx") ||
+    url.includes("/default.aspx?jobid=")
+  )) {
     return "applitrack";
   }
   if (url.includes(".careers.hibob.com/job/")) return "hibob";
@@ -2956,6 +2962,7 @@ function extractSourceIdFromPostingUrl(urlValue, atsKey = "") {
     if (normalizedAts === "jobvite") return path.match(/\/job\/([^/]+)/i)?.[1] || lastPart;
     if (normalizedAts === "careerplug") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart;
     if (normalizedAts === "hirebridge") return queryFirst("jid", "jobId", "jobid") || lastPart;
+    if (normalizedAts === "applitrack") return queryFirst("AppliTrackJobId", "JobID", "jobid", "posJobCodes") || lastPart.match(/^(\d+)$/)?.[1] || "";
     if (normalizedAts === "teamtailor") return path.match(/\/jobs\/([^/]+)/i)?.[1] || lastPart.match(/^(\d+)/)?.[1] || lastPart;
     if (normalizedAts === "brassring") return queryFirst("jobid", "jobId", "reqid");
     if (normalizedAts === "governmentjobs") return path.match(/\/jobs\/(\d+)/i)?.[1] || queryFirst("jobid", "jobId");
@@ -11378,6 +11385,7 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   const postings = [];
   const seenIds = new Set();
   const applyPattern = /applyFor\(\s*["'](\d+)["']\s*,\s*["']([^"']*)["']\s*,\s*["']([^"']*)["'][^)]*\)/gi;
+  const linkPattern = /<a\b[^>]*href=["']([^"']*(?:JobPostings\/view\.asp|ApplyForJob\.aspx|_application\.aspx)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let match = applyPattern.exec(page);
 
   const extractRowContext = (matchIndex) => {
@@ -11414,6 +11422,44 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
     if (/\b(on[- ]?site|onsite|in person|in-person)\b/i.test(compact)) return "onsite";
     return null;
   };
+  const stripTitleText = (value) => cleanSmartRecruitersText(
+    decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+  );
+  const queryValue = (urlValue, names) => {
+    try {
+      const parsed = new URL(String(urlValue || ""), siteRoot);
+      for (const name of names) {
+        const value = cleanSmartRecruitersText(parsed.searchParams.get(name));
+        if (value) return value;
+      }
+    } catch {
+      return "";
+    }
+    return "";
+  };
+  const addPosting = ({ jobId, category, specialty, linkText, rowContext, jobUrl }) => {
+    const sourceJobId = cleanSmartRecruitersText(jobId);
+    if (!sourceJobId || seenIds.has(sourceJobId)) return;
+    const cleanCategory = cleanSmartRecruitersText(category);
+    const cleanSpecialty = cleanSmartRecruitersText(specialty);
+    const linkTitle = stripTitleText(linkText);
+    const title = [cleanCategory, cleanSpecialty].filter(Boolean).join(" - ") || linkTitle || `Job ${sourceJobId}`;
+    const canonicalUrl = jobUrl || new URL(`default.aspx?JobID=${encodeURIComponent(sourceJobId)}`, siteRoot).toString();
+    const rowText = cleanApplitrackRowText(rowContext);
+
+    postings.push({
+      company_name: companyName,
+      source_job_id: sourceJobId,
+      position_name: title,
+      job_posting_url: canonicalUrl,
+      apply_url: canonicalUrl,
+      remote_type: extractRemoteTypeFromText(rowText),
+      posting_date: extractDateFromRow(rowText),
+      location: extractLocationFromRow(rowText, [sourceJobId, cleanCategory, cleanSpecialty, title]),
+      department: cleanCategory || null
+    });
+    seenIds.add(sourceJobId);
+  };
 
   while (match) {
     const jobId = cleanSmartRecruitersText(match[1]);
@@ -11424,23 +11470,40 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
 
     const category = cleanSmartRecruitersText(match[2]);
     const specialty = cleanSmartRecruitersText(match[3]);
-    const title = [category, specialty].filter(Boolean).join(" - ") || `Job ${jobId}`;
-    const jobUrl = new URL(`default.aspx?JobID=${encodeURIComponent(jobId)}`, siteRoot).toString();
     const rowContext = extractRowContext(Number(match.index || 0));
-    const rowText = cleanApplitrackRowText(rowContext);
-
-    postings.push({
-      company_name: companyName,
-      source_job_id: jobId,
-      position_name: title,
-      job_posting_url: jobUrl,
-      remote_type: extractRemoteTypeFromText(rowText),
-      posting_date: extractDateFromRow(rowText),
-      location: extractLocationFromRow(rowText, [jobId, category, specialty, title]),
-      department: category || null
+    addPosting({
+      jobId,
+      category,
+      specialty,
+      rowContext
     });
-    seenIds.add(jobId);
     match = applyPattern.exec(page);
+  }
+
+  match = linkPattern.exec(page);
+  while (match) {
+    const href = String(match[1] || "").replace(/&amp;/gi, "&");
+    let parsedLink = null;
+    try {
+      parsedLink = new URL(href, siteRoot);
+    } catch {
+      match = linkPattern.exec(page);
+      continue;
+    }
+    const jobId =
+      queryValue(parsedLink.toString(), ["AppliTrackJobId", "JobID", "jobid", "posJobCodes"]) ||
+      String(parsedLink.pathname || "").match(/\/jobs?\/(\d+)/i)?.[1] ||
+      "";
+    const rowContext = extractRowContext(Number(match.index || 0));
+    addPosting({
+      jobId,
+      category: queryValue(parsedLink.toString(), ["posFirstChoice", "category"]),
+      specialty: queryValue(parsedLink.toString(), ["posSpecialty", "specialty"]),
+      linkText: match[2],
+      rowContext,
+      jobUrl: new URL(`default.aspx?JobID=${encodeURIComponent(jobId)}`, siteRoot).toString()
+    });
+    match = linkPattern.exec(page);
   }
 
   return postings;
@@ -11520,7 +11583,7 @@ function extractApplitrackDetailFields(detailHtml) {
       pickLabel(["Date Posted", "Posted", "Posting Date", "Date Available"]) ||
       text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/)?.[0] ||
       null,
-    location: genericLocation ? (footerAddress || rawLocation) : (rawLocation || footerAddress),
+    location: genericLocation ? rawLocation : (rawLocation || footerAddress),
     department: pickLabel(["Position Type", "Category", "Department"]),
     remote_type: normalizeExplicitRemoteValue(
       pickLabel(["Remote", "Work Location Type", "Work Type"]) ||

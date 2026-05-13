@@ -30,10 +30,10 @@
     "posting_date": "04/12/2026"
   },
   "expected_district_wide": {
-    "location_text": "Westminster, CO 80030",
-    "country": "United States",
-    "region": "North America",
-    "remote_type": "onsite",
+    "location_text": "DISTRICT WIDE",
+    "country": "",
+    "region": "",
+    "remote_type": "unknown",
     "posting_date": "1/6/2026"
   }
 }

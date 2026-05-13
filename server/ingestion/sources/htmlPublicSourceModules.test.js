@@ -88,3 +88,37 @@ for (const atsKey of HTML_PUBLIC_SOURCES) {
     }
   });
 }
+
+test("applitrack source module enriches Output.asp rows from deterministic detail pages", async () => {
+  const source = getSourceModule("applitrack");
+  const sourceDir = path.join(__dirname, "applitrack");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      const value = String(url || "");
+      if (/Output\.asp/i.test(value)) return { html: fixture.output_html, status: 200, url: value };
+      const parsed = new URL(value);
+      const jobId = parsed.searchParams.get("AppliTrackJobId");
+      if (fixture.details[jobId]) return { html: fixture.details[jobId], status: 200, url: value };
+      return { html: "", status: fixture.stale_detail_status, url: value };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 3);
+  const normalized = parsed.map((posting) => source.normalize(posting, fixture.company));
+  const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId["7001"].country, fixture.expected["7001"].country);
+  assert.equal(byId["7001"].city, fixture.expected["7001"].city);
+  assert.equal(byId["7001"].remote_type, fixture.expected["7001"].remote_type);
+  assert.equal(evaluatePublicPosting(byId["7001"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(byId["7002"].country, fixture.expected["7002"].country);
+  assert.equal(byId["7002"].remote_type, fixture.expected["7002"].remote_type);
+  assert.equal(evaluatePublicPosting(byId["7002"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(byId["7003"].location_text, "District Wide");
+  assert.ok(byId["7003"].source_failure_reasons.includes(fixture.expected["7003"].reason));
+  assert.equal(evaluatePublicPosting(byId["7003"], { parserVersion: source.parserVersion }).status, "quarantined");
+});
