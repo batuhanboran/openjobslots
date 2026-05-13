@@ -244,6 +244,28 @@ Taleo recovery ran on May 13, 2026 after a fresh production backup and source-sp
 
 The worker remains stopped, app/Postgres/Meili were healthy in the Taleo final checks, and the production auto-deploy timer is stopped/inactive. No non-Taleo source apply ran during the Taleo prompt. Use `50,241` as the latest observed visible-count floor, but reconcile the `-1` Meili/Postgres derived-index delta before the next larger apply wave.
 
+Public-enabled source growth ran on May 13, 2026 after a fresh production audit and backup.
+
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-public-enabled-growth-20260513-160152.dump`.
+- Report prefix: `/root/OpenJobSlots/reports/public-enabled-growth-20260513-160152-*`.
+- Source recovery report: `/root/OpenJobSlots/reports/public-enabled-growth-20260513-160152-source-recovery-report.json`.
+- Scope was limited to already normal/public-enabled sources; quarantine-only and auto-disabled sources were not processed except read-only comparison.
+- Selected sources: `applytojob`, `bamboohr`, `lever`, `greenhouse`, and `careerplug`.
+- Selection basis: public-enabled source state, fixture-backed parser confidence, high accepted dry-run volume, existing row count or quality debt, and stable source evidence.
+- Global visible postings for the canary window: `50,241 -> 50,300`.
+- Selected-source accepted public rows: `26,585 -> 26,644`.
+- Public row gain: `59`.
+- New selected-source `no_geo_no_remote` public rows: `0`.
+- Selected-source missing any normalized geo: `3,457 -> 3,458`; selected-source weak/unknown remote stayed `1,097 -> 1,097`.
+- Per-source gains: `applytojob` `+1`, `bamboohr` `+2`, `lever` `+5`, `greenhouse` `+4`, `careerplug` `+47`.
+- Canary runs fetched `100` tenants, parsed `1,945` rows, wrote `1,164` public upserts, and wrote `21` quarantine rows.
+- `hrmdirect` was not selected for writes because a bounded dry-run parsed `7` rows and accepted `0`; `fountain`, `breezy`, and `applicantpro` were fallback dry-runs only.
+- Failure evidence: `applytojob` `ambiguous_location` (`3`), `bamboohr` `no_geo_no_remote` (`1`) and fetch `404` (`6`), `careerplug` `no_geo_no_remote` (`17`) and `missing_position_name` (`2`), plus `hrmdirect` dry-run-only `no_geo_no_remote` (`7`).
+- Existing source raw/expected/invalid fixtures were verified by tests; no parser or fixture code changes were needed.
+- Meili/Postgres delta remained `-1`, so `ats:recovery:guard` did not pass and no larger bounded apply was run after canary.
+
+The worker remains stopped, app/Postgres/Meili were healthy in the public-enabled growth final checks, and the production auto-deploy timer is stopped/inactive. Use `50,300` as the latest observed visible-count floor, but reconcile the `-1` Meili/Postgres derived-index delta before any larger source apply.
+
 ## Post-v1.8.0 Recovery Strategy
 
 The next phase is ATS-by-ATS recovery, not another broad cleanup or rebuild.
