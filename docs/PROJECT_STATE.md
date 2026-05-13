@@ -6,7 +6,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 - Package/public release line: `v1.8.0`.
 - Last recorded production checkout: `7596fa2` on `main` after auto-deploy reverted the tested recovery branch.
-- Latest tested RecruitCRM recovery branch: `codex/production-baseline-audit` at `959197f`.
+- Latest RecruitCRM recovery branch: `codex/production-baseline-audit` at `33b0992`; tested code commit before docs-only updates was `46e2f3e`.
 - Last recorded production deployment date: May 13, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
@@ -218,7 +218,7 @@ RecruitCRM recovery was applied on May 13, 2026 after a fresh production backup 
 - Remaining RecruitCRM failure evidence is `no_structured_location` (`457`), `no_geo_no_remote` (`20`), `ambiguous_location` (`1`), and `missing_title` (`1`).
 
 Applitrack and Zoho are no longer quarantine-only. RecruitCRM now has accepted public rows but remains quarantine-only for future automatic writes until source-level quality improves. Old quarantine cache rows remain for historical diagnostics.
-The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. During RecruitCRM recovery, Compose and the production auto-deploy timer again started the worker despite the intended source-only scope; ingestion run `13` was cancelled after `63` posting upserts, and runs `14`, `15`, and `16` completed with `146`, `289`, and `514` posting upserts across non-RecruitCRM sources. No rows were deleted or hidden, but those out-of-scope automatic source writes did occur. The final production auto-deploy timer reverted the checkout to `origin/main` at `7596fa2`; the tested recovery branch remains pushed as `codex/production-baseline-audit` at `959197f`. Use the `50,130` final visible count as the latest observed recovery floor.
+The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. During RecruitCRM recovery, Compose and the production auto-deploy timer again started the worker despite the intended source-only scope; ingestion run `13` was cancelled after `63` posting upserts, and runs `14`, `15`, and `16` completed with `146`, `289`, and `514` posting upserts across non-RecruitCRM sources. No rows were deleted or hidden, but those out-of-scope automatic source writes did occur. The final production auto-deploy timer reverted the checkout to `origin/main` at `7596fa2`; the recovery branch remains pushed as `codex/production-baseline-audit` at `33b0992`. Use the `50,130` final visible count as the latest observed recovery floor.
 
 ## Post-v1.8.0 Recovery Strategy
 
