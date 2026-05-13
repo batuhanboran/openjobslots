@@ -36,12 +36,18 @@ const SOURCE_RECOVERY_REPORT_SCHEMA = Object.freeze({
     missing_geo_after: "Rows for the source missing normalized geo after recovery.",
     weak_remote_before: "Rows for the source with weak/unknown remote before recovery.",
     weak_remote_after: "Rows for the source with weak/unknown remote after recovery.",
-    no_improvement_reasons: "Tenant/source/error grouped reasons when no production improvement is possible."
+    no_improvement_reasons: "Tenant/source/error grouped reasons when no production improvement is possible.",
+    no_improvement_blocker_only: "Explicit marker that no production writes occurred and the report is blocker-only.",
+    newly_accepted_row_evidence: "Row-by-row evidence for newly accepted rows, used for explicit remote/hybrid or useful geo exceptions."
   }),
   optional: Object.freeze([
     "rows_newly_accepted_no_geo_no_remote",
     "newly_accepted_no_geo_no_remote_count",
     "bad_newly_accepted_rows",
+    "no_improvement_blocker_only",
+    "newly_accepted_row_evidence",
+    "accepted_row_evidence",
+    "clean_row_evidence",
     "generated_at",
     "run_id"
   ])
@@ -148,8 +154,12 @@ function normalizeSourceRecoveryReport(report = {}) {
     missing_geo_after: toNumber(report.missing_geo_after),
     weak_remote_before: toNumber(report.weak_remote_before),
     weak_remote_after: toNumber(report.weak_remote_after),
-    no_improvement_reasons: normalizeNoImprovementReasons(report.no_improvement_reasons)
+    no_improvement_reasons: normalizeNoImprovementReasons(report.no_improvement_reasons),
+    no_improvement_blocker_only: report.no_improvement_blocker_only === true
   };
+  for (const field of ["newly_accepted_row_evidence", "accepted_row_evidence", "clean_row_evidence"]) {
+    if (Array.isArray(report[field])) normalized[field] = report[field];
+  }
   const badRows = report.bad_newly_accepted_rows || report.newly_accepted_bad_rows || [];
   normalized.rows_newly_accepted_no_geo_no_remote = Math.max(
     0,

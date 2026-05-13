@@ -65,6 +65,27 @@ function pctNumber(value) {
   return toNumber(text, 0);
 }
 
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace("%", ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const parsed = numberOrNull(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function pctFromCount(count, total) {
+  const parsedCount = numberOrNull(count);
+  const parsedTotal = numberOrNull(total);
+  if (parsedCount === null || parsedTotal === null || parsedTotal <= 0) return null;
+  return Number(((parsedCount * 100) / parsedTotal).toFixed(2));
+}
+
 function visibleCount(report = {}) {
   const summary = report.summary || report;
   return toNumber(
@@ -73,6 +94,38 @@ function visibleCount(report = {}) {
     summary.visible_rows ??
     report.total_visible_postings ??
     report.visible_count
+  );
+}
+
+function globalMissingAnyGeoPct(report = {}) {
+  const summary = report.summary || report;
+  return firstNumber(
+    summary.missing_any_normalized_geo_pct,
+    summary.missing_any_geo_pct,
+    summary.field_gap_percentages?.missing_any_normalized_geo,
+    summary.field_gap_percentages?.missing_any_geo,
+    pctFromCount(
+      summary.missing_any_normalized_geo_count ?? summary.missing_any_geo_count,
+      summary.total_visible_postings ?? summary.visible_count ?? summary.visible_rows
+    )
+  );
+}
+
+function globalWeakUnknownRemotePct(report = {}) {
+  const summary = report.summary || report;
+  return firstNumber(
+    summary.weak_unknown_remote_type_pct,
+    summary.weak_unknown_remote_pct,
+    summary.weak_remote_pct,
+    summary.unknown_remote_pct,
+    summary.field_gap_percentages?.weak_unknown_remote_type,
+    pctFromCount(
+      summary.weak_unknown_remote_type_count ??
+        summary.weak_unknown_remote_count ??
+        summary.weak_remote_count ??
+        summary.unknown_remote_count,
+      summary.total_visible_postings ?? summary.visible_count ?? summary.visible_rows
+    )
   );
 }
 
@@ -90,8 +143,67 @@ function sourceKey(row = {}) {
   return clean(row.ats_key || row.source_ats || row.source || row.key).toLowerCase();
 }
 
+function sourceRow(payload = {}, source = "") {
+  const key = clean(source).toLowerCase();
+  if (!key) return null;
+  return sourceRows(payload).find((row) => sourceKey(row) === key) || null;
+}
+
 function acceptedRows(row = {}) {
   return toNumber(row.accepted_public_rows ?? row.accepted_rows ?? row.accepted_count ?? row.visible_rows ?? row.total_visible_rows);
+}
+
+function totalSourceRows(row = {}) {
+  return firstNumber(
+    row.total_visible_rows,
+    row.visible_rows,
+    row.total_visible_postings,
+    row.accepted_public_rows,
+    row.accepted_rows
+  );
+}
+
+function sourceMissingAnyGeoPct(payload = {}, source = "", fallbackReport = null, phase = "before") {
+  const row = sourceRow(payload, source);
+  const rowPct = row
+    ? firstNumber(
+        row.missing_any_normalized_geo_pct,
+        row.missing_any_geo_pct,
+        pctFromCount(
+          row.missing_any_normalized_geo_count ?? row.missing_any_geo_count ?? row.missing_geo_count,
+          totalSourceRows(row)
+        )
+      )
+    : null;
+  if (rowPct !== null) return rowPct;
+  if (!fallbackReport) return null;
+  const count = phase === "after" ? fallbackReport.missing_geo_after : fallbackReport.missing_geo_before;
+  const total = phase === "after" ? fallbackReport.accepted_public_rows_after : fallbackReport.accepted_public_rows_before;
+  return pctFromCount(count, total);
+}
+
+function sourceWeakUnknownRemotePct(payload = {}, source = "", fallbackReport = null, phase = "before") {
+  const row = sourceRow(payload, source);
+  const rowPct = row
+    ? firstNumber(
+        row.weak_unknown_remote_type_pct,
+        row.weak_unknown_remote_pct,
+        row.weak_remote_pct,
+        row.unknown_remote_pct,
+        pctFromCount(
+          row.weak_unknown_remote_type_count ??
+            row.weak_unknown_remote_count ??
+            row.weak_remote_count ??
+            row.unknown_remote_count,
+          totalSourceRows(row)
+        )
+      )
+    : null;
+  if (rowPct !== null) return rowPct;
+  if (!fallbackReport) return null;
+  const count = phase === "after" ? fallbackReport.weak_remote_after : fallbackReport.weak_remote_before;
+  const total = phase === "after" ? fallbackReport.accepted_public_rows_after : fallbackReport.accepted_public_rows_before;
+  return pctFromCount(count, total);
 }
 
 function sourceAcceptedMap(payload = {}) {
@@ -146,12 +258,26 @@ function collectSafetyViolations({ ingestionStatus, serviceStats, maxCpuPct, max
   }
   const stats = Array.isArray(serviceStats) ? serviceStats : serviceStats?.items || serviceStats?.services || [];
   for (const row of stats) {
+    const serviceName = clean(row.name || row.container || row.Name || "unknown");
+    const statusText = clean(row.status || row.state || row.Status || row.State).toLowerCase();
+    if (
+      serviceName.toLowerCase().includes("worker") &&
+      (statusText.includes("up") || statusText.includes("running")) &&
+      !Boolean(row.worker_isolated || row.isolated || item.worker_isolated || item.source_scope_isolated)
+    ) {
+      violations.push({
+        code: "unsafe_worker_running_unisolated",
+        message: `worker service ${serviceName} is running without explicit source isolation`,
+        service: serviceName,
+        status: statusText
+      });
+    }
     const cpu = pctNumber(row.cpu_percent ?? row.cpu ?? row.CPUPerc);
     if (cpu > maxCpuPct) {
       violations.push({
         code: "unsafe_service_cpu",
-        message: `service ${clean(row.name || row.container || row.Name || "unknown")} CPU ${cpu}% > ${maxCpuPct}%`,
-        service: clean(row.name || row.container || row.Name || "unknown"),
+        message: `service ${serviceName} CPU ${cpu}% > ${maxCpuPct}%`,
+        service: serviceName,
         cpu_percent: cpu
       });
     }
@@ -173,9 +299,72 @@ function compareSourceAccepted(beforePayload, afterPayload) {
   return decreases;
 }
 
+function reasonCount(reasons = {}) {
+  return Object.keys(reasons.by_tenant || {}).length +
+    Object.keys(reasons.by_source || {}).length +
+    Object.keys(reasons.by_error || {}).length +
+    (Array.isArray(reasons.items) ? reasons.items.length : 0);
+}
+
+function rowEvidenceList(report = {}) {
+  const candidates = [
+    report.newly_accepted_row_evidence,
+    report.newly_accepted_rows,
+    report.accepted_row_evidence,
+    report.clean_row_evidence
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return [];
+}
+
+function hasRowIdentifier(row = {}) {
+  return Boolean(clean(row.source_job_id || row.canonical_url || row.url || row.id));
+}
+
+function hasExplicitRemoteHybridEvidence(row = {}) {
+  const remoteType = clean(row.remote_type || row.workplace_type || row.work_type).toLowerCase();
+  const remoteOrHybrid = remoteType === "remote" || remoteType === "hybrid";
+  return hasRowIdentifier(row) && (
+    row.explicit_remote_evidence === true ||
+    (remoteOrHybrid && Boolean(row.remote_evidence || row.evidence?.remote || row.evidence?.workplace_type))
+  );
+}
+
+function hasUsefulNormalizedGeoEvidence(row = {}) {
+  const hasStructuredGeo = Boolean(clean(row.country) && (clean(row.region) || clean(row.city)));
+  return hasRowIdentifier(row) && (
+    row.useful_normalized_geo === true ||
+    (hasStructuredGeo && Boolean(row.geo_evidence || row.evidence?.geo || row.evidence?.location))
+  );
+}
+
+function allNewRowsDocumented(report = {}, predicate) {
+  const expected = Math.max(0, toNumber(report.rows_newly_accepted, report.public_row_gain));
+  if (expected <= 0) return false;
+  const rows = rowEvidenceList(report);
+  if (rows.length < expected) return false;
+  return rows.slice(0, expected).every(predicate);
+}
+
+function isNoImprovementBlockerOnly(report = {}) {
+  return report.no_improvement_blocker_only === true &&
+    report.public_row_gain === 0 &&
+    report.rows_newly_accepted === 0 &&
+    report.rows_updated_existing === 0 &&
+    reasonCount(report.no_improvement_reasons) > 0;
+}
+
+function addNoReleaseReason(reasons, code, message, detail = {}) {
+  if (reasons.some((reason) => reason.code === code)) return;
+  reasons.push({ code, message, ...detail });
+}
+
 function evaluateRecoveryGuard(input = {}) {
   const failures = [];
   const warnings = [];
+  const noReleaseAllowed = [];
   if (!input.before) {
     failures.push({
       code: "missing_before_report",
@@ -214,6 +403,10 @@ function evaluateRecoveryGuard(input = {}) {
   }
   const beforeVisible = visibleCount(input.before || {});
   const afterVisible = visibleCount(input.after || {});
+  const beforeGlobalMissingAnyGeoPct = globalMissingAnyGeoPct(input.before || {});
+  const afterGlobalMissingAnyGeoPct = globalMissingAnyGeoPct(input.after || {});
+  const beforeGlobalWeakRemotePct = globalWeakUnknownRemotePct(input.before || {});
+  const afterGlobalWeakRemotePct = globalWeakUnknownRemotePct(input.after || {});
 
   if (beforeVisible > 0 && afterVisible > 0 && afterVisible < beforeVisible) {
     failures.push({
@@ -221,6 +414,32 @@ function evaluateRecoveryGuard(input = {}) {
       message: `visible_count_after ${afterVisible} < visible_count_before ${beforeVisible}`,
       before: beforeVisible,
       after: afterVisible
+    });
+  }
+
+  if (
+    beforeGlobalMissingAnyGeoPct !== null &&
+    afterGlobalMissingAnyGeoPct !== null &&
+    afterGlobalMissingAnyGeoPct > beforeGlobalMissingAnyGeoPct
+  ) {
+    failures.push({
+      code: "global_missing_any_geo_pct_increased",
+      message: `global missing_any_geo_pct_after ${afterGlobalMissingAnyGeoPct} > before ${beforeGlobalMissingAnyGeoPct}`,
+      before: beforeGlobalMissingAnyGeoPct,
+      after: afterGlobalMissingAnyGeoPct
+    });
+  }
+
+  if (
+    beforeGlobalWeakRemotePct !== null &&
+    afterGlobalWeakRemotePct !== null &&
+    afterGlobalWeakRemotePct > beforeGlobalWeakRemotePct
+  ) {
+    failures.push({
+      code: "global_weak_unknown_remote_pct_increased",
+      message: `global weak_unknown_remote_pct_after ${afterGlobalWeakRemotePct} > before ${beforeGlobalWeakRemotePct}`,
+      before: beforeGlobalWeakRemotePct,
+      after: afterGlobalWeakRemotePct
     });
   }
 
@@ -237,9 +456,13 @@ function evaluateRecoveryGuard(input = {}) {
   }
 
   let sourceReportValidation = null;
+  let recoverySuccess = false;
+  let noImprovementBlockerOnly = false;
   if (input.sourceReport) {
     sourceReportValidation = validateSourceRecoveryReport(input.sourceReport);
     const report = sourceReportValidation.report;
+    noImprovementBlockerOnly = isNoImprovementBlockerOnly(report);
+    recoverySuccess = report.public_row_gain > 0;
     for (const error of sourceReportValidation.errors) {
       failures.push({
         code: "invalid_source_recovery_report",
@@ -257,6 +480,16 @@ function evaluateRecoveryGuard(input = {}) {
         delta: report.accepted_public_rows_after - report.accepted_public_rows_before
       });
     }
+    if (report.accepted_public_rows_after <= report.accepted_public_rows_before && !noImprovementBlockerOnly) {
+      failures.push({
+        code: "target_accepted_public_rows_not_increased",
+        message: `accepted public rows did not increase for ${report.source}`,
+        source: report.source,
+        before: report.accepted_public_rows_before,
+        after: report.accepted_public_rows_after,
+        delta: report.accepted_public_rows_after - report.accepted_public_rows_before
+      });
+    }
     if (report.rows_newly_accepted_no_geo_no_remote > 0) {
       failures.push({
         code: "new_accepted_no_geo_no_remote",
@@ -265,19 +498,73 @@ function evaluateRecoveryGuard(input = {}) {
         count: report.rows_newly_accepted_no_geo_no_remote
       });
     }
+    const beforeSourceMissingGeoPct = sourceMissingAnyGeoPct(
+      input.beforeSourceQuality || input.before,
+      report.source,
+      report,
+      "before"
+    );
+    const afterSourceMissingGeoPct = sourceMissingAnyGeoPct(
+      input.afterSourceQuality || input.after,
+      report.source,
+      report,
+      "after"
+    );
+    const beforeSourceWeakRemotePct = sourceWeakUnknownRemotePct(
+      input.beforeSourceQuality || input.before,
+      report.source,
+      report,
+      "before"
+    );
+    const afterSourceWeakRemotePct = sourceWeakUnknownRemotePct(
+      input.afterSourceQuality || input.after,
+      report.source,
+      report,
+      "after"
+    );
+    if (
+      beforeSourceMissingGeoPct !== null &&
+      afterSourceMissingGeoPct !== null &&
+      afterSourceMissingGeoPct > beforeSourceMissingGeoPct &&
+      !allNewRowsDocumented(report, hasExplicitRemoteHybridEvidence)
+    ) {
+      failures.push({
+        code: "source_missing_any_geo_pct_increased",
+        message: `source missing_any_geo_pct_after ${afterSourceMissingGeoPct} > before ${beforeSourceMissingGeoPct} without row-by-row explicit remote/hybrid evidence`,
+        source: report.source,
+        before: beforeSourceMissingGeoPct,
+        after: afterSourceMissingGeoPct
+      });
+    }
+    if (
+      beforeSourceWeakRemotePct !== null &&
+      afterSourceWeakRemotePct !== null &&
+      afterSourceWeakRemotePct > beforeSourceWeakRemotePct &&
+      !allNewRowsDocumented(report, hasUsefulNormalizedGeoEvidence)
+    ) {
+      failures.push({
+        code: "source_weak_unknown_remote_pct_increased",
+        message: `source weak_unknown_remote_pct_after ${afterSourceWeakRemotePct} > before ${beforeSourceWeakRemotePct} without row-by-row useful normalized geo evidence`,
+        source: report.source,
+        before: beforeSourceWeakRemotePct,
+        after: afterSourceWeakRemotePct
+      });
+    }
     const geoImproved = report.missing_geo_after < report.missing_geo_before;
     const remoteImproved = report.weak_remote_after < report.weak_remote_before;
     const rowsGained = report.public_row_gain > 0;
     if (!geoImproved && !remoteImproved && !rowsGained) {
       const reasons = report.no_improvement_reasons || {};
-      const reasonCount = Object.keys(reasons.by_tenant || {}).length +
-        Object.keys(reasons.by_source || {}).length +
-        Object.keys(reasons.by_error || {}).length +
-        (Array.isArray(reasons.items) ? reasons.items.length : 0);
-      if (reasonCount === 0) {
+      if (reasonCount(reasons) === 0) {
         failures.push({
           code: "missing_no_improvement_reasons",
           message: `no improvement recorded for ${report.source} without tenant/source/error reasons`,
+          source: report.source
+        });
+      } else if (!noImprovementBlockerOnly) {
+        failures.push({
+          code: "no_improvement_not_marked_blocker_only",
+          message: `no improvement recorded for ${report.source} but report is not explicitly marked no_improvement_blocker_only`,
           source: report.source
         });
       } else {
@@ -309,11 +596,53 @@ function evaluateRecoveryGuard(input = {}) {
     maxActivePostgresQueries: toNumber(input.maxActivePostgresQueries, 0)
   }));
 
+  const failureCodes = failures.map((failure) => failure.code);
+  const hasGlobalQualityRegression =
+    failureCodes.includes("global_missing_any_geo_pct_increased") ||
+    failureCodes.includes("global_weak_unknown_remote_pct_increased");
+
+  if (afterVisible > beforeVisible && hasGlobalQualityRegression) {
+    addNoReleaseReason(
+      noReleaseAllowed,
+      "quality_regressed_with_visible_gain",
+      "visible rows increased but global quality percentages regressed",
+      { visible_count_before: beforeVisible, visible_count_after: afterVisible }
+    );
+  }
+  if (failureCodes.length === 1 && failureCodes[0] === "meili_postgres_delta_nonzero") {
+    addNoReleaseReason(
+      noReleaseAllowed,
+      "meili_delta_nonzero_only_failure",
+      "guard failed only because Meili/Postgres delta is nonzero"
+    );
+  }
+  if (recoverySuccess && hasGlobalQualityRegression && !failureCodes.includes("new_accepted_no_geo_no_remote")) {
+    addNoReleaseReason(
+      noReleaseAllowed,
+      "clean_source_writes_global_quality_regressed",
+      "source writes are clean but global quality regressed"
+    );
+  }
+  if (!recoverySuccess && noImprovementBlockerOnly) {
+    addNoReleaseReason(
+      noReleaseAllowed,
+      "no_improvement_blocker_only",
+      "no release allowed because the source recovery report is blocker-only and records no production row gain"
+    );
+  }
+
   return {
     ok: failures.length === 0,
+    success: recoverySuccess,
+    release_allowed: failures.length === 0 && recoverySuccess,
+    no_release_allowed: noReleaseAllowed,
     generated_at: new Date().toISOString(),
     visible_count_before: beforeVisible,
     visible_count_after: afterVisible,
+    global_missing_any_geo_pct_before: beforeGlobalMissingAnyGeoPct,
+    global_missing_any_geo_pct_after: afterGlobalMissingAnyGeoPct,
+    global_weak_unknown_remote_pct_before: beforeGlobalWeakRemotePct,
+    global_weak_unknown_remote_pct_after: afterGlobalWeakRemotePct,
     failures,
     warnings,
     source_recovery_report_schema: SOURCE_RECOVERY_REPORT_SCHEMA,
@@ -355,7 +684,11 @@ module.exports = {
   collectSafetyViolations,
   compareSourceAccepted,
   evaluateRecoveryGuard,
+  globalMissingAnyGeoPct,
+  globalWeakUnknownRemotePct,
   parseArgs,
   sourceAcceptedMap,
+  sourceMissingAnyGeoPct,
+  sourceWeakUnknownRemotePct,
   visibleCount
 };
