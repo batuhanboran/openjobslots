@@ -5,7 +5,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 ## Current Version
 
 - Package/public release line: `v1.8.0`.
-- Last recorded deployed commit: `f93147a` on `main`.
+- Last recorded deployed commit: `46e2f3e` on `codex/production-baseline-audit`.
 - Last recorded production deployment date: May 13, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
@@ -194,8 +194,29 @@ Zoho recovery was applied on May 13, 2026 after a fresh production baseline and 
 - Successful Zoho tenants include `ubuntuimpact` (`89` accepted), `restore-talent` (`71`), `careerbridge` (`35`), `metasource` (`28`), `amc-travaux` (`25`), `kn-it` (`18`), `umanrecrutement` (`16`), and `yinternational` (`16`).
 - Remaining Zoho quarantine evidence is `no_geo_no_remote` (`65`), `ambiguous_location` (`57`), and `source_disabled_by_threshold` (`37`).
 
-Applitrack and Zoho are no longer quarantine-only. They are recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
-The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. Use the `49,277` post-Zoho visible count as the latest recovery floor.
+RecruitCRM recovery was applied on May 13, 2026 after a fresh production backup and source-specific public API inspection.
+
+- Deployed recovery code commits: `c4e815b` and `46e2f3e`.
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-recruitcrm-recovery-20260513-113654.dump`.
+- Report prefix: `/root/OpenJobSlots/reports/recruitcrm-recovery-20260513-112731-*`.
+- Source recovery report: `/root/OpenJobSlots/reports/recruitcrm-recovery-20260513-112731-source-recovery-report.json`.
+- Visible postings for the whole observed run: `49,277 -> 49,919`.
+- RecruitCRM write-window visible postings after the deployment auto-sync interruption: `49,310 -> 49,832`.
+- RecruitCRM accepted public rows: `0 -> 522`.
+- Public row gain: `522`.
+- RecruitCRM source state: `canary_only`.
+- RecruitCRM candidate tenants/source hosts: `26`; dry-run fetched all `26`, parsed `1,400`, accepted `908`, quarantined `491`, and rejected `1` without writing.
+- Canary plus bounded apply wrote `522` accepted public rows and `478` quarantine rows; bounded apply stopped at `max_updates_reached`.
+- New RecruitCRM `no_geo_no_remote` public rows: `0`.
+- RecruitCRM missing all normalized geo: `0 -> 45`; those rows have explicit remote evidence.
+- RecruitCRM weak/unknown remote rows: `0 -> 10`; those rows have useful geo evidence.
+- Meili/Postgres delta after bounded writes and final check: `0`.
+- `ats:recovery:guard` passed with `0` failures.
+- Successful RecruitCRM tenants include `somewhere` (`308` accepted), `rcrm` (`53`), `Talentbank_1_jobs` (`45`), `TLNT_Group_jobs` (`29`), `talentsource` (`25`), `jobsnvisa` (`24`), and `Ensitech_Careers` (`17`).
+- Remaining RecruitCRM failure evidence is `no_structured_location` (`457`), `no_geo_no_remote` (`20`), `ambiguous_location` (`1`), and `missing_title` (`1`).
+
+Applitrack, Zoho, and RecruitCRM are no longer quarantine-only. They are recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
+The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the first Applitrack app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. During RecruitCRM recovery, Compose again started the worker despite the intended source-only scope; ingestion run `13` was cancelled after `63` posting upserts, and ingestion run `14` completed with `146` posting upserts across non-RecruitCRM sources. No rows were deleted or hidden, but those out-of-scope automatic source writes did occur. Use the `49,919` final visible count as the latest recovery floor.
 
 ## Post-v1.8.0 Recovery Strategy
 
