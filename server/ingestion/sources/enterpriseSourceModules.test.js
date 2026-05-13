@@ -23,6 +23,10 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function readText(filePath) {
+  return fs.readFileSync(filePath, "utf8");
+}
+
 for (const atsKey of ENTERPRISE_SOURCES) {
   test(`${atsKey} enterprise source module parses fixture with strict evidence`, () => {
     const source = getSourceModule(atsKey);
@@ -131,4 +135,39 @@ test("icims source module follows wrapper iframe and enriches from public detail
   assert.equal(normalized.posting_date, fixture.expected.posting_date);
   const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
   assert.equal(gate.status, "accepted");
+});
+
+test("taleo source module parses AJAX fallback fixture and rejects unsupported shapes", () => {
+  const source = getSourceModule("taleo");
+  const sourceDir = path.join(__dirname, "taleo");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const ajaxText = readText(path.join(sourceDir, "fixtures", "ajax-list.txt"));
+  const unsupported = readJson(path.join(sourceDir, "fixtures", "unsupported-shapes.json"));
+
+  const raw = {
+    ajaxText,
+    __sourceConfig: {
+      baseSectionUrl: "https://fixture.taleo.net/careersection/001",
+      lang: "en"
+    }
+  };
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const remote = byId.get("TALEO-7001");
+  assert.equal(remote.country, "Canada");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const hybrid = byId.get("TALEO-7002");
+  assert.equal(hybrid.country, "United Kingdom");
+  assert.equal(hybrid.city, "London");
+  assert.equal(hybrid.remote_type, "hybrid");
+  assert.equal(source.validatePublic(hybrid).status, "accepted");
+
+  for (const item of unsupported.cases) {
+    assert.equal(source.parse(item.payload, company).length, item.expected_count, item.name);
+  }
 });

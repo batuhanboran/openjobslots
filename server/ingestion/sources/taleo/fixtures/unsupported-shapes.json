@@ -1,0 +1,22 @@
+{
+  "ats_key": "taleo",
+  "description": "Unsupported Taleo tenant/list shapes that must not produce public rows.",
+  "cases": [
+    {
+      "name": "empty REST response",
+      "payload": {
+        "requisitionList": []
+      },
+      "expected_count": 0,
+      "reason": "portal_search_empty"
+    },
+    {
+      "name": "HTML page without REST portal bootstrap",
+      "payload": {
+        "html": "<html><body><h1>No jobs available</h1></body></html>"
+      },
+      "expected_count": 0,
+      "reason": "unsupported_tenant_shape"
+    }
+  ]
+}

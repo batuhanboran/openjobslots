@@ -2,6 +2,7 @@ const {
   collectPostingsForCompany,
   buildApplitrackDetailUrl,
   extractApplitrackDetailFields,
+  extractTaleoPostingsFromAjax,
   extractTaleoPostingsFromRest,
   parseApplitrackPostings,
   parseApplyToJobPostingsFromHtml,
@@ -37,7 +38,7 @@ const {
   parseZohoPostingsFromHtml
 } = require("../../index");
 const { validateNormalizedPostingContract } = require("../parserContract");
-const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
+const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../posting");
 
 const DEFAULT_PARSER_CONFIDENCE = 0.75;
@@ -651,6 +652,129 @@ async function fetchApplitrackSourceList(company = {}, target = {}, options = {}
   };
 }
 
+function isTaleoAmbiguousLocation(value) {
+  const normalized = clean(value).toLowerCase().replace(/\s+/g, " ");
+  if (!normalized) return false;
+  return /^(multiple locations?|various locations?|all locations?|tbd|to be determined|unknown|n\/a|na)$/i.test(normalized);
+}
+
+function taleoHasExplicitWorkMode(posting = {}, normalized = {}) {
+  const remoteType = clean(normalized.remote_type || posting.remote_type).toLowerCase();
+  if (!["remote", "hybrid", "onsite"].includes(remoteType)) return false;
+
+  const sourceText = [
+    posting.remote_type,
+    posting.workplace_type,
+    posting.workplaceType,
+    posting.work_type,
+    posting.workType,
+    posting.location,
+    posting.location_text,
+    posting?.source_evidence?.remote_source,
+    posting?.source_evidence?.location_source
+  ].map((value) => clean(value)).filter(Boolean).join(" ");
+
+  if (!sourceText) return false;
+  if (remoteType === "remote") return /\b(remote|fully remote|work from home|wfh|virtual|telework|telecommute)\b/i.test(sourceText);
+  if (remoteType === "hybrid") return /\bhybrid\b/i.test(sourceText);
+  return /\b(on[-\s]?site|onsite|office based|in office|work from office)\b/i.test(sourceText);
+}
+
+function taleoSourceFailureReasons(posting = {}, normalized = {}) {
+  const target = normalized && Object.keys(normalized).length > 0 ? normalized : posting;
+  const reasons = [];
+  const location = clean(target.location_text || target.location || posting.location_text || posting.location);
+  const usefulGeo = hasUsefulGeoEvidence(target);
+  const explicitWorkMode = taleoHasExplicitWorkMode(posting, target);
+
+  if (isTaleoAmbiguousLocation(location) && !explicitWorkMode) reasons.push("ambiguous_location");
+  if (!usefulGeo && !explicitWorkMode) {
+    reasons.push("no_structured_location");
+    reasons.push("no_explicit_remote_evidence");
+  }
+
+  return Array.from(new Set(reasons));
+}
+
+function parseTaleoSourcePayload(companyName, config, payload) {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const ajaxText = typeof payload.ajaxText === "string"
+      ? payload.ajaxText
+      : typeof payload.ajax_text === "string"
+        ? payload.ajax_text
+        : "";
+    if (ajaxText) return extractTaleoPostingsFromAjax(companyName, config, ajaxText);
+  }
+  return extractTaleoPostingsFromRest(
+    companyName,
+    config,
+    Array.isArray(payload) ? payload : payload?.requisitionList || []
+  );
+}
+
+function classifyTaleoFetchError(error) {
+  const message = String(error?.message || error || "");
+  const statusMatch = message.match(/\b([1-5][0-9]{2})\b/);
+  const status = statusMatch ? Number(statusMatch[1]) : 0;
+  if (status) return classifyPublicRouteStatus(status, "unsupported_tenant_shape");
+  if (/portal|csrf|token/i.test(message)) return "unsupported_tenant_shape";
+  if (/timed? out|rate|blocked|forbidden/i.test(message)) return "blocked_or_rate_limited";
+  return "unsupported_tenant_shape";
+}
+
+async function fetchTaleoSourceList(company = {}, target = {}, options = {}) {
+  const context = buildCompanyContext(company);
+  const discovered = target && target.list_url ? target : SOURCE_SPECS.taleo.discover(context);
+  const config = discovered?.config || {};
+  const listUrl = clean(discovered?.list_url || context.url_string);
+  const companyName = normalizeCompanyName(context, hostSlug(listUrl) || "Taleo");
+  let parsed = [];
+
+  if (typeof options.fetcher === "function") {
+    const payload = await options.fetcher(listUrl, discovered);
+    parsed = parseTaleoSourcePayload(companyName, config, payload);
+  } else {
+    try {
+      parsed = await collectPostingsForCompany({
+        ...context,
+        ATS_name: "taleo"
+      });
+    } catch (error) {
+      error.ingestionErrorType = error.ingestionErrorType || classifyTaleoFetchError(error);
+      throw error;
+    }
+  }
+
+  const enriched = (Array.isArray(parsed) ? parsed : []).map((posting) => ({
+    ...posting,
+    source_requires_normalized_geo_or_remote: true,
+    source_evidence: {
+      ...(posting.source_evidence || {}),
+      list_url: listUrl,
+      route_kind: "taleo_careersection_rest_or_ajax",
+      location_source: clean(posting.location || posting.location_text) ? "taleo_requisition_column" : "",
+      remote_source: clean(posting.remote_type || posting.workplace_type || posting.workplaceType) ? "taleo_requisition_column" : "",
+      posting_date_source: clean(posting.posting_date) ? "taleo_requisition_column" : ""
+    },
+    source_failure_reasons: taleoSourceFailureReasons(posting)
+  }));
+
+  if (enriched.length === 0) {
+    throw makeSourceFetchError("portal_search_empty", "Taleo public careersection returned no parseable jobs", {
+      url: listUrl
+    });
+  }
+
+  return {
+    __legacyParsed: enriched,
+    __sourceConfig: {
+      ...config,
+      list_url: listUrl,
+      route_kind: "taleo_careersection_rest_or_ajax"
+    }
+  };
+}
+
 const SOURCE_SPECS = Object.freeze({
   greenhouse: {
     sourceFamily: "direct_json",
@@ -863,9 +987,9 @@ const SOURCE_SPECS = Object.freeze({
   taleo: {
     sourceFamily: "brittle",
     confidence: 0.35,
-    parser: (companyName, config, payload) =>
-      extractTaleoPostingsFromRest(companyName, config, Array.isArray(payload) ? payload : payload?.requisitionList || []),
+    parser: parseTaleoSourcePayload,
     officialDocs: "observed Taleo careersection REST/AJAX public endpoints",
+    fetchList: fetchTaleoSourceList,
     discover(company) {
       const url = clean(company.url_string);
       const parsed = asUrl(url);
@@ -875,6 +999,19 @@ const SOURCE_SPECS = Object.freeze({
         config: { baseSectionUrl, lang },
         listUrl: url
       };
+    },
+    postNormalize(normalized, posting) {
+      const usefulGeo = hasUsefulGeoEvidence(normalized);
+      const explicitWorkMode = taleoHasExplicitWorkMode(posting, normalized);
+      const patch = {};
+      if (!usefulGeo && !explicitWorkMode) {
+        patch.remote_type = "unknown";
+        patch.is_remote = false;
+      }
+      const finalPosting = { ...normalized, ...patch };
+      const reasons = taleoSourceFailureReasons(posting, finalPosting);
+      patch.source_failure_reasons = reasons;
+      return patch;
     }
   },
   oracle: {
