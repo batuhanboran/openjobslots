@@ -5,8 +5,8 @@ This is the short current-state document for future Codex runs. Detailed runbook
 ## Current Version
 
 - Package/public release line: `v1.8.0`.
-- Last recorded deployed commit: current `v1.8.0` release commit on `main`.
-- Last recorded production deployment date: May 12, 2026.
+- Last recorded deployed commit: `f93147a` on `main`.
+- Last recorded production deployment date: May 13, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 
@@ -123,7 +123,25 @@ Recruitee recovery was applied on May 12, 2026 after a fresh production baseline
 - `ats:recovery:guard` passed with `0` failures.
 
 Recruitee is no longer quarantine-only. It is recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
-The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks.
+Applitrack recovery was applied on May 13, 2026 after a fresh production baseline and backup.
+
+- Deployed recovery code commit: `f93147a`.
+- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-applitrack-recovery-20260513-070709.dump`.
+- Baseline reports: `/root/OpenJobSlots/reports/applitrack-recovery-baseline-20260513-064311-*` and `/root/OpenJobSlots/reports/applitrack-recovery-before-write-20260513-070641-*`.
+- Dry-run/canary/apply reports: `/root/OpenJobSlots/reports/applitrack-recovery-postdeploy-dry-run-20260513-070339.json`, `/root/OpenJobSlots/reports/applitrack-recovery-canary-apply-20260513-070858.json`, and `/root/OpenJobSlots/reports/applitrack-recovery-bounded-apply-20260513-071028.json`.
+- After/guard reports: `/root/OpenJobSlots/reports/applitrack-recovery-after-apply-20260513-071241-*`, `/root/OpenJobSlots/reports/applitrack-recovery-meili-check-20260513-071259.json`, and `/root/OpenJobSlots/reports/applitrack-recovery-final3-20260513-071850-guard.json`.
+- Visible postings for the Applitrack write window: `48,091 -> 48,176`.
+- Applitrack accepted public rows: `0 -> 85`.
+- Applitrack source state: `canary_only`.
+- Applitrack configured targets: `1,323`; manual bounded apply considered `25`, fetched `5`, parsed `172`, wrote `85` accepted public rows, and wrote `15` quarantine rows.
+- New Applitrack `no_geo_no_remote` public rows: `0`.
+- Applitrack missing all normalized geo: `0 -> 0`.
+- Applitrack weak/unknown remote rows: `0 -> 85`; accepted rows have normalized city evidence, so missing-all-geo plus weak/unknown remote stayed `0`.
+- Meili/Postgres delta after bounded writes: `0`.
+- `ats:recovery:guard` passed with `0` failures.
+
+Applitrack is no longer quarantine-only. It is recovered to canary-only public writes, while old quarantine cache rows remain for historical diagnostics.
+The worker is currently stopped to prevent further out-of-scope automatic source processing; app, Postgres, and Meili remained healthy in the final checks. During the app deploy/recreate, Compose briefly started the worker before it was stopped; the resulting stale ingestion run was marked `cancelled` after the worker container was stopped. Use the `48,091` pre-write baseline as the Applitrack recovery floor.
 
 ## Post-v1.8.0 Recovery Strategy
 
