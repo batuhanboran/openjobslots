@@ -239,6 +239,7 @@ Taleo recovery ran on May 13, 2026 after a fresh production backup and source-sp
 - Meili/Postgres delta after bounded outbox check: `-1`; the bounded Taleo outbox processor selected `0` pending Taleo upserts.
 - `ats:recovery:guard` did not pass; its only failure was `meili_postgres_delta_nonzero` with delta `-1`.
 - Supported Taleo shapes now include REST career-section payloads and AJAX/list text payloads where stable job identity plus structured/labeled location evidence are present.
+- Successful Taleo tenants were `wvu` (`110` accepted public rows across `staff` and `wvumtemps`) and `zionsbancorp` (`1` accepted public row).
 - Unsupported/quarantined Taleo evidence is `zionsbancorp` `no_structured_location` (`11`), `zionsbancorp` `unsupported_tenant_shape` (`19`), `xoriant` `portal_search_empty` (`1`), and `xl` `portal_search_empty` (`1`).
 
 The worker remains stopped, app/Postgres/Meili were healthy in the Taleo final checks, and the production auto-deploy timer is stopped/inactive. No non-Taleo source apply ran during the Taleo prompt. Use `50,241` as the latest observed visible-count floor, but reconcile the `-1` Meili/Postgres derived-index delta before the next larger apply wave.
