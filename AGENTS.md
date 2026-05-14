@@ -4,11 +4,16 @@ These are the canonical operating notes for Codex and human operators working in
 
 ## Read First
 
-1. `AGENTS.md` - operator rules, safety constraints, branch/test/deploy expectations.
-2. `README.md` - project overview, local setup, architecture summary.
+For routine Codex runs, start from only the current operating context needed for the task:
+
+1. `handoff.md` - latest handoff and source recovery status.
+2. `AGENTS.md` - operator rules, safety constraints, branch/test/deploy expectations.
 3. `docs/PROJECT_STATE.md` - current version, deployment status, endpoints, known risks, next tasks.
-4. `docs/reference/` - detailed runbooks and certification records relevant to the task.
-5. `docs/archive/` - historical plans and notes. Read only when tracing why a decision was made.
+4. The relevant source module for the requested work.
+5. The relevant tests for the requested work.
+6. The relevant latest production report when the task depends on live state.
+
+Load `README.md` or `docs/reference/` only when the task needs architecture, deployment, runbook, ATS matrix, certification, quality, or search details. Do not use archived or obsolete docs as current production state.
 
 ## Product Context
 
@@ -32,6 +37,15 @@ These are the canonical operating notes for Codex and human operators working in
 - Retention rules: `docs/reference/data-retention.md`.
 - QA and Playwright/API testing: `docs/reference/QA_RUNBOOK.md`.
 - End-user docs site content: `docs-site/`.
+- Obsolete historical notes: `docs/archive-obsolete/`. Do not read these for current state.
+
+## Codex Context Hygiene
+
+Keep Codex context focused on current source and state. Do not read dependency trees, generated artifacts, runtime data, stale reports, or obsolete docs unless the user explicitly asks for that path or the task is to clean those artifacts.
+
+Noisy paths are listed in `.codexignore` and include `node_modules/`, `docs-site/node_modules/`, `docs-site/.docusaurus/`, `docs-site/build/`, `.tmp/`, `reports/`, `backups/`, `test-results/`, `playwright-report/`, `coverage/`, `build/`, `dist/`, `.expo/`, `.cache/`, runtime database files, dumps, and `docs/archive-obsolete/`.
+
+Current production state lives in `handoff.md`, `docs/PROJECT_STATE.md`, and the latest relevant production report. If local `reports/` content is stale or noisy, regenerate the requested report or read the explicitly named latest live report instead of scanning the whole tree. Historical docs may explain old decisions, but they must not override current handoff or project state.
 
 ## Branch, Commit, And Deploy Rules
 

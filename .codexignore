@@ -1,0 +1,33 @@
+# Dependency trees
+node_modules/
+docs-site/node_modules/
+
+# Generated docs-site output
+docs-site/.docusaurus/
+docs-site/build/
+
+# Generated reports, backups, and test output
+.tmp/
+reports/
+backups/
+test-results/
+playwright-report/
+coverage/
+
+# Build and cache artifacts
+build/
+dist/
+.expo/
+.cache/
+*.cache
+
+# Runtime databases and dumps
+jobs.db
+*.db
+*.db-shm
+*.db-wal
+*.dump
+*.sql.gz
+
+# Historical docs that are not current operating state
+docs/archive-obsolete/
