@@ -16,6 +16,10 @@ test("source runner apply requires explicit production safety flags", () => {
   const companyLimitAlias = parseArgs(["--source=icims", "--company-limit=7"]);
   assert.equal(companyLimitAlias.limit, 7);
 
+  const offsetRun = parseArgs(["--source=hrmdirect", "--limit=1500", "--offset=1000"]);
+  assert.equal(offsetRun.limit, 1000);
+  assert.equal(offsetRun.offset, 1000);
+
   const missingMax = parseArgs(["--source=greenhouse", "--apply", "--confirm-production"]);
   const missingMaxGate = getSafetyGate(missingMax);
   assert.equal(missingMaxGate.authorized, false);

@@ -13,6 +13,7 @@ const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
 const DEFAULT_HOST_CONCURRENCY = 1;
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_RUN_LIMIT = 1000;
+const MAX_RUN_OFFSET = 1_000_000;
 const MAX_CONCURRENCY = 4;
 
 function nowEpochSeconds() {
@@ -50,6 +51,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     source: String(env.OPENJOBSLOTS_ATS_SOURCE || "").trim().toLowerCase(),
     limit: asInt(env.OPENJOBSLOTS_ATS_SOURCE_LIMIT, DEFAULT_SOURCE_RUN_LIMIT, 1, MAX_RUN_LIMIT),
     batchSize: asInt(env.OPENJOBSLOTS_ATS_SOURCE_BATCH_SIZE, DEFAULT_BATCH_SIZE, 1, 1000),
+    offset: asInt(env.OPENJOBSLOTS_ATS_SOURCE_OFFSET, 0, 0, MAX_RUN_OFFSET),
     concurrency: asInt(env.OPENJOBSLOTS_ATS_SOURCE_CONCURRENCY, 1, 1, MAX_CONCURRENCY),
     hostConcurrency: asInt(env.OPENJOBSLOTS_ATS_SOURCE_HOST_CONCURRENCY, DEFAULT_HOST_CONCURRENCY, 1, MAX_CONCURRENCY),
     statementTimeoutMs: asInt(
@@ -75,6 +77,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     else if (arg.startsWith("--source=")) options.source = String(arg.slice("--source=".length)).trim().toLowerCase();
     else if (arg.startsWith("--limit=")) options.limit = asInt(arg.slice("--limit=".length), options.limit, 1, MAX_RUN_LIMIT);
     else if (arg.startsWith("--company-limit=")) options.limit = asInt(arg.slice("--company-limit=".length), options.limit, 1, MAX_RUN_LIMIT);
+    else if (arg.startsWith("--offset=")) options.offset = asInt(arg.slice("--offset=".length), options.offset, 0, MAX_RUN_OFFSET);
     else if (arg.startsWith("--batch-size=")) options.batchSize = asInt(arg.slice("--batch-size=".length), options.batchSize, 1, 1000);
     else if (arg.startsWith("--concurrency=")) options.concurrency = asInt(arg.slice("--concurrency=".length), options.concurrency, 1, MAX_CONCURRENCY);
     else if (arg.startsWith("--host-concurrency=")) options.hostConcurrency = asInt(arg.slice("--host-concurrency=".length), options.hostConcurrency, 1, MAX_CONCURRENCY);
@@ -133,9 +136,13 @@ async function discoverSourceTargets(pool, options = {}) {
       WHERE c.ats_key = $1
         ${enabledFilter}
       ORDER BY c.updated_at DESC, c.id ASC
-      LIMIT $2;
+      LIMIT $2 OFFSET $3;
     `,
-    [source, Math.max(1, Number(options.limit || DEFAULT_SOURCE_RUN_LIMIT))]
+    [
+      source,
+      Math.max(1, Number(options.limit || DEFAULT_SOURCE_RUN_LIMIT)),
+      Math.max(0, Number(options.offset || 0))
+    ]
   );
   return result.rows.map((row) => {
     const company = {
@@ -401,6 +408,72 @@ function extractHttpStatus(error) {
   return Number.isFinite(parsed) && parsed >= 100 && parsed <= 599 ? parsed : null;
 }
 
+function evaluateSourceCandidate(target, item, options = {}) {
+  const nowEpoch = Number(options.nowEpoch || nowEpochSeconds());
+  let normalized = {
+    ...target.adapter.normalize(item, target.company, { nowEpoch }),
+    ats_key: target.atsKey
+  };
+  const adapterValidation = target.adapter.validate(normalized);
+  const gate = evaluatePublicPosting(
+    {
+      ...normalized,
+      parser_version: target.adapter.parserVersion,
+      parser_confidence: Number(normalized?.confidence || normalized?.parser_confidence || 0.5)
+    },
+    { parserVersion: target.adapter.parserVersion }
+  );
+  const quarantineOnly = target.sourcePolicy?.source_quality_state === SOURCE_QUALITY_STATES.QUARANTINE_ONLY;
+  let validation = adapterValidation?.ok ? validationFromGate(gate) : adapterValidation;
+  let status = adapterValidation?.ok ? gate.status : "rejected";
+  if (adapterValidation?.ok && gate.status === "accepted" && quarantineOnly) {
+    status = "quarantined";
+    validation = {
+      ok: false,
+      status: "quarantined",
+      error: "source_disabled_by_threshold",
+      reason_codes: ["source_disabled_by_threshold"],
+      evidence: gate.evidence,
+      retry_detail_refetch_eligible: false
+    };
+  }
+  const sourceFailureReasons = postingSourceFailureReasons(normalized);
+  if (normalized?.source_requires_normalized_geo_or_remote === true) {
+    const hasNormalizedGeo = Boolean(clean(normalized.country) || clean(normalized.region) || clean(normalized.city));
+    const hasExplicitRemote = ["remote", "hybrid", "onsite"].includes(clean(normalized.remote_type).toLowerCase());
+    if (!hasNormalizedGeo && !hasExplicitRemote) sourceFailureReasons.push("no_normalized_geo_or_explicit_remote");
+  }
+  if (adapterValidation?.ok && status === "accepted" && sourceFailureReasons.length > 0) {
+    status = "quarantined";
+    validation = {
+      ok: false,
+      status: "quarantined",
+      error: sourceFailureReasons[0],
+      reason_codes: Array.from(new Set(sourceFailureReasons)),
+      evidence: gate.evidence,
+      retry_detail_refetch_eligible: false
+    };
+  }
+  if (adapterValidation?.ok && status === "quarantined" && sourceFailureReasons.length > 0) {
+    validation = {
+      ...validation,
+      error: sourceFailureReasons[0],
+      reason_codes: Array.from(new Set([
+        ...sourceFailureReasons,
+        ...(Array.isArray(validation?.reason_codes) ? validation.reason_codes : [])
+      ]))
+    };
+  }
+  return {
+    normalized,
+    adapterValidation,
+    gate,
+    validation,
+    status,
+    sourceFailureReasons
+  };
+}
+
 async function processTarget(pool, target, options, summary, runId) {
   const started = Date.now();
   const nowEpoch = nowEpochSeconds();
@@ -436,68 +509,16 @@ async function processTarget(pool, target, options, summary, runId) {
   const accepted = [];
   const safetyGate = getSafetyGate(options);
   for (const item of Array.isArray(parsed) ? parsed : []) {
-    let normalized;
+    let evaluated;
     try {
-      normalized = {
-        ...target.adapter.normalize(item, target.company, { nowEpoch }),
-        ats_key: target.atsKey
-      };
+      evaluated = evaluateSourceCandidate(target, item, { nowEpoch });
     } catch (error) {
       summary.rejected_count += 1;
       incrementCounter(summary.parser_failure_reasons, "parser_normalize");
       await recordSourceRunError(pool, runId, target, error, { errorType: "parser_normalize" });
       continue;
     }
-    const adapterValidation = target.adapter.validate(normalized);
-    const gate = evaluatePublicPosting(
-      {
-        ...normalized,
-        parser_version: target.adapter.parserVersion,
-        parser_confidence: Number(normalized?.confidence || normalized?.parser_confidence || 0.5)
-      },
-      { parserVersion: target.adapter.parserVersion }
-    );
-    const quarantineOnly = target.sourcePolicy?.source_quality_state === SOURCE_QUALITY_STATES.QUARANTINE_ONLY;
-    let validation = adapterValidation?.ok ? validationFromGate(gate) : adapterValidation;
-    let status = adapterValidation?.ok ? gate.status : "rejected";
-    if (adapterValidation?.ok && gate.status === "accepted" && quarantineOnly) {
-      status = "quarantined";
-      validation = {
-        ok: false,
-        status: "quarantined",
-        error: "source_disabled_by_threshold",
-        reason_codes: ["source_disabled_by_threshold"],
-        evidence: gate.evidence,
-        retry_detail_refetch_eligible: false
-      };
-    }
-    const sourceFailureReasons = postingSourceFailureReasons(normalized);
-    if (normalized?.source_requires_normalized_geo_or_remote === true) {
-      const hasNormalizedGeo = Boolean(clean(normalized.country) || clean(normalized.region) || clean(normalized.city));
-      const hasExplicitRemote = ["remote", "hybrid", "onsite"].includes(clean(normalized.remote_type).toLowerCase());
-      if (!hasNormalizedGeo && !hasExplicitRemote) sourceFailureReasons.push("no_normalized_geo_or_explicit_remote");
-    }
-    if (adapterValidation?.ok && status === "accepted" && sourceFailureReasons.length > 0) {
-      status = "quarantined";
-      validation = {
-        ok: false,
-        status: "quarantined",
-        error: sourceFailureReasons[0],
-        reason_codes: Array.from(new Set(sourceFailureReasons)),
-        evidence: gate.evidence,
-        retry_detail_refetch_eligible: false
-      };
-    }
-    if (adapterValidation?.ok && status === "quarantined" && sourceFailureReasons.length > 0) {
-      validation = {
-        ...validation,
-        error: sourceFailureReasons[0],
-        reason_codes: Array.from(new Set([
-          ...sourceFailureReasons,
-          ...(Array.isArray(validation?.reason_codes) ? validation.reason_codes : [])
-        ]))
-      };
-    }
+    const { normalized, gate, validation, status } = evaluated;
     if (status === "accepted") {
       summary.accepted_count += 1;
       accepted.push(normalized);
@@ -664,7 +685,9 @@ const sourceRunnerInterface = Object.freeze({
 
 module.exports = {
   DEFAULT_HOST_CONCURRENCY,
+  MAX_RUN_LIMIT,
   DEFAULT_SOURCE_RUN_LIMIT,
+  evaluateSourceCandidate,
   getSafetyGate,
   parseArgs,
   runSourceJob,

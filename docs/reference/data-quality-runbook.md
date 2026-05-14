@@ -99,6 +99,30 @@ The audit derives counts from actual stored row fields instead of trusting `qual
 
 Each count also has a matching percentage field ending in `_pct`. Grouped output is available under `by_source` and `by_parser`.
 
+## Net-New ATS Public Row Estimator
+
+Before any ATS recovery canary/apply or 5k target selection, estimate actual net-new public row gain:
+
+```powershell
+npm.cmd run ats:estimate-net-new -- --source=lever --limit=250 --company-limit=250 --json
+```
+
+The estimator is read-only. It uses the same source-runner fetch, parse, normalize, validate, and public-posting gate path as `ats:source:dry-run`, then compares accepted candidates against Postgres by canonical URL, normalized canonical URL, apply URL, source job id, and `source_ats + source_job_id`.
+
+Use these fields for recovery selection:
+
+- `net_new_clean_public_candidates`
+- `expected_public_row_gain`
+- `duplicate_count`
+- `existing_public_update_candidates`
+- `stale_or_hidden_reactivation_candidates`
+- `inventory.cannot_prove_remaining_inventory`
+- `inventory.runner_limit_cap_unproven_inventory`
+
+Do not use raw `rows_parsed`, raw dry-run `accepted_count`, or total clean candidates as public-row gain. Lever and HRMDirect proved why this matters: a source can parse many clean rows while most already exist in production.
+
+If the report shows remaining unscanned targets, use `--offset=<n>` to scan the next source-runner window where supported. A capped single-window report with `runner_limit_cap_unproven_inventory=true` is not enough evidence for a 5k apply.
+
 ## Geo/Remote Backfill Planner
 
 Use the dry-run planner to estimate normalized geo, remote, and quality flag repairs that can be made from stored evidence only:
