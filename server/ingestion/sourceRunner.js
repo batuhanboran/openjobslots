@@ -6,6 +6,11 @@ const { getAdapterForCompany } = require("./adapters");
 const { hashPayload } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
 const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
+const {
+  FAILURE_REASONS,
+  decideDetailEscalation,
+  summarizeEvidence
+} = require("./parserEvidence");
 const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
 
 const DEFAULT_SOURCE_RUN_LIMIT = 25;
@@ -396,7 +401,8 @@ function buildInitialSummary(options) {
     average_latency_ms: 0,
     stop_reason: "",
     errors: [],
-    samples: []
+    samples: [],
+    candidate_reports: []
   };
 }
 
@@ -406,6 +412,124 @@ function extractHttpStatus(error) {
   const match = String(error?.message || error || "").match(/\b([1-5][0-9]{2})\b/);
   const parsed = match ? Number(match[1]) : 0;
   return Number.isFinite(parsed) && parsed >= 100 && parsed <= 599 ? parsed : null;
+}
+
+function publicGateDecision(gate = {}) {
+  return {
+    status: gate.status || "unknown",
+    public: Boolean(gate.public),
+    ok: Boolean(gate.ok),
+    reason: clean(gate.reason || "", 300),
+    reason_codes: Array.isArray(gate.reason_codes) ? gate.reason_codes : [],
+    retry_detail_refetch_eligible: Boolean(gate.retry_detail_refetch_eligible),
+    confidence: Number(gate.confidence || 0)
+  };
+}
+
+function nonAcceptedNetNewClassification(status, validation = {}) {
+  const reasonCodes = Array.isArray(validation?.reason_codes) ? validation.reason_codes : [];
+  const reason = clean(validation?.error || validation?.reason || reasonCodes.join(", "));
+  if (reasonCodes.includes("no_geo_no_remote") || reason === "no_geo_no_remote") return "no_geo_no_remote";
+  if (reasonCodes.includes("ambiguous_location") || reason === "ambiguous_location") return "ambiguous_location";
+  if (status === "rejected") return "rejected_candidate";
+  return "quarantine_candidate";
+}
+
+function buildCandidateReport(target, normalized, status, gate, validation, detailEscalation) {
+  const reasonCodes = Array.from(new Set([
+    ...(Array.isArray(validation?.reason_codes) ? validation.reason_codes : []),
+    ...(Array.isArray(detailEscalation?.failure_reasons) ? detailEscalation.failure_reasons : [])
+  ].map((reason) => clean(reason, 120)).filter(Boolean)));
+  return {
+    source_url: target.companyUrl,
+    source_host: target.host,
+    canonical_url: normalized.canonical_url || normalized.job_posting_url || "",
+    source_job_id: normalized.source_job_id || "",
+    title: normalized.position_name || normalized.title || "",
+    status,
+    reason: validation?.error || gate.reason || "",
+    reason_codes: reasonCodes,
+    public_gate_decision: publicGateDecision(gate),
+    detail_escalation_decision: detailEscalation,
+    evidence_summary: summarizeEvidence(normalized.evidence || gate.evidence || {}),
+    net_new_classification: status === "accepted"
+      ? "not_evaluated"
+      : nonAcceptedNetNewClassification(status, validation)
+  };
+}
+
+function appendFailureReason(report, reason) {
+  const normalized = clean(reason, 120);
+  if (!normalized) return;
+  report.failure_reasons = Array.from(new Set([
+    ...(Array.isArray(report.failure_reasons) ? report.failure_reasons : []),
+    normalized
+  ]));
+}
+
+async function annotateNetNewCandidateReports(pool, target, reports = []) {
+  const acceptedReports = reports.filter((report) => report.status === "accepted");
+  if (acceptedReports.length === 0) return;
+  const sourceJobIds = Array.from(new Set(acceptedReports.map((report) => clean(report.source_job_id, 500)).filter(Boolean)));
+  const urls = Array.from(new Set(acceptedReports.flatMap((report) => [
+    clean(report.canonical_url, 2000)
+  ]).filter(Boolean)));
+  if (sourceJobIds.length === 0 && urls.length === 0) {
+    for (const report of acceptedReports) report.net_new_classification = "net_new_clean_public_candidate";
+    return;
+  }
+  const result = await pool.query(
+    `
+      SELECT canonical_url, apply_url, ats_key, source_job_id, hidden
+      FROM postings
+      WHERE (ats_key = $1 AND $2::text[] <> '{}'::text[] AND source_job_id = ANY($2::text[]))
+         OR ($3::text[] <> '{}'::text[] AND (canonical_url = ANY($3::text[]) OR apply_url = ANY($3::text[])));
+    `,
+    [target.atsKey, sourceJobIds, urls]
+  );
+  const bySameSourceJobId = new Map();
+  const byUrl = new Map();
+  for (const row of result.rows || []) {
+    const sourceJobId = clean(row.source_job_id, 500);
+    if (clean(row.ats_key).toLowerCase() === clean(target.atsKey).toLowerCase() && sourceJobId) {
+      if (!bySameSourceJobId.has(sourceJobId)) bySameSourceJobId.set(sourceJobId, []);
+      bySameSourceJobId.get(sourceJobId).push(row);
+    }
+    for (const url of [row.canonical_url, row.apply_url].map((value) => clean(value, 2000)).filter(Boolean)) {
+      if (!byUrl.has(url)) byUrl.set(url, []);
+      byUrl.get(url).push(row);
+    }
+  }
+  const seenSourceJobIds = new Set();
+  const seenUrls = new Set();
+  for (const report of acceptedReports) {
+    const sourceJobId = clean(report.source_job_id, 500);
+    const url = clean(report.canonical_url, 2000);
+    if ((sourceJobId && seenSourceJobIds.has(sourceJobId)) || (url && seenUrls.has(url))) {
+      report.net_new_classification = "already_indexable_duplicate";
+      appendFailureReason(report, FAILURE_REASONS.CANDIDATE_CLEAN_BUT_EXISTING);
+      continue;
+    }
+    if (sourceJobId) seenSourceJobIds.add(sourceJobId);
+    if (url) seenUrls.add(url);
+    const sourceMatches = sourceJobId ? bySameSourceJobId.get(sourceJobId) || [] : [];
+    const urlMatches = url ? byUrl.get(url) || [] : [];
+    const hiddenMatch = [...sourceMatches, ...urlMatches].some((row) => row.hidden === true || row.hidden === "true");
+    if (hiddenMatch) {
+      report.net_new_classification = "stale_or_hidden_reactivation_candidate";
+      appendFailureReason(report, FAILURE_REASONS.CANDIDATE_CLEAN_BUT_EXISTING);
+    } else if (sourceMatches.length > 0) {
+      report.net_new_classification = "already_public_same_source_job_id";
+      appendFailureReason(report, FAILURE_REASONS.DUPLICATE_EXISTING_SOURCE_JOB_ID);
+      appendFailureReason(report, FAILURE_REASONS.CANDIDATE_CLEAN_BUT_EXISTING);
+    } else if (urlMatches.length > 0) {
+      report.net_new_classification = "already_public_same_canonical_url";
+      appendFailureReason(report, FAILURE_REASONS.DUPLICATE_EXISTING_PUBLIC);
+      appendFailureReason(report, FAILURE_REASONS.CANDIDATE_CLEAN_BUT_EXISTING);
+    } else {
+      report.net_new_classification = "net_new_clean_public_candidate";
+    }
+  }
 }
 
 function evaluateSourceCandidate(target, item, options = {}) {
@@ -464,13 +588,18 @@ function evaluateSourceCandidate(target, item, options = {}) {
       ]))
     };
   }
+  const detailEscalation = normalized.detail_escalation_decision || decideDetailEscalation(normalized, {
+    sourceFamily: normalized.source_family || target.adapter.metadata?.sourceFamily || "",
+    detailSupported: typeof target.adapter.fetchDetail === "function"
+  });
   return {
     normalized,
     adapterValidation,
     gate,
     validation,
     status,
-    sourceFailureReasons
+    sourceFailureReasons,
+    detailEscalation
   };
 }
 
@@ -507,6 +636,7 @@ async function processTarget(pool, target, options, summary, runId) {
   }
 
   const accepted = [];
+  const targetCandidateReports = [];
   const safetyGate = getSafetyGate(options);
   for (const item of Array.isArray(parsed) ? parsed : []) {
     let evaluated;
@@ -518,7 +648,9 @@ async function processTarget(pool, target, options, summary, runId) {
       await recordSourceRunError(pool, runId, target, error, { errorType: "parser_normalize" });
       continue;
     }
-    const { normalized, gate, validation, status } = evaluated;
+    const { normalized, gate, validation, status, detailEscalation } = evaluated;
+    const candidateReport = buildCandidateReport(target, normalized, status, gate, validation, detailEscalation);
+    targetCandidateReports.push(candidateReport);
     if (status === "accepted") {
       summary.accepted_count += 1;
       accepted.push(normalized);
@@ -540,7 +672,11 @@ async function processTarget(pool, target, options, summary, runId) {
         canonical_url: normalized.canonical_url || normalized.job_posting_url || "",
         title: normalized.position_name || normalized.title || "",
         status,
-        reason: validation?.error || gate.reason || ""
+        reason: validation?.error || gate.reason || "",
+        public_gate_decision: candidateReport.public_gate_decision,
+        detail_escalation_decision: candidateReport.detail_escalation_decision,
+        evidence_summary: candidateReport.evidence_summary,
+        net_new_classification: candidateReport.net_new_classification
       });
     }
 
@@ -563,6 +699,26 @@ async function processTarget(pool, target, options, summary, runId) {
       summary.quarantine_write_count += 1;
     }
   }
+
+  if (!safetyGate.authorized && targetCandidateReports.length > 0) {
+    try {
+      await annotateNetNewCandidateReports(pool, target, targetCandidateReports);
+      const classificationByUrl = new Map(targetCandidateReports.map((report) => [report.canonical_url, report.net_new_classification]));
+      for (const sample of summary.samples) {
+        if (classificationByUrl.has(sample.canonical_url)) {
+          sample.net_new_classification = classificationByUrl.get(sample.canonical_url);
+        }
+      }
+    } catch (error) {
+      for (const report of targetCandidateReports) {
+        if (report.status === "accepted") report.net_new_classification = "net_new_estimator_unavailable";
+      }
+      incrementCounter(summary.parser_failure_reasons, "net_new_estimator_unavailable");
+      summary.errors.push({ source_url: target.companyUrl, error: clean(error?.message || error, 240) });
+    }
+  }
+  summary.candidate_reports.push(...targetCandidateReports);
+  summary.candidate_report_count = summary.candidate_reports.length;
 
   if (safetyGate.authorized && accepted.length > 0) {
     const remaining = Math.max(0, Number(options.maxUpdates || 0) - summary.public_write_count - summary.quarantine_write_count);

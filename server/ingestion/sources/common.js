@@ -39,6 +39,7 @@ const {
 } = require("../../index");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");
+const { decideDetailEscalation } = require("../parserEvidence");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../posting");
 
 const DEFAULT_PARSER_CONFIDENCE = 0.75;
@@ -1365,11 +1366,20 @@ function createSourceModule(atsKey) {
     normalized.canonical_url = canonicalizePostingUrl(normalized.canonical_url || normalized.job_posting_url);
     normalized.job_posting_url = normalized.canonical_url;
     normalized.apply_url = canonicalizePostingUrl(normalized.apply_url || normalized.canonical_url);
-    normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion });
+    normalized.source_family = spec.sourceFamily || (key === "zoho" ? "embedded_json" : "direct_json");
+    normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion, sourceFamily: normalized.source_family });
+    normalized.detail_escalation_decision = decideDetailEscalation(normalized, {
+      sourceFamily: normalized.source_family,
+      detailSupported: typeof spec.fetchDetail === "function" || ["enterprise_api", "html_detail", "public_sector", "brittle"].includes(normalized.source_family)
+    });
     if (typeof spec.postNormalize === "function") {
       const patch = spec.postNormalize(normalized, posting, company, options) || {};
       Object.assign(normalized, patch);
-      normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion });
+      normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion, sourceFamily: normalized.source_family });
+      normalized.detail_escalation_decision = decideDetailEscalation(normalized, {
+        sourceFamily: normalized.source_family,
+        detailSupported: typeof spec.fetchDetail === "function" || ["enterprise_api", "html_detail", "public_sector", "brittle"].includes(normalized.source_family)
+      });
     }
     return normalized;
   }

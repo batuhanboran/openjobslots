@@ -1,3 +1,5 @@
+const { buildFieldEvidenceMetadata } = require("./parserEvidence");
+
 function asString(value) {
   return String(value ?? "").trim();
 }
@@ -172,54 +174,12 @@ function hasExplicitRemoteEvidence(posting = {}) {
 }
 
 function buildEvidenceMetadata(posting = {}, options = {}) {
-  const locationText = getLocationText(posting);
-  const remoteType = normalizeRemoteType(posting.remote_type);
-  const confidence = Math.max(0, Math.min(1, getConfidence(posting)));
-  const qualityScore = getQualityScore(posting, confidence);
-  const sourceJobId = asString(
-    posting.source_job_id ||
-    posting.source_derived_id ||
-    posting.stable_source_id ||
-    posting.job_id ||
-    posting.id
-  );
-  const parserVersion = asString(options.parserVersion || getParserVersion(posting));
-  return {
-    title: createEvidence(getTitle(posting), "normalized_title"),
-    company: createEvidence(getCompany(posting), "normalized_company"),
-    canonical_url: createEvidence(getCanonicalUrl(posting), "canonical_url"),
-    source_job_id: createEvidence(sourceJobId, "source_payload"),
-    location_text: createEvidence(locationText, "source_location_text", {
-      ambiguous: locationLooksAmbiguous(locationText, posting)
-    }),
-    country: createEvidence(posting.country, "normalized_country"),
-    region: createEvidence(posting.region || posting.state, "normalized_region"),
-    city: createEvidence(posting.city, "normalized_city"),
-    remote_type: createEvidence(remoteType === "unknown" ? "" : remoteType, "normalized_remote_type", {
-      normalized: remoteType,
-      explicit: hasExplicitRemoteEvidence({ ...posting, remote_type: remoteType })
-    }),
-    posting_date: createEvidence(posting.posted_at || posting.posting_date || posting.posted_at_epoch || posting.posting_date_epoch, "source_posting_date"),
-    parser_key: createEvidence(getParserKey(posting), "parser"),
-    parser_version: createEvidence(parserVersion, "parser"),
-    confidence: {
-      present: true,
-      value: confidence,
-      source: "parser_confidence"
-    },
-    confidence_score: {
-      present: true,
-      value: confidence,
-      source: "parser_confidence"
-    },
-    quality_score: {
-      present: true,
-      value: qualityScore,
-      source: Number.isFinite(asNumber(posting.quality_score ?? posting.qualityScore, NaN))
-        ? "stored_quality_score"
-        : "confidence_fallback"
-    }
-  };
+  return buildFieldEvidenceMetadata(posting, {
+    parserVersion: asString(options.parserVersion || getParserVersion(posting)),
+    sourceFamily: options.sourceFamily || posting.source_family,
+    confidence: Math.max(0, Math.min(1, getConfidence(posting))),
+    qualityScore: getQualityScore(posting, getConfidence(posting))
+  });
 }
 
 function evaluatePublicPosting(posting = {}, options = {}) {

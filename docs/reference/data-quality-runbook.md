@@ -123,6 +123,23 @@ Do not use raw `rows_parsed`, raw dry-run `accepted_count`, or total clean candi
 
 If the report shows remaining unscanned targets, use `--offset=<n>` to scan the next source-runner window where supported. A capped single-window report with `runner_limit_cap_unproven_inventory=true` is not enough evidence for a 5k apply.
 
+## Parser Field Evidence And Detail Escalation
+
+Parser dry-runs expose per-candidate parser mechanics so operators can see why a row was accepted, quarantined, rejected, or classified as duplicate:
+
+- `public_gate_decision`: accepted/quarantined/rejected status, reason codes, retry detail eligibility, and gate confidence.
+- `detail_escalation_decision`: whether list evidence needs detail for geo, remote, or date; whether detail is supported, blocked, unavailable, or not needed.
+- `evidence_summary`: field-level evidence source, path/selector/key, confidence, and rule name for title, company, canonical URL, source job id, location, normalized geo, remote type, and posting date.
+- `net_new_classification`: read-only duplicate/net-new classification when source-runner can compare dry-run candidates with Postgres.
+
+Field evidence must use source-specific provenance:
+
+- `list_api`, `detail_api`, `embedded_json`, `json_ld`, and `labeled_html` are acceptable evidence for geo/remote/date when source-specific and deterministic.
+- `url` and `title` evidence can explain canonical/source id/title behavior but must not set country, city, or remote type alone.
+- `generic_body_text` can only explain rejection/quarantine; it must not make a row public by inventing geo or remote state.
+
+Expected detail escalation failure reasons include `list_missing_location`, `list_missing_remote`, `detail_required_but_unavailable`, `detail_no_structured_location`, `detail_no_explicit_remote`, `unsupported_tenant_shape`, `duplicate_existing_public`, `duplicate_existing_source_job_id`, and `candidate_clean_but_existing`.
+
 ## Geo/Remote Backfill Planner
 
 Use the dry-run planner to estimate normalized geo, remote, and quality flag repairs that can be made from stored evidence only:
