@@ -99,9 +99,33 @@ The audit derives counts from actual stored row fields instead of trusting `qual
 
 Each count also has a matching percentage field ending in `_pct`. Grouped output is available under `by_source` and `by_parser`.
 
-## Net-New ATS Public Row Estimator
+## ATS Inventory Scanner And Net-New Estimator
 
-Before any ATS recovery canary/apply or 5k target selection, estimate actual net-new public row gain:
+Before any ATS recovery canary/apply or 5k target selection, scan source inventory and estimate actual net-new public row gain:
+
+```powershell
+npm.cmd run ats:inventory:scan -- --source=hrmdirect --company-limit=1500 --row-limit=20000 --json --output=C:\tmp\hrmdirect-inventory.json
+```
+
+The inventory scanner is read-only. It pages source targets beyond the source-runner 1,000 target cap, writes an optional checkpoint, resumes by offset, and uses the same source-runner fetch/parse/normalize/public-gate path as the estimator. Use it when a 5k selection depends on target coverage.
+
+Key fields:
+
+- `configured_targets`
+- `scanned_targets`
+- `unscanned_targets`
+- `successful_targets`
+- `failed_targets`
+- `rows_parsed`
+- `clean_candidates`
+- `net_new_clean_candidates`
+- `duplicate_existing_public_rows`
+- `candidate_pool_exhausted`
+- `estimate_confidence`
+
+If `candidate_pool_exhausted=false`, the report is not proof of full inventory. Do not use it for a 5k apply unless the scanned subset already proves at least 5,000 net-new clean public candidates.
+
+For bounded spot checks, run:
 
 ```powershell
 npm.cmd run ats:estimate-net-new -- --source=lever --limit=250 --company-limit=250 --json
@@ -121,7 +145,7 @@ Use these fields for recovery selection:
 
 Do not use raw `rows_parsed`, raw dry-run `accepted_count`, or total clean candidates as public-row gain. Lever and HRMDirect proved why this matters: a source can parse many clean rows while most already exist in production.
 
-If the report shows remaining unscanned targets, use `--offset=<n>` to scan the next source-runner window where supported. A capped single-window report with `runner_limit_cap_unproven_inventory=true` is not enough evidence for a 5k apply.
+If an estimator report shows remaining unscanned targets, switch to `ats:inventory:scan` so offset/resume windows are aggregated into one coverage report. A capped single-window report with `runner_limit_cap_unproven_inventory=true` is not enough evidence for a 5k apply.
 
 ## Parser Field Evidence And Detail Escalation
 

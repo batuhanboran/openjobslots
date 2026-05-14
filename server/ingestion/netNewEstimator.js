@@ -567,9 +567,15 @@ async function runNetNewEstimate(options = {}, env = process.env) {
     if (!options.pool) {
       lock = await acquireHeavyJobLock(pool, `ats-estimate-net-new-${source}`);
     }
+    const configuredTargetsPromise = options.configuredTargets !== undefined
+      ? Promise.resolve(Number(options.configuredTargets || 0))
+      : countConfiguredTargets(pool, source, options);
+    const targetsPromise = Array.isArray(options.targets)
+      ? Promise.resolve(options.targets)
+      : discoverSourceTargets(pool, { ...options, source });
     const [configuredTargets, targets] = await Promise.all([
-      countConfiguredTargets(pool, source, options),
-      discoverSourceTargets(pool, { ...options, source })
+      configuredTargetsPromise,
+      targetsPromise
     ]);
     const inventory = summarizeInventory({
       configuredTargets,
@@ -651,6 +657,7 @@ module.exports = {
   candidateQualityRisk,
   classifyCandidateAgainstExisting,
   classifyNonAccepted,
+  countConfiguredTargets,
   createEmptyClassificationCounts,
   finalizeReport,
   markCandidateSeen,
