@@ -25,6 +25,11 @@ const {
   makeQualitySummary
 } = require("./ingestion/dataQualityAudit");
 const {
+  createEmptyGrowthSummary,
+  getPostgresGrowthSummary,
+  normalizeHours: normalizeGrowthHours
+} = require("./ingestion/growthSummary");
+const {
   createPostgresPool,
   ensurePostgresSchema,
   seedPostgresAtsSources
@@ -16895,12 +16900,13 @@ function createServer() {
   app.get("/ingestion/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts, heavyJob, sourceQuality, sourceRuns] = await Promise.all([
+        const [status, parserAttentionByAts, heavyJob, sourceQuality, sourceRuns, growth24h] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
           getPostgresParserAttentionByAts(postgresPool),
           getHeavyJobLockStatus(postgresPool),
           getPostgresSourceQualityDashboard(postgresPool, 25),
-          getPostgresSourceRunStatus(postgresPool, 10)
+          getPostgresSourceRunStatus(postgresPool, 10),
+          getPostgresGrowthSummary(postgresPool, { hours: 24 })
         ]);
         return sanitizeFrontendValue({
           ok: true,
@@ -16914,7 +16920,8 @@ function createServer() {
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
             parser_attention_by_ats: parserAttentionByAts,
             source_quality: sourceQuality,
-            source_jobs: sourceRuns
+            source_jobs: sourceRuns,
+            growth_24h: growth24h
           }
         });
       }
@@ -16932,8 +16939,28 @@ function createServer() {
           search_reindex: readMeiliReindexStatus(),
           queue_backend: QUEUE_BACKEND,
           write_pressure: getWritePressure(status),
-          parser_attention_by_ats: parserAttentionByAts
+          parser_attention_by_ats: parserAttentionByAts,
+          growth_24h: createEmptyGrowthSummary({ hours: 24 })
         }
+      });
+    });
+  });
+
+  app.get("/ingestion/growth-summary", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const hours = normalizeGrowthHours(req.query.hours || 24);
+      const report = DB_BACKEND === "postgres"
+        ? await getPostgresGrowthSummary(postgresPool, { hours })
+        : {
+            ...createEmptyGrowthSummary({ hours }),
+            skipped: true,
+            reason: "growth summary requires the Postgres production source of truth"
+          };
+      return sanitizeFrontendValue({
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        ...report
       });
     });
   });

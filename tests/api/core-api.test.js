@@ -15,7 +15,8 @@ test.describe("openjobslots API compatibility", () => {
       { path: "/search/suggest", params: { search: "tur", limit: "5" } },
       { path: "/ingestion/quality/summary" },
       { path: "/ingestion/rejections" },
-      { path: "/ingestion/parser-stats" }
+      { path: "/ingestion/parser-stats" },
+      { path: "/ingestion/growth-summary", params: { hours: "24" } }
     ];
 
     for (const check of publicChecks) {
@@ -45,7 +46,16 @@ test.describe("openjobslots API compatibility", () => {
 
     const ingestionStatus = await request.get(`${apiBaseUrl}/ingestion/status`);
     expect(ingestionStatus.ok()).toBeTruthy();
-    expect(await ingestionStatus.json()).toEqual(expect.objectContaining({ ok: true, item: expect.any(Object) }));
+    expect(await ingestionStatus.json()).toEqual(expect.objectContaining({
+      ok: true,
+      item: expect.objectContaining({
+        growth_24h: expect.objectContaining({
+          new_visible_rows_24h: expect.any(Number),
+          new_clean_rows_24h: expect.any(Number),
+          new_rows_by_ats_24h: expect.any(Array)
+        })
+      })
+    }));
   });
 
   test("postings and filters support Turkish/Turkiye search terms", async ({ request }) => {
