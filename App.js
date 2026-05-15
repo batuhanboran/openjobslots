@@ -3190,7 +3190,7 @@ export default function App() {
     Animated.timing(searchMotionRef.current, {
       toValue: searchShellCompact ? 1 : 0,
       duration: prefersReducedMotionRef.current ? 0 : 300,
-      useNativeDriver: true
+      useNativeDriver: Platform.OS !== "web"
     }).start();
   }, [searchShellCompact]);
 
@@ -3198,7 +3198,7 @@ export default function App() {
     Animated.timing(suggestionsMotionRef.current, {
       toValue: suggestionsVisible ? 1 : 0,
       duration: prefersReducedMotionRef.current ? 0 : 180,
-      useNativeDriver: true
+      useNativeDriver: Platform.OS !== "web"
     }).start();
   }, [suggestionsVisible]);
 
@@ -3206,7 +3206,7 @@ export default function App() {
     Animated.timing(resultsMotionRef.current, {
       toValue: showResultsSurface ? 1 : 0,
       duration: prefersReducedMotionRef.current ? 0 : 320,
-      useNativeDriver: true
+      useNativeDriver: Platform.OS !== "web"
     }).start();
   }, [showResultsSurface]);
 
@@ -3628,7 +3628,7 @@ export default function App() {
         testID="search-shell"
       >
         {isDesktopViewport && searchUiMode !== "results" ? (
-          <View pointerEvents="box-none" style={styles.searchMetaRail}>
+          <View pointerEvents={Platform.OS === "web" ? undefined : "box-none"} style={styles.searchMetaRail}>
             <Pressable
               onPress={() => setReleaseNotesOpen(true)}
               style={({ pressed }) => [styles.publicVersionButton, pressed ? styles.publicVersionButtonPressed : null]}
@@ -4386,9 +4386,9 @@ export default function App() {
         }}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBackdrop} pointerEvents="none" />
+          <View style={styles.modalBackdrop} pointerEvents={Platform.OS === "web" ? undefined : "none"} />
           <View style={styles.modalCard}>
-            <View style={styles.modalCloseRow} pointerEvents="box-none">
+            <View style={styles.modalCloseRow} pointerEvents={Platform.OS === "web" ? undefined : "box-none"}>
               <Pressable
                 onPress={() => {
                   if (migrationRunning) return;
@@ -5071,7 +5071,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 12
+    gap: 12,
+    ...(Platform.OS === "web" ? { pointerEvents: "box-none" } : {})
   },
   publicVersionButton: {
     flexShrink: 1,
@@ -5476,19 +5477,21 @@ const styles = StyleSheet.create({
     height: 58,
     fontSize: 16,
     color: OJS_COLORS.ink,
-    shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 6 },
     ...(Platform.OS === "web"
       ? {
+          boxShadow: "0 6px 20px rgba(38, 51, 45, 0.10)",
           outlineColor: OJS_COLORS.focus,
           outlineOffset: 2,
           transitionProperty: "border-color, box-shadow, transform",
           transitionDuration: "180ms",
           transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
-      : {})
+      : {
+          shadowColor: OJS_COLORS.shadow,
+          shadowOpacity: 0.1,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 6 }
+        })
   },
   searchCompact: {
     height: 48,
@@ -5508,17 +5511,19 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: OJS_COLORS.surface,
     paddingVertical: 6,
-    shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
     ...(Platform.OS === "web"
       ? {
+          boxShadow: "0 5px 14px rgba(38, 51, 45, 0.10)",
           transitionProperty: "opacity, transform, margin, max-height",
           transitionDuration: "180ms",
           transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
-      : {})
+      : {
+          shadowColor: OJS_COLORS.shadow,
+          shadowOpacity: 0.1,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 5 }
+        })
   },
   searchSuggestionItem: {
     minHeight: 44,
@@ -5561,10 +5566,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "row",
-    shadowColor: OJS_COLORS.blue,
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 }
+    ...(Platform.OS === "web"
+      ? { boxShadow: "0 3px 8px rgba(38, 51, 45, 0.14)" }
+      : {
+          shadowColor: OJS_COLORS.blue,
+          shadowOpacity: 0.14,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 3 }
+        })
   },
   syncBtnRunning: {
     backgroundColor: OJS_COLORS.red
@@ -5787,12 +5796,16 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.green,
     borderWidth: 1,
     borderColor: OJS_COLORS.focus,
-    shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
     elevation: 8,
-    zIndex: 40
+    zIndex: 40,
+    ...(Platform.OS === "web"
+      ? { boxShadow: "0 10px 20px rgba(38, 51, 45, 0.18)" }
+      : {
+          shadowColor: OJS_COLORS.shadow,
+          shadowOpacity: 0.18,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 10 }
+        })
   },
   scrollTopButtonDesktop: {
     right: 28,
@@ -6235,10 +6248,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: OJS_COLORS.surface,
     padding: 22,
-    shadowColor: OJS_COLORS.shadow,
-    shadowOpacity: 0.14,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 18 }
+    ...(Platform.OS === "web"
+      ? { boxShadow: "0 18px 30px rgba(38, 51, 45, 0.14)" }
+      : {
+          shadowColor: OJS_COLORS.shadow,
+          shadowOpacity: 0.14,
+          shadowRadius: 30,
+          shadowOffset: { width: 0, height: 18 }
+        })
   },
   releaseNotesHeader: {
     flexDirection: "row",
@@ -6323,7 +6340,8 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 0
+    zIndex: 0,
+    ...(Platform.OS === "web" ? { pointerEvents: "none" } : {})
   },
   modalCard: {
     position: "relative",
@@ -6345,7 +6363,8 @@ const styles = StyleSheet.create({
     zIndex: 60,
     elevation: 16,
     alignItems: "flex-end",
-    marginBottom: 4
+    marginBottom: 4,
+    ...(Platform.OS === "web" ? { pointerEvents: "box-none" } : {})
   },
   modalHeaderRow: {
     position: "relative",
