@@ -122,3 +122,44 @@ test("applitrack source module enriches Output.asp rows from deterministic detai
   assert.ok(byId["7003"].source_failure_reasons.includes(fixture.expected["7003"].reason));
   assert.equal(evaluatePublicPosting(byId["7003"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
+
+test("applytojob source module enriches list rows from JSON-LD and labeled detail pages", async () => {
+  const source = getSourceModule("applytojob");
+  const sourceDir = path.join(__dirname, "applytojob");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      const value = String(url || "");
+      if (value.endsWith("/apply")) return { html: fixture.list_html, status: 200, url: value };
+      const parsed = new URL(value);
+      const jobId = parsed.pathname.split("/").filter(Boolean)[1];
+      if (fixture.details[jobId]) return { html: fixture.details[jobId], status: 200, url: value };
+      return { html: "", status: 404, url: value };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 4);
+  const normalized = parsed.map((posting) => source.normalize(posting, fixture.company));
+  const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId["ATJ2001"].country, fixture.expected["ATJ2001"].country);
+  assert.equal(byId["ATJ2001"].city, fixture.expected["ATJ2001"].city);
+  assert.equal(byId["ATJ2001"].posting_date, fixture.expected["ATJ2001"].posting_date);
+  assert.equal(byId["ATJ2001"].source_evidence.location_source, fixture.expected["ATJ2001"].location_source);
+  assert.equal(evaluatePublicPosting(byId["ATJ2001"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(byId["ATJ2002"].remote_type, fixture.expected["ATJ2002"].remote_type);
+  assert.equal(byId["ATJ2002"].posting_date, fixture.expected["ATJ2002"].posting_date);
+  assert.equal(byId["ATJ2002"].source_evidence.remote_source, fixture.expected["ATJ2002"].remote_source);
+  assert.equal(evaluatePublicPosting(byId["ATJ2002"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(byId["ATJ2003"].country, fixture.expected["ATJ2003"].country);
+  assert.equal(byId["ATJ2003"].city, fixture.expected["ATJ2003"].city);
+  assert.equal(byId["ATJ2003"].remote_type, fixture.expected["ATJ2003"].remote_type);
+  assert.equal(byId["ATJ2003"].source_evidence.remote_source, fixture.expected["ATJ2003"].remote_source);
+  assert.equal(evaluatePublicPosting(byId["ATJ2003"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.ok(byId["ATJ2004"].source_failure_reasons.includes(fixture.expected["ATJ2004"].reason));
+  assert.equal(evaluatePublicPosting(byId["ATJ2004"], { parserVersion: source.parserVersion }).status, "quarantined");
+});

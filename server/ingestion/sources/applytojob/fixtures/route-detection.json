@@ -1,0 +1,36 @@
+{
+  "company": {
+    "company_name": "Fixture ApplyToJob",
+    "ATS_name": "applytojob",
+    "url_string": "https://fixture.applytojob.com/apply"
+  },
+  "list_html": "<ul><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/ATJ2001/Facilities-Engineer\">Facilities Engineer</a></h3><span>Department: Operations</span></li><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/ATJ2002/Remote-Support\">Remote Support</a></h3><span>Posted: 2026-05-10</span></li><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/ATJ2003/Hybrid-Analyst\">Hybrid Analyst</a></h3><span>Location: Chicago, IL</span></li><li class=\"list-group-item\"><h3 class=\"list-group-item-heading\"><a href=\"/apply/ATJ2004/Unsupported-Role\">Unsupported Role</a></h3></li></ul>",
+  "details": {
+    "ATJ2001": "<html><head><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Facilities Engineer\",\"datePosted\":\"2026-04-20\",\"employmentType\":\"FULL_TIME\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"McLean\",\"addressRegion\":\"VA\",\"addressCountry\":\"US\"}}}</script></head><body><h1>Facilities Engineer</h1></body></html>",
+    "ATJ2002": "<html><body><dl><dt>Location</dt><dd>Remote</dd><dt>Work Type</dt><dd>Remote</dd><dt>Posting Date</dt><dd>2026-05-10</dd></dl></body></html>",
+    "ATJ2003": "<html><body><div><strong>Location:</strong><span>Chicago, IL</span></div><div><strong>Work Type:</strong><span>Hybrid</span></div><div><strong>Date Posted:</strong><span>2026-05-11</span></div></body></html>",
+    "ATJ2004": "<html><body><h1>Unsupported Role</h1><p>Marketing copy without labeled location or remote evidence.</p></body></html>"
+  },
+  "expected": {
+    "ATJ2001": {
+      "country": "United States",
+      "city": "McLean",
+      "posting_date": "2026-04-20",
+      "location_source": "json_ld"
+    },
+    "ATJ2002": {
+      "remote_type": "remote",
+      "posting_date": "2026-05-10",
+      "remote_source": "labeled_html"
+    },
+    "ATJ2003": {
+      "country": "United States",
+      "city": "Chicago",
+      "remote_type": "hybrid",
+      "remote_source": "labeled_html"
+    },
+    "ATJ2004": {
+      "reason": "no_structured_location"
+    }
+  }
+}

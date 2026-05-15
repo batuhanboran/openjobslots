@@ -781,6 +781,90 @@ async function fetchTaleoSourceList(company = {}, target = {}, options = {}) {
   };
 }
 
+function applyToJobDetailKey(urlValue) {
+  try {
+    const parsed = new URL(clean(urlValue));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+async function fetchApplyToJobSourceList(company = {}, target = {}, options = {}) {
+  const context = buildCompanyContext(company);
+  const discovered = target && target.list_url ? target : SOURCE_SPECS.applytojob.discover(context);
+  const listUrl = clean(discovered?.list_url || context.url_string);
+  if (!listUrl) {
+    throw makeSourceFetchError("no_public_jobs_route", "ApplyToJob source has no public list route", {
+      url: context.url_string
+    });
+  }
+
+  const list = await fetchText(listUrl, {
+    ...options,
+    target: discovered,
+    sourceLabel: "ApplyToJob"
+  });
+  const config = {
+    ...(discovered.config || {}),
+    list_url: list.finalUrl || listUrl
+  };
+  const companyName = normalizeCompanyName(context, hostSlug(listUrl) || "ApplyToJob");
+  const parsed = parseApplyToJobPostingsFromHtml(companyName, config, {
+    html: list.text,
+    __listUrl: list.finalUrl || listUrl
+  });
+
+  if (parsed.length === 0) {
+    throw makeSourceFetchError("portal_search_empty", "ApplyToJob public list returned no parseable postings", {
+      url: listUrl
+    });
+  }
+
+  const detailLimit = Math.max(0, Math.min(50, Number(process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY || 5)));
+  let detailFetches = 0;
+  const detailHtmlByUrl = {};
+  const detailStatusByUrl = {};
+  const detailFailureByUrl = {};
+
+  for (const posting of parsed) {
+    if (detailFetches >= detailLimit) break;
+    const detailUrl = clean(posting.job_posting_url);
+    if (!detailUrl) continue;
+    try {
+      const detail = await fetchText(detailUrl, {
+        ...options,
+        target: discovered,
+        sourceLabel: "ApplyToJob"
+      });
+      detailFetches += 1;
+      const key = applyToJobDetailKey(detailUrl);
+      detailHtmlByUrl[detailUrl] = detail.text;
+      detailHtmlByUrl[key] = detail.text;
+      detailStatusByUrl[detailUrl] = detail.status;
+      detailStatusByUrl[key] = detail.status;
+    } catch (error) {
+      detailFetches += 1;
+      const key = applyToJobDetailKey(detailUrl);
+      detailFailureByUrl[detailUrl] = classifyPublicRouteStatus(Number(error?.status || 0), "unsupported_html_shape");
+      detailFailureByUrl[key] = detailFailureByUrl[detailUrl];
+    }
+  }
+
+  return {
+    html: list.text,
+    __listUrl: list.finalUrl || listUrl,
+    __detailHtmlByUrl: detailHtmlByUrl,
+    __detailStatusByUrl: detailStatusByUrl,
+    __detailFailureByUrl: detailFailureByUrl,
+    __sourceConfig: {
+      ...config,
+      detail_fetch_count: detailFetches
+    }
+  };
+}
+
 const SOURCE_SPECS = Object.freeze({
   greenhouse: {
     sourceFamily: "direct_json",
@@ -1278,7 +1362,8 @@ const SOURCE_SPECS = Object.freeze({
   applytojob: {
     sourceFamily: "html_detail",
     confidence: 0.75,
-    parser: (companyName, config, payload) => parseApplyToJobPostingsFromHtml(companyName, config, payload?.html || payload),
+    parser: (companyName, config, payload) => parseApplyToJobPostingsFromHtml(companyName, config, payload),
+    fetchList: fetchApplyToJobSourceList,
     officialDocs: "observed ApplyToJob public list HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);
