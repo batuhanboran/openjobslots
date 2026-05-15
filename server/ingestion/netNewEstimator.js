@@ -660,6 +660,7 @@ module.exports = {
   countConfiguredTargets,
   createEmptyClassificationCounts,
   finalizeReport,
+  getExistingRowsForCandidates,
   markCandidateSeen,
   parseEstimatorArgs,
   runNetNewEstimate,
