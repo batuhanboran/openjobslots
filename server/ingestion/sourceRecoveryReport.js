@@ -38,7 +38,11 @@ const SOURCE_RECOVERY_REPORT_SCHEMA = Object.freeze({
     weak_remote_after: "Rows for the source with weak/unknown remote after recovery.",
     no_improvement_reasons: "Tenant/source/error grouped reasons when no production improvement is possible.",
     no_improvement_blocker_only: "Explicit marker that no production writes occurred and the report is blocker-only.",
-    newly_accepted_row_evidence: "Row-by-row evidence for newly accepted rows, used for explicit remote/hybrid or useful geo exceptions."
+    newly_accepted_row_evidence: "Row-by-row evidence for newly accepted rows, used for explicit remote/hybrid or useful geo exceptions.",
+    planned_tenant_batch_file_path: "Path to the tenant batch plan used before canary/apply writes.",
+    predicted_guard_result: "Guard prediction from the tenant batch plan before writes.",
+    actual_guard_result: "Recovery guard result after canary/apply writes.",
+    rollback_command: "Exact rollback command for the source run if guard fails."
   }),
   optional: Object.freeze([
     "rows_newly_accepted_no_geo_no_remote",
@@ -48,6 +52,10 @@ const SOURCE_RECOVERY_REPORT_SCHEMA = Object.freeze({
     "newly_accepted_row_evidence",
     "accepted_row_evidence",
     "clean_row_evidence",
+    "planned_tenant_batch_file_path",
+    "predicted_guard_result",
+    "actual_guard_result",
+    "rollback_command",
     "generated_at",
     "run_id"
   ])
@@ -159,6 +167,9 @@ function normalizeSourceRecoveryReport(report = {}) {
   };
   for (const field of ["newly_accepted_row_evidence", "accepted_row_evidence", "clean_row_evidence"]) {
     if (Array.isArray(report[field])) normalized[field] = report[field];
+  }
+  for (const field of ["planned_tenant_batch_file_path", "predicted_guard_result", "actual_guard_result", "rollback_command"]) {
+    if (report[field] !== undefined) normalized[field] = cleanString(report[field]);
   }
   const badRows = report.bad_newly_accepted_rows || report.newly_accepted_bad_rows || [];
   normalized.rows_newly_accepted_no_geo_no_remote = Math.max(

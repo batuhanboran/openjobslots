@@ -12,6 +12,7 @@ const {
   summarizeEvidence
 } = require("./parserEvidence");
 const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
+const { recordSourceRunPostingChanges, snapshotRows } = require("./sourceRollback");
 
 const DEFAULT_SOURCE_RUN_LIMIT = 25;
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
@@ -70,7 +71,9 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     maxUpdates: asInt(env.OPENJOBSLOTS_ATS_SOURCE_MAX_UPDATES, 0, 0, 100_000),
     json: asBool(env.OPENJOBSLOTS_ATS_SOURCE_JSON),
     output: String(env.OPENJOBSLOTS_ATS_SOURCE_OUTPUT || "").trim(),
-    includeDisabled: asBool(env.OPENJOBSLOTS_ATS_SOURCE_INCLUDE_DISABLED)
+    includeDisabled: asBool(env.OPENJOBSLOTS_ATS_SOURCE_INCLUDE_DISABLED),
+    plannedBatch: String(env.OPENJOBSLOTS_ATS_SOURCE_PLANNED_BATCH || "").trim(),
+    predictedGuardResult: String(env.OPENJOBSLOTS_ATS_SOURCE_PREDICTED_GUARD_RESULT || "").trim()
   };
 
   for (const arg of argv) {
@@ -89,6 +92,8 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     else if (arg.startsWith("--statement-timeout-ms=")) options.statementTimeoutMs = asInt(arg.slice("--statement-timeout-ms=".length), options.statementTimeoutMs, 1000, 120_000);
     else if (arg.startsWith("--max-updates=")) options.maxUpdates = asInt(arg.slice("--max-updates=".length), options.maxUpdates, 0, 100_000);
     else if (arg.startsWith("--output=")) options.output = String(arg.slice("--output=".length)).trim();
+    else if (arg.startsWith("--planned-batch=")) options.plannedBatch = String(arg.slice("--planned-batch=".length)).trim();
+    else if (arg.startsWith("--predicted-guard-result=")) options.predictedGuardResult = String(arg.slice("--predicted-guard-result=".length)).trim();
   }
 
   if (options.mode === "apply") options.apply = true;
@@ -402,7 +407,10 @@ function buildInitialSummary(options) {
     stop_reason: "",
     errors: [],
     samples: [],
-    candidate_reports: []
+    candidate_reports: [],
+    planned_tenant_batch_file_path: String(options.plannedBatch || ""),
+    predicted_guard_result: String(options.predictedGuardResult || ""),
+    rollback_command: ""
   };
 }
 
@@ -724,6 +732,9 @@ async function processTarget(pool, target, options, summary, runId) {
     const remaining = Math.max(0, Number(options.maxUpdates || 0) - summary.public_write_count - summary.quarantine_write_count);
     const toWrite = accepted.slice(0, remaining);
     if (toWrite.length > 0) {
+      const canonicalUrls = toWrite.map((posting) => clean(posting.canonical_url || posting.job_posting_url, 2000)).filter(Boolean);
+      const beforePostings = runId ? await snapshotRows(pool, "postings", canonicalUrls) : new Map();
+      const beforeCache = runId ? await snapshotRows(pool, "posting_cache", canonicalUrls) : new Map();
       await upsertPostgresPostings(pool, toWrite, {
         nowEpoch,
         parserVersion: target.adapter.parserVersion
@@ -734,6 +745,22 @@ async function processTarget(pool, target, options, summary, runId) {
           parserVersion: target.adapter.parserVersion,
           sourceCompanyUrl: target.companyUrl
         });
+      }
+      if (runId) {
+        const afterPostings = await snapshotRows(pool, "postings", canonicalUrls);
+        const afterCache = await snapshotRows(pool, "posting_cache", canonicalUrls);
+        const recorded = await recordSourceRunPostingChanges(pool, {
+          runId,
+          source: target.atsKey,
+          target,
+          postings: toWrite,
+          beforePostings,
+          beforeCache,
+          afterPostings,
+          afterCache
+        });
+        summary.rollback_command = `npm run ats:source:rollback -- --run-id=${runId} --source=${target.atsKey} --confirm-production --json`;
+        summary.source_write_audit_count = Number(summary.source_write_audit_count || 0) + Number(recorded.recorded || 0);
       }
       summary.public_write_count += toWrite.length;
     }

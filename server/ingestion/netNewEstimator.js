@@ -192,6 +192,67 @@ function candidateQualityRisk(candidate = {}) {
   };
 }
 
+function tenantKeyForTarget(target = {}) {
+  const host = clean(target.host || target.companyUrl, 300).toLowerCase();
+  const company = clean(target.company?.company_name || target.company?.name || "", 300);
+  return host || company.toLowerCase() || clean(target.companyUrl || "unknown", 300).toLowerCase() || "unknown";
+}
+
+function createTenantSummary(target = {}) {
+  return {
+    tenant_key: tenantKeyForTarget(target),
+    source: normalizeAtsKey(target.atsKey || target.company?.ATS_name),
+    tenant_host: clean(target.host || "", 300),
+    company: clean(target.company?.company_name || "", 300),
+    target_url: clean(target.companyUrl || target.company?.url_string || "", 2000),
+    rows_fetched: 0,
+    rows_parsed: 0,
+    clean_candidates: 0,
+    net_new_clean_public_candidates: 0,
+    duplicate_existing_public_rows: 0,
+    existing_public_update_candidates: 0,
+    stale_or_hidden_reactivation_candidates: 0,
+    quarantine_candidates: 0,
+    rejected_candidates: 0,
+    no_geo_no_remote_count: 0,
+    missing_any_geo_count: 0,
+    weak_unknown_remote_count: 0,
+    classifications: createEmptyClassificationCounts(),
+    parser_failure_reasons: {},
+    quality_risk_of_net_new_rows: {
+      missing_country: 0,
+      missing_region: 0,
+      missing_city: 0,
+      missing_any_geo: 0,
+      missing_all_geo: 0,
+      weak_unknown_remote: 0,
+      no_geo_no_remote: 0
+    },
+    sample_urls: []
+  };
+}
+
+function ensureTenantSummary(report = {}, target = {}) {
+  if (!Array.isArray(report.tenant_summaries)) report.tenant_summaries = [];
+  if (!report._tenant_summary_map) {
+    Object.defineProperty(report, "_tenant_summary_map", {
+      value: new Map(),
+      enumerable: false,
+      configurable: true
+    });
+    for (const tenant of report.tenant_summaries) {
+      if (tenant?.tenant_key) report._tenant_summary_map.set(tenant.tenant_key, tenant);
+    }
+  }
+  const key = tenantKeyForTarget(target);
+  if (!report._tenant_summary_map.has(key)) {
+    const tenant = createTenantSummary(target);
+    report._tenant_summary_map.set(key, tenant);
+    report.tenant_summaries.push(tenant);
+  }
+  return report._tenant_summary_map.get(key);
+}
+
 function classifyNonAccepted(status, validation = {}) {
   const reasonCodes = Array.isArray(validation.reason_codes) ? validation.reason_codes.map(clean) : [];
   const reason = clean(validation.error || validation.reason || reasonCodes.join(", "));
@@ -393,7 +454,8 @@ function createBaseReport(options = {}) {
     meili_comparison: {
       skipped: true,
       reason: "optional Meili duplicate comparison was not requested; Postgres remains source of truth"
-    }
+    },
+    tenant_summaries: []
   };
 }
 
@@ -423,15 +485,19 @@ async function collectCandidates(pool, targets = [], options = {}, report = crea
   await runWithLimitedConcurrency(
     targets,
     async (target) => {
+      const tenant = ensureTenantSummary(report, target);
       let raw;
       try {
         raw = await target.adapter.fetch(target.company);
         report.rows_fetched += 1;
+        tenant.rows_fetched += 1;
       } catch (error) {
         const httpStatus = extractHttpStatus(error);
         if (httpStatus) incrementCounter(report.http_status_counts, httpStatus);
         incrementCounter(report.parser_failure_reasons, error?.ingestionErrorType || "source_fetch_failure");
         incrementCounter(report.classifications, "source_fetch_failure");
+        incrementCounter(tenant.classifications, "source_fetch_failure");
+        incrementCounter(tenant.parser_failure_reasons, error?.ingestionErrorType || "source_fetch_failure");
         report.errors.push({ source_url: target.companyUrl, error: clean(error?.message || error, 300) });
         return;
       }
@@ -442,11 +508,14 @@ async function collectCandidates(pool, targets = [], options = {}, report = crea
       } catch (error) {
         incrementCounter(report.parser_failure_reasons, "parser_failure");
         incrementCounter(report.classifications, "parser_failure");
+        incrementCounter(tenant.classifications, "parser_failure");
+        incrementCounter(tenant.parser_failure_reasons, "parser_failure");
         report.errors.push({ source_url: target.companyUrl, error: clean(error?.message || error, 300) });
         return;
       }
       const rows = Array.isArray(parsed) ? parsed : [];
       report.rows_parsed += rows.length;
+      tenant.rows_parsed += rows.length;
       for (const item of rows) {
         let evaluated;
         try {
@@ -454,6 +523,8 @@ async function collectCandidates(pool, targets = [], options = {}, report = crea
         } catch (error) {
           incrementCounter(report.parser_failure_reasons, "parser_failure");
           incrementCounter(report.classifications, "parser_failure");
+          incrementCounter(tenant.classifications, "parser_failure");
+          incrementCounter(tenant.parser_failure_reasons, "parser_failure");
           recordSample(report, target, {}, "parser_failure", error?.message || error);
           continue;
         }
@@ -461,13 +532,18 @@ async function collectCandidates(pool, targets = [], options = {}, report = crea
         if (status !== "accepted") {
           const classification = classifyNonAccepted(status, validation);
           incrementCounter(report.classifications, classification);
+          incrementCounter(tenant.classifications, classification);
           if (classification === "rejected_candidate") report.rejected_candidates += 1;
           else report.quarantine_candidates += 1;
+          if (classification === "rejected_candidate") tenant.rejected_candidates += 1;
+          else tenant.quarantine_candidates += 1;
           incrementCounter(report.parser_failure_reasons, validation?.error || classification);
+          incrementCounter(tenant.parser_failure_reasons, validation?.error || classification);
           recordSample(report, target, normalized, classification, validation?.error || classification);
           continue;
         }
         report.clean_candidates += 1;
+        tenant.clean_candidates += 1;
         acceptedCandidates.push({ target, candidate: normalized });
       }
     },
@@ -482,15 +558,22 @@ async function classifyAcceptedCandidates(pool, source, acceptedCandidates = [],
   const seen = { sourceJobKeys: new Set(), urlKeys: new Set() };
   for (const item of acceptedCandidates) {
     const candidate = item.candidate;
+    const tenant = ensureTenantSummary(report, item.target);
     const result = classifyCandidateAgainstExisting(candidate, lookup, seen);
     incrementCounter(report.classifications, result.classification);
+    incrementCounter(tenant.classifications, result.classification);
     if (result.classification === "net_new_clean_public_candidate") {
       report.net_new_clean_public_candidates += 1;
       report.expected_public_row_gain += 1;
+      tenant.net_new_clean_public_candidates += 1;
       const risk = candidateQualityRisk(candidate);
       for (const [key, value] of Object.entries(risk)) {
         if (value) report.quality_risk_of_net_new_rows[key] += 1;
+        if (value) tenant.quality_risk_of_net_new_rows[key] += 1;
       }
+      if (risk.no_geo_no_remote) tenant.no_geo_no_remote_count += 1;
+      if (risk.missing_any_geo) tenant.missing_any_geo_count += 1;
+      if (risk.weak_unknown_remote) tenant.weak_unknown_remote_count += 1;
       markCandidateSeen(candidate, seen);
     } else if ([
       "already_public_same_source_job_id",
@@ -498,11 +581,16 @@ async function classifyAcceptedCandidates(pool, source, acceptedCandidates = [],
       "already_indexable_duplicate"
     ].includes(result.classification)) {
       report.already_public_duplicates += 1;
+      tenant.duplicate_existing_public_rows += 1;
     } else if (result.classification === "existing_public_update_candidate") {
       report.existing_public_update_candidates += 1;
+      tenant.existing_public_update_candidates += 1;
     } else if (result.classification === "stale_or_hidden_reactivation_candidate") {
       report.stale_or_hidden_reactivation_candidates += 1;
+      tenant.stale_or_hidden_reactivation_candidates += 1;
     }
+    const canonical = getCanonicalUrl(candidate);
+    if (canonical && tenant.sample_urls.length < 10) tenant.sample_urls.push(canonical);
     recordSample(report, item.target, candidate, result.classification, result.reason);
   }
   return report;
@@ -658,12 +746,15 @@ module.exports = {
   classifyCandidateAgainstExisting,
   classifyNonAccepted,
   countConfiguredTargets,
+  createTenantSummary,
   createEmptyClassificationCounts,
+  ensureTenantSummary,
   finalizeReport,
   getExistingRowsForCandidates,
   markCandidateSeen,
   parseEstimatorArgs,
   runNetNewEstimate,
   summarizeInventory,
+  tenantKeyForTarget,
   writeEstimatorOutput
 };

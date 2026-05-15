@@ -394,6 +394,52 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_ats_source_run_metrics_run
       ON ats_source_run_metrics(source_run_id, metric_name);
 
+    CREATE TABLE IF NOT EXISTS ats_source_run_rollbacks (
+      id BIGSERIAL PRIMARY KEY,
+      source_run_id BIGINT REFERENCES ats_source_runs(id),
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      status TEXT NOT NULL DEFAULT 'running',
+      dry_run BOOLEAN NOT NULL DEFAULT false,
+      changes_considered INTEGER NOT NULL DEFAULT 0,
+      created_rows_deleted INTEGER NOT NULL DEFAULT 0,
+      updated_rows_restored INTEGER NOT NULL DEFAULT 0,
+      cache_rows_deleted INTEGER NOT NULL DEFAULT 0,
+      cache_rows_restored INTEGER NOT NULL DEFAULT 0,
+      outbox_deletes INTEGER NOT NULL DEFAULT 0,
+      outbox_upserts INTEGER NOT NULL DEFAULT 0,
+      errors JSONB NOT NULL DEFAULT '[]'::jsonb,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at TIMESTAMPTZ
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_rollbacks_run
+      ON ats_source_run_rollbacks(source_run_id, started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ats_source_run_posting_changes (
+      id BIGSERIAL PRIMARY KEY,
+      source_run_id BIGINT REFERENCES ats_source_runs(id),
+      ats_key TEXT NOT NULL REFERENCES ats_sources(ats_key),
+      source_host TEXT NOT NULL DEFAULT '',
+      source_url TEXT NOT NULL DEFAULT '',
+      canonical_url TEXT NOT NULL,
+      source_job_id TEXT NOT NULL DEFAULT '',
+      change_type TEXT NOT NULL,
+      before_posting JSONB,
+      after_posting JSONB,
+      before_cache JSONB,
+      after_cache JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      rolled_back_at TIMESTAMPTZ,
+      rollback_id BIGINT REFERENCES ats_source_run_rollbacks(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_posting_changes_run
+      ON ats_source_run_posting_changes(source_run_id, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_posting_changes_source
+      ON ats_source_run_posting_changes(ats_key, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_ats_source_run_posting_changes_canonical
+      ON ats_source_run_posting_changes(canonical_url);
+
     CREATE TABLE IF NOT EXISTS search_index_outbox (
       id BIGSERIAL PRIMARY KEY,
       canonical_url TEXT NOT NULL,
