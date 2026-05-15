@@ -1,0 +1,40 @@
+{
+  "company": {
+    "id": 9001,
+    "company_name": "Fixture Breezy",
+    "ATS_name": "breezy",
+    "url_string": "https://fixture.breezy.hr/"
+  },
+  "list_html": "<h2 class=\"group-header\"><i class=\"fa fa-map-marker\"></i><span>Remote</span></h2><ul class=\"positions location\"><li class=\"position transition\"><ul class=\"position-wrap\"><li class=\"position-details\"><a href=\"/p/BRZ2001-remote-support\" title=\"Apply\"><h2>Remote Support Specialist</h2><ul class=\"meta\"><li class=\"location\"><i class=\"fa fa-map-marker\"></i><span>Remote</span><br><i class=\"fa fa-wifi\"></i><span class=\"polygot\">%LABEL_POSITION_TYPE_REMOTE_ANY%</span></li><li class=\"type\"><span>%LABEL_POSITION_TYPE_FULL_TIME%</span></li></ul></a></li></ul></li></ul><h2 class=\"group-header\"><span>Product</span></h2><ul class=\"positions location\"><li class=\"position transition\"><ul class=\"position-wrap\"><li class=\"position-details\"><a href=\"/p/BRZ2002-hybrid-product-manager\" title=\"Apply\"><h2>Hybrid Product Manager</h2><ul class=\"meta\"><li class=\"location\"><i class=\"fa fa-map-marker\"></i><span>London, United Kingdom</span><br><i class=\"fa fa-wifi\"></i><span class=\"polygot\">%LABEL_POSITION_TYPE_HYBRID%</span></li><li class=\"type\"><span>%LABEL_POSITION_TYPE_FULL_TIME%</span></li></ul></a></li></ul></li></ul><ul class=\"positions location\"><li class=\"position transition\"><ul class=\"position-wrap\"><li class=\"position-details\"><a href=\"/p/BRZ2003-onsite-engineer\" title=\"Apply\"><h2>Onsite Engineer</h2><ul class=\"meta\"><li class=\"location\"><i class=\"fa fa-map-marker\"></i><span>Boston, MA</span></li><li class=\"type\"><span>%LABEL_POSITION_TYPE_FULL_TIME%</span></li></ul></a></li></ul></li></ul><ul class=\"positions location\"><li class=\"position transition\"><ul class=\"position-wrap\"><li class=\"position-details\"><a href=\"/p/BRZ2004-ambiguous-role\" title=\"Apply\"><h2>Ambiguous Role</h2><ul class=\"meta\"><li class=\"location\"><i class=\"fa fa-map-marker\"></i><span>%LABEL_MULTIPLE_LOCATIONS%</span><span> (4) </span></li><li class=\"type\"><span>%LABEL_POSITION_TYPE_FULL_TIME%</span></li></ul></a></li></ul></li></ul>",
+  "details": {
+    "BRZ2001-remote-support": "<html><head><script type=\"application/ld+json\">{\"@context\":\"https://schema.org/\",\"@type\":\"JobPosting\",\"title\":\"Remote Support Specialist\",\"datePosted\":\"2026-05-06\",\"employmentType\":\"FULL_TIME\",\"jobLocationType\":\"TELECOMMUTE\",\"applicantLocationRequirements\":{\"@type\":\"Country\",\"name\":\"US\"},\"hiringOrganization\":{\"@type\":\"Organization\",\"name\":\"Fixture Breezy\"}}</script></head><body><h1>Remote Support Specialist</h1></body></html>",
+    "BRZ2002-hybrid-product-manager": "<html><head><script type=\"application/ld+json\">{\"@context\":\"https://schema.org/\",\"@type\":\"JobPosting\",\"title\":\"Hybrid Product Manager\",\"datePosted\":\"2026-05-07\",\"employmentType\":\"FULL_TIME\",\"hiringOrganization\":{\"@type\":\"Organization\",\"name\":\"Fixture Breezy\"},\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"London\",\"addressCountry\":\"GB\"}}}</script></head><body><div class=\"banner\"><ul class=\"meta\"><li class=\"location\"><span>London, United Kingdom</span><span class=\"spacer\"> - </span><i class=\"fa fa-wifi\"></i><span class=\"polygot\">%LABEL_POSITION_TYPE_HYBRID%</span></li></ul></div></body></html>",
+    "BRZ2003-onsite-engineer": "<html><head><script type=\"application/ld+json\">{\"@context\":\"https://schema.org/\",\"@type\":\"JobPosting\",\"title\":\"Onsite Engineer\",\"datePosted\":\"2026-05-08\",\"employmentType\":\"FULL_TIME\",\"hiringOrganization\":{\"@type\":\"Organization\",\"name\":\"Fixture Breezy\"},\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"Boston\",\"addressRegion\":\"MA\",\"addressCountry\":\"US\"}}}</script></head><body><strong>Work Type:</strong><span>On-site</span></body></html>",
+    "BRZ2004-ambiguous-role": "<html><head><title>Ambiguous Role</title></head><body><h1>Ambiguous Role</h1><div class=\"description\">Great team role with flexible collaboration.</div></body></html>"
+  },
+  "expected": {
+    "BRZ2001-remote-support": {
+      "country": "United States",
+      "remote_type": "remote",
+      "posting_date": "2026-05-06",
+      "remote_source": "json_ld"
+    },
+    "BRZ2002-hybrid-product-manager": {
+      "country": "United Kingdom",
+      "city": "London",
+      "remote_type": "hybrid",
+      "posting_date": "2026-05-07",
+      "remote_source": "labeled_html"
+    },
+    "BRZ2003-onsite-engineer": {
+      "country": "United States",
+      "city": "Boston",
+      "remote_type": "onsite",
+      "posting_date": "2026-05-08",
+      "remote_source": "labeled_html"
+    },
+    "BRZ2004-ambiguous-role": {
+      "reason": "ambiguous_location"
+    }
+  }
+}

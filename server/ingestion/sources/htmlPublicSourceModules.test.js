@@ -163,3 +163,44 @@ test("applytojob source module enriches list rows from JSON-LD and labeled detai
   assert.ok(byId["ATJ2004"].source_failure_reasons.includes(fixture.expected["ATJ2004"].reason));
   assert.equal(evaluatePublicPosting(byId["ATJ2004"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
+
+test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {
+  const source = getSourceModule("breezy");
+  const sourceDir = path.join(__dirname, "breezy");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      const value = String(url || "");
+      if (value === fixture.company.url_string) return { html: fixture.list_html, status: 200, url: value };
+      const jobId = new URL(value).pathname.split("/").filter(Boolean)[1];
+      if (fixture.details[jobId]) return { html: fixture.details[jobId], status: 200, url: value };
+      return { html: "", status: 404, url: value };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 4);
+  const normalized = parsed.map((posting) => source.normalize(posting, fixture.company));
+  const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId["BRZ2001-remote-support"].country, fixture.expected["BRZ2001-remote-support"].country);
+  assert.equal(byId["BRZ2001-remote-support"].remote_type, fixture.expected["BRZ2001-remote-support"].remote_type);
+  assert.equal(byId["BRZ2001-remote-support"].posting_date, fixture.expected["BRZ2001-remote-support"].posting_date);
+  assert.equal(byId["BRZ2001-remote-support"].source_evidence.remote_source, fixture.expected["BRZ2001-remote-support"].remote_source);
+  assert.equal(evaluatePublicPosting(byId["BRZ2001-remote-support"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(byId["BRZ2002-hybrid-product-manager"].country, fixture.expected["BRZ2002-hybrid-product-manager"].country);
+  assert.equal(byId["BRZ2002-hybrid-product-manager"].city, fixture.expected["BRZ2002-hybrid-product-manager"].city);
+  assert.equal(byId["BRZ2002-hybrid-product-manager"].remote_type, fixture.expected["BRZ2002-hybrid-product-manager"].remote_type);
+  assert.equal(byId["BRZ2002-hybrid-product-manager"].source_evidence.remote_source, fixture.expected["BRZ2002-hybrid-product-manager"].remote_source);
+  assert.equal(evaluatePublicPosting(byId["BRZ2002-hybrid-product-manager"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(byId["BRZ2003-onsite-engineer"].country, fixture.expected["BRZ2003-onsite-engineer"].country);
+  assert.equal(byId["BRZ2003-onsite-engineer"].city, fixture.expected["BRZ2003-onsite-engineer"].city);
+  assert.equal(byId["BRZ2003-onsite-engineer"].remote_type, fixture.expected["BRZ2003-onsite-engineer"].remote_type);
+  assert.equal(byId["BRZ2003-onsite-engineer"].source_evidence.remote_source, fixture.expected["BRZ2003-onsite-engineer"].remote_source);
+  assert.equal(evaluatePublicPosting(byId["BRZ2003-onsite-engineer"], { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.ok(byId["BRZ2004-ambiguous-role"].source_failure_reasons.includes(fixture.expected["BRZ2004-ambiguous-role"].reason));
+  assert.equal(evaluatePublicPosting(byId["BRZ2004-ambiguous-role"], { parserVersion: source.parserVersion }).status, "quarantined");
+});

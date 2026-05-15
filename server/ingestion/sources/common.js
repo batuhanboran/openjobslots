@@ -865,6 +865,100 @@ async function fetchApplyToJobSourceList(company = {}, target = {}, options = {}
   };
 }
 
+function breezyDetailKey(urlValue) {
+  try {
+    const parsed = new URL(clean(urlValue));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function breezyPostingNeedsDetail(posting = {}) {
+  const location = clean(posting.location || posting.location_text);
+  const remoteType = clean(posting.remote_type).toLowerCase();
+  const hasExplicitRemote = ["remote", "hybrid", "onsite"].includes(remoteType);
+  const hasConcreteListLocation = Boolean(location) &&
+    !/^(multiple|multiple locations|various|all locations|anywhere|global|remote|hybrid|tbd|to be determined)(?:\s|\(|$)/i.test(location);
+  return !hasConcreteListLocation || !hasExplicitRemote || !clean(posting.posting_date);
+}
+
+async function fetchBreezySourceList(company = {}, target = {}, options = {}) {
+  const context = buildCompanyContext(company);
+  const discovered = target && target.list_url ? target : SOURCE_SPECS.breezy.discover(context);
+  const listUrl = clean(discovered?.list_url || context.url_string);
+  if (!listUrl) {
+    throw makeSourceFetchError("no_public_jobs_route", "Breezy source has no public portal route", {
+      url: context.url_string
+    });
+  }
+
+  const list = await fetchText(listUrl, {
+    ...options,
+    target: discovered,
+    sourceLabel: "Breezy"
+  });
+  const config = {
+    ...(discovered.config || {}),
+    list_url: list.finalUrl || listUrl
+  };
+  const companyName = normalizeCompanyName(context, hostSlug(listUrl) || "Breezy");
+  const parsed = parseBreezyPostingsFromHtml(companyName, config, {
+    html: list.text,
+    __listUrl: list.finalUrl || listUrl
+  });
+
+  if (parsed.length === 0) {
+    throw makeSourceFetchError("portal_search_empty", "Breezy public portal returned no parseable postings", {
+      url: listUrl
+    });
+  }
+
+  const detailLimit = Math.max(0, Math.min(75, Number(process.env.OPENJOBSLOTS_BREEZY_DETAIL_FETCH_LIMIT_PER_COMPANY || 8)));
+  let detailFetches = 0;
+  const detailHtmlByUrl = {};
+  const detailStatusByUrl = {};
+  const detailFailureByUrl = {};
+
+  for (const posting of parsed) {
+    if (detailFetches >= detailLimit) break;
+    if (!breezyPostingNeedsDetail(posting)) continue;
+    const detailUrl = clean(posting.job_posting_url);
+    if (!detailUrl) continue;
+    try {
+      const detail = await fetchText(detailUrl, {
+        ...options,
+        target: discovered,
+        sourceLabel: "Breezy"
+      });
+      detailFetches += 1;
+      const key = breezyDetailKey(detailUrl);
+      detailHtmlByUrl[detailUrl] = detail.text;
+      detailHtmlByUrl[key] = detail.text;
+      detailStatusByUrl[detailUrl] = detail.status;
+      detailStatusByUrl[key] = detail.status;
+    } catch (error) {
+      detailFetches += 1;
+      const key = breezyDetailKey(detailUrl);
+      detailFailureByUrl[detailUrl] = classifyPublicRouteStatus(Number(error?.status || 0), "unsupported_html_shape");
+      detailFailureByUrl[key] = detailFailureByUrl[detailUrl];
+    }
+  }
+
+  return {
+    html: list.text,
+    __listUrl: list.finalUrl || listUrl,
+    __detailHtmlByUrl: detailHtmlByUrl,
+    __detailStatusByUrl: detailStatusByUrl,
+    __detailFailureByUrl: detailFailureByUrl,
+    __sourceConfig: {
+      ...config,
+      detail_fetch_count: detailFetches
+    }
+  };
+}
+
 const SOURCE_SPECS = Object.freeze({
   greenhouse: {
     sourceFamily: "direct_json",
@@ -1347,7 +1441,8 @@ const SOURCE_SPECS = Object.freeze({
   breezy: {
     sourceFamily: "html_detail",
     confidence: 0.75,
-    parser: (companyName, config, payload) => parseBreezyPostingsFromHtml(companyName, config, payload?.html || payload),
+    parser: (companyName, config, payload) => parseBreezyPostingsFromHtml(companyName, config, payload),
+    fetchList: fetchBreezySourceList,
     officialDocs: "observed Breezy public portal HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);
@@ -1356,6 +1451,24 @@ const SOURCE_SPECS = Object.freeze({
           origin: parsed ? parsed.origin : ""
         },
         listUrl: clean(company.url_string)
+      };
+    },
+    postNormalize(normalized, posting) {
+      const sourceEvidence = {
+        ...(posting?.source_evidence || {}),
+        ...(normalized?.source_evidence || {})
+      };
+      if (clean(sourceEvidence.remote_source || sourceEvidence.remote_path)) return {};
+      if (!["remote", "hybrid", "onsite"].includes(clean(normalized.remote_type).toLowerCase())) return {};
+      return {
+        remote_type: "unknown",
+        is_remote: false,
+        source_evidence: {
+          ...sourceEvidence,
+          remote_source: "",
+          remote_path: "",
+          remote_rule_name: ""
+        }
       };
     }
   },
