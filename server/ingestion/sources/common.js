@@ -41,6 +41,7 @@ const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../posting");
+const { readLimitedResponseText, safeFetch } = require("../safeFetch");
 
 const DEFAULT_PARSER_CONFIDENCE = 0.75;
 const DEFAULT_RATE_LIMIT = Object.freeze({
@@ -120,26 +121,24 @@ function normalizeCompanyName(company, fallback) {
   return clean(company?.company_name || company?.companyName || company?.name || fallback);
 }
 
-function fetchJson(url, init = {}) {
-  if (typeof fetch !== "function") {
-    throw new Error("global fetch is unavailable for source fetch");
-  }
-  return fetch(url, {
+async function fetchJson(url, init = {}) {
+  const response = await safeFetch(url, {
+    ...init,
     headers: {
       accept: "application/json,text/html;q=0.8,*/*;q=0.5",
-      "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)"
-    },
-    ...init
-  }).then(async (response) => {
-    if (!response.ok) {
-      const error = new Error(`source fetch failed with HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
+      "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)",
+      ...(init.headers || {})
     }
-    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-    if (contentType.includes("application/json")) return response.json();
-    return response.text();
   });
+  if (!response.ok) {
+    const error = new Error(`source fetch failed with HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  const body = await readLimitedResponseText(response, { sourceUrl: response.url || url });
+  if (contentType.includes("json")) return JSON.parse(body);
+  return body;
 }
 
 function makeSourceFetchError(code, message, detail = {}) {
@@ -179,15 +178,14 @@ async function fetchText(url, options = {}) {
     }
     return { text: String(response || ""), finalUrl: url, status: 200 };
   }
-  if (typeof fetch !== "function") {
-    throw new Error("global fetch is unavailable for source fetch");
-  }
-  const response = await fetch(url, {
+  const fetchOptions = options.fetchOptions || {};
+  const response = await safeFetch(url, {
+    ...fetchOptions,
     headers: {
       accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5",
-      "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)"
-    },
-    ...(options.fetchOptions || {})
+      "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)",
+      ...(fetchOptions.headers || {})
+    }
   });
   if (!response.ok) {
     const code = classifyPublicRouteStatus(response.status, "fetch_failed");
@@ -198,7 +196,7 @@ async function fetchText(url, options = {}) {
     });
   }
   return {
-    text: await response.text(),
+    text: await readLimitedResponseText(response, { sourceUrl: response.url || url }),
     finalUrl: response.url || url,
     status: response.status
   };

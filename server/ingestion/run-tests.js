@@ -1,6 +1,7 @@
 require("./cache.test");
 require("./dataQuality.test");
 require("./dataQualityAudit.test");
+require("./safeFetch.test");
 require("./publicPostingGate.test");
 require("./backfill/geoRemotePlanner.test");
 require("./detailRefetch/detailRefetchPlanner.test");

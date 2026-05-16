@@ -29,12 +29,12 @@ const {
   getPostgresGrowthSummary,
   normalizeHours: normalizeGrowthHours
 } = require("./ingestion/growthSummary");
+const { safeFetch } = require("./ingestion/safeFetch");
 const {
   createPostgresPool,
   ensurePostgresSchema,
   seedPostgresAtsSources
 } = require("./backends/postgres");
-const { getHeavyJobLockStatus } = require("./backends/heavyJobLock");
 const {
   expandSearchTokens
 } = require("./search/config");
@@ -1188,19 +1188,34 @@ const CONTROL_ROUTE_PREFIXES = Object.freeze([
   "/admin",
   "/settings",
   "/mcp",
-  "/applications"
+  "/applications",
+  "/ingestion/quality",
+  "/ingestion/rejections",
+  "/ingestion/parser-stats",
+  "/ingestion/source-quality",
+  "/ingestion/parser-drift",
+  "/ingestion/quarantine-summary"
 ]);
 const CONTROL_ROUTE_EXACT = Object.freeze([
   "/sync/start",
   "/sync/stop",
   "/sync/ats",
   "/sync/workday",
-  "/postings/ignore"
+  "/postings/ignore",
+  "/ingestion/growth-summary"
 ]);
+
+function isPostingDiagnosticsRoute(pathname) {
+  return pathname === "/postings/diagnostics" || /^\/postings\/[^/]+\/diagnostics$/.test(pathname);
+}
 
 function isControlRoute(req) {
   const pathname = String(req.path || "").toLowerCase();
-  return CONTROL_ROUTE_EXACT.includes(pathname) || CONTROL_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return (
+    CONTROL_ROUTE_EXACT.includes(pathname) ||
+    CONTROL_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
+    isPostingDiagnosticsRoute(pathname)
+  );
 }
 
 function securityHeadersMiddleware(_req, res, next) {
@@ -9893,7 +9908,7 @@ async function fetchWithAtsRateLimit(rateLimitKey, fallbackWaitMs, url, init = {
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
       await waitForAtsCooldown(rateLimitKey);
-      const res = await fetch(url, {
+      const res = await safeFetch(url, {
         ...init,
         signal: controller.signal
       });
@@ -10811,7 +10826,7 @@ async function fetchPeopleforceJobsPage(config) {
     Pragma: "no-cache"
   };
 
-  const res = await fetch(config.jobsUrl, {
+  const res = await safeFetch(config.jobsUrl, {
     method: "GET",
     headers
   });
@@ -10874,7 +10889,7 @@ async function fetchLoxoJobsPage(config) {
   };
 
   const doRequest = async () =>
-    fetch(config.boardUrl, {
+    safeFetch(config.boardUrl, {
       method: "GET",
       headers
     });
@@ -17449,6 +17464,28 @@ function getWritePressure(ingestionWorker = {}) {
   return "idle";
 }
 
+function buildPublicIngestionStatusItem(ingestionWorker = {}, options = {}) {
+  return {
+    latest_run_id: Number(ingestionWorker?.latest_run_id || 0),
+    latest_status: String(ingestionWorker?.latest_status || ""),
+    started_at_epoch: Number(ingestionWorker?.started_at_epoch || 0),
+    finished_at_epoch: Number(ingestionWorker?.finished_at_epoch || 0),
+    last_run_duration_seconds: Number(ingestionWorker?.last_run_duration_seconds || 0),
+    total_targets: Number(ingestionWorker?.total_targets || 0),
+    success_count: Number(ingestionWorker?.success_count || 0),
+    failure_count: Number(ingestionWorker?.failure_count || 0),
+    queue_due_count: Number(ingestionWorker?.queue_due_count || 0),
+    parser_error_count_24h: Number(ingestionWorker?.parser_error_count_24h || 0),
+    db_backend: String(options.db_backend || DB_BACKEND),
+    search_backend: String(options.search_backend || SEARCH_BACKEND),
+    search_reindex: options.search_reindex || readMeiliReindexStatus(),
+    queue_backend: String(options.queue_backend || QUEUE_BACKEND),
+    write_pressure: String(options.write_pressure || getWritePressure(ingestionWorker)),
+    parser_attention_count: Number(options.parser_attention_count || 0),
+    growth_24h: options.growth_24h || createEmptyGrowthSummary({ hours: 24 })
+  };
+}
+
 function addSuggestion(suggestions, seen, type, value, count = 1) {
   const label = String(value || "").trim();
   if (!label) return;
@@ -17640,22 +17677,41 @@ function createServer() {
   app.get("/sync/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts, heavyJob] = await Promise.all([
+        const [status, parserAttentionByAts] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
-          getPostgresParserAttentionByAts(postgresPool),
-          getHeavyJobLockStatus(postgresPool)
+          getPostgresParserAttentionByAts(postgresPool)
         ]);
         return sanitizeFrontendValue({
-          ...status,
+          running: Boolean(status.running),
+          queued: Boolean(status.queued),
+          status: String(status.status || ""),
+          stopping: Boolean(status.stopping),
+          cancel_requested: Boolean(status.cancel_requested),
+          legacy_api_sync: Boolean(status.legacy_api_sync),
+          last_sync_at: status.last_sync_at || null,
+          last_failed_sync_at: status.last_failed_sync_at || null,
+          last_sync_summary: status.last_sync_summary || {},
+          db_backend: status.db_backend || DB_BACKEND,
+          search_backend: status.search_backend || SEARCH_BACKEND,
           search_reindex: readMeiliReindexStatus(),
-          heavy_job: heavyJob,
+          queue_backend: status.queue_backend || QUEUE_BACKEND,
+          queue_depth: Number(status.queue_depth || 0),
+          sync_enabled_company_count: Number(status.sync_enabled_company_count || 0),
+          configured_enabled_ats_count: Number(status.configured_enabled_ats_count || 0),
+          excluded_ats_count: Number(status.excluded_ats_count || 0),
+          company_count: Number(status.company_count || 0),
+          posting_count: Number(status.posting_count || 0),
+          postings_seen_24h_count: Number(status.postings_seen_24h_count || 0),
           write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
           parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
-          parser_attention_by_ats: parserAttentionByAts,
-          ingestion_worker: {
-            ...(status.ingestion_worker || {}),
-            parser_attention_by_ats: parserAttentionByAts
-          }
+          ingestion_worker: buildPublicIngestionStatusItem(status.ingestion_worker || {}, {
+            db_backend: status.db_backend || DB_BACKEND,
+            search_backend: status.search_backend || SEARCH_BACKEND,
+            search_reindex: readMeiliReindexStatus(),
+            queue_backend: status.queue_backend || QUEUE_BACKEND,
+            write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
+            parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+          })
         });
       }
 
@@ -17676,11 +17732,14 @@ function createServer() {
         legacy_api_sync: true,
         write_pressure: getWritePressure(ingestionWorker),
         parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
-        parser_attention_by_ats: parserAttentionByAts,
-        ingestion_worker: {
-          ...ingestionWorker,
-          parser_attention_by_ats: parserAttentionByAts
-        }
+        ingestion_worker: buildPublicIngestionStatusItem(ingestionWorker, {
+          db_backend: DB_BACKEND,
+          search_backend: SEARCH_BACKEND,
+          search_reindex: readMeiliReindexStatus(),
+          queue_backend: QUEUE_BACKEND,
+          write_pressure: getWritePressure(ingestionWorker),
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+        })
       });
     });
   });
@@ -17688,29 +17747,22 @@ function createServer() {
   app.get("/ingestion/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts, heavyJob, sourceQuality, sourceRuns, growth24h] = await Promise.all([
+        const [status, parserAttentionByAts, growth24h] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
           getPostgresParserAttentionByAts(postgresPool),
-          getHeavyJobLockStatus(postgresPool),
-          getPostgresSourceQualityDashboard(postgresPool, 25),
-          getPostgresSourceRunStatus(postgresPool, 10),
           getPostgresGrowthSummary(postgresPool, { hours: 24 })
         ]);
         return sanitizeFrontendValue({
           ok: true,
-          item: {
-            ...(status.ingestion_worker || {}),
+          item: buildPublicIngestionStatusItem(status.ingestion_worker || {}, {
             db_backend: DB_BACKEND,
             search_backend: SEARCH_BACKEND,
             search_reindex: readMeiliReindexStatus(),
-            heavy_job: heavyJob,
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
-            parser_attention_by_ats: parserAttentionByAts,
-            source_quality: sourceQuality,
-            source_jobs: sourceRuns,
+            parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
             growth_24h: growth24h
-          }
+          })
         });
       }
 
@@ -17720,16 +17772,15 @@ function createServer() {
       ]);
       return sanitizeFrontendValue({
         ok: true,
-        item: {
-          ...status,
+        item: buildPublicIngestionStatusItem(status, {
           db_backend: DB_BACKEND,
           search_backend: SEARCH_BACKEND,
           search_reindex: readMeiliReindexStatus(),
           queue_backend: QUEUE_BACKEND,
           write_pressure: getWritePressure(status),
-          parser_attention_by_ats: parserAttentionByAts,
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
           growth_24h: createEmptyGrowthSummary({ hours: 24 })
-        }
+        })
       });
     });
   });

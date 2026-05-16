@@ -4,6 +4,7 @@ const { createPostgresPool } = require("../../backends/postgres");
 const { acquireHeavyJobLock } = require("../../backends/heavyJobLock");
 const { openSqliteReadOnly } = require("../dataQualityAudit");
 const { buildStoredQualityFields, parseQualityFlags } = require("../dataQuality");
+const { safeFetch } = require("../safeFetch");
 const {
   normalizePosting,
   normalizePostingValue
@@ -456,7 +457,7 @@ async function fetchDetailHtml(row, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, options.timeoutMs || DEFAULT_TIMEOUT_MS));
   try {
-    const response = await fetch(detailUrl, {
+    const response = await safeFetch(detailUrl, {
       method: "GET",
       signal: controller.signal,
       headers: {

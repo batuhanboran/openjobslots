@@ -2,6 +2,10 @@ const { test, expect } = require("@playwright/test");
 
 const apiPort = process.env.OPENJOBSLOTS_E2E_API_PORT || "8877";
 const apiBaseUrl = process.env.OPENJOBSLOTS_API_BASE_URL || `http://127.0.0.1:${apiPort}`;
+const adminToken = process.env.OPENJOBSLOTS_E2E_ADMIN_TOKEN || "openjobslots-e2e-admin-token";
+const adminHeaders = {
+  Authorization: `Bearer ${adminToken}`
+};
 
 test.describe("openjobslots API compatibility", () => {
   test("public routes respond without an admin token", async ({ request }) => {
@@ -10,13 +14,8 @@ test.describe("openjobslots API compatibility", () => {
       { path: "/sync/status" },
       { path: "/ingestion/status" },
       { path: "/postings", params: { search: "remote jobs", limit: "10" } },
-      { path: "/postings/diagnostics", params: { url: "https://boards.greenhouse.io/openjobslotsqa/jobs/1001" } },
       { path: "/postings/filter-options" },
-      { path: "/search/suggest", params: { search: "tur", limit: "5" } },
-      { path: "/ingestion/quality/summary" },
-      { path: "/ingestion/rejections" },
-      { path: "/ingestion/parser-stats" },
-      { path: "/ingestion/growth-summary", params: { hours: "24" } }
+      { path: "/search/suggest", params: { search: "tur", limit: "5" } }
     ];
 
     for (const check of publicChecks) {
@@ -43,10 +42,19 @@ test.describe("openjobslots API compatibility", () => {
         postings_seen_24h_count: expect.any(Number)
       })
     );
+    expect(syncPayload).not.toHaveProperty("heavy_job");
+    expect(syncPayload).not.toHaveProperty("parser_attention_by_ats");
+    expect(syncPayload.ingestion_worker).not.toHaveProperty("current_company_url");
+    expect(syncPayload.ingestion_worker).not.toHaveProperty("current_company_name");
+    expect(syncPayload.ingestion_worker).not.toHaveProperty("last_error");
+    expect(syncPayload.ingestion_worker).not.toHaveProperty("http_status_counts");
+    expect(syncPayload.ingestion_worker).not.toHaveProperty("active_ats");
+    expect(syncPayload.ingestion_worker).not.toHaveProperty("parser_attention_by_ats");
 
     const ingestionStatus = await request.get(`${apiBaseUrl}/ingestion/status`);
     expect(ingestionStatus.ok()).toBeTruthy();
-    expect(await ingestionStatus.json()).toEqual(expect.objectContaining({
+    const ingestionPayload = await ingestionStatus.json();
+    expect(ingestionPayload).toEqual(expect.objectContaining({
       ok: true,
       item: expect.objectContaining({
         growth_24h: expect.objectContaining({
@@ -56,6 +64,14 @@ test.describe("openjobslots API compatibility", () => {
         })
       })
     }));
+    expect(ingestionPayload.item).not.toHaveProperty("current_company_url");
+    expect(ingestionPayload.item).not.toHaveProperty("current_company_name");
+    expect(ingestionPayload.item).not.toHaveProperty("last_error");
+    expect(ingestionPayload.item).not.toHaveProperty("http_status_counts");
+    expect(ingestionPayload.item).not.toHaveProperty("active_ats");
+    expect(ingestionPayload.item).not.toHaveProperty("parser_attention_by_ats");
+    expect(ingestionPayload.item).not.toHaveProperty("source_quality");
+    expect(ingestionPayload.item).not.toHaveProperty("source_jobs");
   });
 
   test("postings and filters support Turkish/Turkiye search terms", async ({ request }) => {
@@ -135,6 +151,15 @@ test.describe("openjobslots API compatibility", () => {
       { method: "get", path: "/applications" },
       { method: "post", path: "/applications", data: {} },
       { method: "get", path: "/mcp/candidates" },
+      { method: "get", path: "/postings/diagnostics" },
+      { method: "get", path: "/postings/1/diagnostics" },
+      { method: "get", path: "/ingestion/growth-summary" },
+      { method: "get", path: "/ingestion/quality/summary" },
+      { method: "get", path: "/ingestion/rejections" },
+      { method: "get", path: "/ingestion/parser-stats" },
+      { method: "get", path: "/ingestion/source-quality" },
+      { method: "get", path: "/ingestion/parser-drift" },
+      { method: "get", path: "/ingestion/quarantine-summary" },
       { method: "post", path: "/sync/start", data: {} },
       { method: "post", path: "/sync/stop", data: {} },
       { method: "post", path: "/sync/ats", data: {} },
@@ -156,6 +181,7 @@ test.describe("openjobslots API compatibility", () => {
 
   test("data quality diagnostics are bounded and explainable", async ({ request }) => {
     const diagnostics = await request.get(`${apiBaseUrl}/postings/diagnostics`, {
+      headers: adminHeaders,
       params: { url: "https://boards.greenhouse.io/openjobslotsqa/jobs/1001" }
     });
     expect(diagnostics.ok()).toBeTruthy();
@@ -176,6 +202,7 @@ test.describe("openjobslots API compatibility", () => {
     expect(JSON.stringify(diagnosticsPayload)).not.toMatch(/raw_payload|stack trace|MEILI_|postgres:\/\//i);
 
     const summary = await request.get(`${apiBaseUrl}/ingestion/quality/summary`, {
+      headers: adminHeaders,
       params: { limit: "10" }
     });
     expect(summary.ok()).toBeTruthy();
@@ -193,6 +220,7 @@ test.describe("openjobslots API compatibility", () => {
     );
 
     const rejections = await request.get(`${apiBaseUrl}/ingestion/rejections`, {
+      headers: adminHeaders,
       params: { limit: "10" }
     });
     expect(rejections.ok()).toBeTruthy();
@@ -202,6 +230,7 @@ test.describe("openjobslots API compatibility", () => {
     expect(rejectionsPayload.items.some((item) => /missing required title|missing title/i.test(item.rejection_reason))).toBeTruthy();
 
     const parserStats = await request.get(`${apiBaseUrl}/ingestion/parser-stats`, {
+      headers: adminHeaders,
       params: { limit: "10" }
     });
     expect(parserStats.ok()).toBeTruthy();

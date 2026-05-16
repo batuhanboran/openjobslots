@@ -11,6 +11,7 @@ const {
   evaluateSourceCandidate,
   runWithLimitedConcurrency
 } = require("./sourceRunner");
+const { safeFetch } = require("./safeFetch");
 const {
   buildExistingLookup,
   candidateQualityRisk,
@@ -369,8 +370,7 @@ async function fetchDetailHtml(url, options = {}) {
     }
     return { status: 200, url, text: String(response || "") };
   }
-  if (typeof fetch !== "function") throw new Error("global fetch is unavailable for method experiment detail fetch");
-  const response = await fetch(url, {
+  const response = await safeFetch(url, {
     headers: {
       accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5",
       "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)"
