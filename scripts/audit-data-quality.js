@@ -14,6 +14,7 @@ function parseArgs(argv) {
     bySource: false,
     byParser: false,
     limit: 25,
+    lastSeenDays: null,
     output: "",
     dbPath: ""
   };
@@ -22,14 +23,22 @@ function parseArgs(argv) {
     else if (arg === "--by-source") options.bySource = true;
     else if (arg === "--by-parser") options.byParser = true;
     else if (arg.startsWith("--limit=")) options.limit = Number(arg.slice("--limit=".length));
+    else if (arg.startsWith("--last-seen-days=")) options.lastSeenDays = Number(arg.slice("--last-seen-days=".length));
     else if (arg === "--limit") options.expectLimit = true;
+    else if (arg === "--last-seen-days") options.expectLastSeenDays = true;
     else if (options.expectLimit) {
       options.limit = Number(arg);
       options.expectLimit = false;
+    } else if (options.expectLastSeenDays) {
+      options.lastSeenDays = Number(arg);
+      options.expectLastSeenDays = false;
     } else if (arg.startsWith("--db=")) options.dbPath = arg.slice("--db=".length);
     else if (arg.startsWith("--output=")) options.output = arg.slice("--output=".length);
   }
   options.limit = Math.max(1, Math.min(1000, Number(options.limit || 25)));
+  options.lastSeenDays = Number.isFinite(Number(options.lastSeenDays)) && Number(options.lastSeenDays) > 0
+    ? Math.floor(Number(options.lastSeenDays))
+    : null;
   return options;
 }
 
@@ -48,6 +57,9 @@ function printSummary(report) {
   const summary = report.summary || {};
   console.log("OpenJobSlots data quality audit");
   console.log(`Backend: ${report.db_backend}`);
+  if (report.filters?.last_seen_days) {
+    console.log(`Last seen window: ${report.filters.last_seen_days} days`);
+  }
   console.log(`Total visible postings: ${summary.total_visible_postings || 0}`);
   console.log(`Missing country: ${summary.missing_country_count || 0} / ${formatPct(summary.missing_country_pct)}`);
   console.log(`Missing location_text: ${summary.missing_location_text_count || 0} / ${formatPct(summary.missing_location_text_pct)}`);
@@ -85,11 +97,12 @@ async function runAudit(options = parseArgs(process.argv.slice(2)), env = proces
       const audit = await withHeavyJobLock(
         pool,
         "data-quality-audit",
-        () => getPostgresQualityAudit(pool, { limit: options.limit })
+        () => getPostgresQualityAudit(pool, { limit: options.limit, lastSeenDays: options.lastSeenDays })
       );
       return {
         ok: true,
         db_backend: "postgres",
+        filters: audit.filters,
         summary: audit.summary,
         by_source: audit.by_source,
         by_parser: audit.by_parser
@@ -102,11 +115,12 @@ async function runAudit(options = parseArgs(process.argv.slice(2)), env = proces
   const dbPath = options.dbPath || env.DB_PATH || path.resolve(__dirname, "..", "jobs.db");
   const db = await openSqliteReadOnly(dbPath);
   try {
-    const audit = await getSqliteQualityAudit(db, { limit: options.limit });
+    const audit = await getSqliteQualityAudit(db, { limit: options.limit, lastSeenDays: options.lastSeenDays });
     return {
       ok: true,
       db_backend: "sqlite",
       db_path: path.resolve(dbPath),
+      filters: audit.filters,
       summary: audit.summary,
       by_source: audit.by_source,
       by_parser: audit.by_parser

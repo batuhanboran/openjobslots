@@ -178,3 +178,53 @@ test("audit command reads SQLite in read-only mode and does not mutate rows", as
     await verifyDb.close();
   }
 });
+
+test("audit command can restrict SQLite rows to a last-seen freshness window", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "openjobslots-audit-window-test-"));
+  const dbPath = path.join(tempDir, "jobs.db");
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  const db = await openWritableSqlite(dbPath);
+  try {
+    await db.exec(`
+      CREATE TABLE Postings (
+        company_name TEXT,
+        position_name TEXT,
+        job_posting_url TEXT,
+        ats_key TEXT,
+        parser_version TEXT,
+        location_text TEXT,
+        country TEXT,
+        region TEXT,
+        city TEXT,
+        remote_type TEXT,
+        quality_score INTEGER NOT NULL DEFAULT 0,
+        quality_flags TEXT NOT NULL DEFAULT '[]',
+        hidden INTEGER NOT NULL DEFAULT 0,
+        last_seen_epoch INTEGER NOT NULL
+      );
+      INSERT INTO Postings (
+        company_name, position_name, job_posting_url, ats_key, parser_version,
+        location_text, country, region, city, remote_type, quality_score, quality_flags, hidden, last_seen_epoch
+      ) VALUES
+      (
+        'Fresh', 'Fresh Engineer', 'https://example.test/jobs/fresh', 'greenhouse', 'greenhouse-v1',
+        'Berlin, Germany', 'Germany', 'EMEA', 'Berlin', 'hybrid', 100, '[]', 0, ${nowEpoch - 86_400}
+      ),
+      (
+        'Old', 'Old Engineer', 'https://example.test/jobs/old', 'applytojob', 'applytojob-v1',
+        '', '', '', '', 'unknown', 100, '[]', 0, ${nowEpoch - 90 * 86_400}
+      );
+    `);
+  } finally {
+    await db.close();
+  }
+
+  const report = await runAudit(
+    { json: true, bySource: true, byParser: true, limit: 10, dbPath, lastSeenDays: 30 },
+    { OPENJOBSLOTS_DB_BACKEND: "sqlite", DB_PATH: dbPath }
+  );
+  assert.equal(report.ok, true);
+  assert.equal(report.filters.last_seen_days, 30);
+  assert.equal(report.summary.total_visible_postings, 1);
+  assert.equal(report.by_source[0].source_ats, "greenhouse");
+});

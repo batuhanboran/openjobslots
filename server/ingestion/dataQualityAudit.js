@@ -57,6 +57,8 @@ const AUDIT_COUNT_FIELDS = [
   "missing_all_geo_and_weak_remote"
 ];
 
+const SECONDS_PER_DAY = 86_400;
+
 function cleanText(value) {
   return String(value ?? "").trim();
 }
@@ -84,6 +86,20 @@ function isWeakRemoteType(value) {
 
 function normalizeGroupValue(value) {
   return cleanText(value) || "unknown";
+}
+
+function normalizePositiveInt(value, fallback = null) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const integer = Math.floor(parsed);
+  return integer > 0 ? integer : fallback;
+}
+
+function cutoffEpochForDays(days, nowEpoch = Math.floor(Date.now() / 1000)) {
+  const normalizedDays = normalizePositiveInt(days);
+  if (!normalizedDays) return 0;
+  const normalizedNow = normalizePositiveInt(nowEpoch, Math.floor(Date.now() / 1000));
+  return Math.max(0, normalizedNow - normalizedDays * SECONDS_PER_DAY);
 }
 
 function classifyStoredPosting(row = {}) {
@@ -246,7 +262,10 @@ function pgWeakRemote(column) {
   return `(lower(btrim(coalesce(${column}, ''))) IN (${pgIn(PG_WEAK_REMOTE_VALUES)}))`;
 }
 
-const POSTGRES_VISIBLE_CTE = `
+function postgresVisibleCte(cutoffEpoch = 0) {
+  const normalizedCutoff = normalizePositiveInt(cutoffEpoch, 0);
+  const lastSeenFilter = normalizedCutoff ? `AND COALESCE(last_seen_epoch, 0) >= ${normalizedCutoff}` : "";
+  return `
   WITH visible AS (
     SELECT
       COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS source_ats,
@@ -266,8 +285,10 @@ const POSTGRES_VISIBLE_CTE = `
       ((${pgBlankLike("country")}) AND (${pgBlankLike("region")}) AND (${pgBlankLike("city")}) AND (${pgWeakRemote("remote_type")})) AS missing_all_geo_and_weak_remote
     FROM postings
     WHERE hidden = false
+      ${lastSeenFilter}
   )
 `;
+}
 
 const COUNT_SELECT_SQL = AUDIT_COUNT_FIELDS
   .map((field) => `COUNT(*) FILTER (WHERE ${field})::bigint AS ${field}_count`)
@@ -287,9 +308,14 @@ function mapPgGroupRow(row) {
 
 async function getPostgresQualityAudit(pool, options = {}) {
   const limit = Math.max(1, Math.min(1000, Number(options.limit || 100)));
+  const lastSeenDays = normalizePositiveInt(options.lastSeenDays || options.last_seen_days);
+  const lastSeenCutoffEpoch = lastSeenDays ? cutoffEpochForDays(lastSeenDays, options.nowEpoch) : 0;
+  const visibleCte = postgresVisibleCte(lastSeenCutoffEpoch);
+  const cacheLastSeenFilter = lastSeenCutoffEpoch ? `AND COALESCE(last_seen_epoch, 0) >= ${lastSeenCutoffEpoch}` : "";
+  const errorCreatedAtFilter = lastSeenCutoffEpoch ? `AND created_at >= to_timestamp(${lastSeenCutoffEpoch})` : "";
   const [summaryResult, sourceResult, parserResult, sourceFlagResult, parserFlagResult, rejectionResult, errorResult] = await Promise.all([
     pool.query(`
-      ${POSTGRES_VISIBLE_CTE}
+      ${visibleCte}
       SELECT
         COUNT(*)::bigint AS total_visible_postings,
         ${COUNT_SELECT_SQL}
@@ -297,7 +323,7 @@ async function getPostgresQualityAudit(pool, options = {}) {
     `),
     pool.query(
       `
-        ${POSTGRES_VISIBLE_CTE}
+        ${visibleCte}
         SELECT
           source_ats,
           COUNT(*)::bigint AS total_visible_rows,
@@ -313,7 +339,7 @@ async function getPostgresQualityAudit(pool, options = {}) {
     ),
     pool.query(
       `
-        ${POSTGRES_VISIBLE_CTE}
+        ${visibleCte}
         SELECT
           source_ats,
           parser_version,
@@ -329,14 +355,14 @@ async function getPostgresQualityAudit(pool, options = {}) {
       [limit]
     ),
     pool.query(`
-      ${POSTGRES_VISIBLE_CTE}
+      ${visibleCte}
       SELECT source_ats, flag, COUNT(*)::bigint AS count
       FROM visible
       CROSS JOIN LATERAL jsonb_array_elements_text(quality_flags) AS flag
       GROUP BY source_ats, flag;
     `),
     pool.query(`
-      ${POSTGRES_VISIBLE_CTE}
+      ${visibleCte}
       SELECT source_ats, parser_version, flag, COUNT(*)::bigint AS count
       FROM visible
       CROSS JOIN LATERAL jsonb_array_elements_text(quality_flags) AS flag
@@ -348,9 +374,12 @@ async function getPostgresQualityAudit(pool, options = {}) {
         COALESCE(NULLIF(btrim(parser_version), ''), 'unknown') AS parser_version,
         COUNT(*)::bigint AS count
       FROM posting_cache
-      WHERE validation_status <> 'valid'
-         OR btrim(coalesce(rejection_reason, '')) <> ''
-         OR btrim(coalesce(validation_error, '')) <> ''
+      WHERE (
+           validation_status <> 'valid'
+        OR btrim(coalesce(rejection_reason, '')) <> ''
+        OR btrim(coalesce(validation_error, '')) <> ''
+      )
+         ${cacheLastSeenFilter}
       GROUP BY source_ats, parser_version;
     `),
     pool.query(`
@@ -359,8 +388,11 @@ async function getPostgresQualityAudit(pool, options = {}) {
         COUNT(*)::bigint AS count,
         MAX(error_message) AS latest_parser_error
       FROM ingestion_run_errors
-      WHERE error_type LIKE 'parser_%'
-         OR error_type LIKE '%validation%'
+      WHERE (
+           error_type LIKE 'parser_%'
+        OR error_type LIKE '%validation%'
+      )
+         ${errorCreatedAtFilter}
       GROUP BY source_ats;
     `)
   ]);
@@ -404,6 +436,10 @@ async function getPostgresQualityAudit(pool, options = {}) {
   }));
 
   return {
+    filters: {
+      last_seen_days: lastSeenDays || null,
+      last_seen_cutoff_epoch: lastSeenCutoffEpoch || null
+    },
     summary: createSummaryRecord(summaryResult.rows[0] || {}),
     by_source: bySource,
     by_parser: byParser
@@ -419,12 +455,16 @@ function sqliteColumn(columns, columnName, fallbackSql) {
   return columns.has(columnName) ? columnName : `${fallbackSql} AS ${columnName}`;
 }
 
-async function getSqliteVisibleRows(db) {
+async function getSqliteVisibleRows(db, options = {}) {
   const columns = await getSqliteColumns(db, "Postings");
   const titleColumn = columns.has("position_name") ? "position_name" : "'' AS position_name";
   const companyColumn = columns.has("company_name") ? "company_name" : "'' AS company_name";
   const urlColumn = columns.has("job_posting_url") ? "job_posting_url AS canonical_url" : "'' AS canonical_url";
   const hiddenWhere = columns.has("hidden") ? "COALESCE(hidden, 0) = 0" : "1 = 1";
+  const cutoffEpoch = normalizePositiveInt(options.cutoffEpoch, 0);
+  const lastSeenColumn = columns.has("last_seen_epoch") ? "last_seen_epoch" : "0 AS last_seen_epoch";
+  const lastSeenWhere = cutoffEpoch && columns.has("last_seen_epoch") ? "AND COALESCE(last_seen_epoch, 0) >= ?" : "";
+  const params = lastSeenWhere ? [cutoffEpoch] : [];
   const rows = await db.all(`
     SELECT
       ${titleColumn},
@@ -438,10 +478,12 @@ async function getSqliteVisibleRows(db) {
       ${sqliteColumn(columns, "city", "''")},
       ${sqliteColumn(columns, "remote_type", "'unknown'")},
       ${sqliteColumn(columns, "quality_score", "0")},
-      ${sqliteColumn(columns, "quality_flags", "'[]'")}
+      ${sqliteColumn(columns, "quality_flags", "'[]'")},
+      ${lastSeenColumn}
     FROM Postings
-    WHERE ${hiddenWhere};
-  `);
+    WHERE ${hiddenWhere}
+      ${lastSeenWhere};
+  `, params);
   return rows || [];
 }
 
@@ -542,8 +584,171 @@ function aggregateRows(rows = [], options = {}) {
 }
 
 async function getSqliteQualityAudit(db, options = {}) {
+  const lastSeenDays = normalizePositiveInt(options.lastSeenDays || options.last_seen_days);
+  const cutoffEpoch = lastSeenDays ? cutoffEpochForDays(lastSeenDays, options.nowEpoch) : 0;
+  const rows = await getSqliteVisibleRows(db, { cutoffEpoch });
+  return {
+    filters: {
+      last_seen_days: lastSeenDays || null,
+      last_seen_cutoff_epoch: cutoffEpoch || null
+    },
+    ...aggregateRows(rows, options)
+  };
+}
+
+function createSourceFreshnessReportFromRows(rows = [], options = {}) {
+  const staleDays = normalizePositiveInt(options.staleDays || options.stale_days, 30);
+  const cutoffEpoch = cutoffEpochForDays(staleDays, options.nowEpoch);
+  const limit = Math.max(1, Math.min(1000, Number(options.limit || 100)));
+  const buckets = new Map();
+
+  for (const rawRow of rows) {
+    const row = normalizeSqliteRow(rawRow);
+    const source = row.source_ats;
+    const bucket = buckets.get(source) || {
+      ats_key: source,
+      display_name: source,
+      enabled: true,
+      protection_status: "unknown",
+      target_count: 0,
+      visible_rows: 0,
+      visible_rows_seen_within_window: 0,
+      latest_seen_epoch: 0,
+      latest_source_run_epoch: null,
+      runs_within_window: 0
+    };
+    bucket.visible_rows += 1;
+    const lastSeen = Number(row.last_seen_epoch || 0);
+    if (lastSeen >= cutoffEpoch) bucket.visible_rows_seen_within_window += 1;
+    bucket.latest_seen_epoch = Math.max(bucket.latest_seen_epoch, lastSeen);
+    buckets.set(source, bucket);
+  }
+
+  return {
+    filters: {
+      stale_days: staleDays,
+      stale_cutoff_epoch: cutoffEpoch
+    },
+    items: Array.from(buckets.values())
+      .map((item) => {
+        const latestSeen = Number(item.latest_seen_epoch || 0);
+        const dueReason = latestSeen <= 0
+          ? "no_visible_rows"
+          : latestSeen < cutoffEpoch
+            ? "posting_stale"
+            : "fresh";
+        return {
+          ...item,
+          is_due: dueReason !== "fresh",
+          due_reason: dueReason
+        };
+      })
+      .sort((a, b) => Number(b.is_due) - Number(a.is_due) || (a.latest_seen_epoch || 0) - (b.latest_seen_epoch || 0) || a.ats_key.localeCompare(b.ats_key))
+      .slice(0, limit)
+  };
+}
+
+async function getSqliteSourceFreshnessReport(db, options = {}) {
   const rows = await getSqliteVisibleRows(db);
-  return aggregateRows(rows, options);
+  return createSourceFreshnessReportFromRows(rows, options);
+}
+
+async function getPostgresSourceFreshnessReport(pool, options = {}) {
+  const staleDays = normalizePositiveInt(options.staleDays || options.stale_days, 30);
+  const cutoffEpoch = cutoffEpochForDays(staleDays, options.nowEpoch);
+  const limit = Math.max(1, Math.min(1000, Number(options.limit || 100)));
+  const result = await pool.query(
+    `
+      WITH source_targets AS (
+        SELECT
+          s.ats_key,
+          COALESCE(NULLIF(btrim(s.display_name), ''), s.ats_key) AS display_name,
+          s.enabled,
+          COALESCE(NULLIF(btrim(s.protection_status), ''), 'normal') AS protection_status,
+          COUNT(c.id)::bigint AS target_count
+        FROM ats_sources s
+        LEFT JOIN companies c ON c.ats_key = s.ats_key
+        GROUP BY s.ats_key, s.display_name, s.enabled, s.protection_status
+      ),
+      posting_seen AS (
+        SELECT
+          ats_key,
+          COUNT(*) FILTER (WHERE hidden = false)::bigint AS visible_rows,
+          COUNT(*) FILTER (WHERE hidden = false AND COALESCE(last_seen_epoch, 0) >= $1)::bigint AS visible_rows_seen_within_window,
+          COALESCE(MAX(last_seen_epoch) FILTER (WHERE hidden = false), 0)::bigint AS latest_seen_epoch
+        FROM postings
+        GROUP BY ats_key
+      ),
+      run_seen AS (
+        SELECT
+          ats_key,
+          COALESCE(MAX(EXTRACT(EPOCH FROM COALESCE(finished_at, started_at)))::bigint, 0)::bigint AS latest_source_run_epoch,
+          COUNT(*) FILTER (WHERE started_at >= to_timestamp($1))::bigint AS runs_within_window
+        FROM ats_source_runs
+        GROUP BY ats_key
+      )
+      SELECT
+        st.ats_key,
+        st.display_name,
+        st.enabled,
+        st.protection_status,
+        st.target_count,
+        COALESCE(ps.visible_rows, 0)::bigint AS visible_rows,
+        COALESCE(ps.visible_rows_seen_within_window, 0)::bigint AS visible_rows_seen_within_window,
+        COALESCE(ps.latest_seen_epoch, 0)::bigint AS latest_seen_epoch,
+        COALESCE(rs.latest_source_run_epoch, 0)::bigint AS latest_source_run_epoch,
+        COALESCE(rs.runs_within_window, 0)::bigint AS runs_within_window
+      FROM source_targets st
+      LEFT JOIN posting_seen ps ON ps.ats_key = st.ats_key
+      LEFT JOIN run_seen rs ON rs.ats_key = st.ats_key
+      ORDER BY
+        CASE
+          WHEN COALESCE(ps.latest_seen_epoch, 0) = 0 THEN 0
+          WHEN COALESCE(ps.latest_seen_epoch, 0) < $1 THEN 1
+          WHEN COALESCE(rs.latest_source_run_epoch, 0) = 0 THEN 2
+          WHEN COALESCE(rs.latest_source_run_epoch, 0) < $1 THEN 3
+          ELSE 4
+        END ASC,
+        COALESCE(ps.latest_seen_epoch, 0) ASC,
+        st.ats_key ASC
+      LIMIT $2;
+    `,
+    [cutoffEpoch, limit]
+  );
+
+  return {
+    filters: {
+      stale_days: staleDays,
+      stale_cutoff_epoch: cutoffEpoch
+    },
+    items: result.rows.map((row) => {
+      const latestSeen = Number(row.latest_seen_epoch || 0);
+      const latestRun = Number(row.latest_source_run_epoch || 0);
+      const dueReason = latestSeen <= 0
+        ? "no_visible_rows"
+        : latestSeen < cutoffEpoch
+          ? "posting_stale"
+          : latestRun <= 0
+            ? "no_source_run"
+            : latestRun < cutoffEpoch
+              ? "source_run_due"
+              : "fresh";
+      return {
+        ats_key: normalizeGroupValue(row.ats_key),
+        display_name: cleanText(row.display_name || row.ats_key),
+        enabled: Boolean(row.enabled),
+        protection_status: cleanText(row.protection_status || "normal"),
+        target_count: Number(row.target_count || 0),
+        visible_rows: Number(row.visible_rows || 0),
+        visible_rows_seen_within_window: Number(row.visible_rows_seen_within_window || 0),
+        latest_seen_epoch: latestSeen,
+        latest_source_run_epoch: latestRun || null,
+        runs_within_window: Number(row.runs_within_window || 0),
+        is_due: dueReason !== "fresh",
+        due_reason: dueReason
+      };
+    })
+  };
 }
 
 function openSqliteReadOnly(dbPath) {
@@ -583,15 +788,20 @@ module.exports = {
   AUDIT_COUNT_FIELDS,
   aggregateRows,
   classifyStoredPosting,
+  createSourceFreshnessReportFromRows,
   createGroupRecord,
   createSummaryRecord,
+  cutoffEpochForDays,
   getPostgresQualityAudit,
+  getPostgresSourceFreshnessReport,
   getSqliteQualityAudit,
+  getSqliteSourceFreshnessReport,
   isBlankLike,
   isMissingRemoteType,
   isSuspiciousGeoValue,
   isWeakRemoteType,
   makeQualitySummary,
+  normalizePositiveInt,
   openSqliteReadOnly,
   pct
 };
