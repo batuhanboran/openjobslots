@@ -231,6 +231,11 @@ async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMei
 async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
   if (!config.enabled) return { ok: true, skipped: true, hits: [], estimatedTotalHits: 0 };
   const filters = ["hidden = false"];
+  const sortBy = String(options.sort_by || "relevance")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   const quote = (value) => `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   const pushInFilter = (field, values) => {
     const items = (Array.isArray(values) ? values : []).map((item) => String(item || "").trim()).filter(Boolean);
@@ -252,6 +257,16 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
   if (options.hide_no_date) {
     filters.push("(posting_date EXISTS AND posting_date IS NOT EMPTY AND posting_date IS NOT NULL)");
   }
+  const freshnessDays = Number(options.freshness_days || 0);
+  if ([3, 7, 30].includes(freshnessDays)) {
+    filters.push(`last_seen_epoch >= ${Math.floor(Date.now() / 1000) - freshnessDays * 24 * 60 * 60}`);
+  }
+  const sort =
+    sortBy === "last_seen" || sortBy === "recent" || sortBy === "fresh_source"
+      ? ["last_seen_epoch:desc"]
+      : sortBy === "posted_date" || sortBy === "posted_at"
+        ? ["posted_at_epoch:desc", "last_seen_epoch:desc"]
+        : undefined;
 
   return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {
     method: "POST",
@@ -261,7 +276,7 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
       offset: Math.max(0, Number(options.offset || 0)),
       filter: filters.length > 0 ? filters.join(" AND ") : undefined,
       matchingStrategy: "all",
-      sort: ["last_seen_epoch:desc"]
+      ...(sort ? { sort } : {})
     })
   });
 }

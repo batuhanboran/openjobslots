@@ -138,6 +138,66 @@ test.describe("openjobslots API compatibility", () => {
     expect(remoteCombinedPayload.items.every((item) => /Remote/i.test(`${item.location || ""} ${item.position_name || ""}`))).toBeTruthy();
   });
 
+  test("postings expose exact count metadata plus read-only freshness and sort params", async ({ request }) => {
+    const firstPage = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "QA",
+        limit: "1",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(firstPage.ok()).toBeTruthy();
+    const firstPagePayload = await firstPage.json();
+    expect(firstPagePayload.items.length).toBe(1);
+    expect(firstPagePayload.count).toBeGreaterThan(firstPagePayload.items.length);
+    expect(firstPagePayload.count_exact).toBe(true);
+
+    const freshOnly = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "QA",
+        freshness_days: "3",
+        limit: "10",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(freshOnly.ok()).toBeTruthy();
+    const freshPayload = await freshOnly.json();
+    expect(freshPayload.filters).toEqual(expect.objectContaining({ freshness_days: 3 }));
+    expect(freshPayload.count).toBeLessThan(firstPagePayload.count);
+    expect(freshPayload.items.every((item) => Number(item.last_seen_epoch || 0) > 0)).toBeTruthy();
+
+    const sortOptions = await request.get(`${apiBaseUrl}/postings/filter-options`);
+    expect(sortOptions.ok()).toBeTruthy();
+    const sortPayload = await sortOptions.json();
+    expect(sortPayload.sort_options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: "relevance" }),
+        expect.objectContaining({ value: "last_seen" }),
+        expect.objectContaining({ value: "posted_date" }),
+        expect.objectContaining({ value: "ats_source" }),
+        expect.objectContaining({ value: "confidence" })
+      ])
+    );
+
+    for (const sortBy of ["relevance", "last_seen", "posted_date", "ats_source", "confidence"]) {
+      const sorted = await request.get(`${apiBaseUrl}/postings`, {
+        params: {
+          search: "QA",
+          sort_by: sortBy,
+          limit: "10",
+          include_applied: "1",
+          include_ignored: "1"
+        }
+      });
+      expect(sorted.ok(), `${sortBy} should be accepted`).toBeTruthy();
+      const payload = await sorted.json();
+      expect(payload.filters).toEqual(expect.objectContaining({ sort_by: sortBy }));
+      expect(Array.isArray(payload.items)).toBeTruthy();
+    }
+  });
+
   test("admin and mutation endpoints are protected or absent from public API", async ({ request }) => {
     const protectedChecks = [
       { method: "get", path: "/admin/services" },

@@ -28,6 +28,15 @@ const {
 const { evaluatePublicPosting } = require("../ingestion/publicPostingGate");
 
 const DAY_SECONDS = 24 * 60 * 60;
+const POSTING_SORT_OPTIONS = new Set(["relevance", "last_seen", "posted_date", "ats_source", "confidence"]);
+const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
+const POSTING_SORT_OPTION_ITEMS = Object.freeze([
+  { value: "relevance", label: "Relevance" },
+  { value: "last_seen", label: "Fresh source" },
+  { value: "posted_date", label: "Posted date" },
+  { value: "ats_source", label: "ATS/source" },
+  { value: "confidence", label: "Confidence" }
+]);
 
 function getRetentionConfig(env = process.env) {
   return {
@@ -86,6 +95,32 @@ function parseCsv(value) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizePostingSort(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (normalized === "recent" || normalized === "fresh_source" || normalized === "lastseen") return "last_seen";
+  if (normalized === "posted" || normalized === "posted_at") return "posted_date";
+  if (normalized === "ats" || normalized === "source" || normalized === "company_asc" || normalized === "alphabetical") {
+    return "ats_source";
+  }
+  if (normalized === "quality" || normalized === "quality_score" || normalized === "confidence_score") return "confidence";
+  return POSTING_SORT_OPTIONS.has(normalized) ? normalized : "relevance";
+}
+
+function normalizeFreshnessDays(value) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return null;
+  const rounded = Math.floor(numberValue);
+  return POSTING_FRESHNESS_DAY_OPTIONS.has(rounded) ? rounded : null;
+}
+
+function getPublicPostingSortOptions() {
+  return POSTING_SORT_OPTION_ITEMS.map((option) => ({ ...option }));
 }
 
 const COUNTRY_FILTER_ALIASES = new Map([
@@ -317,6 +352,12 @@ function buildFilterSql(options, startIndex = 1) {
     );
   }
   if (options.hide_no_date) where.push("p.posting_date IS NOT NULL AND btrim(p.posting_date) <> ''");
+  const freshnessDays = normalizeFreshnessDays(options.freshness_days);
+  if (freshnessDays) {
+    where.push(`COALESCE(p.last_seen_epoch, 0) >= $${index}`);
+    values.push(Math.floor(Date.now() / 1000) - freshnessDays * DAY_SECONDS);
+    index += 1;
+  }
   if (!options.include_applied) where.push("COALESCE(s.applied, false) = false");
   if (!options.include_ignored) where.push("COALESCE(s.ignored, false) = false");
 
@@ -336,8 +377,14 @@ function buildFilterSql(options, startIndex = 1) {
 }
 
 function getPostgresOrderBy(sortBy) {
-  if (String(sortBy || "").trim() === "company_asc") {
-    return "lower(p.company_name) ASC, lower(p.position_name) ASC, p.canonical_url ASC";
+  if (sortBy === "posted_date") {
+    return "COALESCE(p.posted_at_epoch, 0) DESC, p.last_seen_epoch DESC, p.canonical_url ASC";
+  }
+  if (sortBy === "ats_source") {
+    return "lower(p.ats_key) ASC, lower(p.company_name) ASC, lower(p.position_name) ASC, p.last_seen_epoch DESC, p.canonical_url ASC";
+  }
+  if (sortBy === "confidence") {
+    return "COALESCE(p.confidence, 0) DESC, COALESCE(p.quality_score, 0) DESC, p.last_seen_epoch DESC, p.canonical_url ASC";
   }
   return "p.last_seen_epoch DESC, p.canonical_url";
 }
@@ -406,26 +453,35 @@ async function hydratePostgresPostings(pool, urls, options = {}) {
   return canonicalUrls.map((url) => byUrl.get(url)).filter(Boolean);
 }
 
+async function countPostgresPostingsSql(pool, options = {}) {
+  const filter = buildFilterSql(options, 1);
+  const result = await pool.query(
+    `
+      SELECT COUNT(*)::int AS count
+      FROM postings p
+      LEFT JOIN posting_application_state s
+        ON s.canonical_url = p.canonical_url
+      WHERE ${filter.where.join(" AND ")};
+    `,
+    filter.values
+  );
+  if (Object.prototype.hasOwnProperty.call(result.rows[0] || {}, "count")) {
+    return Number(result.rows[0]?.count || 0);
+  }
+  return Array.isArray(result.rows) ? result.rows.length : 0;
+}
+
 async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset = 0, sortBy = "recent") {
   const filter = buildFilterSql(options, 1);
-  const rank = String(sortBy || "").trim() === "company_asc"
-    ? { sql: "", values: [], nextIndex: filter.nextIndex }
-    : buildSearchRankSql(options.search, filter.nextIndex);
+  const rank = sortBy === "relevance"
+    ? buildSearchRankSql(options.search, filter.nextIndex)
+    : { sql: "", values: [], nextIndex: filter.nextIndex };
   const limitIndex = rank.nextIndex;
   const offsetIndex = rank.nextIndex + 1;
   const orderBy = getPostgresOrderBy(sortBy);
   const rankedOrderBy = rank.sql ? `${rank.sql} DESC, ${orderBy}` : orderBy;
-  const [countResult, result] = await Promise.all([
-    pool.query(
-      `
-        SELECT COUNT(*)::int AS count
-        FROM postings p
-        LEFT JOIN posting_application_state s
-          ON s.canonical_url = p.canonical_url
-        WHERE ${filter.where.join(" AND ")};
-      `,
-      filter.values
-    ),
+  const [count, result] = await Promise.all([
+    countPostgresPostingsSql(pool, options),
     pool.query(
       `
         SELECT
@@ -449,23 +505,61 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
       [...filter.values, ...rank.values, limit, offset]
     )
   ]);
-  return { items: result.rows.map(rowToPosting).slice(0, limit), count: Number(countResult.rows[0]?.count || 0), limit, offset };
+  return {
+    items: result.rows.map(rowToPosting).slice(0, limit),
+    count,
+    count_exact: true,
+    limit,
+    offset,
+    filters: {
+      search: String(options.search || "").trim(),
+      sort_by: sortBy,
+      freshness_days: normalizeFreshnessDays(options.freshness_days),
+      ats: parseCsv(options.ats).map(normalizeAtsKey),
+      countries: parseCsv(options.countries).map(normalizeCountryFilterValue),
+      regions: parseCsv(options.regions),
+      industries: parseCsv(options.industries),
+      remote: String(options.remote || "all").trim().toLowerCase() || "all",
+      hide_no_date: Boolean(options.hide_no_date),
+      include_ignored: Boolean(options.include_ignored)
+    }
+  };
 }
 
 async function listPostgresPostings(pool, options = {}) {
   const limit = Math.max(1, Math.min(2000, Number(options.limit || 500)));
   const offset = Math.max(0, Number(options.offset || 0));
   const meiliConfig = getMeiliConfig();
-  const sortBy = String(options.sort_by || "recent").trim();
-  const useMeili = meiliConfig.enabled && sortBy !== "company_asc" && offset + limit <= 2000 && (String(options.search || "").trim() || parseCsv(options.ats).length || parseCsv(options.countries).length || parseCsv(options.regions).length || parseCsv(options.industries).length || String(options.remote || "all") !== "all");
+  const sortBy = normalizePostingSort(options.sort_by);
+  const meiliSortable = sortBy === "relevance" || sortBy === "last_seen" || sortBy === "posted_date";
+  const useMeili = meiliConfig.enabled && meiliSortable && offset + limit <= 2000 && (String(options.search || "").trim() || parseCsv(options.ats).length || parseCsv(options.countries).length || parseCsv(options.regions).length || parseCsv(options.industries).length || String(options.remote || "all") !== "all" || normalizeFreshnessDays(options.freshness_days));
 
   if (useMeili) {
     try {
       const searchLimit = Math.min(2000, offset + Math.max(limit * 3, limit + 100));
-      const searchResult = await searchMeiliPostings({ ...options, limit: searchLimit, offset: 0 }, meiliConfig);
+      const normalizedOptions = { ...options, sort_by: sortBy, limit: searchLimit, offset: 0 };
+      const searchResult = await searchMeiliPostings(normalizedOptions, meiliConfig);
       const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
       if (urls.length === 0 && Number(searchResult.estimatedTotalHits || 0) === 0) {
-        return { items: [], count: 0, limit, offset };
+        return {
+          items: [],
+          count: 0,
+          count_exact: false,
+          limit,
+          offset,
+          filters: {
+            search: String(options.search || "").trim(),
+            sort_by: sortBy,
+            freshness_days: normalizeFreshnessDays(options.freshness_days),
+            ats: parseCsv(options.ats).map(normalizeAtsKey),
+            countries: parseCsv(options.countries).map(normalizeCountryFilterValue),
+            regions: parseCsv(options.regions),
+            industries: parseCsv(options.industries),
+            remote: String(options.remote || "all").trim().toLowerCase() || "all",
+            hide_no_date: Boolean(options.hide_no_date),
+            include_ignored: Boolean(options.include_ignored)
+          }
+        };
       }
       const hydratedItems = await hydratePostgresPostings(pool, urls, options);
       const items = hydratedItems.slice(offset, offset + limit);
@@ -495,13 +589,26 @@ async function listPostgresPostings(pool, options = {}) {
         });
         return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
       }
-      const count =
-        hydratedItems.length === urls.length
-          ? estimatedTotalHits
-          : estimatedTotalHits <= searchLimit
-            ? hydratedItems.length
-            : Math.max(offset + items.length, hydratedItems.length);
-      return { items: items.slice(0, limit), count, limit, offset };
+      const count = await countPostgresPostingsSql(pool, { ...options, sort_by: sortBy });
+      return {
+        items: items.slice(0, limit),
+        count,
+        count_exact: true,
+        limit,
+        offset,
+        filters: {
+          search: String(options.search || "").trim(),
+          sort_by: sortBy,
+          freshness_days: normalizeFreshnessDays(options.freshness_days),
+          ats: parseCsv(options.ats).map(normalizeAtsKey),
+          countries: parseCsv(options.countries).map(normalizeCountryFilterValue),
+          regions: parseCsv(options.regions),
+          industries: parseCsv(options.industries),
+          remote: String(options.remote || "all").trim().toLowerCase() || "all",
+          hide_no_date: Boolean(options.hide_no_date),
+          include_ignored: Boolean(options.include_ignored)
+        }
+      };
     } catch (error) {
       logSearchFallback("meili_error", {
         limit,
@@ -559,10 +666,7 @@ async function getPostgresFilterOptions(pool, atsItems = []) {
       label: row.display_name || labels.get(row.ats_key) || row.ats_key,
       enabled: Boolean(row.enabled)
     })),
-    sort_options: [
-      { value: "recent", label: "Most Recently Seen" },
-      { value: "company_asc", label: "Company (A-Z)" }
-    ],
+    sort_options: getPublicPostingSortOptions(),
     industries: industryRows.rows,
     regions: regionRows.rows,
     countries: countryRows.rows,

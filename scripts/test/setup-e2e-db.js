@@ -139,7 +139,8 @@ async function seedFixtureRows(db) {
       position_name: "Remote Backend Engineer",
       job_posting_url: "https://jobs.lever.co/openjobslotsqa/remote-backend-engineer",
       location: "Remote - EMEA",
-      posting_date: "2026-05-05T12:00:00Z"
+      posting_date: "2026-05-05T12:00:00Z",
+      last_seen_epoch: now - 10 * 24 * 60 * 60
     },
     {
       company_name: "QA Ashby Europe",
@@ -179,7 +180,7 @@ async function seedFixtureRows(db) {
         posting.location,
         posting.posting_date,
         now,
-        now
+        Number(posting.last_seen_epoch || now)
       ]
     );
   }

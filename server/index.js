@@ -732,7 +732,15 @@ const SYNC_DEFAULT_ENABLED_ATS = Object.freeze(
     .filter((item) => item.enabledByDefault !== false && isAtsEnabledByDefault(item.value))
     .map((item) => item.value)
 );
-const POSTING_SORT_OPTIONS = new Set(["recent", "company_asc"]);
+const POSTING_SORT_OPTION_ITEMS = Object.freeze([
+  { value: "relevance", label: "Relevance" },
+  { value: "last_seen", label: "Fresh source" },
+  { value: "posted_date", label: "Posted date" },
+  { value: "ats_source", label: "ATS/source" },
+  { value: "confidence", label: "Confidence" }
+]);
+const POSTING_SORT_OPTIONS = new Set(POSTING_SORT_OPTION_ITEMS.map((option) => option.value));
+const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
 const MCP_SETTINGS_DEFAULTS = {
   enabled: false,
   preferred_agent_name: "openjobslots Agent",
@@ -2608,20 +2616,93 @@ function normalizeAtsFilters(value) {
 
 function normalizePostingSort(value) {
   const normalized = normalizeLikeText(value);
-  if (normalized === "company_asc" || normalized === "alphabetical") {
-    return "company_asc";
+  if (normalized === "recent" || normalized === "fresh_source" || normalized === "fresh-source" || normalized === "lastseen") {
+    return "last_seen";
+  }
+  if (normalized === "posted" || normalized === "posted_at" || normalized === "posted-date") {
+    return "posted_date";
+  }
+  if (normalized === "ats" || normalized === "source" || normalized === "company_asc" || normalized === "alphabetical") {
+    return "ats_source";
+  }
+  if (normalized === "quality" || normalized === "quality_score" || normalized === "confidence_score") {
+    return "confidence";
   }
   if (POSTING_SORT_OPTIONS.has(normalized)) {
     return normalized;
   }
-  return "recent";
+  return "relevance";
+}
+
+function normalizeFreshnessDays(value) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return null;
+  const rounded = Math.floor(numberValue);
+  return POSTING_FRESHNESS_DAY_OPTIONS.has(rounded) ? rounded : null;
 }
 
 function getPostingsOrderByClause(sortBy) {
-  if (sortBy === "company_asc") {
-    return "company_name ASC, position_name ASC";
+  if (sortBy === "ats_source") {
+    return "COALESCE(last_seen_epoch, 0) DESC, id DESC";
+  }
+  if (sortBy === "posted_date") {
+    return "COALESCE(first_seen_epoch, last_seen_epoch, 0) DESC, COALESCE(last_seen_epoch, 0) DESC, id DESC";
+  }
+  if (sortBy === "confidence") {
+    return "COALESCE(confidence, 0) DESC, COALESCE(quality_score, 0) DESC, COALESCE(last_seen_epoch, 0) DESC, id DESC";
   }
   return "COALESCE(last_seen_epoch, 0) DESC, id DESC";
+}
+
+function getPublicPostingSortOptions() {
+  return POSTING_SORT_OPTION_ITEMS.map((option) => ({ ...option }));
+}
+
+function parsePostingDateEpoch(value) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
+}
+
+function getSqlitePostingRelevanceScore(row, search) {
+  const query = normalizeLikeText(search);
+  if (!query) return 0;
+  const position = normalizeLikeText(row?.position_name);
+  const company = normalizeLikeText(row?.company_name);
+  const location = normalizeLikeText(row?.location);
+  const ats = normalizeLikeText(row?.ats);
+  let score = 0;
+  if (position.includes(query)) score += 40;
+  if (company.includes(query)) score += 30;
+  if (location.includes(query)) score += 20;
+  if (ats.includes(query)) score += 10;
+  return score;
+}
+
+function sortSqlitePostingItems(items, sortBy, search) {
+  const rows = Array.isArray(items) ? items : [];
+  return rows.slice().sort((a, b) => {
+    if (sortBy === "relevance") {
+      const scoreDelta = getSqlitePostingRelevanceScore(b, search) - getSqlitePostingRelevanceScore(a, search);
+      if (scoreDelta !== 0) return scoreDelta;
+    }
+    if (sortBy === "posted_date") {
+      const postedDelta = parsePostingDateEpoch(b?.posting_date) - parsePostingDateEpoch(a?.posting_date);
+      if (postedDelta !== 0) return postedDelta;
+    } else if (sortBy === "ats_source") {
+      const atsDelta = String(a?.ats || "").localeCompare(String(b?.ats || ""));
+      if (atsDelta !== 0) return atsDelta;
+      const companyDelta = String(a?.company_name || "").localeCompare(String(b?.company_name || ""));
+      if (companyDelta !== 0) return companyDelta;
+    } else if (sortBy === "confidence") {
+      const confidenceDelta = Number(b?.confidence || 0) - Number(a?.confidence || 0);
+      if (confidenceDelta !== 0) return confidenceDelta;
+      const qualityDelta = Number(b?.quality_score || 0) - Number(a?.quality_score || 0);
+      if (qualityDelta !== 0) return qualityDelta;
+    }
+    const seenDelta = Number(b?.last_seen_epoch || 0) - Number(a?.last_seen_epoch || 0);
+    if (seenDelta !== 0) return seenDelta;
+    return String(a?.job_posting_url || "").localeCompare(String(b?.job_posting_url || ""));
+  });
 }
 
 function shuffleArrayInPlace(values) {
@@ -15778,8 +15859,11 @@ async function listPostingsWithFilters(options = {}) {
   const regionFilters = parseRegionFilters(normalizeStringArray(options?.regions));
   const remoteFilter = normalizeRemoteFilter(options?.remote);
   const hideNoDate = normalizeBoolean(options?.hide_no_date, false);
+  const freshnessDays = normalizeFreshnessDays(options?.freshness_days);
+  const freshnessCutoffEpoch = freshnessDays ? nowEpochSeconds() - freshnessDays * 24 * 60 * 60 : 0;
   const includeApplied = normalizeBoolean(options?.include_applied, true);
   const includeIgnored = normalizeBoolean(options?.include_ignored, false);
+  const requiresInMemorySort = sortBy === "relevance" || sortBy === "posted_date" || sortBy === "ats_source";
   const hasStructuredFilters =
     atsFilters.length > 0 ||
     industryKeys.length > 0 ||
@@ -15787,14 +15871,32 @@ async function listPostingsWithFilters(options = {}) {
     countyFilters.length > 0 ||
     countryFilters.length > 0 ||
     regionFilters.length > 0 ||
-    remoteFilter !== "all";
+    remoteFilter !== "all" ||
+    Boolean(freshnessDays) ||
+    requiresInMemorySort;
 
   let rows = [];
+  let totalCount = 0;
   if (!search && !hasStructuredFilters) {
     if (includeApplied && includeIgnored) {
-      rows = await db.all(
-        `
-          SELECT id, company_name, position_name, job_posting_url, location, posting_date, last_seen_epoch
+      const [countRow, pageRows] = await Promise.all([
+        db.get(
+          `
+            SELECT COUNT(*) AS count
+            FROM Postings
+            WHERE COALESCE(hidden, 0) = 0
+              AND (? = 0 OR (posting_date IS NOT NULL AND TRIM(posting_date) <> ''))
+              AND NOT EXISTS (
+                SELECT 1
+                FROM blocked_companies b
+                WHERE b.normalized_company_name = LOWER(TRIM(Postings.company_name))
+              );
+          `,
+          [hideNoDate ? 1 : 0]
+        ),
+        db.all(
+          `
+          SELECT id, company_name, position_name, job_posting_url, location, posting_date, first_seen_epoch, last_seen_epoch, confidence, quality_score
           FROM Postings
           WHERE COALESCE(hidden, 0) = 0
             AND (? = 0 OR (posting_date IS NOT NULL AND TRIM(posting_date) <> ''))
@@ -15806,12 +15908,38 @@ async function listPostingsWithFilters(options = {}) {
           ORDER BY ${orderByClause}
           LIMIT ? OFFSET ?;
         `,
-        [hideNoDate ? 1 : 0, limit, offset]
-      );
+          [hideNoDate ? 1 : 0, limit, offset]
+        )
+      ]);
+      rows = pageRows;
+      totalCount = Number(countRow?.count || 0);
     } else {
-      rows = await db.all(
-        `
-          SELECT p.id, p.company_name, p.position_name, p.job_posting_url, p.location, p.posting_date, p.last_seen_epoch
+      const [countRow, pageRows] = await Promise.all([
+        db.get(
+          `
+            SELECT COUNT(*) AS count
+            FROM Postings p
+            LEFT JOIN posting_application_state s
+              ON s.job_posting_url = p.job_posting_url
+              AND (
+                (${includeApplied ? 0 : 1} = 1 AND COALESCE(s.applied, 0) = 1)
+                OR
+                (${includeIgnored ? 0 : 1} = 1 AND COALESCE(s.ignored, 0) = 1)
+              )
+            WHERE COALESCE(p.hidden, 0) = 0
+              AND (? = 0 OR (p.posting_date IS NOT NULL AND TRIM(p.posting_date) <> ''))
+              AND NOT EXISTS (
+                SELECT 1
+                FROM blocked_companies b
+                WHERE b.normalized_company_name = LOWER(TRIM(p.company_name))
+              )
+              AND s.job_posting_url IS NULL;
+          `,
+          [hideNoDate ? 1 : 0]
+        ),
+        db.all(
+          `
+          SELECT p.id, p.company_name, p.position_name, p.job_posting_url, p.location, p.posting_date, p.first_seen_epoch, p.last_seen_epoch, p.confidence, p.quality_score
           FROM Postings p
           LEFT JOIN posting_application_state s
             ON s.job_posting_url = p.job_posting_url
@@ -15831,13 +15959,16 @@ async function listPostingsWithFilters(options = {}) {
           ORDER BY ${orderByClause}
           LIMIT ? OFFSET ?;
         `,
-        [hideNoDate ? 1 : 0, limit, offset]
-      );
+          [hideNoDate ? 1 : 0, limit, offset]
+        )
+      ]);
+      rows = pageRows;
+      totalCount = Number(countRow?.count || 0);
     }
   } else {
     rows = await db.all(
       `
-        SELECT id, company_name, position_name, job_posting_url, location, posting_date, last_seen_epoch
+        SELECT id, company_name, position_name, job_posting_url, location, posting_date, first_seen_epoch, last_seen_epoch, confidence, quality_score
         FROM Postings
         WHERE COALESCE(hidden, 0) = 0
           AND NOT EXISTS (
@@ -15891,9 +16022,12 @@ async function listPostingsWithFilters(options = {}) {
       if (!matchesRemote) return false;
 
       if (hideNoDate && !String(row?.posting_date || "").trim()) return false;
+      if (freshnessCutoffEpoch && Number(row?.last_seen_epoch || 0) < freshnessCutoffEpoch) return false;
 
       return true;
     });
+    items = sortSqlitePostingItems(items, sortBy, search);
+    totalCount = items.length;
     items = items.slice(offset, offset + limit);
   }
 
@@ -15908,13 +16042,15 @@ async function listPostingsWithFilters(options = {}) {
 
   return {
     items,
-    count: items.length,
+    count: totalCount || items.length,
+    count_exact: true,
     limit,
     offset,
     filters: {
       search,
       ats: atsFilters,
       sort_by: sortBy,
+      freshness_days: freshnessDays,
       industries: industryKeys,
       states: stateCodes,
       counties: countyFilters.map((filter) =>
@@ -18398,10 +18534,7 @@ function createServer() {
         label: item.label,
         enabled: enabledAts.has(item.value)
       }));
-      const sort_options = [
-        { value: "recent", label: "Most Recently Seen" },
-        { value: "company_asc", label: "Company (A-Z)" }
-      ];
+      const sort_options = getPublicPostingSortOptions();
 
       let industries = [];
       try {
@@ -18948,6 +19081,7 @@ function createServer() {
         limit: Number(req.query.limit || 500),
         offset: Number(req.query.offset || 0),
         sort_by: String(req.query.sort_by || "").trim(),
+        freshness_days: req.query.freshness_days,
         ats: parseCsvParam(req.query.ats),
         industries: parseCsvParam(req.query.industries),
         states: parseCsvParam(req.query.states),
@@ -18979,8 +19113,15 @@ function createServer() {
       return {
         items: sanitizeFrontendValue(sanitizePublicPostings(resultItems)),
         count: publicCount,
+        count_exact: result?.count_exact === false ? false : true,
+        count_capped: Boolean(result?.count_capped),
         limit: resultLimit,
         offset: resultOffset,
+        filters: sanitizeFrontendValue(result?.filters || {
+          search: options.search,
+          sort_by: normalizePostingSort(options.sort_by),
+          freshness_days: normalizeFreshnessDays(options.freshness_days)
+        }),
         has_more: Boolean(hasMore && resultItems.length > 0),
         next_offset: hasMore && resultItems.length > 0 ? loadedThrough : null
       };

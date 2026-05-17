@@ -750,6 +750,71 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("result count, freshness, and sort controls reflect current API results", async ({ page }) => {
+    const postingItem = {
+      id: 7001,
+      company_name: "QA Dynamic Count",
+      position_name: "Remote Product Engineer",
+      job_posting_url: "https://jobs.lever.co/openjobslotsqa/dynamic-count",
+      location: "Remote - EMEA",
+      posting_date: "2026-05-15",
+      last_seen_epoch: 1778889600,
+      ats: "lever"
+    };
+    const requestedPostings = [];
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      requestedPostings.push({
+        search: url.searchParams.get("search") || "",
+        freshnessDays: url.searchParams.get("freshness_days") || "",
+        sortBy: url.searchParams.get("sort_by") || ""
+      });
+      const freshnessDays = url.searchParams.get("freshness_days");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [postingItem],
+          count: freshnessDays === "3" ? 7 : 42,
+          count_exact: true,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          filters: {
+            search: url.searchParams.get("search") || "",
+            freshness_days: freshnessDays ? Number(freshnessDays) : null,
+            sort_by: url.searchParams.get("sort_by") || "relevance"
+          }
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("dynamic");
+    await page.getByTestId("search-input").press("Enter");
+    await expect(page.getByTestId("result-count")).toContainText("42 slots");
+
+    await ensureFiltersVisible(page);
+    await page.getByTestId("freshness-filter-3d").click();
+    await expect(page.getByTestId("result-count")).toContainText("7 slots");
+    await expect
+      .poll(() => requestedPostings.some((request) => request.search === "dynamic" && request.freshnessDays === "3"))
+      .toBeTruthy();
+
+    await page.getByTestId("sort-control").click();
+    await page.getByTestId("sort-option-posted-date").click();
+    await expect(page.getByTestId("sort-control")).toContainText(/Posted date/i);
+    await expect
+      .poll(() => requestedPostings.some((request) => request.search === "dynamic" && request.sortBy === "posted_date"))
+      .toBeTruthy();
+    await expectNoRawErrors(page);
+  });
+
   test("search motion, suggestions, coverage, and scrolling stay calm", async ({ page }) => {
     await openJobSlots(page);
 

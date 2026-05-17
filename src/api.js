@@ -96,6 +96,8 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   const countries = Array.isArray(filters?.countries) ? filters.countries.filter(Boolean) : [];
   const regions = Array.isArray(filters?.regions) ? filters.regions.filter(Boolean) : [];
   const remote = String(filters?.remote || "all").trim().toLowerCase();
+  const freshnessDays = Number(filters?.freshness_days || 0);
+  const sortBy = String(filters?.sort_by || "relevance").trim().toLowerCase();
 
   if (atsArray.length > 0) {
     params.set("ats", atsArray.join(","));
@@ -122,6 +124,14 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   }
   if (filters?.hide_no_date) {
     params.set("hide_no_date", "1");
+  }
+  if ([3, 7, 30].includes(freshnessDays)) {
+    params.set("freshness_days", String(freshnessDays));
+  }
+  if (sortBy && sortBy !== "relevance") {
+    params.set("sort_by", sortBy);
+  } else {
+    params.set("sort_by", "relevance");
   }
 
   return request(`/postings?${params.toString()}`);

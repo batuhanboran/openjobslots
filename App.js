@@ -370,6 +370,19 @@ const REGION_GROUPS = {
   europe: ["europe", "northern europe", "southern europe", "western europe", "eastern europe", "european union"],
   oceania: ["oceania", "australia", "australia and new zealand", "melanesia", "micronesia", "polynesia"]
 };
+const DEFAULT_POSTING_SORT_OPTIONS = [
+  { value: "relevance", label: "Relevance" },
+  { value: "last_seen", label: "Fresh source" },
+  { value: "posted_date", label: "Posted date" },
+  { value: "ats_source", label: "ATS/source" },
+  { value: "confidence", label: "Confidence" }
+];
+const FRESHNESS_FILTER_OPTIONS = [
+  { value: "all", label: "Any date", testId: "freshness-filter-any" },
+  { value: 3, label: "3 days", testId: "freshness-filter-3d" },
+  { value: 7, label: "7 days", testId: "freshness-filter-7d" },
+  { value: 30, label: "30 days", testId: "freshness-filter-30d" }
+];
 function createDefaultPostingsFilters() {
   return {
     ats: "all",
@@ -379,7 +392,9 @@ function createDefaultPostingsFilters() {
     states: [],
     counties: [],
     remote: "all",
-    hide_no_date: false
+    hide_no_date: false,
+    freshness_days: "all",
+    sort_by: "relevance"
   };
 }
 
@@ -393,7 +408,9 @@ function getPostingsFiltersSignature(filters = {}) {
     states: normalizeArray(filters.states),
     counties: normalizeArray(filters.counties),
     remote: String(filters.remote || "all"),
-    hide_no_date: Boolean(filters.hide_no_date)
+    hide_no_date: Boolean(filters.hide_no_date),
+    freshness_days: String(filters.freshness_days || "all"),
+    sort_by: String(filters.sort_by || "relevance")
   });
 }
 
@@ -1487,7 +1504,16 @@ function MultiSelectDropdown({
   );
 }
 
-function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, anyLabel = "Any" }) {
+function SingleSelectDropdown({
+  label,
+  options,
+  selectedValue,
+  onSelectValue,
+  anyLabel = "Any",
+  includeAnyOption = true,
+  triggerTestID = "",
+  optionTestIDPrefix = ""
+}) {
   const [open, setOpen] = useState(false);
   const normalizedOptions = Array.isArray(options) ? options : [];
   const selected = String(selectedValue || "all");
@@ -1499,7 +1525,7 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
       <Pressable
         onPress={() => setOpen((prev) => !prev)}
         style={({ pressed }) => [styles.dropdownTrigger, pressed ? styles.buttonPressed : null]}
-        testID={`${testIdPart}-filter-trigger`}
+        testID={triggerTestID || `${testIdPart}-filter-trigger`}
         accessibilityRole="button"
         accessibilityLabel={`${label} filter`}
       >
@@ -1510,24 +1536,26 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
       {open ? (
         <View style={styles.dropdownPanel}>
           <ScrollView style={styles.dropdownOptionsScroll}>
-            <Pressable
-              onPress={() => {
-                onSelectValue("all");
-                setOpen(false);
-              }}
-              style={({ pressed }) => [
-                styles.dropdownOption,
-                selected === "all" ? styles.dropdownOptionSelected : null,
-                pressed ? styles.buttonPressed : null
-              ]}
-              testID={`${testIdPart}-filter-option-all`}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected === "all" }}
-            >
-              <Text style={[styles.dropdownOptionLabel, selected === "all" ? styles.dropdownOptionLabelSelected : null]}>
-                {anyLabel}
-              </Text>
-            </Pressable>
+            {includeAnyOption ? (
+              <Pressable
+                onPress={() => {
+                  onSelectValue("all");
+                  setOpen(false);
+                }}
+                style={({ pressed }) => [
+                  styles.dropdownOption,
+                  selected === "all" ? styles.dropdownOptionSelected : null,
+                  pressed ? styles.buttonPressed : null
+                ]}
+                testID={`${testIdPart}-filter-option-all`}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected === "all" }}
+              >
+                <Text style={[styles.dropdownOptionLabel, selected === "all" ? styles.dropdownOptionLabelSelected : null]}>
+                  {anyLabel}
+                </Text>
+              </Pressable>
+            ) : null}
 
             {normalizedOptions.map((option) => {
               const value = String(option?.value || "");
@@ -1547,7 +1575,9 @@ function SingleSelectDropdown({ label, options, selectedValue, onSelectValue, an
                     !isEnabled ? styles.dropdownOptionDisabled : null,
                     pressed && isEnabled ? styles.buttonPressed : null
                   ]}
-                  testID={`${testIdPart}-filter-option-${toTestIdPart(value || option?.label)}`}
+                  testID={optionTestIDPrefix
+                    ? `${optionTestIDPrefix}-${toTestIdPart(value || option?.label)}`
+                    : `${testIdPart}-filter-option-${toTestIdPart(value || option?.label)}`}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: isSelected, disabled: !isEnabled }}
                 >
@@ -1594,7 +1624,8 @@ export default function App() {
     regions: [],
     countries: [],
     states: [],
-    counties: []
+    counties: [],
+    sort_options: DEFAULT_POSTING_SORT_OPTIONS
   });
   const [postingFilterOptionsLoading, setPostingFilterOptionsLoading] = useState(false);
   const [postingsFilterPanelOpen, setPostingsFilterPanelOpen] = useState(false);
@@ -1931,7 +1962,8 @@ export default function App() {
       (postingsFilters.states || []).length > 0 ||
       (postingsFilters.counties || []).length > 0 ||
       postingsFilters.remote !== "all" ||
-      Boolean(postingsFilters.hide_no_date)
+      Boolean(postingsFilters.hide_no_date) ||
+      String(postingsFilters.freshness_days || "all") !== "all"
     );
   }, [postingsFilters]);
   const hasLocationPostingFilters = useMemo(() => {
@@ -2146,7 +2178,10 @@ export default function App() {
         regions: Array.isArray(response?.regions) ? response.regions : [],
         countries: Array.isArray(response?.countries) ? response.countries : [],
         states: Array.isArray(response?.states) ? response.states : [],
-        counties: Array.isArray(response?.counties) ? response.counties : []
+        counties: Array.isArray(response?.counties) ? response.counties : [],
+        sort_options: Array.isArray(response?.sort_options) && response.sort_options.length > 0
+          ? response.sort_options
+          : DEFAULT_POSTING_SORT_OPTIONS
       });
     } catch (e) {
       setError(String(e.message || e));
@@ -3549,6 +3584,9 @@ export default function App() {
     const resultCountLabel = showResultsSurface
       ? `${formatCompactNumberLabel(resultTotalCount)} ${resultTotalCount === 1 ? "slot" : "slots"}`
       : "Search to see slots";
+    const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
+      ? postingFilterOptions.sort_options
+      : DEFAULT_POSTING_SORT_OPTIONS;
 
     return (
     <View style={styles.postingsPageFrame}>
@@ -3841,19 +3879,33 @@ export default function App() {
             <View style={styles.freshnessFilterGroup}>
               <Text style={styles.fieldLabel}>Freshness</Text>
               <View style={styles.remoteFilterChipsRow}>
-                <View style={[styles.remoteFilterChip, styles.remoteFilterChipActive]}>
-                  <Text style={[styles.remoteFilterChipText, styles.remoteFilterChipTextActive]}>Any date</Text>
-                </View>
-                <Pressable
-                  disabled
-                  style={[styles.remoteFilterChip, styles.filterChipDisabled]}
-                  testID="freshness-filter-3d"
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: true }}
-                  accessibilityLabel="3 days freshness filter placeholder"
-                >
-                  <Text style={[styles.remoteFilterChipText, styles.filterChipDisabledText]}>3 days</Text>
-                </Pressable>
+                {FRESHNESS_FILTER_OPTIONS.map((option) => {
+                  const selected = String(postingsFilters.freshness_days || "all") === String(option.value);
+                  return (
+                    <Pressable
+                      key={String(option.value)}
+                      onPress={() => {
+                        setSearchResultsMode(true);
+                        setPostingsFilters((prev) => ({
+                          ...prev,
+                          freshness_days: option.value
+                        }));
+                      }}
+                      style={({ pressed }) => [
+                        styles.remoteFilterChip,
+                        selected ? styles.remoteFilterChipActive : null,
+                        pressed ? styles.buttonPressed : null
+                      ]}
+                      testID={option.testId}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
 
@@ -3944,14 +3996,23 @@ export default function App() {
             <Text style={styles.resultCountText} testID="result-count" accessibilityRole="status">
               {resultCountLabel}
             </Text>
-            <View
-              style={styles.sortControl}
-              testID="sort-control"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
-              accessibilityLabel="Sort control placeholder"
-            >
-              <Text style={styles.sortControlText}>Sort: Last seen</Text>
+            <View style={styles.sortControlWrap}>
+              <SingleSelectDropdown
+                label="Sort"
+                options={sortOptions}
+                selectedValue={postingsFilters.sort_by}
+                onSelectValue={(value) => {
+                  setSearchResultsMode(true);
+                  setPostingsFilters((prev) => ({
+                    ...prev,
+                    sort_by: value || "relevance"
+                  }));
+                }}
+                anyLabel="Relevance"
+                includeAnyOption={false}
+                triggerTestID="sort-control"
+                optionTestIDPrefix="sort-option"
+              />
             </View>
           </View>
         </View>
@@ -5897,6 +5958,11 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.text,
     fontSize: 13,
     fontWeight: "800"
+  },
+  sortControlWrap: {
+    minWidth: 180,
+    maxWidth: 240,
+    zIndex: 5
   },
   sortControl: {
     minHeight: 40,
