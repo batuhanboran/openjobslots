@@ -15,6 +15,8 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
+import appMetadata from "./app.json";
+import packageMetadata from "./package.json";
 import {
   blockCompany,
   createApplication,
@@ -24,7 +26,6 @@ import {
   fetchMcpCandidates,
   fetchMcpSettings,
   fetchPostingFilterOptions,
-  fetchPostingDiagnostics,
   fetchPersonalInformation,
   fetchPostings,
   fetchSearchSuggestions,
@@ -118,7 +119,7 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
-const PUBLIC_APP_VERSION = "1.8.0";
+const PUBLIC_APP_VERSION = String(appMetadata?.expo?.version || packageMetadata?.version || "1.8.0");
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
@@ -1195,10 +1196,6 @@ function PostingCard({
   ignoringPostingIds,
   blockedCompanyNames,
   blockingCompanyNames,
-  diagnostics,
-  diagnosticsOpen,
-  diagnosticsLoading,
-  onToggleDiagnostics,
   showAdminActions = false
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1227,15 +1224,6 @@ function PostingCard({
   const postingDateLabel = sanitizeDisplayText(item?.posting_date, "Posting date unavailable");
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
   const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
-  const diagnosticsItem = diagnostics?.item?.diagnostics || null;
-  const diagnosticsFlags = Array.isArray(diagnosticsItem?.quality_flags) ? diagnosticsItem.quality_flags.slice(0, 4) : [];
-  const diagnosticsQuality = Number.isFinite(Number(diagnosticsItem?.quality_score))
-    ? `${Number(diagnosticsItem.quality_score)}/100`
-    : "Not scored";
-  const diagnosticsConfidence = Number.isFinite(Number(diagnosticsItem?.confidence_score))
-    ? Number(diagnosticsItem.confidence_score).toFixed(2)
-    : "Unknown";
-
   return (
     <View style={styles.card} testID="posting-card">
       <View style={styles.postingCardTopRow}>
@@ -1336,48 +1324,6 @@ function PostingCard({
           </View>
         ) : null}
       </View>
-      <View style={styles.postingCardSourceRow}>
-        <Pressable
-          onPress={() => onToggleDiagnostics?.(item)}
-          style={({ pressed }) => [styles.postingCardSourceButton, pressed ? styles.buttonPressed : null]}
-          testID="posting-card-source-toggle"
-          accessibilityRole="button"
-          accessibilityLabel="Show posting source and quality details"
-        >
-          <Text style={styles.postingCardSourceButtonText}>{diagnosticsOpen ? "Hide source" : "Source"}</Text>
-        </Pressable>
-      </View>
-      {diagnosticsOpen ? (
-        <View style={styles.postingCardSourcePanel} testID="posting-card-source-panel">
-          {diagnosticsLoading ? (
-            <Text style={styles.postingCardSourceText}>Loading source details...</Text>
-          ) : diagnostics?.ok === false ? (
-            <Text style={styles.postingCardSourceText}>{diagnostics.error || "Source details are unavailable."}</Text>
-          ) : diagnosticsItem ? (
-            <>
-              <Text style={styles.postingCardSourceText}>
-                Source: {sanitizeDisplayText(diagnosticsItem.source_ats || item?.ats || atsLabel, "Unknown")}
-              </Text>
-              <Text style={styles.postingCardSourceText}>
-                Last seen: {formatEpochSeconds(diagnosticsItem.last_seen_epoch, "Not available")}
-              </Text>
-              <Text style={styles.postingCardSourceText}>
-                Quality: {diagnosticsQuality} - Confidence: {diagnosticsConfidence}
-              </Text>
-              <Text style={styles.postingCardSourceText}>
-                Parser: {sanitizeDisplayText(diagnosticsItem.parser_key || diagnosticsItem.parser_version, "Unknown")}
-              </Text>
-              {diagnosticsFlags.length > 0 ? (
-                <Text style={styles.postingCardSourceFlags}>Flags: {diagnosticsFlags.join(", ")}</Text>
-              ) : (
-                <Text style={styles.postingCardSourceFlags}>No quality warnings recorded.</Text>
-              )}
-            </>
-          ) : (
-            <Text style={styles.postingCardSourceText}>Source details are unavailable.</Text>
-          )}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1657,9 +1603,6 @@ export default function App() {
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
   const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
-  const [postingDiagnosticsOpenUrl, setPostingDiagnosticsOpenUrl] = useState("");
-  const [postingDiagnosticsByUrl, setPostingDiagnosticsByUrl] = useState({});
-  const [postingDiagnosticsLoadingByUrl, setPostingDiagnosticsLoadingByUrl] = useState({});
   const [showScrollTopButton, setShowScrollTopButton] = useState(false);
   const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
@@ -2000,6 +1943,32 @@ export default function App() {
     );
   }, [postingsFilters]);
   const hasRemotePostingFilter = postingsFilters.remote !== "all";
+  const visibleSourceSummary = useMemo(() => {
+    const bySource = new Map();
+    postings.forEach((posting) => {
+      const sourceKey = String(posting?.ats || "").trim().toLowerCase() || "unknown";
+      const sourceLabel = getAtsDisplayLabel(sourceKey);
+      const existing = bySource.get(sourceKey) || {
+        key: sourceKey,
+        label: sourceLabel,
+        count: 0,
+        latestSeenEpoch: 0,
+        datedCount: 0
+      };
+      existing.count += 1;
+      const seenEpoch = Number(posting?.last_seen_epoch || 0);
+      if (Number.isFinite(seenEpoch) && seenEpoch > existing.latestSeenEpoch) {
+        existing.latestSeenEpoch = seenEpoch;
+      }
+      if (String(posting?.posting_date || "").trim()) {
+        existing.datedCount += 1;
+      }
+      bySource.set(sourceKey, existing);
+    });
+    return Array.from(bySource.values())
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      .slice(0, 5);
+  }, [postings]);
 
   const searchQueryText = String(search || "").trim();
   const showResultsSurface = searchResultsMode || hasActivePostingFilters;
@@ -2166,37 +2135,6 @@ export default function App() {
       }
     }
   }, [queueFrontendLog]);
-
-  const togglePostingDiagnostics = useCallback(async (item) => {
-    const postingUrl = String(item?.job_posting_url || "").trim();
-    if (!postingUrl) return;
-    if (postingDiagnosticsOpenUrl === postingUrl) {
-      setPostingDiagnosticsOpenUrl("");
-      return;
-    }
-    setPostingDiagnosticsOpenUrl(postingUrl);
-    if (postingDiagnosticsByUrl[postingUrl] || postingDiagnosticsLoadingByUrl[postingUrl]) {
-      return;
-    }
-    setPostingDiagnosticsLoadingByUrl((prev) => ({ ...prev, [postingUrl]: true }));
-    try {
-      const response = await fetchPostingDiagnostics(postingUrl);
-      setPostingDiagnosticsByUrl((prev) => ({
-        ...prev,
-        [postingUrl]: response?.ok === false
-          ? { ok: false, error: "Source details are not available for this posting yet." }
-          : { ok: true, item: response?.item || null }
-      }));
-    } catch (e) {
-      setPostingDiagnosticsByUrl((prev) => ({
-        ...prev,
-        [postingUrl]: { ok: false, error: "Source details are temporarily unavailable." }
-      }));
-      queueFrontendLog("warn", "posting_diagnostics_failed", String(e?.message || e), { posting_url: postingUrl });
-    } finally {
-      setPostingDiagnosticsLoadingByUrl((prev) => ({ ...prev, [postingUrl]: false }));
-    }
-  }, [postingDiagnosticsByUrl, postingDiagnosticsLoadingByUrl, postingDiagnosticsOpenUrl, queueFrontendLog]);
 
   const loadPostingFilterOptions = useCallback(async () => {
     setPostingFilterOptionsLoading(true);
@@ -3256,7 +3194,7 @@ export default function App() {
           setDrawerOpen(false);
           return;
         }
-        if (isEditableTarget && targetTestId !== "postings-search-input") {
+        if (isEditableTarget && targetTestId !== "search-input") {
           return;
         }
         if (activePage === PAGE_KEYS.POSTINGS) {
@@ -3605,7 +3543,14 @@ export default function App() {
     </Modal>
   );
 
-  const renderPostingsPage = () => (
+  const renderPostingsPage = () => {
+    const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
+    const resultTotalCount = Math.max(postingsTotalCount, postings.length);
+    const resultCountLabel = showResultsSurface
+      ? `${formatCompactNumberLabel(resultTotalCount)} ${resultTotalCount === 1 ? "slot" : "slots"}`
+      : "Search to see slots";
+
+    return (
     <View style={styles.postingsPageFrame}>
       <ScrollView
         ref={postingsListRef}
@@ -3616,18 +3561,26 @@ export default function App() {
         scrollEventThrottle={250}
         testID="postings-page-scroll"
       >
+      <View
+        style={[styles.publicSearchLayout, isDesktopViewport ? styles.publicSearchLayoutDesktop : styles.publicSearchLayoutMobile]}
+        testID="search-shell"
+      >
+      <View
+        style={[
+          styles.searchPanel,
+          isDesktopViewport ? styles.searchPanelDesktop : styles.searchPanelMobile,
+          isDesktopViewport ? styles.searchPanelSticky : null
+        ]}
+        testID="search-panel"
+      >
       <Animated.View
         style={[
           styles.searchShell,
-          searchShellCompact ? styles.searchShellCompact : styles.searchShellHome,
-          searchUiMode === "suggest" ? styles.searchShellSuggest : null,
-          postingsFilterPanelOpen && !showResultsSurface ? styles.searchShellFilterOpen : null,
-          Platform.OS === "web" ? styles.webSmoothMotion : null,
-          searchMotionStyle
+          Platform.OS === "web" ? styles.webSmoothMotion : null
         ]}
-        testID="search-shell"
+        testID="search-controls"
       >
-        {isDesktopViewport && searchUiMode !== "results" ? (
+        {isDesktopViewport ? (
           <View pointerEvents={Platform.OS === "web" ? undefined : "box-none"} style={styles.searchMetaRail}>
             <Pressable
               onPress={() => setReleaseNotesOpen(true)}
@@ -3656,30 +3609,29 @@ export default function App() {
         <Pressable
           onPress={handleBrandHome}
           style={({ pressed }) => [styles.brandWordmark, pressed ? styles.brandWordmarkPressed : null]}
-          testID="brand-wordmark"
+          testID="app-logo"
           accessibilityRole="link"
           accessibilityLabel="openjobslots home"
         >
-          {WORDMARK_SEGMENTS.map((segment, index) => (
-            <Text
-              key={`brand-wordmark-${segment.text}-${index}`}
-              style={[
-                styles.brandWordmarkLetter,
-                searchShellCompact ? styles.brandWordmarkLetterCompact : null,
-                { color: segment.color }
-              ]}
-            >
-              {segment.text}
-            </Text>
-          ))}
+          <View style={styles.brandWordmarkInner} testID="brand-wordmark">
+            {WORDMARK_SEGMENTS.map((segment, index) => (
+              <Text
+                key={`brand-wordmark-${segment.text}-${index}`}
+                style={[styles.brandWordmarkLetter, { color: segment.color }]}
+              >
+                {segment.text}
+              </Text>
+            ))}
+          </View>
         </Pressable>
-        <Text style={[styles.searchLead, searchShellCompact ? styles.searchLeadCompact : null]}>
+        <Text style={styles.searchLead}>
           Find fresh openings across public ATS job boards.
         </Text>
+        <Text style={styles.searchPanelLabel}>Search openings</Text>
         <View style={styles.searchBoxRow}>
           <TextInput
             ref={searchInputRef}
-            style={[styles.search, searchShellCompact ? styles.searchCompact : null]}
+            style={styles.search}
             value={search}
             onChangeText={handleSearchChange}
             onSubmitEditing={() => submitSearch(search)}
@@ -3688,16 +3640,12 @@ export default function App() {
             autoCapitalize="none"
             returnKeyType="search"
             blurOnSubmit={false}
-            testID="postings-search-input"
+            testID="search-input"
             accessibilityLabel="Search postings"
           />
         </View>
         <View
-          style={[
-            styles.searchLowerRail,
-            searchShellCompact ? styles.searchLowerRailCompact : null,
-            postingsFilterPanelOpen && !showResultsSurface ? styles.searchLowerRailFiltersOpen : null
-          ]}
+          style={styles.searchLowerRail}
         >
           {suggestionsVisible ? (
             <Animated.View
@@ -3732,17 +3680,19 @@ export default function App() {
                 </Text>
               ) : null}
               <View style={styles.searchActionsRow}>
-                <Pressable
-                  onPress={() => setPostingsFilterPanelOpen((prev) => !prev)}
-                  style={({ pressed }) => [styles.postingsFiltersToggleBtn, pressed ? styles.buttonPressed : null]}
-                  testID="postings-filter-toggle"
-                  accessibilityRole="button"
-                  accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
-                >
-                  <Text style={styles.postingsFiltersToggleText}>
-                    {postingsFilterPanelOpen ? "Hide filters" : "Filters"}
-                  </Text>
-                </Pressable>
+                {!isDesktopViewport ? (
+                  <Pressable
+                    onPress={() => setPostingsFilterPanelOpen((prev) => !prev)}
+                    style={({ pressed }) => [styles.postingsFiltersToggleBtn, pressed ? styles.buttonPressed : null]}
+                    testID="postings-filter-toggle"
+                    accessibilityRole="button"
+                    accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
+                  >
+                    <Text style={styles.postingsFiltersToggleText}>
+                      {postingsFilterPanelOpen ? "Hide filters" : "Filters"}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
                   onPress={clearSearchAndSuggestions}
                   style={({ pressed }) => [styles.postingsFiltersClearBtn, pressed ? styles.buttonPressed : null]}
@@ -3763,7 +3713,7 @@ export default function App() {
         </View>
       </Animated.View>
 
-      {postingsFilterPanelOpen ? (
+      {filtersVisible ? (
         <View style={styles.postingsFiltersPanel} testID="filters-panel">
           <View style={styles.postingsFiltersPanelContent}>
             {postingFilterOptionsLoading ? (
@@ -3888,6 +3838,25 @@ export default function App() {
               </>
             )}
 
+            <View style={styles.freshnessFilterGroup}>
+              <Text style={styles.fieldLabel}>Freshness</Text>
+              <View style={styles.remoteFilterChipsRow}>
+                <View style={[styles.remoteFilterChip, styles.remoteFilterChipActive]}>
+                  <Text style={[styles.remoteFilterChipText, styles.remoteFilterChipTextActive]}>Any date</Text>
+                </View>
+                <Pressable
+                  disabled
+                  style={[styles.remoteFilterChip, styles.filterChipDisabled]}
+                  testID="freshness-filter-3d"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: true }}
+                  accessibilityLabel="3 days freshness filter placeholder"
+                >
+                  <Text style={[styles.remoteFilterChipText, styles.filterChipDisabledText]}>3 days</Text>
+                </Pressable>
+              </View>
+            </View>
+
             <View style={styles.remoteFilterGroup}>
               <Text style={styles.fieldLabel}>Remote Filter</Text>
               <View style={styles.remoteFilterChipsRow}>
@@ -3943,12 +3912,64 @@ export default function App() {
         </View>
       ) : null}
 
+      <View style={styles.atsIntelligencePanel} testID="ats-intelligence-panel">
+        <Text style={styles.atsIntelligenceTitle}>Source mix</Text>
+        {showResultsSurface && visibleSourceSummary.length > 0 ? (
+          visibleSourceSummary.map((source) => (
+            <View key={source.key} style={styles.atsIntelligenceRow}>
+              <View style={styles.atsIntelligenceSourceBlock}>
+                <Text style={styles.atsIntelligenceSource}>{source.label}</Text>
+                <Text style={styles.atsIntelligenceMeta}>
+                  {formatCompactNumberLabel(source.count)} {source.count === 1 ? "result" : "results"}
+                </Text>
+              </View>
+              <Text style={styles.atsIntelligenceFreshness}>
+                {source.latestSeenEpoch ? formatEpochSeconds(source.latestSeenEpoch, "Recently seen") : "Current set"}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.atsIntelligenceEmpty}>Run a search to see sources in the current result set.</Text>
+        )}
+      </View>
+      </View>
+
+      <View style={styles.resultsColumn}>
+        <View style={styles.resultsHeader}>
+          <View>
+            <Text style={styles.resultsEyebrow}>Public search</Text>
+            <Text style={styles.resultsTitle}>Open roles</Text>
+          </View>
+          <View style={styles.resultsToolbar}>
+            <Text style={styles.resultCountText} testID="result-count" accessibilityRole="status">
+              {resultCountLabel}
+            </Text>
+            <View
+              style={styles.sortControl}
+              testID="sort-control"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: true }}
+              accessibilityLabel="Sort control placeholder"
+            >
+              <Text style={styles.sortControlText}>Sort: Last seen</Text>
+            </View>
+          </View>
+        </View>
+
+      {!showResultsSurface ? (
+        <View style={styles.initialResultsState} testID="postings-initial-state">
+          <Text style={styles.emptyTitle}>Search fresh public ATS openings.</Text>
+          <Text style={styles.emptyText}>
+            Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.
+          </Text>
+        </View>
+      ) : null}
+
       {showResultsSurface ? (
         <Animated.View
           style={[styles.resultsSurface, Platform.OS === "web" ? styles.resultsSurfaceMotion : null, resultsMotionStyle]}
           testID="results-surface"
         >
-          {renderSyncStatusPanel()}
           {loading && !initializing ? (
             <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" accessibilityRole="status">
               Updating visible results...
@@ -4011,10 +4032,6 @@ export default function App() {
                     ignoringPostingIds={ignoringPostingIds}
                     blockedCompanyNames={blockedCompanyNames}
                     blockingCompanyNames={blockingCompanyNamesSet}
-                    diagnosticsOpen={postingDiagnosticsOpenUrl === String(item?.job_posting_url || "").trim()}
-                    diagnosticsLoading={Boolean(postingDiagnosticsLoadingByUrl[String(item?.job_posting_url || "").trim()])}
-                    diagnostics={postingDiagnosticsByUrl[String(item?.job_posting_url || "").trim()]}
-                    onToggleDiagnostics={togglePostingDiagnostics}
                   />
                 ))
               )}
@@ -4040,6 +4057,8 @@ export default function App() {
           ) : null}
         </Animated.View>
       ) : null}
+      </View>
+      </View>
       </ScrollView>
       {showResultsSurface && showScrollTopButton ? (
         <Pressable
@@ -4058,7 +4077,8 @@ export default function App() {
       ) : null}
       {isDesktopViewport ? renderReleaseNotesModal() : null}
     </View>
-  );
+    );
+  };
 
   const renderApplicationsPage = () => (
     <ScrollView contentContainerStyle={styles.settingsContent}>
@@ -5021,7 +5041,9 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.bg
   },
   postingsPageContent: {
-    paddingBottom: 20
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 40
   },
   webSmoothMotion: {
     transitionProperty: "min-height, padding, margin, transform, opacity",
@@ -5030,12 +5052,53 @@ const styles = StyleSheet.create({
   },
   searchShell: {
     position: "relative",
-    alignSelf: "center",
     width: "100%",
-    maxWidth: 980,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center"
+    alignItems: "stretch"
+  },
+  publicSearchLayout: {
+    width: "100%",
+    maxWidth: 1280,
+    alignSelf: "center",
+    gap: 16
+  },
+  publicSearchLayoutDesktop: {
+    flexDirection: "row",
+    alignItems: "flex-start"
+  },
+  publicSearchLayoutMobile: {
+    flexDirection: "column"
+  },
+  searchPanel: {
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 12,
+    backgroundColor: OJS_COLORS.surface,
+    padding: 14,
+    zIndex: 5,
+    ...(Platform.OS === "web"
+      ? { boxShadow: "0 8px 24px rgba(38, 51, 45, 0.08)" }
+      : {
+          shadowColor: OJS_COLORS.shadow,
+          shadowOpacity: 0.08,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 }
+        })
+  },
+  searchPanelDesktop: {
+    width: 340,
+    flexShrink: 0
+  },
+  searchPanelMobile: {
+    width: "100%"
+  },
+  searchPanelSticky: {
+    ...(Platform.OS === "web"
+      ? {
+          position: "sticky",
+          top: 14,
+          alignSelf: "flex-start"
+        }
+      : {})
   },
   searchShellHome: {
     minHeight: Platform.OS === "web" ? "calc(100svh - 48px)" : 620,
@@ -5062,21 +5125,16 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   searchMetaRail: {
-    position: "absolute",
-    top: Platform.OS === "web" ? 14 : 10,
-    left: 16,
-    right: 16,
-    zIndex: 3,
-    elevation: 3,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
+    marginBottom: 12,
     ...(Platform.OS === "web" ? { pointerEvents: "box-none" } : {})
   },
   publicVersionButton: {
     flexShrink: 1,
-    maxWidth: "36%",
+    maxWidth: "46%",
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4
@@ -5094,7 +5152,7 @@ const styles = StyleSheet.create({
   },
   searchCreditText: {
     flexShrink: 1,
-    maxWidth: "62%",
+    maxWidth: "54%",
     textAlign: "right",
     color: OJS_COLORS.muted,
     fontSize: 11,
@@ -5108,21 +5166,23 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline"
   },
   brandWordmark: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "center",
-    marginTop: 2,
+    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 2,
     borderRadius: 24
+  },
+  brandWordmarkInner: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "flex-start"
   },
   brandWordmarkPressed: {
     backgroundColor: OJS_COLORS.surfaceMuted,
     transform: [{ scale: 0.992 }]
   },
   brandWordmarkLetter: {
-    fontSize: 44,
-    lineHeight: 50,
+    fontSize: 30,
+    lineHeight: 34,
     fontWeight: "800",
     letterSpacing: 0
   },
@@ -5144,9 +5204,10 @@ const styles = StyleSheet.create({
   },
   searchLead: {
     marginTop: 2,
-    marginBottom: 18,
-    textAlign: "center",
+    marginBottom: 16,
+    textAlign: "left",
     fontSize: 13,
+    lineHeight: 18,
     color: OJS_COLORS.muted
   },
   searchLeadCompact: {
@@ -5155,15 +5216,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16
   },
+  searchPanelLabel: {
+    marginBottom: 7,
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+    textTransform: "uppercase"
+  },
   searchBoxRow: {
     width: "100%",
-    maxWidth: 760
+    maxWidth: "100%"
   },
   searchLowerRail: {
     width: "100%",
-    maxWidth: 760,
-    minHeight: Platform.OS === "web" ? 170 : 170,
-    alignItems: "center"
+    minHeight: 0,
+    alignItems: "stretch"
   },
   searchLowerRailCompact: {
     minHeight: Platform.OS === "web" ? 58 : 54
@@ -5181,7 +5249,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     gap: 8,
     flexWrap: "wrap"
   },
@@ -5233,23 +5301,16 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }]
   },
   postingsFiltersPanel: {
-    alignSelf: "center",
     width: "100%",
-    maxWidth: 1160,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
-    borderRadius: 14,
-    backgroundColor: OJS_COLORS.surface,
-    padding: 10
+    maxWidth: "100%",
+    marginTop: 14,
+    marginBottom: 4
   },
   postingsFiltersPanelContent: {
     paddingBottom: 4
   },
   postingsFiltersIntro: {
-    borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: OJS_COLORS.surfaceMuted,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -5422,6 +5483,10 @@ const styles = StyleSheet.create({
   remoteFilterGroup: {
     marginTop: 2
   },
+  freshnessFilterGroup: {
+    marginTop: 2,
+    marginBottom: 12
+  },
   remoteFilterChipsRow: {
     flexDirection: "row",
     gap: 8,
@@ -5468,14 +5533,21 @@ const styles = StyleSheet.create({
   remoteFilterChipTextActive: {
     color: OJS_COLORS.ink
   },
+  filterChipDisabled: {
+    opacity: 0.58,
+    backgroundColor: OJS_COLORS.hover
+  },
+  filterChipDisabledText: {
+    color: OJS_COLORS.muted
+  },
   search: {
     borderWidth: 1,
     borderColor: OJS_COLORS.border,
-    borderRadius: 30,
+    borderRadius: 12,
     backgroundColor: OJS_COLORS.surface,
-    paddingHorizontal: 24,
-    height: 58,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: 14,
     color: OJS_COLORS.ink,
     ...(Platform.OS === "web"
       ? {
@@ -5741,6 +5813,113 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: 20
   },
+  atsIntelligencePanel: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: OJS_COLORS.softBorder,
+    paddingTop: 12
+  },
+  atsIntelligenceTitle: {
+    color: OJS_COLORS.ink,
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 8
+  },
+  atsIntelligenceRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: OJS_COLORS.softBorder
+  },
+  atsIntelligenceSourceBlock: {
+    flex: 1,
+    minWidth: 0
+  },
+  atsIntelligenceSource: {
+    color: OJS_COLORS.text,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  atsIntelligenceMeta: {
+    marginTop: 2,
+    color: OJS_COLORS.muted,
+    fontSize: 11
+  },
+  atsIntelligenceFreshness: {
+    flexShrink: 1,
+    maxWidth: 132,
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    textAlign: "right"
+  },
+  atsIntelligenceEmpty: {
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17
+  },
+  resultsColumn: {
+    flex: 1,
+    minWidth: 0
+  },
+  resultsHeader: {
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap"
+  },
+  resultsEyebrow: {
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+    textTransform: "uppercase"
+  },
+  resultsTitle: {
+    marginTop: 2,
+    color: OJS_COLORS.ink,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "800"
+  },
+  resultsToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    flexWrap: "wrap"
+  },
+  resultCountText: {
+    color: OJS_COLORS.text,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  sortControl: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 10,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 12,
+    justifyContent: "center"
+  },
+  sortControlText: {
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  initialResultsState: {
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 12,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 22
+  },
   resultsSurface: {
     width: "100%"
   },
@@ -5750,13 +5929,12 @@ const styles = StyleSheet.create({
     transitionTimingFunction: "cubic-bezier(0.0, 0.0, 0.2, 1)"
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingTop: 8,
     paddingBottom: 12,
     gap: 10
   },
   postingsRefreshIndicator: {
-    marginHorizontal: 16,
     marginTop: 2,
     marginBottom: 4,
     color: OJS_COLORS.muted,
@@ -5765,8 +5943,6 @@ const styles = StyleSheet.create({
   postingsPagingFooter: {
     alignSelf: "center",
     width: "100%",
-    maxWidth: 980,
-    paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 24,
     alignItems: "center",
@@ -5884,43 +6060,6 @@ const styles = StyleSheet.create({
   },
   postingCardMainPressAreaPressed: {
     opacity: 0.78
-  },
-  postingCardSourceRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    justifyContent: "flex-start"
-  },
-  postingCardSourceButton: {
-    borderWidth: 1,
-    borderColor: OJS_COLORS.border,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: OJS_COLORS.surfaceMuted
-  },
-  postingCardSourceButtonText: {
-    fontSize: 12,
-    color: OJS_COLORS.text,
-    fontWeight: "600"
-  },
-  postingCardSourcePanel: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: OJS_COLORS.surfaceMuted
-  },
-  postingCardSourceText: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: OJS_COLORS.text
-  },
-  postingCardSourceFlags: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 18,
-    color: OJS_COLORS.muted
   },
   postingCardMenuAnchor: {
     position: "relative",

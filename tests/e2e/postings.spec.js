@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const { version: APP_VERSION } = require("../../package.json");
 
 const SEARCH_COMPATIBILITY_QUERIES = [
   "remote jobs",
@@ -57,11 +58,19 @@ async function openJobSlots(page) {
   });
 
   await page.goto("/");
-  await expect(page.getByTestId("brand-wordmark")).toContainText("openjobslots");
+  await expect(page.getByTestId("app-logo")).toContainText("openjobslots");
   await expect(page.getByTestId("search-shell")).toBeVisible();
-  await expect(page.getByTestId("postings-search-input")).toBeVisible();
+  await expect(page.getByTestId("search-panel")).toBeVisible();
+  await expect(page.getByTestId("search-input")).toBeVisible();
+  await expect(page.getByTestId("result-count")).toBeVisible();
+  await expect(page.getByTestId("sort-control")).toBeVisible();
+  await expect(page.getByTestId("ats-intelligence-panel")).toBeVisible();
   await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
   await expect(page.getByTestId("posting-card")).toHaveCount(0);
+  await expect(page.getByText("Dense Search Cockpit")).toHaveCount(0);
+  await expect(page.getByText("Mobile Card Stack")).toHaveCount(0);
+  await expect(page.getByText("ATS Intelligence Overlay")).toHaveCount(0);
+  await expect(page.getByText(/demo,\s*local only/i)).toHaveCount(0);
   await expect(page.getByTestId("app-error-message")).toHaveCount(0);
   await expect(page.getByText(/API:|ATS postings|Sync-enabled companies:|Stored today:/i)).toHaveCount(0);
   await expect(page.getByText(/Request failed \(401\)|Admin token required/i)).toHaveCount(0);
@@ -72,30 +81,33 @@ async function openJobSlots(page) {
 }
 
 async function submitSearchAndExpectResults(page, query = "remote jobs") {
-  await page.getByTestId("postings-search-input").fill(query);
-  await page.getByTestId("postings-search-input").press("Enter");
-  await expect(page.getByTestId("sync-status-panel")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("search-input").fill(query);
+  await page.getByTestId("search-input").press("Enter");
   await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("result-count")).toContainText(/slot|slots/i);
   await expect(page.getByTestId("postings-pagination-status")).toBeVisible();
   await expect(page.getByText("Refreshing results...")).toHaveCount(0);
 }
 
 async function expectSearchEngineVisualContract(page) {
-  const searchBox = await page.getByTestId("postings-search-input").boundingBox();
+  const searchBox = await page.getByTestId("search-input").boundingBox();
   const shell = await page.getByTestId("search-shell").boundingBox();
+  const panel = await page.getByTestId("search-panel").boundingBox();
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
-  const searchCenterY = searchBox.y + searchBox.height / 2;
 
-  expect(searchBox.width).toBeGreaterThan(viewport.width < 600 ? 250 : 520);
-  expect(shell.height).toBeGreaterThan(viewport.height * (viewport.width < 600 ? 0.82 : 0.86));
-  expect(searchCenterY).toBeGreaterThan(viewport.height * 0.43);
-  expect(searchCenterY).toBeLessThan(viewport.height * 0.55);
-  expect(Math.abs((searchBox.x + searchBox.width / 2) - viewport.width / 2)).toBeLessThan(viewport.width * 0.08);
-  expect(Math.abs((searchBox.x + searchBox.width / 2) - (shell.x + shell.width / 2))).toBeLessThan(8);
+  expect(searchBox.width).toBeGreaterThan(viewport.width < 600 ? 250 : 240);
+  expect(shell.height).toBeLessThan(viewport.height * 1.8);
+  if (viewport.width >= 768) {
+    expect(panel.x).toBeLessThan(viewport.width * 0.36);
+    expect(searchBox.x).toBeLessThan(viewport.width * 0.36);
+  } else {
+    expect(panel.width).toBeLessThanOrEqual(viewport.width);
+    expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
+  }
   await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
-  await expect(page.getByText("Enter to search · Esc to clear")).toBeVisible();
+  await expect(page.getByText(/Enter to search/i)).toBeVisible();
 
-  const wordmarkColors = await page.getByTestId("brand-wordmark").evaluate((node) => {
+  const wordmarkColors = await page.getByTestId("app-logo").evaluate((node) => {
     const colors = [];
     node.querySelectorAll("*").forEach((child) => {
       const text = (child.textContent || "").trim();
@@ -119,7 +131,7 @@ async function expectSearchEngineVisualContract(page) {
   expect(wordmarkColors).toContain("rgb(104, 117, 110)");
   if (viewport.width >= 768) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
-    await expect(page.getByText("Public v1.8.0")).toBeVisible();
+    await expect(page.getByText(`Public v${APP_VERSION}`)).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
     const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
     await expect(attributionLink).toBeVisible();
@@ -158,18 +170,18 @@ async function expectSuggestionPanelDoesNotOverlap(page) {
 }
 
 async function expectSearchMovesUpAfterSubmit(page) {
-  const homeSearchBox = await page.getByTestId("postings-search-input").boundingBox();
-  await page.getByTestId("postings-search-input").fill("remote jobs");
-  await page.getByTestId("postings-search-input").press("Enter");
+  const homeSearchBox = await page.getByTestId("search-input").boundingBox();
+  await page.getByTestId("search-input").fill("remote jobs");
+  await page.getByTestId("search-input").press("Enter");
   await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(380);
-  const compactSearchBox = await page.getByTestId("postings-search-input").boundingBox();
-  expect(compactSearchBox.y).toBeLessThan(homeSearchBox.y - 70);
+  const compactSearchBox = await page.getByTestId("search-input").boundingBox();
+  expect(Math.abs(compactSearchBox.y - homeSearchBox.y)).toBeLessThan(24);
   await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
-  await expect(page.getByTestId("sync-status-panel")).toBeVisible();
+  await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
   await expect(page.getByTestId("results-surface")).toBeVisible();
-    await expect(page.getByText("Public v1.6.1")).toHaveCount(0);
-  await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
+  await expect(page.getByTestId("result-count")).toContainText(/slot|slots/i);
+  await expect(page.getByText("Public v1.6.1")).toHaveCount(0);
 }
 
 async function expectNoNestedPublicScroll(page) {
@@ -232,8 +244,12 @@ async function expectMobileTapTarget(page, testId) {
   if (viewport.width >= 600) return;
   const target = page.getByTestId(testId).first();
   await expect(target).toBeVisible();
-  const box = await target.boundingBox();
-  expect(box.height, `${testId} should be at least 44px tall on mobile`).toBeGreaterThanOrEqual(44);
+  await expect
+    .poll(async () => {
+      const box = await target.boundingBox();
+      return box?.height || 0;
+    }, `${testId} should be at least 44px tall on mobile`)
+    .toBeGreaterThanOrEqual(44);
 }
 
 async function expectScrollTopButtonWorks(page) {
@@ -262,6 +278,14 @@ async function expectMobileFiltersNearControls(page) {
   const panelBox = await page.getByTestId("filters-panel").boundingBox();
   const gap = panelBox.y - (toggleBox.y + toggleBox.height);
   expect(gap, "mobile filters panel should open close to the filter controls").toBeLessThan(90);
+}
+
+async function ensureFiltersVisible(page) {
+  if ((await page.getByTestId("filters-panel").count()) === 0) {
+    await page.getByTestId("postings-filter-toggle").click();
+  }
+  await expect(page.getByTestId("filters-panel")).toBeVisible();
+  await expect(page.getByTestId("ats-filter-trigger")).toBeVisible();
 }
 
 async function expectPublicPaletteIsSoft(page) {
@@ -669,9 +693,9 @@ test.describe("postings page QA", () => {
 
     protectedRouteCalls.length = 0;
     await page.reload();
-    await expect(page.getByTestId("brand-wordmark")).toContainText("openjobslots");
+    await expect(page.getByTestId("app-logo")).toContainText("openjobslots");
     await expect(page.getByTestId("search-shell")).toBeVisible();
-    await expect(page.getByTestId("postings-search-input")).toBeVisible();
+    await expect(page.getByTestId("search-input")).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
     await expect(page.getByTestId("posting-card")).toHaveCount(0);
@@ -688,8 +712,8 @@ test.describe("postings page QA", () => {
     await expectPublicPaletteIsSoft(page);
 
     for (const query of SEARCH_COMPATIBILITY_QUERIES) {
-      await page.getByTestId("postings-search-input").fill(query);
-      await page.getByTestId("postings-search-input").press("Enter");
+      await page.getByTestId("search-input").fill(query);
+      await page.getByTestId("search-input").press("Enter");
       await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
       await expectNoRawErrors(page);
     }
@@ -697,42 +721,63 @@ test.describe("postings page QA", () => {
     expect(failedResponses).toEqual([]);
   });
 
+  test("desktop shell keeps the search panel sticky while results scroll", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width < 768, "desktop sticky behavior is covered by the desktop project");
+
+    await openJobSlots(page);
+    await submitSearchAndExpectResults(page, "remote jobs");
+    const before = await page.getByTestId("search-panel").boundingBox();
+    await page.mouse.wheel(0, 1200);
+    await page.waitForTimeout(250);
+    const after = await page.getByTestId("search-panel").boundingBox();
+
+    expect(after.y).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(after.y - before.y), "sticky panel should stay pinned during document scroll").toBeLessThan(24);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("mobile shell keeps filters collapsible without horizontal overflow", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile shell behavior is covered by the mobile project");
+
+    await openJobSlots(page);
+    await expect(page.getByTestId("filters-panel")).toHaveCount(0);
+    const searchBox = await page.getByTestId("search-input").boundingBox();
+    expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
+    await page.getByTestId("postings-filter-toggle").click();
+    await expect(page.getByTestId("filters-panel")).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("search motion, suggestions, coverage, and scrolling stay calm", async ({ page }) => {
     await openJobSlots(page);
 
     await expect(page.getByTestId("coverage-details")).toHaveCount(0);
     await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
-    const homeSearchBox = await page.getByTestId("postings-search-input").boundingBox();
+    const homeSearchBox = await page.getByTestId("search-input").boundingBox();
 
-    await page.getByTestId("postings-search-input").fill("tur");
+    await page.getByTestId("search-input").fill("tur");
     await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
     await expectMobileTapTarget(page, "search-suggestion-0");
-    await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByText(/Ctrl\+K focuses search/i)).toHaveCount(0);
     await expectSuggestionPanelDoesNotOverlap(page);
-    const suggestSearchBox = await page.getByTestId("postings-search-input").boundingBox();
+    const suggestSearchBox = await page.getByTestId("search-input").boundingBox();
     expect(Math.abs(suggestSearchBox.y - homeSearchBox.y)).toBeLessThan(24);
     await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
 
-    await page.getByTestId("postings-search-input").press("Escape");
+    await page.getByTestId("search-input").press("Escape");
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
-    await expect(page.getByTestId("postings-filter-toggle")).toBeVisible();
-    await expectMobileTapTarget(page, "postings-filter-toggle");
     await expectMobileTapTarget(page, "postings-filter-clear");
-    await page.getByTestId("postings-filter-toggle").click();
-    await expect(page.getByTestId("filters-panel")).toBeVisible();
+    await ensureFiltersVisible(page);
     await expectMobileFiltersNearControls(page);
     await expectNoNestedPublicScroll(page);
     await expectNoHorizontalOverflow(page);
 
-    await page.getByTestId("brand-wordmark").click();
+    await page.getByTestId("app-logo").click();
     await expectSearchMovesUpAfterSubmit(page);
     await expectScrollTopButtonWorks(page);
-    await page.getByTestId("coverage-toggle").click();
-    await expectMobileTapTarget(page, "coverage-toggle");
-    await expect(page.getByTestId("coverage-details")).toBeVisible();
-    await page.getByTestId("coverage-toggle").click();
-    await expect(page.getByTestId("coverage-details")).toHaveCount(0);
+    await expect(page.getByTestId("coverage-toggle")).toHaveCount(0);
     await expectNoRawErrors(page);
   });
 
@@ -740,46 +785,46 @@ test.describe("postings page QA", () => {
     await openJobSlots(page);
 
     await page.keyboard.press("/");
-    await expect(page.getByTestId("postings-search-input")).toBeFocused();
-    await page.getByTestId("postings-search-input").fill("tur");
+    await expect(page.getByTestId("search-input")).toBeFocused();
+    await page.getByTestId("search-input").fill("tur");
     await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
     await page.getByTestId("search-suggestion-0").click();
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
 
     await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
-    await expect(page.getByTestId("postings-search-input")).toBeFocused();
-    await page.getByTestId("postings-search-input").fill("turksih jobs");
+    await expect(page.getByTestId("search-input")).toBeFocused();
+    await page.getByTestId("search-input").fill("turksih jobs");
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
 
-    await page.getByTestId("postings-search-input").fill("remote jobs");
-    await page.getByTestId("postings-search-input").press("Escape");
-    await expect(page.getByTestId("postings-search-input")).toHaveValue("");
+    await page.getByTestId("search-input").fill("remote jobs");
+    await page.getByTestId("search-input").press("Escape");
+    await expect(page.getByTestId("search-input")).toHaveValue("");
 
-    await page.getByTestId("postings-search-input").fill("QA Greenhouse");
-    await page.getByTestId("postings-search-input").press("Enter");
+    await page.getByTestId("search-input").fill("QA Greenhouse");
+    await page.getByTestId("search-input").press("Enter");
     await expect(page.getByTestId("posting-card").first()).toContainText(/QA Greenhouse|Turkish/i, {
       timeout: 15_000
     });
     await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
-    await expect(page.getByTestId("postings-search-input")).toBeFocused();
-    await expect(page.getByTestId("postings-search-input")).toHaveValue(/QA Greenhouse/i);
-    await page.getByTestId("postings-search-input").fill("remote jobs");
+    await expect(page.getByTestId("search-input")).toBeFocused();
+    await expect(page.getByTestId("search-input")).toHaveValue(/QA Greenhouse/i);
+    await page.getByTestId("search-input").fill("remote jobs");
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId("postings-filter-toggle").click();
+    await ensureFiltersVisible(page);
     await page.getByTestId("ats-filter-trigger").click();
     await page.getByTestId("ats-filter-option-greenhouse").click();
-    await page.getByTestId("brand-wordmark").click();
-    await expect(page.getByTestId("postings-search-input")).toHaveValue("");
-    await page.getByTestId("postings-filter-toggle").click();
+    await page.getByTestId("app-logo").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("");
+    await ensureFiltersVisible(page);
     await expect(page.getByTestId("ats-filter-trigger")).toContainText(/All ATS/i);
 
     await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
-    await expect(page.getByTestId("postings-search-input")).toBeFocused();
+    await expect(page.getByTestId("search-input")).toBeFocused();
   });
 
   test("public search buttons are clickable without exposing admin controls", async ({ page }) => {
@@ -787,8 +832,7 @@ test.describe("postings page QA", () => {
     await expectPublicSearchChrome(page);
 
     const visiblePublicButtons = [
-      page.getByTestId("brand-wordmark"),
-      page.getByTestId("postings-filter-toggle"),
+      page.getByTestId("app-logo"),
       page.getByTestId("postings-filter-clear")
     ];
 
@@ -796,18 +840,16 @@ test.describe("postings page QA", () => {
       await expect(button).toBeVisible();
     }
 
-    await page.getByTestId("postings-filter-toggle").click();
+    await ensureFiltersVisible(page);
     await expect(page.getByTestId("ats-filter-trigger")).toBeVisible();
-    await page.getByTestId("postings-filter-toggle").click();
-    await expect(page.getByTestId("ats-filter-trigger")).toHaveCount(0);
 
-    await page.getByTestId("postings-search-input").fill("tur");
+    await page.getByTestId("search-input").fill("tur");
     await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
     await page.getByTestId("search-suggestion-0").click();
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId("brand-wordmark").click();
-    await expect(page.getByTestId("postings-search-input")).toHaveValue("");
+    await page.getByTestId("app-logo").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("");
     await expectNoRawErrors(page);
   });
 
@@ -829,8 +871,8 @@ test.describe("postings page QA", () => {
       await route.continue();
     });
 
-    await page.getByTestId("postings-search-input").fill("busy-probe");
-    await page.getByTestId("postings-search-input").press("Enter");
+    await page.getByTestId("search-input").fill("busy-probe");
+    await page.getByTestId("search-input").press("Enter");
     await expect(page.getByTestId("search-notice")).toContainText(/latest results while indexing catches up/i, {
       timeout: 10_000
     });
@@ -843,22 +885,21 @@ test.describe("postings page QA", () => {
     await installNoResultsRoute(page, emptySearch);
     await openJobSlots(page);
 
-    await page.getByTestId("postings-search-input").fill(emptySearch);
-    await page.getByTestId("postings-search-input").press("Enter");
-    await expect(page.getByTestId("sync-status-panel")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("search-input").fill(emptySearch);
+    await page.getByTestId("search-input").press("Enter");
     await expect(page.getByTestId("postings-empty-state")).toBeVisible();
     await expect(page.getByText(/No slots match this exact search/i)).toBeVisible();
     await expect(page.getByTestId("posting-card")).toHaveCount(0);
     await expectNoRawErrors(page);
 
     await page.getByTestId("postings-filter-clear").click();
-    await expect(page.getByTestId("postings-search-input")).toHaveValue("");
+    await expect(page.getByTestId("search-input")).toHaveValue("");
     await expect(page.getByTestId("postings-empty-state")).toHaveCount(0);
     await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
     await expectNoRawErrors(page);
   });
 
-  test("status failures stay in coverage UI without raw backend text", async ({ page }) => {
+  test("optional status failures do not break the public search shell", async ({ page }) => {
     await page.route("**/sync/status**", async (route) => {
       await route.fulfill({
         status: 503,
@@ -868,13 +909,11 @@ test.describe("postings page QA", () => {
     });
 
     await openJobSlots(page);
-    await page.getByTestId("postings-search-input").fill("remote jobs");
-    await page.getByTestId("postings-search-input").press("Enter");
+    await page.getByTestId("search-input").fill("remote jobs");
+    await page.getByTestId("search-input").press("Enter");
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("sync-status-panel")).toBeVisible();
-    await expect(page.getByTestId("sync-status-summary")).toContainText(/Index coverage is temporarily unavailable/i);
-    await page.getByTestId("coverage-toggle").click();
-    await expect(page.getByTestId("sync-last-error")).toContainText(/Coverage diagnostics are temporarily unavailable/i);
+    await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
+    await expect(page.getByTestId("coverage-toggle")).toHaveCount(0);
     await expect(page.getByTestId("app-error-message")).toHaveCount(0);
     await expectNoRawErrors(page);
   });
@@ -894,14 +933,13 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
     await page.getByTestId("release-notes-backdrop").click({ position: { x: 5, y: 5 }, force: true });
     await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
-    await expect(page.getByTestId("postings-search-input")).toBeVisible();
+    await expect(page.getByTestId("search-input")).toBeVisible();
   });
 
   test("filters can open, select, combine, and clear", async ({ page }) => {
     await openJobSlots(page);
 
-    await page.getByTestId("postings-filter-toggle").click();
-    await expect(page.getByTestId("ats-filter-trigger")).toBeVisible();
+    await ensureFiltersVisible(page);
     await expectMobileFiltersNearControls(page);
     await expectMobileTapTarget(page, "ats-filter-trigger");
     await expectMobileTapTarget(page, "postings-filter-clear");
@@ -938,7 +976,7 @@ test.describe("postings page QA", () => {
 
   test("worldwide geo filters are usable or show graceful empty states", async ({ page }) => {
     await openJobSlots(page);
-    await page.getByTestId("postings-filter-toggle").click();
+    await ensureFiltersVisible(page);
 
     await expectGeoFilterUsable(
       page,
@@ -990,19 +1028,14 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("posting-card-block-company")).toHaveCount(0);
   });
 
-  test("posting card source diagnostics open and close safely", async ({ page }) => {
+  test("posting cards do not expose source diagnostics on the public page", async ({ page }) => {
     await openJobSlots(page);
     await submitSearchAndExpectResults(page, "remote jobs");
 
     const firstCard = page.getByTestId("posting-card").first();
-    await firstCard.getByTestId("posting-card-source-toggle").click();
-    await expect(firstCard.getByTestId("posting-card-source-panel")).toBeVisible();
-    await expect(firstCard.getByText(/Source:/i)).toBeVisible();
-    await expect(firstCard.getByText(/Quality:/i)).toBeVisible();
-    await expect(firstCard.getByText(/Parser:/i)).toBeVisible();
-    await expect(firstCard.getByText(/raw_payload|postgres:\/\/|MEILI_|MASTER_KEY|stack trace/i)).toHaveCount(0);
-    await firstCard.getByTestId("posting-card-source-toggle").click();
+    await expect(firstCard.getByTestId("posting-card-source-toggle")).toHaveCount(0);
     await expect(firstCard.getByTestId("posting-card-source-panel")).toHaveCount(0);
+    await expect(firstCard.getByText(/Quality:|Parser:|Flags:|raw_payload|postgres:\/\/|MEILI_|MASTER_KEY|stack trace/i)).toHaveCount(0);
   });
 
   test("public page does not expose admin destinations", async ({ page }) => {
@@ -1015,6 +1048,6 @@ test.describe("postings page QA", () => {
     await expect(page.getByText("Migrate Settings And Applications")).toHaveCount(0);
     await expect(page.getByText("Save Sync Settings")).toHaveCount(0);
     await expect(page.getByText("Save MCP Settings")).toHaveCount(0);
-    await expect(page.getByTestId("brand-wordmark")).toContainText("openjobslots");
+    await expect(page.getByTestId("app-logo")).toContainText("openjobslots");
   });
 });
