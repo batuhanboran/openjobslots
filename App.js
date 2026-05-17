@@ -137,6 +137,9 @@ const OJS_DARK_COLORS = {
   green: "#8ED6B9",
   shadow: "#050806"
 };
+const OJS_FONT_STACK = Platform.OS === "web"
+  ? "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+  : undefined;
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
 const DEFAULT_PUBLIC_LANGUAGE = "en";
@@ -211,6 +214,18 @@ const PUBLIC_MESSAGES = {
     "filters.states.any": "All states/provinces",
     "filters.counties": "Counties",
     "filters.counties.any": "All counties",
+    "filters.industries.empty": "No industries available.",
+    "filters.industries.helper": "Optional. Leave empty to search every indexed industry.",
+    "filters.regions.empty": "Worldwide search is active. Region metadata is not indexed yet.",
+    "filters.regions.helper": "Start broad by continent, then narrow to countries when useful.",
+    "filters.countries.emptyRegion": "No countries match the selected region yet. Clear Regions to search worldwide.",
+    "filters.countries.empty": "No countries match. Worldwide search is still active.",
+    "filters.countries.helperRegion": "Countries are limited by the selected region.",
+    "filters.countries.helper": "Leave empty to include every country.",
+    "filters.states.empty": "No states or provinces are indexed for the selected countries.",
+    "filters.states.helper": "Shown after country selection. Leave empty to include all states/provinces.",
+    "filters.counties.empty": "No counties match selected states.",
+    "filters.counties.helper": "Shown after state selection for sources that include county metadata.",
     "filters.countryHint": "Choose a country to narrow by state or province.",
     "filters.stateHint": "Choose a state/province to narrow by county when county data exists.",
     "freshness.label": "Freshness",
@@ -243,7 +258,33 @@ const PUBLIC_MESSAGES = {
     "sort.confidence": "Confidence",
     "theme.day": "Day",
     "theme.night": "Night",
-    "language.label": "Language"
+    "language.label": "Language",
+    "version.label": "Public v{version}",
+    "credit.deployed": "Deployed and developed by",
+    "dropdown.search": "Search {label}",
+    "dropdown.empty": "{label} are not indexed yet. Worldwide search is still active.",
+    "dropdown.noMatch": "No {label} match \"{search}\".",
+    "dropdown.showing": "Showing {visible} of {total} {label}.",
+    "dropdown.clear": "Clear {label}",
+    "sources.result": "result",
+    "sources.results": "results",
+    "sources.confidence": "Conf",
+    "sources.quality": "Quality",
+    "sources.freshSeen": "{fresh}% fresh - seen {date}",
+    "sources.currentSet": "{fresh}% fresh - current set",
+    "search.intentDetected": "Detected intent",
+    "posting.atsLabel": "ATS",
+    "posting.dateUnavailable": "Posting date unavailable",
+    "empty.noSlotsExact": "No slots match this exact search.",
+    "empty.tryDifferent": "Try another title, source, location, or freshness window.",
+    "empty.searchAllLocations": "Search all locations",
+    "empty.allWorkModes": "All work modes",
+    "empty.clearFilters": "Clear filters",
+    "results.updating": "Updating visible results...",
+    "results.showingOf": "Showing {visible} of {total} slots",
+    "results.loadingMore": "Loading more slots...",
+    "results.scrollMore": "Scroll to load more",
+    "results.allLoaded": "All visible slots loaded"
   },
   tr: {
     "results.eyebrow": "Genel arama",
@@ -293,8 +334,8 @@ const PUBLIC_MESSAGES = {
     "sources.empty": "Bu sonuç setindeki kaynakları görmek için arama yap.",
     "results.search": "Ara",
     "results.toSeeSlots": "slotları gör",
-    "results.slot": "slot",
-    "results.slots": "slot",
+    "results.slot": "ilan",
+    "results.slots": "ilan",
     "initial.title": "Taze public ATS ilanlarını ara.",
     "initial.copy": "Ünvan, şirket, konum, ülke veya çalışma modu ile başla. Filtreler desktop görünümde sonuçların yanında sabit kalır.",
     "sort.relevance": "Alaka",
@@ -304,7 +345,33 @@ const PUBLIC_MESSAGES = {
     "sort.confidence": "Güven",
     "theme.day": "Gündüz",
     "theme.night": "Gece",
-    "language.label": "Dil"
+    "language.label": "Dil",
+    "version.label": "Genel v{version}",
+    "credit.deployed": "Yayina alan ve gelistiren",
+    "dropdown.search": "{label} ara",
+    "dropdown.empty": "{label} henuz indekslenmedi. Global arama aktif kalir.",
+    "dropdown.noMatch": "\"{search}\" icin {label} eslesmesi yok.",
+    "dropdown.showing": "{total} {label} icinde {visible} gosteriliyor.",
+    "dropdown.clear": "{label} temizle",
+    "sources.result": "sonuc",
+    "sources.results": "sonuc",
+    "sources.confidence": "Guven",
+    "sources.quality": "Kalite",
+    "sources.freshSeen": "%{fresh} guncel - son gorulme {date}",
+    "sources.currentSet": "%{fresh} guncel - mevcut set",
+    "search.intentDetected": "Algilanan niyet",
+    "posting.atsLabel": "ATS",
+    "posting.dateUnavailable": "Ilan tarihi yok",
+    "empty.noSlotsExact": "Bu aramayla eslesen ilan yok.",
+    "empty.tryDifferent": "Baska bir unvan, kaynak, konum veya guncellik araligi dene.",
+    "empty.searchAllLocations": "Tum konumlarda ara",
+    "empty.allWorkModes": "Tum calisma modlari",
+    "empty.clearFilters": "Filtreleri temizle",
+    "results.updating": "Gorunen sonuclar guncelleniyor...",
+    "results.showingOf": "{visible} / {total} ilan gosteriliyor",
+    "results.loadingMore": "Daha fazla ilan yukleniyor...",
+    "results.scrollMore": "Daha fazlasi icin kaydir",
+    "results.allLoaded": "Gorunen tum ilanlar yuklendi"
   },
   de: {
     "results.eyebrow": "Oeffentliche Suche",
@@ -853,6 +920,16 @@ function translatePublicText(languageCode, key, fallback = "") {
   return messages?.[key] || PUBLIC_MESSAGES.en?.[key] || fallback || key;
 }
 
+function interpolatePublicText(template, values = {}) {
+  return String(template || "").replace(/\{([a-zA-Z0-9_]+)\}/g, (_match, key) =>
+    Object.prototype.hasOwnProperty.call(values, key) ? String(values[key]) : ""
+  );
+}
+
+function translatedPublicText(t, key, fallback = "", values = {}) {
+  return interpolatePublicText(t(key, fallback), values);
+}
+
 function getTranslatedSortOption(option, languageCode) {
   const value = String(option?.value || "").trim() || "relevance";
   return {
@@ -1243,16 +1320,21 @@ function formatSourceMetricPercent(value) {
   return `${Math.round(percentValue)}%`;
 }
 
-function formatSourceQualitySummary(source) {
-  return `Conf ${formatSourceMetricPercent(source?.avgConfidence)} - Quality ${Math.round(Number(source?.avgQuality || 0))}`;
+function formatSourceQualitySummary(source, t = (key, fallback) => fallback || key) {
+  return `${t("sources.confidence", "Conf")} ${formatSourceMetricPercent(source?.avgConfidence)} - ${t("sources.quality", "Quality")} ${Math.round(Number(source?.avgQuality || 0))}`;
 }
 
-function formatSourceFreshnessSummary(source) {
+function formatSourceFreshnessSummary(source, t = (key, fallback) => fallback || key) {
   const freshPercentage = Math.max(0, Math.min(100, Math.round(Number(source?.freshPercentage || 0))));
-  const seenText = source?.latestSeenEpoch
-    ? `seen ${formatEpochSeconds(source.latestSeenEpoch, "recent").slice(0, 10)}`
-    : "current set";
-  return `${freshPercentage}% fresh - ${seenText}`;
+  if (source?.latestSeenEpoch) {
+    return translatedPublicText(t, "sources.freshSeen", "{fresh}% fresh - seen {date}", {
+      fresh: freshPercentage,
+      date: formatEpochSeconds(source.latestSeenEpoch, "recent").slice(0, 10)
+    });
+  }
+  return translatedPublicText(t, "sources.currentSet", "{fresh}% fresh - current set", {
+    fresh: freshPercentage
+  });
 }
 
 function getPostingIdentity(item, fallbackIndex = 0) {
@@ -1870,7 +1952,8 @@ function PostingCard({
   ignoringPostingIds,
   blockedCompanyNames,
   blockingCompanyNames,
-  showAdminActions = false
+  showAdminActions = false,
+  t = (key, fallback) => fallback || key
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const postingUrl = String(item?.job_posting_url || "").trim();
@@ -1895,7 +1978,7 @@ function PostingCard({
   const positionName = sanitizeDisplayText(item?.position_name, "Unknown position");
   const locationLabel = sanitizeDisplayText(item?.location, "Location unavailable");
   const companyLabel = sanitizeDisplayText(item?.company_name, "Unknown company");
-  const postingDateLabel = sanitizeDisplayText(item?.posting_date, "Posting date unavailable");
+  const postingDateLabel = sanitizeDisplayText(item?.posting_date, t("posting.dateUnavailable", "Posting date unavailable"));
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
   const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
   return (
@@ -1911,7 +1994,7 @@ function PostingCard({
           <Text style={styles.position}>{positionName}</Text>
           <Text style={styles.location}>{locationLabel}</Text>
           <Text style={styles.company}>{companyLabel}</Text>
-          <Text style={styles.ats}>ATS: {atsLabel}</Text>
+          <Text style={styles.ats}>{t("posting.atsLabel", "ATS")}: {atsLabel}</Text>
           <Text style={styles.posted}>{postingDateLabel}</Text>
           {isApplied ? (
             <Text style={styles.postingAppliedNotice}>{appliedByLabel}</Text>
@@ -2046,7 +2129,8 @@ function MultiSelectDropdown({
   emptyText,
   helperText,
   anyLabel = "Worldwide",
-  maxVisibleOptions = 80
+  maxVisibleOptions = 80,
+  t = (key, fallback) => fallback || key
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -2105,18 +2189,18 @@ function MultiSelectDropdown({
             style={styles.dropdownSearch}
             value={search}
             onChangeText={setSearch}
-            placeholder={`Search ${label.toLowerCase()}`}
+            placeholder={translatedPublicText(t, "dropdown.search", "Search {label}", { label: label.toLowerCase() })}
             autoCapitalize="none"
             testID={`${testIdPart}-filter-search`}
-            accessibilityLabel={`Search ${label}`}
+            accessibilityLabel={translatedPublicText(t, "dropdown.search", "Search {label}", { label })}
           />
 
           <ScrollView style={styles.dropdownOptionsScroll}>
             {filteredOptions.length === 0 ? (
               <Text style={styles.dropdownEmpty}>
                 {normalizedOptions.length === 0
-                  ? emptyText || `${label} are not indexed yet. Worldwide search is still active.`
-                  : `No ${label.toLowerCase()} match "${search}".`}
+                  ? emptyText || translatedPublicText(t, "dropdown.empty", "{label} are not indexed yet. Worldwide search is still active.", { label })
+                  : translatedPublicText(t, "dropdown.noMatch", "No {label} match \"{search}\".", { label: label.toLowerCase(), search })}
               </Text>
             ) : (
               filteredOptions.map((option) => {
@@ -2144,7 +2228,11 @@ function MultiSelectDropdown({
             )}
           </ScrollView>
           <Text style={styles.dropdownOptionCount}>
-            Showing {filteredOptions.length} of {normalizedOptions.length} {label.toLowerCase()}.
+            {translatedPublicText(t, "dropdown.showing", "Showing {visible} of {total} {label}.", {
+              visible: filteredOptions.length,
+              total: normalizedOptions.length,
+              label: label.toLowerCase()
+            })}
           </Text>
 
           <Pressable
@@ -2153,7 +2241,7 @@ function MultiSelectDropdown({
             testID={`${testIdPart}-filter-clear`}
             accessibilityRole="button"
           >
-            <Text style={styles.dropdownClearBtnText}>Clear {label}</Text>
+            <Text style={styles.dropdownClearBtnText}>{translatedPublicText(t, "dropdown.clear", "Clear {label}", { label })}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -2407,14 +2495,14 @@ function SourceIntelligencePanel({
               <View style={styles.atsIntelligenceSourceBlock}>
                 <Text style={styles.atsIntelligenceSource}>{source.label}</Text>
                 <Text style={styles.atsIntelligenceMeta} testID={`source-intelligence-count-${testIdPart}`}>
-                  {formatCompactNumberLabel(source.count)} {source.count === 1 ? "result" : "results"}
+                  {formatCompactNumberLabel(source.count)} {source.count === 1 ? t("sources.result", "result") : t("sources.results", "results")}
                 </Text>
                 <Text style={styles.atsIntelligenceQuality} testID={`source-intelligence-quality-${testIdPart}`}>
-                  {formatSourceQualitySummary(source)}
+                  {formatSourceQualitySummary(source, t)}
                 </Text>
               </View>
               <Text style={styles.atsIntelligenceFreshness} testID={`source-intelligence-freshness-${testIdPart}`}>
-                {formatSourceFreshnessSummary(source)}
+                {formatSourceFreshnessSummary(source, t)}
               </Text>
             </Pressable>
           );
@@ -3062,10 +3150,15 @@ export default function App() {
     }
   }, [queueFrontendLog]);
 
-  const loadPostingFilterOptions = useCallback(async () => {
-    setPostingFilterOptionsLoading(true);
+  const loadPostingFilterOptions = useCallback(async (options = {}) => {
+    const silent = Boolean(options.silent);
+    const q = Object.prototype.hasOwnProperty.call(options, "search") ? options.search : searchRef.current;
+    const filters = options.filters || postingsFiltersRef.current;
+    if (!silent) {
+      setPostingFilterOptionsLoading(true);
+    }
     try {
-      const response = await fetchPostingFilterOptions();
+      const response = await fetchPostingFilterOptions(q, filters);
       setPostingFilterOptions({
         ats: mergeAtsFilterOptions(response?.ats),
         industries: Array.isArray(response?.industries) ? response.industries : [],
@@ -3078,11 +3171,14 @@ export default function App() {
           : DEFAULT_POSTING_SORT_OPTIONS
       });
     } catch (e) {
-      setError(String(e.message || e));
+      if (!silent) setError(String(e.message || e));
+      else queueFrontendLog("warn", "load_filter_options_failed", String(e?.message || e), {});
     } finally {
-      setPostingFilterOptionsLoading(false);
+      if (!silent) {
+        setPostingFilterOptionsLoading(false);
+      }
     }
-  }, []);
+  }, [queueFrontendLog]);
 
   const loadMorePostings = useCallback(() => {
     if (initializing || loading) return;
@@ -4293,7 +4389,6 @@ export default function App() {
       try {
         await Promise.all([
           loadPostings("", { filters: postingsFiltersRef.current }),
-          loadStatus(),
           loadPostingFilterOptions()
         ]);
       } catch (e) {
@@ -4306,7 +4401,6 @@ export default function App() {
     bootstrap();
   }, [
     loadPostings,
-    loadStatus,
     loadPostingFilterOptions
   ]);
 
@@ -4323,9 +4417,10 @@ export default function App() {
     }
     const timer = setTimeout(() => {
       loadPostings(search, { filters: postingsFilters });
+      loadPostingFilterOptions({ search, filters: postingsFilters, silent: true });
     }, 1800);
     return () => clearTimeout(timer);
-  }, [search, postingsFilters, loadPostings]);
+  }, [search, postingsFilters, loadPostings, loadPostingFilterOptions]);
 
   useEffect(() => {
     if (activePage === PAGE_KEYS.POSTINGS || !syncSettings.autoSyncEnabled) return undefined;
@@ -4360,6 +4455,7 @@ export default function App() {
   }, [activePage, runSync, syncSettings.autoSyncEnabled, syncSettings.syncIntervalSeconds, syncSettings.wifiOnly]);
 
   useEffect(() => {
+    if (activePage === PAGE_KEYS.POSTINGS) return undefined;
     const id = setInterval(async () => {
       if (statusPollInFlightRef.current) return;
 
@@ -4416,9 +4512,8 @@ export default function App() {
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return;
-    loadStatus();
     loadPostingFilterOptions();
-  }, [activePage, loadStatus, loadPostingFilterOptions]);
+  }, [activePage, loadPostingFilterOptions]);
 
   const renderSyncStatusPanel = () => {
     const isWorkerRunning = syncing || syncStatusDetails.workerState === "Worker running";
@@ -4590,10 +4685,12 @@ export default function App() {
               accessibilityRole="button"
               accessibilityLabel={`Open release notes for version ${PUBLIC_APP_VERSION}`}
             >
-              <Text style={styles.publicVersionLabel}>{PUBLIC_VERSION_LABEL}</Text>
+              <Text style={styles.publicVersionLabel}>
+                {translatedPublicText(t, "version.label", PUBLIC_VERSION_LABEL, { version: PUBLIC_APP_VERSION })}
+              </Text>
             </Pressable>
             <Text style={styles.searchCreditText}>
-              Deployed and developed by{" "}
+              {t("credit.deployed", "Deployed and developed by")}{" "}
               <Text
                 href={BATUHAN_WEBSITE_URL}
                 hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
@@ -4650,7 +4747,7 @@ export default function App() {
         </View>
         {searchIntentChips.length > 0 ? (
           <View style={styles.searchIntentPanel} testID="search-intent-chips">
-            <Text style={styles.searchIntentLabel}>Detected intent</Text>
+            <Text style={styles.searchIntentLabel}>{t("search.intentDetected", "Detected intent")}</Text>
             <View style={styles.searchIntentChipsRow}>
               {searchIntentChips.map((suggestion, index) => {
                 const selected = isSearchIntentActive(suggestion, postingsFilters);
@@ -4794,9 +4891,10 @@ export default function App() {
                       industries: []
                     }))
                   }
-                  emptyText="No industries available."
-                  helperText="Optional. Leave empty to search every indexed industry."
+                  emptyText={t("filters.industries.empty", "No industries available.")}
+                  helperText={t("filters.industries.helper", "Optional. Leave empty to search every indexed industry.")}
                   anyLabel={t("filters.industries.any", "Any industry")}
+                  t={t}
                 />
 
                 <MultiSelectDropdown
@@ -4811,9 +4909,10 @@ export default function App() {
                       countries: []
                     }))
                   }
-                  emptyText="Worldwide search is active. Region metadata is not indexed yet."
-                  helperText="Start broad by continent, then narrow to countries when useful."
+                  emptyText={t("filters.regions.empty", "Worldwide search is active. Region metadata is not indexed yet.")}
+                  helperText={t("filters.regions.helper", "Start broad by continent, then narrow to countries when useful.")}
                   anyLabel={t("filters.regions.any", "Worldwide")}
+                  t={t}
                 />
 
                 <MultiSelectDropdown
@@ -4829,15 +4928,16 @@ export default function App() {
                   }
                   emptyText={
                     postingsFilters.regions?.length
-                      ? "No countries match the selected region yet. Clear Regions to search worldwide."
-                      : "No countries match. Worldwide search is still active."
+                      ? t("filters.countries.emptyRegion", "No countries match the selected region yet. Clear Regions to search worldwide.")
+                      : t("filters.countries.empty", "No countries match. Worldwide search is still active.")
                   }
                   helperText={
                     postingsFilters.regions?.length
-                      ? "Countries are limited by the selected region."
-                      : "Leave empty to include every country."
+                      ? t("filters.countries.helperRegion", "Countries are limited by the selected region.")
+                      : t("filters.countries.helper", "Leave empty to include every country.")
                   }
                   anyLabel={t("filters.countries.any", "All countries")}
+                  t={t}
                 />
 
                 {(postingsFilters.countries || []).length > 0 || (postingsFilters.states || []).length > 0 ? (
@@ -4853,9 +4953,10 @@ export default function App() {
                         counties: []
                       }))
                     }
-                    emptyText="No states or provinces are indexed for the selected countries."
-                    helperText="Shown after country selection. Leave empty to include all states/provinces."
+                    emptyText={t("filters.states.empty", "No states or provinces are indexed for the selected countries.")}
+                    helperText={t("filters.states.helper", "Shown after country selection. Leave empty to include all states/provinces.")}
                     anyLabel={t("filters.states.any", "All states/provinces")}
+                    t={t}
                   />
                 ) : (
                   <Text style={styles.contextualFilterHint}>
@@ -4875,9 +4976,10 @@ export default function App() {
                         counties: []
                       }))
                     }
-                    emptyText="No counties match selected states."
-                    helperText="Shown after state selection for sources that include county metadata."
+                    emptyText={t("filters.counties.empty", "No counties match selected states.")}
+                    helperText={t("filters.counties.helper", "Shown after state selection for sources that include county metadata.")}
                     anyLabel={t("filters.counties.any", "All counties")}
+                    t={t}
                   />
                 ) : (
                   <Text style={styles.contextualFilterHint}>
@@ -5061,7 +5163,7 @@ export default function App() {
         >
           {loading && !initializing ? (
             <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" accessibilityRole="status">
-              Updating visible results...
+              {t("results.updating", "Updating visible results...")}
             </Text>
           ) : null}
           {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
@@ -5072,9 +5174,9 @@ export default function App() {
             <View style={styles.list} testID="postings-list">
               {postings.length === 0 ? (
                 <View style={styles.emptyState} testID="postings-empty-state">
-                  <Text style={styles.emptyTitle}>No slots match this exact search.</Text>
+                  <Text style={styles.emptyTitle}>{t("empty.noSlotsExact", "No slots match this exact search.")}</Text>
                   <Text style={styles.emptyText}>
-                    The title can exist globally while the selected location or work mode has no indexed match yet.
+                    {t("empty.tryDifferent", "Try another title, source, location, or freshness window.")}
                   </Text>
                   <View style={styles.emptyActions}>
                     {hasLocationPostingFilters ? (
@@ -5084,7 +5186,7 @@ export default function App() {
                         testID="empty-clear-location-filters"
                         accessibilityRole="button"
                       >
-                        <Text style={styles.emptyActionPrimaryText}>Search all locations</Text>
+                        <Text style={styles.emptyActionPrimaryText}>{t("empty.searchAllLocations", "Search all locations")}</Text>
                       </Pressable>
                     ) : null}
                     {hasRemotePostingFilter ? (
@@ -5094,7 +5196,7 @@ export default function App() {
                         testID="empty-clear-remote-filter"
                         accessibilityRole="button"
                       >
-                        <Text style={styles.emptyActionText}>All work modes</Text>
+                        <Text style={styles.emptyActionText}>{t("empty.allWorkModes", "All work modes")}</Text>
                       </Pressable>
                     ) : null}
                     {hasActivePostingFilters ? (
@@ -5104,7 +5206,7 @@ export default function App() {
                         testID="empty-clear-all-filters"
                         accessibilityRole="button"
                       >
-                        <Text style={styles.emptyActionText}>Clear filters</Text>
+                        <Text style={styles.emptyActionText}>{t("empty.clearFilters", "Clear filters")}</Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -5121,6 +5223,7 @@ export default function App() {
                     ignoringPostingIds={ignoringPostingIds}
                     blockedCompanyNames={blockedCompanyNames}
                     blockingCompanyNames={blockingCompanyNamesSet}
+                    t={t}
                   />
                 ))
               )}
@@ -5129,17 +5232,19 @@ export default function App() {
           {!initializing && postings.length > 0 ? (
             <View style={styles.postingsPagingFooter} testID="postings-pagination-status" accessibilityRole="status">
               <Text style={styles.postingsPagingText}>
-                Showing {formatCompactNumberLabel(postings.length)} of{" "}
-                {formatCompactNumberLabel(Math.max(postingsTotalCount, postings.length))} slots
+                {translatedPublicText(t, "results.showingOf", "Showing {visible} of {total} slots", {
+                  visible: formatCompactNumberLabel(postings.length),
+                  total: formatCompactNumberLabel(Math.max(postingsTotalCount, postings.length))
+                })}
               </Text>
               <View style={styles.postingsPagingStateRow}>
                 {postingsLoadingMore ? <ActivityIndicator size="small" color={OJS_COLORS.green} /> : null}
                 <Text style={styles.postingsPagingHint}>
                   {postingsLoadingMore
-                    ? "Loading more slots..."
+                    ? t("results.loadingMore", "Loading more slots...")
                     : postingsHasMore
-                      ? "Scroll to load more"
-                      : "All visible slots loaded"}
+                      ? t("results.scrollMore", "Scroll to load more")
+                      : t("results.allLoaded", "All visible slots loaded")}
                 </Text>
               </View>
             </View>
@@ -5983,7 +6088,8 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: OJS_COLORS.bg
+    backgroundColor: OJS_COLORS.bg,
+    fontFamily: OJS_FONT_STACK
   },
   header: {
     paddingHorizontal: 16,
@@ -6123,6 +6229,7 @@ const styles = StyleSheet.create({
   postingsPageScroll: {
     flex: 1,
     backgroundColor: OJS_COLORS.bg,
+    fontFamily: OJS_FONT_STACK,
     ...(Platform.OS === "web"
       ? {
           scrollbarColor: `${OJS_COLORS.border} ${OJS_COLORS.bg}`,
@@ -6141,7 +6248,8 @@ const styles = StyleSheet.create({
   postingsPageFrame: {
     flex: 1,
     position: "relative",
-    backgroundColor: OJS_COLORS.bg
+    backgroundColor: OJS_COLORS.bg,
+    fontFamily: OJS_FONT_STACK
   },
   postingsPageFrameDark: {
     backgroundColor: OJS_DARK_COLORS.bg
@@ -6181,6 +6289,7 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.surface,
     padding: 14,
     zIndex: 5,
+    fontFamily: OJS_FONT_STACK,
     ...(Platform.OS === "web"
       ? { boxShadow: "0 8px 24px rgba(38, 51, 45, 0.08)" }
       : {
@@ -6338,7 +6447,7 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted,
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: "800",
+    fontWeight: "700",
     textTransform: "uppercase"
   },
   searchBoxRow: {
@@ -6466,7 +6575,7 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.ink,
     fontSize: 12,
     lineHeight: 15,
-    fontWeight: "800"
+    fontWeight: "700"
   },
   globalFilterStatusText: {
     marginTop: 1,
@@ -6521,7 +6630,7 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerLabel: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: OJS_COLORS.text,
     marginRight: 10
   },
@@ -6694,7 +6803,7 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.text,
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     textAlign: "center"
   },
   filterSegmentChipTextActive: {
@@ -7093,7 +7202,7 @@ const styles = StyleSheet.create({
   atsIntelligenceTitle: {
     color: OJS_COLORS.ink,
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "700",
     marginBottom: 8
   },
   atsIntelligenceRow: {
@@ -7128,7 +7237,7 @@ const styles = StyleSheet.create({
   atsIntelligenceSource: {
     color: OJS_COLORS.text,
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "700"
   },
   atsIntelligenceMeta: {
     marginTop: 2,
@@ -7175,7 +7284,7 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted,
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: "800",
+    fontWeight: "700",
     textTransform: "uppercase"
   },
   resultsTitle: {
@@ -7490,13 +7599,13 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.ink,
     fontSize: 17,
     lineHeight: 20,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   resultCountUnitText: {
     color: OJS_COLORS.muted,
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: "800"
+    fontWeight: "700"
   },
   sortControlWrap: {
     flexGrow: 1,
@@ -7582,7 +7691,7 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted,
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: "800",
+    fontWeight: "700",
     textAlign: "center"
   },
   sortSegmentOptionTextActive: {
@@ -7704,7 +7813,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder
+    borderColor: OJS_COLORS.softBorder,
+    fontFamily: OJS_FONT_STACK
   },
   position: {
     fontSize: 16,

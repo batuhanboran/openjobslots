@@ -1323,6 +1323,8 @@ const CONTROL_ROUTE_PREFIXES = Object.freeze([
   "/ingestion/quarantine-summary"
 ]);
 const CONTROL_ROUTE_EXACT = Object.freeze([
+  "/sync/status",
+  "/ingestion/status",
   "/sync/start",
   "/sync/stop",
   "/sync/ats",
@@ -18437,8 +18439,9 @@ function createServer() {
 
   app.get("/search/suggest", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const search = String(req.query.search || req.query.q || "").trim();
       if (DB_BACKEND === "postgres") {
-        const items = await getPostgresSuggestions(postgresPool, req.query.search, Number(req.query.limit || 8), ATS_FILTER_OPTION_ITEMS);
+        const items = await getPostgresSuggestions(postgresPool, search, Number(req.query.limit || 8), ATS_FILTER_OPTION_ITEMS);
         return {
           ok: true,
           items,
@@ -18446,7 +18449,7 @@ function createServer() {
         };
       }
 
-      const items = await getSearchSuggestions(req.query.search, Number(req.query.limit || 8));
+      const items = await getSearchSuggestions(search, Number(req.query.limit || 8));
       return {
         ok: true,
         items,
@@ -18789,8 +18792,22 @@ function createServer() {
 
   app.get("/postings/filter-options", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const options = {
+        search: String(req.query.search || "").trim(),
+        freshness_days: req.query.freshness_days,
+        ats: parseCsvParam(req.query.ats),
+        industries: parseCsvParam(req.query.industries),
+        states: parseCsvParam(req.query.states),
+        counties: parseCsvParam(req.query.counties),
+        countries: parseCsvParam(req.query.countries),
+        regions: parseCsvParam(req.query.regions),
+        remote: req.query.remote,
+        hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
+        include_applied: false,
+        include_ignored: false
+      };
       if (DB_BACKEND === "postgres") {
-        return getPostgresFilterOptions(postgresPool, ATS_FILTER_OPTION_ITEMS);
+        return getPostgresFilterOptions(postgresPool, ATS_FILTER_OPTION_ITEMS, options);
       }
 
       const selectedStates = parseCsvParam(req.query.states).map((state) => state.toUpperCase());

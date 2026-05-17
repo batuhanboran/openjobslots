@@ -137,8 +137,32 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   return request(`/postings?${params.toString()}`);
 }
 
-export function fetchPostingFilterOptions() {
-  return request("/postings/filter-options");
+export function fetchPostingFilterOptions(search = "", filters = {}) {
+  const params = new URLSearchParams();
+  const query = String(search || "").trim();
+  const atsArray = Array.isArray(filters?.ats) ? filters.ats.filter(Boolean) : [];
+  const atsSingle = !Array.isArray(filters?.ats) ? String(filters?.ats || "").trim().toLowerCase() : "";
+  const industries = Array.isArray(filters?.industries) ? filters.industries.filter(Boolean) : [];
+  const states = Array.isArray(filters?.states) ? filters.states.filter(Boolean) : [];
+  const counties = Array.isArray(filters?.counties) ? filters.counties.filter(Boolean) : [];
+  const countries = Array.isArray(filters?.countries) ? filters.countries.filter(Boolean) : [];
+  const regions = Array.isArray(filters?.regions) ? filters.regions.filter(Boolean) : [];
+  const remote = String(filters?.remote || "all").trim().toLowerCase();
+  const freshnessDays = Number(filters?.freshness_days || 0);
+
+  if (query) params.set("search", query);
+  if (atsArray.length > 0) params.set("ats", atsArray.join(","));
+  else if (atsSingle && atsSingle !== "all") params.set("ats", atsSingle);
+  if (industries.length > 0) params.set("industries", industries.join(","));
+  if (states.length > 0) params.set("states", states.join(","));
+  if (counties.length > 0) params.set("counties", counties.join(","));
+  if (countries.length > 0) params.set("countries", countries.join(","));
+  if (regions.length > 0) params.set("regions", regions.join(","));
+  if (remote && remote !== "all") params.set("remote", remote);
+  if (filters?.hide_no_date) params.set("hide_no_date", "1");
+  if ([3, 7, 30].includes(freshnessDays)) params.set("freshness_days", String(freshnessDays));
+  const suffix = params.toString();
+  return request(`/postings/filter-options${suffix ? `?${suffix}` : ""}`);
 }
 
 export function fetchSearchSuggestions(search = "", limit = 8) {

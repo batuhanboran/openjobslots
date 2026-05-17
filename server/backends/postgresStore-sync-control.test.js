@@ -341,11 +341,11 @@ async function testHydratePostgresPostingsKeepsSafetyAndFilterGuards() {
   assert.match(captured.sql, /p\.hidden = false/);
   assert.match(captured.sql, /lower\(unaccent\(coalesce\(p\.country, ''\)\)\)/);
   assert.match(captured.sql, /p\.location_text/);
-  assert.doesNotMatch(captured.sql, /lower\(unaccent\(p\.position_name\)\)/);
+  assert.match(captured.sql, /lower\(unaccent\(p\.position_name\)\)/);
   assert.deepEqual(captured.params[0], ["https://example.com/hidden", "https://example.com/visible"]);
   assert.equal(captured.params[1], "Turkey");
   assert.ok(captured.params.some((value) => value === "%turkiye%"));
-  assert.ok(!captured.params.some((value) => value === "%engineer%"));
+  assert.ok(captured.params.some((value) => value === "%engineer%"));
   assert.ok(!captured.params.some((value) => String(value).includes("\"")));
   assert.deepEqual(items.map((item) => item.job_posting_url), ["https://example.com/visible"]);
 }

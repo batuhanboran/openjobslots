@@ -11,8 +11,6 @@ test.describe("openjobslots API compatibility", () => {
   test("public routes respond without an admin token", async ({ request }) => {
     const publicChecks = [
       { path: "/health" },
-      { path: "/sync/status" },
-      { path: "/ingestion/status" },
       { path: "/public/preferences" },
       { path: "/postings", params: { search: "remote jobs", limit: "10" } },
       { path: "/postings/filter-options" },
@@ -31,7 +29,7 @@ test.describe("openjobslots API compatibility", () => {
     expect(health.ok()).toBeTruthy();
     expect(await health.json()).toEqual(expect.objectContaining({ ok: true }));
 
-    const syncStatus = await request.get(`${apiBaseUrl}/sync/status`);
+    const syncStatus = await request.get(`${apiBaseUrl}/sync/status`, { headers: adminHeaders });
     expect(syncStatus.ok()).toBeTruthy();
     const syncPayload = await syncStatus.json();
     expect(syncPayload).toEqual(
@@ -82,7 +80,7 @@ test.describe("openjobslots API compatibility", () => {
     expect(countryFallback.ok()).toBeTruthy();
     expect(await countryFallback.json()).toEqual(expect.objectContaining({ default_language: "tr", country: "TR" }));
 
-    const ingestionStatus = await request.get(`${apiBaseUrl}/ingestion/status`);
+    const ingestionStatus = await request.get(`${apiBaseUrl}/ingestion/status`, { headers: adminHeaders });
     expect(ingestionStatus.ok()).toBeTruthy();
     const ingestionPayload = await ingestionStatus.json();
     expect(ingestionPayload).toEqual(expect.objectContaining({
@@ -139,6 +137,13 @@ test.describe("openjobslots API compatibility", () => {
     const suggestionPayload = await suggestions.json();
     expect(Array.isArray(suggestionPayload.items)).toBeTruthy();
     expect(suggestionPayload.items.length).toBeGreaterThan(0);
+
+    const qAliasSuggestions = await request.get(`${apiBaseUrl}/search/suggest`, {
+      params: { q: "remote frontend", limit: "5" }
+    });
+    expect(qAliasSuggestions.ok()).toBeTruthy();
+    const qAliasPayload = await qAliasSuggestions.json();
+    expect(qAliasPayload.items.some((item) => item.intent_type === "remote" && item.filter?.remote === "remote")).toBeTruthy();
 
     const combined = await request.get(`${apiBaseUrl}/postings`, {
       params: {
@@ -318,6 +323,8 @@ test.describe("openjobslots API compatibility", () => {
       { method: "get", path: "/settings/mcp" },
       { method: "get", path: "/settings/sync/blocked-companies" },
       { method: "get", path: "/applications" },
+      { method: "get", path: "/sync/status" },
+      { method: "get", path: "/ingestion/status" },
       { method: "post", path: "/applications", data: {} },
       { method: "get", path: "/mcp/candidates" },
       { method: "get", path: "/postings/diagnostics" },

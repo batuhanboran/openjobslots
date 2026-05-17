@@ -429,7 +429,7 @@ function logSearchFallback(reason, metadata = {}) {
 async function hydratePostgresPostings(pool, urls, options = {}) {
   const canonicalUrls = (Array.isArray(urls) ? urls : []).map((url) => String(url || "").trim()).filter(Boolean);
   if (canonicalUrls.length === 0) return [];
-  const filter = buildFilterSql({ ...options, search: "" }, 2);
+  const filter = buildFilterSql(options, 2);
   const result = await pool.query(
     `
       SELECT
@@ -712,19 +712,79 @@ async function getPostgresCounts(pool) {
   };
 }
 
-async function getPostgresFilterOptions(pool, atsItems = []) {
+async function getPostgresFilterOptions(pool, atsItems = [], options = {}) {
+  const filter = buildFilterSql(options, 1);
+  const values = filter.values;
   const [sourceRows, countryRows, regionRows, industryRows] = await Promise.all([
-    pool.query("SELECT ats_key, display_name, enabled FROM ats_sources ORDER BY display_name;"),
-    pool.query("SELECT country AS value, country AS label, region FROM postings WHERE hidden = false AND country <> '' GROUP BY country, region ORDER BY country;"),
-    pool.query("SELECT region AS value, region AS label FROM postings WHERE hidden = false AND region <> '' GROUP BY region ORDER BY region;"),
-    pool.query("SELECT industry AS value, industry AS label FROM postings WHERE hidden = false AND industry <> '' GROUP BY industry ORDER BY industry;")
+    pool.query(
+      `
+        SELECT
+          COALESCE(NULLIF(btrim(p.ats_key), ''), 'unknown') AS ats_key,
+          COALESCE(MAX(a.display_name), COALESCE(NULLIF(btrim(p.ats_key), ''), 'unknown')) AS display_name,
+          COALESCE(bool_or(a.enabled), true) AS enabled,
+          COUNT(*)::int AS count
+        FROM postings p
+        LEFT JOIN posting_application_state s
+          ON s.canonical_url = p.canonical_url
+        LEFT JOIN ats_sources a
+          ON a.ats_key = p.ats_key
+        WHERE ${filter.where.join(" AND ")}
+        GROUP BY COALESCE(NULLIF(btrim(p.ats_key), ''), 'unknown')
+        ORDER BY count DESC, display_name ASC
+        LIMIT 100;
+      `,
+      values
+    ),
+    pool.query(
+      `
+        SELECT p.country AS value, p.country AS label, p.region, COUNT(*)::int AS count
+        FROM postings p
+        LEFT JOIN posting_application_state s
+          ON s.canonical_url = p.canonical_url
+        WHERE ${filter.where.join(" AND ")}
+          AND p.country <> ''
+        GROUP BY p.country, p.region
+        ORDER BY count DESC, p.country ASC
+        LIMIT 250;
+      `,
+      values
+    ),
+    pool.query(
+      `
+        SELECT p.region AS value, p.region AS label, COUNT(*)::int AS count
+        FROM postings p
+        LEFT JOIN posting_application_state s
+          ON s.canonical_url = p.canonical_url
+        WHERE ${filter.where.join(" AND ")}
+          AND p.region <> ''
+        GROUP BY p.region
+        ORDER BY count DESC, p.region ASC
+        LIMIT 80;
+      `,
+      values
+    ),
+    pool.query(
+      `
+        SELECT p.industry AS value, p.industry AS label, COUNT(*)::int AS count
+        FROM postings p
+        LEFT JOIN posting_application_state s
+          ON s.canonical_url = p.canonical_url
+        WHERE ${filter.where.join(" AND ")}
+          AND p.industry <> ''
+        GROUP BY p.industry
+        ORDER BY count DESC, p.industry ASC
+        LIMIT 300;
+      `,
+      values
+    )
   ]);
   const labels = new Map(atsItems.map((item) => [String(item.value), String(item.label)]));
   return {
     ats: sourceRows.rows.map((row) => ({
       value: row.ats_key,
       label: row.display_name || labels.get(row.ats_key) || row.ats_key,
-      enabled: Boolean(row.enabled)
+      enabled: Boolean(row.enabled),
+      count: Number(row.count || 0)
     })),
     sort_options: getPublicPostingSortOptions(),
     industries: industryRows.rows,
