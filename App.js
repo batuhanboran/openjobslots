@@ -127,16 +127,21 @@ const OJS_DARK_COLORS = {
   surface: "#17221D",
   surfaceMuted: "#20352B",
   hover: "#22342C",
-  text: "#DCE8E1",
-  ink: "#F4FBF7",
-  muted: "#9BAEA4",
+  text: "#D8E7DF",
+  ink: "#ECF6F1",
+  muted: "#B5C8BE",
   border: "#33483D",
-  softBorder: "#2A3A32",
+  softBorder: "#385347",
   pressed: "#274E40",
   focus: "#8ED6B9",
   green: "#8ED6B9",
   shadow: "#050806"
 };
+const DARK_WORDMARK_SEGMENTS = [
+  { text: "open", color: OJS_DARK_COLORS.green },
+  { text: "job", color: "#BFE4D3" },
+  { text: "slots", color: OJS_DARK_COLORS.muted }
+];
 const OJS_FONT_STACK = Platform.OS === "web"
   ? "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   : undefined;
@@ -2703,6 +2708,7 @@ export default function App() {
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
   const isDarkPublicTheme = publicTheme === "dark";
+  const publicWordmarkSegments = isDarkPublicTheme ? DARK_WORDMARK_SEGMENTS : WORDMARK_SEGMENTS;
   const t = useCallback(
     (key, fallback = "") => translatePublicText(publicLanguageCode, key, fallback),
     [publicLanguageCode]
@@ -4719,7 +4725,7 @@ export default function App() {
           accessibilityLabel="openjobslots home"
         >
           <View style={styles.brandWordmarkInner} testID="brand-wordmark">
-            {WORDMARK_SEGMENTS.map((segment, index) => (
+            {publicWordmarkSegments.map((segment, index) => (
               <Text
                 key={`brand-wordmark-${segment.text}-${index}`}
                 style={[styles.brandWordmarkLetter, { color: segment.color }]}

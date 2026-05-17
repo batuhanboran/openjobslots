@@ -900,6 +900,62 @@ test.describe("postings page QA", () => {
     }
   });
 
+  test("dark mode keeps public header text readable across languages", async ({ page }) => {
+    await openJobSlots(page);
+    await page.getByTestId("theme-toggle").click();
+
+    for (const languageCode of ["en", "tr", "de", "fr", "es"]) {
+      if (languageCode !== "en") {
+        await page.getByTestId("language-selector").click();
+        await page.getByTestId(`language-option-${languageCode}`).click();
+      }
+      await page.waitForTimeout(250);
+
+      const colorState = await page.evaluate(() => {
+        const parseRgb = (value) => {
+          const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+          return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : [0, 0, 0];
+        };
+        const perceivedLightness = (value) => {
+          const [r, g, b] = parseRgb(value);
+          return Math.round((r * 299 + g * 587 + b * 114) / 1000);
+        };
+        const read = (selector) => {
+          const node = document.querySelector(selector);
+          if (!node) return null;
+          const style = window.getComputedStyle(node);
+          return {
+            color: style.color,
+            lightness: perceivedLightness(style.color)
+          };
+        };
+        const wordmark = Array.from(document.querySelectorAll('[data-testid="brand-wordmark"] *')).map((node) => {
+          const style = window.getComputedStyle(node);
+          return {
+            text: node.textContent || "",
+            color: style.color,
+            lightness: perceivedLightness(style.color)
+          };
+        });
+        return {
+          wordmark,
+          resultsTitle: read('[data-testid="results-header-title"]') ? read('[data-testid="results-header-title"]').lightness : 0,
+          searchLead: read('[data-testid="app-logo"] + *'),
+          initialTitle: read('[data-testid="postings-initial-state"] *')
+        };
+      });
+
+      expect(
+        colorState.wordmark.every((item) => item.lightness >= 145),
+        `${languageCode} dark logo text should avoid low-contrast muted colors: ${JSON.stringify(colorState.wordmark)}`
+      ).toBeTruthy();
+      expect(colorState.resultsTitle, `${languageCode} dark results heading should remain readable`).toBeGreaterThanOrEqual(210);
+      expect(colorState.searchLead.lightness, `${languageCode} dark lead copy should remain readable`).toBeGreaterThanOrEqual(165);
+      expect(colorState.initialTitle.lightness, `${languageCode} dark empty heading should remain readable`).toBeGreaterThanOrEqual(210);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("desktop shell keeps the search panel sticky while results scroll", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width < 768, "desktop sticky behavior is covered by the desktop project");
