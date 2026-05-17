@@ -126,6 +126,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "1.9.2",
+    date: "May 17, 2026",
+    title: "Public search dependency hardening",
+    summary:
+      "Kept the public search update live and resolved deploy-time dependency audit warnings with pinned transitive overrides for the web build."
+  },
+  {
     version: "1.9.1",
     date: "May 17, 2026",
     title: "Public search experience update",
