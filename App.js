@@ -247,6 +247,7 @@ const PUBLIC_MESSAGES = {
     "sources.empty": "Run a search to see sources in the current result set.",
     "results.search": "Search",
     "results.toSeeSlots": "to see slots",
+    "results.searchPrompt": "Search jobs",
     "results.slot": "slot",
     "results.slots": "slots",
     "initial.title": "Search fresh public ATS openings.",
@@ -334,6 +335,7 @@ const PUBLIC_MESSAGES = {
     "sources.empty": "Bu sonuç setindeki kaynakları görmek için arama yap.",
     "results.search": "Ara",
     "results.toSeeSlots": "slotları gör",
+    "results.searchPrompt": "İlan ara",
     "results.slot": "ilan",
     "results.slots": "ilan",
     "initial.title": "Taze public ATS ilanlarını ara.",
@@ -421,6 +423,7 @@ const PUBLIC_MESSAGES = {
     "sources.empty": "Starte eine Suche, um Quellen im Ergebnis zu sehen.",
     "results.search": "Suchen",
     "results.toSeeSlots": "Slots anzeigen",
+    "results.searchPrompt": "Stellen suchen",
     "results.slot": "Slot",
     "results.slots": "Slots",
     "initial.title": "Frische oeffentliche ATS-Stellen suchen.",
@@ -482,6 +485,7 @@ const PUBLIC_MESSAGES = {
     "sources.empty": "Lancez une recherche pour voir les sources.",
     "results.search": "Rechercher",
     "results.toSeeSlots": "pour voir les slots",
+    "results.searchPrompt": "Chercher des offres",
     "results.slot": "slot",
     "results.slots": "slots",
     "initial.title": "Rechercher des offres ATS publiques recentes.",
@@ -543,6 +547,7 @@ const PUBLIC_MESSAGES = {
     "sources.empty": "Haz una busqueda para ver las fuentes del resultado.",
     "results.search": "Buscar",
     "results.toSeeSlots": "para ver slots",
+    "results.searchPrompt": "Buscar empleos",
     "results.slot": "slot",
     "results.slots": "slots",
     "initial.title": "Busca ofertas ATS publicas recientes.",
@@ -4633,13 +4638,15 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
-    const resultCountValueLabel = showResultsSurface ? formatCompactNumberLabel(resultTotalCount) : t("results.search", "Search");
+    const resultCountValueLabel = showResultsSurface
+      ? formatCompactNumberLabel(resultTotalCount)
+      : t("results.searchPrompt", "Search jobs");
     const resultCountUnitLabel = showResultsSurface
       ? resultTotalCount === 1 ? t("results.slot", "slot") : t("results.slots", "slots")
-      : t("results.toSeeSlots", "to see slots");
+      : "";
     const resultCountLabel = showResultsSurface
       ? `${resultCountValueLabel} ${resultCountUnitLabel}`
-      : `${resultCountValueLabel} ${resultCountUnitLabel}`;
+      : resultCountValueLabel;
     const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
       ? postingFilterOptions.sort_options
       : DEFAULT_POSTING_SORT_OPTIONS;
@@ -5106,7 +5113,7 @@ export default function App() {
               {t("results.title", "Open roles")}
             </Text>
           </View>
-          <View style={[styles.resultsToolbar, isDesktopViewport ? null : styles.resultsToolbarMobile]}>
+          <View style={[styles.resultsToolbar, isDesktopViewport ? styles.resultsToolbarDesktop : styles.resultsToolbarMobile]}>
             <View style={styles.resultsUtilityControls}>
               <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} />
               <LanguageSelector
@@ -5124,7 +5131,9 @@ export default function App() {
               accessibilityLabel={resultCountLabel}
             >
               <Text style={[styles.resultCountValueText, isDarkPublicTheme ? styles.textInkDark : null]}>{resultCountValueLabel}</Text>
-              <Text style={[styles.resultCountUnitText, isDarkPublicTheme ? styles.textMutedDark : null]}> {resultCountUnitLabel}</Text>
+              {resultCountUnitLabel ? (
+                <Text style={[styles.resultCountUnitText, isDarkPublicTheme ? styles.textMutedDark : null]}> {resultCountUnitLabel}</Text>
+              ) : null}
             </Text>
             <View
               style={[
@@ -7302,6 +7311,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 8,
     flexWrap: "wrap"
+  },
+  resultsToolbarDesktop: {
+    width: 700,
+    maxWidth: "100%"
   },
   resultsToolbarMobile: {
     width: "100%",

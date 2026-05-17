@@ -865,6 +865,41 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("localized desktop header controls stay aligned in dark mode", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width < 768, "desktop language header alignment is covered by the desktop project");
+
+    await openJobSlots(page);
+    await page.getByTestId("theme-toggle").click();
+
+    for (const languageCode of ["fr", "es", "de"]) {
+      await page.getByTestId("language-selector").click();
+      await page.getByTestId(`language-option-${languageCode}`).click();
+      await page.waitForTimeout(250);
+
+      const headerState = await page.evaluate(() => {
+        const title = document.querySelector('[data-testid="results-header-title"]')?.getBoundingClientRect();
+        const resultCount = document.querySelector('[data-testid="result-count"]')?.getBoundingClientRect();
+        const sort = document.querySelector('[data-testid="sort-control"]')?.getBoundingClientRect();
+        return {
+          titleTop: title?.top || 0,
+          resultCountTop: resultCount?.top || 0,
+          sortTop: sort?.top || 0
+        };
+      });
+
+      expect(
+        headerState.resultCountTop - headerState.titleTop,
+        `${languageCode} result-count pill should not wrap below the header title`
+      ).toBeLessThan(32);
+      expect(
+        headerState.sortTop - headerState.titleTop,
+        `${languageCode} sort control should stay visually attached to the header controls`
+      ).toBeLessThan(60);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("desktop shell keeps the search panel sticky while results scroll", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width < 768, "desktop sticky behavior is covered by the desktop project");
