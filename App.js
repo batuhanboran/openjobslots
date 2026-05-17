@@ -77,6 +77,7 @@ const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const SEARCH_SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SEARCH_SUGGESTION_DEBOUNCE_MS = 90;
 const SEARCH_SUGGESTION_LIMIT = 4;
+const SEARCH_INTENT_CHIP_LIMIT = 4;
 const LOCAL_SEARCH_SHORTCUTS = [
   { type: "search", value: "remote jobs", label: "remote jobs" },
   { type: "search", value: "technical support", label: "technical support" },
@@ -765,12 +766,17 @@ function normalizeSearchSuggestionItem(item, fallbackType = "search") {
   const value = sanitizeDisplayText(source.value || source.label, "").trim();
   const label = sanitizeDisplayText(source.label || source.value, "").trim();
   if (!value || !label) return null;
-  return {
+  const normalized = {
     type: sanitizeDisplayText(source.type, fallbackType).trim() || fallbackType,
     value,
     label,
     count: Number(source.count || 1)
   };
+  const intentType = sanitizeDisplayText(source.intent_type || source.intentType, "").trim();
+  const filter = normalizeSearchSuggestionFilter(source.filter);
+  if (intentType) normalized.intent_type = intentType;
+  if (filter) normalized.filter = filter;
+  return normalized;
 }
 
 function mergeSearchSuggestions(...groups) {
@@ -787,11 +793,124 @@ function mergeSearchSuggestions(...groups) {
   return merged;
 }
 
-function appendLocalSuggestion(candidates, type, value, label = value, count = 1) {
-  const normalized = normalizeSearchSuggestionItem({ type, value, label, count }, type);
+function appendLocalSuggestion(candidates, type, value, label = value, count = 1, extras = {}) {
+  const normalized = normalizeSearchSuggestionItem({ type, value, label, count, ...extras }, type);
   if (normalized) {
     candidates.push(normalized);
   }
+}
+
+function normalizeSearchSuggestionFilter(filter) {
+  const source = filter && typeof filter === "object" ? filter : {};
+  const patch = {};
+  const remote = String(source.remote || "").trim().toLowerCase();
+  if (["remote", "hybrid", "non_remote"].includes(remote)) {
+    patch.remote = remote;
+  }
+  const freshnessDays = Number(source.freshness_days || source.freshnessDays || 0);
+  if ([3, 7, 30].includes(freshnessDays)) {
+    patch.freshness_days = freshnessDays;
+  }
+  const ats = normalizeAtsValue(source.ats || source.source || "");
+  if (ats && ATS_LABEL_BY_VALUE[ats]) {
+    patch.ats = ats;
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function normalizedSuggestionContainsTerm(text, term) {
+  const normalizedText = normalizeSuggestionQuery(text);
+  const normalizedTerm = normalizeSuggestionQuery(term);
+  if (!normalizedText || !normalizedTerm) return false;
+  const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(normalizedText)) return true;
+  return normalizedTerm.length >= 4 && normalizedText.includes(normalizedTerm);
+}
+
+function getSearchSourceSuggestionOptions(filterOptions = {}) {
+  const byValue = new Map();
+  const add = (option) => {
+    const rawValue = option?.value || option?.label;
+    const value = normalizeAtsValue(rawValue);
+    const label = sanitizeDisplayText(option?.label || rawValue, "").trim();
+    if (!value || !label || byValue.has(value)) return;
+    byValue.set(value, { value, label, count: Number(option?.count || 1) });
+  };
+  DEFAULT_ATS_FILTER_OPTIONS.forEach(add);
+  (filterOptions.ats || []).forEach(add);
+  return Array.from(byValue.values());
+}
+
+function buildSearchIntentSuggestions(query, limit = SEARCH_INTENT_CHIP_LIMIT, context = {}) {
+  const normalizedQuery = normalizeSuggestionQuery(query);
+  if (normalizedQuery.length < 2) return [];
+
+  const candidates = [];
+  if (normalizedSuggestionContainsTerm(normalizedQuery, "remote") || normalizedSuggestionContainsTerm(normalizedQuery, "wfh") || normalizedQuery.includes("work from home")) {
+    appendLocalSuggestion(candidates, "intent", "remote", "Remote", 1, {
+      intent_type: "remote",
+      filter: { remote: "remote" }
+    });
+  }
+  if (normalizedSuggestionContainsTerm(normalizedQuery, "hybrid")) {
+    appendLocalSuggestion(candidates, "intent", "hybrid", "Hybrid", 1, {
+      intent_type: "hybrid",
+      filter: { remote: "hybrid" }
+    });
+  }
+  if (
+    normalizedSuggestionContainsTerm(normalizedQuery, "onsite") ||
+    normalizedQuery.includes("on site") ||
+    normalizedQuery.includes("in office")
+  ) {
+    appendLocalSuggestion(candidates, "intent", "onsite", "On-site", 1, {
+      intent_type: "onsite",
+      filter: { remote: "non_remote" }
+    });
+  }
+  if (/(^|\s)(last|past|within)\s+3\s+(days?|d)(\s|$)/.test(normalizedQuery) || /(^|\s)3\s+(days?|d)(\s|$)/.test(normalizedQuery) || /(^|\s)3d(\s|$)/.test(normalizedQuery)) {
+    appendLocalSuggestion(candidates, "intent", "3", "Last 3 days", 1, {
+      intent_type: "freshness",
+      filter: { freshness_days: 3 }
+    });
+  }
+
+  getSearchSourceSuggestionOptions(context.postingFilterOptions || {}).forEach((source) => {
+    if (
+      normalizedSuggestionContainsTerm(normalizedQuery, source.value) ||
+      normalizedSuggestionContainsTerm(normalizedQuery, source.label)
+    ) {
+      appendLocalSuggestion(candidates, "source", source.value, source.label, source.count, {
+        intent_type: "source",
+        filter: { ats: source.value }
+      });
+    }
+  });
+
+  return mergeSearchSuggestions(candidates).slice(0, limit);
+}
+
+function getSearchSuggestionFilterPatch(suggestion) {
+  return normalizeSearchSuggestionFilter(suggestion?.filter);
+}
+
+function getSearchIntentChipTestId(suggestion) {
+  const filter = getSearchSuggestionFilterPatch(suggestion);
+  const intentType = String(suggestion?.intent_type || suggestion?.type || "").trim().toLowerCase();
+  if (filter?.freshness_days) return `intent-chip-freshness-${filter.freshness_days}d`;
+  if (filter?.ats) return `intent-chip-source-${filter.ats}`;
+  if (intentType === "onsite" || filter?.remote === "non_remote") return "intent-chip-onsite";
+  if (filter?.remote) return `intent-chip-${filter.remote}`;
+  return `intent-chip-${normalizeSuggestionQuery(suggestion?.value || suggestion?.label).replace(/[^a-z0-9]+/g, "-") || "suggestion"}`;
+}
+
+function isSearchIntentActive(suggestion, filters = {}) {
+  const filter = getSearchSuggestionFilterPatch(suggestion);
+  if (!filter) return false;
+  if (filter.remote && String(filters.remote || "all") !== filter.remote) return false;
+  if (filter.freshness_days && String(filters.freshness_days || "all") !== String(filter.freshness_days)) return false;
+  if (filter.ats && String(filters.ats || "all") !== filter.ats) return false;
+  return true;
 }
 
 function buildLocalSearchSuggestions(query, limit = 5, context = {}) {
@@ -800,6 +919,9 @@ function buildLocalSearchSuggestions(query, limit = 5, context = {}) {
 
   const candidates = [];
   const filterOptions = context.postingFilterOptions || {};
+  const intentItems = buildSearchIntentSuggestions(query, SEARCH_INTENT_CHIP_LIMIT, {
+    postingFilterOptions: filterOptions
+  });
   const postingsSource = Array.isArray(context.postings) ? context.postings.slice(0, 250) : [];
 
   LOCAL_SEARCH_SHORTCUTS.forEach((shortcut) => {
@@ -841,7 +963,9 @@ function buildLocalSearchSuggestions(query, limit = 5, context = {}) {
     .map((entry) => entry.item)
     .slice(0, limit);
 
-  if (scored.length > 0) return scored;
+  if (scored.length > 0 || intentItems.length > 0) {
+    return mergeSearchSuggestions(intentItems, scored).slice(0, limit);
+  }
   return [{ type: "search", value: query.trim(), label: query.trim(), count: 1 }];
 }
 
@@ -2007,6 +2131,10 @@ export default function App() {
   const searchUiMode = showResultsSurface ? "results" : searchQueryText ? "suggest" : "home";
   const searchShellCompact = searchUiMode === "results";
   const suggestionsVisible = searchSuggestionsOpen && searchSuggestions.length > 0;
+  const searchIntentChips = useMemo(
+    () => buildSearchIntentSuggestions(search, SEARCH_INTENT_CHIP_LIMIT, { postingFilterOptions }),
+    [postingFilterOptions, search]
+  );
   const searchMotionStyle = {
     opacity: searchMotionRef.current.interpolate({
       inputRange: [0, 1],
@@ -2439,11 +2567,36 @@ export default function App() {
     void loadPostings("", { filters: defaultFilters });
   }, [loadPostings, scrollPostingsToTop]);
 
+  const applySearchSuggestionFilter = useCallback((suggestion) => {
+    const filterPatch = getSearchSuggestionFilterPatch(suggestion);
+    if (!filterPatch) return false;
+    const nextFilters = {
+      ...postingsFiltersRef.current,
+      ...filterPatch
+    };
+    const query = String(searchRef.current || "").trim();
+    const filtersSignature = getPostingsFiltersSignature(nextFilters);
+    lastSearchSubmitRef.current = {
+      value: query,
+      filtersSignature,
+      at: Date.now()
+    };
+    suppressedSuggestionQueryRef.current = query;
+    setPostingsFilters(nextFilters);
+    setSearchResultsMode(true);
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+    scrollPostingsToTop();
+    void loadPostings(query, { filters: nextFilters });
+    return true;
+  }, [loadPostings, scrollPostingsToTop]);
+
   const selectSearchSuggestion = useCallback((suggestion) => {
+    if (applySearchSuggestionFilter(suggestion)) return;
     const value = String(suggestion?.value || suggestion?.label || "").trim();
     if (!value) return;
     submitSearch(value);
-  }, [submitSearch]);
+  }, [applySearchSuggestionFilter, submitSearch]);
 
   const handleBrandHome = useCallback(() => {
     const defaultFilters = createDefaultPostingsFilters();
@@ -3682,6 +3835,39 @@ export default function App() {
             accessibilityLabel="Search postings"
           />
         </View>
+        {searchIntentChips.length > 0 ? (
+          <View style={styles.searchIntentPanel} testID="search-intent-chips">
+            <Text style={styles.searchIntentLabel}>Detected intent</Text>
+            <View style={styles.searchIntentChipsRow}>
+              {searchIntentChips.map((suggestion, index) => {
+                const selected = isSearchIntentActive(suggestion, postingsFilters);
+                const label = String(suggestion?.label || suggestion?.value || "").trim();
+                return (
+                  <Pressable
+                    key={`${suggestion?.intent_type || suggestion?.type || "intent"}-${suggestion?.value || label}-${index}`}
+                    onPress={() => selectSearchSuggestion(suggestion)}
+                    style={({ pressed }) => [
+                      styles.searchIntentChip,
+                      selected ? styles.searchIntentChipActive : null,
+                      pressed ? styles.buttonPressed : null
+                    ]}
+                    testID={getSearchIntentChipTestId(suggestion)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Apply ${label} search intent`}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.searchIntentChipText, selected ? styles.searchIntentChipTextActive : null]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
         <View
           style={styles.searchLowerRail}
         >
@@ -5657,6 +5843,49 @@ const styles = StyleSheet.create({
           shadowRadius: 14,
           shadowOffset: { width: 0, height: 5 }
         })
+  },
+  searchIntentPanel: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    marginTop: 10,
+    gap: 7
+  },
+  searchIntentLabel: {
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase"
+  },
+  searchIntentChipsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  searchIntentChip: {
+    minHeight: 44,
+    maxWidth: "100%",
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  searchIntentChipActive: {
+    borderColor: OJS_COLORS.green,
+    backgroundColor: OJS_COLORS.accentSoft
+  },
+  searchIntentChipText: {
+    color: OJS_COLORS.text,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  searchIntentChipTextActive: {
+    color: OJS_COLORS.green
   },
   searchSuggestionItem: {
     minHeight: 44,

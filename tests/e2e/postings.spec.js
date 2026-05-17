@@ -34,6 +34,21 @@ function installProtectedPublicRouteRecorder(page) {
   return calls;
 }
 
+function installPostingsRequestRecorder(page) {
+  const calls = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (!url.pathname.endsWith("/postings")) return;
+    calls.push({
+      search: url.searchParams.get("search") || "",
+      remote: url.searchParams.get("remote") || "",
+      ats: url.searchParams.get("ats") || "",
+      freshnessDays: url.searchParams.get("freshness_days") || ""
+    });
+  });
+  return calls;
+}
+
 async function expectNoProtectedPublicRouteCalls(calls, phase) {
   expect(calls, `public search ${phase} must not call protected admin/API routes`).toEqual([]);
 }
@@ -844,6 +859,44 @@ test.describe("postings page QA", () => {
     await expectScrollTopButtonWorks(page);
     await expect(page.getByTestId("coverage-toggle")).toHaveCount(0);
     await expectNoRawErrors(page);
+  });
+
+  test("autocomplete exposes visible intent chips and applies explicit filters", async ({ page }) => {
+    const protectedCalls = installProtectedPublicRouteRecorder(page);
+    const postingsRequests = installPostingsRequestRecorder(page);
+    await openJobSlots(page);
+
+    await page.getByTestId("search-input").fill("remote frontend engineer");
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await expect(page.getByTestId("intent-chip-remote")).toBeVisible();
+    await expectMobileTapTarget(page, "intent-chip-remote");
+    await page.getByTestId("intent-chip-remote").click();
+    await expect
+      .poll(() => postingsRequests.some((request) => request.search === "remote frontend engineer" && request.remote === "remote"))
+      .toBeTruthy();
+
+    await page.getByTestId("search-input").fill("hybrid designer");
+    await expect(page.getByTestId("intent-chip-hybrid")).toBeVisible();
+
+    await page.getByTestId("search-input").fill("greenhouse engineer");
+    await expect(page.getByTestId("intent-chip-source-greenhouse")).toBeVisible();
+
+    await page.getByTestId("search-input").fill("last 3 days");
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await expect(page.getByTestId("intent-chip-freshness-3d")).toBeVisible();
+    await page.getByTestId("intent-chip-freshness-3d").click();
+    await expect
+      .poll(() => postingsRequests.some((request) => request.search === "last 3 days" && request.freshnessDays === "3"))
+      .toBeTruthy();
+
+    await page.getByTestId("search-input").fill("remote frontend engineer");
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await page.getByTestId("search-input").press("Escape");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+
+    await expectNoHorizontalOverflow(page);
+    await expectNoRawErrors(page);
+    await expectNoProtectedPublicRouteCalls(protectedCalls, "autocomplete intent");
   });
 
   test("keyboard shortcuts and brand home keep search fast", async ({ page }) => {

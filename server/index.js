@@ -17622,18 +17622,97 @@ function buildPublicIngestionStatusItem(ingestionWorker = {}, options = {}) {
   };
 }
 
-function addSuggestion(suggestions, seen, type, value, count = 1) {
-  const label = String(value || "").trim();
-  if (!label) return;
-  const key = `${type}:${normalizeSearchText(label)}`;
+function normalizePublicSuggestionFilter(filter = {}) {
+  const source = filter && typeof filter === "object" ? filter : {};
+  const patch = {};
+  const remote = String(source.remote || "").trim().toLowerCase();
+  if (["remote", "hybrid", "non_remote"].includes(remote)) {
+    patch.remote = remote;
+  }
+  const freshnessDays = Number(source.freshness_days || source.freshnessDays || 0);
+  if ([3, 7, 30].includes(freshnessDays)) {
+    patch.freshness_days = freshnessDays;
+  }
+  const ats = normalizeAtsFilterValue(source.ats || source.source || "");
+  if (ATS_FILTER_OPTIONS.has(ats)) {
+    patch.ats = ats;
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function addSuggestion(suggestions, seen, type, value, count = 1, extras = {}) {
+  const label = String(extras.label || value || "").trim();
+  const suggestionValue = String(value || label || "").trim();
+  const suggestionType = String(type || "search").trim().toLowerCase() || "search";
+  if (!label || !suggestionValue) return;
+  const intentType = String(extras.intent_type || "").trim().toLowerCase();
+  const key = `${suggestionType}:${normalizeSearchText(suggestionValue)}:${intentType}`;
   if (seen.has(key)) return;
   seen.add(key);
-  suggestions.push({
-    type,
-    value: label,
+  const suggestion = {
+    type: suggestionType,
+    value: suggestionValue,
     label,
     count: Number(count || 1)
-  });
+  };
+  const filter = normalizePublicSuggestionFilter(extras.filter);
+  if (intentType) suggestion.intent_type = intentType;
+  if (filter) suggestion.filter = filter;
+  suggestions.push(suggestion);
+}
+
+function normalizedSuggestionContainsTerm(text, term) {
+  const normalizedText = normalizeSearchText(text);
+  const normalizedTerm = normalizeSearchText(term);
+  if (!normalizedText || !normalizedTerm) return false;
+  const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(normalizedText)) return true;
+  return normalizedTerm.length >= 4 && normalizedText.includes(normalizedTerm);
+}
+
+function addSearchIntentSuggestions(suggestions, seen, search, atsItems = ATS_FILTER_OPTION_ITEMS) {
+  const query = normalizeSearchText(search);
+  if (query.length < 2) return;
+  if (normalizedSuggestionContainsTerm(query, "remote") || normalizedSuggestionContainsTerm(query, "wfh") || query.includes("work from home")) {
+    addSuggestion(suggestions, seen, "intent", "remote", 1, {
+      label: "Remote",
+      intent_type: "remote",
+      filter: { remote: "remote" }
+    });
+  }
+  if (normalizedSuggestionContainsTerm(query, "hybrid")) {
+    addSuggestion(suggestions, seen, "intent", "hybrid", 1, {
+      label: "Hybrid",
+      intent_type: "hybrid",
+      filter: { remote: "hybrid" }
+    });
+  }
+  if (normalizedSuggestionContainsTerm(query, "onsite") || query.includes("on site") || query.includes("in office")) {
+    addSuggestion(suggestions, seen, "intent", "onsite", 1, {
+      label: "On-site",
+      intent_type: "onsite",
+      filter: { remote: "non_remote" }
+    });
+  }
+  if (/(^|\s)(last|past|within)\s+3\s+(days?|d)(\s|$)/.test(query) || /(^|\s)3\s+(days?|d)(\s|$)/.test(query) || /(^|\s)3d(\s|$)/.test(query)) {
+    addSuggestion(suggestions, seen, "intent", "3", 1, {
+      label: "Last 3 days",
+      intent_type: "freshness",
+      filter: { freshness_days: 3 }
+    });
+  }
+  for (const item of atsItems || []) {
+    const value = normalizeAtsFilterValue(item?.value || item?.label || "");
+    const label = String(item?.label || item?.value || "").trim();
+    if (!value || !label || !ATS_FILTER_OPTIONS.has(value)) continue;
+    if (normalizedSuggestionContainsTerm(query, value) || normalizedSuggestionContainsTerm(query, label)) {
+      addSuggestion(suggestions, seen, "source", value, Number(item?.count || 1), {
+        label,
+        intent_type: "source",
+        filter: { ats: value }
+      });
+    }
+  }
 }
 
 async function getSearchSuggestions(search, limit = 8) {
@@ -17641,6 +17720,8 @@ async function getSearchSuggestions(search, limit = 8) {
   const resolvedLimit = Math.max(1, Math.min(20, Number(limit || 8)));
   const suggestions = [];
   const seen = new Set();
+
+  addSearchIntentSuggestions(suggestions, seen, query, ATS_FILTER_OPTION_ITEMS);
 
   for (const alias of ["remote jobs", "turkish jobs", "t\u00fcrkiye", "turkiye", "turkey"]) {
     if (!query || normalizeSearchText(alias).includes(normalizeSearchText(query))) {
@@ -18171,7 +18252,7 @@ function createServer() {
   app.get("/search/suggest", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       if (DB_BACKEND === "postgres") {
-        const items = await getPostgresSuggestions(postgresPool, req.query.search, Number(req.query.limit || 8));
+        const items = await getPostgresSuggestions(postgresPool, req.query.search, Number(req.query.limit || 8), ATS_FILTER_OPTION_ITEMS);
         return {
           ok: true,
           items,

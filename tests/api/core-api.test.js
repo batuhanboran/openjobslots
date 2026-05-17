@@ -198,6 +198,39 @@ test.describe("openjobslots API compatibility", () => {
     }
   });
 
+  test("search suggestions expose safe visible intent metadata", async ({ request }) => {
+    const cases = [
+      {
+        search: "remote frontend engineer",
+        matcher: (item) => item.intent_type === "remote" && item.filter?.remote === "remote"
+      },
+      {
+        search: "hybrid designer",
+        matcher: (item) => item.intent_type === "hybrid" && item.filter?.remote === "hybrid"
+      },
+      {
+        search: "greenhouse engineer",
+        matcher: (item) => item.intent_type === "source" && item.filter?.ats === "greenhouse"
+      },
+      {
+        search: "last 3 days",
+        matcher: (item) => item.intent_type === "freshness" && Number(item.filter?.freshness_days) === 3
+      }
+    ];
+
+    for (const check of cases) {
+      const response = await request.get(`${apiBaseUrl}/search/suggest`, {
+        params: { search: check.search, limit: "8" }
+      });
+      expect(response.ok(), `${check.search} should return suggestions`).toBeTruthy();
+      const payload = await response.json();
+      expect(Array.isArray(payload.items)).toBeTruthy();
+      expect(payload.items.some(check.matcher), `${check.search} should include matching visible intent`).toBeTruthy();
+      const serialized = JSON.stringify(payload);
+      expect(serialized).not.toMatch(/source_quality|parser_version|quality_flags|raw_payload|rejection_reason|MEILI_|MASTER_KEY|postgres:\/\//i);
+    }
+  });
+
   test("admin and mutation endpoints are protected or absent from public API", async ({ request }) => {
     const protectedChecks = [
       { method: "get", path: "/admin/services" },

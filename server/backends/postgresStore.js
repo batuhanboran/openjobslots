@@ -675,21 +675,80 @@ async function getPostgresFilterOptions(pool, atsItems = []) {
   };
 }
 
-async function getPostgresSuggestions(pool, search, limit = 8) {
+function normalizePostgresSuggestionFilter(filter = {}, atsItems = []) {
+  const source = filter && typeof filter === "object" ? filter : {};
+  const atsOptions = new Set((atsItems || []).map((item) => normalizeAtsKey(item?.value || item?.label)).filter(Boolean));
+  const patch = {};
+  const remote = String(source.remote || "").trim().toLowerCase();
+  if (["remote", "hybrid", "non_remote"].includes(remote)) {
+    patch.remote = remote;
+  }
+  const freshnessDays = Number(source.freshness_days || source.freshnessDays || 0);
+  if ([3, 7, 30].includes(freshnessDays)) {
+    patch.freshness_days = freshnessDays;
+  }
+  const ats = normalizeAtsKey(source.ats || source.source || "");
+  if (ats && (atsOptions.size === 0 || atsOptions.has(ats))) {
+    patch.ats = ats;
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function normalizedSuggestionContainsTerm(text, term) {
+  const normalizedText = normalizeText(text);
+  const normalizedTerm = normalizeText(term);
+  if (!normalizedText || !normalizedTerm) return false;
+  const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(normalizedText)) return true;
+  return normalizedTerm.length >= 4 && normalizedText.includes(normalizedTerm);
+}
+
+async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
   const query = String(search || "").trim();
+  const resolvedLimit = Math.max(1, Math.min(20, Number(limit || 8)));
   const suggestions = [];
   const seen = new Set();
-  const add = (type, label, count = 1) => {
-    const value = String(label || "").trim();
-    const key = `${type}:${normalizeText(value)}`;
-    if (!value || seen.has(key)) return;
+  const add = (type, value, count = 1, extras = {}) => {
+    const suggestionValue = String(value || extras.label || "").trim();
+    const label = String(extras.label || value || "").trim();
+    const suggestionType = String(type || "search").trim().toLowerCase() || "search";
+    const intentType = String(extras.intent_type || "").trim().toLowerCase();
+    const key = `${suggestionType}:${normalizeText(suggestionValue)}:${intentType}`;
+    if (!suggestionValue || !label || seen.has(key)) return;
     seen.add(key);
-    suggestions.push({ type, value, label: value, count: Number(count || 1) });
+    const suggestion = { type: suggestionType, value: suggestionValue, label, count: Number(count || 1) };
+    const filter = normalizePostgresSuggestionFilter(extras.filter, atsItems);
+    if (intentType) suggestion.intent_type = intentType;
+    if (filter) suggestion.filter = filter;
+    suggestions.push(suggestion);
   };
+  const normalizedQuery = normalizeText(query);
+  if (normalizedQuery.length >= 2) {
+    if (normalizedSuggestionContainsTerm(normalizedQuery, "remote") || normalizedSuggestionContainsTerm(normalizedQuery, "wfh") || normalizedQuery.includes("work from home")) {
+      add("intent", "remote", 1, { label: "Remote", intent_type: "remote", filter: { remote: "remote" } });
+    }
+    if (normalizedSuggestionContainsTerm(normalizedQuery, "hybrid")) {
+      add("intent", "hybrid", 1, { label: "Hybrid", intent_type: "hybrid", filter: { remote: "hybrid" } });
+    }
+    if (normalizedSuggestionContainsTerm(normalizedQuery, "onsite") || normalizedQuery.includes("on site") || normalizedQuery.includes("in office")) {
+      add("intent", "onsite", 1, { label: "On-site", intent_type: "onsite", filter: { remote: "non_remote" } });
+    }
+    if (/(^|\s)(last|past|within)\s+3\s+(days?|d)(\s|$)/.test(normalizedQuery) || /(^|\s)3\s+(days?|d)(\s|$)/.test(normalizedQuery) || /(^|\s)3d(\s|$)/.test(normalizedQuery)) {
+      add("intent", "3", 1, { label: "Last 3 days", intent_type: "freshness", filter: { freshness_days: 3 } });
+    }
+    for (const item of atsItems || []) {
+      const value = normalizeAtsKey(item?.value || item?.label || "");
+      const label = String(item?.label || item?.value || "").trim();
+      if (!value || !label) continue;
+      if (normalizedSuggestionContainsTerm(normalizedQuery, value) || normalizedSuggestionContainsTerm(normalizedQuery, label)) {
+        add("source", value, Number(item?.count || 1), { label, intent_type: "source", filter: { ats: value } });
+      }
+    }
+  }
   for (const alias of ["remote jobs", "turkish jobs", "t\u00fcrkiye", "turkiye", "turkey"]) {
     if (!query || normalizeText(alias).includes(normalizeText(query))) add("shortcut", alias);
   }
-  if (query && suggestions.length < limit) {
+  if (query && suggestions.length < resolvedLimit) {
     const pattern = `%${query}%`;
     const rows = await pool.query(
       `
@@ -704,14 +763,14 @@ async function getPostgresSuggestions(pool, search, limit = 8) {
         ORDER BY count DESC
         LIMIT $2;
       `,
-      [pattern, Math.max(limit, 20)]
+      [pattern, Math.max(resolvedLimit, 20)]
     );
     for (const row of rows.rows) {
       add(row.type, row.value, row.count);
-      if (suggestions.length >= limit) break;
+      if (suggestions.length >= resolvedLimit) break;
     }
   }
-  return suggestions.slice(0, limit);
+  return suggestions.slice(0, resolvedLimit);
 }
 
 async function getPostgresParserAttentionByAts(pool, limit = 20) {
