@@ -126,6 +126,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "1.9.1",
+    date: "May 17, 2026",
+    title: "Public search experience update",
+    summary:
+      "Cleaned the public search shell, kept the openjobslots logo, added a sticky desktop search panel, mobile-friendly filters, dynamic result counts, a 3-day freshness filter, expanded sort controls, search suggestions with visible intent chips, and a compact sources-in-results panel."
+  },
+  {
     version: "1.8.0",
     date: "May 12, 2026",
     title: "Certified-source indexing release",
