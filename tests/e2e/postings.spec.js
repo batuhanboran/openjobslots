@@ -79,7 +79,12 @@ async function openJobSlots(page) {
   await expect(page.getByTestId("search-input")).toBeVisible();
   await expect(page.getByTestId("result-count")).toBeVisible();
   await expect(page.getByTestId("sort-control")).toBeVisible();
-  await expect(page.getByTestId("ats-intelligence-panel")).toBeVisible();
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width >= 768) {
+    await expect(page.getByTestId("ats-intelligence-panel")).toBeVisible();
+  } else {
+    await expect(page.getByTestId("ats-intelligence-panel")).toHaveCount(0);
+  }
   await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
   await expect(page.getByTestId("posting-card")).toHaveCount(0);
   await expect(page.getByText("Dense Search Cockpit")).toHaveCount(0);
@@ -827,6 +832,155 @@ test.describe("postings page QA", () => {
     await expect
       .poll(() => requestedPostings.some((request) => request.search === "dynamic" && request.sortBy === "posted_date"))
       .toBeTruthy();
+    await expectNoRawErrors(page);
+  });
+
+  test("sources in results panel reflects facets and filters by source", async ({ page }) => {
+    const requestedPostings = [];
+    const basePosting = {
+      id: 8101,
+      company_name: "QA Source Facet",
+      position_name: "Source Intelligence Engineer",
+      job_posting_url: "https://boards.greenhouse.io/openjobslotsqa/jobs/source-facet",
+      location: "Remote",
+      posting_date: "2026-05-16",
+      last_seen_epoch: 1778889600,
+      ats: "greenhouse"
+    };
+
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      const search = url.searchParams.get("search") || "";
+      if (search !== "source mix") {
+        await route.continue();
+        return;
+      }
+
+      const ats = url.searchParams.get("ats") || "";
+      requestedPostings.push({ search, ats });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [basePosting],
+          count: ats === "greenhouse" ? 3 : 7,
+          count_exact: true,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          filters: {
+            search,
+            ats: ats ? [ats] : [],
+            sort_by: url.searchParams.get("sort_by") || "relevance"
+          },
+          source_facets: ats === "greenhouse"
+            ? [
+                {
+                  value: "greenhouse",
+                  label: "Greenhouse",
+                  count: 3,
+                  avg_confidence: 0.91,
+                  avg_quality: 88,
+                  latest_seen_epoch: 1778889600,
+                  fresh_percentage: 100
+                }
+              ]
+            : [
+                {
+                  value: "greenhouse",
+                  label: "Greenhouse",
+                  count: 5,
+                  avg_confidence: 0.82,
+                  avg_quality: 77,
+                  latest_seen_epoch: 1778889600,
+                  fresh_percentage: 80
+                },
+                {
+                  value: "lever",
+                  label: "Lever",
+                  count: 2,
+                  avg_confidence: 0.73,
+                  avg_quality: 68,
+                  latest_seen_epoch: 1778803200,
+                  fresh_percentage: 50
+                }
+              ]
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("source mix");
+    await page.getByTestId("search-input").press("Enter");
+    await ensureFiltersVisible(page);
+
+    const sourcePanel = page.getByTestId("ats-intelligence-panel");
+    await expect(sourcePanel).toBeVisible();
+    await expect(sourcePanel.getByText("Sources in results")).toBeVisible();
+    await expect(page.getByTestId("source-intelligence-row-greenhouse")).toContainText("Greenhouse");
+    await expect(page.getByTestId("source-intelligence-count-greenhouse")).toContainText("5 results");
+    await expect(page.getByTestId("source-intelligence-quality-greenhouse")).toContainText(/Conf 82%|Quality 77/i);
+    await expect(page.getByTestId("source-intelligence-freshness-greenhouse")).toContainText(/80% fresh|seen/i);
+    await expect(sourcePanel).not.toContainText(/risk|recommendation/i);
+
+    await page.getByTestId("source-intelligence-row-greenhouse").click();
+    await expect
+      .poll(() => requestedPostings.some((request) => request.search === "source mix" && request.ats === "greenhouse"))
+      .toBeTruthy();
+    await expect(page.getByTestId("ats-filter-trigger")).toContainText(/Greenhouse/i);
+    await expect(page.getByTestId("source-intelligence-count-greenhouse")).toContainText("3 results");
+    await expectNoRawErrors(page);
+  });
+
+  test("search still works when source facets are absent", async ({ page }) => {
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings") || url.searchParams.get("search") !== "facetless-source") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            {
+              id: 8201,
+              company_name: "QA Facetless",
+              position_name: "Fallback Source Analyst",
+              job_posting_url: "https://boards.greenhouse.io/openjobslotsqa/jobs/facetless",
+              location: "Remote",
+              posting_date: "2026-05-16",
+              last_seen_epoch: 1778889600,
+              ats: "greenhouse"
+            }
+          ],
+          count: 1,
+          count_exact: true,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          filters: {
+            search: "facetless-source",
+            sort_by: "relevance"
+          }
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("facetless-source");
+    await page.getByTestId("search-input").press("Enter");
+    await expect(page.getByTestId("posting-card").first()).toContainText("QA Facetless");
+    await ensureFiltersVisible(page);
+    await expect(page.getByTestId("ats-intelligence-panel")).toBeVisible();
+    await expect(page.getByTestId("source-intelligence-row-greenhouse")).toContainText("Greenhouse");
     await expectNoRawErrors(page);
   });
 

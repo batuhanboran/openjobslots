@@ -231,6 +231,51 @@ test.describe("openjobslots API compatibility", () => {
     }
   });
 
+  test("postings expose bounded public source facets without diagnostics", async ({ request }) => {
+    const response = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "QA",
+        limit: "10",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(response.ok()).toBeTruthy();
+    const payload = await response.json();
+    expect(Array.isArray(payload.source_facets)).toBeTruthy();
+    expect(payload.source_facets.length).toBeGreaterThan(0);
+
+    const greenhouse = payload.source_facets.find((item) => item.value === "greenhouse");
+    expect(greenhouse).toEqual(
+      expect.objectContaining({
+        value: "greenhouse",
+        label: expect.any(String),
+        count: expect.any(Number),
+        avg_confidence: expect.any(Number),
+        avg_quality: expect.any(Number),
+        latest_seen_epoch: expect.any(Number),
+        fresh_percentage: expect.any(Number)
+      })
+    );
+    expect(greenhouse.count).toBeGreaterThan(0);
+
+    const greenhouseOnly = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "QA",
+        ats: "greenhouse",
+        limit: "10",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(greenhouseOnly.ok()).toBeTruthy();
+    const greenhousePayload = await greenhouseOnly.json();
+    expect(greenhousePayload.source_facets.map((item) => item.value)).toEqual(["greenhouse"]);
+
+    const serialized = JSON.stringify(payload.source_facets);
+    expect(serialized).not.toMatch(/risk|recommendation|source_quality|parser_version|quality_flags|raw_payload|rejection_reason|MEILI_|MASTER_KEY|postgres:\/\//i);
+  });
+
   test("admin and mutation endpoints are protected or absent from public API", async ({ request }) => {
     const protectedChecks = [
       { method: "get", path: "/admin/services" },

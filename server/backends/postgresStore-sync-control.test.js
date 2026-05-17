@@ -18,6 +18,23 @@ const {
 } = require("./postgresStore");
 const { searchMeiliPostings, toMeiliPostingDocument } = require("../search/meili");
 
+function isSourceFacetQuery(sql) {
+  return /AS fresh_count/i.test(sql) && /GROUP BY COALESCE\(NULLIF\(btrim\(p\.ats_key\), ''\), 'unknown'\)/i.test(sql);
+}
+
+function createSourceFacetRows(value = "greenhouse", count = 1) {
+  return {
+    rows: [{
+      value,
+      count,
+      avg_confidence: 0.9,
+      avg_quality: 90,
+      latest_seen_epoch: 1778205600,
+      fresh_count: count
+    }]
+  };
+}
+
 function createMockPool(status = "idle") {
   const calls = [];
   return {
@@ -450,6 +467,9 @@ async function testUnderfilledMeiliHydrationFallsBackToPostgres() {
       if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) {
         return { rows: [{ count: 3 }] };
       }
+      if (isSourceFacetQuery(sql)) {
+        return createSourceFacetRows("greenhouse", 2);
+      }
       fallbackSelectLimit = params[params.length - 2];
       return {
         rows: [
@@ -635,6 +655,7 @@ async function testPublicPostingReadsDoNotWrite() {
     async query(sql, params = []) {
       calls.push({ sql, params });
       if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) return { rows: [{ count: 1 }] };
+      if (isSourceFacetQuery(sql)) return createSourceFacetRows("fixture", 1);
       if (/SELECT\s+row_number\(\) OVER/i.test(sql)) {
         return {
           rows: [{

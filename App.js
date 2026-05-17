@@ -78,6 +78,7 @@ const SEARCH_SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SEARCH_SUGGESTION_DEBOUNCE_MS = 90;
 const SEARCH_SUGGESTION_LIMIT = 4;
 const SEARCH_INTENT_CHIP_LIMIT = 4;
+const SOURCE_INTELLIGENCE_LIMIT = 8;
 const LOCAL_SEARCH_SHORTCUTS = [
   { type: "search", value: "remote jobs", label: "remote jobs" },
   { type: "search", value: "technical support", label: "technical support" },
@@ -720,6 +721,88 @@ function normalizePostingItem(item, index = 0) {
 function normalizePostingItems(items) {
   const source = Array.isArray(items) ? items : [];
   return source.map((item, index) => normalizePostingItem(item, index));
+}
+
+function normalizeSourceFacetItem(item) {
+  const source = item && typeof item === "object" ? item : {};
+  const value = normalizeAtsValue(source.value || source.ats || source.source || source.label || "") || "unknown";
+  const label = sanitizeDisplayText(source.label || getAtsDisplayLabel(value), getAtsDisplayLabel(value));
+  const count = Math.max(0, Number(source.count || 0));
+  const freshCount = Math.max(0, Math.min(count, Number(source.fresh_count || source.freshCount || 0)));
+  const latestSeenEpoch = Math.max(0, Number(source.latest_seen_epoch || source.latestSeenEpoch || 0));
+  const rawFreshPercentage = Number(source.fresh_percentage ?? source.freshPercentage);
+  const freshPercentage = Number.isFinite(rawFreshPercentage)
+    ? Math.max(0, Math.min(100, Math.round(rawFreshPercentage)))
+    : count > 0
+      ? Math.round((freshCount / count) * 100)
+      : 0;
+
+  if (!count) return null;
+  return {
+    key: value,
+    value,
+    label,
+    count,
+    avgConfidence: Math.max(0, Number(source.avg_confidence ?? source.avgConfidence ?? 0) || 0),
+    avgQuality: Math.max(0, Number(source.avg_quality ?? source.avgQuality ?? 0) || 0),
+    latestSeenEpoch,
+    freshCount,
+    freshPercentage
+  };
+}
+
+function normalizeSourceFacets(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(normalizeSourceFacetItem)
+    .filter(Boolean)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, SOURCE_INTELLIGENCE_LIMIT);
+}
+
+function buildSourceFacetsFromPostings(items) {
+  const bySource = new Map();
+  const freshCutoffEpoch = Math.floor(Date.now() / 1000) - 3 * 24 * 60 * 60;
+  (Array.isArray(items) ? items : []).forEach((posting) => {
+    const value = normalizeAtsValue(posting?.ats || "") || "unknown";
+    const existing = bySource.get(value) || {
+      value,
+      label: getAtsDisplayLabel(value),
+      count: 0,
+      latest_seen_epoch: 0,
+      fresh_count: 0,
+      avg_confidence: 0,
+      avg_quality: 0
+    };
+    existing.count += 1;
+    const latestSeenEpoch = Math.max(0, Number(posting?.last_seen_epoch || 0));
+    if (latestSeenEpoch > existing.latest_seen_epoch) {
+      existing.latest_seen_epoch = latestSeenEpoch;
+    }
+    if (latestSeenEpoch >= freshCutoffEpoch) {
+      existing.fresh_count += 1;
+    }
+    bySource.set(value, existing);
+  });
+  return normalizeSourceFacets(Array.from(bySource.values()));
+}
+
+function formatSourceMetricPercent(value) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return "0%";
+  const percentValue = numberValue <= 1 ? numberValue * 100 : numberValue;
+  return `${Math.round(percentValue)}%`;
+}
+
+function formatSourceQualitySummary(source) {
+  return `Conf ${formatSourceMetricPercent(source?.avgConfidence)} - Quality ${Math.round(Number(source?.avgQuality || 0))}`;
+}
+
+function formatSourceFreshnessSummary(source) {
+  const freshPercentage = Math.max(0, Math.min(100, Math.round(Number(source?.freshPercentage || 0))));
+  const seenText = source?.latestSeenEpoch
+    ? `seen ${formatEpochSeconds(source.latestSeenEpoch, "recent").slice(0, 10)}`
+    : "current set";
+  return `${freshPercentage}% fresh - ${seenText}`;
 }
 
 function getPostingIdentity(item, fallbackIndex = 0) {
@@ -1725,6 +1808,52 @@ function SingleSelectDropdown({
   );
 }
 
+function SourceIntelligencePanel({ sources, showResultsSurface, selectedSource, onSelectSource }) {
+  const visibleSources = Array.isArray(sources) ? sources : [];
+  return (
+    <View style={styles.atsIntelligencePanel} testID="ats-intelligence-panel">
+      <Text style={styles.atsIntelligenceTitle}>Sources in results</Text>
+      {showResultsSurface && visibleSources.length > 0 ? (
+        visibleSources.map((source) => {
+          const sourceValue = source.value || source.key || "unknown";
+          const testIdPart = toTestIdPart(sourceValue || source.label);
+          const selected = selectedSource === sourceValue;
+          return (
+            <Pressable
+              key={`${sourceValue}-${source.label}`}
+              onPress={() => onSelectSource?.(source)}
+              style={({ pressed }) => [
+                styles.atsIntelligenceRow,
+                selected ? styles.atsIntelligenceRowActive : null,
+                pressed ? styles.buttonPressed : null
+              ]}
+              testID={`source-intelligence-row-${testIdPart}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`Filter results by ${source.label}`}
+            >
+              <View style={styles.atsIntelligenceSourceBlock}>
+                <Text style={styles.atsIntelligenceSource}>{source.label}</Text>
+                <Text style={styles.atsIntelligenceMeta} testID={`source-intelligence-count-${testIdPart}`}>
+                  {formatCompactNumberLabel(source.count)} {source.count === 1 ? "result" : "results"}
+                </Text>
+                <Text style={styles.atsIntelligenceQuality} testID={`source-intelligence-quality-${testIdPart}`}>
+                  {formatSourceQualitySummary(source)}
+                </Text>
+              </View>
+              <Text style={styles.atsIntelligenceFreshness} testID={`source-intelligence-freshness-${testIdPart}`}>
+                {formatSourceFreshnessSummary(source)}
+              </Text>
+            </Pressable>
+          );
+        })
+      ) : (
+        <Text style={styles.atsIntelligenceEmpty}>Run a search to see sources in the current result set.</Text>
+      )}
+    </View>
+  );
+}
+
 function ToggleRow({ label, value, onValueChange }) {
   return (
     <View style={styles.toggleRow}>
@@ -1754,6 +1883,7 @@ export default function App() {
   const [postingFilterOptionsLoading, setPostingFilterOptionsLoading] = useState(false);
   const [postingsFilterPanelOpen, setPostingsFilterPanelOpen] = useState(false);
   const [postings, setPostings] = useState([]);
+  const [sourceFacets, setSourceFacets] = useState([]);
   const [postingsTotalCount, setPostingsTotalCount] = useState(0);
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
@@ -2100,31 +2230,9 @@ export default function App() {
   }, [postingsFilters]);
   const hasRemotePostingFilter = postingsFilters.remote !== "all";
   const visibleSourceSummary = useMemo(() => {
-    const bySource = new Map();
-    postings.forEach((posting) => {
-      const sourceKey = String(posting?.ats || "").trim().toLowerCase() || "unknown";
-      const sourceLabel = getAtsDisplayLabel(sourceKey);
-      const existing = bySource.get(sourceKey) || {
-        key: sourceKey,
-        label: sourceLabel,
-        count: 0,
-        latestSeenEpoch: 0,
-        datedCount: 0
-      };
-      existing.count += 1;
-      const seenEpoch = Number(posting?.last_seen_epoch || 0);
-      if (Number.isFinite(seenEpoch) && seenEpoch > existing.latestSeenEpoch) {
-        existing.latestSeenEpoch = seenEpoch;
-      }
-      if (String(posting?.posting_date || "").trim()) {
-        existing.datedCount += 1;
-      }
-      bySource.set(sourceKey, existing);
-    });
-    return Array.from(bySource.values())
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
-      .slice(0, 5);
-  }, [postings]);
+    if (sourceFacets.length > 0) return sourceFacets;
+    return buildSourceFacetsFromPostings(postings);
+  }, [postings, sourceFacets]);
 
   const searchQueryText = String(search || "").trim();
   const showResultsSurface = searchResultsMode || hasActivePostingFilters;
@@ -2246,6 +2354,8 @@ export default function App() {
       const nextVisibleItems = append
         ? mergePostingItems(postingsRef.current, normalizedItems)
         : normalizedItems;
+      const nextSourceFacets = normalizeSourceFacets(response?.source_facets);
+      const fallbackSourceFacets = buildSourceFacetsFromPostings(nextVisibleItems);
       const visibleCountAfterLoad = nextVisibleItems.length;
       const responseCount = Number(response?.count || 0);
       const totalCount = Math.max(responseCount, visibleCountAfterLoad);
@@ -2264,6 +2374,7 @@ export default function App() {
       postingsNextOffsetRef.current = nextOffset;
       postingsHasMoreRef.current = Boolean(responseHasMore && normalizedItems.length > 0);
       setPostings(nextVisibleItems);
+      setSourceFacets(nextSourceFacets.length > 0 ? nextSourceFacets : fallbackSourceFacets);
       setPostingsTotalCount(totalCount);
       setPostingsNextOffset(nextOffset);
       setPostingsHasMore(Boolean(responseHasMore && normalizedItems.length > 0));
@@ -3162,6 +3273,18 @@ export default function App() {
     scrollPostingsToTop();
     void loadPostings(searchRef.current, { filters: nextFilters });
   }, [loadPostings, scrollPostingsToTop]);
+
+  const handleSelectSourceFacet = useCallback(
+    (source) => {
+      const value = normalizeAtsValue(source?.value || source?.key || source?.label || "");
+      if (!value || value === "unknown" || !ATS_LABEL_BY_VALUE[value]) return;
+      applyPostingsFiltersImmediately({
+        ...postingsFiltersRef.current,
+        ats: value
+      });
+    },
+    [applyPostingsFiltersImmediately]
+  );
 
   const clearLocationPostingFilters = useCallback(() => {
     applyPostingsFiltersImmediately({
@@ -4146,30 +4269,16 @@ export default function App() {
                 />
               </View>
             </View>
+            <SourceIntelligencePanel
+              sources={visibleSourceSummary}
+              showResultsSurface={showResultsSurface}
+              selectedSource={postingsFilters.ats}
+              onSelectSource={handleSelectSourceFacet}
+            />
           </View>
         </View>
       ) : null}
 
-      <View style={styles.atsIntelligencePanel} testID="ats-intelligence-panel">
-        <Text style={styles.atsIntelligenceTitle}>Source mix</Text>
-        {showResultsSurface && visibleSourceSummary.length > 0 ? (
-          visibleSourceSummary.map((source) => (
-            <View key={source.key} style={styles.atsIntelligenceRow}>
-              <View style={styles.atsIntelligenceSourceBlock}>
-                <Text style={styles.atsIntelligenceSource}>{source.label}</Text>
-                <Text style={styles.atsIntelligenceMeta}>
-                  {formatCompactNumberLabel(source.count)} {source.count === 1 ? "result" : "results"}
-                </Text>
-              </View>
-              <Text style={styles.atsIntelligenceFreshness}>
-                {source.latestSeenEpoch ? formatEpochSeconds(source.latestSeenEpoch, "Recently seen") : "Current set"}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.atsIntelligenceEmpty}>Run a search to see sources in the current result set.</Text>
-        )}
-      </View>
       </View>
 
       <View style={styles.resultsColumn}>
@@ -6120,9 +6229,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
+    borderRadius: 8,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     borderTopWidth: 1,
     borderTopColor: OJS_COLORS.softBorder
+  },
+  atsIntelligenceRowActive: {
+    backgroundColor: OJS_COLORS.accentSoft,
+    borderTopColor: OJS_COLORS.accent
   },
   atsIntelligenceSourceBlock: {
     flex: 1,
@@ -6134,6 +6249,11 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   atsIntelligenceMeta: {
+    marginTop: 2,
+    color: OJS_COLORS.muted,
+    fontSize: 11
+  },
+  atsIntelligenceQuality: {
     marginTop: 2,
     color: OJS_COLORS.muted,
     fontSize: 11

@@ -741,6 +741,9 @@ const POSTING_SORT_OPTION_ITEMS = Object.freeze([
 ]);
 const POSTING_SORT_OPTIONS = new Set(POSTING_SORT_OPTION_ITEMS.map((option) => option.value));
 const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
+const ATS_FILTER_LABEL_BY_VALUE = new Map(ATS_FILTER_OPTION_ITEMS.map((item) => [item.value, item.label]));
+const PUBLIC_SOURCE_FACET_LIMIT = 8;
+const PUBLIC_SOURCE_FACET_FRESH_DAYS = 3;
 const MCP_SETTINGS_DEFAULTS = {
   enabled: false,
   preferred_agent_name: "openjobslots Agent",
@@ -831,6 +834,93 @@ function sanitizePublicPostingItem(posting) {
 
 function sanitizePublicPostings(items) {
   return (Array.isArray(items) ? items : []).map(sanitizePublicPostingItem);
+}
+
+function roundPublicMetric(value, digits = 2) {
+  const numberValue = Number(value || 0);
+  if (!Number.isFinite(numberValue)) return 0;
+  const factor = 10 ** digits;
+  return Math.round(numberValue * factor) / factor;
+}
+
+function getPublicSourceLabel(value) {
+  const normalized = normalizeAtsFilterValue(value);
+  if (!normalized || normalized === "unknown") return "Unknown source";
+  return ATS_FILTER_LABEL_BY_VALUE.get(normalized) || normalized;
+}
+
+function sanitizePublicSourceFacetItem(item) {
+  const value = normalizeAtsFilterValue(item?.value || item?.ats || item?.source || "");
+  const count = Math.max(0, Number(item?.count || 0));
+  const freshCount = Math.max(0, Math.min(count, Number(item?.fresh_count || 0)));
+  const freshPercentage = Number.isFinite(Number(item?.fresh_percentage))
+    ? Math.max(0, Math.min(100, Math.round(Number(item.fresh_percentage))))
+    : count > 0
+      ? Math.round((freshCount / count) * 100)
+      : 0;
+
+  return {
+    value: value || "unknown",
+    label: sanitizeFrontendText(item?.label || getPublicSourceLabel(value), "Unknown source"),
+    count,
+    avg_confidence: roundPublicMetric(item?.avg_confidence, 2),
+    avg_quality: roundPublicMetric(item?.avg_quality, 1),
+    latest_seen_epoch: Math.max(0, Number(item?.latest_seen_epoch || 0)),
+    fresh_count: freshCount,
+    fresh_percentage: freshPercentage
+  };
+}
+
+function sanitizePublicSourceFacets(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(sanitizePublicSourceFacetItem)
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, PUBLIC_SOURCE_FACET_LIMIT);
+}
+
+function buildPublicSourceFacets(rows, limit = PUBLIC_SOURCE_FACET_LIMIT) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const freshCutoffEpoch = nowEpochSeconds() - PUBLIC_SOURCE_FACET_FRESH_DAYS * 24 * 60 * 60;
+  const bySource = new Map();
+
+  for (const row of sourceRows) {
+    const jobPostingUrl = String(row?.job_posting_url || row?.canonical_url || "").trim();
+    const value = normalizeAtsFilterValue(row?.ats || row?.ats_key || inferAtsFromJobPostingUrl(jobPostingUrl)) || "unknown";
+    const existing = bySource.get(value) || {
+      value,
+      label: getPublicSourceLabel(value),
+      count: 0,
+      confidenceSum: 0,
+      qualitySum: 0,
+      latest_seen_epoch: 0,
+      fresh_count: 0
+    };
+    existing.count += 1;
+    existing.confidenceSum += Math.max(0, Number(row?.confidence ?? row?.confidence_score ?? 0) || 0);
+    existing.qualitySum += Math.max(0, Number(row?.quality_score ?? row?.quality ?? 0) || 0);
+    const lastSeenEpoch = Math.max(0, Number(row?.last_seen_epoch || 0));
+    if (lastSeenEpoch > existing.latest_seen_epoch) {
+      existing.latest_seen_epoch = lastSeenEpoch;
+    }
+    if (lastSeenEpoch >= freshCutoffEpoch) {
+      existing.fresh_count += 1;
+    }
+    bySource.set(value, existing);
+  }
+
+  return sanitizePublicSourceFacets(
+    Array.from(bySource.values()).map((item) => ({
+      value: item.value,
+      label: item.label,
+      count: item.count,
+      avg_confidence: item.count > 0 ? item.confidenceSum / item.count : 0,
+      avg_quality: item.count > 0 ? item.qualitySum / item.count : 0,
+      latest_seen_epoch: item.latest_seen_epoch,
+      fresh_count: item.fresh_count,
+      fresh_percentage: item.count > 0 ? Math.round((item.fresh_count / item.count) * 100) : 0
+    }))
+  ).slice(0, limit);
 }
 
 function sqlitePostingRowToQualityInput(row = {}) {
@@ -15877,6 +15967,7 @@ async function listPostingsWithFilters(options = {}) {
 
   let rows = [];
   let totalCount = 0;
+  let sourceFacets = [];
   if (!search && !hasStructuredFilters) {
     if (includeApplied && includeIgnored) {
       const [countRow, pageRows] = await Promise.all([
@@ -16028,7 +16119,10 @@ async function listPostingsWithFilters(options = {}) {
     });
     items = sortSqlitePostingItems(items, sortBy, search);
     totalCount = items.length;
+    sourceFacets = buildPublicSourceFacets(items);
     items = items.slice(offset, offset + limit);
+  } else {
+    sourceFacets = buildPublicSourceFacets(enrichedRows);
   }
 
   items = await enrichPostingsWithApplicationState(items);
@@ -16044,6 +16138,7 @@ async function listPostingsWithFilters(options = {}) {
     items,
     count: totalCount || items.length,
     count_exact: true,
+    source_facets: sourceFacets,
     limit,
     offset,
     filters: {
@@ -19196,6 +19291,7 @@ function createServer() {
         count: publicCount,
         count_exact: result?.count_exact === false ? false : true,
         count_capped: Boolean(result?.count_capped),
+        source_facets: sanitizeFrontendValue(sanitizePublicSourceFacets(result?.source_facets)),
         limit: resultLimit,
         offset: resultOffset,
         filters: sanitizeFrontendValue(result?.filters || {

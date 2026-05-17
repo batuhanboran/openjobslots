@@ -30,6 +30,8 @@ const { evaluatePublicPosting } = require("../ingestion/publicPostingGate");
 const DAY_SECONDS = 24 * 60 * 60;
 const POSTING_SORT_OPTIONS = new Set(["relevance", "last_seen", "posted_date", "ats_source", "confidence"]);
 const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
+const PUBLIC_SOURCE_FACET_LIMIT = 8;
+const PUBLIC_SOURCE_FACET_FRESH_DAYS = 3;
 const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "relevance", label: "Relevance" },
   { value: "last_seen", label: "Fresh source" },
@@ -471,6 +473,57 @@ async function countPostgresPostingsSql(pool, options = {}) {
   return Array.isArray(result.rows) ? result.rows.length : 0;
 }
 
+function sanitizePostgresSourceFacetItem(row = {}) {
+  const value = normalizeAtsKey(row.value || row.ats_key || "") || "unknown";
+  const count = Math.max(0, Number(row.count || 0));
+  const freshCount = Math.max(0, Math.min(count, Number(row.fresh_count || 0)));
+  return {
+    value,
+    label: value === "unknown" ? "Unknown source" : value,
+    count,
+    avg_confidence: Math.round((Number(row.avg_confidence || 0) || 0) * 100) / 100,
+    avg_quality: Math.round((Number(row.avg_quality || 0) || 0) * 10) / 10,
+    latest_seen_epoch: Math.max(0, Number(row.latest_seen_epoch || 0)),
+    fresh_count: freshCount,
+    fresh_percentage: count > 0 ? Math.round((freshCount / count) * 100) : 0
+  };
+}
+
+async function getPostgresSourceFacets(pool, options = {}, limit = PUBLIC_SOURCE_FACET_LIMIT) {
+  const filter = buildFilterSql(options, 1);
+  const freshCutoffIndex = filter.nextIndex;
+  const limitIndex = filter.nextIndex + 1;
+  const result = await pool.query(
+    `
+      SELECT
+        COALESCE(NULLIF(btrim(p.ats_key), ''), 'unknown') AS value,
+        COUNT(*)::int AS count,
+        COALESCE(AVG(COALESCE(p.confidence, 0)), 0)::float AS avg_confidence,
+        COALESCE(AVG(COALESCE(p.quality_score, 0)), 0)::float AS avg_quality,
+        COALESCE(MAX(COALESCE(p.last_seen_epoch, 0)), 0)::bigint AS latest_seen_epoch,
+        SUM(
+          CASE
+            WHEN COALESCE(p.last_seen_epoch, 0) >= $${freshCutoffIndex} THEN 1
+            ELSE 0
+          END
+        )::int AS fresh_count
+      FROM postings p
+      LEFT JOIN posting_application_state s
+        ON s.canonical_url = p.canonical_url
+      WHERE ${filter.where.join(" AND ")}
+      GROUP BY COALESCE(NULLIF(btrim(p.ats_key), ''), 'unknown')
+      ORDER BY count DESC, value ASC
+      LIMIT $${limitIndex};
+    `,
+    [
+      ...filter.values,
+      Math.floor(Date.now() / 1000) - PUBLIC_SOURCE_FACET_FRESH_DAYS * DAY_SECONDS,
+      Math.max(1, Math.min(20, Number(limit || PUBLIC_SOURCE_FACET_LIMIT)))
+    ]
+  );
+  return (Array.isArray(result.rows) ? result.rows : []).map(sanitizePostgresSourceFacetItem);
+}
+
 async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset = 0, sortBy = "recent") {
   const filter = buildFilterSql(options, 1);
   const rank = sortBy === "relevance"
@@ -480,8 +533,9 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
   const offsetIndex = rank.nextIndex + 1;
   const orderBy = getPostgresOrderBy(sortBy);
   const rankedOrderBy = rank.sql ? `${rank.sql} DESC, ${orderBy}` : orderBy;
-  const [count, result] = await Promise.all([
+  const [count, sourceFacets, result] = await Promise.all([
     countPostgresPostingsSql(pool, options),
+    getPostgresSourceFacets(pool, options),
     pool.query(
       `
         SELECT
@@ -509,6 +563,7 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
     items: result.rows.map(rowToPosting).slice(0, limit),
     count,
     count_exact: true,
+    source_facets: sourceFacets,
     limit,
     offset,
     filters: {
@@ -545,6 +600,7 @@ async function listPostgresPostings(pool, options = {}) {
           items: [],
           count: 0,
           count_exact: false,
+          source_facets: [],
           limit,
           offset,
           filters: {
@@ -589,11 +645,15 @@ async function listPostgresPostings(pool, options = {}) {
         });
         return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
       }
-      const count = await countPostgresPostingsSql(pool, { ...options, sort_by: sortBy });
+      const [count, sourceFacets] = await Promise.all([
+        countPostgresPostingsSql(pool, { ...options, sort_by: sortBy }),
+        getPostgresSourceFacets(pool, { ...options, sort_by: sortBy })
+      ]);
       return {
         items: items.slice(0, limit),
         count,
         count_exact: true,
+        source_facets: sourceFacets,
         limit,
         offset,
         filters: {
