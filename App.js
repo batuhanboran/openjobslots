@@ -255,6 +255,9 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Search jobs",
     "results.slot": "slot",
     "results.slots": "slots",
+    "results.slotIndexed": "slot indexed",
+    "results.slotsIndexed": "slots indexed",
+    "results.indexLoading": "Loading index",
     "initial.title": "Search fresh public ATS openings.",
     "initial.copy": "Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.",
     "sort.relevance": "Relevance",
@@ -343,6 +346,9 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "İlan ara",
     "results.slot": "ilan",
     "results.slots": "ilan",
+    "results.slotIndexed": "ilan indeksli",
+    "results.slotsIndexed": "ilan indeksli",
+    "results.indexLoading": "Indeks yukleniyor",
     "initial.title": "Taze public ATS ilanlarını ara.",
     "initial.copy": "Ünvan, şirket, konum, ülke veya çalışma modu ile başla. Filtreler desktop görünümde sonuçların yanında sabit kalır.",
     "sort.relevance": "Alaka",
@@ -431,6 +437,9 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Stellen suchen",
     "results.slot": "Slot",
     "results.slots": "Slots",
+    "results.slotIndexed": "Slot indexiert",
+    "results.slotsIndexed": "Slots indexiert",
+    "results.indexLoading": "Index wird geladen",
     "initial.title": "Frische oeffentliche ATS-Stellen suchen.",
     "initial.copy": "Beginne mit Titel, Firma, Ort, Land oder Arbeitsmodus. Filter bleiben am Desktop neben den Ergebnissen fixiert.",
     "sort.relevance": "Relevanz",
@@ -493,6 +502,9 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Chercher des offres",
     "results.slot": "slot",
     "results.slots": "slots",
+    "results.slotIndexed": "slot indexe",
+    "results.slotsIndexed": "slots indexes",
+    "results.indexLoading": "Index en chargement",
     "initial.title": "Rechercher des offres ATS publiques recentes.",
     "initial.copy": "Commencez par un titre, une entreprise, un lieu, un pays ou un mode de travail. Les filtres restent fixes sur desktop.",
     "sort.relevance": "Pertinence",
@@ -555,6 +567,9 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Buscar empleos",
     "results.slot": "slot",
     "results.slots": "slots",
+    "results.slotIndexed": "slot indexado",
+    "results.slotsIndexed": "slots indexados",
+    "results.indexLoading": "Cargando indice",
     "initial.title": "Busca ofertas ATS publicas recientes.",
     "initial.copy": "Empieza con titulo, empresa, ubicacion, pais o modo de trabajo. Los filtros quedan fijos junto a los resultados en desktop.",
     "sort.relevance": "Relevancia",
@@ -2536,9 +2551,6 @@ function SortSegmentedControl({ options, selectedValue, onSelectValue }) {
     .slice(0, 5);
   const safeOptions = normalizedOptions.length > 0 ? normalizedOptions : DEFAULT_POSTING_SORT_OPTIONS;
   const selected = String(selectedValue || "relevance");
-  const selectedIndex = Math.max(0, safeOptions.findIndex((option) => option.value === selected));
-  const indicatorWidth = `${100 / safeOptions.length}%`;
-  const indicatorLeft = `${selectedIndex * (100 / safeOptions.length)}%`;
 
   return (
     <View
@@ -2547,16 +2559,6 @@ function SortSegmentedControl({ options, selectedValue, onSelectValue }) {
       accessibilityRole="radiogroup"
       accessibilityLabel="Sort results"
     >
-      <View
-        pointerEvents="none"
-        style={[
-          styles.sortSegmentedIndicator,
-          {
-            width: indicatorWidth,
-            left: indicatorLeft
-          }
-        ]}
-      />
       {safeOptions.map((option) => {
         const isSelected = option.value === selected;
         return (
@@ -4644,13 +4646,16 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
-    const resultCountValueLabel = showResultsSurface
-      ? formatCompactNumberLabel(resultTotalCount)
-      : t("results.searchPrompt", "Search jobs");
+    const resultCountValueLabel =
+      showResultsSurface || resultTotalCount > 0
+        ? formatCompactNumberLabel(resultTotalCount)
+        : t("results.indexLoading", "Loading index");
     const resultCountUnitLabel = showResultsSurface
       ? resultTotalCount === 1 ? t("results.slot", "slot") : t("results.slots", "slots")
-      : "";
-    const resultCountLabel = showResultsSurface
+      : resultTotalCount > 0
+        ? resultTotalCount === 1 ? t("results.slotIndexed", "slot indexed") : t("results.slotsIndexed", "slots indexed")
+        : "";
+    const resultCountLabel = resultCountUnitLabel
       ? `${resultCountValueLabel} ${resultCountUnitLabel}`
       : resultCountValueLabel;
     const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
@@ -7669,12 +7674,12 @@ const styles = StyleSheet.create({
   sortSegmentedControl: {
     position: "relative",
     overflow: "hidden",
-    minHeight: 44,
+    minHeight: 46,
     borderWidth: 1,
     borderColor: OJS_COLORS.softBorder,
     borderRadius: 14,
     backgroundColor: OJS_COLORS.surface,
-    padding: 3,
+    padding: 4,
     flexDirection: "row",
     alignItems: "stretch",
     ...(Platform.OS === "web"
@@ -7700,31 +7705,38 @@ const styles = StyleSheet.create({
       : {})
   },
   sortSegmentOption: {
-    zIndex: 1,
     flex: 1,
     flexBasis: 0,
     flexShrink: 1,
     minWidth: 0,
     overflow: "hidden",
-    minHeight: 38,
-    borderRadius: 11,
+    minHeight: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
     paddingHorizontal: 7,
     alignItems: "center",
     justifyContent: "center",
     ...(Platform.OS === "web"
       ? {
           cursor: "pointer",
-          transitionProperty: "background-color, color, transform",
-          transitionDuration: "160ms",
-          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+          transitionProperty: "background-color, border-color, box-shadow, color, transform",
+          transitionDuration: "220ms",
+          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)"
         }
       : {})
   },
   sortSegmentOptionActive: {
-    backgroundColor: "transparent"
+    backgroundColor: OJS_COLORS.pressed,
+    borderColor: OJS_COLORS.focus,
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0 6px 14px rgba(82, 125, 104, 0.18)"
+        }
+      : {})
   },
   sortSegmentOptionPressed: {
-    transform: [{ scale: 0.975 }]
+    transform: [{ scale: 0.985 }]
   },
   sortSegmentOptionText: {
     maxWidth: "100%",

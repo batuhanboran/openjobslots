@@ -306,6 +306,42 @@ async function expectDirectSortControl(page) {
   await expect(sort.locator('[data-testid$="-filter-options"]')).toHaveCount(0);
 }
 
+async function expectInitialIndexCountVisible(page) {
+  const count = page.getByTestId("result-count");
+  await expect(count).toBeVisible();
+  await expect(count).toContainText(/\d/);
+  await expect(count).toContainText(/indexed/i);
+  await expect(count).not.toContainText(/^Search jobs$/i);
+}
+
+async function expectSortActiveFillFits(page) {
+  const state = await page.evaluate(() => {
+    const sort = document.querySelector('[data-testid="sort-control"]');
+    const active = document.querySelector('[data-testid="sort-option-relevance"]');
+    const sortRect = sort?.getBoundingClientRect();
+    const activeRect = active?.getBoundingClientRect();
+    const activeStyle = active ? window.getComputedStyle(active) : null;
+    return {
+      sort: sortRect
+        ? { top: sortRect.top, bottom: sortRect.bottom, left: sortRect.left, right: sortRect.right, width: sortRect.width }
+        : null,
+      active: activeRect
+        ? { top: activeRect.top, bottom: activeRect.bottom, left: activeRect.left, right: activeRect.right, width: activeRect.width }
+        : null,
+      activeBackground: activeStyle?.backgroundColor || ""
+    };
+  });
+
+  expect(state.sort).toBeTruthy();
+  expect(state.active).toBeTruthy();
+  expect(state.activeBackground).not.toBe("rgba(0, 0, 0, 0)");
+  expect(state.activeBackground).not.toBe("transparent");
+  expect(state.active.top).toBeGreaterThanOrEqual(state.sort.top + 2);
+  expect(state.active.bottom).toBeLessThanOrEqual(state.sort.bottom - 2);
+  expect(state.active.left).toBeGreaterThanOrEqual(state.sort.left + 2);
+  expect(state.active.right).toBeLessThanOrEqual(state.sort.right - 2);
+}
+
 async function expectResultCountPill(page) {
   const state = await page.getByTestId("result-count").evaluate((node) => {
     const style = window.getComputedStyle(node);
@@ -824,6 +860,8 @@ test.describe("postings page QA", () => {
     await expectPublicSearchChrome(page);
     await expectPublicPaletteIsSoft(page);
     await expectDirectSortControl(page);
+    await expectInitialIndexCountVisible(page);
+    await expectSortActiveFillFits(page);
     await expectResultCountPill(page);
 
     for (const query of SEARCH_COMPATIBILITY_QUERIES) {
