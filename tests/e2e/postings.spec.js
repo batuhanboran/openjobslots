@@ -912,34 +912,74 @@ test.describe("postings page QA", () => {
       await page.waitForTimeout(250);
 
       const colorState = await page.evaluate(() => {
-        const parseRgb = (value) => {
-          const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-          return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : [0, 0, 0];
+        const parseRgba = (value) => {
+          const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/i);
+          if (!match) return null;
+          return {
+            r: Number(match[1]),
+            g: Number(match[2]),
+            b: Number(match[3]),
+            a: match[4] === undefined ? 1 : Number(match[4])
+          };
         };
         const perceivedLightness = (value) => {
-          const [r, g, b] = parseRgb(value);
+          const { r, g, b } = parseRgba(value) || { r: 0, g: 0, b: 0 };
           return Math.round((r * 299 + g * 587 + b * 114) / 1000);
+        };
+        const relativeLuminance = ({ r, g, b }) => {
+          const toLinear = (channel) => {
+            const value = channel / 255;
+            return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+          };
+          return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+        };
+        const contrastRatio = (foreground, background) => {
+          const fg = relativeLuminance(foreground);
+          const bg = relativeLuminance(background);
+          const lighter = Math.max(fg, bg);
+          const darker = Math.min(fg, bg);
+          return Number(((lighter + 0.05) / (darker + 0.05)).toFixed(2));
+        };
+        const nearestSolidBackground = (node) => {
+          let current = node;
+          while (current) {
+            const background = parseRgba(window.getComputedStyle(current).backgroundColor);
+            if (background && background.a > 0.01) return background;
+            current = current.parentElement;
+          }
+          return parseRgba(window.getComputedStyle(document.body).backgroundColor) || { r: 255, g: 255, b: 255, a: 1 };
         };
         const read = (selector) => {
           const node = document.querySelector(selector);
           if (!node) return null;
           const style = window.getComputedStyle(node);
+          const foreground = parseRgba(style.color) || { r: 0, g: 0, b: 0, a: 1 };
+          const background = nearestSolidBackground(node);
           return {
             color: style.color,
+            background: `rgb(${background.r}, ${background.g}, ${background.b})`,
+            contrast: contrastRatio(foreground, background),
             lightness: perceivedLightness(style.color)
           };
         };
         const wordmark = Array.from(document.querySelectorAll('[data-testid="brand-wordmark"] *')).map((node) => {
           const style = window.getComputedStyle(node);
+          const foreground = parseRgba(style.color) || { r: 0, g: 0, b: 0, a: 1 };
+          const background = nearestSolidBackground(node);
           return {
             text: node.textContent || "",
             color: style.color,
+            background: `rgb(${background.r}, ${background.g}, ${background.b})`,
+            contrast: contrastRatio(foreground, background),
             lightness: perceivedLightness(style.color)
           };
         });
         return {
           wordmark,
-          resultsTitle: read('[data-testid="results-header-title"]') ? read('[data-testid="results-header-title"]').lightness : 0,
+          versionLabel: read('[data-testid="public-version-label"]'),
+          creditText: read('[data-testid="search-credit-text"]'),
+          creditLink: read('[data-testid="search-credit-link"]'),
+          resultsTitle: read('[data-testid="results-header-title"]'),
           searchLead: read('[data-testid="app-logo"] + *'),
           initialTitle: read('[data-testid="postings-initial-state"] *')
         };
@@ -949,7 +989,25 @@ test.describe("postings page QA", () => {
         colorState.wordmark.every((item) => item.lightness >= 145),
         `${languageCode} dark logo text should avoid low-contrast muted colors: ${JSON.stringify(colorState.wordmark)}`
       ).toBeTruthy();
-      expect(colorState.resultsTitle, `${languageCode} dark results heading should remain readable`).toBeGreaterThanOrEqual(210);
+      expect(
+        colorState.wordmark.every((item) => item.contrast >= 4.5),
+        `${languageCode} dark logo text should pass contrast: ${JSON.stringify(colorState.wordmark)}`
+      ).toBeTruthy();
+      for (const [label, state] of [
+        ["version label", colorState.versionLabel],
+        ["credit text", colorState.creditText],
+        ["credit link", colorState.creditLink],
+        ["results heading", colorState.resultsTitle],
+        ["lead copy", colorState.searchLead],
+        ["empty state heading", colorState.initialTitle]
+      ]) {
+        if (!state) continue;
+        expect(
+          state.contrast,
+          `${languageCode} dark ${label} should pass contrast: ${JSON.stringify(state)}`
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(colorState.resultsTitle.lightness, `${languageCode} dark results heading should remain readable`).toBeGreaterThanOrEqual(210);
       expect(colorState.searchLead.lightness, `${languageCode} dark lead copy should remain readable`).toBeGreaterThanOrEqual(165);
       expect(colorState.initialTitle.lightness, `${languageCode} dark empty heading should remain readable`).toBeGreaterThanOrEqual(210);
       await expectNoHorizontalOverflow(page);

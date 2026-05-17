@@ -4693,22 +4693,33 @@ export default function App() {
           <View pointerEvents={Platform.OS === "web" ? undefined : "box-none"} style={styles.searchMetaRail}>
             <Pressable
               onPress={() => setReleaseNotesOpen(true)}
-              style={({ pressed }) => [styles.publicVersionButton, pressed ? styles.publicVersionButtonPressed : null]}
+              style={({ pressed }) => [
+                styles.publicVersionButton,
+                pressed ? styles.publicVersionButtonPressed : null,
+                pressed && isDarkPublicTheme ? styles.publicVersionButtonPressedDark : null
+              ]}
               testID="public-version-button"
               accessibilityRole="button"
               accessibilityLabel={`Open release notes for version ${PUBLIC_APP_VERSION}`}
             >
-              <Text style={styles.publicVersionLabel}>
+              <Text
+                style={[styles.publicVersionLabel, isDarkPublicTheme ? styles.publicVersionLabelDark : null]}
+                testID="public-version-label"
+              >
                 {translatedPublicText(t, "version.label", PUBLIC_VERSION_LABEL, { version: PUBLIC_APP_VERSION })}
               </Text>
             </Pressable>
-            <Text style={styles.searchCreditText}>
+            <Text
+              style={[styles.searchCreditText, isDarkPublicTheme ? styles.searchCreditTextDark : null]}
+              testID="search-credit-text"
+            >
               {t("credit.deployed", "Deployed and developed by")}{" "}
               <Text
                 href={BATUHAN_WEBSITE_URL}
                 hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
                 onPress={handleOpenDeveloperCredit}
-                style={styles.searchCreditLink}
+                style={[styles.searchCreditLink, isDarkPublicTheme ? styles.searchCreditLinkDark : null]}
+                testID="search-credit-link"
                 accessibilityRole="link"
                 accessibilityLabel="Batuhan Boran website"
               >
@@ -6384,12 +6395,18 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.surfaceMuted,
     transform: [{ scale: 0.985 }]
   },
+  publicVersionButtonPressedDark: {
+    backgroundColor: "rgba(191, 228, 211, 0.12)"
+  },
   publicVersionLabel: {
     color: OJS_COLORS.muted,
     fontSize: 11,
     lineHeight: 15,
     fontWeight: "700",
     letterSpacing: 0
+  },
+  publicVersionLabelDark: {
+    color: OJS_DARK_COLORS.muted
   },
   searchCreditText: {
     flexShrink: 1,
@@ -6401,10 +6418,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0
   },
+  searchCreditTextDark: {
+    color: OJS_DARK_COLORS.muted
+  },
   searchCreditLink: {
     color: OJS_COLORS.green,
     fontWeight: "800",
     textDecorationLine: "underline"
+  },
+  searchCreditLinkDark: {
+    color: OJS_DARK_COLORS.green
   },
   brandWordmark: {
     alignSelf: "flex-start",
