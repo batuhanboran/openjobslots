@@ -123,7 +123,7 @@ const WORDMARK_SEGMENTS = [
 ];
 const PUBLIC_APP_VERSION = String(appMetadata?.expo?.version || packageMetadata?.version || "1.8.0");
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
-const LINKEDIN_PROFILE_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
+const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
 const PUBLIC_RELEASE_NOTES = [
   {
     version: "1.9.2",
@@ -1868,6 +1868,66 @@ function SourceIntelligencePanel({ sources, showResultsSurface, selectedSource, 
   );
 }
 
+function SortSegmentedControl({ options, selectedValue, onSelectValue }) {
+  const normalizedOptions = (Array.isArray(options) && options.length > 0 ? options : DEFAULT_POSTING_SORT_OPTIONS)
+    .map((option) => ({
+      value: String(option?.value || "").trim() || "relevance",
+      label: sanitizeDisplayText(option?.label || option?.value || "Relevance", "Relevance")
+    }))
+    .filter((option) => option.value)
+    .slice(0, 5);
+  const safeOptions = normalizedOptions.length > 0 ? normalizedOptions : DEFAULT_POSTING_SORT_OPTIONS;
+  const selected = String(selectedValue || "relevance");
+  const selectedIndex = Math.max(0, safeOptions.findIndex((option) => option.value === selected));
+  const indicatorWidth = `${100 / safeOptions.length}%`;
+  const indicatorLeft = `${selectedIndex * (100 / safeOptions.length)}%`;
+
+  return (
+    <View
+      style={styles.sortSegmentedControl}
+      testID="sort-control"
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Sort results"
+    >
+      <View
+        pointerEvents="none"
+        style={[
+          styles.sortSegmentedIndicator,
+          {
+            width: indicatorWidth,
+            left: indicatorLeft
+          }
+        ]}
+      />
+      {safeOptions.map((option) => {
+        const isSelected = option.value === selected;
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => onSelectValue?.(option.value)}
+            style={({ pressed }) => [
+              styles.sortSegmentOption,
+              isSelected ? styles.sortSegmentOptionActive : null,
+              pressed ? styles.sortSegmentOptionPressed : null
+            ]}
+            testID={`sort-option-${toTestIdPart(option.value)}`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: isSelected }}
+            accessibilityLabel={`Sort by ${option.label}`}
+          >
+            <Text
+              numberOfLines={1}
+              style={[styles.sortSegmentOptionText, isSelected ? styles.sortSegmentOptionTextActive : null]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function ToggleRow({ label, value, onValueChange }) {
   return (
     <View style={styles.toggleRow}>
@@ -2033,12 +2093,12 @@ export default function App() {
     },
     [flushFrontendLogs]
   );
-  const handleOpenLinkedInCredit = useCallback(async () => {
+  const handleOpenDeveloperCredit = useCallback(async () => {
     try {
-      if (!isSafeExternalHttpUrl(LINKEDIN_PROFILE_URL)) return;
-      const supported = await Linking.canOpenURL(LINKEDIN_PROFILE_URL);
+      if (!isSafeExternalHttpUrl(BATUHAN_WEBSITE_URL)) return;
+      const supported = await Linking.canOpenURL(BATUHAN_WEBSITE_URL);
       if (supported) {
-        await Linking.openURL(LINKEDIN_PROFILE_URL);
+        await Linking.openURL(BATUHAN_WEBSITE_URL);
       }
     } catch {
       // Non-critical attribution link; ignore platform/browser launch failures.
@@ -2046,10 +2106,10 @@ export default function App() {
   }, []);
   const remoteFilterOptions = useMemo(
     () => [
-      { value: "all", label: "All Locations" },
-      { value: "remote", label: "Remote Only" },
-      { value: "hybrid", label: "Hybrid Only" },
-      { value: "non_remote", label: "On-Site / Unknown" }
+      { value: "all", label: "All Locations", shortLabel: "Any" },
+      { value: "remote", label: "Remote Only", shortLabel: "Remote" },
+      { value: "hybrid", label: "Hybrid Only", shortLabel: "Hybrid" },
+      { value: "non_remote", label: "On-Site / Unknown", shortLabel: "On-site" }
     ],
     []
   );
@@ -3871,8 +3931,12 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
+    const resultCountValueLabel = showResultsSurface ? formatCompactNumberLabel(resultTotalCount) : "Search";
+    const resultCountUnitLabel = showResultsSurface
+      ? resultTotalCount === 1 ? "slot" : "slots"
+      : "to see slots";
     const resultCountLabel = showResultsSurface
-      ? `${formatCompactNumberLabel(resultTotalCount)} ${resultTotalCount === 1 ? "slot" : "slots"}`
+      ? `${resultCountValueLabel} ${resultCountUnitLabel}`
       : "Search to see slots";
     const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
       ? postingFilterOptions.sort_options
@@ -3922,12 +3986,12 @@ export default function App() {
             <Text style={styles.searchCreditText}>
               Deployed and developed by{" "}
               <Text
-                href={LINKEDIN_PROFILE_URL}
+                href={BATUHAN_WEBSITE_URL}
                 hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
-                onPress={handleOpenLinkedInCredit}
+                onPress={handleOpenDeveloperCredit}
                 style={styles.searchCreditLink}
                 accessibilityRole="link"
-                accessibilityLabel="Batuhan Boran LinkedIn profile"
+                accessibilityLabel="Batuhan Boran website"
               >
                 Batuhan Boran
               </Text>
@@ -4075,17 +4139,27 @@ export default function App() {
       </Animated.View>
 
       {filtersVisible ? (
-        <View style={styles.postingsFiltersPanel} testID="filters-panel">
+        <View
+          style={[styles.postingsFiltersPanel, isDesktopViewport ? styles.postingsFiltersPanelDesktop : null]}
+          testID="filters-panel"
+        >
           <View style={styles.postingsFiltersPanelContent}>
             {postingFilterOptionsLoading ? (
               <Text style={styles.small}>Loading filter options...</Text>
             ) : (
               <>
-                <View style={styles.postingsFiltersIntro}>
-                  <Text style={styles.postingsFiltersIntroTitle}>Worldwide filters</Text>
-                  <Text style={styles.postingsFiltersIntroText}>
-                    Search stays global until you choose a region, country, or remote mode.
-                  </Text>
+                <View style={styles.globalFilterStatus} testID="global-filter-status">
+                  <View style={styles.globalFilterStatusDot} />
+                  <View style={styles.globalFilterStatusCopy}>
+                    <Text style={styles.globalFilterStatusTitle}>
+                      {hasLocationPostingFilters ? "Location narrowed" : "Global search"}
+                    </Text>
+                    <Text style={styles.globalFilterStatusText} numberOfLines={2}>
+                      {hasLocationPostingFilters
+                        ? "Region and country filters are active."
+                        : "Search remains worldwide until a location filter is selected."}
+                    </Text>
+                  </View>
                 </View>
                 <SingleSelectDropdown
                   label="ATS"
@@ -4201,7 +4275,7 @@ export default function App() {
 
             <View style={styles.freshnessFilterGroup}>
               <Text style={styles.fieldLabel}>Freshness</Text>
-              <View style={styles.remoteFilterChipsRow}>
+              <View style={styles.filterSegmentRow}>
                 {FRESHNESS_FILTER_OPTIONS.map((option) => {
                   const selected = String(postingsFilters.freshness_days || "all") === String(option.value);
                   return (
@@ -4215,15 +4289,18 @@ export default function App() {
                         }));
                       }}
                       style={({ pressed }) => [
-                        styles.remoteFilterChip,
-                        selected ? styles.remoteFilterChipActive : null,
-                        pressed ? styles.buttonPressed : null
+                        styles.filterSegmentChip,
+                        selected ? styles.filterSegmentChipActive : null,
+                        pressed ? styles.filterSegmentChipPressed : null
                       ]}
                       testID={option.testId}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                     >
-                      <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.filterSegmentChipText, selected ? styles.filterSegmentChipTextActive : null]}
+                      >
                         {option.label}
                       </Text>
                     </Pressable>
@@ -4234,9 +4311,10 @@ export default function App() {
 
             <View style={styles.remoteFilterGroup}>
               <Text style={styles.fieldLabel}>Remote Filter</Text>
-              <View style={styles.remoteFilterChipsRow}>
+              <View style={styles.filterSegmentRow} testID="remote-filter-row">
                 {remoteFilterOptions.map((option) => {
                   const selected = postingsFilters.remote === option.value;
+                  const label = option.shortLabel || option.label;
                   return (
                     <Pressable
                       key={option.value}
@@ -4250,16 +4328,20 @@ export default function App() {
                         }
                       }
                       style={({ pressed }) => [
-                        styles.remoteFilterChip,
-                        selected ? styles.remoteFilterChipActive : null,
-                        pressed ? styles.buttonPressed : null
+                        styles.filterSegmentChip,
+                        selected ? styles.filterSegmentChipActive : null,
+                        pressed ? styles.filterSegmentChipPressed : null
                       ]}
                       testID={`remote-filter-${option.value}`}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
+                      accessibilityLabel={option.label}
                     >
-                      <Text style={[styles.remoteFilterChipText, selected ? styles.remoteFilterChipTextActive : null]}>
-                        {option.label}
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.filterSegmentChipText, selected ? styles.filterSegmentChipTextActive : null]}
+                      >
+                        {label}
                       </Text>
                     </Pressable>
                   );
@@ -4301,13 +4383,23 @@ export default function App() {
             <Text style={styles.resultsEyebrow}>Public search</Text>
             <Text style={styles.resultsTitle}>Open roles</Text>
           </View>
-          <View style={styles.resultsToolbar}>
-            <Text style={styles.resultCountText} testID="result-count" accessibilityRole="status">
-              {resultCountLabel}
+          <View style={[styles.resultsToolbar, isDesktopViewport ? null : styles.resultsToolbarMobile]}>
+            <Text
+              style={styles.resultCountText}
+              testID="result-count"
+              accessibilityRole="status"
+              accessibilityLabel={resultCountLabel}
+            >
+              <Text style={styles.resultCountValueText}>{resultCountValueLabel}</Text>
+              <Text style={styles.resultCountUnitText}> {resultCountUnitLabel}</Text>
             </Text>
-            <View style={styles.sortControlWrap}>
-              <SingleSelectDropdown
-                label="Sort"
+            <View
+              style={[
+                styles.sortControlWrap,
+                isDesktopViewport ? styles.sortControlWrapDesktop : styles.sortControlWrapMobile
+              ]}
+            >
+              <SortSegmentedControl
                 options={sortOptions}
                 selectedValue={postingsFilters.sort_by}
                 onSelectValue={(value) => {
@@ -4317,10 +4409,6 @@ export default function App() {
                     sort_by: value || "relevance"
                   }));
                 }}
-                anyLabel="Relevance"
-                includeAnyOption={false}
-                triggerTestID="sort-control"
-                optionTestIDPrefix="sort-option"
               />
             </View>
           </View>
@@ -5456,7 +5544,13 @@ const styles = StyleSheet.create({
   },
   searchPanelDesktop: {
     width: 340,
-    flexShrink: 0
+    flexShrink: 0,
+    ...(Platform.OS === "web"
+      ? {
+          maxHeight: "calc(100svh - 28px)",
+          overflow: "hidden"
+        }
+      : {})
   },
   searchPanelMobile: {
     width: "100%"
@@ -5676,8 +5770,56 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 4
   },
+  postingsFiltersPanelDesktop: {
+    ...(Platform.OS === "web"
+      ? {
+          maxHeight: "calc(100svh - 330px)",
+          overflowY: "auto",
+          overflowX: "hidden",
+          paddingRight: 4,
+          marginRight: -4,
+          scrollbarColor: `${OJS_COLORS.border} transparent`,
+          scrollbarWidth: "thin"
+        }
+      : {})
+  },
   postingsFiltersPanelContent: {
     paddingBottom: 4
+  },
+  globalFilterStatus: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    backgroundColor: OJS_COLORS.hover,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9
+  },
+  globalFilterStatusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.focus
+  },
+  globalFilterStatusCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  globalFilterStatusTitle: {
+    color: OJS_COLORS.ink,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "800"
+  },
+  globalFilterStatusText: {
+    marginTop: 1,
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 15
   },
   postingsFiltersIntro: {
     borderRadius: 10,
@@ -5856,6 +5998,54 @@ const styles = StyleSheet.create({
   freshnessFilterGroup: {
     marginTop: 2,
     marginBottom: 12
+  },
+  filterSegmentRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 6,
+    flexWrap: "nowrap",
+    width: "100%"
+  },
+  filterSegmentChip: {
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: OJS_COLORS.border,
+    backgroundColor: OJS_COLORS.surface,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 8,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    ...(Platform.OS === "web"
+      ? {
+          cursor: "pointer",
+          transitionProperty: "background-color, border-color, color, transform, box-shadow",
+          transitionDuration: "180ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  filterSegmentChipActive: {
+    borderColor: OJS_COLORS.focus,
+    backgroundColor: OJS_COLORS.focus,
+    ...(Platform.OS === "web" ? { boxShadow: "0 8px 18px rgba(82, 125, 104, 0.18)" } : {})
+  },
+  filterSegmentChipPressed: {
+    backgroundColor: OJS_COLORS.pressed,
+    transform: [{ scale: 0.975 }]
+  },
+  filterSegmentChipText: {
+    color: OJS_COLORS.text,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  filterSegmentChipTextActive: {
+    color: OJS_COLORS.ink
   },
   remoteFilterChipsRow: {
     flexDirection: "row",
@@ -6230,7 +6420,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
     borderTopWidth: 1,
     borderTopColor: OJS_COLORS.softBorder,
-    paddingTop: 12
+    paddingTop: 12,
+    paddingBottom: 2
   },
   atsIntelligenceTitle: {
     color: OJS_COLORS.ink,
@@ -6243,15 +6434,25 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
-    borderRadius: 8,
-    paddingHorizontal: 8,
+    borderRadius: 10,
+    paddingHorizontal: 9,
     paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: OJS_COLORS.softBorder
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    backgroundColor: OJS_COLORS.surface,
+    ...(Platform.OS === "web"
+      ? {
+          cursor: "pointer",
+          transitionProperty: "background-color, border-color, transform, box-shadow",
+          transitionDuration: "180ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
   },
   atsIntelligenceRowActive: {
     backgroundColor: OJS_COLORS.accentSoft,
-    borderTopColor: OJS_COLORS.accent
+    borderColor: OJS_COLORS.accent
   },
   atsIntelligenceSourceBlock: {
     flex: 1,
@@ -6274,9 +6475,10 @@ const styles = StyleSheet.create({
   },
   atsIntelligenceFreshness: {
     flexShrink: 1,
-    maxWidth: 132,
+    maxWidth: 112,
     color: OJS_COLORS.muted,
     fontSize: 11,
+    lineHeight: 15,
     textAlign: "right"
   },
   atsIntelligenceEmpty: {
@@ -6317,15 +6519,132 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: "wrap"
   },
+  resultsToolbarMobile: {
+    width: "100%",
+    alignItems: "stretch",
+    justifyContent: "flex-start"
+  },
   resultCountText: {
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 40,
     color: OJS_COLORS.text,
     fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "800",
+    ...(Platform.OS === "web"
+      ? {
+          fontVariantNumeric: "tabular-nums",
+          boxShadow: "0 6px 16px rgba(38, 51, 45, 0.06)"
+        }
+      : {})
+  },
+  resultCountValueText: {
+    color: OJS_COLORS.ink,
+    fontSize: 17,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  resultCountUnitText: {
+    color: OJS_COLORS.muted,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: "800"
   },
   sortControlWrap: {
-    minWidth: 180,
-    maxWidth: 240,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: "100%",
     zIndex: 5
+  },
+  sortControlWrapDesktop: {
+    flexBasis: 440,
+    minWidth: 300,
+    maxWidth: 520
+  },
+  sortControlWrapMobile: {
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%"
+  },
+  sortSegmentedControl: {
+    position: "relative",
+    overflow: "hidden",
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    backgroundColor: OJS_COLORS.surface,
+    padding: 3,
+    flexDirection: "row",
+    alignItems: "stretch",
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0 8px 18px rgba(38, 51, 45, 0.07)"
+        }
+      : {})
+  },
+  sortSegmentedIndicator: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    borderRadius: 11,
+    backgroundColor: OJS_COLORS.pressed,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.focus,
+    ...(Platform.OS === "web"
+      ? {
+          transitionProperty: "left, width, background-color, border-color",
+          transitionDuration: "240ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  sortSegmentOption: {
+    zIndex: 1,
+    flex: 1,
+    flexBasis: 0,
+    flexShrink: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    minHeight: 38,
+    borderRadius: 11,
+    paddingHorizontal: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    ...(Platform.OS === "web"
+      ? {
+          cursor: "pointer",
+          transitionProperty: "background-color, color, transform",
+          transitionDuration: "160ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  sortSegmentOptionActive: {
+    backgroundColor: "transparent"
+  },
+  sortSegmentOptionPressed: {
+    transform: [{ scale: 0.975 }]
+  },
+  sortSegmentOptionText: {
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  sortSegmentOptionTextActive: {
+    color: OJS_COLORS.ink
   },
   sortControl: {
     minHeight: 40,

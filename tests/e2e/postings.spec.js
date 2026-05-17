@@ -153,9 +153,9 @@ async function expectSearchEngineVisualContract(page) {
     await expect(page.getByTestId("public-version-button")).toBeVisible();
     await expect(page.getByText(`Public v${APP_VERSION}`)).toBeVisible();
     await expect(page.getByText("Deployed and developed by")).toBeVisible();
-    const attributionLink = page.getByRole("link", { name: "Batuhan Boran LinkedIn profile" });
+    const attributionLink = page.getByRole("link", { name: "Batuhan Boran website" });
     await expect(attributionLink).toBeVisible();
-    await expect(attributionLink).toHaveAttribute("href", "https://www.linkedin.com/in/batuhan-boran-320b311b7/");
+    await expect(attributionLink).toHaveAttribute("href", "https://batuhanboran.com");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
     await expect(page.getByText("Version 1.6.1")).toBeVisible();
@@ -176,6 +176,11 @@ async function expectSearchEngineVisualContract(page) {
     await expect(page.getByTestId("public-version-button")).toHaveCount(0);
     await expect(page.getByText("Public v1.6.1")).toHaveCount(0);
     await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
+  }
+
+  await expect(page.getByText("Worldwide filters")).toHaveCount(0);
+  if (viewport.width >= 768) {
+    await expect(page.getByTestId("global-filter-status")).toBeVisible();
   }
 }
 
@@ -205,6 +210,7 @@ async function expectSearchMovesUpAfterSubmit(page) {
 }
 
 async function expectNoNestedPublicScroll(page) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
   const nestedState = await page.evaluate(() => {
     const read = (testId) => {
       const node = document.querySelector(`[data-testid="${testId}"]`);
@@ -221,12 +227,99 @@ async function expectNoNestedPublicScroll(page) {
     };
   });
 
-  if (nestedState.filters) {
+  if (nestedState.filters && viewport.width < 768) {
     expect(nestedState.filters.scrollable, "filters panel should expand in-page instead of scrolling internally").toBe(false);
   }
   if (nestedState.list) {
     expect(nestedState.list.scrollable, "posting cards should use the main page scroll, not their own list scrollbar").toBe(false);
   }
+}
+
+async function expectDesktopFilterRailCanScroll(page) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width < 768) return;
+
+  await ensureFiltersVisible(page);
+  const before = await page.getByTestId("search-panel").boundingBox();
+  const scrollState = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="filters-panel"]');
+    if (!panel) return null;
+    const style = window.getComputedStyle(panel);
+    panel.scrollTop = 0;
+    const beforeTop = panel.scrollTop;
+    panel.scrollTop = 1000;
+    return {
+      beforeTop,
+      afterTop: panel.scrollTop,
+      clientHeight: panel.clientHeight,
+      scrollHeight: panel.scrollHeight,
+      overflowY: style.overflowY
+    };
+  });
+
+  expect(scrollState).toBeTruthy();
+  expect(["auto", "scroll"]).toContain(scrollState.overflowY);
+  expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight + 2);
+  expect(scrollState.afterTop).toBeGreaterThan(scrollState.beforeTop);
+
+  await page.mouse.wheel(0, 900);
+  await page.waitForTimeout(160);
+  const after = await page.getByTestId("search-panel").boundingBox();
+  expect(Math.abs(after.y - before.y), "sticky rail should stay pinned while its filter body can scroll").toBeLessThan(24);
+}
+
+async function expectRemoteFiltersStayInOneRow(page) {
+  await ensureFiltersVisible(page);
+  const rowState = await page.evaluate(() => {
+    const ids = ["remote-filter-all", "remote-filter-remote", "remote-filter-hybrid", "remote-filter-non_remote"];
+    const boxes = ids.map((id) => {
+      const node = document.querySelector(`[data-testid="${id}"]`);
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return { id, left: rect.left, right: rect.right, y: rect.y, width: rect.width, height: rect.height };
+    });
+    const parent = document.querySelector('[data-testid="remote-filter-row"]');
+    const parentRect = parent?.getBoundingClientRect();
+    return { boxes, parent: parentRect ? { left: parentRect.left, right: parentRect.right } : null };
+  });
+
+  expect(rowState.boxes.every(Boolean)).toBeTruthy();
+  const yValues = rowState.boxes.map((box) => box.y);
+  expect(Math.max(...yValues) - Math.min(...yValues), "remote filter chips should stay on one visual row").toBeLessThan(8);
+  expect(rowState.parent).toBeTruthy();
+  for (const box of rowState.boxes) {
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.left).toBeGreaterThanOrEqual(rowState.parent.left - 1);
+    expect(box.right).toBeLessThanOrEqual(rowState.parent.right + 1);
+  }
+}
+
+async function expectDirectSortControl(page) {
+  const sort = page.getByTestId("sort-control");
+  await expect(sort).toBeVisible();
+  await expect(sort).toContainText(/Relevance/i);
+  await expect(page.getByTestId("sort-option-relevance")).toBeVisible();
+  await expect(page.getByTestId("sort-option-last-seen")).toBeVisible();
+  await expect(page.getByTestId("sort-option-posted-date")).toBeVisible();
+  await expect(page.getByTestId("sort-option-ats-source")).toBeVisible();
+  await expect(page.getByTestId("sort-option-confidence")).toBeVisible();
+  await expect(sort.locator('[data-testid$="-filter-options"]')).toHaveCount(0);
+}
+
+async function expectResultCountPill(page) {
+  const state = await page.getByTestId("result-count").evaluate((node) => {
+    const style = window.getComputedStyle(node);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderRadius: style.borderRadius,
+      minHeight: style.minHeight,
+      display: style.display,
+      fontVariantNumeric: style.fontVariantNumeric
+    };
+  });
+  expect(state.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(Number.parseFloat(state.borderRadius)).toBeGreaterThanOrEqual(10);
+  expect(Number.parseFloat(state.minHeight || "0")).toBeGreaterThanOrEqual(40);
 }
 
 async function expectNoHorizontalOverflow(page) {
@@ -730,6 +823,8 @@ test.describe("postings page QA", () => {
     await expectSearchEngineVisualContract(page);
     await expectPublicSearchChrome(page);
     await expectPublicPaletteIsSoft(page);
+    await expectDirectSortControl(page);
+    await expectResultCountPill(page);
 
     for (const query of SEARCH_COMPATIBILITY_QUERIES) {
       await page.getByTestId("search-input").fill(query);
@@ -754,6 +849,8 @@ test.describe("postings page QA", () => {
 
     expect(after.y).toBeGreaterThanOrEqual(0);
     expect(Math.abs(after.y - before.y), "sticky panel should stay pinned during document scroll").toBeLessThan(24);
+    await expectDesktopFilterRailCanScroll(page);
+    await expectRemoteFiltersStayInOneRow(page);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -826,7 +923,7 @@ test.describe("postings page QA", () => {
       .poll(() => requestedPostings.some((request) => request.search === "dynamic" && request.freshnessDays === "3"))
       .toBeTruthy();
 
-    await page.getByTestId("sort-control").click();
+    await expectDirectSortControl(page);
     await page.getByTestId("sort-option-posted-date").click();
     await expect(page.getByTestId("sort-control")).toContainText(/Posted date/i);
     await expect
