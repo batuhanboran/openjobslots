@@ -13,6 +13,7 @@ test.describe("openjobslots API compatibility", () => {
       { path: "/health" },
       { path: "/sync/status" },
       { path: "/ingestion/status" },
+      { path: "/public/preferences" },
       { path: "/postings", params: { search: "remote jobs", limit: "10" } },
       { path: "/postings/filter-options" },
       { path: "/search/suggest", params: { search: "tur", limit: "5" } }
@@ -50,6 +51,36 @@ test.describe("openjobslots API compatibility", () => {
     expect(syncPayload.ingestion_worker).not.toHaveProperty("http_status_counts");
     expect(syncPayload.ingestion_worker).not.toHaveProperty("active_ats");
     expect(syncPayload.ingestion_worker).not.toHaveProperty("parser_attention_by_ats");
+
+    const preferences = await request.get(`${apiBaseUrl}/public/preferences`, {
+      headers: {
+        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.4",
+        "CF-IPCountry": "DE"
+      }
+    });
+    expect(preferences.ok()).toBeTruthy();
+    const preferencePayload = await preferences.json();
+    expect(preferencePayload).toEqual(
+      expect.objectContaining({
+        ok: true,
+        default_language: "tr",
+        country: "DE",
+        supported_languages: expect.arrayContaining([
+          expect.objectContaining({ code: "en" }),
+          expect.objectContaining({ code: "tr" })
+        ])
+      })
+    );
+    expect(JSON.stringify(preferencePayload)).not.toMatch(/ip|address|cf-|accept-language|cookie|postgres:\/\/|MEILI_|MASTER_KEY/i);
+
+    const countryFallback = await request.get(`${apiBaseUrl}/public/preferences`, {
+      headers: {
+        "Accept-Language": "ja-JP,ja;q=0.9",
+        "CF-IPCountry": "TR"
+      }
+    });
+    expect(countryFallback.ok()).toBeTruthy();
+    expect(await countryFallback.json()).toEqual(expect.objectContaining({ default_language: "tr", country: "TR" }));
 
     const ingestionStatus = await request.get(`${apiBaseUrl}/ingestion/status`);
     expect(ingestionStatus.ok()).toBeTruthy();

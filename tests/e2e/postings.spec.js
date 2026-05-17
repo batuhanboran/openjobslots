@@ -836,6 +836,35 @@ test.describe("postings page QA", () => {
     expect(failedResponses).toEqual([]);
   });
 
+  test("language selector and day night switch update the public search chrome", async ({ page }) => {
+    await openJobSlots(page);
+
+    await expect(page.getByTestId("language-selector")).toBeVisible();
+    await expect(page.getByTestId("theme-toggle")).toBeVisible();
+    await expect(page.getByTestId("language-countryball-en")).toBeVisible();
+
+    await page.getByTestId("language-selector").click();
+    await expect(page.getByTestId("language-options")).toBeVisible();
+    await expect(page.getByTestId("language-countryball-tr")).toBeVisible();
+    await page.getByTestId("language-option-tr").click();
+    await expect(page.getByTestId("language-selector")).toContainText("TR");
+    await expect(page.getByTestId("search-panel")).toContainText("İlan ara");
+    await expect(page.getByTestId("results-header-title")).toContainText("Açık roller");
+    await expect(page.getByTestId("search-input")).toHaveAttribute("placeholder", /ünvan|şirket|konum|ülke/i);
+
+    const beforeTheme = await page.getByTestId("postings-page-scroll").evaluate((node) => window.getComputedStyle(node).backgroundColor);
+    await page.getByTestId("theme-toggle").click();
+    await expect(page.getByTestId("theme-toggle")).toContainText(/Night|Dark|Gece/i);
+    const afterTheme = await page.getByTestId("postings-page-scroll").evaluate((node) => window.getComputedStyle(node).backgroundColor);
+    expect(afterTheme).not.toBe(beforeTheme);
+
+    await page.reload();
+    await expect(page.getByTestId("language-selector")).toContainText("TR");
+    await expect(page.getByTestId("search-panel")).toContainText("İlan ara");
+    await expect(page.getByTestId("theme-toggle")).toContainText(/Night|Dark|Gece/i);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("desktop shell keeps the search panel sticky while results scroll", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width < 768, "desktop sticky behavior is covered by the desktop project");

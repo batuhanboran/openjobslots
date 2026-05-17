@@ -95,6 +95,34 @@ const PUBLIC_SITE_URL = String(process.env.OPENJOBSLOTS_PUBLIC_SITE_URL || "").t
 const SEO_SITE_TITLE = "OpenJobSlots | Fresh Job Openings";
 const SEO_SITE_DESCRIPTION =
   "Search fresh job openings across ATS platforms, filter by role, company, location, industry, and remote work, and track applications in one place.";
+const PUBLIC_SUPPORTED_LANGUAGES = Object.freeze([
+  { code: "en", label: "English", native_label: "English", country_code: "US" },
+  { code: "tr", label: "Turkish", native_label: "Türkçe", country_code: "TR" },
+  { code: "de", label: "German", native_label: "Deutsch", country_code: "DE" },
+  { code: "fr", label: "French", native_label: "Français", country_code: "FR" },
+  { code: "es", label: "Spanish", native_label: "Español", country_code: "ES" }
+]);
+const PUBLIC_SUPPORTED_LANGUAGE_CODES = new Set(PUBLIC_SUPPORTED_LANGUAGES.map((language) => language.code));
+const PUBLIC_COUNTRY_LANGUAGE_FALLBACKS = Object.freeze({
+  AT: "de",
+  CH: "de",
+  DE: "de",
+  ES: "es",
+  MX: "es",
+  AR: "es",
+  CL: "es",
+  CO: "es",
+  PE: "es",
+  FR: "fr",
+  BE: "fr",
+  CA: "en",
+  GB: "en",
+  IE: "en",
+  AU: "en",
+  NZ: "en",
+  US: "en",
+  TR: "tr"
+});
 const BACKEND_DATA_ROOT = path.dirname(DB_PATH);
 const BACKEND_LOG_DIRECTORY_PATH = path.join(BACKEND_DATA_ROOT, "logs");
 const FRONTEND_LOG_PATH = path.join(BACKEND_LOG_DIRECTORY_PATH, "frontend-client.log");
@@ -1529,6 +1557,63 @@ function parseCsvParam(value) {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function normalizePublicLanguageCode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+  if (!normalized) return "";
+  const primary = normalized.split("-")[0];
+  return PUBLIC_SUPPORTED_LANGUAGE_CODES.has(primary) ? primary : "";
+}
+
+function parseAcceptLanguagePreferences(value) {
+  return String(value || "")
+    .split(",")
+    .map((part, index) => {
+      const [tagPart, ...params] = part.trim().split(";");
+      const qParam = params.find((param) => param.trim().toLowerCase().startsWith("q="));
+      const qValue = qParam ? Number(qParam.split("=")[1]) : 1;
+      return {
+        tag: tagPart.trim(),
+        q: Number.isFinite(qValue) ? qValue : 0,
+        index
+      };
+    })
+    .filter((item) => item.tag)
+    .sort((a, b) => b.q - a.q || a.index - b.index);
+}
+
+function normalizePublicCountryCode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : "";
+}
+
+function resolvePublicLanguagePreference({ acceptLanguage, countryCode } = {}) {
+  for (const preference of parseAcceptLanguagePreferences(acceptLanguage)) {
+    const languageCode = normalizePublicLanguageCode(preference.tag);
+    if (languageCode) return languageCode;
+  }
+
+  const countryLanguage = PUBLIC_COUNTRY_LANGUAGE_FALLBACKS[normalizePublicCountryCode(countryCode)];
+  return normalizePublicLanguageCode(countryLanguage) || "en";
+}
+
+function buildPublicPreferences(req) {
+  const countryCode = normalizePublicCountryCode(req.get("cf-ipcountry") || req.get("x-vercel-ip-country") || "");
+  return {
+    ok: true,
+    default_language: resolvePublicLanguagePreference({
+      acceptLanguage: req.get("accept-language"),
+      countryCode
+    }),
+    country: countryCode,
+    supported_languages: PUBLIC_SUPPORTED_LANGUAGES
+  };
 }
 
 function parseJsonArray(value) {
@@ -17984,6 +18069,12 @@ function createServer() {
         ...counts
       };
     });
+  });
+
+  app.get("/public/preferences", (req, res) => {
+    res.setHeader("Vary", "Accept-Language, CF-IPCountry");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return res.json(buildPublicPreferences(req));
   });
 
   app.get("/sync/status", async (req, res) => {

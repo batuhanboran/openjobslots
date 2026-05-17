@@ -150,6 +150,10 @@ export function fetchSearchSuggestions(search = "", limit = 8) {
   return request(`/search/suggest?${params.toString()}`);
 }
 
+export function fetchPublicPreferences() {
+  return request(`/public/preferences?_ts=${Date.now()}`);
+}
+
 export function fetchApplications(limit = 500, offset = 0, status = "") {
   const params = new URLSearchParams({
     limit: String(limit),

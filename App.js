@@ -28,6 +28,7 @@ import {
   fetchPostingFilterOptions,
   fetchPersonalInformation,
   fetchPostings,
+  fetchPublicPreferences,
   fetchSearchSuggestions,
   postFrontendLog,
   fetchSyncServiceSettings,
@@ -121,6 +122,374 @@ const WORDMARK_SEGMENTS = [
   { text: "job", color: OJS_COLORS.focus },
   { text: "slots", color: OJS_COLORS.muted }
 ];
+const OJS_DARK_COLORS = {
+  bg: "#101713",
+  surface: "#17221D",
+  surfaceMuted: "#20352B",
+  hover: "#22342C",
+  text: "#DCE8E1",
+  ink: "#F4FBF7",
+  muted: "#9BAEA4",
+  border: "#33483D",
+  softBorder: "#2A3A32",
+  pressed: "#274E40",
+  focus: "#8ED6B9",
+  green: "#8ED6B9",
+  shadow: "#050806"
+};
+const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
+const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
+const DEFAULT_PUBLIC_LANGUAGE = "en";
+const PUBLIC_LANGUAGE_OPTIONS = [
+  {
+    code: "en",
+    label: "English",
+    nativeLabel: "English",
+    shortLabel: "EN",
+    countryCode: "US",
+    flag: { type: "us", stripes: ["#B22234", "#FFFFFF", "#B22234", "#FFFFFF", "#B22234", "#FFFFFF", "#B22234"] }
+  },
+  {
+    code: "tr",
+    label: "Turkish",
+    nativeLabel: "Türkçe",
+    shortLabel: "TR",
+    countryCode: "TR",
+    flag: { type: "tr", stripes: ["#E30A17"] }
+  },
+  {
+    code: "de",
+    label: "German",
+    nativeLabel: "Deutsch",
+    shortLabel: "DE",
+    countryCode: "DE",
+    flag: { type: "horizontal", stripes: ["#111111", "#DD0000", "#FFCE00"] }
+  },
+  {
+    code: "fr",
+    label: "French",
+    nativeLabel: "Français",
+    shortLabel: "FR",
+    countryCode: "FR",
+    flag: { type: "vertical", stripes: ["#0055A4", "#FFFFFF", "#EF4135"] }
+  },
+  {
+    code: "es",
+    label: "Spanish",
+    nativeLabel: "Español",
+    shortLabel: "ES",
+    countryCode: "ES",
+    flag: { type: "horizontal", stripes: ["#AA151B", "#F1BF00", "#AA151B"] }
+  }
+];
+const PUBLIC_LANGUAGE_BY_CODE = new Map(PUBLIC_LANGUAGE_OPTIONS.map((language) => [language.code, language]));
+const PUBLIC_MESSAGES = {
+  en: {
+    "results.eyebrow": "Public search",
+    "results.title": "Open roles",
+    "search.lead": "Find fresh openings across public ATS job boards.",
+    "search.label": "Search openings",
+    "search.placeholder": "Search title, company, location, or country",
+    "search.shortcut": "Enter to search · Esc to clear",
+    "search.clear": "Clear",
+    "filters.loading": "Loading filter options...",
+    "filters.show": "Filters",
+    "filters.hide": "Hide filters",
+    "filters.global.title": "Global search",
+    "filters.global.locationTitle": "Location narrowed",
+    "filters.global.copy": "Search remains worldwide until a location filter is selected.",
+    "filters.global.locationCopy": "Region and country filters are active.",
+    "filters.ats": "ATS",
+    "filters.ats.any": "All ATS",
+    "filters.industries": "Industries",
+    "filters.industries.any": "Any industry",
+    "filters.regions": "Regions",
+    "filters.regions.any": "Worldwide",
+    "filters.countries": "Countries",
+    "filters.countries.any": "All countries",
+    "filters.states": "States",
+    "filters.states.any": "All states/provinces",
+    "filters.counties": "Counties",
+    "filters.counties.any": "All counties",
+    "filters.countryHint": "Choose a country to narrow by state or province.",
+    "filters.stateHint": "Choose a state/province to narrow by county when county data exists.",
+    "freshness.label": "Freshness",
+    "freshness.all": "Any date",
+    "freshness.3": "3 days",
+    "freshness.7": "7 days",
+    "freshness.30": "30 days",
+    "remote.label": "Remote Filter",
+    "remote.all": "All Locations",
+    "remote.allShort": "Any",
+    "remote.remote": "Remote Only",
+    "remote.remoteShort": "Remote",
+    "remote.hybrid": "Hybrid Only",
+    "remote.hybridShort": "Hybrid",
+    "remote.nonRemote": "On-Site / Unknown",
+    "remote.nonRemoteShort": "On-site",
+    "remote.hideNoDate": "Hide postings with no date",
+    "sources.title": "Sources in results",
+    "sources.empty": "Run a search to see sources in the current result set.",
+    "results.search": "Search",
+    "results.toSeeSlots": "to see slots",
+    "results.slot": "slot",
+    "results.slots": "slots",
+    "initial.title": "Search fresh public ATS openings.",
+    "initial.copy": "Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.",
+    "sort.relevance": "Relevance",
+    "sort.last_seen": "Fresh source",
+    "sort.posted_date": "Posted date",
+    "sort.ats_source": "ATS/source",
+    "sort.confidence": "Confidence",
+    "theme.day": "Day",
+    "theme.night": "Night",
+    "language.label": "Language"
+  },
+  tr: {
+    "results.eyebrow": "Genel arama",
+    "results.title": "Açık roller",
+    "search.lead": "Public ATS iş panolarında taze ilanları bul.",
+    "search.label": "İlan ara",
+    "search.placeholder": "Ünvan, şirket, konum veya ülke ara",
+    "search.shortcut": "Aramak için Enter · Temizlemek için Esc",
+    "search.clear": "Temizle",
+    "filters.loading": "Filtreler yükleniyor...",
+    "filters.show": "Filtreler",
+    "filters.hide": "Filtreleri gizle",
+    "filters.global.title": "Global arama",
+    "filters.global.locationTitle": "Konum daraltıldı",
+    "filters.global.copy": "Bölge, ülke veya çalışma modu seçilene kadar arama global kalır.",
+    "filters.global.locationCopy": "Bölge ve ülke filtreleri aktif.",
+    "filters.ats": "ATS",
+    "filters.ats.any": "Tüm ATS",
+    "filters.industries": "Sektörler",
+    "filters.industries.any": "Tüm sektörler",
+    "filters.regions": "Bölgeler",
+    "filters.regions.any": "Dünya geneli",
+    "filters.countries": "Ülkeler",
+    "filters.countries.any": "Tüm ülkeler",
+    "filters.states": "Eyaletler",
+    "filters.states.any": "Tüm eyaletler",
+    "filters.counties": "İlçeler",
+    "filters.counties.any": "Tüm ilçeler",
+    "filters.countryHint": "Eyalet veya bölge kırılımı için önce ülke seç.",
+    "filters.stateHint": "Varsa ilçe kırılımı için eyalet/bölge seç.",
+    "freshness.label": "Güncellik",
+    "freshness.all": "Tümü",
+    "freshness.3": "3 gün",
+    "freshness.7": "7 gün",
+    "freshness.30": "30 gün",
+    "remote.label": "Çalışma modu",
+    "remote.all": "Tüm konumlar",
+    "remote.allShort": "Tümü",
+    "remote.remote": "Sadece remote",
+    "remote.remoteShort": "Remote",
+    "remote.hybrid": "Sadece hibrit",
+    "remote.hybridShort": "Hibrit",
+    "remote.nonRemote": "Ofis / belirsiz",
+    "remote.nonRemoteShort": "Ofis",
+    "remote.hideNoDate": "Tarihi olmayan ilanları gizle",
+    "sources.title": "Sonuçlardaki kaynaklar",
+    "sources.empty": "Bu sonuç setindeki kaynakları görmek için arama yap.",
+    "results.search": "Ara",
+    "results.toSeeSlots": "slotları gör",
+    "results.slot": "slot",
+    "results.slots": "slot",
+    "initial.title": "Taze public ATS ilanlarını ara.",
+    "initial.copy": "Ünvan, şirket, konum, ülke veya çalışma modu ile başla. Filtreler desktop görünümde sonuçların yanında sabit kalır.",
+    "sort.relevance": "Alaka",
+    "sort.last_seen": "Taze kaynak",
+    "sort.posted_date": "İlan tarihi",
+    "sort.ats_source": "ATS/kaynak",
+    "sort.confidence": "Güven",
+    "theme.day": "Gündüz",
+    "theme.night": "Gece",
+    "language.label": "Dil"
+  },
+  de: {
+    "results.eyebrow": "Oeffentliche Suche",
+    "results.title": "Offene Rollen",
+    "search.lead": "Finde frische Stellen auf oeffentlichen ATS-Jobboards.",
+    "search.label": "Stellen suchen",
+    "search.placeholder": "Titel, Firma, Ort oder Land suchen",
+    "search.shortcut": "Enter zum Suchen · Esc zum Leeren",
+    "search.clear": "Leeren",
+    "filters.loading": "Filter werden geladen...",
+    "filters.show": "Filter",
+    "filters.hide": "Filter ausblenden",
+    "filters.global.title": "Globale Suche",
+    "filters.global.locationTitle": "Standort eingegrenzt",
+    "filters.global.copy": "Die Suche bleibt weltweit, bis ein Standortfilter aktiv ist.",
+    "filters.global.locationCopy": "Region- und Landfilter sind aktiv.",
+    "filters.ats": "ATS",
+    "filters.ats.any": "Alle ATS",
+    "filters.industries": "Branchen",
+    "filters.industries.any": "Alle Branchen",
+    "filters.regions": "Regionen",
+    "filters.regions.any": "Weltweit",
+    "filters.countries": "Laender",
+    "filters.countries.any": "Alle Laender",
+    "filters.states": "Bundeslaender",
+    "filters.states.any": "Alle Bundeslaender",
+    "filters.counties": "Kreise",
+    "filters.counties.any": "Alle Kreise",
+    "filters.countryHint": "Waehle ein Land, um nach Bundesland oder Region zu filtern.",
+    "filters.stateHint": "Waehle eine Region, um vorhandene Kreis-Daten zu nutzen.",
+    "freshness.label": "Aktualitaet",
+    "freshness.all": "Alle",
+    "freshness.3": "3 Tage",
+    "freshness.7": "7 Tage",
+    "freshness.30": "30 Tage",
+    "remote.label": "Arbeitsmodus",
+    "remote.all": "Alle Standorte",
+    "remote.allShort": "Alle",
+    "remote.remote": "Nur Remote",
+    "remote.remoteShort": "Remote",
+    "remote.hybrid": "Nur Hybrid",
+    "remote.hybridShort": "Hybrid",
+    "remote.nonRemote": "Vor Ort / unklar",
+    "remote.nonRemoteShort": "Vor Ort",
+    "remote.hideNoDate": "Postings ohne Datum ausblenden",
+    "sources.title": "Quellen in Ergebnissen",
+    "sources.empty": "Starte eine Suche, um Quellen im Ergebnis zu sehen.",
+    "results.search": "Suchen",
+    "results.toSeeSlots": "Slots anzeigen",
+    "results.slot": "Slot",
+    "results.slots": "Slots",
+    "initial.title": "Frische oeffentliche ATS-Stellen suchen.",
+    "initial.copy": "Beginne mit Titel, Firma, Ort, Land oder Arbeitsmodus. Filter bleiben am Desktop neben den Ergebnissen fixiert.",
+    "sort.relevance": "Relevanz",
+    "sort.last_seen": "Frische Quelle",
+    "sort.posted_date": "Veroeffentlicht",
+    "sort.ats_source": "ATS/Quelle",
+    "sort.confidence": "Vertrauen",
+    "theme.day": "Tag",
+    "theme.night": "Nacht",
+    "language.label": "Sprache"
+  },
+  fr: {
+    "results.eyebrow": "Recherche publique",
+    "results.title": "Postes ouverts",
+    "search.lead": "Trouvez des offres recentes sur les ATS publics.",
+    "search.label": "Rechercher",
+    "search.placeholder": "Titre, entreprise, lieu ou pays",
+    "search.shortcut": "Entrer pour rechercher · Esc pour vider",
+    "search.clear": "Vider",
+    "filters.loading": "Chargement des filtres...",
+    "filters.show": "Filtres",
+    "filters.hide": "Masquer les filtres",
+    "filters.global.title": "Recherche mondiale",
+    "filters.global.locationTitle": "Lieu precise",
+    "filters.global.copy": "La recherche reste mondiale jusqu'au choix d'un lieu.",
+    "filters.global.locationCopy": "Les filtres region et pays sont actifs.",
+    "filters.ats": "ATS",
+    "filters.ats.any": "Tous les ATS",
+    "filters.industries": "Secteurs",
+    "filters.industries.any": "Tous les secteurs",
+    "filters.regions": "Regions",
+    "filters.regions.any": "Monde entier",
+    "filters.countries": "Pays",
+    "filters.countries.any": "Tous les pays",
+    "filters.states": "Etats/regions",
+    "filters.states.any": "Tous les etats",
+    "filters.counties": "Comtes",
+    "filters.counties.any": "Tous les comtes",
+    "filters.countryHint": "Choisissez un pays pour filtrer par etat ou region.",
+    "filters.stateHint": "Choisissez une region si des donnees locales existent.",
+    "freshness.label": "Fraicheur",
+    "freshness.all": "Toutes",
+    "freshness.3": "3 jours",
+    "freshness.7": "7 jours",
+    "freshness.30": "30 jours",
+    "remote.label": "Mode de travail",
+    "remote.all": "Tous les lieux",
+    "remote.allShort": "Tous",
+    "remote.remote": "Remote seul",
+    "remote.remoteShort": "Remote",
+    "remote.hybrid": "Hybride seul",
+    "remote.hybridShort": "Hybride",
+    "remote.nonRemote": "Sur site / inconnu",
+    "remote.nonRemoteShort": "Sur site",
+    "remote.hideNoDate": "Masquer les offres sans date",
+    "sources.title": "Sources des resultats",
+    "sources.empty": "Lancez une recherche pour voir les sources.",
+    "results.search": "Rechercher",
+    "results.toSeeSlots": "pour voir les slots",
+    "results.slot": "slot",
+    "results.slots": "slots",
+    "initial.title": "Rechercher des offres ATS publiques recentes.",
+    "initial.copy": "Commencez par un titre, une entreprise, un lieu, un pays ou un mode de travail. Les filtres restent fixes sur desktop.",
+    "sort.relevance": "Pertinence",
+    "sort.last_seen": "Source recente",
+    "sort.posted_date": "Date de publication",
+    "sort.ats_source": "ATS/source",
+    "sort.confidence": "Confiance",
+    "theme.day": "Jour",
+    "theme.night": "Nuit",
+    "language.label": "Langue"
+  },
+  es: {
+    "results.eyebrow": "Busqueda publica",
+    "results.title": "Roles abiertos",
+    "search.lead": "Encuentra ofertas recientes en ATS publicos.",
+    "search.label": "Buscar empleos",
+    "search.placeholder": "Titulo, empresa, ubicacion o pais",
+    "search.shortcut": "Enter para buscar · Esc para limpiar",
+    "search.clear": "Limpiar",
+    "filters.loading": "Cargando filtros...",
+    "filters.show": "Filtros",
+    "filters.hide": "Ocultar filtros",
+    "filters.global.title": "Busqueda global",
+    "filters.global.locationTitle": "Ubicacion acotada",
+    "filters.global.copy": "La busqueda sigue global hasta elegir una ubicacion.",
+    "filters.global.locationCopy": "Los filtros de region y pais estan activos.",
+    "filters.ats": "ATS",
+    "filters.ats.any": "Todos los ATS",
+    "filters.industries": "Industrias",
+    "filters.industries.any": "Cualquier industria",
+    "filters.regions": "Regiones",
+    "filters.regions.any": "Mundial",
+    "filters.countries": "Paises",
+    "filters.countries.any": "Todos los paises",
+    "filters.states": "Estados",
+    "filters.states.any": "Todos los estados",
+    "filters.counties": "Condados",
+    "filters.counties.any": "Todos los condados",
+    "filters.countryHint": "Elige un pais para filtrar por estado o provincia.",
+    "filters.stateHint": "Elige un estado/provincia cuando existan datos de condado.",
+    "freshness.label": "Frescura",
+    "freshness.all": "Todas",
+    "freshness.3": "3 dias",
+    "freshness.7": "7 dias",
+    "freshness.30": "30 dias",
+    "remote.label": "Modo de trabajo",
+    "remote.all": "Todas las ubicaciones",
+    "remote.allShort": "Todas",
+    "remote.remote": "Solo remoto",
+    "remote.remoteShort": "Remoto",
+    "remote.hybrid": "Solo hibrido",
+    "remote.hybridShort": "Hibrido",
+    "remote.nonRemote": "Presencial / desconocido",
+    "remote.nonRemoteShort": "Presencial",
+    "remote.hideNoDate": "Ocultar ofertas sin fecha",
+    "sources.title": "Fuentes en resultados",
+    "sources.empty": "Haz una busqueda para ver las fuentes del resultado.",
+    "results.search": "Buscar",
+    "results.toSeeSlots": "para ver slots",
+    "results.slot": "slot",
+    "results.slots": "slots",
+    "initial.title": "Busca ofertas ATS publicas recientes.",
+    "initial.copy": "Empieza con titulo, empresa, ubicacion, pais o modo de trabajo. Los filtros quedan fijos junto a los resultados en desktop.",
+    "sort.relevance": "Relevancia",
+    "sort.last_seen": "Fuente fresca",
+    "sort.posted_date": "Fecha publicada",
+    "sort.ats_source": "ATS/fuente",
+    "sort.confidence": "Confianza",
+    "theme.day": "Dia",
+    "theme.night": "Noche",
+    "language.label": "Idioma"
+  }
+};
 const PUBLIC_APP_VERSION = String(appMetadata?.expo?.version || packageMetadata?.version || "1.8.0");
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
@@ -428,6 +797,73 @@ function getPostingsFiltersSignature(filters = {}) {
     freshness_days: String(filters.freshness_days || "all"),
     sort_by: String(filters.sort_by || "relevance")
   });
+}
+
+function normalizePublicLanguageCode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+  if (!normalized) return "";
+  const primary = normalized.split("-")[0];
+  return PUBLIC_LANGUAGE_BY_CODE.has(primary) ? primary : "";
+}
+
+function readWebStorageValue(key) {
+  if (Platform.OS !== "web" || typeof window === "undefined" || !window.localStorage) return "";
+  try {
+    return String(window.localStorage.getItem(key) || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeWebStorageValue(key, value) {
+  if (Platform.OS !== "web" || typeof window === "undefined" || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(key, String(value || ""));
+  } catch {
+    // Local storage is optional; ignore private browsing or quota failures.
+  }
+}
+
+function getBrowserLanguageCode() {
+  if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_PUBLIC_LANGUAGE;
+  const navigatorLanguage =
+    normalizePublicLanguageCode(window.navigator?.language) ||
+    normalizePublicLanguageCode((window.navigator?.languages || [])[0]);
+  return navigatorLanguage || DEFAULT_PUBLIC_LANGUAGE;
+}
+
+function getInitialPublicLanguageCode() {
+  return normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY)) || getBrowserLanguageCode();
+}
+
+function getInitialPublicTheme() {
+  const saved = readWebStorageValue(PUBLIC_THEME_STORAGE_KEY).toLowerCase();
+  if (saved === "dark" || saved === "light") return saved;
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
+    return "dark";
+  }
+  return "light";
+}
+
+function translatePublicText(languageCode, key, fallback = "") {
+  const messages = PUBLIC_MESSAGES[languageCode] || PUBLIC_MESSAGES.en;
+  return messages?.[key] || PUBLIC_MESSAGES.en?.[key] || fallback || key;
+}
+
+function getTranslatedSortOption(option, languageCode) {
+  const value = String(option?.value || "").trim() || "relevance";
+  return {
+    ...option,
+    value,
+    label: translatePublicText(languageCode, `sort.${value}`, option?.label || value)
+  };
+}
+
+function getTranslatedFreshnessLabel(value, languageCode, fallback) {
+  return translatePublicText(languageCode, `freshness.${String(value)}`, fallback);
 }
 
 const DEFAULT_ATS_FILTER_OPTIONS = [
@@ -1822,11 +2258,133 @@ function SingleSelectDropdown({
   );
 }
 
-function SourceIntelligencePanel({ sources, showResultsSurface, selectedSource, onSelectSource }) {
+function CountryBall({ language, selected = false, size = 30 }) {
+  const flag = language?.flag || PUBLIC_LANGUAGE_OPTIONS[0].flag;
+  const stripes = Array.isArray(flag.stripes) && flag.stripes.length > 0 ? flag.stripes : ["#ffffff"];
+  const stripeDirectionStyle = flag.type === "vertical" ? styles.countryBallFlagVertical : styles.countryBallFlagHorizontal;
+  return (
+    <View
+      style={[
+        styles.countryBall,
+        selected ? styles.countryBallSelected : null,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2
+        }
+      ]}
+      testID={`language-countryball-${language?.code || "en"}`}
+    >
+      <View style={[styles.countryBallFlagClip, stripeDirectionStyle]}>
+        {stripes.map((color, index) => (
+          <View
+            // eslint-disable-next-line react/no-array-index-key
+            key={`${language?.code || "flag"}-${color}-${index}`}
+            style={[styles.countryBallStripe, { backgroundColor: color }]}
+          />
+        ))}
+        {flag.type === "us" ? <View style={styles.countryBallUsCanton} /> : null}
+        {flag.type === "tr" ? (
+          <View style={styles.countryBallCrescentWrap}>
+            <View style={styles.countryBallCrescentBase} />
+            <View style={styles.countryBallCrescentCut} />
+          </View>
+        ) : null}
+      </View>
+      <View pointerEvents="none" style={styles.countryBallEyes}>
+        <View style={styles.countryBallEye} />
+        <View style={styles.countryBallEye} />
+      </View>
+    </View>
+  );
+}
+
+function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLanguage, t }) {
+  const selectedLanguage = PUBLIC_LANGUAGE_BY_CODE.get(languageCode) || PUBLIC_LANGUAGE_BY_CODE.get(DEFAULT_PUBLIC_LANGUAGE);
+  return (
+    <View style={styles.languageSelectorWrap}>
+      <Pressable
+        onPress={onToggleMenu}
+        style={({ pressed }) => [
+          styles.languageSelectorButton,
+          menuOpen ? styles.languageSelectorButtonOpen : null,
+          pressed ? styles.languageSelectorButtonPressed : null
+        ]}
+        testID="language-selector"
+        accessibilityRole="button"
+        accessibilityLabel={t("language.label", "Language")}
+        accessibilityState={{ expanded: menuOpen }}
+      >
+        <CountryBall language={selectedLanguage} selected size={30} />
+        <Text style={styles.languageSelectorCode}>{selectedLanguage.shortLabel}</Text>
+      </Pressable>
+      {menuOpen ? (
+        <View style={styles.languageOptions} testID="language-options">
+          {PUBLIC_LANGUAGE_OPTIONS.map((language) => {
+            const selected = language.code === selectedLanguage.code;
+            return (
+              <Pressable
+                key={language.code}
+                onPress={() => onSelectLanguage(language.code)}
+                style={({ pressed }) => [
+                  styles.languageOption,
+                  selected ? styles.languageOptionSelected : null,
+                  pressed ? styles.languageOptionPressed : null
+                ]}
+                testID={`language-option-${language.code}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${language.label} language`}
+              >
+                <CountryBall language={language} selected={selected} size={26} />
+                <View style={styles.languageOptionCopy}>
+                  <Text style={styles.languageOptionLabel}>{language.nativeLabel}</Text>
+                  <Text style={styles.languageOptionMeta}>{language.shortLabel}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ThemeToggle({ themeMode, onToggleTheme, t }) {
+  const isDark = themeMode === "dark";
+  return (
+    <Pressable
+      onPress={onToggleTheme}
+      style={({ pressed }) => [styles.themeToggle, isDark ? styles.themeToggleDark : null, pressed ? styles.themeTogglePressed : null]}
+      testID="theme-toggle"
+      accessibilityRole="switch"
+      accessibilityState={{ checked: isDark }}
+      accessibilityLabel={isDark ? t("theme.night", "Night") : t("theme.day", "Day")}
+    >
+      <View style={[styles.themeToggleTrack, isDark ? styles.themeToggleTrackDark : null]}>
+        <View style={[styles.themeToggleKnob, isDark ? styles.themeToggleKnobDark : null]}>
+          <View style={[styles.themeToggleGlyph, isDark ? styles.themeToggleGlyphMoon : styles.themeToggleGlyphSun]} />
+        </View>
+      </View>
+      <Text style={[styles.themeToggleText, isDark ? styles.themeToggleTextDark : null]}>
+        {isDark ? t("theme.night", "Night") : t("theme.day", "Day")}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SourceIntelligencePanel({
+  sources,
+  showResultsSurface,
+  selectedSource,
+  onSelectSource,
+  t = (key, fallback) => fallback || key,
+  isDarkTheme = false
+}) {
   const visibleSources = Array.isArray(sources) ? sources : [];
   return (
-    <View style={styles.atsIntelligencePanel} testID="ats-intelligence-panel">
-      <Text style={styles.atsIntelligenceTitle}>Sources in results</Text>
+    <View style={[styles.atsIntelligencePanel, isDarkTheme ? styles.atsIntelligencePanelDark : null]} testID="ats-intelligence-panel">
+      <Text style={[styles.atsIntelligenceTitle, isDarkTheme ? styles.textInkDark : null]}>{t("sources.title", "Sources in results")}</Text>
       {showResultsSurface && visibleSources.length > 0 ? (
         visibleSources.map((source) => {
           const sourceValue = source.value || source.key || "unknown";
@@ -1862,7 +2420,9 @@ function SourceIntelligencePanel({ sources, showResultsSurface, selectedSource, 
           );
         })
       ) : (
-        <Text style={styles.atsIntelligenceEmpty}>Run a search to see sources in the current result set.</Text>
+        <Text style={[styles.atsIntelligenceEmpty, isDarkTheme ? styles.textMutedDark : null]}>
+          {t("sources.empty", "Run a search to see sources in the current result set.")}
+        </Text>
       )}
     </View>
   );
@@ -1942,6 +2502,9 @@ export default function App() {
   const isDesktopViewport = Platform.OS === "web" && Number(viewportWidth || 0) >= 768;
   const [activePage, setActivePage] = useState(PAGE_KEYS.POSTINGS);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [publicLanguageCode, setPublicLanguageCode] = useState(getInitialPublicLanguageCode);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [publicTheme, setPublicTheme] = useState(getInitialPublicTheme);
   const [search, setSearch] = useState("");
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [postingsFilters, setPostingsFilters] = useState(createDefaultPostingsFilters);
@@ -2046,6 +2609,11 @@ export default function App() {
   const resultsMotionRef = useRef(new Animated.Value(0));
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
+  const isDarkPublicTheme = publicTheme === "dark";
+  const t = useCallback(
+    (key, fallback = "") => translatePublicText(publicLanguageCode, key, fallback),
+    [publicLanguageCode]
+  );
   const flushFrontendLogs = useCallback(async () => {
     if (frontendLogFlushInFlightRef.current) return;
     if (frontendLogQueueRef.current.length === 0) return;
@@ -2104,14 +2672,27 @@ export default function App() {
       // Non-critical attribution link; ignore platform/browser launch failures.
     }
   }, []);
+  const selectPublicLanguage = useCallback((languageCode) => {
+    const nextLanguage = normalizePublicLanguageCode(languageCode) || DEFAULT_PUBLIC_LANGUAGE;
+    setPublicLanguageCode(nextLanguage);
+    setLanguageMenuOpen(false);
+    writeWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY, nextLanguage);
+  }, []);
+  const togglePublicTheme = useCallback(() => {
+    setPublicTheme((previousTheme) => {
+      const nextTheme = previousTheme === "dark" ? "light" : "dark";
+      writeWebStorageValue(PUBLIC_THEME_STORAGE_KEY, nextTheme);
+      return nextTheme;
+    });
+  }, []);
   const remoteFilterOptions = useMemo(
     () => [
-      { value: "all", label: "All Locations", shortLabel: "Any" },
-      { value: "remote", label: "Remote Only", shortLabel: "Remote" },
-      { value: "hybrid", label: "Hybrid Only", shortLabel: "Hybrid" },
-      { value: "non_remote", label: "On-Site / Unknown", shortLabel: "On-site" }
+      { value: "all", label: t("remote.all", "All Locations"), shortLabel: t("remote.allShort", "Any") },
+      { value: "remote", label: t("remote.remote", "Remote Only"), shortLabel: t("remote.remoteShort", "Remote") },
+      { value: "hybrid", label: t("remote.hybrid", "Hybrid Only"), shortLabel: t("remote.hybridShort", "Hybrid") },
+      { value: "non_remote", label: t("remote.nonRemote", "On-Site / Unknown"), shortLabel: t("remote.nonRemoteShort", "On-site") }
     ],
-    []
+    [t]
   );
   const countryRegionByValue = useMemo(
     () =>
@@ -3499,6 +4080,27 @@ export default function App() {
   }, [hasActivePostingFilters]);
 
   useEffect(() => {
+    if (normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY))) return undefined;
+    let cancelled = false;
+    const loadPublicPreference = async () => {
+      try {
+        const response = await fetchPublicPreferences();
+        if (cancelled) return;
+        const nextLanguage = normalizePublicLanguageCode(response?.default_language);
+        if (nextLanguage) {
+          setPublicLanguageCode(nextLanguage);
+        }
+      } catch (e) {
+        queueFrontendLog("warn", "public_preferences_failed", String(e?.message || e));
+      }
+    };
+    void loadPublicPreference();
+    return () => {
+      cancelled = true;
+    };
+  }, [queueFrontendLog]);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || !window.matchMedia) return undefined;
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updatePreference = () => {
@@ -3574,6 +4176,11 @@ export default function App() {
           setReleaseNotesOpen(false);
           return;
         }
+        if (languageMenuOpen) {
+          event.preventDefault();
+          setLanguageMenuOpen(false);
+          return;
+        }
         if (drawerOpen) {
           event.preventDefault();
           setDrawerOpen(false);
@@ -3601,7 +4208,7 @@ export default function App() {
 
     document.addEventListener("keydown", handleGlobalKeyDown);
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [activePage, clearSearchAndSuggestions, drawerOpen, focusSearch, releaseNotesOpen]);
+  }, [activePage, clearSearchAndSuggestions, drawerOpen, focusSearch, languageMenuOpen, releaseNotesOpen]);
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
@@ -3931,22 +4538,23 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
-    const resultCountValueLabel = showResultsSurface ? formatCompactNumberLabel(resultTotalCount) : "Search";
+    const resultCountValueLabel = showResultsSurface ? formatCompactNumberLabel(resultTotalCount) : t("results.search", "Search");
     const resultCountUnitLabel = showResultsSurface
-      ? resultTotalCount === 1 ? "slot" : "slots"
-      : "to see slots";
+      ? resultTotalCount === 1 ? t("results.slot", "slot") : t("results.slots", "slots")
+      : t("results.toSeeSlots", "to see slots");
     const resultCountLabel = showResultsSurface
       ? `${resultCountValueLabel} ${resultCountUnitLabel}`
-      : "Search to see slots";
+      : `${resultCountValueLabel} ${resultCountUnitLabel}`;
     const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
       ? postingFilterOptions.sort_options
       : DEFAULT_POSTING_SORT_OPTIONS;
+    const translatedSortOptions = sortOptions.map((option) => getTranslatedSortOption(option, publicLanguageCode));
 
     return (
-    <View style={styles.postingsPageFrame}>
+    <View style={[styles.postingsPageFrame, isDarkPublicTheme ? styles.postingsPageFrameDark : null]}>
       <ScrollView
         ref={postingsListRef}
-        style={styles.postingsPageScroll}
+        style={[styles.postingsPageScroll, isDarkPublicTheme ? styles.postingsPageScrollDark : null]}
         contentContainerStyle={styles.postingsPageContent}
         keyboardShouldPersistTaps="handled"
         onScroll={handlePostingsScroll}
@@ -3961,7 +4569,8 @@ export default function App() {
         style={[
           styles.searchPanel,
           isDesktopViewport ? styles.searchPanelDesktop : styles.searchPanelMobile,
-          isDesktopViewport ? styles.searchPanelSticky : null
+          isDesktopViewport ? styles.searchPanelSticky : null,
+          isDarkPublicTheme ? styles.searchPanelDark : null
         ]}
         testID="search-panel"
       >
@@ -4016,19 +4625,22 @@ export default function App() {
             ))}
           </View>
         </Pressable>
-        <Text style={styles.searchLead}>
-          Find fresh openings across public ATS job boards.
+        <Text style={[styles.searchLead, isDarkPublicTheme ? styles.textMutedDark : null]}>
+          {t("search.lead", "Find fresh openings across public ATS job boards.")}
         </Text>
-        <Text style={styles.searchPanelLabel}>Search openings</Text>
+        <Text style={[styles.searchPanelLabel, isDarkPublicTheme ? styles.textMutedDark : null]}>
+          {t("search.label", "Search openings")}
+        </Text>
         <View style={styles.searchBoxRow}>
           <TextInput
             ref={searchInputRef}
-            style={styles.search}
+            style={[styles.search, isDarkPublicTheme ? styles.searchDark : null]}
             value={search}
             onChangeText={handleSearchChange}
             onSubmitEditing={() => submitSearch(search)}
             onKeyPress={handleSearchKeyPress}
-            placeholder="Search title, company, location, or country"
+            placeholder={t("search.placeholder", "Search title, company, location, or country")}
+            placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : OJS_COLORS.muted}
             autoCapitalize="none"
             returnKeyType="search"
             blurOnSubmit={false}
@@ -4098,7 +4710,9 @@ export default function App() {
             </Animated.View>
           ) : (
             <>
-              <Text style={styles.searchShortcutHint}>Enter to search · Esc to clear</Text>
+              <Text style={[styles.searchShortcutHint, isDarkPublicTheme ? styles.textMutedDark : null]}>
+                {t("search.shortcut", "Enter to search · Esc to clear")}
+              </Text>
               {searchNotice ? (
                 <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
                   {searchNotice}
@@ -4114,7 +4728,7 @@ export default function App() {
                     accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
                   >
                     <Text style={styles.postingsFiltersToggleText}>
-                      {postingsFilterPanelOpen ? "Hide filters" : "Filters"}
+                      {postingsFilterPanelOpen ? t("filters.hide", "Hide filters") : t("filters.show", "Filters")}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -4125,7 +4739,7 @@ export default function App() {
                   accessibilityRole="button"
                   accessibilityLabel="Clear search and posting filters"
                 >
-                  <Text style={styles.postingsFiltersClearText}>Clear</Text>
+                  <Text style={styles.postingsFiltersClearText}>{t("search.clear", "Clear")}</Text>
                 </Pressable>
               </View>
               {syncNotice ? (
@@ -4145,32 +4759,32 @@ export default function App() {
         >
           <View style={styles.postingsFiltersPanelContent}>
             {postingFilterOptionsLoading ? (
-              <Text style={styles.small}>Loading filter options...</Text>
+              <Text style={[styles.small, isDarkPublicTheme ? styles.textMutedDark : null]}>{t("filters.loading", "Loading filter options...")}</Text>
             ) : (
               <>
                 <View style={styles.globalFilterStatus} testID="global-filter-status">
                   <View style={styles.globalFilterStatusDot} />
                   <View style={styles.globalFilterStatusCopy}>
                     <Text style={styles.globalFilterStatusTitle}>
-                      {hasLocationPostingFilters ? "Location narrowed" : "Global search"}
+                      {hasLocationPostingFilters ? t("filters.global.locationTitle", "Location narrowed") : t("filters.global.title", "Global search")}
                     </Text>
                     <Text style={styles.globalFilterStatusText} numberOfLines={2}>
                       {hasLocationPostingFilters
-                        ? "Region and country filters are active."
-                        : "Search remains worldwide until a location filter is selected."}
+                        ? t("filters.global.locationCopy", "Region and country filters are active.")
+                        : t("filters.global.copy", "Search remains worldwide until a location filter is selected.")}
                     </Text>
                   </View>
                 </View>
                 <SingleSelectDropdown
-                  label="ATS"
+                  label={t("filters.ats", "ATS")}
                   options={postingFilterOptions.ats}
                   selectedValue={postingsFilters.ats}
                   onSelectValue={setAtsFilter}
-                  anyLabel="All ATS"
+                  anyLabel={t("filters.ats.any", "All ATS")}
                 />
 
                 <MultiSelectDropdown
-                  label="Industries"
+                  label={t("filters.industries", "Industries")}
                   options={postingFilterOptions.industries}
                   selectedValues={postingsFilters.industries}
                   onToggleValue={toggleIndustryFilter}
@@ -4182,11 +4796,11 @@ export default function App() {
                   }
                   emptyText="No industries available."
                   helperText="Optional. Leave empty to search every indexed industry."
-                  anyLabel="Any industry"
+                  anyLabel={t("filters.industries.any", "Any industry")}
                 />
 
                 <MultiSelectDropdown
-                  label="Regions"
+                  label={t("filters.regions", "Regions")}
                   options={normalizedRegionOptions}
                   selectedValues={postingsFilters.regions}
                   onToggleValue={toggleRegionFilter}
@@ -4199,11 +4813,11 @@ export default function App() {
                   }
                   emptyText="Worldwide search is active. Region metadata is not indexed yet."
                   helperText="Start broad by continent, then narrow to countries when useful."
-                  anyLabel="Worldwide"
+                  anyLabel={t("filters.regions.any", "Worldwide")}
                 />
 
                 <MultiSelectDropdown
-                  label="Countries"
+                  label={t("filters.countries", "Countries")}
                   options={visibleCountryOptions}
                   selectedValues={postingsFilters.countries}
                   onToggleValue={toggleCountryFilter}
@@ -4216,19 +4830,19 @@ export default function App() {
                   emptyText={
                     postingsFilters.regions?.length
                       ? "No countries match the selected region yet. Clear Regions to search worldwide."
-                      : "Country metadata is not indexed yet. Worldwide search is still active."
+                      : "No countries match. Worldwide search is still active."
                   }
                   helperText={
                     postingsFilters.regions?.length
                       ? "Countries are limited by the selected region."
                       : "Leave empty to include every country."
                   }
-                  anyLabel="All countries"
+                  anyLabel={t("filters.countries.any", "All countries")}
                 />
 
                 {(postingsFilters.countries || []).length > 0 || (postingsFilters.states || []).length > 0 ? (
                   <MultiSelectDropdown
-                    label="States"
+                    label={t("filters.states", "States")}
                     options={postingFilterOptions.states}
                     selectedValues={postingsFilters.states}
                     onToggleValue={toggleStateFilter}
@@ -4241,17 +4855,17 @@ export default function App() {
                     }
                     emptyText="No states or provinces are indexed for the selected countries."
                     helperText="Shown after country selection. Leave empty to include all states/provinces."
-                    anyLabel="All states/provinces"
+                    anyLabel={t("filters.states.any", "All states/provinces")}
                   />
                 ) : (
                   <Text style={styles.contextualFilterHint}>
-                    Choose a country to narrow by state or province.
+                    {t("filters.countryHint", "Choose a country to narrow by state or province.")}
                   </Text>
                 )}
 
                 {(postingsFilters.states || []).length > 0 || (postingsFilters.counties || []).length > 0 ? (
                   <MultiSelectDropdown
-                    label="Counties"
+                    label={t("filters.counties", "Counties")}
                     options={visibleCountyOptions}
                     selectedValues={postingsFilters.counties}
                     onToggleValue={toggleCountyFilter}
@@ -4263,21 +4877,22 @@ export default function App() {
                     }
                     emptyText="No counties match selected states."
                     helperText="Shown after state selection for sources that include county metadata."
-                    anyLabel="All counties"
+                    anyLabel={t("filters.counties.any", "All counties")}
                   />
                 ) : (
                   <Text style={styles.contextualFilterHint}>
-                    Choose a state/province to narrow by county when county data exists.
+                    {t("filters.stateHint", "Choose a state/province to narrow by county when county data exists.")}
                   </Text>
                 )}
               </>
             )}
 
             <View style={styles.freshnessFilterGroup}>
-              <Text style={styles.fieldLabel}>Freshness</Text>
+              <Text style={[styles.fieldLabel, isDarkPublicTheme ? styles.textMutedDark : null]}>{t("freshness.label", "Freshness")}</Text>
               <View style={styles.filterSegmentRow}>
                 {FRESHNESS_FILTER_OPTIONS.map((option) => {
                   const selected = String(postingsFilters.freshness_days || "all") === String(option.value);
+                  const label = getTranslatedFreshnessLabel(option.value, publicLanguageCode, option.label);
                   return (
                     <Pressable
                       key={String(option.value)}
@@ -4301,7 +4916,7 @@ export default function App() {
                         numberOfLines={1}
                         style={[styles.filterSegmentChipText, selected ? styles.filterSegmentChipTextActive : null]}
                       >
-                        {option.label}
+                        {label}
                       </Text>
                     </Pressable>
                   );
@@ -4310,7 +4925,7 @@ export default function App() {
             </View>
 
             <View style={styles.remoteFilterGroup}>
-              <Text style={styles.fieldLabel}>Remote Filter</Text>
+              <Text style={[styles.fieldLabel, isDarkPublicTheme ? styles.textMutedDark : null]}>{t("remote.label", "Remote Filter")}</Text>
               <View style={styles.filterSegmentRow} testID="remote-filter-row">
                 {remoteFilterOptions.map((option) => {
                   const selected = postingsFilters.remote === option.value;
@@ -4348,7 +4963,7 @@ export default function App() {
                 })}
               </View>
               <View style={styles.remoteNoDateToggleRow}>
-                <Text style={styles.remoteNoDateToggleLabel}>Hide postings with no date</Text>
+                <Text style={styles.remoteNoDateToggleLabel}>{t("remote.hideNoDate", "Hide postings with no date")}</Text>
                 <Switch
                   value={Boolean(postingsFilters.hide_no_date)}
                   onValueChange={(value) =>
@@ -4370,6 +4985,8 @@ export default function App() {
               showResultsSurface={showResultsSurface}
               selectedSource={postingsFilters.ats}
               onSelectSource={handleSelectSourceFacet}
+              t={t}
+              isDarkTheme={isDarkPublicTheme}
             />
           </View>
         </View>
@@ -4378,20 +4995,34 @@ export default function App() {
       </View>
 
       <View style={styles.resultsColumn}>
-        <View style={styles.resultsHeader}>
+        <View style={[styles.resultsHeader, isDarkPublicTheme ? styles.resultsHeaderDark : null]}>
           <View>
-            <Text style={styles.resultsEyebrow}>Public search</Text>
-            <Text style={styles.resultsTitle}>Open roles</Text>
+            <Text style={[styles.resultsEyebrow, isDarkPublicTheme ? styles.textMutedDark : null]}>
+              {t("results.eyebrow", "Public search")}
+            </Text>
+            <Text style={[styles.resultsTitle, isDarkPublicTheme ? styles.textInkDark : null]} testID="results-header-title">
+              {t("results.title", "Open roles")}
+            </Text>
           </View>
           <View style={[styles.resultsToolbar, isDesktopViewport ? null : styles.resultsToolbarMobile]}>
+            <View style={styles.resultsUtilityControls}>
+              <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} />
+              <LanguageSelector
+                languageCode={publicLanguageCode}
+                menuOpen={languageMenuOpen}
+                onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
+                onSelectLanguage={selectPublicLanguage}
+                t={t}
+              />
+            </View>
             <Text
-              style={styles.resultCountText}
+              style={[styles.resultCountText, isDarkPublicTheme ? styles.resultCountTextDark : null]}
               testID="result-count"
               accessibilityRole="status"
               accessibilityLabel={resultCountLabel}
             >
-              <Text style={styles.resultCountValueText}>{resultCountValueLabel}</Text>
-              <Text style={styles.resultCountUnitText}> {resultCountUnitLabel}</Text>
+              <Text style={[styles.resultCountValueText, isDarkPublicTheme ? styles.textInkDark : null]}>{resultCountValueLabel}</Text>
+              <Text style={[styles.resultCountUnitText, isDarkPublicTheme ? styles.textMutedDark : null]}> {resultCountUnitLabel}</Text>
             </Text>
             <View
               style={[
@@ -4400,7 +5031,7 @@ export default function App() {
               ]}
             >
               <SortSegmentedControl
-                options={sortOptions}
+                options={translatedSortOptions}
                 selectedValue={postingsFilters.sort_by}
                 onSelectValue={(value) => {
                   setSearchResultsMode(true);
@@ -4415,10 +5046,10 @@ export default function App() {
         </View>
 
       {!showResultsSurface ? (
-        <View style={styles.initialResultsState} testID="postings-initial-state">
-          <Text style={styles.emptyTitle}>Search fresh public ATS openings.</Text>
-          <Text style={styles.emptyText}>
-            Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.
+        <View style={[styles.initialResultsState, isDarkPublicTheme ? styles.initialResultsStateDark : null]} testID="postings-initial-state">
+          <Text style={[styles.emptyTitle, isDarkPublicTheme ? styles.textInkDark : null]}>{t("initial.title", "Search fresh public ATS openings.")}</Text>
+          <Text style={[styles.emptyText, isDarkPublicTheme ? styles.textMutedDark : null]}>
+            {t("initial.copy", "Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.")}
           </Text>
         </View>
       ) : null}
@@ -5483,6 +6114,12 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted,
     marginTop: 2
   },
+  textMutedDark: {
+    color: OJS_DARK_COLORS.muted
+  },
+  textInkDark: {
+    color: OJS_DARK_COLORS.ink
+  },
   postingsPageScroll: {
     flex: 1,
     backgroundColor: OJS_COLORS.bg,
@@ -5493,10 +6130,21 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  postingsPageScrollDark: {
+    backgroundColor: OJS_DARK_COLORS.bg,
+    ...(Platform.OS === "web"
+      ? {
+          scrollbarColor: `${OJS_DARK_COLORS.border} ${OJS_DARK_COLORS.bg}`
+        }
+      : {})
+  },
   postingsPageFrame: {
     flex: 1,
     position: "relative",
     backgroundColor: OJS_COLORS.bg
+  },
+  postingsPageFrameDark: {
+    backgroundColor: OJS_DARK_COLORS.bg
   },
   postingsPageContent: {
     paddingHorizontal: 16,
@@ -5541,6 +6189,11 @@ const styles = StyleSheet.create({
           shadowRadius: 18,
           shadowOffset: { width: 0, height: 8 }
         })
+  },
+  searchPanelDark: {
+    borderColor: OJS_DARK_COLORS.softBorder,
+    backgroundColor: OJS_DARK_COLORS.surface,
+    ...(Platform.OS === "web" ? { boxShadow: "0 12px 28px rgba(0, 0, 0, 0.34)" } : {})
   },
   searchPanelDesktop: {
     width: 340,
@@ -6125,6 +6778,17 @@ const styles = StyleSheet.create({
           shadowOffset: { width: 0, height: 6 }
         })
   },
+  searchDark: {
+    borderColor: OJS_DARK_COLORS.border,
+    backgroundColor: OJS_DARK_COLORS.surfaceMuted,
+    color: OJS_DARK_COLORS.ink,
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.28)",
+          outlineColor: OJS_DARK_COLORS.focus
+        }
+      : {})
+  },
   searchCompact: {
     height: 48,
     paddingHorizontal: 20,
@@ -6423,6 +7087,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 2
   },
+  atsIntelligencePanelDark: {
+    borderTopColor: OJS_DARK_COLORS.border
+  },
   atsIntelligenceTitle: {
     color: OJS_COLORS.ink,
     fontSize: 13,
@@ -6491,12 +7158,18 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   resultsHeader: {
+    position: "relative",
+    zIndex: 60,
+    elevation: 8,
     marginBottom: 10,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
     flexWrap: "wrap"
+  },
+  resultsHeaderDark: {
+    borderColor: OJS_DARK_COLORS.softBorder
   },
   resultsEyebrow: {
     color: OJS_COLORS.muted,
@@ -6513,6 +7186,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   resultsToolbar: {
+    position: "relative",
+    zIndex: 65,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
@@ -6523,6 +7198,267 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "stretch",
     justifyContent: "flex-start"
+  },
+  resultsUtilityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    zIndex: 20
+  },
+  languageSelectorWrap: {
+    position: "relative",
+    zIndex: 80,
+    elevation: 10
+  },
+  languageSelectorButton: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    ...(Platform.OS === "web"
+      ? {
+          cursor: "pointer",
+          boxShadow: "0 8px 18px rgba(38, 51, 45, 0.07)",
+          transitionProperty: "background-color, border-color, transform, box-shadow",
+          transitionDuration: "220ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  languageSelectorButtonOpen: {
+    borderColor: OJS_COLORS.focus,
+    backgroundColor: OJS_COLORS.accentSoft
+  },
+  languageSelectorButtonPressed: {
+    transform: [{ scale: 0.975 }]
+  },
+  languageSelectorCode: {
+    color: OJS_COLORS.ink,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "900"
+  },
+  languageOptions: {
+    position: "absolute",
+    right: 0,
+    top: 50,
+    zIndex: 90,
+    elevation: 12,
+    minWidth: 178,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    backgroundColor: OJS_COLORS.surface,
+    padding: 6,
+    gap: 4,
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0 18px 34px rgba(38, 51, 45, 0.16)",
+          animationDuration: "180ms",
+          animationTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  languageOption: {
+    minHeight: 44,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    ...(Platform.OS === "web"
+      ? {
+          cursor: "pointer",
+          transitionProperty: "background-color, transform",
+          transitionDuration: "180ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  languageOptionSelected: {
+    backgroundColor: OJS_COLORS.accentSoft
+  },
+  languageOptionPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: OJS_COLORS.hover
+  },
+  languageOptionCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  languageOptionLabel: {
+    color: OJS_COLORS.ink,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "800"
+  },
+  languageOptionMeta: {
+    color: OJS_COLORS.muted,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "800"
+  },
+  countryBall: {
+    position: "relative",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(38, 51, 45, 0.18)",
+    backgroundColor: OJS_COLORS.surfaceMuted,
+    ...(Platform.OS === "web"
+      ? {
+          transitionProperty: "transform, box-shadow, border-color",
+          transitionDuration: "240ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  countryBallSelected: {
+    borderColor: OJS_COLORS.focus,
+    ...(Platform.OS === "web" ? { boxShadow: "0 0 0 3px rgba(127, 191, 166, 0.25)" } : {})
+  },
+  countryBallFlagClip: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden"
+  },
+  countryBallFlagHorizontal: {
+    flexDirection: "column"
+  },
+  countryBallFlagVertical: {
+    flexDirection: "row"
+  },
+  countryBallStripe: {
+    flex: 1
+  },
+  countryBallUsCanton: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "48%",
+    height: "52%",
+    backgroundColor: "#3C3B6E"
+  },
+  countryBallCrescentWrap: {
+    position: "absolute",
+    left: "27%",
+    top: "29%",
+    width: "32%",
+    height: "32%"
+  },
+  countryBallCrescentBase: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF"
+  },
+  countryBallCrescentCut: {
+    position: "absolute",
+    left: "30%",
+    top: "-2%",
+    width: "92%",
+    height: "104%",
+    borderRadius: 999,
+    backgroundColor: "#E30A17"
+  },
+  countryBallEyes: {
+    position: "absolute",
+    left: "22%",
+    right: "22%",
+    top: "34%",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  countryBallEye: {
+    width: 4,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#101713"
+  },
+  themeToggle: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    ...(Platform.OS === "web"
+      ? {
+          cursor: "pointer",
+          boxShadow: "0 8px 18px rgba(38, 51, 45, 0.07)",
+          transitionProperty: "background-color, border-color, transform",
+          transitionDuration: "220ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  themeToggleDark: {
+    borderColor: OJS_DARK_COLORS.border,
+    backgroundColor: OJS_COLORS.surface
+  },
+  themeTogglePressed: {
+    transform: [{ scale: 0.975 }]
+  },
+  themeToggleTrack: {
+    width: 42,
+    height: 26,
+    borderRadius: 999,
+    backgroundColor: OJS_COLORS.accentSoft,
+    padding: 3,
+    justifyContent: "center"
+  },
+  themeToggleTrackDark: {
+    backgroundColor: OJS_DARK_COLORS.pressed
+  },
+  themeToggleKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    backgroundColor: "#F5C96B",
+    alignItems: "center",
+    justifyContent: "center",
+    ...(Platform.OS === "web"
+      ? {
+          transitionProperty: "transform, background-color",
+          transitionDuration: "240ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  themeToggleKnobDark: {
+    backgroundColor: "#DDE7F3",
+    transform: [{ translateX: 16 }]
+  },
+  themeToggleGlyph: {
+    width: 8,
+    height: 8,
+    borderRadius: 999
+  },
+  themeToggleGlyphSun: {
+    backgroundColor: "#FFF4C4"
+  },
+  themeToggleGlyphMoon: {
+    backgroundColor: OJS_DARK_COLORS.surface
+  },
+  themeToggleText: {
+    color: OJS_COLORS.ink,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "900"
+  },
+  themeToggleTextDark: {
+    color: OJS_COLORS.ink
   },
   resultCountText: {
     overflow: "hidden",
@@ -6543,6 +7479,12 @@ const styles = StyleSheet.create({
           boxShadow: "0 6px 16px rgba(38, 51, 45, 0.06)"
         }
       : {})
+  },
+  resultCountTextDark: {
+    borderColor: OJS_DARK_COLORS.softBorder,
+    backgroundColor: OJS_DARK_COLORS.surface,
+    color: OJS_DARK_COLORS.text,
+    ...(Platform.OS === "web" ? { boxShadow: "0 8px 20px rgba(0, 0, 0, 0.24)" } : {})
   },
   resultCountValueText: {
     color: OJS_COLORS.ink,
@@ -6667,6 +7609,10 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.surface,
     paddingHorizontal: 20,
     paddingVertical: 22
+  },
+  initialResultsStateDark: {
+    borderColor: OJS_DARK_COLORS.softBorder,
+    backgroundColor: OJS_DARK_COLORS.surface
   },
   resultsSurface: {
     width: "100%"
