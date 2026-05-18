@@ -42,7 +42,7 @@ const POSTING_SORT_OPTION_ITEMS = Object.freeze([
 
 function getRetentionConfig(env = process.env) {
   return {
-    hotDays: Math.max(1, Number(env.OPENJOBSLOTS_POSTING_HOT_DAYS || 90)),
+    hotDays: Math.max(1, Number(env.OPENJOBSLOTS_POSTING_HOT_DAYS || 30)),
     hiddenRetentionDays: Math.max(1, Number(env.OPENJOBSLOTS_HIDDEN_POSTING_RETENTION_DAYS || 180)),
     cacheMetadataDays: Math.max(1, Number(env.OPENJOBSLOTS_CACHE_METADATA_RETENTION_DAYS || 365)),
     runSummaryDays: Math.max(1, Number(env.OPENJOBSLOTS_INGESTION_RUN_RETENTION_DAYS || 365)),

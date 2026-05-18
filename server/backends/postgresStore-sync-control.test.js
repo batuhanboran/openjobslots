@@ -868,14 +868,14 @@ function testPostgresSearchRankPrioritizesTitleCompanyBeforeDescription() {
 
 function testRetentionDefaultsUseLastSeenPolicy() {
   const config = getRetentionConfig({});
-  assert.equal(config.hotDays, 90);
+  assert.equal(config.hotDays, 30);
   assert.equal(config.hiddenRetentionDays, 180);
   assert.equal(config.cacheMetadataDays, 365);
   assert.equal(config.runSummaryDays, 365);
   assert.equal(config.detailedErrorDays, 90);
 
   const cutoffs = getRetentionCutoffs(200 * 24 * 60 * 60, config);
-  assert.equal(cutoffs.staleVisibleEpoch, 110 * 24 * 60 * 60);
+  assert.equal(cutoffs.staleVisibleEpoch, 170 * 24 * 60 * 60);
   assert.equal(cutoffs.hiddenArchiveEpoch, 20 * 24 * 60 * 60);
 }
 

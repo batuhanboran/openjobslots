@@ -64,6 +64,7 @@ public/static/
 .expo-shared/
 
 # Extra
+.superpowers/
 /db_*
 *.db-shm
 *.db-wal

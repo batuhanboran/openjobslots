@@ -6,7 +6,7 @@ OpenJobSlots uses Postgres as the source of truth and Meilisearch as the public 
 
 | Data | Default |
 | --- | --- |
-| Public searchable postings | 90 days after `last_seen_epoch` |
+| Public searchable postings | 30 days after `last_seen_epoch` |
 | Hidden normalized posting rows | 180 days after `last_seen_epoch` |
 | Posting cache metadata | 365 days |
 | Ingestion run summaries | 365 days |
