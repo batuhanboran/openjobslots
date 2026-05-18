@@ -587,6 +587,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "1.9.3",
+    date: "May 18, 2026",
+    title: "Index freshness and public count polish",
+    summary:
+      "Kept the public search count aligned with the live index, improved sort segment motion, restored worker freshness budgeting, and documented the next safe source-quality path toward a larger fresher index."
+  },
+  {
     version: "1.9.2",
     date: "May 17, 2026",
     title: "Public search dependency hardening",

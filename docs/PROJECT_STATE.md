@@ -2,12 +2,79 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Verified Current State - May 18, 2026
+
+This section supersedes older v1.9.0 recovery notes below when the two conflict.
+
+- Repo release line: `v1.9.3` after the May 18 patch metadata update.
+- Latest deployed production code before this docs/version refresh: `89a997036257a9a162014a9f8e3f68ffcab8833c` on `codex/production-baseline-audit`.
+- Production branch before this refresh: `codex/production-baseline-audit`, aligned with `origin/codex/production-baseline-audit`.
+- Public domain: `openjobslots.com`.
+- Production host/path: production / `public-services`, `/root/OpenJobSlots`.
+- Auto-deploy timer: `openjobslots-deploy.timer` inactive.
+- Services observed running: app, worker, Postgres, and Meilisearch.
+- Worker auto sync is enabled with `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=1000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=25`, and `INGESTION_WORKER_INTERVAL_MS=1800000`.
+- 30-day public retention is active through `OPENJOBSLOTS_POSTING_HOT_DAYS=30`.
+
+Fresh read-only production baseline from May 18, 2026:
+
+- Visible postings: `50,890`.
+- Hidden postings: `0`.
+- Visible postings older than the 30-day `last_seen_epoch` window: `0`.
+- New postings in 24h by `created_at`: `242`.
+- Rows refreshed/seen in 24h by `last_seen_epoch`: `852`.
+- Rows refreshed/seen in 3d by `last_seen_epoch`: `852`.
+- Newest `last_seen`: `2026-05-18 14:15:26Z`.
+- Oldest visible `last_seen`: `2026-05-12 16:01:27Z`.
+- Search parity: Postgres indexable `50,888`, Meili documents `50,888`, delta `0`.
+- Excluded-but-visible placeholders: `2` rows with placeholder titles.
+
+Current source state:
+
+- Total ATS sources: `62`.
+- Enabled sources: `20`.
+- Disabled sources: `42`.
+- Normal enabled sources: `14`.
+- Canary-only sources: `2` (`taleo`, `zoho`).
+- Quarantine-only sources: `4` (`applitrack`, `icims`, `recruitcrm`, `recruitee`).
+- Auto-disabled sources: `3` (`manatal`, `pinpointhq`, `workday`).
+- Disabled normal sources: `39`.
+
+Current public quality gaps:
+
+- Missing country: `4,158` / `8.17%`.
+- Missing region/state: `4,158` / `8.17%`.
+- Missing city: `5,365` / `10.54%`.
+- Missing any normalized geo: `8,047` / `15.81%`.
+- Missing all normalized geo: `1,476` / `2.90%`.
+- Weak or unknown remote classification: `2,160` / `4.24%`.
+- Missing all normalized geo plus weak/unknown remote: `23`.
+
+Highest-impact live quality targets:
+
+- `lever`: `1,868` missing-any-geo rows.
+- `applytojob`: `1,487` missing-any-geo rows and `18` no-geo/no-remote rows.
+- `greenhouse`: `1,045` missing-any-geo rows and `532` weak/unknown remote rows.
+- `ashby`: `971` missing-any-geo rows.
+- `hrmdirect`: about `640` missing-any-geo rows and `516` weak/unknown remote rows.
+- `bamboohr`, `careerplug`, `recruitcrm`, `applitrack`, and `fountain` are the next quality targets by gap density or risk.
+
+Scale posture:
+
+- `100k` visible indexed rows is reachable only through parser/source cleanup plus disabled-source certification, not by lowering quality thresholds.
+- `1k` fresh jobs/day is the worker budget target, but current observed run health is below that target: recent runs processed `125` targets with `64` successes, `61` failures, `852` upserts, and `113` rejected candidates.
+- The all-source estimator currently takes too long for interactive runs even with low per-source limits. Convert it to a background/report workflow before relying on it for daily planning.
+- `jobvite` and `eightfold` are the closest disabled-source expansion candidates after full inventory and fixture certification.
+- `hirebridge`, `jobaps`, and `teamtailor` stay blocked until geo/remote risk drops.
+- Public-board sources with zero configured targets need source-runner virtual target support before safe estimates are meaningful.
+
 ## Current Version
 
-- Package/public release line: `v1.9.0`.
-- Last recorded production checkout: `v1.9.0` tag target on `codex/production-baseline-audit` after the ATS recovery closeout.
-- Latest recovery branch: `codex/production-baseline-audit`; closeout commit is the `v1.9.0` tag target.
-- Last recorded production deployment date: May 13, 2026.
+- Package/public release line: `v1.9.3`.
+- Previous public release tag: `v1.9.2`.
+- Current release branch: `codex/production-baseline-audit`.
+- Last verified production checkout before this patch metadata/docs refresh: `89a997036257a9a162014a9f8e3f68ffcab8833c`.
+- Last verified production deployment date: May 18, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 
@@ -15,7 +82,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 - Production host: production / `public-services`.
 - Production checkout: `/root/OpenJobSlots`.
-- Deployment source: private GitHub repository `batuhanboran/openjobslots`, branch `main`.
+- Deployment source: private GitHub repository `batuhanboran/openjobslots`.
 - Auto-deploy: `openjobslots-deploy.timer`, stopped/inactive after the Taleo canary to prevent another recovery-branch rollback.
 - Deploy log: `/var/log/openjobslots-deploy.log`.
 - Deployment details and rollback notes: `docs/reference/deployment.md`.
