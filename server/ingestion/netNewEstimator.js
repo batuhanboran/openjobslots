@@ -9,10 +9,12 @@ const {
   DEFAULT_SOURCE_RUN_LIMIT,
   discoverSourceTargets,
   evaluateSourceCandidate,
+  getVirtualSourceTargetCount,
   runWithLimitedConcurrency
 } = require("./sourceRunner");
 
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
+const DEFAULT_SOURCE_TIMEOUT_MS = 180_000;
 const MAX_RUN_OFFSET = 1_000_000;
 const MAX_CONCURRENCY = 4;
 
@@ -63,6 +65,69 @@ function incrementCounter(map, key, amount = 1) {
 function pct(numerator, denominator) {
   if (!denominator) return 0;
   return Number(((Number(numerator || 0) / Number(denominator || 1)) * 100).toFixed(2));
+}
+
+function ratioCount(row = {}, key) {
+  const risk = row.quality_risk_of_net_new_rows || {};
+  return Number(
+    row[key]
+    ?? risk[key]
+    ?? row.classifications?.[key]
+    ?? 0
+  );
+}
+
+function classifyEstimateDecision(row = {}) {
+  const configuredTargets = Number(row.configured_targets ?? row.inventory?.configured_targets ?? 0);
+  if (configuredTargets <= 0) return "needs_virtual_targets";
+  if (row.timed_out || row.timeout) return "timeout";
+  const hasExitCode = row.exitCode !== undefined && row.exitCode !== null;
+  if (row.ok === false || (hasExitCode && Number(row.exitCode) !== 0)) return "estimate_failed";
+
+  const targetsScanned = Number(row.targets_scanned ?? row.inventory?.targets_scanned ?? 0);
+  if (targetsScanned <= 0) return "no_targets_scanned";
+
+  const rowsFetched = Number(row.rows_fetched ?? 0);
+  const rowsParsed = Number(row.rows_parsed ?? 0);
+  const classifications = row.classifications || {};
+  const fetchFailures = Number(
+    row.source_fetch_failures
+    ?? classifications.source_fetch_failure
+    ?? 0
+  );
+  if (
+    (rowsFetched <= 0 && targetsScanned > 0) ||
+    fetchFailures >= Math.max(3, Math.ceil(targetsScanned * 0.5))
+  ) {
+    return "blocked_fetch";
+  }
+  if (rowsParsed <= 0) return "parser_or_empty";
+
+  const cleanCandidates = Number(row.clean_candidates ?? 0);
+  const quarantineCount = Number(row.quarantine_count ?? row.quarantine_candidates ?? 0);
+  const rejectedCount = Number(row.rejected_count ?? row.rejected_candidates ?? 0);
+  const totalEvaluated = cleanCandidates + quarantineCount + rejectedCount;
+  if (
+    (cleanCandidates <= 0 && (quarantineCount > 0 || rejectedCount > 0)) ||
+    pct(quarantineCount, totalEvaluated) >= 70 ||
+    pct(rejectedCount, totalEvaluated) >= 30
+  ) {
+    return "needs_parser_quality_fix";
+  }
+
+  const netNew = Number(row.net_new_clean_public_candidates ?? row.net_new_clean_count ?? 0);
+  if (ratioCount(row, "no_geo_no_remote") > 0) return "fails_no_geo_no_remote";
+  if (netNew > 0) {
+    if (
+      pct(ratioCount(row, "missing_any_geo"), netNew) >= 95 ||
+      pct(ratioCount(row, "weak_unknown_remote"), netNew) >= 95
+    ) {
+      return "needs_geo_remote_fix";
+    }
+    return "candidate_after_full_inventory";
+  }
+  if (cleanCandidates > 0) return "already_covered_or_update_only";
+  return "needs_review";
 }
 
 function remoteType(value) {
@@ -384,6 +449,7 @@ function summarizeInventory({ configuredTargets, targetsScanned, requestedLimit,
 }
 
 async function countConfiguredTargets(pool, source, options = {}) {
+  const normalizedSource = normalizeAtsKey(source);
   const enabledFilter = options.includeDisabled
     ? ""
     : "AND s.enabled = true AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')";
@@ -395,9 +461,24 @@ async function countConfiguredTargets(pool, source, options = {}) {
       WHERE c.ats_key = $1
         ${enabledFilter};
     `,
-    [normalizeAtsKey(source)]
+    [normalizedSource]
   );
-  return Number(result.rows[0]?.count || 0);
+  const configuredTargets = Number(result.rows[0]?.count || 0);
+  if (configuredTargets > 0) return configuredTargets;
+
+  const virtualTargetCount = getVirtualSourceTargetCount(normalizedSource);
+  if (!virtualTargetCount) return 0;
+  const virtualSourceResult = await pool.query(
+    `
+      SELECT s.ats_key
+      FROM ats_sources s
+      WHERE s.ats_key = $1
+        ${enabledFilter}
+      LIMIT 1;
+    `,
+    [normalizedSource]
+  );
+  return virtualSourceResult.rows.length > 0 ? virtualTargetCount : 0;
 }
 
 async function getExistingRowsForCandidates(pool, source, candidates = []) {
@@ -466,6 +547,19 @@ function recordSample(report, target, candidate, classification, reason) {
     canonical_url: getCanonicalUrl(candidate),
     source_job_id: getSourceJobId(candidate),
     title: clean(candidate?.position_name || candidate?.title || ""),
+    company: clean(candidate?.company_name || candidate?.company || target?.company?.company_name || ""),
+    location: clean(candidate?.location_text || candidate?.location || ""),
+    city: clean(candidate?.city || ""),
+    region: clean(candidate?.region || candidate?.state || ""),
+    country: clean(candidate?.country || ""),
+    remote_type: remoteType(candidate?.remote_type),
+    posting_date: clean(candidate?.posting_date || candidate?.posted_at || ""),
+    posted_at_epoch: Number(candidate?.posted_at_epoch || candidate?.posting_date_epoch || 0) || "",
+    parser_key: clean(candidate?.parser_key || candidate?.ats_key || candidate?.source_ats || target?.atsKey || ""),
+    parser_version: clean(candidate?.parser_version || target?.adapter?.parserVersion || ""),
+    confidence: Number(candidate?.confidence || candidate?.parser_confidence || 0) || "",
+    quality_score: Number(candidate?.quality_score || 0) || "",
+    description_plain: clean(candidate?.description_plain || candidate?.description_text || candidate?.description || "", 5000),
     classification,
     reason: clean(reason, 300)
   });
@@ -688,9 +782,195 @@ async function runNetNewEstimate(options = {}, env = process.env) {
   }
 }
 
+async function listEstimateSources(pool, options = {}) {
+  const enabledFilter = options.includeDisabled
+    ? ""
+    : "WHERE s.enabled = true AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')";
+  const result = await pool.query(
+    `
+      SELECT
+        s.ats_key,
+        s.enabled,
+        COALESCE(NULLIF(s.protection_status, ''), 'normal') AS protection_status,
+        COALESCE(s.disabled_reason, '') AS disabled_reason,
+        COUNT(c.id)::int AS configured_targets
+      FROM ats_sources s
+      LEFT JOIN companies c ON c.ats_key = s.ats_key
+      ${enabledFilter}
+      GROUP BY s.ats_key, s.enabled, s.protection_status, s.disabled_reason
+      ORDER BY s.ats_key ASC;
+    `
+  );
+  return result.rows.map((row) => {
+    const dbTargets = Number(row.configured_targets || 0);
+    const virtualTargets = dbTargets > 0 ? 0 : getVirtualSourceTargetCount(row.ats_key);
+    return {
+      ats_key: normalizeAtsKey(row.ats_key),
+      enabled: row.enabled === true,
+      protection_status: clean(row.protection_status || "normal"),
+      disabled_reason: clean(row.disabled_reason || ""),
+      configured_targets: dbTargets || virtualTargets,
+      virtual_target_count: virtualTargets
+    };
+  });
+}
+
+function summarizeAllSourceResults(results = []) {
+  const summary = {
+    sources_total: results.length,
+    sources_ok: 0,
+    sources_failed: 0,
+    configured_targets: 0,
+    targets_scanned: 0,
+    rows_fetched: 0,
+    rows_parsed: 0,
+    clean_candidates: 0,
+    net_new_clean_public_candidates: 0,
+    quarantine_candidates: 0,
+    rejected_candidates: 0,
+    expected_public_row_gain: 0,
+    by_decision_bucket: {}
+  };
+  for (const row of results) {
+    if (row.ok === false) summary.sources_failed += 1;
+    else summary.sources_ok += 1;
+    summary.configured_targets += Number(row.configured_targets || 0);
+    summary.targets_scanned += Number(row.targets_scanned || 0);
+    summary.rows_fetched += Number(row.rows_fetched || 0);
+    summary.rows_parsed += Number(row.rows_parsed || 0);
+    summary.clean_candidates += Number(row.clean_candidates || 0);
+    summary.net_new_clean_public_candidates += Number(row.net_new_clean_public_candidates || 0);
+    summary.quarantine_candidates += Number(row.quarantine_count || row.quarantine_candidates || 0);
+    summary.rejected_candidates += Number(row.rejected_count || row.rejected_candidates || 0);
+    summary.expected_public_row_gain += Number(row.expected_public_row_gain || 0);
+    incrementCounter(summary.by_decision_bucket, row.decision_bucket || "needs_review");
+  }
+  return summary;
+}
+
+function allSourceRowFromReport(sourceInfo = {}, report = {}) {
+  const inventory = report.inventory || {};
+  const row = {
+    source: report.source || sourceInfo.ats_key,
+    enabled: sourceInfo.enabled,
+    protection_status: sourceInfo.protection_status,
+    disabled_reason: sourceInfo.disabled_reason,
+    configured_targets: Number(inventory.configured_targets ?? sourceInfo.configured_targets ?? 0),
+    virtual_target_count: Number(sourceInfo.virtual_target_count || 0),
+    targets_scanned: Number(inventory.targets_scanned || 0),
+    targets_remaining_unscanned: Number(inventory.targets_remaining_unscanned || 0),
+    target_coverage_pct: Number(inventory.target_coverage_pct || 0),
+    rows_fetched: Number(report.rows_fetched || 0),
+    rows_parsed: Number(report.rows_parsed || 0),
+    clean_candidates: Number(report.clean_candidates || 0),
+    net_new_clean_public_candidates: Number(report.net_new_clean_public_candidates || 0),
+    expected_public_row_gain: Number(report.expected_public_row_gain || 0),
+    duplicate_count: Number(report.duplicate_count || 0),
+    update_count: Number(report.update_count || 0),
+    quarantine_count: Number(report.quarantine_count || 0),
+    rejected_count: Number(report.rejected_count || 0),
+    classifications: report.classifications || {},
+    parser_failure_reasons: report.parser_failure_reasons || {},
+    http_status_counts: report.http_status_counts || {},
+    quality_risk_of_net_new_rows: report.quality_risk_of_net_new_rows || {},
+    samples: report.samples || [],
+    ok: report.ok !== false,
+    error_message: clean(report.error_message || "", 1000)
+  };
+  return {
+    ...row,
+    decision_bucket: classifyEstimateDecision(row)
+  };
+}
+
+async function runAllSourceNetNewEstimate(options = {}, env = process.env) {
+  const poolEnv = {
+    ...env,
+    POSTGRES_STATEMENT_TIMEOUT_MS: String(options.statementTimeoutMs || DEFAULT_STATEMENT_TIMEOUT_MS),
+    OPENJOBSLOTS_POSTGRES_STATEMENT_TIMEOUT_MS: String(options.statementTimeoutMs || DEFAULT_STATEMENT_TIMEOUT_MS)
+  };
+  const pool = options.pool || createPostgresPool({
+    enabled: true,
+    connectionString: env.DATABASE_URL || env.POSTGRES_URL || "",
+    env: poolEnv
+  });
+  let lock = null;
+  const report = {
+    ok: true,
+    generated_at: nowIso(),
+    mode: "estimate-net-new-all-sources",
+    read_only: true,
+    include_disabled: Boolean(options.includeDisabled),
+    requested_limit_per_source: Number(options.requestedLimit || options.limit || DEFAULT_SOURCE_RUN_LIMIT),
+    effective_limit_per_source: Number(options.limit || DEFAULT_SOURCE_RUN_LIMIT),
+    source_timeout_ms: Number(options.sourceTimeoutMs || DEFAULT_SOURCE_TIMEOUT_MS),
+    command_contract: "npm run ats:estimate-net-new -- --all --include-disabled --limit=25 --json",
+    results: [],
+    summary: {}
+  };
+  try {
+    if (!options.pool) {
+      lock = await acquireHeavyJobLock(pool, "ats-estimate-net-new-all-sources");
+    }
+    const sources = await listEstimateSources(pool, options);
+    for (const sourceInfo of sources) {
+      try {
+        const sourceReport = await runNetNewEstimate({
+          ...options,
+          all: false,
+          source: sourceInfo.ats_key,
+          configuredTargets: sourceInfo.configured_targets,
+          pool,
+          output: "",
+          markdownOutput: ""
+        }, env);
+        report.results.push(allSourceRowFromReport(sourceInfo, sourceReport));
+      } catch (error) {
+        const row = {
+          source: sourceInfo.ats_key,
+          enabled: sourceInfo.enabled,
+          protection_status: sourceInfo.protection_status,
+          disabled_reason: sourceInfo.disabled_reason,
+          configured_targets: Number(sourceInfo.configured_targets || 0),
+          virtual_target_count: Number(sourceInfo.virtual_target_count || 0),
+          targets_scanned: 0,
+          rows_fetched: 0,
+          rows_parsed: 0,
+          clean_candidates: 0,
+          net_new_clean_public_candidates: 0,
+          quarantine_count: 0,
+          rejected_count: 0,
+          classifications: {},
+          quality_risk_of_net_new_rows: {},
+          samples: [],
+          ok: false,
+          error_message: clean(error?.message || error, 1000)
+        };
+        report.results.push({
+          ...row,
+          decision_bucket: classifyEstimateDecision(row)
+        });
+      }
+    }
+    report.summary = summarizeAllSourceResults(report.results);
+    if (lock) await lock.release("succeeded");
+    lock = null;
+    return report;
+  } catch (error) {
+    report.ok = false;
+    report.error_message = clean(error?.message || error, 1000);
+    if (lock) await lock.release("failed");
+    lock = null;
+    throw error;
+  } finally {
+    if (!options.pool && pool && typeof pool.end === "function") await pool.end();
+  }
+}
+
 function parseEstimatorArgs(argv = process.argv.slice(2), env = process.env) {
   const requestedFromEnv = asInt(env.OPENJOBSLOTS_ATS_ESTIMATE_LIMIT, DEFAULT_SOURCE_RUN_LIMIT, 1, 10_000_000);
   const options = {
+    all: asBool(env.OPENJOBSLOTS_ATS_ESTIMATE_ALL),
     source: clean(env.OPENJOBSLOTS_ATS_ESTIMATE_SOURCE).toLowerCase(),
     requestedLimit: requestedFromEnv,
     limit: asInt(requestedFromEnv, DEFAULT_SOURCE_RUN_LIMIT, 1, MAX_RUN_LIMIT),
@@ -703,12 +983,20 @@ function parseEstimatorArgs(argv = process.argv.slice(2), env = process.env) {
       1000,
       120_000
     ),
+    sourceTimeoutMs: asInt(
+      env.OPENJOBSLOTS_ATS_ESTIMATE_SOURCE_TIMEOUT_MS,
+      DEFAULT_SOURCE_TIMEOUT_MS,
+      1000,
+      3_600_000
+    ),
     includeDisabled: asBool(env.OPENJOBSLOTS_ATS_ESTIMATE_INCLUDE_DISABLED),
     json: asBool(env.OPENJOBSLOTS_ATS_ESTIMATE_JSON),
-    output: clean(env.OPENJOBSLOTS_ATS_ESTIMATE_OUTPUT, 2000)
+    output: clean(env.OPENJOBSLOTS_ATS_ESTIMATE_OUTPUT, 2000),
+    markdownOutput: clean(env.OPENJOBSLOTS_ATS_ESTIMATE_MARKDOWN_OUTPUT, 2000)
   };
   for (const arg of argv) {
     if (arg === "--json") options.json = true;
+    else if (arg === "--all") options.all = true;
     else if (arg === "--include-disabled") options.includeDisabled = true;
     else if (arg.startsWith("--source=")) options.source = clean(arg.slice("--source=".length)).toLowerCase();
     else if (arg.startsWith("--limit=")) {
@@ -725,8 +1013,12 @@ function parseEstimatorArgs(argv = process.argv.slice(2), env = process.env) {
       options.hostConcurrency = asInt(arg.slice("--host-concurrency=".length), options.hostConcurrency, 1, MAX_CONCURRENCY);
     } else if (arg.startsWith("--statement-timeout-ms=")) {
       options.statementTimeoutMs = asInt(arg.slice("--statement-timeout-ms=".length), options.statementTimeoutMs, 1000, 120_000);
+    } else if (arg.startsWith("--source-timeout-ms=")) {
+      options.sourceTimeoutMs = asInt(arg.slice("--source-timeout-ms=".length), options.sourceTimeoutMs, 1000, 3_600_000);
     } else if (arg.startsWith("--output=")) {
       options.output = clean(arg.slice("--output=".length), 2000);
+    } else if (arg.startsWith("--markdown-output=")) {
+      options.markdownOutput = clean(arg.slice("--markdown-output=".length), 2000);
     }
   }
   return options;
@@ -744,6 +1036,7 @@ module.exports = {
   buildExistingLookup,
   candidateQualityRisk,
   classifyCandidateAgainstExisting,
+  classifyEstimateDecision,
   classifyNonAccepted,
   countConfiguredTargets,
   createTenantSummary,
@@ -753,6 +1046,7 @@ module.exports = {
   getExistingRowsForCandidates,
   markCandidateSeen,
   parseEstimatorArgs,
+  runAllSourceNetNewEstimate,
   runNetNewEstimate,
   summarizeInventory,
   tenantKeyForTarget,

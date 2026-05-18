@@ -333,7 +333,7 @@ const ATS_SOURCE_PATTERNS = {
   teamtailor: "Teamtailor public board HTML.",
   theapplicantmanager: "The Applicant Manager public careers HTML.",
   ultipro: "UKG/UltiPro opportunities JSON.",
-  usajobs: "USAJobs landing token and search POST.",
+  usajobs: "USAJobs official Search API with Host/User-Agent/Authorization-Key headers.",
   zoho: "Zoho Recruit hidden jobs JSON in careers page."
 };
 
@@ -390,7 +390,7 @@ const PARSER_PATHS = {
   teamtailor: "server/index.js parseTeamtailorPostingsFromHtml",
   theapplicantmanager: "server/index.js parseTheApplicantManagerPostingsFromHtml",
   ultipro: "server/index.js UltiPro collector/opportunities parser",
-  usajobs: "server/index.js USAJobs token/search collector",
+  usajobs: "server/index.js USAJobs official Search API collector",
   zoho: "server/index.js parseZohoPostingsFromHtml"
 };
 

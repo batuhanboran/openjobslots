@@ -21,6 +21,33 @@ const DEFAULT_BATCH_SIZE = 100;
 const MAX_RUN_LIMIT = 1000;
 const MAX_RUN_OFFSET = 1_000_000;
 const MAX_CONCURRENCY = 4;
+const VIRTUAL_SOURCE_TARGETS = Object.freeze({
+  governmentjobs: {
+    company_name: "GovernmentJobs (virtual)",
+    url_string: "https://www.governmentjobs.com/jobs"
+  },
+  k12jobspot: {
+    company_name: "K12JobSpot (virtual)",
+    url_string: "https://api.k12jobspot.com/api/Jobs/Search"
+  },
+  schoolspring: {
+    company_name: "SchoolSpring (virtual)",
+    url_string:
+      "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch?domainName=&keyword=&location=&category=&gradelevel=&jobtype=&organization=&swLat=&swLon=&neLat=&neLon=&page=1&size=25&sortDateAscending=false"
+  },
+  calcareers: {
+    company_name: "CalCareers (virtual)",
+    url_string: "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx"
+  },
+  statejobsny: {
+    company_name: "StateJobsNY (virtual)",
+    url_string: "https://www.statejobsny.com/public/vacancyTable.cfm"
+  },
+  usajobs: {
+    company_name: "USAJobs (virtual)",
+    url_string: "https://data.usajobs.gov/api/Search"
+  }
+});
 
 function nowEpochSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -126,6 +153,45 @@ function incrementCounter(map, key, amount = 1) {
   map[normalized] = Number(map[normalized] || 0) + amount;
 }
 
+function getVirtualSourceTarget(source) {
+  const normalized = normalizeAtsKey(source);
+  const target = VIRTUAL_SOURCE_TARGETS[normalized];
+  if (!target) return null;
+  return {
+    ...target,
+    ATS_name: normalized
+  };
+}
+
+function getVirtualSourceTargetCount(source) {
+  return getVirtualSourceTarget(source) ? 1 : 0;
+}
+
+function rowToSourceTarget(row, company) {
+  const source = normalizeAtsKey(company.ATS_name || row.ats_key);
+  const sourcePolicy = getSourceSyncPolicy(source, {
+    protectionStatus: row.protection_status,
+    disabledReason: row.disabled_reason
+  });
+  const target = {
+    company,
+    atsKey: source,
+    companyUrl: company.url_string,
+    host: sourceHost(company.url_string),
+    adapter: getAdapterForCompany(company),
+    source: {
+      enabled: Boolean(row.enabled),
+      protection_status: String(row.protection_status || "normal"),
+      disabled_reason: String(row.disabled_reason || ""),
+      rate_limit_ms: Number(row.rate_limit_ms || 0),
+      quality_state: sourcePolicy.source_quality_state,
+      policy: sourcePolicy
+    },
+    sourcePolicy
+  };
+  return target.adapter ? target : null;
+}
+
 async function discoverSourceTargets(pool, options = {}) {
   const source = normalizeAtsKey(options.source);
   if (!source) throw new Error("--source=<ats> is required");
@@ -154,34 +220,43 @@ async function discoverSourceTargets(pool, options = {}) {
       Math.max(0, Number(options.offset || 0))
     ]
   );
-  return result.rows.map((row) => {
+  const targets = result.rows.map((row) => {
     const company = {
       id: Number(row.id || 0),
       company_name: String(row.company_name || ""),
       url_string: String(row.url_string || ""),
       ATS_name: String(row.ats_key || "")
     };
-    const sourcePolicy = getSourceSyncPolicy(source, {
-      protectionStatus: row.protection_status,
-      disabledReason: row.disabled_reason
-    });
-    return {
-      company,
-      atsKey: source,
-      companyUrl: company.url_string,
-      host: sourceHost(company.url_string),
-      adapter: getAdapterForCompany(company),
-      source: {
-        enabled: Boolean(row.enabled),
-        protection_status: String(row.protection_status || "normal"),
-        disabled_reason: String(row.disabled_reason || ""),
-        rate_limit_ms: Number(row.rate_limit_ms || 0),
-        quality_state: sourcePolicy.source_quality_state,
-        policy: sourcePolicy
-      },
-      sourcePolicy
-    };
-  }).filter((target) => target.adapter);
+    return rowToSourceTarget(row, company);
+  }).filter(Boolean);
+  if (targets.length > 0 || Number(options.offset || 0) > 0) return targets;
+
+  const virtualCompany = getVirtualSourceTarget(source);
+  if (!virtualCompany) return targets;
+  const virtualSourceResult = await pool.query(
+    `
+      SELECT
+        s.ats_key,
+        s.enabled,
+        s.protection_status,
+        s.disabled_reason,
+        s.rate_limit_ms
+      FROM ats_sources s
+      WHERE s.ats_key = $1
+        ${enabledFilter}
+      LIMIT 1;
+    `,
+    [source]
+  );
+  const virtualRow = virtualSourceResult.rows[0];
+  if (!virtualRow) return targets;
+  const virtualTarget = rowToSourceTarget(virtualRow, {
+    id: 0,
+    company_name: virtualCompany.company_name,
+    url_string: virtualCompany.url_string,
+    ATS_name: virtualCompany.ATS_name
+  });
+  return virtualTarget ? [virtualTarget] : targets;
 }
 
 async function createSourceRun(pool, options = {}, targets = []) {
@@ -871,6 +946,8 @@ module.exports = {
   MAX_RUN_LIMIT,
   DEFAULT_SOURCE_RUN_LIMIT,
   evaluateSourceCandidate,
+  getVirtualSourceTarget,
+  getVirtualSourceTargetCount,
   getSafetyGate,
   parseArgs,
   runSourceJob,

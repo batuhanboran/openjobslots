@@ -38,6 +38,7 @@ const {
   parseRecruitCrmPostingsFromApi,
   parseSmartRecruitersPostingsFromApi,
   parseTeamtailorPostingsFromHtml,
+  parseUsajobsPostingsFromPayload,
   parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName
@@ -315,6 +316,47 @@ test("high-volume ATS parsers preserve country, date, remote, and source ids whe
   assert.equal(applitrack.source_job_id, "5503511");
   assert.equal(applitrack.posting_date, "05/08/2026");
   assert.equal(applitrack.department, "Teacher");
+});
+
+test("USAJobs official search payload preserves official API evidence", () => {
+  const parsed = parseUsajobsPostingsFromPayload({
+    SearchResult: {
+      SearchResultItems: [
+        {
+          MatchedObjectDescriptor: {
+            PositionID: "806553000",
+            PositionTitle: "IT Specialist",
+            PositionURI: "https://www.usajobs.gov/job/806553000",
+            OrganizationName: "Department of Example",
+            PublicationStartDate: "2026-05-17T00:00:00.0000",
+            PositionLocationDisplay: "Washington, District of Columbia",
+            PositionLocation: [
+              {
+                CityName: "Washington",
+                CountrySubDivisionCode: "DC",
+                CountryCode: "US"
+              }
+            ],
+            UserArea: {
+              Details: {
+                RemoteIndicator: true,
+                JobSummary: "Public API summary"
+              }
+            }
+          }
+        }
+      ]
+    }
+  });
+  assert.equal(parsed.length, 1);
+  const normalized = normalizeParsed("usajobs", parsed[0], "USAJobs");
+  assert.equal(normalized.position_name, "IT Specialist");
+  assert.equal(normalized.company_name, "Department of Example");
+  assert.equal(normalized.source_job_id, "806553000");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Washington");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.posting_date, "2026-05-17T00:00:00.0000");
 });
 
 test("iCIMS raw detail fixtures certify ATS code locations and remote header evidence", () => {

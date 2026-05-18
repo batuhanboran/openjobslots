@@ -4,9 +4,14 @@ const {
   buildExistingLookup,
   classifyCandidateAgainstExisting,
   classifyNonAccepted,
+  classifyEstimateDecision,
   markCandidateSeen,
+  parseEstimatorArgs,
   summarizeInventory
 } = require("../server/ingestion/netNewEstimator");
+const {
+  buildMarkdownEvidenceSnapshot
+} = require("../server/ingestion/markdownEvidence");
 
 function cleanCandidate(overrides = {}) {
   return {
@@ -92,6 +97,98 @@ test("runner cap without full coverage marks estimate as unproven", () => {
   assert.equal(inventory.cannot_prove_remaining_inventory, true);
   assert.equal(inventory.runner_limit_cap_unproven_inventory, true);
   assert.equal(inventory.offset_resume_supported, true);
+});
+
+test("estimator accepts all-source read-only report flags", () => {
+  const options = parseEstimatorArgs([
+    "--all",
+    "--include-disabled",
+    "--limit=25",
+    "--source-timeout-ms=90000",
+    "--markdown-output=reports/ats-evidence.md",
+    "--json"
+  ]);
+  assert.equal(options.all, true);
+  assert.equal(options.includeDisabled, true);
+  assert.equal(options.limit, 25);
+  assert.equal(options.sourceTimeoutMs, 90000);
+  assert.equal(options.markdownOutput, "reports/ats-evidence.md");
+  assert.equal(options.json, true);
+});
+
+test("estimate decision buckets separate pass candidates and blocked sources", () => {
+  assert.equal(classifyEstimateDecision({
+    configured_targets: 454,
+    exitCode: 0,
+    ok: true,
+    targets_scanned: 25,
+    rows_fetched: 25,
+    rows_parsed: 557,
+    clean_candidates: 557,
+    net_new_clean_public_candidates: 557,
+    quarantine_count: 0,
+    rejected_count: 0,
+    quality_risk_of_net_new_rows: { no_geo_no_remote: 0, missing_any_geo: 139, weak_unknown_remote: 127 },
+    classifications: {}
+  }), "candidate_after_full_inventory");
+
+  assert.equal(classifyEstimateDecision({
+    configured_targets: 169,
+    exitCode: 0,
+    ok: true,
+    targets_scanned: 25,
+    rows_fetched: 20,
+    rows_parsed: 1896,
+    clean_candidates: 1862,
+    net_new_clean_public_candidates: 1861,
+    quarantine_count: 34,
+    rejected_count: 0,
+    quality_risk_of_net_new_rows: { no_geo_no_remote: 0, missing_any_geo: 1861, weak_unknown_remote: 1827 },
+    classifications: { source_fetch_failure: 5 }
+  }), "needs_geo_remote_fix");
+
+  assert.equal(classifyEstimateDecision({
+    configured_targets: 0,
+    exitCode: 0,
+    ok: true,
+    targets_scanned: 0
+  }), "needs_virtual_targets");
+});
+
+test("markdown evidence snapshots are bounded review artifacts", () => {
+  const markdown = buildMarkdownEvidenceSnapshot({
+    source: "jobvite",
+    generated_at: "2026-05-18T09:00:00.000Z",
+    samples: [
+      {
+        source_url: "https://jobs.jobvite.com/acme/jobs",
+        canonical_url: "https://jobs.jobvite.com/acme/job/o123",
+        source_job_id: "o123",
+        title: "Support Engineer",
+        company: "Acme",
+        location: "Remote - United States",
+        city: "",
+        region: "North America",
+        country: "United States",
+        remote_type: "remote",
+        posting_date: "2026-05-17",
+        posted_at_epoch: 1778976000,
+        parser_version: "source-jobvite-v1",
+        confidence: 0.75,
+        quality_score: 75,
+        classification: "net_new_clean_public_candidate",
+        reason: "accepted_candidate_not_found_in_existing_public_rows",
+        description_plain: "A".repeat(900)
+      }
+    ]
+  }, { maxDescriptionLength: 120 });
+
+  assert.match(markdown, /## jobvite \/ o123/);
+  assert.match(markdown, /- Source URL: https:\/\/jobs\.jobvite\.com\/acme\/jobs/);
+  assert.match(markdown, /- Parsed country: United States/);
+  assert.match(markdown, /- Remote evidence: remote/);
+  assert.match(markdown, /- Quality gate: net_new_clean_public_candidate/);
+  assert.ok(markdown.length < 1400);
 });
 
 test("true new clean candidate is counted", () => {

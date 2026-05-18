@@ -3,6 +3,7 @@ const test = require("node:test");
 const {
   getSafetyGate,
   parseArgs,
+  discoverSourceTargets,
   runWithLimitedConcurrency,
   sourceHost
 } = require("./sourceRunner");
@@ -64,6 +65,62 @@ test("source runner host concurrency serializes same host while allowing differe
   );
   assert.equal(peakByHost.get("a.example"), 1);
   assert.equal(peakByHost.get("b.example"), 1);
+});
+
+test("source runner exposes virtual targets for public aggregate boards in include-disabled estimates", async () => {
+  const queries = [];
+  const pool = {
+    async query(sql, params) {
+      queries.push({ sql, params });
+      if (/FROM companies c/i.test(sql)) return { rows: [] };
+      if (/FROM ats_sources s/i.test(sql)) {
+        return {
+          rows: [{
+            ats_key: "governmentjobs",
+            enabled: false,
+            protection_status: "normal",
+            disabled_reason: "",
+            rate_limit_ms: 0
+          }]
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const targets = await discoverSourceTargets(pool, {
+    source: "governmentjobs",
+    includeDisabled: true,
+    limit: 25,
+    offset: 0
+  });
+
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].company.company_name, "GovernmentJobs (virtual)");
+  assert.equal(targets[0].company.url_string, "https://www.governmentjobs.com/jobs");
+  assert.equal(targets[0].atsKey, "governmentjobs");
+  assert.equal(targets[0].source.enabled, false);
+  assert.ok(targets[0].adapter, "virtual targets should still use the normal source adapter");
+  assert.equal(queries.length, 2);
+});
+
+test("source runner does not expose disabled virtual targets without include-disabled", async () => {
+  const pool = {
+    async query(sql) {
+      if (/FROM companies c/i.test(sql)) return { rows: [] };
+      if (/FROM ats_sources s/i.test(sql)) return { rows: [] };
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const targets = await discoverSourceTargets(pool, {
+    source: "governmentjobs",
+    includeDisabled: false,
+    limit: 25,
+    offset: 0
+  });
+
+  assert.deepEqual(targets, []);
 });
 
 console.log("source runner tests passed");

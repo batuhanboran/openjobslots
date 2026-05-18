@@ -204,6 +204,7 @@ const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPEN
 const APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const USAJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const USAJOBS_SEARCH_API_URL = "https://data.usajobs.gov/api/Search";
 const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SCHOOLSPRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -13985,8 +13986,82 @@ function extractUsajobsOpenDate(dateDisplay) {
   return match?.[1] || null;
 }
 
+function getUsajobsApiConfig(env = process.env) {
+  const authorizationKey = String(
+    env.OPENJOBSLOTS_USAJOBS_AUTHORIZATION_KEY ||
+    env.USAJOBS_AUTHORIZATION_KEY ||
+    env.USAJOBS_API_KEY ||
+    ""
+  ).trim();
+  if (!authorizationKey) {
+    throw new Error("USAJobs official API key is not configured; set OPENJOBSLOTS_USAJOBS_AUTHORIZATION_KEY");
+  }
+  const userAgent = String(
+    env.OPENJOBSLOTS_USAJOBS_USER_AGENT ||
+    env.USAJOBS_USER_AGENT ||
+    env.OPENJOBSLOTS_CONTACT_EMAIL ||
+    "openjobslots.com"
+  ).trim();
+  return { authorizationKey, userAgent };
+}
+
+function normalizeUsajobsRemoteType(value) {
+  if (value === true) return "remote";
+  const normalized = cleanUsajobsText(value).toLowerCase();
+  if (["true", "yes", "y", "remote"].includes(normalized)) return "remote";
+  return "unknown";
+}
+
+function getUsajobsStructuredLocation(descriptor = {}) {
+  const locations = Array.isArray(descriptor.PositionLocation) ? descriptor.PositionLocation : [];
+  const first = locations.find((location) => location && typeof location === "object") || {};
+  const city = cleanUsajobsText(first.CityName);
+  const region = cleanUsajobsText(first.CountrySubDivisionCode || first.CountrySubDivision);
+  const countryCode = cleanUsajobsText(first.CountryCode);
+  const country = countryCode ? normalizeCountryName(countryCode) : cleanUsajobsText(first.CountryName);
+  const display = cleanUsajobsText(descriptor.PositionLocationDisplay);
+  const location = display || [city, region, country].filter(Boolean).join(", ");
+  return { city, region, country, location };
+}
+
+function parseUsajobsOfficialSearchPayload(payload) {
+  const items = Array.isArray(payload?.SearchResult?.SearchResultItems)
+    ? payload.SearchResult.SearchResultItems
+    : [];
+  const postings = [];
+  const seenUrls = new Set();
+  for (const item of items) {
+    const descriptor = item?.MatchedObjectDescriptor;
+    if (!descriptor || typeof descriptor !== "object") continue;
+    const sourceJobId = cleanUsajobsText(descriptor.PositionID || descriptor.DocumentID || descriptor.MatchedObjectId);
+    let jobPostingUrl = cleanUsajobsText(descriptor.PositionURI);
+    if (!jobPostingUrl && sourceJobId) jobPostingUrl = `https://www.usajobs.gov/job/${sourceJobId}`;
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) continue;
+
+    const details = descriptor.UserArea?.Details || {};
+    const location = getUsajobsStructuredLocation(descriptor);
+    postings.push({
+      company_name: cleanUsajobsText(descriptor.OrganizationName || descriptor.DepartmentName) || "Unknown Agency",
+      position_name: cleanUsajobsText(descriptor.PositionTitle) || "Untitled Position",
+      job_posting_url: jobPostingUrl,
+      source_job_id: sourceJobId,
+      posting_date: cleanUsajobsText(descriptor.PublicationStartDate),
+      location: location.location || null,
+      city: location.city || null,
+      region: location.region || null,
+      country: location.country || null,
+      remote_type: normalizeUsajobsRemoteType(details.RemoteIndicator),
+      description_plain: cleanUsajobsText(details.JobSummary || details.MajorDuties || details.Requirements || "")
+    });
+    seenUrls.add(jobPostingUrl);
+  }
+  return postings;
+}
+
 function parseUsajobsPostingsFromPayload(payload) {
   if (!payload || typeof payload !== "object") return [];
+  const officialPostings = parseUsajobsOfficialSearchPayload(payload);
+  if (officialPostings.length > 0) return officialPostings;
   const jobs = Array.isArray(payload.Jobs) ? payload.Jobs : [];
   const postings = [];
   const seenUrls = new Set();
@@ -14022,83 +14097,39 @@ function parseUsajobsPostingsFromPayload(payload) {
 }
 
 async function collectPostingsForUsajobsDynamic(maxPages = 2, resultsPerPage = 25) {
-  const executeUrl = "https://www.usajobs.gov/Search/ExecuteSearch";
-  const resultsUrl = "https://www.usajobs.gov/Search/Results?hiringPath=public&s=startdate&sd=desc&p=1";
-
-  const landingRes = await fetchWithAtsRateLimit("usajobs", USAJOBS_RATE_LIMIT_WAIT_MS, resultsUrl, {
-    method: "GET",
-    headers: {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9"
-    }
-  });
-
-  if (!landingRes.ok) {
-    const body = await landingRes.text();
-    throw new Error(`USAJobs landing request failed (${landingRes.status}): ${body.slice(0, 180)}`);
-  }
-  const landingHtml = await landingRes.text();
-  const tokenMatch = landingHtml.match(/<meta name="request-verification-token" content="([^"]+)"/i);
-  const requestVerificationToken = String(tokenMatch?.[1] || "").trim();
-  if (!requestVerificationToken) {
-    throw new Error("USAJobs RequestVerificationToken not found on landing page");
-  }
-
+  const { authorizationKey, userAgent } = getUsajobsApiConfig(process.env);
   const collected = [];
   const seenUrls = new Set();
   let totalPages = 1;
   const pageLimit = Math.max(1, Math.min(20, Number(maxPages) || 2));
-  const perPage = Math.max(1, Math.min(100, Number(resultsPerPage) || 25));
+  const perPage = Math.max(1, Math.min(500, Number(resultsPerPage) || 25));
 
   for (let page = 1; page <= pageLimit; page += 1) {
-    const requestBody = {
-      JobTitle: [],
-      GradeBucket: [],
-      JobCategoryCode: [],
-      JobCategoryFamily: [],
-      LocationName: [],
-      Department: [],
-      Agency: [],
-      PositionOfferingTypeCode: [],
-      TravelPercentage: [],
-      PositionScheduleTypeCode: [],
-      SecurityClearanceRequired: [],
-      PositionSensitivity: [],
-      JobGradeCode: [],
-      SortField: "startdate",
-      SortDirection: "desc",
-      Page: String(page),
-      ShowAllFilters: [],
-      HiringPath: ["public"],
-      SocTitle: [],
-      ResultsPerPage: perPage,
-      MCOTags: [],
-      CyberWorkRole: [],
-      CyberWorkGrouping: [],
-      JobType: []
-    };
+    const url = new URL(USAJOBS_SEARCH_API_URL);
+    url.searchParams.set("HiringPath", "public");
+    url.searchParams.set("DatePosted", "30");
+    url.searchParams.set("SortField", "DatePosted");
+    url.searchParams.set("SortDirection", "Desc");
+    url.searchParams.set("ResultsPerPage", String(perPage));
+    url.searchParams.set("Page", String(page));
 
-    const res = await fetchWithAtsRateLimit("usajobs", USAJOBS_RATE_LIMIT_WAIT_MS, executeUrl, {
-      method: "POST",
+    const res = await fetchWithAtsRateLimit("usajobs", USAJOBS_RATE_LIMIT_WAIT_MS, url.toString(), {
+      method: "GET",
       headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Content-Type": "application/json;charset=UTF-8",
-        "X-Requested-With": "XMLHttpRequest",
-        Origin: "https://www.usajobs.gov",
-        Referer: resultsUrl,
-        RequestVerificationToken: requestVerificationToken
-      },
-      body: JSON.stringify(requestBody)
+        Accept: "application/json",
+        Host: "data.usajobs.gov",
+        "User-Agent": userAgent,
+        "Authorization-Key": authorizationKey
+      }
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`USAJobs search request failed (${res.status}): ${body.slice(0, 180)}`);
+      throw new Error(`USAJobs official search request failed (${res.status}): ${body.slice(0, 180)}`);
     }
 
     const payload = await res.json();
-    const numberOfPagesRaw = Number(payload?.Pager?.NumberOfPages);
+    const numberOfPagesRaw = Number(payload?.SearchResult?.UserArea?.NumberOfPages || payload?.Pager?.NumberOfPages);
     if (Number.isFinite(numberOfPagesRaw) && numberOfPagesRaw > 0) {
       totalPages = numberOfPagesRaw;
     }
@@ -17448,7 +17479,7 @@ async function runWorkdaySyncInternal() {
       syncTargets.push({
         id: null,
         company_name: "USAJobs (dynamic)",
-        url_string: "https://www.usajobs.gov/Search/ExecuteSearch",
+        url_string: USAJOBS_SEARCH_API_URL,
         ATS_name: "usajobs"
       });
     }
@@ -19563,6 +19594,7 @@ module.exports = {
   parseTalentreefPostingsFromSearchResponse,
   parseTeamtailorPostingsFromHtml,
   parseUltiProPostingsFromApi,
+  parseUsajobsPostingsFromPayload,
   parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName,

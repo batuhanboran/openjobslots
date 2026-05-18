@@ -1,10 +1,36 @@
 const {
   parseEstimatorArgs,
+  runAllSourceNetNewEstimate,
   runNetNewEstimate,
   writeEstimatorOutput
 } = require("../server/ingestion/netNewEstimator");
+const {
+  buildMarkdownEvidenceSnapshot
+} = require("../server/ingestion/markdownEvidence");
+
+const fs = require("node:fs");
+const path = require("node:path");
 
 function printSummary(report) {
+  if (report.mode === "estimate-net-new-all-sources") {
+    const summary = report.summary || {};
+    process.stdout.write(
+      [
+        "ATS all-source net-new estimate",
+        `  sources_total: ${summary.sources_total || 0}`,
+        `  configured_targets: ${summary.configured_targets || 0}`,
+        `  targets_scanned: ${summary.targets_scanned || 0}`,
+        `  rows_fetched: ${summary.rows_fetched || 0}`,
+        `  rows_parsed: ${summary.rows_parsed || 0}`,
+        `  clean_candidates: ${summary.clean_candidates || 0}`,
+        `  net_new_clean_public_candidates: ${summary.net_new_clean_public_candidates || 0}`,
+        `  quarantine_candidates: ${summary.quarantine_candidates || 0}`,
+        `  rejected_candidates: ${summary.rejected_candidates || 0}`,
+        `  decision_buckets: ${JSON.stringify(summary.by_decision_bucket || {})}`
+      ].join("\n") + "\n"
+    );
+    return;
+  }
   process.stdout.write(
     [
       `ATS net-new estimate: ${report.source}`,
@@ -27,10 +53,20 @@ function printSummary(report) {
   );
 }
 
+function writeMarkdownOutput(report, outputPath) {
+  if (!outputPath) return;
+  const resolved = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  fs.writeFileSync(resolved, buildMarkdownEvidenceSnapshot(report));
+}
+
 async function main() {
   const options = parseEstimatorArgs(process.argv.slice(2));
-  const report = await runNetNewEstimate(options, process.env);
+  const report = options.all
+    ? await runAllSourceNetNewEstimate(options, process.env)
+    : await runNetNewEstimate(options, process.env);
   writeEstimatorOutput(report, options.output);
+  writeMarkdownOutput(report, options.markdownOutput);
   if (options.json) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return;
@@ -46,5 +82,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  printSummary
+  printSummary,
+  writeMarkdownOutput
 };

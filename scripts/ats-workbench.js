@@ -87,7 +87,7 @@ const OBSERVED_ENDPOINTS = Object.freeze({
   talexio: "Observed Talexio public jobs JSON.",
   theapplicantmanager: "Observed The Applicant Manager public careers HTML.",
   ultipro: "Observed UKG/UltiPro opportunities JSON.",
-  usajobs: "Observed USAJobs landing token and search POST.",
+  usajobs: "Observed USAJobs official Search API.",
   workday: "Observed Workday CXS job postings API.",
   zoho: "Observed Zoho Recruit hidden jobs JSON in careers page."
 });
