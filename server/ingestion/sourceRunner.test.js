@@ -1,6 +1,10 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  attachDetailEvidenceSnapshot,
+  buildCandidateReport,
+  buildQualityGapFlags,
+  candidateDetailEvidenceUrl,
   getSafetyGate,
   parseArgs,
   discoverSourceTargets,
@@ -16,6 +20,16 @@ test("source runner apply requires explicit production safety flags", () => {
 
   const companyLimitAlias = parseArgs(["--source=icims", "--company-limit=7"]);
   assert.equal(companyLimitAlias.limit, 7);
+
+  const detailEvidence = parseArgs([
+    "--source=icims",
+    "--detail-evidence",
+    "--detail-evidence-provider=local",
+    "--detail-evidence-sample=20"
+  ]);
+  assert.equal(detailEvidence.detailEvidence, true);
+  assert.equal(detailEvidence.detailEvidenceProvider, "local");
+  assert.equal(detailEvidence.detailEvidenceSample, 20);
 
   const offsetRun = parseArgs(["--source=hrmdirect", "--limit=1500", "--offset=1000"]);
   assert.equal(offsetRun.limit, 1000);
@@ -121,6 +135,117 @@ test("source runner does not expose disabled virtual targets without include-dis
   });
 
   assert.deepEqual(targets, []);
+});
+
+test("source runner report classifies geo/remote gaps without assigning missing fields", () => {
+  const flags = buildQualityGapFlags({
+    country: "",
+    region: "",
+    city: "",
+    location_text: "",
+    remote_type: "unknown"
+  }, "quarantined", ["no_geo_no_remote"]);
+
+  assert.equal(flags.missing_any_geo, true);
+  assert.equal(flags.missing_all_geo, true);
+  assert.equal(flags.weak_unknown_remote, true);
+  assert.equal(flags.no_geo_no_remote, true);
+  assert.equal(flags.detail_evidence_found, false);
+});
+
+test("source runner detail evidence sampling is dry-run only and bounded", async () => {
+  const normalized = {
+    canonical_url: "https://jobs.example.com/1",
+    position_name: "Engineer",
+    country: "",
+    region: "",
+    city: "",
+    remote_type: "unknown"
+  };
+  const summary = {
+    detail_evidence_sampled_count: 0,
+    detail_evidence_failure_count: 0,
+    detail_evidence_status_counts: {}
+  };
+
+  assert.equal(candidateDetailEvidenceUrl(normalized), "https://jobs.example.com/1");
+  await attachDetailEvidenceSnapshot(normalized, {
+    mode: "dry-run",
+    detailEvidence: true,
+    detailEvidenceSample: 1,
+    detailEvidenceProvider: "local",
+    detailEvidenceFetcher: async () => ({
+      ok: true,
+      status: 200,
+      url: "https://jobs.example.com/1",
+      headers: { get: () => "" },
+      async text() {
+        return "<p>Location: Austin</p><p>Hybrid role</p>";
+      }
+    }),
+    detailEvidenceLookup: async () => [{ address: "93.184.216.34", family: 4 }]
+  }, summary);
+
+  assert.equal(summary.detail_evidence_sampled_count, 1);
+  assert.equal(summary.detail_evidence_status_counts.fetched, 1);
+  assert.equal(normalized.detail_evidence.status, "fetched");
+  assert.equal(normalized.detail_evidence.country, undefined);
+
+  const second = { ...normalized, canonical_url: "https://jobs.example.com/2", detail_evidence: null };
+  await attachDetailEvidenceSnapshot(second, {
+    mode: "dry-run",
+    detailEvidence: true,
+    detailEvidenceSample: 1,
+    detailEvidenceProvider: "local"
+  }, summary);
+  assert.equal(second.detail_evidence, null);
+
+  const applyMode = { canonical_url: "https://jobs.example.com/3" };
+  await attachDetailEvidenceSnapshot(applyMode, {
+    mode: "apply",
+    detailEvidence: true,
+    detailEvidenceSample: 10
+  }, { detail_evidence_sampled_count: 0 });
+  assert.equal(applyMode.detail_evidence, undefined);
+});
+
+test("source runner candidate reports include source family and detail evidence summary", () => {
+  const report = buildCandidateReport(
+    {
+      companyUrl: "https://jobs.example.com",
+      host: "jobs.example.com",
+      adapter: { metadata: { sourceFamily: "html_detail" } }
+    },
+    {
+      canonical_url: "https://jobs.example.com/1",
+      source_job_id: "job-1",
+      position_name: "Engineer",
+      country: "",
+      region: "",
+      city: "",
+      remote_type: "unknown",
+      detail_evidence: {
+        status: "fetched",
+        extractor: "local",
+        final_url: "https://jobs.example.com/1",
+        content_hash: "abc",
+        markdown_length: 42,
+        evidence_spans: [{ kind: "location", excerpt: "Location: Austin" }]
+      }
+    },
+    "quarantined",
+    { status: "quarantined", public: false, ok: false, reason: "no_geo_no_remote" },
+    { error: "no_geo_no_remote", reason_codes: ["no_geo_no_remote"] },
+    { failure_reasons: [] }
+  );
+
+  assert.equal(report.source_family, "html_detail");
+  assert.equal(report.detail_evidence_summary.present, true);
+  assert.equal(report.detail_evidence_summary.extractor, "local");
+  assert.equal(report.quality_gap_flags.detail_evidence_found, true);
+  assert.equal(report.quality_gap_flags.no_geo_no_remote, true);
+  assert.equal(report.country, undefined);
+  assert.equal(report.remote_type, undefined);
 });
 
 console.log("source runner tests passed");

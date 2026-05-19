@@ -5,6 +5,8 @@ const { upsertPostgresPostings, normalizeAtsKey } = require("../backends/postgre
 const { getAdapterForCompany } = require("./adapters");
 const { hashPayload } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
+const { classifyStoredPosting } = require("./dataQualityAudit");
+const { buildDetailEvidenceSummary, collectDetailEvidence } = require("./detailEvidence");
 const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
 const {
   FAILURE_REASONS,
@@ -100,7 +102,10 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     output: String(env.OPENJOBSLOTS_ATS_SOURCE_OUTPUT || "").trim(),
     includeDisabled: asBool(env.OPENJOBSLOTS_ATS_SOURCE_INCLUDE_DISABLED),
     plannedBatch: String(env.OPENJOBSLOTS_ATS_SOURCE_PLANNED_BATCH || "").trim(),
-    predictedGuardResult: String(env.OPENJOBSLOTS_ATS_SOURCE_PREDICTED_GUARD_RESULT || "").trim()
+    predictedGuardResult: String(env.OPENJOBSLOTS_ATS_SOURCE_PREDICTED_GUARD_RESULT || "").trim(),
+    detailEvidence: asBool(env.OPENJOBSLOTS_DETAIL_EVIDENCE),
+    detailEvidenceProvider: String(env.OPENJOBSLOTS_DETAIL_EVIDENCE_PROVIDER || "local").trim().toLowerCase(),
+    detailEvidenceSample: asInt(env.OPENJOBSLOTS_DETAIL_EVIDENCE_SAMPLE, 0, 0, 1000)
   };
 
   for (const arg of argv) {
@@ -121,6 +126,10 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     else if (arg.startsWith("--output=")) options.output = String(arg.slice("--output=".length)).trim();
     else if (arg.startsWith("--planned-batch=")) options.plannedBatch = String(arg.slice("--planned-batch=".length)).trim();
     else if (arg.startsWith("--predicted-guard-result=")) options.predictedGuardResult = String(arg.slice("--predicted-guard-result=".length)).trim();
+    else if (arg === "--detail-evidence") options.detailEvidence = true;
+    else if (arg === "--no-detail-evidence") options.detailEvidence = false;
+    else if (arg.startsWith("--detail-evidence-provider=")) options.detailEvidenceProvider = String(arg.slice("--detail-evidence-provider=".length)).trim().toLowerCase();
+    else if (arg.startsWith("--detail-evidence-sample=")) options.detailEvidenceSample = asInt(arg.slice("--detail-evidence-sample=".length), options.detailEvidenceSample, 0, 1000);
   }
 
   if (options.mode === "apply") options.apply = true;
@@ -485,6 +494,22 @@ function buildInitialSummary(options) {
     candidate_reports: [],
     planned_tenant_batch_file_path: String(options.plannedBatch || ""),
     predicted_guard_result: String(options.predictedGuardResult || ""),
+    detail_evidence_enabled: Boolean(options.detailEvidence),
+    detail_evidence_provider: String(options.detailEvidenceProvider || "local").trim().toLowerCase(),
+    detail_evidence_sample: Number(options.detailEvidenceSample || 0),
+    detail_evidence_sampled_count: 0,
+    detail_evidence_failure_count: 0,
+    detail_evidence_status_counts: {},
+    source_family_buckets: {},
+    quality_gap_counts: {
+      missing_any_geo: 0,
+      missing_all_geo: 0,
+      weak_unknown_remote: 0,
+      no_geo_no_remote: 0,
+      detail_evidence_found: 0,
+      parser_safe_repair: 0,
+      blocked: 0
+    },
     rollback_command: ""
   };
 }
@@ -518,14 +543,107 @@ function nonAcceptedNetNewClassification(status, validation = {}) {
   return "quarantine_candidate";
 }
 
+function sourceFamilyForCandidate(target = {}, normalized = {}) {
+  return clean(
+    normalized.source_family ||
+      target.adapter?.metadata?.sourceFamily ||
+      target.adapter?.sourceFamily ||
+      target.source?.family ||
+      "unknown",
+    80
+  ) || "unknown";
+}
+
+function getDetailEvidenceSnapshot(normalized = {}) {
+  return normalized.detail_evidence ||
+    normalized.detailEvidence ||
+    normalized.evidence_snapshot ||
+    normalized.raw_metadata?.detail_evidence ||
+    null;
+}
+
+function candidateDetailEvidenceUrl(normalized = {}) {
+  return clean(
+    normalized.canonical_url ||
+      normalized.job_posting_url ||
+      normalized.apply_url ||
+      normalized.url ||
+      "",
+    2000
+  );
+}
+
+function shouldCollectDetailEvidence(options = {}, summary = {}, normalized = {}) {
+  if (!options.detailEvidence) return false;
+  if (String(options.mode || "dry-run") !== "dry-run") return false;
+  if (Number(options.detailEvidenceSample || 0) <= 0) return false;
+  if (Number(summary.detail_evidence_sampled_count || 0) >= Number(options.detailEvidenceSample || 0)) return false;
+  return Boolean(candidateDetailEvidenceUrl(normalized));
+}
+
+async function attachDetailEvidenceSnapshot(normalized = {}, options = {}, summary = {}) {
+  if (!shouldCollectDetailEvidence(options, summary, normalized)) return null;
+  const sourceUrl = candidateDetailEvidenceUrl(normalized);
+  if (!summary.detail_evidence_status_counts) summary.detail_evidence_status_counts = {};
+  summary.detail_evidence_sampled_count = Number(summary.detail_evidence_sampled_count || 0) + 1;
+  const snapshot = await collectDetailEvidence(sourceUrl, {
+    enabled: true,
+    provider: options.detailEvidenceProvider || "local",
+    env: options.env || process.env,
+    fetcher: options.detailEvidenceFetcher,
+    lookup: options.detailEvidenceLookup,
+    maxResponseBytes: options.detailEvidenceMaxBytes,
+    timeoutMs: options.detailEvidenceTimeoutMs,
+    maxSpans: options.detailEvidenceMaxSpans
+  });
+  normalized.detail_evidence = snapshot;
+  incrementCounter(summary.detail_evidence_status_counts, snapshot.status || "unknown");
+  if (!snapshot.ok) summary.detail_evidence_failure_count = Number(summary.detail_evidence_failure_count || 0) + 1;
+  return snapshot;
+}
+
+function buildQualityGapFlags(normalized = {}, status = "", reasonCodes = []) {
+  const row = {
+    ...normalized,
+    location_text: normalized.location_text || normalized.location || normalized.location_name || ""
+  };
+  const classified = classifyStoredPosting(row);
+  const normalizedReasons = new Set((Array.isArray(reasonCodes) ? reasonCodes : []).map((reason) => clean(reason, 120)));
+  const noGeoNoRemote =
+    Boolean(classified.missing_all_normalized_geo && classified.weak_unknown_remote_type) ||
+    normalizedReasons.has("no_geo_no_remote") ||
+    normalizedReasons.has("no_normalized_geo_or_explicit_remote");
+  const blockedReasons = [
+    "source_disabled_by_threshold",
+    "source_auto_disabled",
+    "source_quarantine_only",
+    "blocked_fetch",
+    "detail_required_but_unavailable"
+  ];
+
+  return {
+    missing_any_geo: Boolean(classified.missing_any_normalized_geo),
+    missing_all_geo: Boolean(classified.missing_all_normalized_geo),
+    weak_unknown_remote: Boolean(classified.weak_unknown_remote_type),
+    no_geo_no_remote: Boolean(noGeoNoRemote),
+    detail_evidence_found: Boolean(buildDetailEvidenceSummary(getDetailEvidenceSnapshot(normalized)).present),
+    parser_safe_repair: Boolean(normalized.parser_safe_repair || normalized.parser_safe_repairs),
+    blocked: status !== "accepted" && blockedReasons.some((reason) => normalizedReasons.has(reason))
+  };
+}
+
 function buildCandidateReport(target, normalized, status, gate, validation, detailEscalation) {
   const reasonCodes = Array.from(new Set([
     ...(Array.isArray(validation?.reason_codes) ? validation.reason_codes : []),
     ...(Array.isArray(detailEscalation?.failure_reasons) ? detailEscalation.failure_reasons : [])
   ].map((reason) => clean(reason, 120)).filter(Boolean)));
+  const sourceFamily = sourceFamilyForCandidate(target, normalized);
+  const detailEvidenceSummary = buildDetailEvidenceSummary(getDetailEvidenceSnapshot(normalized));
+  const qualityGapFlags = buildQualityGapFlags(normalized, status, reasonCodes);
   return {
     source_url: target.companyUrl,
     source_host: target.host,
+    source_family: sourceFamily,
     canonical_url: normalized.canonical_url || normalized.job_posting_url || "",
     source_job_id: normalized.source_job_id || "",
     title: normalized.position_name || normalized.title || "",
@@ -535,10 +653,54 @@ function buildCandidateReport(target, normalized, status, gate, validation, deta
     public_gate_decision: publicGateDecision(gate),
     detail_escalation_decision: detailEscalation,
     evidence_summary: summarizeEvidence(normalized.evidence || gate.evidence || {}),
+    detail_evidence_summary: detailEvidenceSummary,
+    quality_gap_flags: qualityGapFlags,
     net_new_classification: status === "accepted"
       ? "not_evaluated"
       : nonAcceptedNetNewClassification(status, validation)
   };
+}
+
+function emptySourceFamilyBucket() {
+  return {
+    total: 0,
+    status_counts: {},
+    missing_any_geo: 0,
+    missing_all_geo: 0,
+    weak_unknown_remote: 0,
+    no_geo_no_remote: 0,
+    detail_evidence_found: 0,
+    parser_safe_repair: 0,
+    blocked: 0
+  };
+}
+
+function recordCandidateReportMetrics(summary, report = {}) {
+  if (!summary) return;
+  if (!summary.source_family_buckets) summary.source_family_buckets = {};
+  if (!summary.quality_gap_counts) {
+    summary.quality_gap_counts = {
+      missing_any_geo: 0,
+      missing_all_geo: 0,
+      weak_unknown_remote: 0,
+      no_geo_no_remote: 0,
+      detail_evidence_found: 0,
+      parser_safe_repair: 0,
+      blocked: 0
+    };
+  }
+  const family = clean(report.source_family || "unknown", 80) || "unknown";
+  const bucket = summary.source_family_buckets[family] || emptySourceFamilyBucket();
+  bucket.total += 1;
+  incrementCounter(bucket.status_counts, report.status || "unknown");
+  const flags = report.quality_gap_flags || {};
+  for (const key of Object.keys(summary.quality_gap_counts)) {
+    if (flags[key]) {
+      bucket[key] += 1;
+      summary.quality_gap_counts[key] += 1;
+    }
+  }
+  summary.source_family_buckets[family] = bucket;
 }
 
 function appendFailureReason(report, reason) {
@@ -732,8 +894,10 @@ async function processTarget(pool, target, options, summary, runId) {
       continue;
     }
     const { normalized, gate, validation, status, detailEscalation } = evaluated;
+    await attachDetailEvidenceSnapshot(normalized, options, summary);
     const candidateReport = buildCandidateReport(target, normalized, status, gate, validation, detailEscalation);
     targetCandidateReports.push(candidateReport);
+    recordCandidateReportMetrics(summary, candidateReport);
     if (status === "accepted") {
       summary.accepted_count += 1;
       accepted.push(normalized);
@@ -759,6 +923,9 @@ async function processTarget(pool, target, options, summary, runId) {
         public_gate_decision: candidateReport.public_gate_decision,
         detail_escalation_decision: candidateReport.detail_escalation_decision,
         evidence_summary: candidateReport.evidence_summary,
+        detail_evidence_summary: candidateReport.detail_evidence_summary,
+        source_family: candidateReport.source_family,
+        quality_gap_flags: candidateReport.quality_gap_flags,
         net_new_classification: candidateReport.net_new_classification
       });
     }
@@ -945,6 +1112,10 @@ module.exports = {
   DEFAULT_HOST_CONCURRENCY,
   MAX_RUN_LIMIT,
   DEFAULT_SOURCE_RUN_LIMIT,
+  attachDetailEvidenceSnapshot,
+  buildCandidateReport,
+  buildQualityGapFlags,
+  candidateDetailEvidenceUrl,
   evaluateSourceCandidate,
   getVirtualSourceTarget,
   getVirtualSourceTargetCount,
