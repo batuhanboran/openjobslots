@@ -38,6 +38,12 @@ An ATS is certified only when all of these exist:
 
 Use the `ats-parser-certification` skill for the source-evidence workflow and the `openjobslots-postgres-audit` skill for production crossmatching. If a result looks fixed in parser output but still fails public search, do not certify it until `/postings`, direct Postgres rows, and raw Meilisearch hits agree or the delta is explicitly explained.
 
+## Detail Evidence Boundary
+
+Detail-page markdown, reader extracts, Jina output, Firecrawl output, and Browserless rendered output are evidence only, not truth. They can show what the source exposed and guide parser work, but the deterministic parser plus saved raw/detail fixtures and expected normalized fixtures must decide `country`, `region`, `city`, `remote_type`, `posting_date`, and `source_job_id`. If a field cannot be reproduced from fixture-backed parser logic, keep it `null`/`unknown` and document the blocker.
+
+Keep detail certification in source-family lanes such as direct JSON/API, enterprise/detail, embedded/HTML, vendor/public-sector, and aggregator-boundary sources. A lane can move from research evidence to canary or public promotion only after the fixture-backed parser contract, source-quality guard, and Postgres-to-Meilisearch parity gate pass; markdown or reader evidence alone never satisfies the promotion gate.
+
 ## Expansion Priority
 
 ### Wave 1
