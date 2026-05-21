@@ -1,0 +1,459 @@
+function registerPublicRoutes(app, context) {
+  const {
+    ATS_FILTER_OPTION_ITEMS,
+    DB_BACKEND,
+    QUEUE_BACKEND,
+    SEARCH_BACKEND,
+    STATE_CODE_TO_NAME,
+    appendFrontendLogEntry,
+    buildPublicIngestionStatusItem,
+    buildPublicPreferences,
+    buildRobotsTxt,
+    buildSitemapXml,
+    createEmptyGrowthSummary,
+    db,
+    express,
+    fs,
+    getCounts,
+    getIngestionWorkerStatus,
+    getParserAttentionByAts,
+    getPostgresCounts,
+    getPostgresFilterOptions,
+    getPostgresGrowthSummary,
+    getPostgresParserAttentionByAts,
+    getPostgresSuggestions,
+    getPostgresSyncStatus,
+    getPostingLocationGeoFilterOptions,
+    getPublicPostingSortOptions,
+    getSearchSuggestions,
+    getSyncScopeStats,
+    getSyncServiceSettings,
+    getWritePressure,
+    hasAdminAccess,
+    listPostgresPostings,
+    listPostingsWithFilters,
+    normalizeBoolean,
+    normalizeFreshnessDays,
+    normalizePostingSort,
+    normalizeSyncEnabledAts,
+    parseCsvParam,
+    path,
+    postgresPool,
+    publicReadCache,
+    readMeiliReindexStatus,
+    renderSeoIndexHtml,
+    sanitizeFrontendValue,
+    sanitizePublicPostings,
+    sanitizePublicSourceFacets,
+    sendCachedPublicJson,
+    syncStatus
+  } = context;
+
+  app.post("/frontend/log", async (req, res) => {
+    try {
+      appendFrontendLogEntry(
+        req.body?.level,
+        req.body?.event,
+        req.body?.message,
+        req.body?.context && typeof req.body.context === "object" ? req.body.context : {}
+      );
+      res.status(202).json({ ok: true });
+    } catch (error) {
+      res.status(400).json({
+        ok: false,
+        error: String(error?.message || error)
+      });
+    }
+  });
+
+  app.get("/health", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        const counts = await getPostgresCounts(postgresPool);
+        return {
+          ok: true,
+          db_backend: DB_BACKEND,
+          search_backend: SEARCH_BACKEND,
+          queue_backend: QUEUE_BACKEND,
+          legacy_api_sync: false,
+          ...counts
+        };
+      }
+
+      const counts = await getCounts();
+      return {
+        ok: true,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        queue_backend: QUEUE_BACKEND,
+        legacy_api_sync: true,
+        ...counts
+      };
+    });
+  });
+
+  app.get("/public/preferences", (req, res) => {
+    res.setHeader("Vary", "Accept-Language, CF-IPCountry");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return res.json(buildPublicPreferences(req));
+  });
+
+  app.get("/sync/status", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND === "postgres") {
+        const [status, parserAttentionByAts] = await Promise.all([
+          getPostgresSyncStatus(postgresPool),
+          getPostgresParserAttentionByAts(postgresPool)
+        ]);
+        return sanitizeFrontendValue({
+          running: Boolean(status.running),
+          queued: Boolean(status.queued),
+          status: String(status.status || ""),
+          stopping: Boolean(status.stopping),
+          cancel_requested: Boolean(status.cancel_requested),
+          legacy_api_sync: Boolean(status.legacy_api_sync),
+          last_sync_at: status.last_sync_at || null,
+          last_failed_sync_at: status.last_failed_sync_at || null,
+          last_sync_summary: status.last_sync_summary || {},
+          db_backend: status.db_backend || DB_BACKEND,
+          search_backend: status.search_backend || SEARCH_BACKEND,
+          search_reindex: readMeiliReindexStatus(),
+          queue_backend: status.queue_backend || QUEUE_BACKEND,
+          queue_depth: Number(status.queue_depth || 0),
+          sync_enabled_company_count: Number(status.sync_enabled_company_count || 0),
+          configured_enabled_ats_count: Number(status.configured_enabled_ats_count || 0),
+          excluded_ats_count: Number(status.excluded_ats_count || 0),
+          company_count: Number(status.company_count || 0),
+          posting_count: Number(status.posting_count || 0),
+          postings_seen_24h_count: Number(status.postings_seen_24h_count || 0),
+          write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+          ingestion_worker: buildPublicIngestionStatusItem(status.ingestion_worker || {}, {
+            db_backend: status.db_backend || DB_BACKEND,
+            search_backend: status.search_backend || SEARCH_BACKEND,
+            search_reindex: readMeiliReindexStatus(),
+            queue_backend: status.queue_backend || QUEUE_BACKEND,
+            write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
+            parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+          })
+        });
+      }
+
+      const [counts, syncScopeStats, ingestionWorker, parserAttentionByAts] = await Promise.all([
+        getCounts(),
+        getSyncScopeStats(),
+        getIngestionWorkerStatus(),
+        getParserAttentionByAts()
+      ]);
+      return sanitizeFrontendValue({
+        ...syncStatus,
+        ...syncScopeStats,
+        ...counts,
+        db_backend: DB_BACKEND,
+        search_backend: SEARCH_BACKEND,
+        search_reindex: readMeiliReindexStatus(),
+        queue_backend: QUEUE_BACKEND,
+        legacy_api_sync: true,
+        write_pressure: getWritePressure(ingestionWorker),
+        parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+        ingestion_worker: buildPublicIngestionStatusItem(ingestionWorker, {
+          db_backend: DB_BACKEND,
+          search_backend: SEARCH_BACKEND,
+          search_reindex: readMeiliReindexStatus(),
+          queue_backend: QUEUE_BACKEND,
+          write_pressure: getWritePressure(ingestionWorker),
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+        })
+      });
+    });
+  });
+
+  app.get("/ingestion/status", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const includeAdminDiagnostics = hasAdminAccess(req);
+      if (DB_BACKEND === "postgres") {
+        const [status, parserAttentionByAts, growth24h] = await Promise.all([
+          getPostgresSyncStatus(postgresPool),
+          getPostgresParserAttentionByAts(postgresPool),
+          includeAdminDiagnostics ? getPostgresGrowthSummary(postgresPool, { hours: 24 }) : Promise.resolve(null)
+        ]);
+        return sanitizeFrontendValue({
+          ok: true,
+          item: buildPublicIngestionStatusItem(status.ingestion_worker || {}, {
+            db_backend: DB_BACKEND,
+            search_backend: SEARCH_BACKEND,
+            search_reindex: readMeiliReindexStatus(),
+            queue_backend: QUEUE_BACKEND,
+            write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
+            parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+            ...(includeAdminDiagnostics ? { growth_24h: growth24h } : {})
+          })
+        });
+      }
+
+      const [status, parserAttentionByAts] = await Promise.all([
+        getIngestionWorkerStatus(),
+        getParserAttentionByAts()
+      ]);
+      return sanitizeFrontendValue({
+        ok: true,
+        item: buildPublicIngestionStatusItem(status, {
+          db_backend: DB_BACKEND,
+          search_backend: SEARCH_BACKEND,
+          search_reindex: readMeiliReindexStatus(),
+          queue_backend: QUEUE_BACKEND,
+          write_pressure: getWritePressure(status),
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+          ...(includeAdminDiagnostics ? { growth_24h: createEmptyGrowthSummary({ hours: 24 }) } : {})
+        })
+      });
+    });
+  });
+
+  app.get("/search/suggest", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const search = String(req.query.search || req.query.q || "").trim();
+      if (DB_BACKEND === "postgres") {
+        const items = await getPostgresSuggestions(postgresPool, search, Number(req.query.limit || 8), ATS_FILTER_OPTION_ITEMS);
+        return {
+          ok: true,
+          items,
+          count: items.length
+        };
+      }
+
+      const items = await getSearchSuggestions(search, Number(req.query.limit || 8));
+      return {
+        ok: true,
+        items,
+        count: items.length
+      };
+    });
+  });
+
+  app.get("/postings/filter-options", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const options = {
+        search: String(req.query.search || "").trim(),
+        freshness_days: req.query.freshness_days,
+        ats: parseCsvParam(req.query.ats),
+        industries: parseCsvParam(req.query.industries),
+        states: parseCsvParam(req.query.states),
+        counties: parseCsvParam(req.query.counties),
+        countries: parseCsvParam(req.query.countries),
+        regions: parseCsvParam(req.query.regions),
+        remote: req.query.remote,
+        hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
+        include_applied: false,
+        include_ignored: false
+      };
+      if (DB_BACKEND === "postgres") {
+        return getPostgresFilterOptions(postgresPool, ATS_FILTER_OPTION_ITEMS, options);
+      }
+
+      const selectedStates = parseCsvParam(req.query.states).map((state) => state.toUpperCase());
+      const syncSettings = await getSyncServiceSettings();
+      const enabledAts = new Set(normalizeSyncEnabledAts(syncSettings?.sync_enabled_ats));
+      const ats = ATS_FILTER_OPTION_ITEMS.map((item) => ({
+        value: item.value,
+        label: item.label,
+        enabled: enabledAts.has(item.value)
+      }));
+      const sort_options = getPublicPostingSortOptions();
+
+      let industries = [];
+      try {
+        industries = await db.all(
+          `
+            SELECT industry_key AS value, industry_label AS label
+            FROM job_industry_categories
+            ORDER BY industry_label ASC;
+          `
+        );
+      } catch {
+        try {
+          industries = await db.all(
+            `
+              SELECT industry_key AS value, industry_label AS label
+              FROM job_position_industry
+              GROUP BY industry_key, industry_label
+              ORDER BY industry_label ASC;
+            `
+          );
+        } catch {
+          industries = [];
+        }
+      }
+
+      let states = [];
+      try {
+        const stateRows = await db.all(
+          `
+            SELECT DISTINCT state_usps
+            FROM state_location_index
+            WHERE state_usps IS NOT NULL AND TRIM(state_usps) <> ''
+            ORDER BY state_usps ASC;
+          `
+        );
+        states = stateRows.map((row) => {
+          const code = String(row?.state_usps || "").trim().toUpperCase();
+          const readableName = STATE_CODE_TO_NAME[code];
+          return {
+            value: code,
+            label: readableName ? `${code} - ${readableName.replace(/\b\w/g, (c) => c.toUpperCase())}` : code
+          };
+        });
+      } catch {
+        states = [];
+      }
+
+      let counties = [];
+      try {
+        let countyRows = [];
+        if (selectedStates.length === 0) {
+          countyRows = await db.all(
+            `
+              SELECT DISTINCT state_usps, search_location_name
+              FROM state_location_index
+              WHERE location_type = 'county'
+                AND search_location_name IS NOT NULL
+                AND TRIM(search_location_name) <> ''
+              ORDER BY state_usps ASC, search_location_name ASC;
+            `
+          );
+        } else {
+          const placeholders = selectedStates.map(() => "?").join(", ");
+          countyRows = await db.all(
+            `
+              SELECT DISTINCT state_usps, search_location_name
+              FROM state_location_index
+              WHERE location_type = 'county'
+                AND search_location_name IS NOT NULL
+                AND TRIM(search_location_name) <> ''
+                AND state_usps IN (${placeholders})
+              ORDER BY state_usps ASC, search_location_name ASC;
+            `,
+            selectedStates
+          );
+        }
+
+        counties = countyRows.map((row) => {
+          const stateCode = String(row?.state_usps || "").trim().toUpperCase();
+          const countyName = String(row?.search_location_name || "").trim();
+          return {
+            value: `${stateCode}|${countyName}`,
+            label: `${countyName} (${stateCode})`,
+            state: stateCode,
+            county: countyName
+          };
+        });
+      } catch {
+        counties = [];
+      }
+
+      const locationGeoOptions = getPostingLocationGeoFilterOptions();
+
+      return {
+        ats,
+        sort_options,
+        industries,
+        regions: Array.isArray(locationGeoOptions?.regions) ? locationGeoOptions.regions : [],
+        countries: Array.isArray(locationGeoOptions?.countries) ? locationGeoOptions.countries : [],
+        states,
+        counties
+      };
+    });
+  });
+
+  app.get("/postings", async (req, res) => {
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const options = {
+        search: String(req.query.search || "").trim(),
+        limit: Number(req.query.limit || 500),
+        offset: Number(req.query.offset || 0),
+        sort_by: String(req.query.sort_by || "").trim(),
+        freshness_days: req.query.freshness_days,
+        ats: parseCsvParam(req.query.ats),
+        industries: parseCsvParam(req.query.industries),
+        states: parseCsvParam(req.query.states),
+        counties: parseCsvParam(req.query.counties),
+        countries: parseCsvParam(req.query.countries),
+        regions: parseCsvParam(req.query.regions),
+        remote: req.query.remote,
+        hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
+        include_applied: false,
+        include_ignored: false
+      };
+
+      const result =
+        DB_BACKEND === "postgres"
+          ? await listPostgresPostings(postgresPool, options)
+          : await listPostingsWithFilters(options);
+      const resultItems = Array.isArray(result.items) ? result.items : [];
+      const resultLimit = Math.max(1, Number(result.limit || options.limit || 500));
+      const resultOffset = Math.max(0, Number(result.offset || options.offset || 0));
+      const resultCount = Math.max(0, Number(result.count || 0));
+      const loadedThrough = resultOffset + resultItems.length;
+      const hasMore =
+        resultCount > loadedThrough ||
+        (resultItems.length >= resultLimit && resultCount <= loadedThrough);
+      const publicCount = hasMore
+        ? Math.max(resultCount, loadedThrough + 1)
+        : Math.max(resultCount, loadedThrough);
+
+      return {
+        items: sanitizeFrontendValue(sanitizePublicPostings(resultItems)),
+        count: publicCount,
+        count_exact: result?.count_exact === false ? false : true,
+        count_capped: Boolean(result?.count_capped),
+        source_facets: sanitizeFrontendValue(sanitizePublicSourceFacets(result?.source_facets)),
+        limit: resultLimit,
+        offset: resultOffset,
+        filters: sanitizeFrontendValue(result?.filters || {
+          search: options.search,
+          sort_by: normalizePostingSort(options.sort_by),
+          freshness_days: normalizeFreshnessDays(options.freshness_days)
+        }),
+        has_more: Boolean(hasMore && resultItems.length > 0),
+        next_offset: hasMore && resultItems.length > 0 ? loadedThrough : null
+      };
+    });
+  });
+
+  const webDistPath = context.webDistPath || path.resolve(__dirname, "..", "..", "dist");
+  const webIndexPath = context.webIndexPath || path.join(webDistPath, "index.html");
+  if (fs.existsSync(webIndexPath)) {
+    const sendSeoIndex = (req, res, next) => {
+      try {
+        const indexHtml = fs.readFileSync(webIndexPath, "utf8");
+        res.type("html").send(renderSeoIndexHtml(indexHtml, req));
+      } catch (error) {
+        next(error);
+      }
+    };
+
+    app.get(["/", "/index.html"], sendSeoIndex);
+    app.get("/robots.txt", (req, res) => {
+      res.type("text/plain").send(buildRobotsTxt(req));
+    });
+    app.get("/sitemap.xml", (req, res) => {
+      res.type("application/xml").send(buildSitemapXml(req));
+    });
+    app.use(express.static(webDistPath, {
+      extensions: ["html"],
+      index: false,
+      maxAge: "5m"
+    }));
+    app.use((req, res, next) => {
+      if (req.method === "GET" && req.accepts("html")) {
+        return sendSeoIndex(req, res, next);
+      }
+      return next();
+    });
+  }
+
+}
+
+module.exports = {
+  registerPublicRoutes
+};

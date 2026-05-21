@@ -52,6 +52,7 @@
     "test:api": "playwright test tests/api",
     "test:e2e": "playwright test tests/e2e",
     "test:e2e:ui": "playwright test tests/e2e --ui",
+    "test:http": "node --check server/http/registerPublicRoutes.js && node --check server/http/registerAdminRoutes.js && node --check server/http/registerUserRoutes.js && node --check server/http/routeRegistration.test.js && node server/http/routeRegistration.test.js",
     "test:rate-limit": "node --check server/ingestion/atsRateLimitStore.js && node --check server/ingestion/atsRateLimitStore.test.js && node server/ingestion/atsRateLimitStore.test.js",
     "skill:validate": "node .agents/skills/openjobslots-ats-recovery/scripts/validate-skill.js",
     "quality:gate": "node scripts/test/quality-gate.js",

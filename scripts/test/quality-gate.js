@@ -28,6 +28,7 @@ let testDbPath = process.env.OPENJOBSLOTS_QUALITY_GATE_DB_PATH || path.join(test
 
 const orderedCandidates = [
   { key: "rate-limit", script: "test:rate-limit" },
+  { key: "http", script: "test:http" },
   { key: "backend", script: "test:backend" },
   { key: "api", script: "test:api" },
   { key: "parser", script: "test:parsers" },
