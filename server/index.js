@@ -1324,8 +1324,6 @@ const CONTROL_ROUTE_PREFIXES = Object.freeze([
   "/ingestion/quarantine-summary"
 ]);
 const CONTROL_ROUTE_EXACT = Object.freeze([
-  "/sync/status",
-  "/ingestion/status",
   "/sync/start",
   "/sync/stop",
   "/sync/ats",
@@ -1454,7 +1452,8 @@ function createTtlJsonCache({ ttlMs, maxEntries }) {
 }
 
 function getPublicReadCacheKey(req) {
-  return `${req.method}:${req.originalUrl || req.url || req.path || ""}`;
+  const authScope = hasAdminAccess(req) ? "admin" : "public";
+  return `${authScope}:${req.method}:${req.originalUrl || req.url || req.path || ""}`;
 }
 
 async function sendCachedPublicJson(req, res, cache, producer) {
@@ -17814,7 +17813,7 @@ function getWritePressure(ingestionWorker = {}) {
 }
 
 function buildPublicIngestionStatusItem(ingestionWorker = {}, options = {}) {
-  return {
+  const item = {
     latest_run_id: Number(ingestionWorker?.latest_run_id || 0),
     latest_status: String(ingestionWorker?.latest_status || ""),
     started_at_epoch: Number(ingestionWorker?.started_at_epoch || 0),
@@ -17830,9 +17829,12 @@ function buildPublicIngestionStatusItem(ingestionWorker = {}, options = {}) {
     search_reindex: options.search_reindex || readMeiliReindexStatus(),
     queue_backend: String(options.queue_backend || QUEUE_BACKEND),
     write_pressure: String(options.write_pressure || getWritePressure(ingestionWorker)),
-    parser_attention_count: Number(options.parser_attention_count || 0),
-    growth_24h: options.growth_24h || createEmptyGrowthSummary({ hours: 24 })
+    parser_attention_count: Number(options.parser_attention_count || 0)
   };
+  if (Object.prototype.hasOwnProperty.call(options, "growth_24h")) {
+    item.growth_24h = options.growth_24h || createEmptyGrowthSummary({ hours: 24 });
+  }
+  return item;
 }
 
 function normalizePublicSuggestionFilter(filter = {}) {
@@ -18182,11 +18184,12 @@ function createServer() {
 
   app.get("/ingestion/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const includeAdminDiagnostics = hasAdminAccess(req);
       if (DB_BACKEND === "postgres") {
         const [status, parserAttentionByAts, growth24h] = await Promise.all([
           getPostgresSyncStatus(postgresPool),
           getPostgresParserAttentionByAts(postgresPool),
-          getPostgresGrowthSummary(postgresPool, { hours: 24 })
+          includeAdminDiagnostics ? getPostgresGrowthSummary(postgresPool, { hours: 24 }) : Promise.resolve(null)
         ]);
         return sanitizeFrontendValue({
           ok: true,
@@ -18197,7 +18200,7 @@ function createServer() {
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
             parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
-            growth_24h: growth24h
+            ...(includeAdminDiagnostics ? { growth_24h: growth24h } : {})
           })
         });
       }
@@ -18215,7 +18218,7 @@ function createServer() {
           queue_backend: QUEUE_BACKEND,
           write_pressure: getWritePressure(status),
           parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
-          growth_24h: createEmptyGrowthSummary({ hours: 24 })
+          ...(includeAdminDiagnostics ? { growth_24h: createEmptyGrowthSummary({ hours: 24 }) } : {})
         })
       });
     });

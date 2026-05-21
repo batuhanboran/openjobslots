@@ -28,6 +28,8 @@ const {
 const { evaluatePublicPosting } = require("../ingestion/publicPostingGate");
 
 const DAY_SECONDS = 24 * 60 * 60;
+const DEFAULT_POSTGRES_COUNTS_CACHE_TTL_MS = 30_000;
+const postgresCountsCache = new WeakMap();
 const POSTING_SORT_OPTIONS = new Set(["relevance", "last_seen", "posted_date", "ats_source", "confidence"]);
 const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
 const PUBLIC_SOURCE_FACET_LIMIT = 8;
@@ -65,6 +67,24 @@ function getRetentionCutoffs(referenceEpoch = Math.floor(Date.now() / 1000), con
 
 function normalizeText(value) {
   return searchConfig.normalizeText(value);
+}
+
+function clonePostgresCounts(counts = {}) {
+  return {
+    company_count: Number(counts.company_count || 0),
+    sync_enabled_company_count: Number(counts.sync_enabled_company_count || 0),
+    configured_enabled_ats_count: Number(counts.configured_enabled_ats_count || 0),
+    posting_count: Number(counts.posting_count || 0),
+    postings_seen_24h_count: Number(counts.postings_seen_24h_count || 0),
+    company_count_by_ats: { ...(counts.company_count_by_ats || {}) }
+  };
+}
+
+function resolvePostgresCountsCacheTtlMs(options = {}, env = process.env) {
+  const raw = options.cacheTtlMs ?? env.OPENJOBSLOTS_POSTGRES_COUNTS_CACHE_TTL_MS ?? DEFAULT_POSTGRES_COUNTS_CACHE_TTL_MS;
+  const ttl = Number(raw);
+  if (!Number.isFinite(ttl)) return DEFAULT_POSTGRES_COUNTS_CACHE_TTL_MS;
+  return Math.max(0, Math.min(5 * 60_000, Math.floor(ttl)));
 }
 
 function cleanSearchToken(value) {
@@ -681,7 +701,13 @@ async function listPostgresPostings(pool, options = {}) {
   return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
 }
 
-async function getPostgresCounts(pool) {
+async function getPostgresCounts(pool, options = {}) {
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  const cacheTtlMs = resolvePostgresCountsCacheTtlMs(options);
+  const cached = postgresCountsCache.get(pool);
+  if (!options.force && cacheTtlMs > 0 && cached && cached.expiresAtMs > nowMs) {
+    return clonePostgresCounts(cached.counts);
+  }
   const [companyRow, syncCompanyRow, enabledAtsRow, postingRow, seenRow, atsRows] = await Promise.all([
     pool.query("SELECT COUNT(*)::int AS count FROM companies;"),
     pool.query(
@@ -696,13 +722,13 @@ async function getPostgresCounts(pool) {
     pool.query("SELECT COUNT(*)::int AS count FROM ats_sources WHERE enabled = true;"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false;"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false AND last_seen_epoch >= $1;", [
-      Math.floor(Date.now() / 1000) - 24 * 60 * 60
+      Math.floor(nowMs / 1000) - 24 * 60 * 60
     ]),
     pool.query("SELECT ats_key, COUNT(*)::int AS count FROM companies GROUP BY ats_key;")
   ]);
   const company_count_by_ats = {};
   for (const row of atsRows.rows) company_count_by_ats[row.ats_key || "Unknown"] = Number(row.count || 0);
-  return {
+  const counts = {
     company_count: Number(companyRow.rows[0]?.count || 0),
     sync_enabled_company_count: Number(syncCompanyRow.rows[0]?.count || 0),
     configured_enabled_ats_count: Number(enabledAtsRow.rows[0]?.count || 0),
@@ -710,6 +736,13 @@ async function getPostgresCounts(pool) {
     postings_seen_24h_count: Number(seenRow.rows[0]?.count || 0),
     company_count_by_ats
   };
+  if (!options.force && cacheTtlMs > 0) {
+    postgresCountsCache.set(pool, {
+      counts: clonePostgresCounts(counts),
+      expiresAtMs: nowMs + cacheTtlMs
+    });
+  }
+  return clonePostgresCounts(counts);
 }
 
 async function getPostgresFilterOptions(pool, atsItems = [], options = {}) {
@@ -823,6 +856,67 @@ function normalizedSuggestionContainsTerm(text, term) {
   return normalizedTerm.length >= 4 && normalizedText.includes(normalizedTerm);
 }
 
+function escapePostgresLikePattern(value) {
+  return String(value || "").replace(/[\\%_]/g, "\\$&");
+}
+
+function buildMeiliSuggestionCandidates(hits = []) {
+  const byKey = new Map();
+  const collect = (type, value, extras = {}) => {
+    const normalizedType = String(type || "search").trim().toLowerCase() || "search";
+    const suggestionValue = String(value || "").trim();
+    if (!suggestionValue) return;
+    const key = `${normalizedType}:${normalizeText(suggestionValue)}`;
+    const current = byKey.get(key) || {
+      type: normalizedType,
+      value: suggestionValue,
+      count: 0,
+      firstIndex: byKey.size,
+      extras
+    };
+    current.count += 1;
+    byKey.set(key, current);
+  };
+
+  for (const hit of Array.isArray(hits) ? hits : []) {
+    collect("title", hit?.title || hit?.position_name);
+    collect("company", hit?.company || hit?.company_name);
+    const location = String(hit?.location || hit?.location_text || "").trim()
+      || [hit?.city, hit?.state, hit?.country].map((value) => String(value || "").trim()).filter(Boolean).join(", ");
+    collect("location", location);
+  }
+
+  return [...byKey.values()]
+    .sort((left, right) => right.count - left.count || left.firstIndex - right.firstIndex)
+    .map((item) => ({
+      type: item.type,
+      value: item.value,
+      count: item.count,
+      extras: item.extras || {}
+    }));
+}
+
+async function addMeiliSuggestions({ query, resolvedLimit, suggestions, add }) {
+  const config = getMeiliConfig();
+  if (!config.enabled || !query || suggestions.length >= resolvedLimit) return false;
+  const result = await searchMeiliPostings(
+    {
+      search: query,
+      limit: Math.max(20, resolvedLimit * 4),
+      offset: 0,
+      sort_by: "relevance"
+    },
+    config
+  );
+  let added = false;
+  for (const candidate of buildMeiliSuggestionCandidates(result?.hits || [])) {
+    add(candidate.type, candidate.value, candidate.count, candidate.extras);
+    added = true;
+    if (suggestions.length >= resolvedLimit) break;
+  }
+  return added;
+}
+
 async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
   const query = String(search || "").trim();
   const resolvedLimit = Math.max(1, Math.min(20, Number(limit || 8)));
@@ -869,25 +963,33 @@ async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
     if (!query || normalizeText(alias).includes(normalizeText(query))) add("shortcut", alias);
   }
   if (query && suggestions.length < resolvedLimit) {
-    const pattern = `%${query}%`;
-    const rows = await pool.query(
-      `
-        SELECT 'title' AS type, position_name AS value, COUNT(*)::int AS count FROM postings
-        WHERE hidden = false AND lower(unaccent(position_name)) LIKE lower(unaccent($1)) GROUP BY position_name
-        UNION ALL
-        SELECT 'company' AS type, company_name AS value, COUNT(*)::int AS count FROM postings
-        WHERE hidden = false AND lower(unaccent(company_name)) LIKE lower(unaccent($1)) GROUP BY company_name
-        UNION ALL
-        SELECT 'location' AS type, location_text AS value, COUNT(*)::int AS count FROM postings
-        WHERE hidden = false AND location_text IS NOT NULL AND lower(unaccent(location_text)) LIKE lower(unaccent($1)) GROUP BY location_text
-        ORDER BY count DESC
-        LIMIT $2;
-      `,
-      [pattern, Math.max(resolvedLimit, 20)]
-    );
-    for (const row of rows.rows) {
-      add(row.type, row.value, row.count);
-      if (suggestions.length >= resolvedLimit) break;
+    let meiliAdded = false;
+    try {
+      meiliAdded = await addMeiliSuggestions({ query, resolvedLimit, suggestions, add });
+    } catch (error) {
+      console.warn("[openjobslots suggestions] Meili suggestion fallback failed:", String(error?.message || error).slice(0, 240));
+    }
+    if (!meiliAdded || suggestions.length < resolvedLimit) {
+      const pattern = `%${escapePostgresLikePattern(query)}%`;
+      const rows = await pool.query(
+        `
+          SELECT 'title' AS type, position_name AS value, COUNT(*)::int AS count FROM postings
+          WHERE hidden = false AND lower(position_name) LIKE lower($1) ESCAPE '\\' GROUP BY position_name
+          UNION ALL
+          SELECT 'company' AS type, company_name AS value, COUNT(*)::int AS count FROM postings
+          WHERE hidden = false AND lower(company_name) LIKE lower($1) ESCAPE '\\' GROUP BY company_name
+          UNION ALL
+          SELECT 'location' AS type, location_text AS value, COUNT(*)::int AS count FROM postings
+          WHERE hidden = false AND location_text IS NOT NULL AND lower(location_text) LIKE lower($1) ESCAPE '\\' GROUP BY location_text
+          ORDER BY count DESC
+          LIMIT $2;
+        `,
+        [pattern, Math.max(resolvedLimit, 20)]
+      );
+      for (const row of rows.rows) {
+        add(row.type, row.value, row.count);
+        if (suggestions.length >= resolvedLimit) break;
+      }
     }
   }
   return suggestions.slice(0, resolvedLimit);
@@ -1880,6 +1982,10 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
   const atsKey = String(target?.atsKey || "").trim();
   const version = String(parserVersion || "unknown");
   const observed = analyzePayloadShape(raw);
+  const observedPaths = Array.isArray(observed.shape_paths) ? observed.shape_paths : [];
+  if (observedPaths.length === 0) {
+    return { drift: false, skipped_empty_shape: true, observed };
+  }
   const existing = await pool.query(
     `
       SELECT shape_hash, shape_paths, observed_count
@@ -1889,6 +1995,7 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
     [atsKey, version]
   );
   const baseline = existing.rows[0] || null;
+  const baselinePaths = Array.isArray(baseline?.shape_paths) ? baseline.shape_paths : [];
   if (!baseline) {
     await pool.query(
       `
@@ -1900,10 +2007,24 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
     );
     return { drift: false, bootstrapped: true, observed };
   }
+  if (baselinePaths.length === 0) {
+    await pool.query(
+      `
+        UPDATE source_payload_shapes
+        SET shape_hash = $3,
+            shape_paths = $4::jsonb,
+            observed_count = GREATEST(observed_count, 0) + 1,
+            last_seen_at = now()
+        WHERE ats_key = $1 AND parser_version = $2;
+      `,
+      [atsKey, version, observed.shape_hash, JSON.stringify(observed.shape_paths)]
+    );
+    return { drift: false, baseline_replaced: true, observed, baseline };
+  }
   const drift = detectParserDrift(
     {
       shape_hash: String(baseline.shape_hash || ""),
-      shape_paths: Array.isArray(baseline.shape_paths) ? baseline.shape_paths : []
+      shape_paths: baselinePaths
     },
     observed,
     options

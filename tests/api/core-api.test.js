@@ -312,6 +312,16 @@ test.describe("openjobslots API compatibility", () => {
     expect(serialized).not.toMatch(/risk|recommendation|source_quality|parser_version|quality_flags|raw_payload|rejection_reason|MEILI_|MASTER_KEY|postgres:\/\//i);
   });
 
+  test("public status endpoints expose coarse read-only health without diagnostics", async ({ request }) => {
+    for (const path of ["/sync/status", "/ingestion/status"]) {
+      const response = await request.get(`${apiBaseUrl}${path}`);
+      expect(response.ok(), `${path} should be public read-only status`).toBeTruthy();
+      const payload = await response.json();
+      expect(payload).toEqual(expect.any(Object));
+      expect(JSON.stringify(payload)).not.toMatch(/postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_|OPENJOBSLOTS_SEARCH_|stack trace|raw_payload|quality_flags|source_quality|parser_version/i);
+    }
+  });
+
   test("admin and mutation endpoints are protected or absent from public API", async ({ request }) => {
     const protectedChecks = [
       { method: "get", path: "/admin/services" },
@@ -323,8 +333,6 @@ test.describe("openjobslots API compatibility", () => {
       { method: "get", path: "/settings/mcp" },
       { method: "get", path: "/settings/sync/blocked-companies" },
       { method: "get", path: "/applications" },
-      { method: "get", path: "/sync/status" },
-      { method: "get", path: "/ingestion/status" },
       { method: "post", path: "/applications", data: {} },
       { method: "get", path: "/mcp/candidates" },
       { method: "get", path: "/postings/diagnostics" },

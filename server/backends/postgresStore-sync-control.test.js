@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const {
   buildSearchRankSql,
+  checkAndRecordPostgresPayloadDrift,
+  getPostgresCounts,
+  getPostgresSuggestions,
   getPostgresSyncStatus,
   getPostgresAtsFieldQualityByAts,
   getPostgresParserAttentionByAts,
@@ -950,6 +953,173 @@ async function testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled() {
   }
 }
 
+async function testPostgresSuggestionsUseMeiliWhenConfigured() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousHost = process.env.MEILI_HOST;
+  const previousIndex = process.env.MEILI_POSTINGS_INDEX;
+  const previousFetch = global.fetch;
+  const fetchCalls = [];
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  process.env.MEILI_HOST = "http://meili.test";
+  process.env.MEILI_POSTINGS_INDEX = "postings";
+  global.fetch = async (url, options = {}) => {
+    fetchCalls.push({ url: String(url), body: JSON.parse(String(options.body || "{}")) });
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          hits: [
+            {
+              title: "Software Engineer",
+              company: "Acme",
+              location: "Istanbul, Turkey",
+              ats_key: "greenhouse"
+            },
+            {
+              title: "Software Engineer",
+              company: "Globex",
+              location: "Remote",
+              ats_key: "lever"
+            }
+          ],
+          estimatedTotalHits: 2
+        };
+      }
+    };
+  };
+  const pool = {
+    async query(sql) {
+      throw new Error(`Postgres suggestion fallback should not run when Meili has candidates: ${sql}`);
+    }
+  };
+
+  try {
+    const suggestions = await getPostgresSuggestions(pool, "engineer", 5, []);
+    assert.equal(fetchCalls.length, 1);
+    assert.match(fetchCalls[0].url, /\/indexes\/postings\/search$/);
+    assert.equal(fetchCalls[0].body.q, "engineer");
+    assert.equal(fetchCalls[0].body.matchingStrategy, "all");
+    assert.ok(suggestions.some((item) => item.type === "title" && item.value === "Software Engineer"));
+    assert.ok(suggestions.some((item) => item.type === "company" && item.value === "Acme"));
+    assert.ok(suggestions.some((item) => item.type === "location" && item.value === "Remote"));
+  } finally {
+    if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+    if (previousHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = previousHost;
+    if (previousIndex === undefined) delete process.env.MEILI_POSTINGS_INDEX;
+    else process.env.MEILI_POSTINGS_INDEX = previousIndex;
+    global.fetch = previousFetch;
+  }
+}
+
+async function testPostgresSuggestionsFallbackAvoidsUnaccentSeqScanPath() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "postgres";
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      return {
+        rows: [
+          { type: "title", value: "Support Engineer", count: 4 },
+          { type: "company", value: "Engineering Labs", count: 2 }
+        ]
+      };
+    }
+  };
+
+  try {
+    const suggestions = await getPostgresSuggestions(pool, "engineer", 5, []);
+    assert.equal(calls.length, 1);
+    assert.doesNotMatch(calls[0].sql, /unaccent/i);
+    assert.match(calls[0].sql, /lower\(position_name\) LIKE lower\(\$1\)/i);
+    assert.match(calls[0].sql, /ESCAPE '\\'/);
+    assert.deepEqual(calls[0].params, ["%engineer%", 20]);
+    assert.equal(suggestions[0].value, "Support Engineer");
+  } finally {
+    if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+  }
+}
+
+async function testPostgresCountsCacheReusesShortTtlSnapshot() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) return { rows: [{ count: 20 }] };
+      if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) return { rows: [{ count: 12 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) return { rows: [{ count: 18 }] };
+      if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) return { rows: [{ count: 7 }] };
+      if (/FROM postings WHERE hidden = false/i.test(sql)) return { rows: [{ count: 30 }] };
+      if (/SELECT ats_key, COUNT\(\*\)::int AS count FROM companies/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 2 }] };
+      throw new Error(`Unexpected count query: ${sql}`);
+    }
+  };
+
+  const first = await getPostgresCounts(pool, { nowMs: 1000, cacheTtlMs: 30000 });
+  const second = await getPostgresCounts(pool, { nowMs: 2000, cacheTtlMs: 30000 });
+  assert.equal(calls.length, 6);
+  assert.deepEqual(second, first);
+
+  second.company_count_by_ats.greenhouse = 99;
+  const third = await getPostgresCounts(pool, { nowMs: 3000, cacheTtlMs: 30000 });
+  assert.equal(third.company_count_by_ats.greenhouse, 2);
+
+  await getPostgresCounts(pool, { nowMs: 32000, cacheTtlMs: 30000 });
+  assert.equal(calls.length, 12);
+}
+
+async function testPayloadDriftDoesNotBootstrapEmptyShapes() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) return { rows: [] };
+      throw new Error(`Empty payload shape should not be written: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    { atsKey: "applitrack", companyUrl: "https://example.com", company: { company_name: "Example" } },
+    [],
+    "source-applitrack-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.skipped_empty_shape, true);
+  assert.equal(calls.length, 0);
+}
+
+async function testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return { rows: [{ shape_hash: "e3b0c44298fc1c149afbf4c8", shape_paths: [], observed_count: 12 }] };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected payload drift query: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    { atsKey: "applytojob", companyUrl: "https://example.applytojob.com/apply", company: { company_name: "Example" } },
+    { jobs: [{ id: "1", title: "Engineer", location: "Remote" }] },
+    "source-applytojob-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.baseline_replaced, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function main() {
   await testRequestSyncStartCastsEpochFields();
   await testRequestSyncStopCastsEpochFields();
@@ -976,6 +1146,11 @@ async function main() {
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();
+  await testPostgresSuggestionsUseMeiliWhenConfigured();
+  await testPostgresSuggestionsFallbackAvoidsUnaccentSeqScanPath();
+  await testPostgresCountsCacheReusesShortTtlSnapshot();
+  await testPayloadDriftDoesNotBootstrapEmptyShapes();
+  await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
   console.log("postgres sync-control bigint cast tests passed");
 }
 

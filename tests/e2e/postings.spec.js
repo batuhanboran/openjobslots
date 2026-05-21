@@ -11,7 +11,7 @@ const SEARCH_COMPATIBILITY_QUERIES = [
 ];
 
 const PROTECTED_PUBLIC_ROUTE_PREFIXES = ["/settings", "/mcp", "/applications"];
-const PROTECTED_PUBLIC_ROUTE_EXACT = ["/sync/status", "/sync/start", "/sync/stop", "/ingestion/status", "/postings/ignore"];
+const PROTECTED_PUBLIC_ROUTE_EXACT = ["/sync/start", "/sync/stop", "/postings/ignore"];
 
 function protectedPublicRouteLabel(rawUrl) {
   const url = new URL(rawUrl);

@@ -17,6 +17,7 @@
     "audit:data-quality": "node scripts/audit-data-quality.js",
     "audit:source-freshness": "node scripts/audit-source-freshness.js",
     "audit:growth": "node scripts/audit-growth.js",
+    "audit:worker-backlog": "node scripts/audit-worker-backlog.js",
     "source-quality:apply": "node scripts/apply-source-quality-protection.js",
     "ats:source:dry-run": "node scripts/ats-source-job.js --mode=dry-run",
     "ats:estimate-net-new": "node scripts/ats-estimate-net-new.js",
