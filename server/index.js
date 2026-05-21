@@ -29,6 +29,7 @@ const {
   getPostgresGrowthSummary,
   normalizeHours: normalizeGrowthHours
 } = require("./ingestion/growthSummary");
+const { createAtsRateLimitStateStore } = require("./ingestion/atsRateLimitStore");
 const { safeFetch } = require("./ingestion/safeFetch");
 const {
   createPostgresPool,
@@ -287,7 +288,9 @@ let postingLocationGeoFilterOptionsCache = {
   regions: []
 };
 const locationGeoInferenceCache = new Map();
-const atsRateLimitStateByKey = new Map();
+const atsRateLimitStore = createAtsRateLimitStateStore({
+  getPool: () => (DB_BACKEND === "postgres" ? postgresPool : null)
+});
 let atsRequestQueueConcurrency = ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT;
 let syncEnabledAts = new Set();
 const syncStatus = {
@@ -10083,23 +10086,8 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function toAtsRateLimitKey(value) {
-  const key = String(value || "").trim().toLowerCase();
-  return key || "default";
-}
-
 function getAtsRateLimitState(rateLimitKey) {
-  const normalizedKey = toAtsRateLimitKey(rateLimitKey);
-  let state = atsRateLimitStateByKey.get(normalizedKey);
-  if (!state) {
-    state = {
-      active: 0,
-      queue: [],
-      blockedUntilEpochMs: 0
-    };
-    atsRateLimitStateByKey.set(normalizedKey, state);
-  }
-  return state;
+  return atsRateLimitStore.getState(rateLimitKey);
 }
 
 function parseRetryAfterMilliseconds(value) {
@@ -10144,13 +10132,12 @@ function releaseAtsRequestSlot(rateLimitKey) {
   state.active = Math.max(0, state.active - 1);
 }
 
-function markAtsRateLimited(rateLimitKey, waitMs) {
-  const state = getAtsRateLimitState(rateLimitKey);
-  const ms = Math.max(0, Number(waitMs || 0));
-  state.blockedUntilEpochMs = Math.max(state.blockedUntilEpochMs, Date.now() + ms);
+async function markAtsRateLimited(rateLimitKey, waitMs) {
+  await atsRateLimitStore.markRateLimited(rateLimitKey, waitMs);
 }
 
 async function waitForAtsCooldown(rateLimitKey) {
+  await atsRateLimitStore.hydrateCooldown(rateLimitKey);
   const state = getAtsRateLimitState(rateLimitKey);
   while (true) {
     const waitMs = Number(state.blockedUntilEpochMs || 0) - Date.now();
@@ -10172,7 +10159,7 @@ async function fetchWithAtsRateLimit(rateLimitKey, fallbackWaitMs, url, init = {
       });
 
       if (res.status === 429) {
-        markAtsRateLimited(rateLimitKey, resolveAtsRateLimitWaitMs(res, fallbackWaitMs));
+        await markAtsRateLimited(rateLimitKey, resolveAtsRateLimitWaitMs(res, fallbackWaitMs));
         continue;
       }
 

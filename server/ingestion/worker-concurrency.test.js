@@ -10,6 +10,7 @@ const {
   extractHttpStatus,
   incrementHttpStatusCount,
   isSqliteBusyError,
+  markFetchRateLimitCooldown,
   withTransientWriteRetry,
   withWriteLock
 } = require("./worker");
@@ -107,6 +108,42 @@ test("http status metrics are extracted and counted", () => {
     429: 1,
     502: 1
   });
+});
+
+test("worker persists ATS cooldown after HTTP 429 fetch errors", async () => {
+  const calls = [];
+  const store = {
+    async markRateLimited(key, waitMs) {
+      calls.push({ key, waitMs });
+    }
+  };
+
+  const marked = await markFetchRateLimitCooldown(
+    store,
+    { atsKey: "bamboohr", settings: { rateLimitMs: 5000 } },
+    Object.assign(new Error("source fetch failed with HTTP 429"), { status: 429 }),
+    { fallbackMs: 60000 }
+  );
+
+  assert.equal(marked, true);
+  assert.deepEqual(calls, [{ key: "bamboohr", waitMs: 60000 }]);
+});
+
+test("worker does not persist cooldown for non-rate-limit fetch errors", async () => {
+  const store = {
+    async markRateLimited() {
+      throw new Error("should not persist cooldown");
+    }
+  };
+
+  const marked = await markFetchRateLimitCooldown(
+    store,
+    { atsKey: "bamboohr", settings: { rateLimitMs: 5000 } },
+    Object.assign(new Error("source fetch failed with HTTP 500"), { status: 500 }),
+    { fallbackMs: 60000 }
+  );
+
+  assert.equal(marked, false);
 });
 
 test("duplicate canonical postings are counted before read-model writes", () => {

@@ -12,6 +12,7 @@ const { hashPayload, writePostingCache } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
 const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
 const { DEFAULT_TTL_SECONDS, ensureIngestionTables, seedAtsSources } = require("./schema");
+const { createAtsRateLimitStateStore } = require("./atsRateLimitStore");
 const {
   createPostgresPool,
   ensurePostgresSchema,
@@ -75,6 +76,10 @@ const SQLITE_WRITE_RETRY_BASE_MS = Math.max(25, Math.floor(positiveNumber(
   process.env.INGESTION_SQLITE_WRITE_RETRY_BASE_MS,
   75
 )));
+const HTTP_429_COOLDOWN_MS = Math.max(1000, Math.floor(positiveNumber(
+  process.env.INGESTION_HTTP_429_COOLDOWN_MS,
+  60_000
+)));
 const MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN = Math.max(1, Math.floor(positiveNumber(
   process.env.INGESTION_MAX_CONSECUTIVE_FAILURES,
   8
@@ -89,6 +94,28 @@ let writeQueue = Promise.resolve();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForPersistedAtsCooldown(rateLimitStore, rateLimitKey, options = {}) {
+  if (!rateLimitStore || typeof rateLimitStore.hydrateCooldown !== "function") return;
+  const sleepFn = typeof options.sleep === "function" ? options.sleep : sleep;
+  const state = await rateLimitStore.hydrateCooldown(rateLimitKey);
+  while (true) {
+    const waitMs = Number(state?.blockedUntilEpochMs || 0) - Date.now();
+    if (waitMs <= 0) return;
+    await sleepFn(waitMs);
+  }
+}
+
+async function markFetchRateLimitCooldown(rateLimitStore, target, error, options = {}) {
+  if (!rateLimitStore || typeof rateLimitStore.markRateLimited !== "function") return false;
+  if (extractHttpStatus(error) !== 429) return false;
+  const fallbackMs = Math.max(
+    Number(options.fallbackMs || HTTP_429_COOLDOWN_MS),
+    Number(target?.settings?.rateLimitMs || 0)
+  );
+  await rateLimitStore.markRateLimited(target?.atsKey || "default", fallbackMs);
+  return true;
 }
 
 function isSqliteBusyError(error) {
@@ -1183,10 +1210,11 @@ async function markPostgresCompanyFailure(pool, target, error, nowEpoch) {
   );
 }
 
-async function processPostgresTarget(pool, runId, target, counters) {
+async function processPostgresTarget(pool, runId, target, counters, options = {}) {
   const nowEpoch = nowEpochSeconds();
   try {
     if (await postgresStopRequested(pool)) return "cancelled";
+    await waitForPersistedAtsCooldown(options.rateLimitStore, target.atsKey);
 
     let raw;
     try {
@@ -1277,6 +1305,7 @@ async function processPostgresTarget(pool, runId, target, counters) {
     counters.lastError = String(error?.message || error);
     const httpStatus = extractHttpStatus(error);
     incrementHttpStatusCount(counters, httpStatus);
+    await markFetchRateLimitCooldown(options.rateLimitStore, target, error);
     await markPostgresCompanyFailure(pool, target, error, nowEpoch);
     await recordPostgresRunError(pool, runId, target, error, httpStatus, classifyIngestionError(error));
     return "failed";
@@ -1305,6 +1334,7 @@ async function runPostgresIngestionOnce(pool, options = {}) {
   const targets = await selectPostgresDueTargets(pool, targetLimit);
   const runId = await createPostgresRun(pool, targets);
   const counters = createRunCounters();
+  const rateLimitStore = createAtsRateLimitStateStore({ pool });
   let cancelled = false;
 
   try {
@@ -1340,7 +1370,7 @@ async function runPostgresIngestionOnce(pool, options = {}) {
         try {
           if (cancelled) return;
           await updatePostgresRunCurrentTarget(pool, runId, target, counters);
-          const result = await processPostgresTarget(pool, runId, target, counters);
+        const result = await processPostgresTarget(pool, runId, target, counters, { rateLimitStore });
           if (result === "cancelled") {
             cancelled = true;
             return;
@@ -1611,6 +1641,7 @@ module.exports = {
   extractHttpStatus,
   incrementHttpStatusCount,
   isSqliteBusyError,
+  markFetchRateLimitCooldown,
   runPostgresIngestionOnce,
   runIngestionOnce,
   selectDueTargets,

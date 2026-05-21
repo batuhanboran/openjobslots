@@ -455,6 +455,15 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_search_index_outbox_due
       ON search_index_outbox(processed_at, available_at);
 
+    CREATE TABLE IF NOT EXISTS ats_rate_limits (
+      rate_limit_key TEXT PRIMARY KEY,
+      blocked_until_epoch_ms BIGINT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ats_rate_limits_blocked_until
+      ON ats_rate_limits(blocked_until_epoch_ms);
+
     CREATE TABLE IF NOT EXISTS sync_control (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       status TEXT NOT NULL DEFAULT 'idle',
