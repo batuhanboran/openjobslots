@@ -61,6 +61,14 @@ const SOURCE_DAILY_TARGET_BUDGET = Math.floor(nonNegativeNumber(
   process.env.INGESTION_SOURCE_DAILY_TARGET_BUDGET,
   100
 ));
+const DUE_TARGET_CANDIDATE_MULTIPLIER = Math.max(1, Math.floor(positiveNumber(
+  process.env.INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER,
+  8
+)));
+const DUE_TARGET_CANDIDATE_MAX = Math.max(1, Math.floor(positiveNumber(
+  process.env.INGESTION_DUE_TARGET_CANDIDATE_MAX,
+  5000
+)));
 const PER_HOST_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(
   process.env.INGESTION_PER_HOST_CONCURRENCY,
   1
@@ -765,6 +773,33 @@ async function ensurePostgresObservability(pool) {
   }
 }
 
+function dueTargetProtectionPriority(status) {
+  const normalized = String(status || "normal").trim().toLowerCase() || "normal";
+  if (normalized === "normal" || normalized === "public_enabled") return 0;
+  if (normalized === "canary_only") return 1;
+  if (normalized === "quarantine_only") return 2;
+  return 3;
+}
+
+function computeDueTargetCandidateLimit(targetLimit) {
+  const expanded = Math.ceil(Number(targetLimit || 0) * DUE_TARGET_CANDIDATE_MULTIPLIER);
+  return Math.max(targetLimit, Math.min(DUE_TARGET_CANDIDATE_MAX, expanded));
+}
+
+function sortDueTargetCandidates(rows = []) {
+  return [...rows].sort((left, right) => {
+    const protectionDelta = dueTargetProtectionPriority(left.protection_status) - dueTargetProtectionPriority(right.protection_status);
+    if (protectionDelta) return protectionDelta;
+    const leftRank = Number(left.ats_rank || 0);
+    const rightRank = Number(right.ats_rank || 0);
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    const nextDelta = Number(left.next_sync_epoch || 0) - Number(right.next_sync_epoch || 0);
+    if (nextDelta) return nextDelta;
+    return String(left.ats_key || "").localeCompare(String(right.ats_key || "")) ||
+      String(left.company_name || "").localeCompare(String(right.company_name || ""));
+  });
+}
+
 async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
   const nowEpoch = nowEpochSeconds();
   const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
@@ -772,6 +807,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
     MAX_TARGETS_PER_RUN,
     Math.floor(positiveNumber(limit, MAX_TARGETS_PER_RUN))
   ));
+  const candidateLimit = computeDueTargetCandidateLimit(targetLimit);
   const result = await pool.query(
     `
       WITH due_targets AS (
@@ -785,6 +821,13 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
           s.default_ttl_seconds,
           s.rate_limit_ms,
           COALESCE(st.next_sync_epoch, 0) AS next_sync_epoch,
+          CASE COALESCE(NULLIF(s.protection_status, ''), 'normal')
+            WHEN 'normal' THEN 0
+            WHEN 'public_enabled' THEN 0
+            WHEN 'canary_only' THEN 1
+            WHEN 'quarantine_only' THEN 2
+            ELSE 3
+          END AS protection_priority,
           row_number() OVER (
             PARTITION BY c.ats_key
             ORDER BY COALESCE(st.next_sync_epoch, 0) ASC, c.company_name ASC, c.url_string ASC
@@ -808,12 +851,14 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
         disabled_reason,
         default_ttl_seconds,
         rate_limit_ms,
-        next_sync_epoch
+        next_sync_epoch,
+        ats_rank,
+        protection_priority
       FROM due_targets
-      ORDER BY ats_rank ASC, next_sync_epoch ASC, ats_key ASC, company_name ASC
+      ORDER BY protection_priority ASC, ats_rank ASC, next_sync_epoch ASC, ats_key ASC, company_name ASC
       LIMIT $2;
     `,
-    [nowEpoch, targetLimit]
+    [nowEpoch, candidateLimit]
   );
 
   const targets = [];
@@ -833,7 +878,8 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
       sourceBudgetUsedToday.set(String(row.ats_key || ""), Number(row.count || 0));
     }
   }
-  for (const row of result.rows) {
+  for (const row of sortDueTargetCandidates(result.rows || [])) {
+    if (targets.length >= targetLimit) break;
     const sourcePolicy = getSourceSyncPolicy(row.ats_key, {
       protectionStatus: row.protection_status,
       disabledReason: row.disabled_reason
@@ -1636,11 +1682,13 @@ if (require.main === module) {
 }
 
 module.exports = {
+  computeDueTargetCandidateLimit,
   computeNextSyncEpoch,
   computeRetryEpoch,
   createRunCounters,
   classifyIngestionError,
   dedupeValidPosting,
+  dueTargetProtectionPriority,
   extractHttpStatus,
   incrementHttpStatusCount,
   isSqliteBusyError,
@@ -1649,6 +1697,7 @@ module.exports = {
   runIngestionOnce,
   selectDueTargets,
   selectPostgresDueTargets,
+  sortDueTargetCandidates,
   startWorker,
   startWorkerWithBackoff,
   withTransientWriteRetry,

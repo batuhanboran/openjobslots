@@ -7103,13 +7103,91 @@ function parsePinpointHqPostingsFromApi(companyNameForPostings, config, response
 }
 
 function formatRecruitCrmLocation(item) {
-  const city = String(item?.city || "").trim();
-  const locality = String(item?.locality || "").trim();
-  const state = String(item?.state || item?.province || item?.region || item?.state_name || "").trim();
-  const country = String(item?.country || item?.country_name || item?.countryCode || item?.country_code || "").trim();
-  const postalCode = String(item?.postalcode || "").trim();
-  const parts = [city, locality, state, country, postalCode].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
+  const parts = extractRecruitCrmLocationParts(item);
+  if (parts.locationText) return parts.locationText;
+  const values = [parts.city, parts.locality, parts.state, parts.country, parts.postalCode].filter(Boolean);
+  return values.length > 0 ? values.join(", ") : null;
+}
+
+function recruitCrmLocationObject(item = {}) {
+  const candidates = [
+    item?.location,
+    item?.job_location,
+    item?.jobLocation,
+    item?.job_location_data,
+    item?.work_location,
+    item?.workLocation,
+    item?.address
+  ];
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) return candidate;
+  }
+  return {};
+}
+
+function recruitCrmLocationText(item = {}) {
+  const direct = [
+    item?.location,
+    item?.job_location,
+    item?.jobLocation,
+    item?.location_name,
+    item?.locationName,
+    item?.work_location,
+    item?.workLocation
+  ].find((value) => typeof value === "string" && value.trim());
+  if (direct) return String(direct).trim();
+
+  const location = recruitCrmLocationObject(item);
+  return String(
+    location?.name ||
+      location?.label ||
+      location?.display_name ||
+      location?.displayName ||
+      location?.formatted_address ||
+      location?.formattedAddress ||
+      location?.address ||
+      ""
+  ).trim();
+}
+
+function extractRecruitCrmLocationParts(item = {}) {
+  const location = recruitCrmLocationObject(item);
+  const city = String(item?.city || location?.city || location?.city_name || location?.cityName || "").trim();
+  const locality = String(item?.locality || location?.locality || location?.suburb || "").trim();
+  const state = String(
+    item?.state ||
+      item?.province ||
+      item?.region ||
+      item?.state_name ||
+      location?.state ||
+      location?.province ||
+      location?.region ||
+      location?.state_name ||
+      location?.stateName ||
+      ""
+  ).trim();
+  const country = String(
+    item?.country ||
+      item?.country_name ||
+      item?.countryCode ||
+      item?.country_code ||
+      location?.country ||
+      location?.country_name ||
+      location?.countryName ||
+      location?.countryCode ||
+      location?.country_code ||
+      ""
+  ).trim();
+  const postalCode = String(item?.postalcode || item?.postal_code || location?.postalcode || location?.postal_code || "").trim();
+  const locationText = recruitCrmLocationText(item);
+  return {
+    city,
+    locality,
+    state,
+    country,
+    postalCode,
+    locationText
+  };
 }
 
 function normalizeRecruitCrmJobUrl(config = {}, itemUrlRaw, slug) {
@@ -7178,14 +7256,16 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
           ""
       ).trim() || null;
     const remoteType = normalizeRecruitCrmRemoteType(item);
-    const sourceCountry = String(item?.country || item?.country_name || item?.countryCode || item?.country_code || "").trim();
-    const sourceCity = String(item?.city || "").trim();
-    const sourceState = String(item?.state || item?.province || item?.region || item?.state_name || "").trim();
-    const sourceLocality = String(item?.locality || "").trim();
-    const sourcePostalCode = String(item?.postalcode || "").trim();
+    const locationParts = extractRecruitCrmLocationParts(item);
+    const sourceCountry = locationParts.country;
+    const sourceCity = locationParts.city;
+    const sourceState = locationParts.state;
+    const sourceLocality = locationParts.locality;
+    const sourcePostalCode = locationParts.postalCode;
+    const formattedLocation = formatRecruitCrmLocation(item);
     const hasStructuredGeo = Boolean(sourceCity || sourceLocality || sourceState || sourceCountry || sourcePostalCode);
     const sourceFailureReasons = [];
-    if (remoteType === "onsite" && !hasStructuredGeo) {
+    if (remoteType === "onsite" && !hasStructuredGeo && !formattedLocation) {
       sourceFailureReasons.push("no_structured_location");
     }
     const sourceJobId =
@@ -7200,13 +7280,25 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
       position_name: rawTitle && !isRecruitCrmPlaceholderTitle(rawTitle) ? rawTitle : "Untitled Position",
       job_posting_url: itemUrl,
       posting_date: postingDate,
-      location: remoteType === "remote" ? "Remote" : formatRecruitCrmLocation(item),
+      location: remoteType === "remote" ? "Remote" : formattedLocation,
       city: sourceCity || null,
       state: sourceState || null,
-      country: normalizeCountryName(sourceCountry) || normalizeCountryFromLocation(sourceCountry) || null,
+      country: normalizeCountryName(sourceCountry) ||
+        normalizeCountryFromLocation(sourceCountry) ||
+        normalizeCountryFromLocation(formattedLocation) ||
+        null,
       remote_type: remoteType || null,
       employment_type: String(item?.employment_type || "").trim() || null,
       department: String(item?.department || "").trim() || null,
+      source_evidence: {
+        route_kind: "recruitcrm_jobs_api",
+        location_source: formattedLocation ? "list_api" : "",
+        location_path: formattedLocation ? "location/job_location/city/state/country" : "",
+        remote_source: remoteType ? "list_api" : "",
+        remote_path: remoteType ? "remote/workplace_type" : "",
+        posting_date_source: postingDate ? "list_api" : "",
+        posting_date_path: postingDate ? "posted_at/published_at/created_at/updated_at" : ""
+      },
       source_failure_reasons: sourceFailureReasons
     });
     seenUrls.add(itemUrl);

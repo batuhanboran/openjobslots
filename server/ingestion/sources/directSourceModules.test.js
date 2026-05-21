@@ -182,6 +182,51 @@ test("recruitcrm source module keeps remote evidence source-specific", () => {
   assert.equal(source.validatePublic(onsite).status, "accepted");
 });
 
+test("recruitcrm source module preserves nested and string location evidence", () => {
+  const { source, company } = recruitCrmFixtureContext();
+  const parsed = source.parse({
+    data: {
+      jobs: [
+        {
+          id: "rc-geo-object",
+          name: "Berlin Delivery Lead",
+          slug: "berlin-delivery-lead",
+          posted_at: "2026-05-09",
+          remote: "0",
+          location: {
+            city: "Berlin",
+            state: "Berlin",
+            country: "Germany"
+          }
+        },
+        {
+          id: "rc-geo-string",
+          name: "Lisbon Success Manager",
+          slug: "lisbon-success-manager",
+          posted_at: "2026-05-09",
+          remote: "0",
+          job_location: "Lisbon, Portugal"
+        }
+      ]
+    }
+  }, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const objectLocation = byId.get("rc-geo-object");
+  assert.equal(objectLocation.location_text, "Berlin, Berlin, Germany");
+  assert.equal(objectLocation.city, "Berlin");
+  assert.equal(objectLocation.country, "Germany");
+  assert.equal(objectLocation.remote_type, "onsite");
+  assert.equal(source.validatePublic(objectLocation).status, "accepted");
+
+  const stringLocation = byId.get("rc-geo-string");
+  assert.equal(stringLocation.location_text, "Lisbon, Portugal");
+  assert.equal(stringLocation.country, "Portugal");
+  assert.equal(stringLocation.remote_type, "onsite");
+  assert.equal(source.validatePublic(stringLocation).status, "accepted");
+});
+
 test("recruitcrm source module quarantines malformed or unsupported raw list shapes", () => {
   const { source, company } = recruitCrmFixtureContext();
   const malformed = readJson(path.join(__dirname, "recruitcrm", "fixtures", "malformed-list-shapes.json"));

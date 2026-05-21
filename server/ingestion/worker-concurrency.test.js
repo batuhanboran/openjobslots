@@ -11,6 +11,7 @@ const {
   incrementHttpStatusCount,
   isSqliteBusyError,
   markFetchRateLimitCooldown,
+  selectPostgresDueTargets,
   withTransientWriteRetry,
   withWriteLock
 } = require("./worker");
@@ -158,4 +159,67 @@ test("duplicate canonical postings are counted before read-model writes", () => 
   assert.equal(second, false);
   assert.equal(third, true);
   assert.equal(counters.duplicateCount, 1);
+});
+
+test("postgres due target selection over-selects when early sources exhaust daily budget", async () => {
+  const rows = [
+    {
+      id: 1,
+      company_name: "Budgeted Bamboo One",
+      url_string: "https://budgeted-one.bamboohr.com/careers",
+      ats_key: "bamboohr",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 1
+    },
+    {
+      id: 2,
+      company_name: "Budgeted Bamboo Two",
+      url_string: "https://budgeted-two.bamboohr.com/careers",
+      ats_key: "bamboohr",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 2
+    },
+    {
+      id: 3,
+      company_name: "Healthy ApplyToJob",
+      url_string: "https://healthy.applytojob.com/apply",
+      ats_key: "applytojob",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 3
+    },
+    {
+      id: 4,
+      company_name: "Healthy Breezy",
+      url_string: "https://healthy.breezy.hr",
+      ats_key: "breezy",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 4
+    }
+  ];
+  let candidateLimit = 0;
+  const pool = {
+    async query(sql, params) {
+      if (String(sql).includes("WITH due_targets")) {
+        candidateLimit = Number(params[1] || 0);
+        return { rows: rows.slice(0, candidateLimit) };
+      }
+      if (String(sql).includes("FROM company_sync_state")) {
+        return { rows: [{ ats_key: "bamboohr", count: 100 }] };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const targets = await selectPostgresDueTargets(pool, 2);
+
+  assert.ok(candidateLimit > 2, "candidate query should over-select beyond the run target limit");
+  assert.deepEqual(targets.map((target) => target.atsKey), ["applytojob", "breezy"]);
 });
