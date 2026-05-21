@@ -45,6 +45,26 @@ test("source fetch URL guard rejects DNS answers in private ranges", async () =>
   );
 });
 
+test("safeFetch pins the transport request to the validated DNS answer", async () => {
+  let lookupCount = 0;
+  const response = await safeFetch("https://example.com/jobs", {}, {
+    lookup: async () => {
+      lookupCount += 1;
+      return [{ address: "93.184.216.34", family: 4 }];
+    },
+    requester: async (target, init) => {
+      assert.equal(target.parsed.hostname, "example.com");
+      assert.deepEqual(target.addresses, [{ address: "93.184.216.34", family: 4 }]);
+      assert.equal(init.redirect, "manual");
+      return new Response("ok", { status: 200 });
+    }
+  });
+
+  assert.equal(lookupCount, 1);
+  assert.equal(response.url, "https://example.com/jobs");
+  assert.equal(await response.text(), "ok");
+});
+
 test("private address classifier covers loopback, private, link-local, and documentation ranges", () => {
   assert.equal(isPrivateAddress("127.0.0.1"), true);
   assert.equal(isPrivateAddress("10.1.2.3"), true);

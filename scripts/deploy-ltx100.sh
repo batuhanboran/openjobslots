@@ -11,6 +11,7 @@ BASE_URL="${BASE_URL:-http://127.0.0.1:8081}"
 DEPLOY_KEY="${DEPLOY_KEY:-REDACTED}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
 FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-3}"
+ORIGIN_PORT="${OPENJOBSLOTS_ORIGIN_PORT:-8081}"
 
 if [[ -f "$DEPLOY_KEY" && -z "${GIT_SSH_COMMAND:-}" ]]; then
   export GIT_SSH_COMMAND="ssh -i ${DEPLOY_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
@@ -27,7 +28,90 @@ log() {
   echo "$(date -Is) $*" | tee -a "$LOG_FILE"
 }
 
+ensure_docker_user_rule() {
+  local bin="$1"
+  shift
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    return 0
+  fi
+  "$bin" -N DOCKER-USER >/dev/null 2>&1 || true
+  if "$bin" -C DOCKER-USER "$@" >/dev/null 2>&1; then
+    return 0
+  fi
+  "$bin" -A DOCKER-USER "$@"
+}
+
+delete_docker_user_rule() {
+  local bin="$1"
+  shift
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    return 0
+  fi
+  while "$bin" -C DOCKER-USER "$@" >/dev/null 2>&1; do
+    "$bin" -D DOCKER-USER "$@"
+  done
+}
+
+harden_origin_port() {
+  local port="$1"
+  if [[ -z "$port" || "$port" == "0" ]]; then
+    return 0
+  fi
+  if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+    log "skipping origin firewall hardening: invalid OPENJOBSLOTS_ORIGIN_PORT=$port"
+    return 0
+  fi
+
+  local ipv4_sources=(
+    "131.0.72.0/22"
+    "172.64.0.0/13"
+    "104.24.0.0/14"
+    "104.16.0.0/13"
+    "162.158.0.0/15"
+    "198.41.128.0/17"
+    "197.234.240.0/22"
+    "188.114.96.0/20"
+    "190.93.240.0/20"
+    "108.162.192.0/18"
+    "141.101.64.0/18"
+    "103.31.4.0/22"
+    "103.22.200.0/22"
+    "103.21.244.0/22"
+    "173.245.48.0/20"
+    "192.168.0.0/16"
+    "172.16.0.0/12"
+    "10.0.0.0/8"
+    "127.0.0.0/8"
+  )
+  local ipv6_sources=(
+    "2400:cb00::/32"
+    "2606:4700::/32"
+    "2803:f800::/32"
+    "2405:b500::/32"
+    "2405:8100::/32"
+    "2a06:98c0::/29"
+    "2c0f:f248::/32"
+    "::1/128"
+    "fc00::/7"
+    "fe80::/10"
+  )
+
+  delete_docker_user_rule iptables -p tcp -m conntrack --ctorigdstport "$port" -j DROP
+  for source in "${ipv4_sources[@]}"; do
+    ensure_docker_user_rule iptables -s "$source" -p tcp -m conntrack --ctorigdstport "$port" -j RETURN
+  done
+  ensure_docker_user_rule iptables -p tcp -m conntrack --ctorigdstport "$port" -j DROP
+
+  delete_docker_user_rule ip6tables -p tcp -m conntrack --ctorigdstport "$port" -j DROP
+  for source in "${ipv6_sources[@]}"; do
+    ensure_docker_user_rule ip6tables -s "$source" -p tcp -m conntrack --ctorigdstport "$port" -j RETURN
+  done
+  ensure_docker_user_rule ip6tables -p tcp -m conntrack --ctorigdstport "$port" -j DROP
+  log "origin firewall hardening ensured for docker-published port $port"
+}
+
 cd "$APP_DIR"
+harden_origin_port "$ORIGIN_PORT"
 
 LOCAL_SHA="$(git rev-parse HEAD)"
 log "checking $REMOTE/$BRANCH from $LOCAL_SHA"
