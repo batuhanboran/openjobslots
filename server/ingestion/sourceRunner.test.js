@@ -5,6 +5,7 @@ const {
   buildCandidateReport,
   buildQualityGapFlags,
   candidateDetailEvidenceUrl,
+  classifySourceCandidateErrorType,
   getSafetyGate,
   parseArgs,
   discoverSourceTargets,
@@ -151,6 +152,11 @@ test("source runner report classifies geo/remote gaps without assigning missing 
   assert.equal(flags.weak_unknown_remote, true);
   assert.equal(flags.no_geo_no_remote, true);
   assert.equal(flags.detail_evidence_found, false);
+});
+
+test("source runner keeps source-quality blocks out of parser validation errors", () => {
+  assert.equal(classifySourceCandidateErrorType("source_disabled_by_threshold"), "source_quality");
+  assert.equal(classifySourceCandidateErrorType("missing source_job_id"), "parser_validation");
 });
 
 test("source runner detail evidence sampling is dry-run only and bounded", async () => {

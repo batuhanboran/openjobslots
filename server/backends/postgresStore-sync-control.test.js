@@ -201,6 +201,7 @@ async function testParserAttentionGroupsCareerplugRejectionReasons() {
 
   assert.match(captured.sql, /jsonb_agg/);
   assert.match(captured.sql, /GROUP BY e3\.error_message/);
+  assert.match(captured.sql, /source_disabled_by_threshold/);
   assert.deepEqual(captured.params, [100]);
   assert.deepEqual(result, [{
     ats_key: "careerplug",
@@ -243,6 +244,7 @@ async function testAtsFieldQualityReportsFieldGapsByAts() {
 
   assert.match(captured.sql, /COUNT\(\*\) FILTER/);
   assert.match(captured.sql, /missing_description_plain_count/);
+  assert.match(captured.sql, /source_disabled_by_threshold/);
   assert.deepEqual(captured.params, [["icims"]]);
   assert.equal(result[0].ats_key, "icims");
   assert.equal(result[0].missing_country_pct, 79);

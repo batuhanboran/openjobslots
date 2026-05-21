@@ -13,6 +13,7 @@ const {
   indexablePostingsWhereClause,
   parseReindexArgs,
   runReindex,
+  summarizeSampleMismatches,
   validateMeiliIndexAgainstPostgres,
   validateMeiliSettings
 } = require("./reindex-meili-from-postgres");
@@ -156,6 +157,31 @@ test("Meili parity comparison reports field mismatches", () => {
     remote_type: "unknown"
   });
   assert.deepEqual(mismatches.map((item) => item.field), ["country", "remote_type"]);
+});
+
+test("Meili sample mismatch summary separates missing documents from field drift", () => {
+  const summary = summarizeSampleMismatches([
+    {
+      canonical_url: "https://example.com/missing",
+      mismatches: [{ field: "id", expected: "abc", actual: null }]
+    },
+    {
+      canonical_url: "https://example.com/field",
+      mismatches: [
+        { field: "country", expected: "Turkey", actual: "" },
+        { field: "remote_type", expected: "remote", actual: "unknown" }
+      ]
+    }
+  ]);
+
+  assert.deepEqual(summary, {
+    missing_documents: 1,
+    field_mismatches: 2,
+    fields: {
+      country: 1,
+      remote_type: 1
+    }
+  });
 });
 
 test("Meili settings validation accepts expected production settings", () => {

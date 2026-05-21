@@ -191,6 +191,9 @@ function classifyIngestionError(error, fallback = "fetch") {
   const explicit = String(error?.ingestionErrorType || error?.errorType || "").trim();
   if (explicit) return explicit;
   const message = String(error?.message || error || "").toLowerCase();
+  if (message.includes("source_disabled_by_threshold") || message.includes("source_auto_disabled") || message.includes("source_quarantine_only")) {
+    return "source_quality";
+  }
   if (message.includes("no_geo_no_remote") || message.includes("ambiguous_location") || message.includes("weak_remote_evidence")) {
     return "parser_quarantine";
   }

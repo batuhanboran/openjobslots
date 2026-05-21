@@ -995,6 +995,21 @@ async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
   return suggestions.slice(0, resolvedLimit);
 }
 
+function parserAttentionPredicate(alias = "") {
+  const prefix = alias ? `${alias}.` : "";
+  return `
+    ${prefix}error_type LIKE 'parser_%'
+    AND NOT (
+      ${prefix}error_type = 'parser_validation'
+      AND lower(btrim(coalesce(${prefix}error_message, ''))) IN (
+        'source_disabled_by_threshold',
+        'source_auto_disabled',
+        'source_quarantine_only'
+      )
+    )
+  `;
+}
+
 async function getPostgresParserAttentionByAts(pool, limit = 20) {
   const rows = await pool.query(
     `
@@ -1006,7 +1021,7 @@ async function getPostgresParserAttentionByAts(pool, limit = 20) {
           SELECT e2.error_message
           FROM ingestion_run_errors e2
           WHERE e2.ats_key = ingestion_run_errors.ats_key
-            AND e2.error_type LIKE 'parser_%'
+            AND ${parserAttentionPredicate("e2")}
           ORDER BY e2.id DESC
           LIMIT 1
         ) AS latest_error,
@@ -1017,7 +1032,7 @@ async function getPostgresParserAttentionByAts(pool, limit = 20) {
             FROM ingestion_run_errors e3
             WHERE e3.ats_key = ingestion_run_errors.ats_key
               AND e3.created_at >= now() - interval '24 hours'
-              AND e3.error_type LIKE 'parser_%'
+              AND ${parserAttentionPredicate("e3")}
             GROUP BY e3.error_message
             ORDER BY error_count DESC, e3.error_message ASC
             LIMIT 5
@@ -1025,7 +1040,7 @@ async function getPostgresParserAttentionByAts(pool, limit = 20) {
         ) AS reasons
       FROM ingestion_run_errors
       WHERE created_at >= now() - interval '24 hours'
-        AND error_type LIKE 'parser_%'
+        AND ${parserAttentionPredicate()}
       GROUP BY ats_key
       ORDER BY error_count DESC, latest_error_at DESC
       LIMIT $1;
@@ -1136,7 +1151,7 @@ async function getPostgresAtsFieldQualityByAts(pool, atsKeys = []) {
         SELECT ats_key, COUNT(*)::int AS parser_attention_count_24h
         FROM ingestion_run_errors
         WHERE created_at >= now() - interval '24 hours'
-          AND error_type LIKE 'parser_%'
+          AND ${parserAttentionPredicate()}
         GROUP BY ats_key
       )
       SELECT
@@ -1687,7 +1702,7 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
       errors AS (
         SELECT
           ats_key,
-          COUNT(*) FILTER (WHERE error_type LIKE 'parser_%')::bigint AS parser_failure_events,
+          COUNT(*) FILTER (WHERE ${parserAttentionPredicate()})::bigint AS parser_failure_events,
           COUNT(*) FILTER (WHERE http_status >= 400 OR error_type = 'fetch')::bigint AS http_failure_events
         FROM ingestion_run_errors
         WHERE created_at >= now() - interval '24 hours'
@@ -2129,7 +2144,7 @@ async function getPostgresSyncStatus(pool) {
       `,
       [Math.floor(Date.now() / 1000)]
     ),
-    pool.query("SELECT COUNT(*)::int AS count FROM ingestion_run_errors WHERE created_at >= now() - interval '24 hours' AND error_type LIKE 'parser_%';")
+    pool.query(`SELECT COUNT(*)::int AS count FROM ingestion_run_errors WHERE created_at >= now() - interval '24 hours' AND ${parserAttentionPredicate()};`)
   ]);
   const run = latestRun.rows[0] || {};
   const failedRun = latestFailedRun.rows[0] || {};

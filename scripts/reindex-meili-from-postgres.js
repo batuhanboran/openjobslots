@@ -437,6 +437,26 @@ async function getSampleDocumentMismatches(pool, config, indexName, sampleLimit)
   return { sampled: rows.length, sample_mismatches: samples };
 }
 
+function summarizeSampleMismatches(samples = []) {
+  const summary = {
+    missing_documents: 0,
+    field_mismatches: 0,
+    fields: {}
+  };
+  for (const sample of Array.isArray(samples) ? samples : []) {
+    for (const mismatch of Array.isArray(sample?.mismatches) ? sample.mismatches : []) {
+      const field = String(mismatch?.field || "unknown");
+      if (field === "id" && mismatch?.actual == null) {
+        summary.missing_documents += 1;
+        continue;
+      }
+      summary.field_mismatches += 1;
+      summary.fields[field] = Number(summary.fields[field] || 0) + 1;
+    }
+  }
+  return summary;
+}
+
 async function runSampleSearches(config, indexName, queries = DEFAULT_SAMPLE_QUERIES) {
   const results = [];
   for (const query of queries) {
@@ -496,6 +516,7 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
     meili_settings_mismatches: settingsValidation.mismatches || [],
     sampled: samples.sampled,
     sample_mismatches: samples.sample_mismatches,
+    sample_mismatch_summary: summarizeSampleMismatches(samples.sample_mismatches),
     sample_searches: sampleSearches
   };
 }
@@ -807,6 +828,7 @@ module.exports = {
   meiliRequest,
   parseReindexArgs,
   runReindex,
+  summarizeSampleMismatches,
   tempIndexUid,
   validateMeiliIndexAgainstPostgres,
   validateMeiliSettings,

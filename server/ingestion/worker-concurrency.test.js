@@ -56,6 +56,7 @@ test("worker write lock serializes concurrent sqlite transactions", async () => 
 
 test("ingestion error classifier separates parser attention from fetch failures", () => {
   assert.equal(classifyIngestionError(new Error("missing job_posting_url")), "parser_validation");
+  assert.equal(classifyIngestionError(new Error("source_disabled_by_threshold")), "source_quality");
   assert.equal(classifyIngestionError(new Error("placeholder company_name")), "source_discovery");
   assert.equal(classifyIngestionError(new Error("Unexpected token < in JSON")), "parser_parse");
   assert.equal(classifyIngestionError(new Error("iCIMS request failed (502)")), "fetch");

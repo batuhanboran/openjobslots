@@ -632,6 +632,18 @@ function buildQualityGapFlags(normalized = {}, status = "", reasonCodes = []) {
   };
 }
 
+function classifySourceCandidateErrorType(reason, fallback = "parser_validation") {
+  const normalized = clean(reason, 120).toLowerCase();
+  if ([
+    "source_disabled_by_threshold",
+    "source_auto_disabled",
+    "source_quarantine_only"
+  ].includes(normalized)) {
+    return "source_quality";
+  }
+  return fallback;
+}
+
 function buildCandidateReport(target, normalized, status, gate, validation, detailEscalation) {
   const reasonCodes = Array.from(new Set([
     ...(Array.isArray(validation?.reason_codes) ? validation.reason_codes : []),
@@ -908,7 +920,7 @@ async function processTarget(pool, target, options, summary, runId) {
       summary.rejected_count += 1;
       incrementCounter(summary.parser_failure_reasons, validation?.error || "rejected");
       await recordSourceRunError(pool, runId, target, new Error(validation?.error || "rejected"), {
-        errorType: "parser_validation",
+        errorType: classifySourceCandidateErrorType(validation?.error),
         parserReason: validation?.error || "rejected"
       });
     }
@@ -1116,6 +1128,7 @@ module.exports = {
   buildCandidateReport,
   buildQualityGapFlags,
   candidateDetailEvidenceUrl,
+  classifySourceCandidateErrorType,
   evaluateSourceCandidate,
   getVirtualSourceTarget,
   getVirtualSourceTargetCount,
