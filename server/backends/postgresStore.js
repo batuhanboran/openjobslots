@@ -2601,6 +2601,264 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
   return { ok: true, processed: rows.length, deleted: deleteUrls.length, upserted: upsertPayloads.length };
 }
 
+function normalizePublicSearchQuery(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 160);
+}
+
+function normalizePublicSearchEventType(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (normalized === "suggest" || normalized === "search_suggest") return "suggest";
+  if (normalized === "filter_options" || normalized === "postings_filter_options") return "filter_options";
+  return "postings";
+}
+
+function boundedIntegerOrNull(value, min = 0, max = 2_000_000) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(min, Math.min(max, Math.floor(number)));
+}
+
+function countFilterValues(value) {
+  if (Array.isArray(value)) return value.filter((item) => String(item || "").trim()).length;
+  return parseCsv(value).length;
+}
+
+function getReferrerHost(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw === "-") return "";
+  try {
+    return new URL(raw).hostname.toLowerCase().slice(0, 120);
+  } catch {
+    return "";
+  }
+}
+
+function getUserAgentFamily(value) {
+  const ua = String(value || "").trim();
+  if (!ua) return "";
+  if (/bot|crawler|spider|preview|prefetch/i.test(ua)) return "Bot";
+  if (/curl|wget|httpie/i.test(ua)) return "CLI";
+  if (/powershell/i.test(ua)) return "PowerShell";
+  if (/firefox/i.test(ua)) return "Firefox";
+  if (/edg\//i.test(ua)) return "Edge";
+  if (/chrome|chromium|crios/i.test(ua)) return "Chrome";
+  if (/safari/i.test(ua)) return "Safari";
+  if (/android/i.test(ua)) return "Android";
+  if (/iphone|ipad|ios/i.test(ua)) return "iOS";
+  return "Other";
+}
+
+async function recordPostgresPublicSearchEvent(pool, event = {}) {
+  if (!pool) return { ok: true, skipped: true, reason: "no_pool" };
+  const query = normalizePublicSearchQuery(event.search);
+  const normalizedQuery = normalizeText(query).slice(0, 160);
+  const values = [
+    normalizePublicSearchEventType(event.eventType),
+    query,
+    normalizedQuery,
+    boundedIntegerOrNull(event.resultCount),
+    boundedIntegerOrNull(event.resultItems),
+    boundedIntegerOrNull(event.limit, 0, 2000),
+    boundedIntegerOrNull(event.offset, 0, 1000000),
+    String(event.sortBy || "").trim().toLowerCase().slice(0, 40),
+    String(event.remote || "").trim().toLowerCase().slice(0, 40),
+    countFilterValues(event.ats),
+    countFilterValues(event.countries),
+    getReferrerHost(event.referrer),
+    getUserAgentFamily(event.userAgent),
+    String(event.cacheStatus || "").trim().toUpperCase().slice(0, 12),
+    countFilterValues(event.regions)
+  ];
+  await pool.query(
+    `
+      INSERT INTO public_search_events (
+        event_type,
+        query,
+        query_normalized,
+        result_count,
+        result_items,
+        limit_value,
+        offset_value,
+        sort_by,
+        remote_filter,
+        ats_filter_count,
+        country_filter_count,
+        referrer_host,
+        user_agent_family,
+        cache_status,
+        region_filter_count
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
+    `,
+    values
+  );
+  return { ok: true };
+}
+
+function normalizeAnalyticsDate(value, now = new Date()) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw || raw === "today") return now.toISOString().slice(0, 10);
+  if (raw === "yesterday") {
+    const date = new Date(now.getTime() - DAY_SECONDS * 1000);
+    return date.toISOString().slice(0, 10);
+  }
+  const match = raw.match(/^\d{4}-\d{2}-\d{2}$/);
+  return match ? raw : now.toISOString().slice(0, 10);
+}
+
+function normalizeAnalyticsTimezone(value) {
+  const timezone = String(value || "Europe/Istanbul").trim();
+  return /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/.test(timezone) ? timezone : "Europe/Istanbul";
+}
+
+function analyticsDateWhere() {
+  return `
+    created_at >= ($1::date::timestamp AT TIME ZONE $2)
+    AND created_at < (($1::date + interval '1 day')::timestamp AT TIME ZONE $2)
+  `;
+}
+
+function toCountMap(rows, keyField) {
+  const result = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const key = String(row?.[keyField] || "").trim() || "unknown";
+    result[key] = Number(row?.count || 0);
+  }
+  return result;
+}
+
+function mapTopTermRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    query: String(row.query_normalized || "").trim(),
+    count: Number(row.count || 0),
+    first_seen_at: row.first_seen_at || null,
+    last_seen_at: row.last_seen_at || null
+  }));
+}
+
+async function getPostgresPublicSearchReport(pool, options = {}) {
+  if (!pool) return { ok: true, skipped: true, reason: "no_pool" };
+  const date = normalizeAnalyticsDate(options.date, options.now instanceof Date ? options.now : new Date());
+  const timezone = normalizeAnalyticsTimezone(options.timezone);
+  const limit = Math.max(1, Math.min(50, Number(options.limit || 15)));
+  const where = analyticsDateWhere();
+  const values = [date, timezone];
+  const [eventCounts, topTerms, topFinalPostings, topSuggestInputs, topFilterSearches, topReferrers, topUserAgents] = await Promise.all([
+    pool.query(
+      `
+        SELECT event_type, COUNT(*)::int AS count
+        FROM public_search_events
+        WHERE ${where}
+        GROUP BY event_type
+        ORDER BY count DESC, event_type ASC;
+      `,
+      values
+    ),
+    pool.query(
+      `
+        SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
+        FROM public_search_events
+        WHERE ${where}
+          AND query_normalized <> ''
+        GROUP BY query_normalized
+        ORDER BY count DESC, query_normalized ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
+        FROM public_search_events
+        WHERE ${where}
+          AND event_type = 'postings'
+          AND query_normalized <> ''
+        GROUP BY query_normalized
+        ORDER BY count DESC, query_normalized ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
+        FROM public_search_events
+        WHERE ${where}
+          AND event_type = 'suggest'
+          AND query_normalized <> ''
+        GROUP BY query_normalized
+        ORDER BY count DESC, query_normalized ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
+        FROM public_search_events
+        WHERE ${where}
+          AND event_type = 'filter_options'
+          AND query_normalized <> ''
+        GROUP BY query_normalized
+        ORDER BY count DESC, query_normalized ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT referrer_host, COUNT(*)::int AS count
+        FROM public_search_events
+        WHERE ${where}
+          AND referrer_host <> ''
+        GROUP BY referrer_host
+        ORDER BY count DESC, referrer_host ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT user_agent_family, COUNT(*)::int AS count
+        FROM public_search_events
+        WHERE ${where}
+          AND user_agent_family <> ''
+        GROUP BY user_agent_family
+        ORDER BY count DESC, user_agent_family ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    )
+  ]);
+
+  return {
+    ok: true,
+    read_only: true,
+    date,
+    timezone,
+    event_counts: toCountMap(eventCounts.rows, "event_type"),
+    top_terms: mapTopTermRows(topTerms.rows),
+    top_final_posting_searches: mapTopTermRows(topFinalPostings.rows),
+    top_suggest_inputs: mapTopTermRows(topSuggestInputs.rows),
+    top_filter_option_searches: mapTopTermRows(topFilterSearches.rows),
+    top_referrers: (topReferrers.rows || []).map((row) => ({
+      host: String(row.referrer_host || "").trim(),
+      count: Number(row.count || 0)
+    })),
+    top_user_agent_families: (topUserAgents.rows || []).map((row) => ({
+      family: String(row.user_agent_family || "").trim(),
+      count: Number(row.count || 0)
+    }))
+  };
+}
+
 module.exports = {
   buildSearchRankSql,
   applyPostgresSourceQualityProtection,
@@ -2615,6 +2873,7 @@ module.exports = {
   getPostgresParserAdmin,
   getPostgresParserAttentionByAts,
   getPostgresPostingDiagnostics,
+  getPostgresPublicSearchReport,
   getPostgresQualitySummary,
   getPostgresQuarantineSummary,
   getPostgresSourceRunStatus,
@@ -2634,6 +2893,7 @@ module.exports = {
   normalizeAtsKey,
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
+  recordPostgresPublicSearchEvent,
   requestSyncStart,
   requestSyncStop,
   upsertPostgresPostings

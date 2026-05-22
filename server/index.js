@@ -48,6 +48,7 @@ const {
   getPostgresParserAdmin,
   getPostgresParserAttentionByAts,
   getPostgresPostingDiagnostics,
+  getPostgresPublicSearchReport,
   getPostgresQualitySummary,
   getPostgresQuarantineSummary,
   getPostgresSourceRunStatus,
@@ -60,6 +61,7 @@ const {
   listPostgresParserDriftEvents,
   listPostgresRejections,
   listPostgresPostings,
+  recordPostgresPublicSearchEvent,
   requestSyncStart,
   requestSyncStop
 } = require("./backends/postgresStore");
@@ -1463,16 +1465,29 @@ function getPublicReadCacheKey(req) {
   return `${authScope}:${req.method}:${req.originalUrl || req.url || req.path || ""}`;
 }
 
-async function sendCachedPublicJson(req, res, cache, producer) {
+function callPublicJsonPayloadHook(hook, req, payload, info) {
+  if (typeof hook !== "function") return;
+  try {
+    Promise.resolve(hook(payload, info)).catch((error) => {
+      console.warn("[openjobslots] public_json_payload_hook_failed", String(error?.message || error));
+    });
+  } catch (error) {
+    console.warn("[openjobslots] public_json_payload_hook_failed", String(error?.message || error));
+  }
+}
+
+async function sendCachedPublicJson(req, res, cache, producer, options = {}) {
   const key = getPublicReadCacheKey(req);
   const cached = cache.get(key);
   if (cached) {
     res.setHeader("X-OpenJobSlots-Cache", "HIT");
+    callPublicJsonPayloadHook(options.afterPayload, req, cached, { cacheStatus: "HIT" });
     return res.json(cached);
   }
   const payload = await producer();
   cache.set(key, payload);
   res.setHeader("X-OpenJobSlots-Cache", "MISS");
+  callPublicJsonPayloadHook(options.afterPayload, req, payload, { cacheStatus: "MISS" });
   return res.json(payload);
 }
 
@@ -18236,6 +18251,7 @@ function createServer() {
     getPostgresParserAttentionByAts,
     getPostgresParserStats,
     getPostgresPostingDiagnostics,
+    getPostgresPublicSearchReport,
     getPostgresQualitySummary,
     getPostgresQuarantineSummary,
     getPostgresSourceQualityDashboard,
@@ -18282,6 +18298,7 @@ function createServer() {
     readMeiliReindexStatus,
     readSourceQualityThresholds,
     renderSeoIndexHtml,
+    recordPostgresPublicSearchEvent,
     requestSyncStart,
     requestSyncStop,
     runWorkdaySync,

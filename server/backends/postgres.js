@@ -455,6 +455,34 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_search_index_outbox_due
       ON search_index_outbox(processed_at, available_at);
 
+    CREATE TABLE IF NOT EXISTS public_search_events (
+      id BIGSERIAL PRIMARY KEY,
+      event_type TEXT NOT NULL CHECK (event_type IN ('postings', 'suggest', 'filter_options')),
+      query TEXT NOT NULL DEFAULT '',
+      query_normalized TEXT NOT NULL DEFAULT '',
+      result_count INTEGER,
+      result_items INTEGER,
+      limit_value INTEGER,
+      offset_value INTEGER,
+      sort_by TEXT NOT NULL DEFAULT '',
+      remote_filter TEXT NOT NULL DEFAULT '',
+      ats_filter_count INTEGER NOT NULL DEFAULT 0,
+      country_filter_count INTEGER NOT NULL DEFAULT 0,
+      region_filter_count INTEGER NOT NULL DEFAULT 0,
+      referrer_host TEXT NOT NULL DEFAULT '',
+      user_agent_family TEXT NOT NULL DEFAULT '',
+      cache_status TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_public_search_events_created
+      ON public_search_events(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_public_search_events_type_created
+      ON public_search_events(event_type, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_public_search_events_query_created
+      ON public_search_events(query_normalized, created_at DESC)
+      WHERE query_normalized <> '';
+
     CREATE TABLE IF NOT EXISTS ats_rate_limits (
       rate_limit_key TEXT PRIMARY KEY,
       blocked_until_epoch_ms BIGINT NOT NULL DEFAULT 0,

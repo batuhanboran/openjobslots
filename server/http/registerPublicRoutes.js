@@ -41,6 +41,7 @@ function registerPublicRoutes(app, context) {
     postgresPool,
     publicReadCache,
     readMeiliReindexStatus,
+    recordPostgresPublicSearchEvent,
     renderSeoIndexHtml,
     sanitizeFrontendValue,
     sanitizePublicPostings,
@@ -48,6 +49,29 @@ function registerPublicRoutes(app, context) {
     sendCachedPublicJson,
     syncStatus
   } = context;
+
+  function recordPublicSearchEvent(req, eventType, search, payload, options = {}, info = {}) {
+    if (DB_BACKEND !== "postgres" || typeof recordPostgresPublicSearchEvent !== "function") return;
+    const event = {
+      eventType,
+      search,
+      resultCount: payload && Number.isFinite(Number(payload.count)) ? Number(payload.count) : null,
+      resultItems: Array.isArray(payload?.items) ? payload.items.length : null,
+      limit: options.limit,
+      offset: options.offset,
+      sortBy: options.sort_by,
+      remote: options.remote,
+      ats: options.ats,
+      countries: options.countries,
+      regions: options.regions,
+      referrer: req.get ? req.get("referer") || req.get("referrer") : "",
+      userAgent: req.get ? req.get("user-agent") : "",
+      cacheStatus: info.cacheStatus
+    };
+    Promise.resolve(recordPostgresPublicSearchEvent(postgresPool, event)).catch((error) => {
+      console.warn("[openjobslots] public_search_event_write_failed", String(error?.message || error));
+    });
+  }
 
   app.post("/frontend/log", async (req, res) => {
     try {
@@ -211,8 +235,12 @@ function registerPublicRoutes(app, context) {
   });
 
   app.get("/search/suggest", async (req, res) => {
+    const search = String(req.query.search || req.query.q || "").trim();
+    const options = {
+      search,
+      limit: Number(req.query.limit || 8)
+    };
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
-      const search = String(req.query.search || req.query.q || "").trim();
       if (DB_BACKEND === "postgres") {
         const items = await getPostgresSuggestions(postgresPool, search, Number(req.query.limit || 8), ATS_FILTER_OPTION_ITEMS);
         return {
@@ -228,25 +256,27 @@ function registerPublicRoutes(app, context) {
         items,
         count: items.length
       };
+    }, {
+      afterPayload: (payload, info) => recordPublicSearchEvent(req, "suggest", search, payload, options, info)
     });
   });
 
   app.get("/postings/filter-options", async (req, res) => {
+    const options = {
+      search: String(req.query.search || "").trim(),
+      freshness_days: req.query.freshness_days,
+      ats: parseCsvParam(req.query.ats),
+      industries: parseCsvParam(req.query.industries),
+      states: parseCsvParam(req.query.states),
+      counties: parseCsvParam(req.query.counties),
+      countries: parseCsvParam(req.query.countries),
+      regions: parseCsvParam(req.query.regions),
+      remote: req.query.remote,
+      hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
+      include_applied: false,
+      include_ignored: false
+    };
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
-      const options = {
-        search: String(req.query.search || "").trim(),
-        freshness_days: req.query.freshness_days,
-        ats: parseCsvParam(req.query.ats),
-        industries: parseCsvParam(req.query.industries),
-        states: parseCsvParam(req.query.states),
-        counties: parseCsvParam(req.query.counties),
-        countries: parseCsvParam(req.query.countries),
-        regions: parseCsvParam(req.query.regions),
-        remote: req.query.remote,
-        hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
-        include_applied: false,
-        include_ignored: false
-      };
       if (DB_BACKEND === "postgres") {
         return getPostgresFilterOptions(postgresPool, ATS_FILTER_OPTION_ITEMS, options);
       }
@@ -362,29 +392,30 @@ function registerPublicRoutes(app, context) {
         states,
         counties
       };
+    }, {
+      afterPayload: (payload, info) => recordPublicSearchEvent(req, "filter_options", options.search, payload, options, info)
     });
   });
 
   app.get("/postings", async (req, res) => {
+    const options = {
+      search: String(req.query.search || "").trim(),
+      limit: Number(req.query.limit || 500),
+      offset: Number(req.query.offset || 0),
+      sort_by: String(req.query.sort_by || "").trim(),
+      freshness_days: req.query.freshness_days,
+      ats: parseCsvParam(req.query.ats),
+      industries: parseCsvParam(req.query.industries),
+      states: parseCsvParam(req.query.states),
+      counties: parseCsvParam(req.query.counties),
+      countries: parseCsvParam(req.query.countries),
+      regions: parseCsvParam(req.query.regions),
+      remote: req.query.remote,
+      hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
+      include_applied: false,
+      include_ignored: false
+    };
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
-      const options = {
-        search: String(req.query.search || "").trim(),
-        limit: Number(req.query.limit || 500),
-        offset: Number(req.query.offset || 0),
-        sort_by: String(req.query.sort_by || "").trim(),
-        freshness_days: req.query.freshness_days,
-        ats: parseCsvParam(req.query.ats),
-        industries: parseCsvParam(req.query.industries),
-        states: parseCsvParam(req.query.states),
-        counties: parseCsvParam(req.query.counties),
-        countries: parseCsvParam(req.query.countries),
-        regions: parseCsvParam(req.query.regions),
-        remote: req.query.remote,
-        hide_no_date: normalizeBoolean(req.query.hide_no_date, false),
-        include_applied: false,
-        include_ignored: false
-      };
-
       const result =
         DB_BACKEND === "postgres"
           ? await listPostgresPostings(postgresPool, options)
@@ -417,6 +448,8 @@ function registerPublicRoutes(app, context) {
         has_more: Boolean(hasMore && resultItems.length > 0),
         next_offset: hasMore && resultItems.length > 0 ? loadedThrough : null
       };
+    }, {
+      afterPayload: (payload, info) => recordPublicSearchEvent(req, "postings", options.search, payload, options, info)
     });
   });
 

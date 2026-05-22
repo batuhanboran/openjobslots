@@ -7,6 +7,7 @@ const {
   getPostgresSyncStatus,
   getPostgresAtsFieldQualityByAts,
   getPostgresParserAttentionByAts,
+  getPostgresPublicSearchReport,
   getRetentionConfig,
   getRetentionCutoffs,
   hydratePostgresPostings,
@@ -15,6 +16,7 @@ const {
   listPostgresPostings,
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
+  recordPostgresPublicSearchEvent,
   requestSyncStart,
   requestSyncStop,
   upsertPostgresPostings
@@ -1122,6 +1124,86 @@ async function testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape() 
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPublicSearchEventInsertIsPrivacyBounded() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const result = await recordPostgresPublicSearchEvent(pool, {
+    eventType: "postings",
+    search: "  Technical   Support Engineer  ",
+    resultCount: 42,
+    resultItems: 5,
+    limit: 80,
+    offset: 0,
+    sortBy: "relevance",
+    remote: "all",
+    ats: ["lever", "ashby"],
+    countries: ["Turkey"],
+    referrer: "https://www.google.com/search?q=openjobslots",
+    userAgent: "Mozilla/5.0 Firefox/151.0",
+    cacheStatus: "MISS"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].sql, /INSERT INTO public_search_events/i);
+  assert.doesNotMatch(calls[0].sql, /ip/i);
+  assert.deepEqual(calls[0].params.slice(0, 4), [
+    "postings",
+    "Technical Support Engineer",
+    "technical support engineer",
+    42
+  ]);
+  assert.equal(calls[0].params[11], "www.google.com");
+  assert.equal(calls[0].params[12], "Firefox");
+}
+
+async function testPublicSearchReportAggregatesTopTermsReadOnly() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/GROUP BY event_type/i.test(sql)) {
+        return { rows: [{ event_type: "postings", count: "3" }, { event_type: "suggest", count: "5" }] };
+      }
+      if (/GROUP BY query_normalized/i.test(sql)) {
+        return {
+          rows: [
+            { query_normalized: "technical support", count: "4", first_seen_at: "2026-05-22T09:00:00Z", last_seen_at: "2026-05-22T09:10:00Z" },
+            { query_normalized: "wordpress", count: "2", first_seen_at: "2026-05-22T10:00:00Z", last_seen_at: "2026-05-22T10:05:00Z" }
+          ]
+        };
+      }
+      if (/GROUP BY referrer_host/i.test(sql)) {
+        return { rows: [{ referrer_host: "www.google.com", count: "2" }] };
+      }
+      if (/GROUP BY user_agent_family/i.test(sql)) {
+        return { rows: [{ user_agent_family: "Firefox", count: "3" }] };
+      }
+      throw new Error(`Unexpected public search report query: ${sql}`);
+    }
+  };
+
+  const report = await getPostgresPublicSearchReport(pool, {
+    date: "2026-05-22",
+    timezone: "Europe/Istanbul",
+    limit: 10
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.read_only, true);
+  assert.equal(report.date, "2026-05-22");
+  assert.equal(report.event_counts.postings, 3);
+  assert.equal(report.event_counts.suggest, 5);
+  assert.equal(report.top_terms[0].query, "technical support");
+  assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
+}
+
 async function main() {
   await testRequestSyncStartCastsEpochFields();
   await testRequestSyncStopCastsEpochFields();
@@ -1153,6 +1235,8 @@ async function main() {
   await testPostgresCountsCacheReusesShortTtlSnapshot();
   await testPayloadDriftDoesNotBootstrapEmptyShapes();
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
+  await testPublicSearchEventInsertIsPrivacyBounded();
+  await testPublicSearchReportAggregatesTopTermsReadOnly();
   console.log("postgres sync-control bigint cast tests passed");
 }
 
