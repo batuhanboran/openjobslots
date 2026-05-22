@@ -310,6 +310,35 @@ function buildLatestRunSummaryQuery() {
   };
 }
 
+function buildParserDriftRecheckQuery(options = {}) {
+  const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const limit = Math.max(1, Math.min(500, Math.floor(Number(options.parserDriftRecheckLimit || 100))));
+  return {
+    values: [errorWindowHours, targetAtsKeys, limit],
+    sql: `
+      SELECT
+        e.ats_key,
+        e.parser_version,
+        e.similarity AS stored_similarity,
+        e.reason,
+        e.shape_paths AS observed_shape_paths,
+        s.shape_paths AS baseline_shape_paths
+      FROM parser_drift_events e
+      LEFT JOIN source_payload_shapes s
+        ON s.ats_key = e.ats_key
+        AND s.parser_version = e.parser_version
+      WHERE e.created_at >= now() - ($1::int * interval '1 hour')
+        AND (
+          cardinality($2::text[]) = 0
+          OR e.ats_key = ANY($2::text[])
+        )
+      ORDER BY e.created_at DESC
+      LIMIT $3;
+    `
+  };
+}
+
 function createEmptyTotals() {
   return {
     source_count: 0,
@@ -518,6 +547,74 @@ function summarizeLatestRun(row = {}) {
   };
 }
 
+function shapePathsFromRowValue(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function createParserDriftRecheckSourceSummary() {
+  return {
+    sample_count: 0,
+    still_drift_count: 0,
+    current_policy_pass_count: 0,
+    skipped_no_baseline_count: 0
+  };
+}
+
+function summarizeParserDriftRecheck(rows = [], options = {}) {
+  const { detectParserDrift } = require("../server/ingestion/sourceQualityPolicy");
+  const sampleLimit = Math.max(1, Math.min(500, Math.floor(Number(options.parserDriftRecheckLimit || 100))));
+  const summary = {
+    read_only: true,
+    sample_limit: sampleLimit,
+    sample_count: 0,
+    still_drift_count: 0,
+    current_policy_pass_count: 0,
+    skipped_no_baseline_count: 0,
+    by_source: {}
+  };
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const atsKey = String(row.ats_key || "").trim().toLowerCase();
+    if (!atsKey) continue;
+    if (!summary.by_source[atsKey]) summary.by_source[atsKey] = createParserDriftRecheckSourceSummary();
+    const source = summary.by_source[atsKey];
+    summary.sample_count += 1;
+    source.sample_count += 1;
+
+    const baselineShapePaths = shapePathsFromRowValue(row.baseline_shape_paths);
+    const observedShapePaths = shapePathsFromRowValue(row.observed_shape_paths || row.shape_paths);
+    if (baselineShapePaths.length === 0) {
+      summary.skipped_no_baseline_count += 1;
+      source.skipped_no_baseline_count += 1;
+      continue;
+    }
+
+    const result = detectParserDrift(
+      { shape_paths: baselineShapePaths },
+      { shape_paths: observedShapePaths },
+      options
+    );
+    if (result.drift) {
+      summary.still_drift_count += 1;
+      source.still_drift_count += 1;
+    } else {
+      summary.current_policy_pass_count += 1;
+      source.current_policy_pass_count += 1;
+    }
+  }
+
+  return summary;
+}
+
 function emptyRecentErrorSummary() {
   return {
     total_count: 0,
@@ -561,6 +658,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       source_policy_block_count: sourcePolicyBlockCount,
       failure_reason_counts: failureReasonCounts,
       latest_run: summarizeLatestRun(latestRunRows[0] || options.latestRun || {}),
+      parser_drift_recheck: summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options),
       error_taxonomy: {
         failure_reason_buckets: [...FAILURE_REASON_BUCKETS],
         failure_reason_types: [...WORKER_FAILURE_REASON_TAXONOMY],
@@ -600,10 +698,13 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
   const latestRunQuery = buildLatestRunSummaryQuery();
   const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
+  const parserDriftRecheckQuery = buildParserDriftRecheckQuery(options);
+  const parserDriftRecheck = await pool.query(parserDriftRecheckQuery.sql, parserDriftRecheckQuery.values);
   return attachBacklogDiagnostics(report, {
     ...options,
     recentErrorRows: recentErrors.rows,
-    latestRunRows: latestRun.rows
+    latestRunRows: latestRun.rows,
+    parserDriftRecheckRows: parserDriftRecheck.rows
   });
 }
 
@@ -671,6 +772,7 @@ if (require.main === module) {
 module.exports = {
   attachBacklogDiagnostics,
   buildLatestRunSummaryQuery,
+  buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildWorkerBacklogQuery,
   classifyFailureReason,
@@ -678,6 +780,7 @@ module.exports = {
   parseBacklogArgs,
   runAudit,
   runPostgresBacklogAudit,
+  summarizeParserDriftRecheck,
   summarizeBacklogRows,
   writeOutput
 };

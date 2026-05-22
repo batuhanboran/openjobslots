@@ -3,10 +3,12 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const {
   attachBacklogDiagnostics,
+  buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
   runPostgresBacklogAudit,
+  summarizeParserDriftRecheck,
   summarizeBacklogRows
 } = require("./audit-worker-backlog");
 
@@ -50,6 +52,20 @@ test("buildRecentErrorsQuery groups http status for failure taxonomy", () => {
   assert.deepEqual(query.values, [48, ["applytojob", "breezy"]]);
   assert.match(query.sql, /http_status/i);
   assert.match(query.sql, /GROUP BY ats_key, error_type, http_status/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildParserDriftRecheckQuery is read-only and bounded", () => {
+  const query = buildParserDriftRecheckQuery({
+    errorWindowHours: 48,
+    targetAtsKeys: ["applytojob", "breezy"],
+    parserDriftRecheckLimit: 25
+  });
+
+  assert.deepEqual(query.values, [48, ["applytojob", "breezy"], 25]);
+  assert.match(query.sql, /FROM parser_drift_events/i);
+  assert.match(query.sql, /LEFT JOIN source_payload_shapes/i);
+  assert.match(query.sql, /LIMIT \$3/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -227,6 +243,9 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
           ]
         };
       }
+      if (/FROM parser_drift_events/i.test(sql)) {
+        return { rows: [] };
+      }
       throw new Error(`unexpected query: ${sql}`);
     }
   };
@@ -238,11 +257,52 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
   assert.equal(report.diagnostics.failure_reason_counts.rate_limit, 3);
+  assert.equal(report.diagnostics.parser_drift_recheck.sample_count, 0);
+});
+
+test("summarizeParserDriftRecheck separates current-policy pass from real drift", () => {
+  const report = summarizeParserDriftRecheck([
+    {
+      ats_key: "applytojob",
+      stored_similarity: 0.3913,
+      baseline_shape_paths: [
+        "html:string",
+        "__detailHtmlByUrl.first:string",
+        "__detailStatusByUrl.first:number"
+      ],
+      observed_shape_paths: [
+        "html:string",
+        "__detailHtmlByUrl.second:string",
+        "__detailStatusByUrl.second:number"
+      ]
+    },
+    {
+      ats_key: "breezy",
+      stored_similarity: 0.25,
+      baseline_shape_paths: ["html:string", "jobs[]:object", "jobs[].title:string"],
+      observed_shape_paths: ["html:string", "paging:object"]
+    },
+    {
+      ats_key: "breezy",
+      stored_similarity: 0.1,
+      baseline_shape_paths: [],
+      observed_shape_paths: ["html:string"]
+    }
+  ], { parserDriftRecheckLimit: 50 });
+
+  assert.equal(report.sample_limit, 50);
+  assert.equal(report.sample_count, 3);
+  assert.equal(report.current_policy_pass_count, 1);
+  assert.equal(report.still_drift_count, 1);
+  assert.equal(report.skipped_no_baseline_count, 1);
+  assert.equal(report.by_source.applytojob.current_policy_pass_count, 1);
+  assert.equal(report.by_source.breezy.still_drift_count, 1);
+  assert.equal(report.by_source.breezy.skipped_no_baseline_count, 1);
 });
 
 test("attachBacklogDiagnostics joins recent errors and fixture coverage without mutating totals", () => {
