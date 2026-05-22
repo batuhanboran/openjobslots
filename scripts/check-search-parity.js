@@ -116,6 +116,15 @@ function isSortedByLastSeen(items) {
   return true;
 }
 
+function shouldAssertLastSeenOrder(sortBy) {
+  const normalized = String(sortBy || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized === "last_seen" || normalized === "recent" || normalized === "fresh_source";
+}
+
 function checkFilterViolations(caseSpec, items, source) {
   const violations = [];
   const countries = new Set((caseSpec.countries || []).map((item) => String(item || "").trim()).filter(Boolean));
@@ -255,20 +264,29 @@ async function runParityCase(pool, caseSpec, options) {
     active_minus_meili: Number(activeResult.count || 0) - Number(meiliResult.estimatedTotalHits || 0),
     api_minus_active: apiResult ? Number(apiResult.count || 0) - Number(activeResult.count || 0) : 0
   };
+  const sortBy = String(activeResult?.filters?.sort_by || requestOptions.sort_by || "relevance").trim().toLowerCase();
+  const assertLastSeenOrder = shouldAssertLastSeenOrder(sortBy);
   const sorted = {
-    active_last_seen_desc: isSortedByLastSeen(activeItems),
-    postgres_last_seen_desc: isSortedByLastSeen(postgresItems),
-    meili_last_seen_desc: isSortedByLastSeen(meiliItems),
-    api_last_seen_desc: apiItems ? isSortedByLastSeen(apiItems) : null
+    sort_by: sortBy,
+    assert_last_seen_desc: assertLastSeenOrder,
+    active_last_seen_desc: assertLastSeenOrder ? isSortedByLastSeen(activeItems) : null,
+    postgres_last_seen_desc: assertLastSeenOrder ? isSortedByLastSeen(postgresItems) : null,
+    meili_last_seen_desc: assertLastSeenOrder ? isSortedByLastSeen(meiliItems) : null,
+    api_last_seen_desc: assertLastSeenOrder && apiItems ? isSortedByLastSeen(apiItems) : null
   };
+  const sortedOk =
+    !assertLastSeenOrder ||
+    (
+      sorted.active_last_seen_desc &&
+      sorted.postgres_last_seen_desc &&
+      sorted.meili_last_seen_desc &&
+      (sorted.api_last_seen_desc === null || sorted.api_last_seen_desc)
+    );
   const ok =
     requiredIssues.length === 0 &&
     filterViolations.length === 0 &&
     topUrlMismatches.api_vs_active.length === 0 &&
-    sorted.active_last_seen_desc &&
-    sorted.postgres_last_seen_desc &&
-    sorted.meili_last_seen_desc &&
-    (sorted.api_last_seen_desc === null || sorted.api_last_seen_desc);
+    sortedOk;
 
   return {
     name: caseSpec.name,
@@ -345,5 +363,6 @@ module.exports = {
   isSortedByLastSeen,
   parseParityArgs,
   requiredFieldIssues,
-  runSearchParity
+  runSearchParity,
+  shouldAssertLastSeenOrder
 };

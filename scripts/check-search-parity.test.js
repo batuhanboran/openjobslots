@@ -6,7 +6,8 @@ const {
   compareTopUrls,
   isSortedByLastSeen,
   parseParityArgs,
-  requiredFieldIssues
+  requiredFieldIssues,
+  shouldAssertLastSeenOrder
 } = require("./check-search-parity");
 
 test("parity args default to representative search cases", () => {
@@ -84,4 +85,8 @@ test("top URL and sort helpers report parity-relevant differences", () => {
   assert.deepEqual(compareTopUrls(["a", "b"], ["a", "c"]), [{ index: 1, left: "b", right: "c" }]);
   assert.equal(isSortedByLastSeen([{ last_seen_epoch: 3 }, { last_seen_epoch: 2 }]), true);
   assert.equal(isSortedByLastSeen([{ last_seen_epoch: 2 }, { last_seen_epoch: 3 }]), false);
+  assert.equal(shouldAssertLastSeenOrder("last_seen"), true);
+  assert.equal(shouldAssertLastSeenOrder("recent"), true);
+  assert.equal(shouldAssertLastSeenOrder("relevance"), false);
+  assert.equal(shouldAssertLastSeenOrder("posted_date"), false);
 });
