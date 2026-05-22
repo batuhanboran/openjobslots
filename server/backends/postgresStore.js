@@ -2655,6 +2655,11 @@ function getUserAgentFamily(value) {
   return "Other";
 }
 
+function normalizeAnonymousSessionKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(key) ? key : "";
+}
+
 async function recordPostgresPublicSearchEvent(pool, event = {}) {
   if (!pool) return { ok: true, skipped: true, reason: "no_pool" };
   const query = normalizePublicSearchQuery(event.search);
@@ -2674,7 +2679,8 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
     getReferrerHost(event.referrer),
     getUserAgentFamily(event.userAgent),
     String(event.cacheStatus || "").trim().toUpperCase().slice(0, 12),
-    countFilterValues(event.regions)
+    countFilterValues(event.regions),
+    normalizeAnonymousSessionKey(event.anonymousSessionKey)
   ];
   await pool.query(
     `
@@ -2693,24 +2699,41 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
         referrer_host,
         user_agent_family,
         cache_status,
-        region_filter_count
+        region_filter_count,
+        anonymous_session_key
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
     `,
     values
   );
   return { ok: true };
 }
 
-function normalizeAnalyticsDate(value, now = new Date()) {
+function formatDateInTimezone(now, timezone) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now instanceof Date ? now : new Date(now));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addDaysToIsoDate(value, days) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + Number(days || 0)));
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeAnalyticsDate(value, now = new Date(), timezone = "Europe/Istanbul") {
   const raw = String(value || "").trim().toLowerCase();
-  if (!raw || raw === "today") return now.toISOString().slice(0, 10);
-  if (raw === "yesterday") {
-    const date = new Date(now.getTime() - DAY_SECONDS * 1000);
-    return date.toISOString().slice(0, 10);
-  }
+  const today = formatDateInTimezone(now, normalizeAnalyticsTimezone(timezone));
+  if (!raw || raw === "today") return today;
+  if (raw === "yesterday") return addDaysToIsoDate(today, -1);
   const match = raw.match(/^\d{4}-\d{2}-\d{2}$/);
-  return match ? raw : now.toISOString().slice(0, 10);
+  return match ? raw : today;
 }
 
 function normalizeAnalyticsTimezone(value) {
@@ -2734,6 +2757,14 @@ function toCountMap(rows, keyField) {
   return result;
 }
 
+function withDefaultCounts(counts, keys) {
+  const result = { ...counts };
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(result, key)) result[key] = 0;
+  }
+  return result;
+}
+
 function mapTopTermRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({
     query: String(row.query_normalized || "").trim(),
@@ -2743,14 +2774,44 @@ function mapTopTermRows(rows) {
   }));
 }
 
+const PUBLIC_ANALYTICS_ENDPOINTS = {
+  postings: "/postings",
+  suggest: "/search/suggest",
+  filter_options: "/postings/filter-options"
+};
+
+function mapEndpointRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const eventType = String(row.event_type || "").trim();
+      return {
+        endpoint: PUBLIC_ANALYTICS_ENDPOINTS[eventType] || eventType || "unknown",
+        event_type: eventType || "unknown",
+        count: Number(row.count || 0)
+      };
+    })
+    .sort((a, b) => b.count - a.count || a.endpoint.localeCompare(b.endpoint));
+}
+
 async function getPostgresPublicSearchReport(pool, options = {}) {
   if (!pool) return { ok: true, skipped: true, reason: "no_pool" };
-  const date = normalizeAnalyticsDate(options.date, options.now instanceof Date ? options.now : new Date());
   const timezone = normalizeAnalyticsTimezone(options.timezone);
+  const date = normalizeAnalyticsDate(options.date, options.now instanceof Date ? options.now : new Date(), timezone);
   const limit = Math.max(1, Math.min(50, Number(options.limit || 15)));
   const where = analyticsDateWhere();
   const values = [date, timezone];
-  const [eventCounts, topTerms, topFinalPostings, topSuggestInputs, topFilterSearches, topReferrers, topUserAgents] = await Promise.all([
+  const [
+    eventCounts,
+    eventTotals,
+    topTerms,
+    topFinalPostings,
+    topSuggestInputs,
+    topFilterSearches,
+    topReferrers,
+    topUserAgents,
+    resultBuckets,
+    cacheStatuses
+  ] = await Promise.all([
     pool.query(
       `
         SELECT event_type, COUNT(*)::int AS count
@@ -2758,6 +2819,16 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         WHERE ${where}
         GROUP BY event_type
         ORDER BY count DESC, event_type ASC;
+      `,
+      values
+    ),
+    pool.query(
+      `
+        SELECT
+          COUNT(*)::int AS total_events,
+          COUNT(DISTINCT NULLIF(anonymous_session_key, ''))::int AS anonymous_session_count
+        FROM public_search_events
+        WHERE ${where};
       `,
       values
     ),
@@ -2835,19 +2906,67 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         LIMIT $3;
       `,
       [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT
+          CASE
+            WHEN result_count = 0 THEN 'zero_result'
+            WHEN result_count BETWEEN 1 AND 9 THEN 'low_result'
+            WHEN result_count >= 10 THEN 'normal_result'
+            ELSE 'unknown_result'
+          END AS result_bucket,
+          COUNT(*)::int AS count
+        FROM public_search_events
+        WHERE ${where}
+        GROUP BY result_bucket
+        ORDER BY result_bucket ASC;
+      `,
+      values
+    ),
+    pool.query(
+      `
+        SELECT cache_status, COUNT(*)::int AS count
+        FROM public_search_events
+        WHERE ${where}
+          AND cache_status <> ''
+        GROUP BY cache_status
+        ORDER BY count DESC, cache_status ASC;
+      `,
+      values
     )
   ]);
+  const endpointCounts = mapEndpointRows(eventCounts.rows);
+  const cacheStatusCounts = withDefaultCounts(toCountMap(cacheStatuses.rows, "cache_status"), ["HIT", "MISS"]);
+  const cacheTotal = Object.values(cacheStatusCounts).reduce((sum, count) => sum + Number(count || 0), 0);
+  const topFinalSearches = mapTopTermRows(topFinalPostings.rows);
+  const topCombinedTerms = mapTopTermRows(topTerms.rows);
+  const totals = eventTotals.rows?.[0] || {};
 
   return {
     ok: true,
     read_only: true,
     date,
     timezone,
+    total_events: Number(totals.total_events || 0),
+    anonymous_session_count: Number(totals.anonymous_session_count || 0),
     event_counts: toCountMap(eventCounts.rows, "event_type"),
-    top_terms: mapTopTermRows(topTerms.rows),
-    top_final_posting_searches: mapTopTermRows(topFinalPostings.rows),
+    top_endpoints: endpointCounts,
+    top_endpoint: endpointCounts[0] || null,
+    top_terms: topCombinedTerms,
+    top_normalized_queries: topCombinedTerms,
+    top_final_posting_searches: topFinalSearches,
+    top_job_title_keywords: topFinalSearches,
     top_suggest_inputs: mapTopTermRows(topSuggestInputs.rows),
     top_filter_option_searches: mapTopTermRows(topFilterSearches.rows),
+    result_count_distribution: withDefaultCounts(toCountMap(resultBuckets.rows, "result_bucket"), [
+      "zero_result",
+      "low_result",
+      "normal_result",
+      "unknown_result"
+    ]),
+    cache_status_counts: cacheStatusCounts,
+    cache_hit_rate: cacheTotal > 0 ? Number((Number(cacheStatusCounts.HIT || 0) / cacheTotal).toFixed(4)) : null,
     top_referrers: (topReferrers.rows || []).map((row) => ({
       host: String(row.referrer_host || "").trim(),
       count: Number(row.count || 0)

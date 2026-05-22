@@ -1146,13 +1146,17 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
     countries: ["Turkey"],
     referrer: "https://www.google.com/search?q=openjobslots",
     userAgent: "Mozilla/5.0 Firefox/151.0",
-    cacheStatus: "MISS"
+    cacheStatus: "MISS",
+    anonymousSessionKey: "a".repeat(64),
+    ip: "203.0.113.10"
   });
 
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
   assert.match(calls[0].sql, /INSERT INTO public_search_events/i);
   assert.doesNotMatch(calls[0].sql, /ip/i);
+  assert.doesNotMatch(calls[0].sql, /user_agent_raw/i);
+  assert.doesNotMatch(calls[0].sql, /referrer_url/i);
   assert.deepEqual(calls[0].params.slice(0, 4), [
     "postings",
     "Technical Support Engineer",
@@ -1161,6 +1165,7 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
   ]);
   assert.equal(calls[0].params[11], "www.google.com");
   assert.equal(calls[0].params[12], "Firefox");
+  assert.equal(calls[0].params[15], "a".repeat(64));
 }
 
 async function testPublicSearchReportAggregatesTopTermsReadOnly() {
@@ -1170,6 +1175,9 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
       calls.push({ sql, params });
       if (/GROUP BY event_type/i.test(sql)) {
         return { rows: [{ event_type: "postings", count: "3" }, { event_type: "suggest", count: "5" }] };
+      }
+      if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
+        return { rows: [{ total_events: "8", anonymous_session_count: "2" }] };
       }
       if (/GROUP BY query_normalized/i.test(sql)) {
         return {
@@ -1185,6 +1193,18 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
       if (/GROUP BY user_agent_family/i.test(sql)) {
         return { rows: [{ user_agent_family: "Firefox", count: "3" }] };
       }
+      if (/AS result_bucket/i.test(sql)) {
+        return {
+          rows: [
+            { result_bucket: "zero_result", count: "1" },
+            { result_bucket: "low_result", count: "2" },
+            { result_bucket: "normal_result", count: "5" }
+          ]
+        };
+      }
+      if (/GROUP BY cache_status/i.test(sql)) {
+        return { rows: [{ cache_status: "HIT", count: "6" }, { cache_status: "MISS", count: "2" }] };
+      }
       throw new Error(`Unexpected public search report query: ${sql}`);
     }
   };
@@ -1198,10 +1218,41 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
   assert.equal(report.ok, true);
   assert.equal(report.read_only, true);
   assert.equal(report.date, "2026-05-22");
+  assert.equal(report.total_events, 8);
+  assert.equal(report.anonymous_session_count, 2);
   assert.equal(report.event_counts.postings, 3);
   assert.equal(report.event_counts.suggest, 5);
+  assert.deepEqual(report.top_endpoint, { endpoint: "/search/suggest", event_type: "suggest", count: 5 });
+  assert.equal(report.result_count_distribution.zero_result, 1);
+  assert.equal(report.result_count_distribution.low_result, 2);
+  assert.equal(report.result_count_distribution.normal_result, 5);
+  assert.equal(report.cache_status_counts.HIT, 6);
+  assert.equal(report.cache_status_counts.MISS, 2);
+  assert.equal(report.cache_hit_rate, 0.75);
   assert.equal(report.top_terms[0].query, "technical support");
   assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
+}
+
+async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
+        return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const report = await getPostgresPublicSearchReport(pool, {
+    date: "today",
+    timezone: "Europe/Istanbul",
+    now: new Date("2026-05-21T22:30:00.000Z")
+  });
+
+  assert.equal(report.date, "2026-05-22");
+  assert.ok(calls.every((call) => call.params[0] === "2026-05-22"));
 }
 
 async function main() {
@@ -1237,6 +1288,7 @@ async function main() {
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
   await testPublicSearchEventInsertIsPrivacyBounded();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
+  await testPublicSearchReportResolvesTodayInRequestedTimezone();
   console.log("postgres sync-control bigint cast tests passed");
 }
 

@@ -1,3 +1,54 @@
+const crypto = require("crypto");
+
+const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
+const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function parseCookieHeader(header) {
+  const cookies = {};
+  for (const part of String(header || "").split(";")) {
+    const [name, ...valueParts] = part.trim().split("=");
+    if (!name || valueParts.length === 0) continue;
+    cookies[name] = valueParts.join("=");
+  }
+  return cookies;
+}
+
+function isValidPublicAnalyticsSessionId(value) {
+  return /^[a-f0-9-]{32,64}$/i.test(String(value || "").trim());
+}
+
+function createPublicAnalyticsSessionId() {
+  return typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : crypto.randomBytes(16).toString("hex");
+}
+
+function shouldUseSecureAnalyticsCookie(req) {
+  const forwardedProto = String(req.get ? req.get("x-forwarded-proto") : "").toLowerCase();
+  return Boolean(req.secure || forwardedProto.split(",").map((item) => item.trim()).includes("https"));
+}
+
+function getPublicAnalyticsSessionKey(req, res) {
+  const cookies = parseCookieHeader(req.get ? req.get("cookie") : req.headers?.cookie);
+  let sessionId = String(cookies[PUBLIC_ANALYTICS_SESSION_COOKIE] || "").trim();
+  if (!isValidPublicAnalyticsSessionId(sessionId)) {
+    sessionId = createPublicAnalyticsSessionId();
+    if (res && typeof res.cookie === "function" && !res.headersSent) {
+      res.cookie(PUBLIC_ANALYTICS_SESSION_COOKIE, sessionId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: shouldUseSecureAnalyticsCookie(req),
+        maxAge: PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS,
+        path: "/"
+      });
+    }
+  }
+  return crypto
+    .createHash("sha256")
+    .update(`openjobslots-public-analytics-v1:${sessionId}`)
+    .digest("hex");
+}
+
 function registerPublicRoutes(app, context) {
   const {
     ATS_FILTER_OPTION_ITEMS,
@@ -50,7 +101,7 @@ function registerPublicRoutes(app, context) {
     syncStatus
   } = context;
 
-  function recordPublicSearchEvent(req, eventType, search, payload, options = {}, info = {}) {
+  function recordPublicSearchEvent(req, res, eventType, search, payload, options = {}, info = {}) {
     if (DB_BACKEND !== "postgres" || typeof recordPostgresPublicSearchEvent !== "function") return;
     const event = {
       eventType,
@@ -66,7 +117,8 @@ function registerPublicRoutes(app, context) {
       regions: options.regions,
       referrer: req.get ? req.get("referer") || req.get("referrer") : "",
       userAgent: req.get ? req.get("user-agent") : "",
-      cacheStatus: info.cacheStatus
+      cacheStatus: info.cacheStatus,
+      anonymousSessionKey: getPublicAnalyticsSessionKey(req, res)
     };
     Promise.resolve(recordPostgresPublicSearchEvent(postgresPool, event)).catch((error) => {
       console.warn("[openjobslots] public_search_event_write_failed", String(error?.message || error));
@@ -257,7 +309,7 @@ function registerPublicRoutes(app, context) {
         count: items.length
       };
     }, {
-      afterPayload: (payload, info) => recordPublicSearchEvent(req, "suggest", search, payload, options, info)
+      afterPayload: (payload, info) => recordPublicSearchEvent(req, res, "suggest", search, payload, options, info)
     });
   });
 
@@ -393,7 +445,7 @@ function registerPublicRoutes(app, context) {
         counties
       };
     }, {
-      afterPayload: (payload, info) => recordPublicSearchEvent(req, "filter_options", options.search, payload, options, info)
+      afterPayload: (payload, info) => recordPublicSearchEvent(req, res, "filter_options", options.search, payload, options, info)
     });
   });
 
@@ -449,7 +501,7 @@ function registerPublicRoutes(app, context) {
         next_offset: hasMore && resultItems.length > 0 ? loadedThrough : null
       };
     }, {
-      afterPayload: (payload, info) => recordPublicSearchEvent(req, "postings", options.search, payload, options, info)
+      afterPayload: (payload, info) => recordPublicSearchEvent(req, res, "postings", options.search, payload, options, info)
     });
   });
 
