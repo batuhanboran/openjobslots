@@ -315,6 +315,63 @@ function buildLatestRunSummaryQuery() {
   };
 }
 
+function buildLatestRunBySourceQuery(options = {}) {
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  return {
+    values: [targetAtsKeys],
+    sql: `
+      WITH latest AS (
+        SELECT
+          id,
+          started_at_epoch,
+          COALESCE(finished_at_epoch, EXTRACT(EPOCH FROM now())::bigint) AS finished_at_epoch
+        FROM ingestion_runs
+        ORDER BY id DESC
+        LIMIT 1
+      ),
+      successes AS (
+        SELECT
+          l.id AS latest_run_id,
+          st.ats_key,
+          COUNT(*)::int AS success_count
+        FROM company_sync_state st
+        JOIN latest l
+          ON st.last_success_epoch >= l.started_at_epoch
+          AND st.last_success_epoch <= l.finished_at_epoch
+        WHERE (
+          cardinality($1::text[]) = 0
+          OR st.ats_key = ANY($1::text[])
+        )
+        GROUP BY l.id, st.ats_key
+      ),
+      failures AS (
+        SELECT
+          l.id AS latest_run_id,
+          e.ats_key,
+          COUNT(*)::int AS failure_count
+        FROM ingestion_run_errors e
+        JOIN latest l
+          ON e.run_id = l.id
+        WHERE (
+          cardinality($1::text[]) = 0
+          OR e.ats_key = ANY($1::text[])
+        )
+        GROUP BY l.id, e.ats_key
+      )
+      SELECT
+        COALESCE(s.latest_run_id, f.latest_run_id)::bigint AS latest_run_id,
+        COALESCE(s.ats_key, f.ats_key) AS ats_key,
+        COALESCE(s.success_count, 0)::int AS success_count,
+        COALESCE(f.failure_count, 0)::int AS failure_count
+      FROM successes s
+      FULL OUTER JOIN failures f
+        ON f.latest_run_id = s.latest_run_id
+        AND f.ats_key = s.ats_key
+      ORDER BY ats_key ASC;
+    `
+  };
+}
+
 function buildAutoSyncBudgetUsageQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
@@ -582,6 +639,45 @@ function summarizeLatestRun(row = {}) {
   };
 }
 
+function summarizeLatestRunBySourceRow(row = {}) {
+  const successCount = Number(row?.success_count || 0);
+  const failureCount = Number(row?.failure_count || 0);
+  const totalTargets = successCount + failureCount;
+  return {
+    latest_run_id: Number(row?.latest_run_id || row?.id || 0),
+    total_targets: totalTargets,
+    success_count: successCount,
+    failure_count: failureCount,
+    success_rate_pct: totalTargets > 0
+      ? Number(((successCount / totalTargets) * 100).toFixed(2))
+      : null,
+    failure_rate_pct: totalTargets > 0
+      ? Number(((failureCount / totalTargets) * 100).toFixed(2))
+      : null
+  };
+}
+
+function summarizeLatestRunBySourceRows(rows = []) {
+  const bySource = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const atsKey = String(row.ats_key || "").trim().toLowerCase();
+    if (!atsKey) continue;
+    bySource[atsKey] = summarizeLatestRunBySourceRow(row);
+  }
+  return bySource;
+}
+
+function emptyLatestRunBySourceSummary(latestRunId = 0) {
+  return {
+    latest_run_id: Number(latestRunId || 0),
+    total_targets: 0,
+    success_count: 0,
+    failure_count: 0,
+    success_rate_pct: null,
+    failure_rate_pct: null
+  };
+}
+
 function summarizeAutoSyncBudgetUsage(rows = [], options = {}) {
   const workerBudgetConfig = readWorkerBudgetConfig(options.env || process.env, options);
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
@@ -732,6 +828,8 @@ function attachBacklogDiagnostics(report, options = {}) {
     }
   }
   const latestRunRows = Array.isArray(options.latestRunRows) ? options.latestRunRows : [];
+  const latestRun = summarizeLatestRun(latestRunRows[0] || options.latestRun || {});
+  const latestRunBySource = summarizeLatestRunBySourceRows(options.latestRunBySourceRows || []);
   return {
     ...report,
     diagnostics: {
@@ -741,7 +839,8 @@ function attachBacklogDiagnostics(report, options = {}) {
       parser_attention_count: parserAttentionCount,
       source_policy_block_count: sourcePolicyBlockCount,
       failure_reason_counts: failureReasonCounts,
-      latest_run: summarizeLatestRun(latestRunRows[0] || options.latestRun || {}),
+      latest_run: latestRun,
+      latest_run_by_source: latestRunBySource,
       auto_sync_budget_usage: summarizeAutoSyncBudgetUsage(options.autoSyncBudgetUsageRows || [], options),
       parser_drift_recheck: summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options),
       error_taxonomy: {
@@ -756,6 +855,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       const atsKey = String(item.ats_key || "").trim().toLowerCase();
       return {
         ...item,
+        latest_run: latestRunBySource[atsKey] || emptyLatestRunBySourceSummary(latestRun.latest_run_id),
         source_daily_budget_usage: sourceBudgetUsageByAts.get(atsKey) || sourceBudgetUsageSummary(0, options),
         recent_errors: recentByAts.get(atsKey) || emptyRecentErrorSummary(),
         fixture_coverage: getFixtureCoverage(atsKey, options)
@@ -784,6 +884,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
   const latestRunQuery = buildLatestRunSummaryQuery();
   const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
+  const latestRunBySourceQuery = buildLatestRunBySourceQuery(options);
+  const latestRunBySource = await pool.query(latestRunBySourceQuery.sql, latestRunBySourceQuery.values);
   const autoSyncBudgetUsageQuery = buildAutoSyncBudgetUsageQuery({ ...options, nowEpoch });
   const autoSyncBudgetUsage = await pool.query(autoSyncBudgetUsageQuery.sql, autoSyncBudgetUsageQuery.values);
   const sourceBudgetUsageQuery = buildSourceBudgetUsageQuery({ ...options, nowEpoch });
@@ -795,6 +897,7 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     nowEpoch,
     recentErrorRows: recentErrors.rows,
     latestRunRows: latestRun.rows,
+    latestRunBySourceRows: latestRunBySource.rows,
     autoSyncBudgetUsageRows: autoSyncBudgetUsage.rows,
     sourceBudgetUsageRows: sourceBudgetUsage.rows,
     parserDriftRecheckRows: parserDriftRecheck.rows
@@ -865,6 +968,7 @@ if (require.main === module) {
 module.exports = {
   attachBacklogDiagnostics,
   buildAutoSyncBudgetUsageQuery,
+  buildLatestRunBySourceQuery,
   buildLatestRunSummaryQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
@@ -876,6 +980,7 @@ module.exports = {
   runAudit,
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
+  summarizeLatestRunBySourceRows,
   summarizeSourceBudgetUsageRows,
   summarizeParserDriftRecheck,
   summarizeBacklogRows,
