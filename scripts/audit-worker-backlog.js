@@ -4,13 +4,21 @@ const { createPostgresPool } = require("../server/backends/postgres");
 
 function parseBacklogArgs(argv = process.argv.slice(2)) {
   const options = {
+    diagnostics: false,
+    errorWindowHours: 24,
     json: false,
     limit: 100,
     output: "",
-    nowEpoch: 0
+    nowEpoch: 0,
+    targetAtsKeys: []
   };
   for (const arg of argv) {
     if (arg === "--json") options.json = true;
+    else if (arg === "--diagnostics") options.diagnostics = true;
+    else if (arg.startsWith("--targets=")) options.targetAtsKeys = parseTargetAtsKeys(arg.slice("--targets=".length));
+    else if (arg === "--targets") options.expectTargets = true;
+    else if (arg.startsWith("--error-window-hours=")) options.errorWindowHours = Number(arg.slice("--error-window-hours=".length));
+    else if (arg === "--error-window-hours") options.expectErrorWindowHours = true;
     else if (arg.startsWith("--limit=")) options.limit = Number(arg.slice("--limit=".length));
     else if (arg === "--limit") options.expectLimit = true;
     else if (arg.startsWith("--now-epoch=")) options.nowEpoch = Number(arg.slice("--now-epoch=".length));
@@ -22,11 +30,26 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     } else if (options.expectNowEpoch) {
       options.nowEpoch = Number(arg);
       options.expectNowEpoch = false;
+    } else if (options.expectErrorWindowHours) {
+      options.errorWindowHours = Number(arg);
+      options.expectErrorWindowHours = false;
+    } else if (options.expectTargets) {
+      options.targetAtsKeys = parseTargetAtsKeys(arg);
+      options.expectTargets = false;
     }
   }
   options.limit = Math.max(1, Math.min(500, Math.floor(Number(options.limit || 100))));
   options.nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || 0)));
+  options.errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   return options;
+}
+
+function parseTargetAtsKeys(value = "") {
+  return String(value || "")
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((part, index, list) => list.indexOf(part) === index);
 }
 
 function positiveInteger(value, fallback) {
@@ -88,6 +111,28 @@ function buildWorkerBacklogQuery(options = {}) {
       GROUP BY s.ats_key, s.display_name, s.enabled, s.protection_status, s.disabled_reason
       ORDER BY due_count DESC, failure_pressure DESC, s.ats_key ASC
       LIMIT $2;
+    `
+  };
+}
+
+function buildRecentErrorsQuery(options = {}) {
+  const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  return {
+    values: [errorWindowHours, targetAtsKeys],
+    sql: `
+      SELECT
+        ats_key,
+        error_type,
+        COUNT(*)::int AS count
+      FROM ingestion_run_errors
+      WHERE created_at >= now() - ($1::int * interval '1 hour')
+        AND (
+          cardinality($2::text[]) = 0
+          OR ats_key = ANY($2::text[])
+        )
+      GROUP BY ats_key, error_type
+      ORDER BY count DESC, ats_key ASC, error_type ASC;
     `
   };
 }
@@ -184,12 +229,90 @@ function summarizeBacklogRows(rows = [], options = {}) {
   };
 }
 
+function boolPath(filePath) {
+  return fs.existsSync(filePath);
+}
+
+function getFixtureCoverage(atsKey, options = {}) {
+  const key = String(atsKey || "").trim().toLowerCase();
+  const repoRoot = path.resolve(options.repoRoot || path.join(__dirname, ".."));
+  const sourceFixtureDir = path.join(repoRoot, "server", "ingestion", "sources", key, "fixtures");
+  const legacyFixtureDir = path.join(repoRoot, "server", "ingestion", "fixtures");
+  return {
+    source_module_dir: boolPath(path.join(repoRoot, "server", "ingestion", "sources", key)),
+    source_fixture_dir: boolPath(sourceFixtureDir),
+    source_fixtures: {
+      company: boolPath(path.join(sourceFixtureDir, "company.json")),
+      list: boolPath(path.join(sourceFixtureDir, "list.json")),
+      expected_normalized: boolPath(path.join(sourceFixtureDir, "expected-normalized.json")),
+      invalid_shapes: boolPath(path.join(sourceFixtureDir, "invalid-shapes.json")),
+      route_detection: boolPath(path.join(sourceFixtureDir, "route-detection.json")),
+      malformed_list_shapes: boolPath(path.join(sourceFixtureDir, "malformed-list-shapes.json")),
+      missing_geo_list: boolPath(path.join(sourceFixtureDir, "missing-geo-list.json"))
+    },
+    legacy_fixtures: {
+      postings: boolPath(path.join(legacyFixtureDir, `${key}-postings.json`)),
+      direct: boolPath(path.join(legacyFixtureDir, `${key}-direct.json`)),
+      failures: boolPath(path.join(legacyFixtureDir, `${key}-failures.json`)),
+      detail_certification: boolPath(path.join(legacyFixtureDir, `${key}-detail-certification.json`))
+    }
+  };
+}
+
+function summarizeRecentErrors(rows = []) {
+  const byAts = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const atsKey = String(row.ats_key || "").trim().toLowerCase();
+    const errorType = String(row.error_type || "unknown").trim() || "unknown";
+    const count = Number(row.count || 0);
+    if (!atsKey || count <= 0) continue;
+    if (!byAts.has(atsKey)) {
+      byAts.set(atsKey, {
+        total_count: 0,
+        parser_drift_count: 0,
+        by_type: {}
+      });
+    }
+    const current = byAts.get(atsKey);
+    current.total_count += count;
+    current.by_type[errorType] = (current.by_type[errorType] || 0) + count;
+    if (errorType === "parser_drift") current.parser_drift_count += count;
+  }
+  return byAts;
+}
+
+function attachBacklogDiagnostics(report, options = {}) {
+  const recentByAts = summarizeRecentErrors(options.recentErrorRows || []);
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  return {
+    ...report,
+    diagnostics: {
+      read_only: true,
+      error_window_hours: errorWindowHours,
+      target_ats_keys: targetAtsKeys
+    },
+    items: (report.items || []).map((item) => {
+      const atsKey = String(item.ats_key || "").trim().toLowerCase();
+      return {
+        ...item,
+        recent_errors: recentByAts.get(atsKey) || {
+          total_count: 0,
+          parser_drift_count: 0,
+          by_type: {}
+        },
+        fixture_coverage: getFixtureCoverage(atsKey, options)
+      };
+    })
+  };
+}
+
 async function runPostgresBacklogAudit(pool, options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const query = buildWorkerBacklogQuery({ ...options, nowEpoch });
   const result = await pool.query(query.sql, query.values);
   const summary = summarizeBacklogRows(result.rows, options);
-  return {
+  const report = {
     ok: true,
     db_backend: "postgres",
     read_only: true,
@@ -199,6 +322,13 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     },
     ...summary
   };
+  if (!options.diagnostics) return report;
+  const recentErrorsQuery = buildRecentErrorsQuery(options);
+  const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
+  return attachBacklogDiagnostics(report, {
+    ...options,
+    recentErrorRows: recentErrors.rows
+  });
 }
 
 function writeOutput(report, outputPath) {
@@ -263,7 +393,10 @@ if (require.main === module) {
 }
 
 module.exports = {
+  attachBacklogDiagnostics,
+  buildRecentErrorsQuery,
   buildWorkerBacklogQuery,
+  getFixtureCoverage,
   parseBacklogArgs,
   runAudit,
   runPostgresBacklogAudit,

@@ -117,6 +117,7 @@ for (const fileName of fixtureFileNames) {
 }
 
 const newlyCertifiedFailureFixtures = [
+  "applicantpro-failures.json",
   "ashby-failures.json",
   "applytojob-failures.json",
   "bamboohr-failures.json",

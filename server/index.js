@@ -8710,6 +8710,77 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     seenUrls.add(absoluteUrl);
   }
 
+  const genericLinkPattern =
+    /<a\b(?=[^>]*href=["']([^"']*\/apply\/[^"']+)["'])[^>]*>([\s\S]*?)<\/a>/gi;
+  const genericMatches = Array.from(source.matchAll(genericLinkPattern));
+  for (let index = 0; index < genericMatches.length; index += 1) {
+    const match = genericMatches[index];
+    const href = String(match?.[1] || "").trim();
+    const absoluteUrl = href ? new URL(href, `${config.baseOrigin}/`).toString() : "";
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) continue;
+
+    const title = cleanApplyToJobText(match?.[2] || "");
+    if (!title) continue;
+
+    const nextStart = index + 1 < genericMatches.length ? Number(genericMatches[index + 1].index || 0) : source.length;
+    const contextStart = Math.max(0, Number(match.index || 0) - 600);
+    const contextEnd = Math.min(nextStart, Number(match.index || 0) + String(match[0] || "").length + 2200);
+    const contextHtml = source.slice(contextStart, contextEnd);
+    const location =
+      extractApplyToJobStructuredLabeledField(contextHtml, ["Location", "Job Location", "Office", "Work Location"]) ||
+      extractApplyToJobIconField(contextHtml, ["fa-map-marker", "fa-map-marker-alt", "fa-location-dot"]);
+    const postingDate =
+      extractApplyToJobStructuredLabeledField(contextHtml, ["Posted", "Date Posted", "Posting Date"]) ||
+      extractApplyToJobIconField(contextHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]);
+    const department = extractApplyToJobStructuredLabeledField(contextHtml, ["Department", "Category", "Team"]);
+    const employmentType = extractApplyToJobStructuredLabeledField(contextHtml, [
+      "Employment Type",
+      "Job Type",
+      "Schedule",
+      "Type"
+    ]);
+    const locationRemoteType = extractApplyToJobRemoteTypeFromValue(location);
+    const labeledRemote = extractApplyToJobLabeledRemoteType(contextHtml) ||
+      ((locationRemoteType === "remote" || locationRemoteType === "hybrid")
+        ? { value: locationRemoteType, path: "generic card location label" }
+        : null);
+
+    const basePosting = {
+      company_name: companyNameForPostings,
+      source_job_id: extractApplyToJobSourceId(absoluteUrl),
+      position_name: title,
+      job_posting_url: absoluteUrl,
+      posting_date: postingDate,
+      location,
+      remote_type: labeledRemote?.value || null,
+      department,
+      employment_type: employmentType,
+      source_requires_normalized_geo_or_remote: true,
+      source_evidence: {
+        list_url: listUrl,
+        route_kind: "applytojob_generic_card_html",
+        title_source: "labeled_html",
+        title_path: "a[href*='/apply/']",
+        canonical_url_source: "url",
+        canonical_url_path: "a[href*='/apply/']",
+        source_job_id_source: "url",
+        source_job_id_path: "/apply/:id",
+        location_source: location ? "labeled_html" : "",
+        location_path: location ? "generic card location label/icon" : "",
+        remote_source: labeledRemote ? "labeled_html" : "",
+        remote_path: labeledRemote?.path || "",
+        posting_date_source: postingDate ? "labeled_html" : "",
+        posting_date_path: postingDate ? "generic card date label/icon" : ""
+      }
+    };
+    postings.push(enrichApplyToJobPostingFromDetail(
+      basePosting,
+      lookupApplyToJobDetailHtml(detailHtmlByUrl, absoluteUrl),
+      detailStatusByUrl[absoluteUrl] || detailStatusByUrl[canonicalApplyToJobDetailKey(absoluteUrl)]
+    ));
+    seenUrls.add(absoluteUrl);
+  }
+
   return postings;
 }
 
@@ -9263,6 +9334,21 @@ function extractBreezyListGroupHeader(contextBefore) {
   return { text, kind };
 }
 
+function extractBreezyListTitle(anchorHtml, linkBody) {
+  const headingMatch = String(linkBody || "").match(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i);
+  const headingTitle = cleanBreezyText(headingMatch?.[1] || "");
+  if (headingTitle) return headingTitle;
+
+  const classTitleMatch = String(linkBody || "").match(
+    /<(?:span|div|p)[^>]*class=["'][^"']*\b(?:position-title|job-title|posting-title|title)\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
+  );
+  const classTitle = cleanBreezyText(classTitleMatch?.[1] || "");
+  if (classTitle) return classTitle;
+
+  const attrMatch = String(anchorHtml || "").match(/\b(?:title|aria-label|data-title|data-position-title)=["']([^"']+)["']/i);
+  return cleanBreezyText(attrMatch?.[1] || "");
+}
+
 function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const payload = pageHtml && typeof pageHtml === "object" && !Array.isArray(pageHtml) ? pageHtml : { html: pageHtml };
   const source = String(payload.html || payload.text || "");
@@ -9274,7 +9360,6 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
 
   const linkPattern =
     /<a[^>]*href=["']((?:https?:\/\/[^"'<>]+)?\/p\/[^"'<>]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  const titlePattern = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i;
   const locationPattern =
     /<li[^>]*class=["'][^"']*\blocation\b[^"']*["'][^>]*>[\s\S]*?(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/li>/i;
   const postedPattern =
@@ -9290,8 +9375,7 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     }
 
     const linkBody = String(linkMatch[2] || "");
-    const titleMatch = linkBody.match(titlePattern);
-    const title = cleanBreezyText(titleMatch?.[1] || "");
+    const title = extractBreezyListTitle(linkMatch[0], linkBody);
     if (!title) {
       linkMatch = linkPattern.exec(source);
       continue;

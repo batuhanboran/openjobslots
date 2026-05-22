@@ -1,0 +1,59 @@
+{
+  "ats_key": "applicantpro",
+  "company_name_for_postings": "Fixture ApplicantPro",
+  "company": {
+    "company_name": "Fixture ApplicantPro",
+    "ATS_name": "ApplicantPro"
+  },
+  "config": {
+    "origin": "https://fixtureco.applicantpro.com"
+  },
+  "raw_response": {
+    "success": true,
+    "data": {
+      "jobs": [
+        {
+          "id": "bad-title",
+          "title": "",
+          "jobUrl": "/jobs/bad-title",
+          "startDateRef": "2026-05-08",
+          "city": "Istanbul",
+          "iso3": "TUR"
+        }
+      ]
+    }
+  },
+  "missing_company_raw_response": {
+    "success": true,
+    "data": {
+      "jobs": [
+        {
+          "id": "missing-company",
+          "title": "Support Engineer",
+          "jobUrl": "/jobs/missing-company",
+          "city": "Istanbul",
+          "iso3": "TUR"
+        }
+      ]
+    }
+  },
+  "missing_url_raw_response": {
+    "success": true,
+    "data": {
+      "jobs": [
+        {
+          "title": "Missing URL",
+          "jobUrl": "",
+          "city": "Istanbul",
+          "iso3": "TUR"
+        }
+      ]
+    }
+  },
+  "expected_rejections": [
+    {
+      "source_job_id": "bad-title",
+      "reason": "placeholder position_name"
+    }
+  ]
+}

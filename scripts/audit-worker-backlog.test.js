@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const path = require("node:path");
 const {
+  attachBacklogDiagnostics,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
   runPostgresBacklogAudit,
@@ -13,6 +15,20 @@ test("parseBacklogArgs accepts read-only backlog controls", () => {
   assert.equal(options.limit, 5);
   assert.equal(options.nowEpoch, 1_800_000_000);
   assert.equal(options.output, "C:\\tmp\\backlog.json");
+});
+
+test("parseBacklogArgs accepts diagnostics, target ATS list, and error window", () => {
+  const options = parseBacklogArgs([
+    "--json",
+    "--diagnostics",
+    "--targets=applytojob,breezy,icims",
+    "--error-window-hours=48"
+  ]);
+
+  assert.equal(options.json, true);
+  assert.equal(options.diagnostics, true);
+  assert.deepEqual(options.targetAtsKeys, ["applytojob", "breezy", "icims"]);
+  assert.equal(options.errorWindowHours, 48);
 });
 
 test("buildWorkerBacklogQuery is read-only and reports due source fields", () => {
@@ -118,4 +134,65 @@ test("runPostgresBacklogAudit performs one read-only query", async () => {
   assert.equal(report.read_only, true);
   assert.equal(report.totals.due_count, 3);
   assert.equal(report.items[0].ats_key, "applytojob");
+});
+
+test("attachBacklogDiagnostics joins recent errors and fixture coverage without mutating totals", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "applytojob",
+      display_name: "ApplyToJob",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 10,
+      due_count: 8,
+      runnable_due_count: 8,
+      failure_pressure: 3,
+      failing_due_count: 2
+    },
+    {
+      ats_key: "applicantpro",
+      display_name: "ApplicantPro",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 4,
+      due_count: 4,
+      runnable_due_count: 4,
+      failure_pressure: 1,
+      failing_due_count: 1
+    }
+  ]);
+  const report = {
+    ok: true,
+    totals: base.totals,
+    items: base.items
+  };
+
+  const withDiagnostics = attachBacklogDiagnostics(report, {
+    repoRoot: path.resolve(__dirname, ".."),
+    errorWindowHours: 24,
+    recentErrorRows: [
+      { ats_key: "applytojob", error_type: "parser_drift", count: 7 },
+      { ats_key: "applytojob", error_type: "portal_search_empty", count: 2 },
+      { ats_key: "applicantpro", error_type: "parser_drift", count: 1 }
+    ],
+    targetAtsKeys: ["applytojob", "applicantpro", "workday"]
+  });
+
+  assert.equal(withDiagnostics.totals.due_count, report.totals.due_count);
+  assert.deepEqual(withDiagnostics.diagnostics.target_ats_keys, ["applytojob", "applicantpro", "workday"]);
+  assert.equal(withDiagnostics.diagnostics.error_window_hours, 24);
+
+  const applytojob = withDiagnostics.items.find((item) => item.ats_key === "applytojob");
+  assert.equal(applytojob.recent_errors.total_count, 9);
+  assert.equal(applytojob.recent_errors.parser_drift_count, 7);
+  assert.equal(applytojob.recent_errors.by_type.parser_drift, 7);
+  assert.equal(applytojob.recent_errors.by_type.portal_search_empty, 2);
+  assert.equal(applytojob.fixture_coverage.source_fixtures.list, true);
+  assert.equal(applytojob.fixture_coverage.source_fixtures.expected_normalized, true);
+  assert.equal(applytojob.fixture_coverage.source_fixtures.invalid_shapes, true);
+
+  const applicantpro = withDiagnostics.items.find((item) => item.ats_key === "applicantpro");
+  assert.equal(applicantpro.recent_errors.total_count, 1);
+  assert.equal(applicantpro.fixture_coverage.source_fixture_dir, false);
+  assert.equal(applicantpro.fixture_coverage.legacy_fixtures.direct, true);
 });

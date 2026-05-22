@@ -164,6 +164,34 @@ test("applytojob source module enriches list rows from JSON-LD and labeled detai
   assert.equal(evaluatePublicPosting(byId["ATJ2004"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("applytojob source module parses generic card links with labeled fields", () => {
+  const source = getSourceModule("applytojob");
+  const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <section class="jobs">
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ3001/Onsite-Operations-Lead">Onsite Operations Lead</a>
+          <div><span>Location:</span><span>Austin, TX, United States</span></div>
+          <div><span>Work Type:</span><span>On-site</span></div>
+          <div><span>Date Posted:</span><span>2026-05-12</span></div>
+        </article>
+      </section>
+    `,
+    __listUrl: company.url_string
+  }, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "ATJ3001");
+  assert.equal(normalized.position_name, "Onsite Operations Lead");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Austin");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.posting_date, "2026-05-12");
+  assert.equal(normalized.source_evidence.route_kind, "applytojob_generic_card_html");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {
   const source = getSourceModule("breezy");
   const sourceDir = path.join(__dirname, "breezy");
@@ -203,4 +231,33 @@ test("breezy source module enriches list rows from JSON-LD and labeled detail pa
 
   assert.ok(byId["BRZ2004-ambiguous-role"].source_failure_reasons.includes(fixture.expected["BRZ2004-ambiguous-role"].reason));
   assert.equal(evaluatePublicPosting(byId["BRZ2004-ambiguous-role"], { parserVersion: source.parserVersion }).status, "quarantined");
+});
+
+test("breezy source module parses card titles outside heading tags", () => {
+  const source = getSourceModule("breezy");
+  const company = readJson(path.join(__dirname, "breezy", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <div class="position-card">
+        <a href="/p/BRZ3001-customer-success-manager" title="Customer Success Manager">
+          <span class="position-title">Customer Success Manager</span>
+          <ul class="meta">
+            <li class="location"><span>Toronto, Canada</span></li>
+            <li class="posted"><span>2026-05-13</span></li>
+            <li class="type"><span>%LABEL_POSITION_TYPE_ON_SITE%</span></li>
+          </ul>
+        </a>
+      </div>
+    `,
+    __listUrl: company.url_string
+  }, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "BRZ3001-customer-success-manager");
+  assert.equal(normalized.position_name, "Customer Success Manager");
+  assert.equal(normalized.country, "Canada");
+  assert.equal(normalized.city, "Toronto");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.posting_date, "2026-05-13");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
 });
