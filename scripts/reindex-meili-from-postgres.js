@@ -21,6 +21,7 @@ const DEFAULT_SAMPLE_QUERIES = Object.freeze([
   "software",
   "engineer"
 ]);
+const PLACEHOLDER_TITLE_PATTERN = /^(untitled|unknown|n\/?a|not available|job opening|new job|open position|position)$/i;
 
 function parseNumberOption(value, fallback, min, max) {
   const parsed = Number(value);
@@ -437,6 +438,51 @@ async function getSampleDocumentMismatches(pool, config, indexName, sampleLimit)
   return { sampled: rows.length, sample_mismatches: samples };
 }
 
+function classifyPostgresIndexStatus(row) {
+  if (!row) {
+    return {
+      postgres_index_status: "not_found",
+      postgres_exclusion_reasons: []
+    };
+  }
+  const reasons = [];
+  const canonicalUrl = String(row.canonical_url || "").trim();
+  const title = String(row.position_name || "").trim();
+  const company = String(row.company_name || "").trim();
+  if (Boolean(row.hidden)) reasons.push("hidden");
+  if (!canonicalUrl) reasons.push("missing_canonical_url");
+  else if (!/^https?:\/\//i.test(canonicalUrl)) reasons.push("invalid_canonical_url");
+  if (!title) reasons.push("missing_title");
+  else if (PLACEHOLDER_TITLE_PATTERN.test(title)) reasons.push("placeholder_title");
+  if (!company) reasons.push("missing_company");
+  return {
+    postgres_index_status: reasons.length === 0
+      ? "indexable"
+      : (Boolean(row.hidden) ? "hidden" : "excluded_visible"),
+    postgres_exclusion_reasons: reasons
+  };
+}
+
+async function annotateExtraDocumentsWithPostgresStatus(pool, documents = []) {
+  const urls = Array.from(new Set((Array.isArray(documents) ? documents : [])
+    .map((document) => String(document?.canonical_url || "").trim())
+    .filter(Boolean)));
+  if (urls.length === 0) return documents;
+  const result = await pool.query(
+    `
+      SELECT canonical_url, hidden, position_name, company_name
+      FROM postings
+      WHERE canonical_url = ANY($1::text[]);
+    `,
+    [urls]
+  );
+  const byUrl = new Map((result.rows || []).map((row) => [String(row.canonical_url || "").trim(), row]));
+  return documents.map((document) => ({
+    ...document,
+    ...classifyPostgresIndexStatus(byUrl.get(String(document?.canonical_url || "").trim()))
+  }));
+}
+
 async function getPostgresIndexableDocumentRefs(pool, options = {}) {
   const ids = new Set();
   const urlsById = new Map();
@@ -518,12 +564,13 @@ async function getMeiliDocumentDrift(pool, config, indexName, options = {}) {
       missingDocuments.push({ id, canonical_url: canonicalUrl });
     }
   }
+  const annotatedExtraDocuments = await annotateExtraDocumentsWithPostgresStatus(pool, extraDocuments);
 
   return {
     postgres_document_count: postgresRefs.ids.size,
     meili_document_count: meiliDocumentCount,
     extra_meili_document_count: extraDocumentCount,
-    extra_meili_documents: extraDocuments,
+    extra_meili_documents: annotatedExtraDocuments,
     missing_meili_document_count: missingDocumentCount,
     missing_meili_documents: missingDocuments
   };

@@ -230,7 +230,7 @@ function createResponse(status, body) {
   };
 }
 
-function makePool({ count = 1, facet = { remote: 1 }, rows = [] } = {}) {
+function makePool({ count = 1, facet = { remote: 1 }, rows = [], driftRows = [] } = {}) {
   let selectCalls = 0;
   const pool = {
     queries: [],
@@ -278,6 +278,10 @@ function makePool({ count = 1, facet = { remote: 1 }, rows = [] } = {}) {
         };
       }
       if (/COUNT\(\*\)::int AS count/i.test(queryText)) return { rows: [{ count }] };
+      if (/canonical_url = ANY/i.test(queryText)) {
+        const urls = new Set(Array.isArray(params?.[0]) ? params[0] : []);
+        return { rows: driftRows.filter((row) => urls.has(row.canonical_url)) };
+      }
       if (/SELECT\s+canonical_url/i.test(queryText)) {
         selectCalls += 1;
         return { rows: selectCalls === 1 ? rows : [] };
@@ -452,7 +456,17 @@ test("replace validation catches count mismatch", async () => {
   });
   try {
     const result = await validateMeiliIndexAgainstPostgres(
-      makePool({ count: 1, facet: { remote: 1 }, rows: [posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })] }),
+      makePool({
+        count: 1,
+        facet: { remote: 1 },
+        rows: [posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })],
+        driftRows: [posting({
+          canonical_url: "https://example.com/jobs/stale-open-position",
+          company_name: "Demo Co",
+          position_name: "Open Position",
+          remote_type: "onsite"
+        })]
+      }),
       { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
       "postings_tmp",
       { sampleLimit: 0, sampleSearches: false }
@@ -467,7 +481,9 @@ test("replace validation catches count mismatch", async () => {
         title: "Open Position",
         company: "Demo Co",
         remote_type: "onsite",
-        hidden: false
+        hidden: false,
+        postgres_index_status: "excluded_visible",
+        postgres_exclusion_reasons: ["placeholder_title"]
       }
     ]);
   } finally {
