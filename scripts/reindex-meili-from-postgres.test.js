@@ -422,21 +422,54 @@ test("replace validation catches count mismatch", async () => {
   const mock = installFetchMock((url, options) => {
     if (url.endsWith("/indexes/postings_tmp")) return createResponse(200, { uid: "postings_tmp", primaryKey: "id" });
     if (url.endsWith("/indexes/postings_tmp/settings")) return createResponse(200, expectedSettingsResponse());
-    if (url.endsWith("/indexes/postings_tmp/stats")) return createResponse(200, { numberOfDocuments: 1 });
+    if (url.endsWith("/indexes/postings_tmp/stats")) return createResponse(200, { numberOfDocuments: 2 });
     if (url.endsWith("/indexes/postings_tmp/search")) {
-      return createResponse(200, { facetDistribution: { remote_type: { remote: 2 } }, hits: [], estimatedTotalHits: 0 });
+      return createResponse(200, { facetDistribution: { remote_type: { remote: 1, onsite: 1 } }, hits: [], estimatedTotalHits: 0 });
+    }
+    if (url.includes("/indexes/postings_tmp/documents?")) {
+      return createResponse(200, {
+        results: [
+          {
+            id: toMeiliPostingDocument(posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })).id,
+            canonical_url: "https://example.com/jobs/remote-00000000",
+            title: "Software Engineer",
+            company: "Example Co",
+            remote_type: "remote",
+            hidden: false
+          },
+          {
+            id: "stale-id",
+            canonical_url: "https://example.com/jobs/stale-open-position",
+            title: "Open Position",
+            company: "Demo Co",
+            remote_type: "onsite",
+            hidden: false
+          }
+        ]
+      });
     }
     throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
   });
   try {
     const result = await validateMeiliIndexAgainstPostgres(
-      makePool({ count: 2, facet: { remote: 2 } }),
+      makePool({ count: 1, facet: { remote: 1 }, rows: [posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })] }),
       { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
       "postings_tmp",
       { sampleLimit: 0, sampleSearches: false }
     );
     assert.equal(result.ok, false);
-    assert.equal(result.count_delta, 1);
+    assert.equal(result.count_delta, -1);
+    assert.equal(result.extra_meili_document_count, 1);
+    assert.deepEqual(result.extra_meili_documents, [
+      {
+        id: "stale-id",
+        canonical_url: "https://example.com/jobs/stale-open-position",
+        title: "Open Position",
+        company: "Demo Co",
+        remote_type: "onsite",
+        hidden: false
+      }
+    ]);
   } finally {
     mock.restore();
   }

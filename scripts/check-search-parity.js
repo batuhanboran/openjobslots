@@ -4,6 +4,10 @@ const {
   normalizeCountryFromLocation,
   normalizeRemoteTypeFromEvidence
 } = require("../server/ingestion/posting");
+const {
+  getCountryFilterTerms,
+  normalizeText
+} = require("../server/search/config");
 const { getMeiliConfig, searchMeiliPostings } = require("../server/search/meili");
 
 const DEFAULT_CASES = Object.freeze([
@@ -80,6 +84,24 @@ function countryFromItem(item) {
   return normalizeCountryFromLocation(item?.location || item?.location_text || "");
 }
 
+function containsNormalizedTerm(value, term) {
+  const haystack = ` ${normalizeText(value).replace(/\s+/g, " ")} `;
+  const needle = normalizeText(term).replace(/\s+/g, " ").trim();
+  return Boolean(needle) && haystack.includes(` ${needle} `);
+}
+
+function itemHasCountryFilterEvidence(item, expectedCountry) {
+  const explicit = String(item?.country || "").trim();
+  if (explicit) return explicit === expectedCountry;
+  const evidence = [
+    item?.location,
+    item?.location_text,
+    item?.position_name,
+    item?.title
+  ].map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+  return getCountryFilterTerms(expectedCountry).some((term) => containsNormalizedTerm(evidence, term));
+}
+
 function remoteTypeFromItem(item) {
   const explicit = String(item?.remote_type || "").trim();
   if (explicit && explicit !== "unknown") return explicit;
@@ -130,7 +152,7 @@ function checkFilterViolations(caseSpec, items, source) {
   const countries = new Set((caseSpec.countries || []).map((item) => String(item || "").trim()).filter(Boolean));
   for (const item of Array.isArray(items) ? items : []) {
     const canonicalUrl = canonicalUrlFromItem(item);
-    if (countries.size > 0 && !countries.has(countryFromItem(item))) {
+    if (countries.size > 0 && ![...countries].some((country) => itemHasCountryFilterEvidence(item, country))) {
       violations.push({
         source,
         canonical_url: canonicalUrl,

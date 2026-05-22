@@ -437,6 +437,98 @@ async function getSampleDocumentMismatches(pool, config, indexName, sampleLimit)
   return { sampled: rows.length, sample_mismatches: samples };
 }
 
+async function getPostgresIndexableDocumentRefs(pool, options = {}) {
+  const ids = new Set();
+  const urlsById = new Map();
+  let lastCanonicalUrl = "";
+  const batchSize = Math.max(100, Math.min(10000, Number(options.batchSize || 5000)));
+  while (true) {
+    const result = await pool.query(
+      `
+        SELECT canonical_url
+        FROM postings
+        WHERE ${indexablePostingsWhereClause()}
+          AND canonical_url > $1
+        ORDER BY canonical_url ASC
+        LIMIT $2;
+      `,
+      [lastCanonicalUrl, batchSize]
+    );
+    if (result.rows.length === 0) break;
+    for (const row of result.rows) {
+      const canonicalUrl = String(row.canonical_url || "").trim();
+      const id = toMeiliDocumentId(canonicalUrl);
+      ids.add(id);
+      urlsById.set(id, canonicalUrl);
+    }
+    lastCanonicalUrl = String(result.rows[result.rows.length - 1].canonical_url || "");
+  }
+  return { ids, urlsById };
+}
+
+function toDriftDocumentSample(document) {
+  return {
+    id: String(document?.id || "").trim(),
+    canonical_url: String(document?.canonical_url || "").trim(),
+    title: String(document?.title || "").trim(),
+    company: String(document?.company || "").trim(),
+    remote_type: String(document?.remote_type || "").trim(),
+    hidden: Boolean(document?.hidden)
+  };
+}
+
+async function getMeiliDocumentDrift(pool, config, indexName, options = {}) {
+  const sampleLimit = Math.max(0, Math.min(100, Number(options.sampleLimit ?? 20)));
+  const postgresRefs = await getPostgresIndexableDocumentRefs(pool, options);
+  const meiliIds = new Set();
+  const extraDocuments = [];
+  let extraDocumentCount = 0;
+  let meiliDocumentCount = 0;
+  let offset = 0;
+  const limit = Math.max(100, Math.min(1000, Number(options.pageSize || 1000)));
+  while (true) {
+    const page = await meiliRequest(
+      config,
+      `/indexes/${encodeIndex(indexName)}/documents?limit=${limit}&offset=${offset}&fields=id,canonical_url,title,company,remote_type,hidden`
+    );
+    const documents = Array.isArray(page?.results) ? page.results : [];
+    if (documents.length === 0) break;
+    for (const document of documents) {
+      const id = String(document?.id || "").trim();
+      if (!id) continue;
+      meiliDocumentCount += 1;
+      meiliIds.add(id);
+      if (!postgresRefs.ids.has(id)) {
+        extraDocumentCount += 1;
+        if (extraDocuments.length < sampleLimit) {
+          extraDocuments.push(toDriftDocumentSample(document));
+        }
+      }
+    }
+    offset += documents.length;
+    if (documents.length < limit) break;
+  }
+
+  const missingDocuments = [];
+  let missingDocumentCount = 0;
+  for (const [id, canonicalUrl] of postgresRefs.urlsById.entries()) {
+    if (meiliIds.has(id)) continue;
+    missingDocumentCount += 1;
+    if (missingDocuments.length < sampleLimit) {
+      missingDocuments.push({ id, canonical_url: canonicalUrl });
+    }
+  }
+
+  return {
+    postgres_document_count: postgresRefs.ids.size,
+    meili_document_count: meiliDocumentCount,
+    extra_meili_document_count: extraDocumentCount,
+    extra_meili_documents: extraDocuments,
+    missing_meili_document_count: missingDocumentCount,
+    missing_meili_documents: missingDocuments
+  };
+}
+
 function summarizeSampleMismatches(samples = []) {
   const summary = {
     missing_documents: 0,
@@ -489,13 +581,19 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
   const postgresRemoteFacet = await getPostgresRemoteFacet(pool, options);
   const meiliRemoteFacet = config.enabled && index?.uid ? await getMeiliRemoteFacet(config, indexName) : {};
   const remoteFacetComparison = compareFacetDistributions(postgresRemoteFacet, meiliRemoteFacet);
+  const countDelta = postgresCount - Number(stats?.numberOfDocuments || 0);
   const samples = config.enabled && index?.uid
     ? await getSampleDocumentMismatches(pool, config, indexName, options.sampleLimit)
     : { sampled: 0, sample_mismatches: [] };
+  const documentDrift = config.enabled && index?.uid && countDelta !== 0
+    ? await getMeiliDocumentDrift(pool, config, indexName, {
+      batchSize: options.batchSize,
+      sampleLimit: options.driftSampleLimit ?? 20
+    })
+    : { extra_meili_documents: [], missing_meili_documents: [] };
   const sampleSearches = config.enabled && index?.uid && options.sampleSearches !== false
     ? await runSampleSearches(config, indexName)
     : [];
-  const countDelta = postgresCount - Number(stats?.numberOfDocuments || 0);
   const ok =
     Boolean(settingsValidation.ok) &&
     countDelta === 0 &&
@@ -517,6 +615,10 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
     sampled: samples.sampled,
     sample_mismatches: samples.sample_mismatches,
     sample_mismatch_summary: summarizeSampleMismatches(samples.sample_mismatches),
+    extra_meili_document_count: Number(documentDrift.extra_meili_document_count || 0),
+    extra_meili_documents: documentDrift.extra_meili_documents,
+    missing_meili_document_count: Number(documentDrift.missing_meili_document_count || 0),
+    missing_meili_documents: documentDrift.missing_meili_documents,
     sample_searches: sampleSearches
   };
 }

@@ -81,6 +81,21 @@ test("filter violation checks infer public API country and remote evidence", () 
   assert.deepEqual(violations, []);
 });
 
+test("filter violation accepts multi-country public API location when expected country is present", () => {
+  const violations = checkFilterViolations(
+    { countries: ["Germany"] },
+    [
+      {
+        job_posting_url: "https://example.com/germany-uk",
+        position_name: "Category Lead, Germany",
+        location: "Berlin, Germany / London, England, United Kingdom"
+      }
+    ],
+    "api"
+  );
+  assert.deepEqual(violations, []);
+});
+
 test("top URL and sort helpers report parity-relevant differences", () => {
   assert.deepEqual(compareTopUrls(["a", "b"], ["a", "c"]), [{ index: 1, left: "b", right: "c" }]);
   assert.equal(isSortedByLastSeen([{ last_seen_epoch: 3 }, { last_seen_epoch: 2 }]), true);
