@@ -20,6 +20,8 @@ function testFormatReportIncludesDeterministicDailySummary() {
     top_endpoint: { endpoint: "/postings", event_type: "postings", count: 4 },
     top_terms: [{ query: "software engineer", count: 3 }],
     top_job_title_keywords: [{ query: "software engineer", count: 2 }],
+    top_country_filters: [{ value: "United States", count: 3 }, { value: "Turkey", count: 1 }],
+    remote_filter_counts: { all: 2, remote: 3, hybrid: 1, non_remote: 1, unknown: 0 },
     top_suggest_inputs: [{ query: "software", count: 2 }],
     top_filter_option_searches: [{ query: "remote", count: 1 }],
     result_count_distribution: {
@@ -40,6 +42,8 @@ function testFormatReportIncludesDeterministicDailySummary() {
   assert.match(formatted, /Top endpoint: \/postings \(4\)/);
   assert.match(formatted, /Top normalized query: software engineer \(3\)/);
   assert.match(formatted, /Top job title\/keyword: software engineer \(2\)/);
+  assert.match(formatted, /Top requested countries: United States \(3\), Turkey \(1\)/);
+  assert.match(formatted, /Remote filters: all=2, remote=3, hybrid=1, non_remote=1, unknown=0/);
   assert.match(formatted, /Result counts: zero=1, low=2, normal=4, unknown=0/);
   assert.match(formatted, /Cache: HIT=5, MISS=2, hit_rate=71\.43%/);
   assert.doesNotMatch(formatted, /Cloudflare.*Backend public search events/s);

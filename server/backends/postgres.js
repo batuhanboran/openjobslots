@@ -468,6 +468,8 @@ async function ensurePostgresSchema(pool) {
       remote_filter TEXT NOT NULL DEFAULT '',
       ats_filter_count INTEGER NOT NULL DEFAULT 0,
       country_filter_count INTEGER NOT NULL DEFAULT 0,
+      country_filters TEXT NOT NULL DEFAULT '',
+      region_filters TEXT NOT NULL DEFAULT '',
       region_filter_count INTEGER NOT NULL DEFAULT 0,
       referrer_host TEXT NOT NULL DEFAULT '',
       user_agent_family TEXT NOT NULL DEFAULT '',
@@ -478,6 +480,10 @@ async function ensurePostgresSchema(pool) {
 
     ALTER TABLE IF EXISTS public_search_events
       ADD COLUMN IF NOT EXISTS anonymous_session_key TEXT NOT NULL DEFAULT '';
+    ALTER TABLE IF EXISTS public_search_events
+      ADD COLUMN IF NOT EXISTS country_filters TEXT NOT NULL DEFAULT '';
+    ALTER TABLE IF EXISTS public_search_events
+      ADD COLUMN IF NOT EXISTS region_filters TEXT NOT NULL DEFAULT '';
 
     CREATE INDEX IF NOT EXISTS idx_public_search_events_created
       ON public_search_events(created_at DESC);

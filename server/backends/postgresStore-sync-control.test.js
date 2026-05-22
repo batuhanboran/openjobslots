@@ -1143,7 +1143,8 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
     sortBy: "relevance",
     remote: "all",
     ats: ["lever", "ashby"],
-    countries: ["Turkey"],
+    countries: ["Turkey", "United States"],
+    regions: ["North America"],
     referrer: "https://www.google.com/search?q=openjobslots",
     userAgent: "Mozilla/5.0 Firefox/151.0",
     cacheStatus: "MISS",
@@ -1166,6 +1167,8 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
   assert.equal(calls[0].params[11], "www.google.com");
   assert.equal(calls[0].params[12], "Firefox");
   assert.equal(calls[0].params[15], "a".repeat(64));
+  assert.equal(calls[0].params[16], "Turkey,United States");
+  assert.equal(calls[0].params[17], "North America");
 }
 
 async function testPublicSearchReportAggregatesTopTermsReadOnly() {
@@ -1176,8 +1179,17 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
       if (/GROUP BY event_type/i.test(sql)) {
         return { rows: [{ event_type: "postings", count: "3" }, { event_type: "suggest", count: "5" }] };
       }
+      if (/information_schema\.columns/i.test(sql)) {
+        return { rows: [{ has_country_filters: true }] };
+      }
       if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
         return { rows: [{ total_events: "8", anonymous_session_count: "2" }] };
+      }
+      if (/regexp_split_to_table\(country_filters/i.test(sql)) {
+        return { rows: [{ country_filter: "Turkey", count: "4" }, { country_filter: "United States", count: "2" }] };
+      }
+      if (/AS remote_filter/i.test(sql) && /GROUP BY/i.test(sql)) {
+        return { rows: [{ remote_filter: "remote", count: "4" }, { remote_filter: "all", count: "3" }] };
       }
       if (/GROUP BY query_normalized/i.test(sql)) {
         return {
@@ -1230,6 +1242,13 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
   assert.equal(report.cache_status_counts.MISS, 2);
   assert.equal(report.cache_hit_rate, 0.75);
   assert.equal(report.top_terms[0].query, "technical support");
+  assert.deepEqual(report.top_country_filters, [
+    { value: "Turkey", count: 4 },
+    { value: "United States", count: 2 }
+  ]);
+  assert.equal(report.remote_filter_counts.remote, 4);
+  assert.equal(report.remote_filter_counts.all, 3);
+  assert.equal(report.remote_filter_counts.hybrid, 0);
   assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
 }
 
@@ -1240,6 +1259,9 @@ async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
       calls.push({ sql, params });
       if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
         return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
+      }
+      if (/information_schema\.columns/i.test(sql)) {
+        return { rows: [{ has_country_filters: false }] };
       }
       return { rows: [] };
     }
@@ -1252,7 +1274,7 @@ async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
   });
 
   assert.equal(report.date, "2026-05-22");
-  assert.ok(calls.every((call) => call.params[0] === "2026-05-22"));
+  assert.ok(calls.filter((call) => call.params.length > 0).every((call) => call.params[0] === "2026-05-22"));
 }
 
 async function main() {

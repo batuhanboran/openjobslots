@@ -41,6 +41,17 @@ function formatTopTerm(items = []) {
   return `${items[0].query} (${items[0].count})`;
 }
 
+function formatFilterValues(items = []) {
+  if (!Array.isArray(items) || items.length === 0) return "none";
+  return items.map((item) => `${item.value} (${item.count})`).join(", ");
+}
+
+function formatRemoteFilters(counts = {}) {
+  return ["all", "remote", "hybrid", "non_remote", "unknown"]
+    .map((key) => `${key}=${Number(counts[key] || 0)}`)
+    .join(", ");
+}
+
 function formatPercent(value) {
   if (!Number.isFinite(Number(value))) return "n/a";
   return `${(Number(value) * 100).toFixed(2)}%`;
@@ -59,6 +70,8 @@ function formatReport(report) {
     `Top endpoint: ${topEndpoint ? `${topEndpoint.endpoint} (${topEndpoint.count})` : "none"}`,
     `Top normalized query: ${formatTopTerm(report.top_normalized_queries || report.top_terms)}`,
     `Top job title/keyword: ${formatTopTerm(report.top_job_title_keywords || report.top_final_posting_searches)}`,
+    `Top requested countries: ${formatFilterValues(report.top_country_filters)}`,
+    `Remote filters: ${formatRemoteFilters(report.remote_filter_counts)}`,
     `Top final searches: ${formatTerms(report.top_final_posting_searches)}`,
     `Top suggest inputs: ${formatTerms(report.top_suggest_inputs)}`,
     `Top combined terms: ${formatTerms(report.top_terms)}`,
@@ -93,5 +106,6 @@ if (require.main === module) {
 
 module.exports = {
   formatReport,
+  formatRemoteFilters,
   parseArgs
 };

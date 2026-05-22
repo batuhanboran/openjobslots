@@ -2630,6 +2630,23 @@ function countFilterValues(value) {
   return parseCsv(value).length;
 }
 
+function normalizeAnalyticsFilterValue(value) {
+  return String(value || "")
+    .replace(/,/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function serializeAnalyticsFilterValues(value) {
+  const items = Array.isArray(value) ? value : parseCsv(value);
+  return items
+    .map(normalizeAnalyticsFilterValue)
+    .filter(Boolean)
+    .slice(0, 20)
+    .join(",");
+}
+
 function getReferrerHost(value) {
   const raw = String(value || "").trim();
   if (!raw || raw === "-") return "";
@@ -2680,7 +2697,9 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
     getUserAgentFamily(event.userAgent),
     String(event.cacheStatus || "").trim().toUpperCase().slice(0, 12),
     countFilterValues(event.regions),
-    normalizeAnonymousSessionKey(event.anonymousSessionKey)
+    normalizeAnonymousSessionKey(event.anonymousSessionKey),
+    serializeAnalyticsFilterValues(event.countries),
+    serializeAnalyticsFilterValues(event.regions)
   ];
   await pool.query(
     `
@@ -2700,9 +2719,11 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
         user_agent_family,
         cache_status,
         region_filter_count,
-        anonymous_session_key
+        anonymous_session_key,
+        country_filters,
+        region_filters
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
     `,
     values
   );
@@ -2774,6 +2795,15 @@ function mapTopTermRows(rows) {
   }));
 }
 
+function mapTopFilterRows(rows, field) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      value: String(row?.[field] || "").trim(),
+      count: Number(row?.count || 0)
+    }))
+    .filter((item) => item.value);
+}
+
 const PUBLIC_ANALYTICS_ENDPOINTS = {
   postings: "/postings",
   suggest: "/search/suggest",
@@ -2800,6 +2830,16 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
   const limit = Math.max(1, Math.min(50, Number(options.limit || 15)));
   const where = analyticsDateWhere();
   const values = [date, timezone];
+  const columnInfo = await pool.query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'public_search_events'
+        AND column_name = 'country_filters'
+    ) AS has_country_filters;
+  `);
+  const hasCountryFilters = Boolean(columnInfo.rows?.[0]?.has_country_filters);
   const [
     eventCounts,
     eventTotals,
@@ -2810,7 +2850,9 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
     topReferrers,
     topUserAgents,
     resultBuckets,
-    cacheStatuses
+    cacheStatuses,
+    remoteFilters,
+    topCountryFilters
   ] = await Promise.all([
     pool.query(
       `
@@ -2934,10 +2976,43 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         ORDER BY count DESC, cache_status ASC;
       `,
       values
-    )
+    ),
+    pool.query(
+      `
+        SELECT COALESCE(NULLIF(remote_filter, ''), 'unknown') AS remote_filter, COUNT(*)::int AS count
+        FROM public_search_events
+        WHERE ${where}
+        GROUP BY COALESCE(NULLIF(remote_filter, ''), 'unknown')
+        ORDER BY count DESC, remote_filter ASC;
+      `,
+      values
+    ),
+    hasCountryFilters
+      ? pool.query(
+        `
+          SELECT btrim(country_filter) AS country_filter, COUNT(*)::int AS count
+          FROM public_search_events,
+            regexp_split_to_table(country_filters, ',') AS country_filter
+          WHERE ${where}
+            AND btrim(country_filters) <> ''
+            AND btrim(country_filter) <> ''
+          GROUP BY btrim(country_filter)
+          ORDER BY count DESC, country_filter ASC
+          LIMIT $3;
+        `,
+        [...values, limit]
+      )
+      : Promise.resolve({ rows: [] })
   ]);
   const endpointCounts = mapEndpointRows(eventCounts.rows);
   const cacheStatusCounts = withDefaultCounts(toCountMap(cacheStatuses.rows, "cache_status"), ["HIT", "MISS"]);
+  const remoteFilterCounts = withDefaultCounts(toCountMap(remoteFilters.rows, "remote_filter"), [
+    "all",
+    "remote",
+    "hybrid",
+    "non_remote",
+    "unknown"
+  ]);
   const cacheTotal = Object.values(cacheStatusCounts).reduce((sum, count) => sum + Number(count || 0), 0);
   const topFinalSearches = mapTopTermRows(topFinalPostings.rows);
   const topCombinedTerms = mapTopTermRows(topTerms.rows);
@@ -2957,6 +3032,8 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
     top_normalized_queries: topCombinedTerms,
     top_final_posting_searches: topFinalSearches,
     top_job_title_keywords: topFinalSearches,
+    top_country_filters: mapTopFilterRows(topCountryFilters.rows, "country_filter"),
+    remote_filter_counts: remoteFilterCounts,
     top_suggest_inputs: mapTopTermRows(topSuggestInputs.rows),
     top_filter_option_searches: mapTopTermRows(topFilterSearches.rows),
     result_count_distribution: withDefaultCounts(toCountMap(resultBuckets.rows, "result_bucket"), [

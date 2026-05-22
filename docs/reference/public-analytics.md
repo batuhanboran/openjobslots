@@ -27,9 +27,13 @@ OPENJOBSLOTS_SMTP_PORT=465
 OPENJOBSLOTS_SMTP_SECURE=1
 OPENJOBSLOTS_SMTP_USER=reports@openjobslots.com
 OPENJOBSLOTS_SMTP_PASS=...
+
+OPENJOBSLOTS_CLOUDFLARE_ZONE_ID=bd00782a72f0341b99c4de04e7dd824b
+OPENJOBSLOTS_CLOUDFLARE_API_TOKEN=...
 ```
 
 `OPENJOBSLOTS_ANALYTICS_EMAIL_TO` defaults to `maintainer@example.com`.
+The Cloudflare token needs read access for zone analytics. Cloudflare Email Routing is inbound forwarding, not SMTP.
 
 ## Commands
 
