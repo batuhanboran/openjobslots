@@ -4,6 +4,7 @@ const path = require("node:path");
 const {
   attachBacklogDiagnostics,
   buildAutoSyncBudgetUsageQuery,
+  buildLatestRunFailureReasonsQuery,
   buildLatestRunBySourceQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
@@ -95,6 +96,19 @@ test("buildLatestRunBySourceQuery compares latest-run successes and failures by 
   assert.match(query.sql, /FROM ingestion_run_errors/i);
   assert.match(query.sql, /last_success_epoch >= l\.started_at_epoch/i);
   assert.match(query.sql, /e\.run_id = l\.id/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildLatestRunFailureReasonsQuery groups only the latest run by source", () => {
+  const query = buildLatestRunFailureReasonsQuery({
+    targetAtsKeys: ["applytojob", "breezy"]
+  });
+
+  assert.deepEqual(query.values, [["applytojob", "breezy"]]);
+  assert.match(query.sql, /WITH latest AS/i);
+  assert.match(query.sql, /FROM ingestion_run_errors/i);
+  assert.match(query.sql, /e\.run_id = l\.id/i);
+  assert.match(query.sql, /GROUP BY e\.ats_key, e\.error_type, COALESCE\(e\.http_status, 0\)/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -266,6 +280,15 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
       }
       if (/FROM ingestion_run_errors/i.test(sql)) {
         if (/e\.run_id = l\.id/i.test(sql)) {
+          if (/GROUP BY e\.ats_key, e\.error_type/i.test(sql)) {
+            return {
+              rows: [
+                { ats_key: "applytojob", error_type: "parser_validation", http_status: 0, count: 3 },
+                { ats_key: "breezy", error_type: "blocked_or_rate_limited", http_status: 403, count: 1 },
+                { ats_key: "breezy", error_type: "portal_search_empty", http_status: 0, count: 2 }
+              ]
+            };
+          }
           return {
             rows: [
               { latest_run_id: 211, ats_key: "applytojob", success_count: 1, failure_count: 3 },
@@ -315,15 +338,20 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 7);
+  assert.equal(calls.length, 8);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
   assert.equal(report.diagnostics.latest_run_by_source.applytojob.success_rate_pct, 25);
   assert.equal(report.diagnostics.latest_run_by_source.applytojob.failure_rate_pct, 75);
+  assert.equal(report.diagnostics.latest_run_by_source.applytojob.failure_reasons.parser_bug_count, 3);
+  assert.equal(report.diagnostics.latest_run_by_source.applytojob.failure_reasons.by_type.parser_validation, 3);
   assert.equal(report.diagnostics.latest_run_by_source.breezy.success_rate_pct, 33.33);
+  assert.equal(report.diagnostics.latest_run_by_source.breezy.failure_reasons.rate_limit_count, 1);
+  assert.equal(report.diagnostics.latest_run_by_source.breezy.failure_reasons.empty_no_jobs_count, 2);
   assert.equal(report.items[0].latest_run.success_count, 1);
   assert.equal(report.items[0].latest_run.failure_count, 3);
+  assert.equal(report.items[0].latest_run.failure_reasons.parser_bug_count, 3);
   assert.equal(report.diagnostics.failure_reason_counts.rate_limit, 3);
   assert.equal(report.diagnostics.parser_drift_recheck.sample_count, 0);
   assert.equal(report.diagnostics.auto_sync_budget_usage.targets_started_today, 2000);
