@@ -93,6 +93,53 @@ function testDriftDetection() {
   assert.ok(shapeSimilarity(baseline.shape_paths, similar.shape_paths) > 0.9);
 }
 
+function testDynamicDetailPayloadKeysDoNotCauseDrift() {
+  const baseline = analyzePayloadShape({
+    html: "<html></html>",
+    __listUrl: "https://fixture.applytojob.com/apply",
+    __sourceConfig: {
+      baseOrigin: "https://fixture.applytojob.com",
+      detail_fetch_count: 2,
+      list_url: "https://fixture.applytojob.com/apply"
+    },
+    __detailHtmlByUrl: {
+      "https://fixture.applytojob.com/apply/a/One": "<html>one</html>",
+      "https://fixture.applytojob.com/apply/b/Two": "<html>two</html>"
+    },
+    __detailStatusByUrl: {
+      "https://fixture.applytojob.com/apply/a/One": 200,
+      "https://fixture.applytojob.com/apply/b/Two": 200
+    },
+    __detailFailureByUrl: {}
+  });
+  const observed = analyzePayloadShape({
+    html: "<html></html>",
+    __listUrl: "https://fixture.applytojob.com/apply",
+    __sourceConfig: {
+      baseOrigin: "https://fixture.applytojob.com",
+      detail_fetch_count: 5,
+      list_url: "https://fixture.applytojob.com/apply"
+    },
+    __detailHtmlByUrl: {
+      "https://fixture.applytojob.com/apply/c/Three": "<html>three</html>",
+      "https://fixture.applytojob.com/apply/d/Four": "<html>four</html>",
+      "https://fixture.applytojob.com/apply/e/Five": "<html>five</html>",
+      "https://fixture.applytojob.com/apply/f/Six": "<html>six</html>",
+      "https://fixture.applytojob.com/apply/g/Seven": "<html>seven</html>"
+    },
+    __detailStatusByUrl: {
+      "https://fixture.applytojob.com/apply/c/Three": 200,
+      "https://fixture.applytojob.com/apply/d/Four": 200,
+      "https://fixture.applytojob.com/apply/e/Five": 200,
+      "https://fixture.applytojob.com/apply/f/Six": 200,
+      "https://fixture.applytojob.com/apply/g/Seven": 200
+    },
+    __detailFailureByUrl: {}
+  });
+  const result = detectParserDrift(baseline, observed, { threshold: 0.55 });
+  assert.equal(result.drift, false);
+}
+
 function testWorkerSpinGuardInputs() {
   const httpFailed = classifySourceProtection({
     ats_key: "blocked",
@@ -116,6 +163,7 @@ testCertifiedSourceGetsNormalBudget();
 testPartialSourceGetsCanaryBudget();
 testFallbackSourceDisabled();
 testDriftDetection();
+testDynamicDetailPayloadKeysDoNotCauseDrift();
 testWorkerSpinGuardInputs();
 
 console.log("source quality policy tests passed");

@@ -331,6 +331,38 @@ function analyzePayloadShape(payload) {
   return { shape_hash: shapeHash, shape_paths: paths };
 }
 
+const DYNAMIC_DETAIL_MAP_KEYS = Object.freeze([
+  "__detailHtmlByUrl",
+  "detailHtmlByUrl",
+  "__detailStatusByUrl",
+  "detailStatusByUrl",
+  "__detailFailureByUrl",
+  "detailFailureByUrl"
+]);
+
+function normalizeDynamicDetailShapePath(path) {
+  const source = String(path || "");
+  const typeSeparator = source.lastIndexOf(":");
+  if (typeSeparator <= 0) return source;
+  const stem = source.slice(0, typeSeparator);
+  const type = source.slice(typeSeparator + 1);
+  for (const key of DYNAMIC_DETAIL_MAP_KEYS) {
+    if (stem.startsWith(`${key}.`)) {
+      return `${key}.*:${type}`;
+    }
+    const nestedMarker = `.${key}.`;
+    const nestedIndex = stem.indexOf(nestedMarker);
+    if (nestedIndex >= 0) {
+      return `${stem.slice(0, nestedIndex + 1)}${key}.*:${type}`;
+    }
+  }
+  return source;
+}
+
+function normalizeShapePathsForDrift(paths = []) {
+  return Array.from(new Set((Array.isArray(paths) ? paths : []).map(normalizeDynamicDetailShapePath))).sort();
+}
+
 function shapeSimilarity(aPaths = [], bPaths = []) {
   const a = new Set(Array.isArray(aPaths) ? aPaths : []);
   const b = new Set(Array.isArray(bPaths) ? bPaths : []);
@@ -347,7 +379,10 @@ function detectParserDrift(baselineShape, observedShape, options = {}) {
   if (!baselineShape || !Array.isArray(baselineShape.shape_paths)) {
     return { drift: false, similarity: 1, reason: "no-baseline" };
   }
-  const similarity = shapeSimilarity(baselineShape.shape_paths, observedShape?.shape_paths || []);
+  const similarity = shapeSimilarity(
+    normalizeShapePathsForDrift(baselineShape.shape_paths),
+    normalizeShapePathsForDrift(observedShape?.shape_paths || [])
+  );
   const threshold = asNumber(options.threshold, readThresholds().driftSimilarityThreshold);
   return {
     drift: similarity < threshold,
