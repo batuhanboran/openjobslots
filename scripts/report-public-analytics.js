@@ -70,6 +70,8 @@ function formatReport(report) {
     `Top endpoint: ${topEndpoint ? `${topEndpoint.endpoint} (${topEndpoint.count})` : "none"}`,
     `Top normalized query: ${formatTopTerm(report.top_normalized_queries || report.top_terms)}`,
     `Top job title/keyword: ${formatTopTerm(report.top_job_title_keywords || report.top_final_posting_searches)}`,
+    `Top zero-result queries: ${formatTerms(report.top_zero_result_queries)}`,
+    `Top low-result queries: ${formatTerms(report.top_low_result_queries)}`,
     `Top requested countries: ${formatFilterValues(report.top_country_filters)}`,
     `Remote filters: ${formatRemoteFilters(report.remote_filter_counts)}`,
     `Top final searches: ${formatTerms(report.top_final_posting_searches)}`,

@@ -1191,6 +1191,20 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
       if (/AS remote_filter/i.test(sql) && /GROUP BY/i.test(sql)) {
         return { rows: [{ remote_filter: "remote", count: "4" }, { remote_filter: "all", count: "3" }] };
       }
+      if (/GROUP BY query_normalized/i.test(sql) && /result_count\s*=\s*0/i.test(sql)) {
+        return {
+          rows: [
+            { query_normalized: "wordpress", count: "2", first_seen_at: "2026-05-22T10:00:00Z", last_seen_at: "2026-05-22T10:05:00Z" }
+          ]
+        };
+      }
+      if (/GROUP BY query_normalized/i.test(sql) && /result_count BETWEEN 1 AND 9/i.test(sql)) {
+        return {
+          rows: [
+            { query_normalized: "teacher", count: "3", first_seen_at: "2026-05-22T11:00:00Z", last_seen_at: "2026-05-22T11:05:00Z" }
+          ]
+        };
+      }
       if (/GROUP BY query_normalized/i.test(sql)) {
         return {
           rows: [
@@ -1242,6 +1256,8 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
   assert.equal(report.cache_status_counts.MISS, 2);
   assert.equal(report.cache_hit_rate, 0.75);
   assert.equal(report.top_terms[0].query, "technical support");
+  assert.deepEqual(report.top_zero_result_queries, [{ query: "wordpress", count: 2, first_seen_at: "2026-05-22T10:00:00Z", last_seen_at: "2026-05-22T10:05:00Z" }]);
+  assert.deepEqual(report.top_low_result_queries, [{ query: "teacher", count: 3, first_seen_at: "2026-05-22T11:00:00Z", last_seen_at: "2026-05-22T11:05:00Z" }]);
   assert.deepEqual(report.top_country_filters, [
     { value: "Turkey", count: 4 },
     { value: "United States", count: 2 }

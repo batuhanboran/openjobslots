@@ -2847,6 +2847,8 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
     topFinalPostings,
     topSuggestInputs,
     topFilterSearches,
+    topZeroResultQueries,
+    topLowResultQueries,
     topReferrers,
     topUserAgents,
     resultBuckets,
@@ -2919,6 +2921,32 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         WHERE ${where}
           AND event_type = 'filter_options'
           AND query_normalized <> ''
+        GROUP BY query_normalized
+        ORDER BY count DESC, query_normalized ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
+        FROM public_search_events
+        WHERE ${where}
+          AND query_normalized <> ''
+          AND result_count = 0
+        GROUP BY query_normalized
+        ORDER BY count DESC, query_normalized ASC
+        LIMIT $3;
+      `,
+      [...values, limit]
+    ),
+    pool.query(
+      `
+        SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
+        FROM public_search_events
+        WHERE ${where}
+          AND query_normalized <> ''
+          AND result_count BETWEEN 1 AND 9
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
         LIMIT $3;
@@ -3032,6 +3060,8 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
     top_normalized_queries: topCombinedTerms,
     top_final_posting_searches: topFinalSearches,
     top_job_title_keywords: topFinalSearches,
+    top_zero_result_queries: mapTopTermRows(topZeroResultQueries.rows),
+    top_low_result_queries: mapTopTermRows(topLowResultQueries.rows),
     top_country_filters: mapTopFilterRows(topCountryFilters.rows, "country_filter"),
     remote_filter_counts: remoteFilterCounts,
     top_suggest_inputs: mapTopTermRows(topSuggestInputs.rows),

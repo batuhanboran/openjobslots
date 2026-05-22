@@ -5,6 +5,8 @@ This runbook covers privacy-safe public analytics for `openjobslots.com`.
 ## What Is Tracked
 
 - Backend first-party search/report data comes from Postgres `public_search_events`.
+- Daily demand gaps include top zero-result and low-result normalized queries from backend events.
+- Cloudflare edge analytics is read from GraphQL `httpRequestsAdaptiveGroups` and includes visits, requests, bandwidth, countries, top paths, cache status, HTTP status, device type, and browser family.
 - Google Analytics is optional and only loads when `OPENJOBSLOTS_GA_MEASUREMENT_ID` is set.
 - Search Console verification is optional and only injects a meta tag when `OPENJOBSLOTS_GSC_VERIFICATION_TOKEN` is set.
 - Frontend GA events are aggregate-only:
@@ -34,6 +36,7 @@ OPENJOBSLOTS_CLOUDFLARE_API_TOKEN=...
 
 `OPENJOBSLOTS_ANALYTICS_EMAIL_TO` defaults to `maintainer@example.com`.
 The Cloudflare token needs read access for zone analytics. Cloudflare Email Routing is inbound forwarding, not SMTP.
+For API tokens, use zone `Analytics:Read` plus zone read access for `openjobslots.com`; the daily email does not require Cloudflare write permissions.
 
 ## Commands
 

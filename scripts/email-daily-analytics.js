@@ -54,6 +54,20 @@ function formatCount(value) {
   return Number.isFinite(number) ? number.toLocaleString("en-US") : "0";
 }
 
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  if (unitIndex === 0) return `${Math.round(size).toLocaleString("en-US")} ${units[unitIndex]}`;
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
 function formatPercent(value) {
   if (!Number.isFinite(Number(value))) return "n/a";
   return `${(Number(value) * 100).toFixed(1)}%`;
@@ -62,6 +76,11 @@ function formatPercent(value) {
 function formatQueryList(items = [], key = "query") {
   if (!Array.isArray(items) || items.length === 0) return "none";
   return items.map((item) => `${item[key]} (${formatCount(item.count)})`).join(", ");
+}
+
+function formatNamedCounts(items = [], key = "name") {
+  if (!Array.isArray(items) || items.length === 0) return "none";
+  return items.map((item) => `${item[key]}=${formatCount(item.count)}`).join(", ");
 }
 
 function formatRemoteIntent(counts = {}) {
@@ -148,12 +167,29 @@ function getReportDateUtcRange(date, timezone, now = new Date()) {
   };
 }
 
-function toTopCountryRows(countryCounts = {}) {
-  return Object.entries(countryCounts || {})
-    .map(([code, count]) => ({ code: String(code || "").trim().toUpperCase(), count: Number(count || 0) }))
-    .filter((item) => item.code)
-    .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
-    .slice(0, 10);
+function toCloudflareTime(value, now = new Date()) {
+  if (Number.isFinite(Number(value))) {
+    return new Date((now instanceof Date ? now : new Date()).getTime() + Number(value) * 60 * 1000).toISOString();
+  }
+  return String(value || "").trim();
+}
+
+function mapCloudflareGroups(rows = [], dimensionKey, outputKey, fallback = "unknown") {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => ({
+      [outputKey]: String(row?.dimensions?.[dimensionKey] ?? fallback).trim() || fallback,
+      count: Number(row?.count || 0)
+    }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count || String(a[outputKey]).localeCompare(String(b[outputKey])));
+}
+
+function mapCloudflareStatusCodes(rows = []) {
+  return Object.fromEntries(
+    mapCloudflareGroups(rows, "edgeResponseStatus", "status", "unknown")
+      .map((item) => [String(item.status), item.count])
+  );
 }
 
 async function fetchCloudflareTrafficSummary(report, config = readCloudflareConfig(), fetchImpl = globalThis.fetch) {
@@ -168,21 +204,61 @@ async function fetchCloudflareTrafficSummary(report, config = readCloudflareConf
   }
 
   const range = getReportDateUtcRange(report.date, report.timezone, report.now);
-  const url = new URL(`https://api.cloudflare.com/client/v4/zones/${encodeURIComponent(config.zoneId)}/analytics/dashboard`);
-  url.searchParams.set("since", String(range.since));
-  url.searchParams.set("until", String(range.until));
-  url.searchParams.set("continuous", "false");
+  const now = report.now instanceof Date ? report.now : new Date();
+  const variables = {
+    zoneTag: config.zoneId,
+    since: toCloudflareTime(range.since, now),
+    until: toCloudflareTime(range.until === 0 ? now.toISOString() : range.until, now)
+  };
+  const query = `
+    query OpenJobSlotsDailyTraffic($zoneTag: string, $since: Time, $until: Time) {
+      viewer {
+        zones(filter: { zoneTag: $zoneTag }) {
+          totals: httpRequestsAdaptiveGroups(limit: 1, filter: { datetime_geq: $since, datetime_lt: $until }) {
+            count
+            sum { visits edgeResponseBytes }
+            ratio { status4xx status5xx }
+          }
+          countries: httpRequestsAdaptiveGroups(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }, orderBy: [count_DESC]) {
+            count
+            dimensions { clientCountryName }
+          }
+          statuses: httpRequestsAdaptiveGroups(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }, orderBy: [count_DESC]) {
+            count
+            dimensions { edgeResponseStatus }
+          }
+          cache: httpRequestsAdaptiveGroups(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }, orderBy: [count_DESC]) {
+            count
+            dimensions { cacheStatus }
+          }
+          paths: httpRequestsAdaptiveGroups(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }, orderBy: [count_DESC]) {
+            count
+            dimensions { clientRequestPath }
+          }
+          devices: httpRequestsAdaptiveGroups(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }, orderBy: [count_DESC]) {
+            count
+            dimensions { clientDeviceType }
+          }
+          browsers: httpRequestsAdaptiveGroups(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }, orderBy: [count_DESC]) {
+            count
+            dimensions { userAgentBrowser }
+          }
+        }
+      }
+    }
+  `;
 
   try {
-    const response = await fetchImpl(url, {
-      method: "GET",
+    const response = await fetchImpl("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST",
       headers: {
         Authorization: `Bearer ${config.token}`,
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({ query, variables })
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.success === false) {
+    if (!response.ok || (Array.isArray(payload?.errors) && payload.errors.length > 0)) {
       const firstError = payload?.errors?.[0];
       const message = firstError?.message || response.statusText || "request failed";
       return {
@@ -192,19 +268,25 @@ async function fetchCloudflareTrafficSummary(report, config = readCloudflareConf
       };
     }
 
-    const totals = payload?.result?.totals || {};
+    const zone = payload?.data?.viewer?.zones?.[0];
+    const totals = zone?.totals?.[0] || {};
+    const visits = Number(totals?.sum?.visits || 0);
     return {
       ok: true,
-      source: "cloudflare_zone_analytics",
+      source: "cloudflare_graphql_http_requests_adaptive",
       zone_name: config.zoneName,
-      visitors: Number(totals.uniques?.all || 0),
-      pageviews: Number(totals.pageviews?.all || 0),
-      requests: Number(totals.requests?.all || 0),
-      cached_requests: Number(totals.requests?.cached || 0),
-      threats: Number(totals.threats?.all || 0),
-      bandwidth_bytes: Number(totals.bandwidth?.all || 0),
-      top_countries: toTopCountryRows(totals.requests?.country || {}),
-      status_codes: totals.requests?.http_status || {},
+      visits,
+      visitors: visits,
+      requests: Number(totals?.count || 0),
+      bandwidth_bytes: Number(totals?.sum?.edgeResponseBytes || 0),
+      status4xx_ratio: Number(totals?.ratio?.status4xx || 0),
+      status5xx_ratio: Number(totals?.ratio?.status5xx || 0),
+      top_countries: mapCloudflareGroups(zone?.countries, "clientCountryName", "code"),
+      status_codes: mapCloudflareStatusCodes(zone?.statuses),
+      cache_statuses: mapCloudflareGroups(zone?.cache, "cacheStatus", "status"),
+      top_paths: mapCloudflareGroups(zone?.paths, "clientRequestPath", "path"),
+      device_types: mapCloudflareGroups(zone?.devices, "clientDeviceType", "type"),
+      browsers: mapCloudflareGroups(zone?.browsers, "userAgentBrowser", "name"),
       since: range.since,
       until: range.until
     };
@@ -277,6 +359,14 @@ function createSampleAnalyticsReport(options = {}) {
       normal_result: 1097,
       unknown_result: 29
     },
+    top_zero_result_queries: [
+      { query: "wordpress developer", count: 18 },
+      { query: "visa sponsorship nurse", count: 11 }
+    ],
+    top_low_result_queries: [
+      { query: "teacher", count: 27 },
+      { query: "cybersecurity intern", count: 19 }
+    ],
     cache_status_counts: { HIT: 1041, MISS: 243 },
     cache_hit_rate: 1041 / 1284,
     top_referrers: [
@@ -291,19 +381,39 @@ function createSampleAnalyticsReport(options = {}) {
     ],
     cloudflare_traffic: {
       ok: true,
-      source: "cloudflare_zone_analytics",
+      source: "cloudflare_graphql_http_requests_adaptive",
+      visits: 487,
       visitors: 487,
-      pageviews: 712,
       requests: 1432,
-      cached_requests: 971,
-      threats: 3,
       bandwidth_bytes: 184392114,
+      status4xx_ratio: 0.031,
+      status5xx_ratio: 0,
       top_countries: [
         { code: "US", count: 612 },
         { code: "TR", count: 338 },
         { code: "DE", count: 121 }
       ],
-      status_codes: { "200": 1208, "301": 118, "404": 19, "403": 3 }
+      status_codes: { "200": 1208, "301": 118, "404": 19, "403": 3 },
+      cache_statuses: [
+        { status: "dynamic", count: 910 },
+        { status: "none", count: 321 },
+        { status: "miss", count: 143 }
+      ],
+      top_paths: [
+        { path: "/", count: 612 },
+        { path: "/postings", count: 338 },
+        { path: "/search/suggest", count: 207 }
+      ],
+      device_types: [
+        { type: "desktop", count: 992 },
+        { type: "mobile", count: 438 },
+        { type: "tablet", count: 2 }
+      ],
+      browsers: [
+        { name: "Chrome", count: 602 },
+        { name: "Firefox", count: 356 },
+        { name: "MobileSafari", count: 203 }
+      ]
     }
   };
 }
@@ -314,9 +424,14 @@ function formatCloudflareTrafficText(traffic = {}) {
     return `Cloudflare: unavailable (${reason})`;
   }
   return [
-    `Cloudflare: visitors=${formatCount(traffic.visitors)}, pageviews=${formatCount(traffic.pageviews)}, requests=${formatCount(traffic.requests)}`,
+    `Cloudflare: visits=${formatCount(traffic.visits ?? traffic.visitors)}, requests=${formatCount(traffic.requests)}, bandwidth=${formatBytes(traffic.bandwidth_bytes)}`,
     `Edge countries: ${formatQueryList(traffic.top_countries || [], "code")}`,
-    `Status codes: ${Object.entries(traffic.status_codes || {}).map(([code, count]) => `${code}=${formatCount(count)}`).join(", ") || "none"}`
+    `Top edge paths: ${formatQueryList(traffic.top_paths || [], "path")}`,
+    `Edge cache: ${formatNamedCounts(traffic.cache_statuses || [], "status")}`,
+    `Status codes: ${Object.entries(traffic.status_codes || {}).map(([code, count]) => `${code}=${formatCount(count)}`).join(", ") || "none"}`,
+    `Edge error ratios: 4xx=${formatPercent(traffic.status4xx_ratio)}, 5xx=${formatPercent(traffic.status5xx_ratio)}`,
+    `Devices: ${formatNamedCounts(traffic.device_types || [], "type")}`,
+    `Browsers: ${formatNamedCounts(traffic.browsers || [], "name")}`
   ].join("\n");
 }
 
@@ -340,6 +455,10 @@ function buildAnalyticsEmailText(report) {
     `- Top countries: ${formatQueryList(report.top_country_filters || [], "value")}`,
     `- Remote intent: ${formatRemoteIntent(report.remote_filter_counts || {})}`,
     `- Result buckets: ${formatResultBuckets(resultCounts)}`,
+    "",
+    "Search gaps",
+    `- Zero-result queries: ${formatQueryList(report.top_zero_result_queries)}`,
+    `- Low-result queries: ${formatQueryList(report.top_low_result_queries)}`,
     "",
     "Traffic snapshot",
     formatCloudflareTrafficText(report.cloudflare_traffic),
@@ -376,7 +495,7 @@ function buildAnalyticsEmailHtml(report) {
     : null;
   const traffic = report.cloudflare_traffic || {};
   const cloudflareSummary = traffic.ok === true
-    ? `${formatCount(traffic.visitors)} visitors / ${formatCount(traffic.pageviews)} pageviews / ${formatCount(traffic.requests)} requests`
+    ? `${formatCount(traffic.visits ?? traffic.visitors)} visits / ${formatCount(traffic.requests)} requests / ${formatBytes(traffic.bandwidth_bytes)}`
     : `Unavailable: ${traffic.unavailable_reason || "not configured"}`;
 
   return [
@@ -409,8 +528,15 @@ function buildAnalyticsEmailHtml(report) {
     '</ol>',
     `<p><strong>Remote intent:</strong> ${escapeHtml(formatRemoteIntent(report.remote_filter_counts || {}))}</p>`,
     `<p><strong>Result buckets:</strong> ${escapeHtml(formatResultBuckets(resultCounts))}</p>`,
+    '<h2>Search gaps</h2>',
+    `<p><strong>Zero-result queries:</strong> ${escapeHtml(formatQueryList(report.top_zero_result_queries))}</p>`,
+    `<p><strong>Low-result queries:</strong> ${escapeHtml(formatQueryList(report.top_low_result_queries))}</p>`,
     '<h2>Traffic snapshot</h2>',
     `<p><strong>Cloudflare edge:</strong> ${escapeHtml(cloudflareSummary)}</p>`,
+    `<p><strong>Top edge paths:</strong> ${escapeHtml(formatQueryList(traffic.top_paths || [], "path"))}</p>`,
+    `<p><strong>Edge cache:</strong> ${escapeHtml(formatNamedCounts(traffic.cache_statuses || [], "status"))}</p>`,
+    `<p><strong>Devices:</strong> ${escapeHtml(formatNamedCounts(traffic.device_types || [], "type"))}</p>`,
+    `<p><strong>Browsers:</strong> ${escapeHtml(formatNamedCounts(traffic.browsers || [], "name"))}</p>`,
     '<h3>Backend referrers</h3><ol>',
     listItems(report.top_referrers || [], "host"),
     '</ol>',

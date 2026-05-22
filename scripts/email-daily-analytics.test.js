@@ -48,14 +48,19 @@ function testBuildAnalyticsEmailMessage() {
   assert.match(message.text, /Demand snapshot/);
   assert.match(message.text, /Top countries: United States \(96\), Turkey \(42\)/);
   assert.match(message.text, /Remote intent: remote=312, hybrid=96, non_remote=41/);
+  assert.match(message.text, /Search gaps/);
+  assert.match(message.text, /Zero-result queries: wordpress developer \(18\)/);
   assert.match(message.text, /Traffic snapshot/);
-  assert.match(message.text, /Cloudflare: visitors=487, pageviews=712, requests=1,432/);
+  assert.match(message.text, /Cloudflare: visits=487, requests=1,432, bandwidth=175\.9 MB/);
+  assert.match(message.text, /Top edge paths: \/ \(612\), \/postings \(338\)/);
+  assert.match(message.text, /Edge cache: dynamic=910, none=321, miss=143/);
+  assert.match(message.text, /Devices: desktop=992, mobile=438, tablet=2/);
   assert.match(message.html, /<h2>Demand snapshot<\/h2>/);
   assert.match(message.html, /Cloudflare edge/);
   assert.doesNotMatch(message.text, /secret/);
 }
 
-async function testFetchCloudflareTrafficSummaryUsesReadOnlyDashboard() {
+async function testFetchCloudflareTrafficSummaryUsesReadOnlyGraphql() {
   const calls = [];
   const summary = await fetchCloudflareTrafficSummary(
     { date: "2026-05-22", timezone: "Europe/Istanbul" },
@@ -71,19 +76,17 @@ async function testFetchCloudflareTrafficSummaryUsesReadOnlyDashboard() {
         status: 200,
         async json() {
           return {
-            success: true,
-            result: {
-              totals: {
-                requests: {
-                  all: 12,
-                  cached: 8,
-                  country: { US: 7, TR: 5 },
-                  http_status: { "200": 10, "404": 2 }
-                },
-                pageviews: { all: 6 },
-                uniques: { all: 4 },
-                threats: { all: 1 },
-                bandwidth: { all: 2048 }
+            data: {
+              viewer: {
+                zones: [{
+                  totals: [{ count: 12, sum: { visits: 4, edgeResponseBytes: 2048 }, ratio: { status4xx: 0.2, status5xx: 0 } }],
+                  countries: [{ count: 7, dimensions: { clientCountryName: "US" } }, { count: 5, dimensions: { clientCountryName: "TR" } }],
+                  statuses: [{ count: 10, dimensions: { edgeResponseStatus: 200 } }, { count: 2, dimensions: { edgeResponseStatus: 404 } }],
+                  cache: [{ count: 8, dimensions: { cacheStatus: "dynamic" } }, { count: 4, dimensions: { cacheStatus: "none" } }],
+                  paths: [{ count: 6, dimensions: { clientRequestPath: "/" } }, { count: 3, dimensions: { clientRequestPath: "/postings" } }],
+                  devices: [{ count: 9, dimensions: { clientDeviceType: "desktop" } }],
+                  browsers: [{ count: 8, dimensions: { userAgentBrowser: "Chrome" } }]
+                }]
               }
             }
           };
@@ -93,12 +96,14 @@ async function testFetchCloudflareTrafficSummaryUsesReadOnlyDashboard() {
   );
 
   assert.equal(summary.ok, true);
-  assert.equal(summary.visitors, 4);
-  assert.equal(summary.pageviews, 6);
+  assert.equal(summary.visits, 4);
   assert.equal(summary.requests, 12);
-  assert.equal(summary.cached_requests, 8);
+  assert.equal(summary.bandwidth_bytes, 2048);
   assert.deepEqual(summary.top_countries, [{ code: "US", count: 7 }, { code: "TR", count: 5 }]);
-  assert.match(calls[0].url, /\/zones\/zone123\/analytics\/dashboard/);
+  assert.deepEqual(summary.top_paths, [{ path: "/", count: 6 }, { path: "/postings", count: 3 }]);
+  assert.deepEqual(summary.cache_statuses, [{ status: "dynamic", count: 8 }, { status: "none", count: 4 }]);
+  assert.equal(summary.status4xx_ratio, 0.2);
+  assert.match(calls[0].url, /\/graphql/);
   assert.equal(calls[0].options.headers.Authorization, "Bearer token");
 }
 
@@ -106,7 +111,7 @@ async function main() {
   testParseArgsDefaultsToDryRunFalseAndIstanbul();
   testReadEmailConfigUsesSafeDefaultRecipient();
   testBuildAnalyticsEmailMessage();
-  await testFetchCloudflareTrafficSummaryUsesReadOnlyDashboard();
+  await testFetchCloudflareTrafficSummaryUsesReadOnlyGraphql();
   console.log("email-daily-analytics tests passed");
 }
 
