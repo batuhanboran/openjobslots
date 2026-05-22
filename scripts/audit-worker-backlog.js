@@ -30,6 +30,60 @@ const SOURCE_POLICY_BLOCK_ERROR_TYPES = Object.freeze([
   "source_quality",
   "source_disabled_by_threshold"
 ]);
+const FAILURE_REASON_BUCKETS = Object.freeze([
+  "parser_bug",
+  "source_quality",
+  "rate_limit",
+  "network",
+  "empty_no_jobs",
+  "auth",
+  "unknown"
+]);
+const SOURCE_QUALITY_ERROR_TYPES = Object.freeze([
+  "source_quality",
+  "source_disabled_by_threshold",
+  "response_too_large",
+  "source_policy",
+  "source_disabled",
+  "source_auto_disabled",
+  "source_blocked",
+  "quality_gate"
+]);
+const RATE_LIMIT_ERROR_TYPES = Object.freeze([
+  "rate_limit",
+  "rate_limited",
+  "blocked_or_rate_limited",
+  "cooldown",
+  "http_429"
+]);
+const NETWORK_ERROR_TYPES = Object.freeze([
+  "fetch",
+  "network",
+  "timeout",
+  "request_timeout",
+  "connection_timeout",
+  "econnreset",
+  "etimedout",
+  "enotfound",
+  "eai_again",
+  "http_error"
+]);
+const EMPTY_NO_JOBS_ERROR_TYPES = Object.freeze([
+  "empty_payload",
+  "output_empty",
+  "portal_search_empty",
+  "no_jobs",
+  "no_postings",
+  "no_results",
+  "empty_result",
+  "empty_results"
+]);
+const AUTH_ERROR_TYPES = Object.freeze([
+  "auth",
+  "unauthorized",
+  "forbidden",
+  "login_required"
+]);
 
 function parseBacklogArgs(argv = process.argv.slice(2)) {
   const options = {
@@ -134,6 +188,35 @@ function isParserAttentionErrorType(errorType) {
     LEGACY_PARSER_ATTENTION_ERROR_TYPES.includes(errorType);
 }
 
+function normalizeHttpStatus(value) {
+  const status = Number(value || 0);
+  if (!Number.isFinite(status) || status <= 0) return 0;
+  return Math.floor(status);
+}
+
+function classifyFailureReason(errorType, httpStatus = 0) {
+  const type = String(errorType || "unknown").trim().toLowerCase() || "unknown";
+  const status = normalizeHttpStatus(httpStatus);
+  if (status === 429 || RATE_LIMIT_ERROR_TYPES.includes(type)) return "rate_limit";
+  if (isParserAttentionErrorType(type) || type.startsWith("parser_")) return "parser_bug";
+  if (SOURCE_QUALITY_ERROR_TYPES.includes(type)) return "source_quality";
+  if (EMPTY_NO_JOBS_ERROR_TYPES.includes(type)) return "empty_no_jobs";
+  if (AUTH_ERROR_TYPES.includes(type) || status === 401 || status === 403) return "auth";
+  if (NETWORK_ERROR_TYPES.includes(type) || status >= 500) return "network";
+  return "unknown";
+}
+
+function createFailureReasonCounts() {
+  const counts = {};
+  for (const bucket of FAILURE_REASON_BUCKETS) counts[bucket] = 0;
+  return counts;
+}
+
+function addFailureReasonCount(counts, reason, count) {
+  if (!counts || !reason) return;
+  counts[reason] = Number(counts[reason] || 0) + Number(count || 0);
+}
+
 function buildWorkerBacklogQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const limit = Math.max(1, Math.min(500, Math.floor(Number(options.limit || 100))));
@@ -194,6 +277,7 @@ function buildRecentErrorsQuery(options = {}) {
       SELECT
         ats_key,
         error_type,
+        COALESCE(http_status, 0)::int AS http_status,
         COUNT(*)::int AS count
       FROM ingestion_run_errors
       WHERE created_at >= now() - ($1::int * interval '1 hour')
@@ -201,8 +285,27 @@ function buildRecentErrorsQuery(options = {}) {
           cardinality($2::text[]) = 0
           OR ats_key = ANY($2::text[])
         )
-      GROUP BY ats_key, error_type
-      ORDER BY count DESC, ats_key ASC, error_type ASC;
+      GROUP BY ats_key, error_type, http_status
+      ORDER BY count DESC, ats_key ASC, error_type ASC, http_status ASC;
+    `
+  };
+}
+
+function buildLatestRunSummaryQuery() {
+  return {
+    values: [],
+    sql: `
+      SELECT
+        id,
+        status,
+        started_at_epoch,
+        finished_at_epoch,
+        total_targets,
+        success_count,
+        failure_count
+      FROM ingestion_runs
+      ORDER BY id DESC
+      LIMIT 1;
     `
   };
 }
@@ -359,6 +462,7 @@ function summarizeRecentErrors(rows = []) {
   for (const row of Array.isArray(rows) ? rows : []) {
     const atsKey = String(row.ats_key || "").trim().toLowerCase();
     const errorType = String(row.error_type || "unknown").trim() || "unknown";
+    const httpStatus = normalizeHttpStatus(row.http_status);
     const count = Number(row.count || 0);
     if (!atsKey || count <= 0) continue;
     if (!byAts.has(atsKey)) {
@@ -367,17 +471,69 @@ function summarizeRecentErrors(rows = []) {
         parser_drift_count: 0,
         parser_attention_count: 0,
         source_policy_block_count: 0,
+        parser_bug_count: 0,
+        source_quality_count: 0,
+        rate_limit_count: 0,
+        network_count: 0,
+        empty_no_jobs_count: 0,
+        auth_count: 0,
+        unknown_count: 0,
+        by_reason: {},
         by_type: {}
       });
     }
     const current = byAts.get(atsKey);
+    const failureReason = classifyFailureReason(errorType, httpStatus);
     current.total_count += count;
     current.by_type[errorType] = (current.by_type[errorType] || 0) + count;
+    current.by_reason[failureReason] = (current.by_reason[failureReason] || 0) + count;
     if (errorType === "parser_drift") current.parser_drift_count += count;
     if (isParserAttentionErrorType(errorType)) current.parser_attention_count += count;
     if (SOURCE_POLICY_BLOCK_ERROR_TYPES.includes(errorType)) current.source_policy_block_count += count;
+    current[`${failureReason}_count`] = Number(current[`${failureReason}_count`] || 0) + count;
   }
   return byAts;
+}
+
+function summarizeLatestRun(row = {}) {
+  const totalTargets = Number(row?.total_targets || 0);
+  const successCount = Number(row?.success_count || 0);
+  const failureCount = Number(row?.failure_count || 0);
+  const successRatePct = totalTargets > 0
+    ? Number(((successCount / totalTargets) * 100).toFixed(2))
+    : null;
+  const failureRatePct = totalTargets > 0
+    ? Number(((failureCount / totalTargets) * 100).toFixed(2))
+    : null;
+  return {
+    latest_run_id: Number(row?.id || row?.latest_run_id || 0),
+    latest_status: String(row?.status || row?.latest_status || ""),
+    started_at_epoch: Number(row?.started_at_epoch || 0),
+    finished_at_epoch: Number(row?.finished_at_epoch || 0),
+    total_targets: totalTargets,
+    success_count: successCount,
+    failure_count: failureCount,
+    success_rate_pct: successRatePct,
+    failure_rate_pct: failureRatePct
+  };
+}
+
+function emptyRecentErrorSummary() {
+  return {
+    total_count: 0,
+    parser_drift_count: 0,
+    parser_attention_count: 0,
+    source_policy_block_count: 0,
+    parser_bug_count: 0,
+    source_quality_count: 0,
+    rate_limit_count: 0,
+    network_count: 0,
+    empty_no_jobs_count: 0,
+    auth_count: 0,
+    unknown_count: 0,
+    by_reason: {},
+    by_type: {}
+  };
 }
 
 function attachBacklogDiagnostics(report, options = {}) {
@@ -388,6 +544,13 @@ function attachBacklogDiagnostics(report, options = {}) {
     .reduce((sum, item) => sum + Number(item.parser_attention_count || 0), 0);
   const sourcePolicyBlockCount = Array.from(recentByAts.values())
     .reduce((sum, item) => sum + Number(item.source_policy_block_count || 0), 0);
+  const failureReasonCounts = createFailureReasonCounts();
+  for (const item of recentByAts.values()) {
+    for (const [reason, count] of Object.entries(item.by_reason || {})) {
+      addFailureReasonCount(failureReasonCounts, reason, count);
+    }
+  }
+  const latestRunRows = Array.isArray(options.latestRunRows) ? options.latestRunRows : [];
   return {
     ...report,
     diagnostics: {
@@ -396,7 +559,10 @@ function attachBacklogDiagnostics(report, options = {}) {
       target_ats_keys: targetAtsKeys,
       parser_attention_count: parserAttentionCount,
       source_policy_block_count: sourcePolicyBlockCount,
+      failure_reason_counts: failureReasonCounts,
+      latest_run: summarizeLatestRun(latestRunRows[0] || options.latestRun || {}),
       error_taxonomy: {
+        failure_reason_buckets: [...FAILURE_REASON_BUCKETS],
         failure_reason_types: [...WORKER_FAILURE_REASON_TAXONOMY],
         parser_attention_types: [...PARSER_ATTENTION_ERROR_TYPES],
         legacy_parser_attention_types: [...LEGACY_PARSER_ATTENTION_ERROR_TYPES],
@@ -407,13 +573,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       const atsKey = String(item.ats_key || "").trim().toLowerCase();
       return {
         ...item,
-        recent_errors: recentByAts.get(atsKey) || {
-          total_count: 0,
-          parser_drift_count: 0,
-          parser_attention_count: 0,
-          source_policy_block_count: 0,
-          by_type: {}
-        },
+        recent_errors: recentByAts.get(atsKey) || emptyRecentErrorSummary(),
         fixture_coverage: getFixtureCoverage(atsKey, options)
       };
     })
@@ -438,9 +598,12 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   if (!options.diagnostics) return report;
   const recentErrorsQuery = buildRecentErrorsQuery(options);
   const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
+  const latestRunQuery = buildLatestRunSummaryQuery();
+  const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
   return attachBacklogDiagnostics(report, {
     ...options,
-    recentErrorRows: recentErrors.rows
+    recentErrorRows: recentErrors.rows,
+    latestRunRows: latestRun.rows
   });
 }
 
@@ -507,8 +670,10 @@ if (require.main === module) {
 
 module.exports = {
   attachBacklogDiagnostics,
+  buildLatestRunSummaryQuery,
   buildRecentErrorsQuery,
   buildWorkerBacklogQuery,
+  classifyFailureReason,
   getFixtureCoverage,
   parseBacklogArgs,
   runAudit,

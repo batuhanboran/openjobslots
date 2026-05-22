@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const {
   attachBacklogDiagnostics,
+  buildRecentErrorsQuery,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
   runPostgresBacklogAudit,
@@ -37,6 +38,18 @@ test("buildWorkerBacklogQuery is read-only and reports due source fields", () =>
   assert.match(query.sql, /WITH target_state AS/i);
   assert.match(query.sql, /due_count/i);
   assert.match(query.sql, /runnable_due_count/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildRecentErrorsQuery groups http status for failure taxonomy", () => {
+  const query = buildRecentErrorsQuery({
+    errorWindowHours: 48,
+    targetAtsKeys: ["applytojob", "breezy"]
+  });
+
+  assert.deepEqual(query.values, [48, ["applytojob", "breezy"]]);
+  assert.match(query.sql, /http_status/i);
+  assert.match(query.sql, /GROUP BY ats_key, error_type, http_status/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -175,6 +188,63 @@ test("runPostgresBacklogAudit performs one read-only query", async () => {
   assert.equal(report.items[0].ats_key, "applytojob");
 });
 
+test("runPostgresBacklogAudit diagnostics reports latest run success rate", async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      assert.doesNotMatch(sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+      if (/FROM ats_sources/i.test(sql)) {
+        return {
+          rows: [
+            {
+              ats_key: "applytojob",
+              display_name: "ApplyToJob",
+              enabled: true,
+              protection_status: "normal",
+              target_count: 10,
+              due_count: 8,
+              runnable_due_count: 8
+            }
+          ]
+        };
+      }
+      if (/FROM ingestion_run_errors/i.test(sql)) {
+        return { rows: [{ ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 }] };
+      }
+      if (/FROM ingestion_runs/i.test(sql)) {
+        return {
+          rows: [
+            {
+              id: 211,
+              status: "completed_with_errors",
+              started_at_epoch: 1_800_000_000,
+              finished_at_epoch: 1_800_000_060,
+              total_targets: 25,
+              success_count: 20,
+              failure_count: 5
+            }
+          ]
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const report = await runPostgresBacklogAudit(pool, {
+    diagnostics: true,
+    nowEpoch: 1_800_000_100,
+    limit: 10,
+    errorWindowHours: 24
+  });
+
+  assert.equal(calls.length, 3);
+  assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
+  assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
+  assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
+  assert.equal(report.diagnostics.failure_reason_counts.rate_limit, 3);
+});
+
 test("attachBacklogDiagnostics joins recent errors and fixture coverage without mutating totals", () => {
   const base = summarizeBacklogRows([
     {
@@ -235,6 +305,86 @@ test("attachBacklogDiagnostics joins recent errors and fixture coverage without 
   assert.equal(applicantpro.recent_errors.total_count, 1);
   assert.equal(applicantpro.fixture_coverage.source_fixture_dir, false);
   assert.equal(applicantpro.fixture_coverage.legacy_fixtures.direct, true);
+});
+
+test("attachBacklogDiagnostics maps raw worker errors into operator failure buckets", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "applytojob",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 10,
+      due_count: 8,
+      runnable_due_count: 8
+    },
+    {
+      ats_key: "breezy",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 8,
+      due_count: 6,
+      runnable_due_count: 6
+    },
+    {
+      ats_key: "applitrack",
+      enabled: true,
+      protection_status: "quarantine_only",
+      target_count: 4,
+      due_count: 4,
+      runnable_due_count: 4
+    }
+  ]);
+
+  const withDiagnostics = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      errorWindowHours: 24,
+      recentErrorRows: [
+        { ats_key: "applytojob", error_type: "parser_drift", count: 7 },
+        { ats_key: "applytojob", error_type: "portal_search_empty", count: 2 },
+        { ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 },
+        { ats_key: "applytojob", error_type: "fetch", http_status: 0, count: 4 },
+        { ats_key: "breezy", error_type: "blocked_or_rate_limited", http_status: 403, count: 1 },
+        { ats_key: "breezy", error_type: "output_empty", count: 5 },
+        { ats_key: "applitrack", error_type: "source_quality", count: 8 }
+      ]
+    }
+  );
+
+  const applytojob = withDiagnostics.items.find((item) => item.ats_key === "applytojob");
+  assert.equal(applytojob.recent_errors.parser_bug_count, 7);
+  assert.equal(applytojob.recent_errors.rate_limit_count, 3);
+  assert.equal(applytojob.recent_errors.network_count, 4);
+  assert.equal(applytojob.recent_errors.empty_no_jobs_count, 2);
+  assert.deepEqual(applytojob.recent_errors.by_reason, {
+    parser_bug: 7,
+    empty_no_jobs: 2,
+    rate_limit: 3,
+    network: 4
+  });
+
+  const breezy = withDiagnostics.items.find((item) => item.ats_key === "breezy");
+  assert.equal(breezy.recent_errors.rate_limit_count, 1);
+  assert.equal(breezy.recent_errors.empty_no_jobs_count, 5);
+
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.parser_bug, 7);
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.source_quality, 8);
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.rate_limit, 4);
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.network, 4);
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.empty_no_jobs, 7);
+  assert.deepEqual(withDiagnostics.diagnostics.error_taxonomy.failure_reason_buckets, [
+    "parser_bug",
+    "source_quality",
+    "rate_limit",
+    "network",
+    "empty_no_jobs",
+    "auth",
+    "unknown"
+  ]);
 });
 
 test("attachBacklogDiagnostics keeps source policy blocks out of parser attention count", () => {
