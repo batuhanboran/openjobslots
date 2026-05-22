@@ -70,6 +70,12 @@ const { readMeiliReindexStatus } = require("./search/reindexStatus");
 const { registerAdminRoutes } = require("./http/registerAdminRoutes");
 const { registerPublicRoutes } = require("./http/registerPublicRoutes");
 const { registerUserRoutes } = require("./http/registerUserRoutes");
+const {
+  buildGoogleAnalyticsCsp,
+  buildPublicWebAnalyticsHeadTags,
+  readPublicWebAnalyticsConfig,
+  stripPublicWebAnalyticsHeadTags
+} = require("./analytics/publicWebAnalytics");
 const { readThresholds: readSourceQualityThresholds } = require("./ingestion/sourceQualityPolicy");
 
 const PORT = Number(process.env.PORT || 8787);
@@ -1205,6 +1211,7 @@ function renderSeoIndexHtml(indexHtml, req) {
   const title = escapeHtmlAttribute(SEO_SITE_TITLE);
   const description = escapeHtmlAttribute(SEO_SITE_DESCRIPTION);
   const canonical = escapeHtmlAttribute(canonicalUrl);
+  const analyticsTags = buildPublicWebAnalyticsHeadTags(readPublicWebAnalyticsConfig());
   const tags = [
     '<meta name="description" content="' + description + '" />',
     '<link rel="canonical" href="' + canonical + '" />',
@@ -1218,10 +1225,24 @@ function renderSeoIndexHtml(indexHtml, req) {
     '<meta name="twitter:title" content="' + title + '" />',
     '<meta name="twitter:description" content="' + description + '" />'
   ].join("\n    ");
+  const managedAnalyticsTags = analyticsTags
+    ? [
+      "<!-- OpenJobSlots public analytics start -->",
+      analyticsTags,
+      "<!-- OpenJobSlots public analytics end -->"
+    ].join("\n    ")
+    : "";
 
-  let html = removeExistingSeoTags(indexHtml).replace(/<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
+  let html = stripPublicWebAnalyticsHeadTags(removeExistingSeoTags(indexHtml)).replace(
+    /<title>[\s\S]*?<\/title>/i,
+    `<title>${title}</title>`
+  );
   if (!/<\/head>/i.test(html)) return html;
-  return html.replace(/<\/head>/i, `    <!-- OpenJobSlots SEO metadata -->\n    ${tags}\n</head>`);
+  const analyticsBlock = managedAnalyticsTags ? `\n    ${managedAnalyticsTags}` : "";
+  return html.replace(
+    /<\/head>/i,
+    `    <!-- OpenJobSlots SEO metadata -->\n    ${tags}${analyticsBlock}\n</head>`
+  );
 }
 
 function buildRobotsTxt(req) {
@@ -1354,27 +1375,29 @@ function isControlRoute(req) {
   );
 }
 
+function buildSecurityContentSecurityPolicy(env = process.env) {
+  const analyticsCsp = buildGoogleAnalyticsCsp(readPublicWebAnalyticsConfig(env));
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    ["img-src 'self' data:", ...analyticsCsp.imgSrc].join(" "),
+    "font-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    ["script-src 'self' 'unsafe-inline'", ...analyticsCsp.scriptSrc].join(" "),
+    ["connect-src 'self'", ...analyticsCsp.connectSrc].join(" "),
+    "form-action 'self'"
+  ].join("; ");
+}
+
 function securityHeadersMiddleware(_req, res, next) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "object-src 'none'",
-      "frame-ancestors 'none'",
-      "img-src 'self' data:",
-      "font-src 'self' data:",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline'",
-      "connect-src 'self'",
-      "form-action 'self'"
-    ].join("; ")
-  );
+  res.setHeader("Content-Security-Policy", buildSecurityContentSecurityPolicy());
   if (NODE_ENV === "production") {
     res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   }

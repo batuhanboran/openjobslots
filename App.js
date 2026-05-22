@@ -43,6 +43,11 @@ import {
   unblockCompany,
   updateApplicationStatus
 } from "./src/api";
+import {
+  trackPublicApplyClick,
+  trackPublicFilterChange,
+  trackPublicSearch
+} from "./src/publicAnalytics";
 
 const PAGE_KEYS = {
   POSTINGS: "postings",
@@ -1993,9 +1998,10 @@ function PostingCard({
     if (!postingUrl || !isSafeExternalHttpUrl(postingUrl)) return;
     const supported = await Linking.canOpenURL(postingUrl);
     if (supported) {
+      trackPublicApplyClick(item);
       await Linking.openURL(postingUrl);
     }
-  }, [postingUrl]);
+  }, [item, postingUrl]);
 
   const isSaving = Boolean(savingApplicationIds?.[postingUrl]);
   const isIgnoring = Boolean(ignoringPostingIds?.[postingUrl]);
@@ -3403,8 +3409,9 @@ export default function App() {
     }
   }, [loadStatus, syncActionState, syncing]);
 
-  const submitSearch = useCallback((value = searchRef.current) => {
+  const submitSearch = useCallback((value = searchRef.current, analytics = {}) => {
     const nextSearch = String(value || "").trim();
+    const analyticsSource = String(analytics?.source || "search_box").trim() || "search_box";
     const now = Date.now();
     const filters = postingsFiltersRef.current;
     const filtersSignature = getPostingsFiltersSignature(filters);
@@ -3427,6 +3434,7 @@ export default function App() {
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
     if (!duplicateSubmit) {
+      if (nextSearch) trackPublicSearch(nextSearch, { source: analyticsSource });
       void loadPostings(nextSearch, { filters });
     }
   }, [loadPostings, scrollPostingsToTop]);
@@ -3469,6 +3477,7 @@ export default function App() {
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
+    trackPublicFilterChange("suggestion");
     void loadPostings(query, { filters: nextFilters });
     return true;
   }, [loadPostings, scrollPostingsToTop]);
@@ -3477,7 +3486,7 @@ export default function App() {
     if (applySearchSuggestionFilter(suggestion)) return;
     const value = String(suggestion?.value || suggestion?.label || "").trim();
     if (!value) return;
-    submitSearch(value);
+    submitSearch(value, { source: "suggestion" });
   }, [applySearchSuggestionFilter, submitSearch]);
 
   const handleBrandHome = useCallback(() => {
@@ -3912,6 +3921,7 @@ export default function App() {
   const setAtsFilter = useCallback((value) => {
     const nextValue = String(value || "all").trim().toLowerCase();
     setSearchResultsMode(true);
+    trackPublicFilterChange("ats");
     setPostingsFilters((prev) => ({
       ...prev,
       ats: nextValue || "all"
@@ -3920,6 +3930,7 @@ export default function App() {
 
   const toggleIndustryFilter = useCallback((value) => {
     setSearchResultsMode(true);
+    trackPublicFilterChange("industry");
     setPostingsFilters((prev) => {
       const next = new Set(prev.industries);
       if (next.has(value)) {
@@ -3937,6 +3948,7 @@ export default function App() {
   const toggleRegionFilter = useCallback(
     (value) => {
       setSearchResultsMode(true);
+      trackPublicFilterChange("region");
       setPostingsFilters((prev) => {
         const nextRegions = new Set(prev.regions || []);
         if (nextRegions.has(value)) {
@@ -3964,6 +3976,7 @@ export default function App() {
 
   const toggleCountryFilter = useCallback((value) => {
     setSearchResultsMode(true);
+    trackPublicFilterChange("country");
     setPostingsFilters((prev) => {
       const next = new Set(prev.countries || []);
       if (next.has(value)) {
@@ -3980,6 +3993,7 @@ export default function App() {
 
   const toggleStateFilter = useCallback((value) => {
     setSearchResultsMode(true);
+    trackPublicFilterChange("state");
     setPostingsFilters((prev) => {
       const nextStates = new Set(prev.states);
       if (nextStates.has(value)) {
@@ -4004,6 +4018,7 @@ export default function App() {
 
   const toggleCountyFilter = useCallback((value) => {
     setSearchResultsMode(true);
+    trackPublicFilterChange("county");
     setPostingsFilters((prev) => {
       const next = new Set(prev.counties);
       if (next.has(value)) {
@@ -4020,6 +4035,7 @@ export default function App() {
 
   const clearAllPostingFilters = useCallback(() => {
     const defaultFilters = createDefaultPostingsFilters();
+    trackPublicFilterChange("clear_all");
     setPostingsFilters(defaultFilters);
     setSearchResultsMode(Boolean(String(searchRef.current || "").trim()));
     lastSearchSubmitRef.current = {
@@ -4049,6 +4065,7 @@ export default function App() {
     (source) => {
       const value = normalizeAtsValue(source?.value || source?.key || source?.label || "");
       if (!value || value === "unknown" || !ATS_LABEL_BY_VALUE[value]) return;
+      trackPublicFilterChange("source");
       applyPostingsFiltersImmediately({
         ...postingsFiltersRef.current,
         ats: value
@@ -4058,6 +4075,7 @@ export default function App() {
   );
 
   const clearLocationPostingFilters = useCallback(() => {
+    trackPublicFilterChange("location_clear");
     applyPostingsFiltersImmediately({
       ...postingsFiltersRef.current,
       regions: [],
@@ -4068,6 +4086,7 @@ export default function App() {
   }, [applyPostingsFiltersImmediately]);
 
   const clearRemotePostingFilter = useCallback(() => {
+    trackPublicFilterChange("remote_clear");
     applyPostingsFiltersImmediately({
       ...postingsFiltersRef.current,
       remote: "all"
