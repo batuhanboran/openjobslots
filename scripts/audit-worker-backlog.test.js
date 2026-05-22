@@ -113,6 +113,29 @@ test("summarizeBacklogRows explains protection-state impact and budget projectio
   assert.equal(report.items[0].last_failure_at, "1970-01-01T00:05:00.000Z");
 });
 
+test("summarizeBacklogRows uses live worker stage-1 defaults when audit env omits worker budget", () => {
+  const report = summarizeBacklogRows(
+    [
+      {
+        ats_key: "bamboohr",
+        display_name: "BambooHR",
+        enabled: true,
+        protection_status: "normal",
+        target_count: 5144,
+        due_count: 4985,
+        runnable_due_count: 4985
+      }
+    ],
+    { env: {} }
+  );
+
+  assert.equal(report.daily_budget_projection.auto_sync_daily_target_budget, 2000);
+  assert.equal(report.daily_budget_projection.auto_sync_targets_per_run, 50);
+  assert.equal(report.daily_budget_projection.source_daily_target_budget, 200);
+  assert.equal(report.daily_budget_projection.source_budget_limited_due_count, 200);
+  assert.equal(report.daily_budget_projection.effective_daily_target_budget, 200);
+});
+
 test("runPostgresBacklogAudit performs one read-only query", async () => {
   const calls = [];
   const pool = {

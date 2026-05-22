@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../server/backends/postgres");
+const { readWorkerBudgetConfig } = require("../server/ingestion/workerConfig");
 
 const WORKER_FAILURE_REASON_TAXONOMY = Object.freeze([
   "parser_validation",
@@ -244,18 +245,10 @@ function normalizeBacklogRow(row = {}) {
 }
 
 function summarizeBacklogRows(rows = [], options = {}) {
-  const autoSyncDailyTargetBudget = nonNegativeInteger(
-    options.autoSyncDailyTargetBudget ?? process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET,
-    250
-  );
-  const autoSyncTargetsPerRun = positiveInteger(
-    options.autoSyncTargetsPerRun ?? process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN,
-    50
-  );
-  const sourceDailyTargetBudget = nonNegativeInteger(
-    options.sourceDailyTargetBudget ?? process.env.INGESTION_SOURCE_DAILY_TARGET_BUDGET,
-    100
-  );
+  const workerBudgetConfig = readWorkerBudgetConfig(options.env || process.env, options);
+  const autoSyncDailyTargetBudget = workerBudgetConfig.autoSyncDailyTargetBudget;
+  const autoSyncTargetsPerRun = workerBudgetConfig.autoSyncTargetsPerRun;
+  const sourceDailyTargetBudget = workerBudgetConfig.sourceDailyTargetBudget;
   const items = (Array.isArray(rows) ? rows : []).map(normalizeBacklogRow);
   const totals = createEmptyTotals();
   const dueBySource = {};

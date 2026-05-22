@@ -266,7 +266,7 @@ test("postgres due target selection over-selects when early sources exhaust dail
         return { rows: rows.slice(0, candidateLimit) };
       }
       if (String(sql).includes("FROM company_sync_state")) {
-        return { rows: [{ ats_key: "bamboohr", count: 100 }] };
+        return { rows: [{ ats_key: "bamboohr", count: 200 }] };
       }
       throw new Error(`unexpected query: ${sql}`);
     }

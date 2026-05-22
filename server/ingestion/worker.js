@@ -28,6 +28,7 @@ const {
 } = require("../backends/postgresStore");
 const { ensureMeiliPostingsIndex } = require("../search/meili");
 const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
+const { readWorkerBudgetConfig } = require("./workerConfig");
 
 function positiveNumber(value, fallback) {
   const number = Number(value);
@@ -49,18 +50,10 @@ const RUN_ONCE = String(process.env.INGESTION_RUN_ONCE || "").trim() === "1";
 const AUTO_SYNC_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_AUTO_SYNC ?? "1").trim().toLowerCase()
 );
-const AUTO_SYNC_DAILY_TARGET_BUDGET = Math.floor(nonNegativeNumber(
-  process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET,
-  250
-));
-const AUTO_SYNC_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(
-  process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN,
-  50
-)));
-const SOURCE_DAILY_TARGET_BUDGET = Math.floor(nonNegativeNumber(
-  process.env.INGESTION_SOURCE_DAILY_TARGET_BUDGET,
-  100
-));
+const WORKER_BUDGET_CONFIG = readWorkerBudgetConfig(process.env);
+const AUTO_SYNC_DAILY_TARGET_BUDGET = WORKER_BUDGET_CONFIG.autoSyncDailyTargetBudget;
+const AUTO_SYNC_TARGETS_PER_RUN = WORKER_BUDGET_CONFIG.autoSyncTargetsPerRun;
+const SOURCE_DAILY_TARGET_BUDGET = WORKER_BUDGET_CONFIG.sourceDailyTargetBudget;
 const DUE_TARGET_CANDIDATE_MULTIPLIER = Math.max(1, Math.floor(positiveNumber(
   process.env.INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER,
   8
