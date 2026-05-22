@@ -152,6 +152,11 @@ function epochToIso(epoch) {
   return value > 0 ? new Date(value * 1000).toISOString() : "";
 }
 
+function startOfUtcDayEpoch(epoch) {
+  const value = Math.max(0, Math.floor(Number(epoch || 0)));
+  return Math.floor(value / 86400) * 86400;
+}
+
 function createImpactSummary() {
   return {
     source_count: 0,
@@ -306,6 +311,19 @@ function buildLatestRunSummaryQuery() {
       FROM ingestion_runs
       ORDER BY id DESC
       LIMIT 1;
+    `
+  };
+}
+
+function buildAutoSyncBudgetUsageQuery(options = {}) {
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
+  const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  return {
+    values: [dayStartEpoch],
+    sql: `
+      SELECT COALESCE(SUM(total_targets), 0)::int AS targets_started_today
+      FROM ingestion_runs
+      WHERE started_at_epoch >= $1;
     `
   };
 }
@@ -547,6 +565,28 @@ function summarizeLatestRun(row = {}) {
   };
 }
 
+function summarizeAutoSyncBudgetUsage(rows = [], options = {}) {
+  const workerBudgetConfig = readWorkerBudgetConfig(options.env || process.env, options);
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
+  const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  const row = Array.isArray(rows) ? (rows[0] || {}) : {};
+  const dailyBudget = Number(workerBudgetConfig.autoSyncDailyTargetBudget || 0);
+  const targetsStartedToday = Number(row.targets_started_today || row.count || 0);
+  const remainingDailyBudget = dailyBudget > 0
+    ? Math.max(0, dailyBudget - targetsStartedToday)
+    : null;
+  return {
+    read_only: true,
+    utc_day_start_epoch: dayStartEpoch,
+    utc_day_reset_epoch: dayStartEpoch + 86400,
+    daily_budget: dailyBudget,
+    targets_per_run: Number(workerBudgetConfig.autoSyncTargetsPerRun || 0),
+    targets_started_today: targetsStartedToday,
+    remaining_daily_budget: remainingDailyBudget,
+    daily_budget_exhausted: dailyBudget > 0 && targetsStartedToday >= dailyBudget
+  };
+}
+
 function shapePathsFromRowValue(value) {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") {
@@ -658,6 +698,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       source_policy_block_count: sourcePolicyBlockCount,
       failure_reason_counts: failureReasonCounts,
       latest_run: summarizeLatestRun(latestRunRows[0] || options.latestRun || {}),
+      auto_sync_budget_usage: summarizeAutoSyncBudgetUsage(options.autoSyncBudgetUsageRows || [], options),
       parser_drift_recheck: summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options),
       error_taxonomy: {
         failure_reason_buckets: [...FAILURE_REASON_BUCKETS],
@@ -698,12 +739,16 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
   const latestRunQuery = buildLatestRunSummaryQuery();
   const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
+  const autoSyncBudgetUsageQuery = buildAutoSyncBudgetUsageQuery({ ...options, nowEpoch });
+  const autoSyncBudgetUsage = await pool.query(autoSyncBudgetUsageQuery.sql, autoSyncBudgetUsageQuery.values);
   const parserDriftRecheckQuery = buildParserDriftRecheckQuery(options);
   const parserDriftRecheck = await pool.query(parserDriftRecheckQuery.sql, parserDriftRecheckQuery.values);
   return attachBacklogDiagnostics(report, {
     ...options,
+    nowEpoch,
     recentErrorRows: recentErrors.rows,
     latestRunRows: latestRun.rows,
+    autoSyncBudgetUsageRows: autoSyncBudgetUsage.rows,
     parserDriftRecheckRows: parserDriftRecheck.rows
   });
 }
@@ -771,6 +816,7 @@ if (require.main === module) {
 
 module.exports = {
   attachBacklogDiagnostics,
+  buildAutoSyncBudgetUsageQuery,
   buildLatestRunSummaryQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
@@ -780,6 +826,7 @@ module.exports = {
   parseBacklogArgs,
   runAudit,
   runPostgresBacklogAudit,
+  summarizeAutoSyncBudgetUsage,
   summarizeParserDriftRecheck,
   summarizeBacklogRows,
   writeOutput

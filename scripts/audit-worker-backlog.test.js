@@ -3,11 +3,13 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const {
   attachBacklogDiagnostics,
+  buildAutoSyncBudgetUsageQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
   runPostgresBacklogAudit,
+  summarizeAutoSyncBudgetUsage,
   summarizeParserDriftRecheck,
   summarizeBacklogRows
 } = require("./audit-worker-backlog");
@@ -66,6 +68,15 @@ test("buildParserDriftRecheckQuery is read-only and bounded", () => {
   assert.match(query.sql, /FROM parser_drift_events/i);
   assert.match(query.sql, /LEFT JOIN source_payload_shapes/i);
   assert.match(query.sql, /LIMIT \$3/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildAutoSyncBudgetUsageQuery is read-only and uses UTC day start", () => {
+  const query = buildAutoSyncBudgetUsageQuery({ nowEpoch: 1_800_086_400 });
+
+  assert.deepEqual(query.values, [1_800_057_600]);
+  assert.match(query.sql, /SUM\(total_targets\)/i);
+  assert.match(query.sql, /FROM ingestion_runs/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -229,6 +240,9 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
         return { rows: [{ ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 }] };
       }
       if (/FROM ingestion_runs/i.test(sql)) {
+        if (/SUM\(total_targets\)/i.test(sql)) {
+          return { rows: [{ targets_started_today: 2000 }] };
+        }
         return {
           rows: [
             {
@@ -257,12 +271,28 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
   assert.equal(report.diagnostics.failure_reason_counts.rate_limit, 3);
   assert.equal(report.diagnostics.parser_drift_recheck.sample_count, 0);
+  assert.equal(report.diagnostics.auto_sync_budget_usage.targets_started_today, 2000);
+  assert.equal(report.diagnostics.auto_sync_budget_usage.remaining_daily_budget, 0);
+  assert.equal(report.diagnostics.auto_sync_budget_usage.daily_budget_exhausted, true);
+});
+
+test("summarizeAutoSyncBudgetUsage explains consumed and remaining daily budget", () => {
+  const summary = summarizeAutoSyncBudgetUsage(
+    [{ targets_started_today: 1300 }],
+    { nowEpoch: 1_800_086_400, autoSyncDailyTargetBudget: 2000 }
+  );
+
+  assert.equal(summary.utc_day_start_epoch, 1_800_057_600);
+  assert.equal(summary.daily_budget, 2000);
+  assert.equal(summary.targets_started_today, 1300);
+  assert.equal(summary.remaining_daily_budget, 700);
+  assert.equal(summary.daily_budget_exhausted, false);
 });
 
 test("summarizeParserDriftRecheck separates current-policy pass from real drift", () => {
