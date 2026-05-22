@@ -17,5 +17,15 @@
     "remote_type": "hybrid",
     "posting_date": "2026-05-09",
     "parser_confidence": 0.65
+  },
+  {
+    "source_job_id": "JR5003",
+    "company_name": "Fixture Workday",
+    "position_name": "Onsite Platform Engineer",
+    "country": "Germany",
+    "city": "Berlin",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-10",
+    "parser_confidence": 0.65
   }
 ]

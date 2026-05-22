@@ -98,6 +98,19 @@ const FAILURE_COOLDOWN_SECONDS = Math.max(60 * 60, Math.floor(positiveNumber(
 )));
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
+const WORKER_FAILURE_REASON_TAXONOMY = Object.freeze([
+  "parser_validation",
+  "source_quality",
+  "source_disabled_by_threshold",
+  "rate_limit",
+  "cooldown",
+  "timeout",
+  "network",
+  "auth",
+  "empty_payload",
+  "invalid_shape",
+  "no_jobs"
+]);
 let writeQueue = Promise.resolve();
 
 function sleep(ms) {
@@ -195,22 +208,104 @@ function isAutoSyncRequest(control) {
   return String(control?.message || "").startsWith("Auto sync queued;");
 }
 
-function classifyIngestionError(error, fallback = "fetch") {
+function sanitizeUrlForLog(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return raw.split(/[?#]/)[0].slice(0, 500);
+  }
+}
+
+function sanitizeLogMessage(value, maxLength = 500) {
+  const limit = Math.max(1, Math.floor(Number(maxLength || 500)));
+  const text = String(value || "");
+  const withoutUrlQueries = text.replace(/https?:\/\/[^\s"'<>]+/gi, (match) => sanitizeUrlForLog(match));
+  const withoutTokenPairs = withoutUrlQueries.replace(
+    /\b(token|access_token|refresh_token|api_key|apikey|secret|password|email)=([^\s&]+)/gi,
+    "$1=[redacted]"
+  );
+  const withoutMarkupBodies = withoutTokenPairs.replace(/<[^>\n]{1,200}>/g, "[redacted_body]");
+  return withoutMarkupBodies.slice(0, limit);
+}
+
+function incrementCounterMap(target, key, amount = 1) {
+  if (!target) return;
+  const normalizedKey = String(key || "unknown").trim().toLowerCase() || "unknown";
+  target[normalizedKey] = Number(target[normalizedKey] || 0) + Number(amount || 0);
+}
+
+function incrementNestedCounterMap(target, firstKey, secondKey, amount = 1) {
+  if (!target) return;
+  const normalizedFirst = String(firstKey || "unknown").trim().toLowerCase() || "unknown";
+  const normalizedSecond = String(secondKey || "unknown").trim().toLowerCase() || "unknown";
+  if (!target[normalizedFirst]) target[normalizedFirst] = {};
+  incrementCounterMap(target[normalizedFirst], normalizedSecond, amount);
+}
+
+function sourceKeyForObservability(value) {
+  return normalizeAtsKey(String(value || "unknown").trim() || "unknown");
+}
+
+function normalizeFailureReason(value, fallback = "network") {
+  const reason = String(value || "").trim().toLowerCase();
+  if (!reason) return fallback;
+  if (WORKER_FAILURE_REASON_TAXONOMY.includes(reason)) return reason;
+  return reason.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || fallback;
+}
+
+function classifyIngestionError(error, fallback = "network") {
   const explicit = String(error?.ingestionErrorType || error?.errorType || "").trim();
-  if (explicit) return explicit;
   const message = String(error?.message || error || "").toLowerCase();
-  if (message.includes("source_disabled_by_threshold") || message.includes("source_auto_disabled") || message.includes("source_quarantine_only")) {
+  const code = String(error?.code || "").toUpperCase();
+  const httpStatus = extractHttpStatus(error);
+  if (explicit) {
+    const normalizedExplicit = normalizeFailureReason(explicit, fallback);
+    if (WORKER_FAILURE_REASON_TAXONOMY.includes(normalizedExplicit)) return normalizedExplicit;
+    if (normalizedExplicit === "parser_drift" || normalizedExplicit === "parser_quarantine" || normalizedExplicit === "parser_normalize") {
+      return "parser_validation";
+    }
+    if (normalizedExplicit === "parser_parse") return "invalid_shape";
+    if (normalizedExplicit === "blocked_or_rate_limited") return "rate_limit";
+    if (normalizedExplicit === "portal_search_empty") return "no_jobs";
+    if (normalizedExplicit === "output_empty") return "empty_payload";
+    if (normalizedExplicit === "fetch") {
+      if (httpStatus === 429) return "rate_limit";
+      if (httpStatus === 401 || httpStatus === 403) return "auth";
+      if (httpStatus === 408) return "timeout";
+      if (httpStatus >= 500) return "network";
+    }
+    return explicit;
+  }
+  if (message.includes("source_disabled_by_threshold")) return "source_disabled_by_threshold";
+  if (message.includes("source_auto_disabled") || message.includes("source_quarantine_only")) {
     return "source_quality";
   }
-  if (message.includes("no_geo_no_remote") || message.includes("ambiguous_location") || message.includes("weak_remote_evidence")) {
-    return "parser_quarantine";
+  if (message.includes("cooldown")) return "cooldown";
+  if (httpStatus === 429 || message.includes("rate limit") || message.includes("too many request")) return "rate_limit";
+  if (httpStatus === 401 || httpStatus === 403 || message.includes("unauthorized") || message.includes("forbidden")) return "auth";
+  if (httpStatus === 408 || code === "ETIMEDOUT" || message.includes("timeout") || message.includes("timed out")) return "timeout";
+  if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"].includes(code) ||
+    message.includes("request failed") ||
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    message.includes("connection") ||
+    httpStatus >= 500) {
+    return "network";
   }
-  if (message.includes("placeholder company_name")) return "source_discovery";
+  if (message.includes("empty payload") || message.includes("blank payload") || message.includes("output_empty")) return "empty_payload";
+  if (message.includes("no parseable postings") || message.includes("no jobs") || message.includes("portal_search_empty")) return "no_jobs";
+  if (message.includes("unexpected token") || message.includes("invalid shape") || message.includes("malformed") || message.includes("json")) {
+    return "invalid_shape";
+  }
+  if (message.includes("no_geo_no_remote") || message.includes("ambiguous_location") || message.includes("weak_remote_evidence")) {
+    return "parser_validation";
+  }
   if (message.includes("missing ") || message.includes("placeholder ") || message.includes("invalid job_posting_url")) {
     return "parser_validation";
   }
-  if (message.includes("parse") || message.includes("json")) return "parser_parse";
-  if (message.includes("timeout") || message.includes("rate limit") || message.includes("request failed")) return "fetch";
   return fallback;
 }
 
@@ -246,6 +341,9 @@ function incrementHttpStatusCount(counters, httpStatus) {
   const key = String(status);
   counters.httpStatusCounts = counters.httpStatusCounts || {};
   counters.httpStatusCounts[key] = Number(counters.httpStatusCounts[key] || 0) + 1;
+  const family = `${Math.floor(status / 100)}xx`;
+  counters.httpStatusFamilyCounts = counters.httpStatusFamilyCounts || {};
+  counters.httpStatusFamilyCounts[family] = Number(counters.httpStatusFamilyCounts[family] || 0) + 1;
 }
 
 function incrementDbBusyCount(counters) {
@@ -265,8 +363,76 @@ function createRunCounters() {
     duplicateCount: 0,
     dbBusyCount: 0,
     httpStatusCounts: {},
+    httpStatusFamilyCounts: {},
+    dueByAts: {},
+    selectedByAts: {},
+    skippedByReason: {},
+    skippedByAtsAndReason: {},
+    successByReason: {},
+    successByAts: {},
+    failureByReason: {},
+    failureByAts: {},
+    failureByAtsAndReason: {},
+    failureReasonTaxonomy: [...WORKER_FAILURE_REASON_TAXONOMY],
     lastError: ""
   };
+}
+
+function recordDueTargetsByAts(counters, rows = []) {
+  if (!counters) return;
+  counters.dueByAts = counters.dueByAts || {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const atsKey = sourceKeyForObservability(row?.ats_key || row?.atsKey);
+    const count = Number(row?.due_count ?? row?.count ?? row?.due ?? 0);
+    if (count > 0) incrementCounterMap(counters.dueByAts, atsKey, count);
+  }
+}
+
+function recordSelectedTarget(counters, target) {
+  if (!counters) return;
+  counters.selectedByAts = counters.selectedByAts || {};
+  incrementCounterMap(counters.selectedByAts, sourceKeyForObservability(target?.atsKey || target?.ats_key));
+}
+
+function recordSkippedTarget(counters, targetOrAtsKey, reason = "unknown") {
+  if (!counters) return;
+  const atsKey = sourceKeyForObservability(
+    typeof targetOrAtsKey === "string" ? targetOrAtsKey : targetOrAtsKey?.atsKey || targetOrAtsKey?.ats_key
+  );
+  const normalizedReason = normalizeFailureReason(reason, "unknown");
+  counters.skippedByReason = counters.skippedByReason || {};
+  counters.skippedByAtsAndReason = counters.skippedByAtsAndReason || {};
+  incrementCounterMap(counters.skippedByReason, normalizedReason);
+  incrementNestedCounterMap(counters.skippedByAtsAndReason, atsKey, normalizedReason);
+}
+
+function recordFailureReason(counters, target, reason) {
+  if (!counters) return;
+  const atsKey = sourceKeyForObservability(target?.atsKey || target?.ats_key);
+  const normalizedReason = reason instanceof Error || typeof reason === "object"
+    ? classifyIngestionError(reason)
+    : normalizeFailureReason(reason, "network");
+  counters.failureByReason = counters.failureByReason || {};
+  counters.failureByAts = counters.failureByAts || {};
+  counters.failureByAtsAndReason = counters.failureByAtsAndReason || {};
+  incrementCounterMap(counters.failureByReason, normalizedReason);
+  incrementCounterMap(counters.failureByAts, atsKey);
+  incrementNestedCounterMap(counters.failureByAtsAndReason, atsKey, normalizedReason);
+}
+
+function recordTargetOutcome(counters, target, outcome, reason = "ok") {
+  if (!counters) return;
+  const atsKey = sourceKeyForObservability(target?.atsKey || target?.ats_key);
+  const outcomeKey = String(outcome || "").trim().toLowerCase();
+  if (outcomeKey === "success") {
+    const normalizedReason = normalizeFailureReason(reason, "ok");
+    counters.successByReason = counters.successByReason || {};
+    counters.successByAts = counters.successByAts || {};
+    incrementCounterMap(counters.successByReason, normalizedReason);
+    incrementCounterMap(counters.successByAts, atsKey);
+    return;
+  }
+  recordFailureReason(counters, target, reason);
 }
 
 function dedupeValidPosting(posting, seenCanonicalUrls, counters) {
@@ -447,7 +613,7 @@ async function updateRunCurrentTarget(db, runId, target, counters) {
     ...counters,
     status: "running",
     currentAts: target?.atsKey || "",
-    currentCompanyUrl: target?.companyUrl || "",
+    currentCompanyUrl: sanitizeUrlForLog(target?.companyUrl || ""),
     currentCompanyName: String(target?.company?.company_name || "")
   });
 }
@@ -486,10 +652,10 @@ async function recordRunError(db, runId, target, error, httpStatus = null, error
     [
       runId,
       target?.atsKey || "",
-      target?.companyUrl || "",
+      sanitizeUrlForLog(target?.companyUrl || ""),
       String(target?.company?.company_name || ""),
       String(errorType || classifyIngestionError(error)),
-      String(error?.message || error),
+      sanitizeLogMessage(error?.message || error, 1000),
       httpStatus
     ]
   ));
@@ -571,7 +737,7 @@ async function markCompanyFailure(db, target, error, nowEpoch) {
         nowEpoch,
         computeRetryEpoch(nowEpoch, failures),
         failures,
-        String(error?.message || error).slice(0, 1000)
+        sanitizeLogMessage(error?.message || error, 1000)
       ]
     );
   });
@@ -604,7 +770,8 @@ async function processTarget(db, runId, target, counters) {
         normalized = target.adapter.normalize(item, target.company, { nowEpoch });
       } catch (error) {
         counters.rejectedCount += 1;
-        await recordRunError(db, runId, target, error, null, "parser_normalize");
+        recordFailureReason(counters, target, "parser_validation");
+        await recordRunError(db, runId, target, error, null, "parser_validation");
         continue;
       }
       const adapterValidation = target.adapter.validate(normalized);
@@ -631,7 +798,9 @@ async function processTarget(db, runId, target, counters) {
       } else {
         if (validation.status === "quarantined") counters.quarantinedCount += 1;
         counters.rejectedCount += 1;
-        await recordRunError(db, runId, target, new Error(validation.error), null, classifyIngestionError(validation.error, "parser_validation"));
+        const reason = classifyIngestionError(validation.error, "parser_validation");
+        recordFailureReason(counters, target, reason);
+        await recordRunError(db, runId, target, new Error(validation.error), null, reason);
       }
     }
 
@@ -644,6 +813,7 @@ async function processTarget(db, runId, target, counters) {
 
     await markCompanySuccess(db, target, nowEpoch);
     counters.successCount += 1;
+    recordTargetOutcome(counters, target, "success", "ok");
 
     const rateLimitMs = Number(target.settings.rateLimitMs || 0);
     if (rateLimitMs > 0) {
@@ -651,11 +821,13 @@ async function processTarget(db, runId, target, counters) {
     }
   } catch (error) {
     counters.failureCount += 1;
-    counters.lastError = String(error?.message || error);
+    counters.lastError = sanitizeLogMessage(error?.message || error, 500);
     const httpStatus = extractHttpStatus(error);
+    const reason = classifyIngestionError(error);
     incrementHttpStatusCount(counters, httpStatus);
     await markCompanyFailure(db, target, error, nowEpoch);
-    await recordRunError(db, runId, target, error, httpStatus, classifyIngestionError(error));
+    recordTargetOutcome(counters, target, "failure", reason);
+    await recordRunError(db, runId, target, error, httpStatus, reason);
   }
 }
 
@@ -800,9 +972,32 @@ function sortDueTargetCandidates(rows = []) {
   });
 }
 
-async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
+async function countPostgresDueTargetsByAts(pool) {
+  const nowEpoch = nowEpochSeconds();
+  const result = await pool.query(
+    `
+      SELECT
+        c.ats_key,
+        COUNT(*)::int AS due_count
+      FROM companies c
+      INNER JOIN ats_sources s
+        ON s.ats_key = c.ats_key
+      LEFT JOIN company_sync_state st
+        ON st.ats_key = c.ats_key
+        AND st.company_url = c.url_string
+      WHERE COALESCE(st.next_sync_epoch, 0) <= $1
+      GROUP BY c.ats_key
+      ORDER BY due_count DESC, c.ats_key ASC;
+    `,
+    [nowEpoch]
+  );
+  return result.rows || [];
+}
+
+async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, options = {}) {
   const nowEpoch = nowEpochSeconds();
   const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  const counters = options.counters || null;
   const targetLimit = Math.max(1, Math.min(
     MAX_TARGETS_PER_RUN,
     Math.floor(positiveNumber(limit, MAX_TARGETS_PER_RUN))
@@ -884,11 +1079,20 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
       protectionStatus: row.protection_status,
       disabledReason: row.disabled_reason
     });
-    if (sourcePolicy.mode === "disabled") continue;
+    if (sourcePolicy.mode === "disabled") {
+      recordSkippedTarget(counters, row.ats_key, "source_policy_disabled");
+      continue;
+    }
     const selectedCount = Number(selectedByAts.get(row.ats_key) || 0);
-    if (Number.isFinite(sourcePolicy.maxTargetsPerRun) && selectedCount >= sourcePolicy.maxTargetsPerRun) continue;
+    if (Number.isFinite(sourcePolicy.maxTargetsPerRun) && selectedCount >= sourcePolicy.maxTargetsPerRun) {
+      recordSkippedTarget(counters, row.ats_key, "max_targets_per_run");
+      continue;
+    }
     const startedToday = Number(sourceBudgetUsedToday.get(row.ats_key) || 0);
-    if (SOURCE_DAILY_TARGET_BUDGET > 0 && startedToday + selectedCount >= SOURCE_DAILY_TARGET_BUDGET) continue;
+    if (SOURCE_DAILY_TARGET_BUDGET > 0 && startedToday + selectedCount >= SOURCE_DAILY_TARGET_BUDGET) {
+      recordSkippedTarget(counters, row.ats_key, "source_daily_budget");
+      continue;
+    }
     const company = {
       id: Number(row.id || 0),
       company_name: String(row.company_name || ""),
@@ -896,7 +1100,10 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
       ATS_name: String(row.ats_key || "")
     };
     const adapter = getAdapterForCompany(company);
-    if (!adapter) continue;
+    if (!adapter) {
+      recordSkippedTarget(counters, row.ats_key, "missing_adapter");
+      continue;
+    }
     targets.push({
       company,
       adapter,
@@ -910,6 +1117,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN) {
       }
     });
     selectedByAts.set(row.ats_key, selectedCount + 1);
+    recordSelectedTarget(counters, { atsKey: row.ats_key });
   }
   return targets;
 }
@@ -986,7 +1194,7 @@ async function updatePostgresRunCurrentTarget(pool, runId, target, counters) {
     ...counters,
     status: "running",
     currentAts: target?.atsKey || "",
-    currentCompanyUrl: target?.companyUrl || "",
+    currentCompanyUrl: sanitizeUrlForLog(target?.companyUrl || ""),
     currentCompanyName: String(target?.company?.company_name || "")
   });
 }
@@ -1007,10 +1215,10 @@ async function recordPostgresRunError(pool, runId, target, error, httpStatus = n
     [
       runId,
       target?.atsKey || "",
-      target?.companyUrl || "",
+      sanitizeUrlForLog(target?.companyUrl || ""),
       String(target?.company?.company_name || ""),
       String(errorType || classifyIngestionError(error)),
-      String(error?.message || error),
+      sanitizeLogMessage(error?.message || error, 1000),
       httpStatus
     ]
   );
@@ -1254,7 +1462,7 @@ async function markPostgresCompanyFailure(pool, target, error, nowEpoch) {
       nowEpoch,
       computeRetryEpoch(nowEpoch, failures),
       failures,
-      String(error?.message || error).slice(0, 1000)
+      sanitizeLogMessage(error?.message || error, 1000)
     ]
   );
 }
@@ -1304,7 +1512,8 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
         };
       } catch (error) {
         counters.rejectedCount += 1;
-        await recordPostgresRunError(pool, runId, target, error, null, "parser_normalize");
+        recordFailureReason(counters, target, "parser_validation");
+        await recordPostgresRunError(pool, runId, target, error, null, "parser_validation");
         continue;
       }
       const adapterValidation = target.adapter.validate(normalized);
@@ -1329,7 +1538,9 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
       } else {
         if (validation.status === "quarantined") counters.quarantinedCount += 1;
         counters.rejectedCount += 1;
-        await recordPostgresRunError(pool, runId, target, new Error(validation.error), null, classifyIngestionError(validation.error, "parser_validation"));
+        const reason = classifyIngestionError(validation.error, "parser_validation");
+        recordFailureReason(counters, target, reason);
+        await recordPostgresRunError(pool, runId, target, new Error(validation.error), null, reason);
       }
     }
 
@@ -1343,6 +1554,7 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
 
     await markPostgresCompanySuccess(pool, target, nowEpoch);
     counters.successCount += 1;
+    recordTargetOutcome(counters, target, "success", "ok");
 
     const rateLimitMs = Number(target.settings.rateLimitMs || 0);
     if (rateLimitMs > 0) {
@@ -1351,17 +1563,20 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
     return "ok";
   } catch (error) {
     counters.failureCount += 1;
-    counters.lastError = String(error?.message || error);
+    counters.lastError = sanitizeLogMessage(error?.message || error, 500);
     const httpStatus = extractHttpStatus(error);
+    const reason = classifyIngestionError(error);
     incrementHttpStatusCount(counters, httpStatus);
     await markFetchRateLimitCooldown(options.rateLimitStore, target, error);
     await markPostgresCompanyFailure(pool, target, error, nowEpoch);
-    await recordPostgresRunError(pool, runId, target, error, httpStatus, classifyIngestionError(error));
+    recordTargetOutcome(counters, target, "failure", reason);
+    await recordPostgresRunError(pool, runId, target, error, httpStatus, reason);
     return "failed";
   }
 }
 
 async function runPostgresIngestionOnce(pool, options = {}) {
+  const runStartedMs = Date.now();
   const automatic = Boolean(options.automatic);
   const targetLimit = Math.max(1, Math.min(
     MAX_TARGETS_PER_RUN,
@@ -1371,18 +1586,35 @@ async function runPostgresIngestionOnce(pool, options = {}) {
   const controlStatus = String(control?.status || "idle");
   if (controlStatus === "stopping") {
     await postgresClearSyncControl(pool, "idle", "Stop request completed before a run started");
-    return { skipped: true, reason: "stopped-before-start" };
+    return {
+      skipped: true,
+      reason: "stopped-before-start",
+      skippedByReason: { "stopped-before-start": 1 },
+      failureReasonTaxonomy: [...WORKER_FAILURE_REASON_TAXONOMY]
+    };
   }
   if (!automatic && controlStatus !== "requested" && !RUN_ONCE) {
-    return { skipped: true, reason: "not-requested" };
+    return {
+      skipped: true,
+      reason: "not-requested",
+      skippedByReason: { "not-requested": 1 },
+      failureReasonTaxonomy: [...WORKER_FAILURE_REASON_TAXONOMY]
+    };
   }
   if (automatic && !["idle", "requested"].includes(controlStatus) && !RUN_ONCE) {
-    return { skipped: true, reason: `control-${controlStatus}` };
+    const reason = `control-${controlStatus}`;
+    return {
+      skipped: true,
+      reason,
+      skippedByReason: { [reason]: 1 },
+      failureReasonTaxonomy: [...WORKER_FAILURE_REASON_TAXONOMY]
+    };
   }
 
-  const targets = await selectPostgresDueTargets(pool, targetLimit);
-  const runId = await createPostgresRun(pool, targets);
   const counters = createRunCounters();
+  recordDueTargetsByAts(counters, await countPostgresDueTargetsByAts(pool));
+  const targets = await selectPostgresDueTargets(pool, targetLimit, { counters });
+  const runId = await createPostgresRun(pool, targets);
   const rateLimitStore = createAtsRateLimitStateStore({ pool });
   let cancelled = false;
 
@@ -1477,9 +1709,11 @@ async function runPostgresIngestionOnce(pool, options = {}) {
       }
     }
     return {
+      requestId: runId,
       runId,
       totalTargets: targets.length,
       cancelled,
+      durationMs: Date.now() - runStartedMs,
       remainingDueTargets: cancelled ? 0 : RUN_ONCE ? 0 : await countPostgresDueTargets(pool),
       ...counters
     };
@@ -1491,14 +1725,15 @@ async function runPostgresIngestionOnce(pool, options = {}) {
       currentAts: "",
       currentCompanyUrl: "",
       currentCompanyName: "",
-      lastError: String(error?.message || error)
+      lastError: sanitizeLogMessage(error?.message || error, 500)
     });
-    await postgresClearSyncControl(pool, "idle", String(error?.message || error));
+    await postgresClearSyncControl(pool, "idle", sanitizeLogMessage(error?.message || error, 500));
     throw error;
   }
 }
 
 async function runIngestionOnce() {
+  const runStartedMs = Date.now();
   const db = getDb();
   await ensureIngestionTables(db);
   await seedAtsSources(db, ATS_FILTER_OPTION_ITEMS);
@@ -1539,12 +1774,12 @@ async function runIngestionOnce() {
       currentAts: "",
       currentCompanyUrl: "",
       currentCompanyName: "",
-      lastError: String(error?.message || error)
+      lastError: sanitizeLogMessage(error?.message || error, 500)
     });
     throw error;
   }
 
-  return { runId, totalTargets: targets.length, ...counters };
+  return { requestId: runId, runId, totalTargets: targets.length, durationMs: Date.now() - runStartedMs, ...counters };
 }
 
 async function startWorker() {
@@ -1693,8 +1928,14 @@ module.exports = {
   incrementHttpStatusCount,
   isSqliteBusyError,
   markFetchRateLimitCooldown,
+  recordDueTargetsByAts,
+  recordSelectedTarget,
+  recordSkippedTarget,
+  recordTargetOutcome,
   runPostgresIngestionOnce,
   runIngestionOnce,
+  sanitizeLogMessage,
+  sanitizeUrlForLog,
   selectDueTargets,
   selectPostgresDueTargets,
   sortDueTargetCandidates,

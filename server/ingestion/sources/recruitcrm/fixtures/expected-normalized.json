@@ -22,5 +22,18 @@
     "remote_type": "onsite",
     "industry": "Support",
     "is_remote": false
+  },
+  {
+    "ats_key": "recruitcrm",
+    "company_name": "Fixture RecruitCRM",
+    "position_name": "Hybrid Delivery Manager",
+    "source_job_id": "RC-2003",
+    "job_posting_url": "https://recruitcrm.io/jobs/fixtureco/hybrid-delivery-manager",
+    "country": "Germany",
+    "region": "EMEA",
+    "city": "Berlin",
+    "remote_type": "hybrid",
+    "industry": "Delivery",
+    "is_remote": true
   }
 ]

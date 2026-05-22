@@ -11,6 +11,12 @@ const {
   incrementHttpStatusCount,
   isSqliteBusyError,
   markFetchRateLimitCooldown,
+  recordDueTargetsByAts,
+  recordSelectedTarget,
+  recordSkippedTarget,
+  recordTargetOutcome,
+  sanitizeLogMessage,
+  sanitizeUrlForLog,
   selectPostgresDueTargets,
   withTransientWriteRetry,
   withWriteLock
@@ -57,14 +63,58 @@ test("worker write lock serializes concurrent sqlite transactions", async () => 
 
 test("ingestion error classifier separates parser attention from fetch failures", () => {
   assert.equal(classifyIngestionError(new Error("missing job_posting_url")), "parser_validation");
-  assert.equal(classifyIngestionError(new Error("source_disabled_by_threshold")), "source_quality");
-  assert.equal(classifyIngestionError(new Error("placeholder company_name")), "source_discovery");
-  assert.equal(classifyIngestionError(new Error("Unexpected token < in JSON")), "parser_parse");
-  assert.equal(classifyIngestionError(new Error("iCIMS request failed (502)")), "fetch");
+  assert.equal(classifyIngestionError(new Error("source_disabled_by_threshold")), "source_disabled_by_threshold");
+  assert.equal(classifyIngestionError(new Error("source_auto_disabled")), "source_quality");
+  assert.equal(classifyIngestionError(new Error("source cooldown active")), "cooldown");
+  assert.equal(classifyIngestionError(Object.assign(new Error("HTTP 429"), { status: 429 })), "rate_limit");
+  assert.equal(classifyIngestionError(Object.assign(new Error("HTTP 401"), { status: 401 })), "auth");
+  assert.equal(classifyIngestionError(Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" })), "timeout");
+  assert.equal(classifyIngestionError(Object.assign(new Error("ECONNRESET"), { code: "ECONNRESET" })), "network");
+  assert.equal(classifyIngestionError(new Error("empty payload returned by source")), "empty_payload");
+  assert.equal(classifyIngestionError(new Error("Unexpected token < in JSON")), "invalid_shape");
+  assert.equal(classifyIngestionError(new Error("Breezy public portal returned no parseable postings")), "no_jobs");
   assert.equal(
     classifyIngestionError({ message: "Dayforce missing collector", ingestionErrorType: "parser_adapter_not_implemented" }),
     "parser_adapter_not_implemented"
   );
+});
+
+test("worker observability counters expose source-safe run summary fields", () => {
+  const counters = createRunCounters();
+
+  recordDueTargetsByAts(counters, [
+    { ats_key: "bamboohr", due_count: 5 },
+    { ats_key: "applytojob", count: 3 }
+  ]);
+  recordSelectedTarget(counters, { atsKey: "bamboohr" });
+  recordSkippedTarget(counters, "applytojob", "source_daily_budget");
+  recordTargetOutcome(counters, { atsKey: "bamboohr" }, "success", "ok");
+  recordTargetOutcome(counters, { atsKey: "applytojob" }, "failure", new Error("HTTP 429"));
+
+  assert.deepEqual(counters.dueByAts, { bamboohr: 5, applytojob: 3 });
+  assert.deepEqual(counters.selectedByAts, { bamboohr: 1 });
+  assert.deepEqual(counters.skippedByReason, { source_daily_budget: 1 });
+  assert.deepEqual(counters.successByReason, { ok: 1 });
+  assert.deepEqual(counters.successByAts, { bamboohr: 1 });
+  assert.deepEqual(counters.failureByReason, { rate_limit: 1 });
+  assert.deepEqual(counters.failureByAts, { applytojob: 1 });
+  assert.deepEqual(counters.failureByAtsAndReason, { applytojob: { rate_limit: 1 } });
+});
+
+test("worker log sanitizers strip query strings and keep messages bounded", () => {
+  assert.equal(
+    sanitizeUrlForLog("https://example.com/jobs/search?token=secret&email=user@example.com#private"),
+    "https://example.com/jobs/search"
+  );
+  const sanitized = sanitizeLogMessage(
+    "failed https://example.com/jobs/search?token=secret&email=user@example.com with body <html>bad</html>",
+    200
+  );
+
+  assert.equal(sanitized.includes("token=secret"), false);
+  assert.equal(sanitized.includes("email=user@example.com"), false);
+  assert.equal(sanitized.includes("<html>"), false);
+  assert.ok(sanitized.length <= 200);
 });
 
 test("sqlite write retry observes transient busy failures", async () => {
@@ -109,6 +159,10 @@ test("http status metrics are extracted and counted", () => {
   assert.deepEqual(counters.httpStatusCounts, {
     429: 1,
     502: 1
+  });
+  assert.deepEqual(counters.httpStatusFamilyCounts, {
+    "4xx": 1,
+    "5xx": 1
   });
 });
 

@@ -26,10 +26,28 @@
           "iso3": "TUR",
           "department": "Support",
           "employmentType": "Full-time"
+        },
+        {
+          "job_id": "445567",
+          "jobTitle": "Onsite Operations Manager",
+          "url": "/jobs/445567",
+          "postedDate": "2026-05-09",
+          "jobLocation": "Phoenix, AZ, United States",
+          "countryName": "United States",
+          "department": {
+            "name": "Operations"
+          },
+          "jobType": "Full-time"
         }
       ]
     }
   },
+  "jobs_page_html_variants": [
+    "<div data-domain-id=\"998877\"></div>",
+    "<input type=\"hidden\" name=\"domain_id\" value=\"998877\">",
+    "<script>window.ApplicantPro = {\"domainId\":\"998877\"};</script>"
+  ],
+  "expected_domain_id": "998877",
   "expected": [
     {
       "ats_key": "applicantpro",
@@ -44,6 +62,21 @@
       "remote_type": "remote",
       "posting_date": "2026-05-08",
       "department": "Support",
+      "employment_type": "Full-time"
+    },
+    {
+      "ats_key": "applicantpro",
+      "company_name": "Fixture ApplicantPro",
+      "position_name": "Onsite Operations Manager",
+      "source_job_id": "445567",
+      "job_posting_url": "https://fixtureco.applicantpro.com/jobs/445567",
+      "location_text": "Phoenix, AZ, United States",
+      "city": "Phoenix",
+      "country": "United States",
+      "region": "North America",
+      "remote_type": "onsite",
+      "posting_date": "2026-05-09",
+      "department": "Operations",
       "employment_type": "Full-time"
     }
   ]

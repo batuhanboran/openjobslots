@@ -20,6 +20,21 @@
         "country": "Canada",
         "employment_type": "Full time",
         "department": "Support"
+      },
+      {
+        "job_code": "RC-2003",
+        "job_title": "Hybrid Delivery Manager",
+        "slug": "hybrid-delivery-manager",
+        "publishedAt": "2026-05-08",
+        "workplaceType": "Hybrid",
+        "location": {
+          "city": "Berlin",
+          "countryName": "Germany"
+        },
+        "job_type": "Full time",
+        "department": {
+          "name": "Delivery"
+        }
       }
     ]
   }

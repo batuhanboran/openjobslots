@@ -2,6 +2,34 @@ const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../server/backends/postgres");
 
+const WORKER_FAILURE_REASON_TAXONOMY = Object.freeze([
+  "parser_validation",
+  "source_quality",
+  "source_disabled_by_threshold",
+  "rate_limit",
+  "cooldown",
+  "timeout",
+  "network",
+  "auth",
+  "empty_payload",
+  "invalid_shape",
+  "no_jobs"
+]);
+const PARSER_ATTENTION_ERROR_TYPES = Object.freeze([
+  "parser_drift",
+  "parser_validation",
+  "invalid_shape"
+]);
+const LEGACY_PARSER_ATTENTION_ERROR_TYPES = Object.freeze([
+  "parser_parse",
+  "parser_quarantine",
+  "parser_normalize"
+]);
+const SOURCE_POLICY_BLOCK_ERROR_TYPES = Object.freeze([
+  "source_quality",
+  "source_disabled_by_threshold"
+]);
+
 function parseBacklogArgs(argv = process.argv.slice(2)) {
   const options = {
     diagnostics: false,
@@ -62,6 +90,47 @@ function nonNegativeInteger(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) return fallback;
   return Math.floor(number);
+}
+
+function epochToIso(epoch) {
+  const value = Number(epoch || 0);
+  return value > 0 ? new Date(value * 1000).toISOString() : "";
+}
+
+function createImpactSummary() {
+  return {
+    source_count: 0,
+    target_count: 0,
+    due_count: 0,
+    runnable_due_count: 0,
+    failure_pressure: 0,
+    sources: []
+  };
+}
+
+function addImpactSource(impact, item) {
+  if (!impact || !item) return;
+  impact.source_count += 1;
+  impact.target_count += Number(item.target_count || 0);
+  impact.due_count += Number(item.due_count || 0);
+  impact.runnable_due_count += Number(item.runnable_due_count || 0);
+  impact.failure_pressure += Number(item.failure_pressure || 0);
+  impact.sources.push(item.ats_key);
+}
+
+function buildEstimatedDaysByBudget(runnableDueCount, budgets = []) {
+  const output = {};
+  for (const budget of budgets) {
+    const normalized = nonNegativeInteger(budget, 0);
+    if (normalized <= 0) continue;
+    output[String(normalized)] = Math.ceil(Number(runnableDueCount || 0) / normalized);
+  }
+  return output;
+}
+
+function isParserAttentionErrorType(errorType) {
+  return PARSER_ATTENTION_ERROR_TYPES.includes(errorType) ||
+    LEGACY_PARSER_ATTENTION_ERROR_TYPES.includes(errorType);
 }
 
 function buildWorkerBacklogQuery(options = {}) {
@@ -168,7 +237,9 @@ function normalizeBacklogRow(row = {}) {
     failure_pressure: Number(row.failure_pressure || 0),
     failing_due_count: Number(row.failing_due_count || 0),
     last_success_epoch: Number(row.last_success_epoch || 0),
-    last_failure_epoch: Number(row.last_failure_epoch || 0)
+    last_success_at: epochToIso(row.last_success_epoch),
+    last_failure_epoch: Number(row.last_failure_epoch || 0),
+    last_failure_at: epochToIso(row.last_failure_epoch)
   };
 }
 
@@ -187,6 +258,13 @@ function summarizeBacklogRows(rows = [], options = {}) {
   );
   const items = (Array.isArray(rows) ? rows : []).map(normalizeBacklogRow);
   const totals = createEmptyTotals();
+  const dueBySource = {};
+  const oldestDueBySource = {};
+  const failurePressureBySource = {};
+  const lastSuccessAtBySource = {};
+  const lastFailureAtBySource = {};
+  const quarantineOnlyImpact = createImpactSummary();
+  const autoDisabledImpact = createImpactSummary();
   for (const item of items) {
     totals.source_count += 1;
     totals.target_count += item.target_count;
@@ -199,6 +277,13 @@ function summarizeBacklogRows(rows = [], options = {}) {
     if (item.protection_status === "quarantine_only") totals.quarantine_only_due_count += item.due_count;
     if (item.protection_status === "auto_disabled") totals.auto_disabled_due_count += item.due_count;
     if (!item.enabled || item.protection_status === "disabled") totals.disabled_due_count += item.due_count;
+    if (item.due_count > 0) dueBySource[item.ats_key] = item.due_count;
+    if (item.oldest_due_epoch > 0) oldestDueBySource[item.ats_key] = item.oldest_due_epoch;
+    if (item.failure_pressure > 0) failurePressureBySource[item.ats_key] = item.failure_pressure;
+    if (item.last_success_at) lastSuccessAtBySource[item.ats_key] = item.last_success_at;
+    if (item.last_failure_at) lastFailureAtBySource[item.ats_key] = item.last_failure_at;
+    if (item.protection_status === "quarantine_only") addImpactSource(quarantineOnlyImpact, item);
+    if (item.protection_status === "auto_disabled") addImpactSource(autoDisabledImpact, item);
     if (item.oldest_due_epoch > 0 && (totals.oldest_due_epoch === 0 || item.oldest_due_epoch < totals.oldest_due_epoch)) {
       totals.oldest_due_epoch = item.oldest_due_epoch;
     }
@@ -209,9 +294,26 @@ function summarizeBacklogRows(rows = [], options = {}) {
   const dailyBudget = autoSyncDailyTargetBudget > 0
     ? Math.min(autoSyncDailyTargetBudget, sourceBudgetLimitedDueCount)
     : sourceBudgetLimitedDueCount;
+  const estimatedDaysByBudget = buildEstimatedDaysByBudget(totals.runnable_due_count, [
+    autoSyncDailyTargetBudget,
+    sourceBudgetLimitedDueCount,
+    dailyBudget,
+    250,
+    500,
+    1000,
+    2000
+  ]);
 
   return {
     totals,
+    due_by_source: dueBySource,
+    oldest_due_by_source: oldestDueBySource,
+    failure_pressure_by_source: failurePressureBySource,
+    quarantine_only_impact: quarantineOnlyImpact,
+    auto_disabled_impact: autoDisabledImpact,
+    estimated_days_by_budget: estimatedDaysByBudget,
+    last_success_at_by_source: lastSuccessAtBySource,
+    last_failure_at_by_source: lastFailureAtBySource,
     daily_budget_projection: {
       auto_sync_daily_target_budget: autoSyncDailyTargetBudget,
       auto_sync_targets_per_run: autoSyncTargetsPerRun,
@@ -270,6 +372,8 @@ function summarizeRecentErrors(rows = []) {
       byAts.set(atsKey, {
         total_count: 0,
         parser_drift_count: 0,
+        parser_attention_count: 0,
+        source_policy_block_count: 0,
         by_type: {}
       });
     }
@@ -277,6 +381,8 @@ function summarizeRecentErrors(rows = []) {
     current.total_count += count;
     current.by_type[errorType] = (current.by_type[errorType] || 0) + count;
     if (errorType === "parser_drift") current.parser_drift_count += count;
+    if (isParserAttentionErrorType(errorType)) current.parser_attention_count += count;
+    if (SOURCE_POLICY_BLOCK_ERROR_TYPES.includes(errorType)) current.source_policy_block_count += count;
   }
   return byAts;
 }
@@ -285,12 +391,24 @@ function attachBacklogDiagnostics(report, options = {}) {
   const recentByAts = summarizeRecentErrors(options.recentErrorRows || []);
   const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  const parserAttentionCount = Array.from(recentByAts.values())
+    .reduce((sum, item) => sum + Number(item.parser_attention_count || 0), 0);
+  const sourcePolicyBlockCount = Array.from(recentByAts.values())
+    .reduce((sum, item) => sum + Number(item.source_policy_block_count || 0), 0);
   return {
     ...report,
     diagnostics: {
       read_only: true,
       error_window_hours: errorWindowHours,
-      target_ats_keys: targetAtsKeys
+      target_ats_keys: targetAtsKeys,
+      parser_attention_count: parserAttentionCount,
+      source_policy_block_count: sourcePolicyBlockCount,
+      error_taxonomy: {
+        failure_reason_types: [...WORKER_FAILURE_REASON_TAXONOMY],
+        parser_attention_types: [...PARSER_ATTENTION_ERROR_TYPES],
+        legacy_parser_attention_types: [...LEGACY_PARSER_ATTENTION_ERROR_TYPES],
+        source_policy_block_types: [...SOURCE_POLICY_BLOCK_ERROR_TYPES]
+      }
     },
     items: (report.items || []).map((item) => {
       const atsKey = String(item.ats_key || "").trim().toLowerCase();
@@ -299,6 +417,8 @@ function attachBacklogDiagnostics(report, options = {}) {
         recent_errors: recentByAts.get(atsKey) || {
           total_count: 0,
           parser_drift_count: 0,
+          parser_attention_count: 0,
+          source_policy_block_count: 0,
           by_type: {}
         },
         fixture_coverage: getFixtureCoverage(atsKey, options)

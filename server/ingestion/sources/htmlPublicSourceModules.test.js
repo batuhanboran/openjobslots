@@ -89,6 +89,14 @@ for (const atsKey of HTML_PUBLIC_SOURCES) {
   });
 }
 
+test("target html/public ATS modules return no postings for empty raw payloads", () => {
+  for (const atsKey of ["applitrack", "applytojob", "breezy"]) {
+    const source = getSourceModule(atsKey);
+    const company = readJson(path.join(__dirname, atsKey, "fixtures", "company.json"));
+    assert.deepEqual(source.parse({ html: "" }, company), [], atsKey);
+  }
+});
+
 test("applitrack source module enriches Output.asp rows from deterministic detail pages", async () => {
   const source = getSourceModule("applitrack");
   const sourceDir = path.join(__dirname, "applitrack");

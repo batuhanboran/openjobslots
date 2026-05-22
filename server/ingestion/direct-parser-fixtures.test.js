@@ -7,6 +7,7 @@ const { normalizeCountryFromAtsCodeLocation, validatePosting } = require("./post
 const {
   buildApplitrackDetailUrl,
   extractApplitrackDetailFields,
+  extractApplicantProDomainId,
   parseAdpWorkforcenowPostingsFromApi,
   parseApplicantProPostingsFromApi,
   parseApplitrackPostings,
@@ -115,6 +116,20 @@ for (const fileName of fixtureFileNames) {
     }
   });
 }
+
+test("applicantpro domain id extraction supports current jobs page variants", () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, "applicantpro-direct.json"), "utf8"));
+  for (const html of fixture.jobs_page_html_variants || []) {
+    assert.equal(extractApplicantProDomainId(html), fixture.expected_domain_id);
+  }
+});
+
+test("applicantpro parser returns no postings for empty raw payloads", () => {
+  assert.deepEqual(
+    parseApplicantProPostingsFromApi("Fixture ApplicantPro", { origin: "https://fixtureco.applicantpro.com" }, {}),
+    []
+  );
+});
 
 const newlyCertifiedFailureFixtures = [
   "applicantpro-failures.json",

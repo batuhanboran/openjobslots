@@ -87,6 +87,14 @@ for (const atsKey of PRIMARY_DIRECT_SOURCES) {
   });
 }
 
+test("target direct ATS modules return no postings for empty raw payloads", () => {
+  for (const atsKey of ["recruitcrm", "recruitee"]) {
+    const source = getSourceModule(atsKey);
+    const company = readJson(path.join(__dirname, atsKey, "fixtures", "company.json"));
+    assert.deepEqual(source.parse({}, company), [], atsKey);
+  }
+});
+
 function zohoFixtureContext() {
   return {
     source: getSourceModule("zoho"),
@@ -274,7 +282,7 @@ test("recruitee source module parses raw list variants for remote, hybrid, and o
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
-  assert.equal(normalized.length, 3);
+  assert.equal(normalized.length, 4);
 
   const hybrid = byId.get("1001");
   assert.equal(hybrid.position_name, "Hybrid Product Manager");
@@ -307,6 +315,48 @@ test("recruitee source module parses raw list variants for remote, hybrid, and o
   assert.equal(onsite.department, "Operations");
   assert.equal(onsite.posting_date, "2026-05-08T10:45:00+03:00");
   assert.equal(source.validatePublic(onsite).status, "accepted");
+
+  const localized = byId.get("rec-1004");
+  assert.equal(localized.position_name, "Localized Customer Success Lead");
+  assert.equal(localized.location_text, "Berlin, Germany");
+  assert.equal(localized.city, "Berlin");
+  assert.equal(localized.country, "Germany");
+  assert.equal(localized.remote_type, "hybrid");
+  assert.equal(localized.department, "Customer Success");
+  assert.equal(localized.posting_date, "2026-05-09T11:15:00+03:00");
+  assert.equal(source.validatePublic(localized).status, "accepted");
+});
+
+test("recruitee source module parses embedded PublicApp data-props without fabricating missing fields", () => {
+  const { source, company } = recruiteeFixtureContext();
+  const props = {
+    appConfig: {
+      primaryLangCode: "en",
+      locations: [{ id: 40, city: "Paris", country: "France" }],
+      departments: [{ id: 9, name: "Sales" }],
+      offers: [
+        {
+          id: 1005,
+          slug: "sales-engineer",
+          translations: { en: { title: "Sales Engineer" } },
+          locationIds: [40],
+          departmentId: 9,
+          workplace_type: "On-site",
+          published_at: "2026-05-10T12:00:00+03:00"
+        }
+      ]
+    }
+  };
+  const html = `<div data-component="PublicApp" data-props="${JSON.stringify(props).replace(/"/g, "&quot;")}"></div>`;
+  const parsed = source.parse({ html }, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "1005");
+  assert.equal(normalized.position_name, "Sales Engineer");
+  assert.equal(normalized.country, "France");
+  assert.equal(normalized.city, "Paris");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
 test("recruitee source module quarantines raw list rows with missing geo and no remote evidence", () => {

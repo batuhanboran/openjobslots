@@ -15,5 +15,15 @@
     "remote_type": "unknown",
     "parser_confidence": 0.55,
     "posting_date": "05/09/2026"
+  },
+  {
+    "source_job_id": "12347",
+    "company_name": "Fixture Applitrack",
+    "position_name": "Campus Operations Lead",
+    "country": "United States",
+    "city": "Austin",
+    "remote_type": "onsite",
+    "parser_confidence": 0.55,
+    "posting_date": "05/10/2026"
   }
 ]

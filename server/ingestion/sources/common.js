@@ -957,6 +957,61 @@ async function fetchBreezySourceList(company = {}, target = {}, options = {}) {
   };
 }
 
+async function fetchWorkdaySourceList(company = {}, target = {}, options = {}) {
+  const discovered = target && target.list_url ? target : SOURCE_SPECS.workday.discover(company);
+  const config = discovered?.config || {};
+  const listUrl = clean(discovered?.list_url || "");
+  if (!listUrl) {
+    throw makeSourceFetchError("no_public_jobs_route", "Workday source has no public CXS jobs route", {
+      url: company.url_string
+    });
+  }
+
+  const jobs = [];
+  const seen = new Set();
+  const limit = Math.max(1, Math.min(100, Number(process.env.OPENJOBSLOTS_WORKDAY_SOURCE_PAGE_SIZE || 20)));
+  const maxPages = Math.max(1, Math.min(5, Number(process.env.OPENJOBSLOTS_WORKDAY_SOURCE_MAX_PAGES || 5)));
+  for (let page = 0; page < maxPages; page += 1) {
+    const offset = page * limit;
+    const body = JSON.stringify({
+      appliedFacets: {},
+      limit,
+      offset,
+      searchText: ""
+    });
+    const payload = options.fetcher
+      ? await options.fetcher(listUrl, { ...target, method: "POST", body })
+      : await fetchJson(listUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json"
+          },
+          body
+        });
+    const data = typeof payload === "string" ? JSON.parse(payload) : payload;
+    const batch = Array.isArray(data?.jobPostings)
+      ? data.jobPostings
+      : Array.isArray(data?.data?.jobPostings)
+        ? data.data.jobPostings
+        : Array.isArray(data?.jobs)
+          ? data.jobs
+          : [];
+    for (const item of batch) {
+      const key = clean(item?.jobRequisitionId || item?.jobReqId || item?.requisitionId || item?.jobId || item?.id || item?.externalPath);
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      jobs.push(item);
+    }
+    if (batch.length < limit) break;
+  }
+
+  return {
+    jobPostings: jobs,
+    __sourceConfig: config
+  };
+}
+
 const SOURCE_SPECS = Object.freeze({
   greenhouse: {
     sourceFamily: "direct_json",
@@ -1126,6 +1181,7 @@ const SOURCE_SPECS = Object.freeze({
     sourceFamily: "enterprise_api",
     confidence: 0.65,
     parser: parseWorkdayPostingsFromApi,
+    fetchList: fetchWorkdaySourceList,
     officialDocs: "observed Workday CXS public jobs endpoint",
     discover(company) {
       const parsed = asUrl(company.url_string);

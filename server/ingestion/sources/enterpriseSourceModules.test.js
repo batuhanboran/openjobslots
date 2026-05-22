@@ -92,6 +92,14 @@ for (const atsKey of ENTERPRISE_SOURCES) {
   });
 }
 
+test("target enterprise ATS modules return no postings for empty raw payloads", () => {
+  for (const atsKey of ["workday", "icims"]) {
+    const source = getSourceModule(atsKey);
+    const company = readJson(path.join(__dirname, atsKey, "fixtures", "company.json"));
+    assert.deepEqual(source.parse({ html: "", jobPostings: [] }, company), [], atsKey);
+  }
+});
+
 test("icims source module ignores malformed or unsupported raw list shapes", () => {
   const source = getSourceModule("icims");
   const sourceDir = path.join(__dirname, "icims");
@@ -102,6 +110,42 @@ test("icims source module ignores malformed or unsupported raw list shapes", () 
     const parsed = source.parse(item.payload, company);
     assert.equal(parsed.length, 0, `icims ${item.name} should not produce postings`);
   }
+});
+
+test("workday source module fetches CXS list with POST pagination body", async () => {
+  const source = getSourceModule("workday");
+  const company = readJson(path.join(__dirname, "workday", "fixtures", "company.json"));
+  const seenRequests = [];
+  const raw = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      seenRequests.push({ url, target });
+      assert.equal(target.method, "POST");
+      const body = JSON.parse(target.body);
+      assert.equal(body.limit, 20);
+      assert.equal(body.offset, 0);
+      assert.equal(body.searchText, "");
+      return {
+        jobPostings: [
+          {
+            jobRequisitionId: "JR7001",
+            title: "Remote Workday Fixture",
+            externalPath: "/job/Remote-US/Remote-Workday-Fixture_JR7001",
+            postedOnDate: "2026-05-11",
+            locationsText: "Remote - United States",
+            remoteType: "Remote"
+          }
+        ]
+      };
+    }
+  });
+  assert.equal(seenRequests.length, 1);
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "JR7001");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
 test("icims source module follows wrapper iframe and enriches from public detail", async () => {

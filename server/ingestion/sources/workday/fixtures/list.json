@@ -18,6 +18,20 @@
         "countryName": "United Kingdom"
       },
       "workplaceType": "Hybrid"
+    },
+    {
+      "jobRequisitionId": "JR5003",
+      "title": "Onsite Platform Engineer",
+      "externalPath": "/job/Berlin-Germany/Onsite-Platform-Engineer_JR5003",
+      "externalPostedOn": "2026-05-10",
+      "locations": [
+        {
+          "descriptor": "Berlin, Germany",
+          "city": "Berlin",
+          "country": "Germany"
+        }
+      ],
+      "timeType": "On-site"
     }
   ]
 }
