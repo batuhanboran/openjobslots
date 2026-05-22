@@ -6,10 +6,12 @@ const {
   buildAutoSyncBudgetUsageQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
+  buildSourceBudgetUsageQuery,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
+  summarizeSourceBudgetUsageRows,
   summarizeParserDriftRecheck,
   summarizeBacklogRows
 } = require("./audit-worker-backlog");
@@ -77,6 +79,16 @@ test("buildAutoSyncBudgetUsageQuery is read-only and uses UTC day start", () => 
   assert.deepEqual(query.values, [1_800_057_600]);
   assert.match(query.sql, /SUM\(total_targets\)/i);
   assert.match(query.sql, /FROM ingestion_runs/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildSourceBudgetUsageQuery mirrors worker source budget accounting", () => {
+  const query = buildSourceBudgetUsageQuery({ nowEpoch: 1_800_086_400 });
+
+  assert.deepEqual(query.values, [1_800_057_600]);
+  assert.match(query.sql, /FROM company_sync_state/i);
+  assert.match(query.sql, /last_success_epoch >= \$1/i);
+  assert.match(query.sql, /GROUP BY ats_key/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -260,6 +272,14 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
       if (/FROM parser_drift_events/i.test(sql)) {
         return { rows: [] };
       }
+      if (/FROM company_sync_state/i.test(sql)) {
+        return {
+          rows: [
+            { ats_key: "applytojob", successful_targets_today: 200 },
+            { ats_key: "breezy", successful_targets_today: 175 }
+          ]
+        };
+      }
       throw new Error(`unexpected query: ${sql}`);
     }
   };
@@ -271,7 +291,7 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 6);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
@@ -280,6 +300,11 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   assert.equal(report.diagnostics.auto_sync_budget_usage.targets_started_today, 2000);
   assert.equal(report.diagnostics.auto_sync_budget_usage.remaining_daily_budget, 0);
   assert.equal(report.diagnostics.auto_sync_budget_usage.daily_budget_exhausted, true);
+
+  const applytojob = report.items.find((item) => item.ats_key === "applytojob");
+  assert.equal(applytojob.source_daily_budget_usage.successful_targets_today, 200);
+  assert.equal(applytojob.source_daily_budget_usage.remaining_daily_budget, 0);
+  assert.equal(applytojob.source_daily_budget_usage.daily_budget_exhausted, true);
 });
 
 test("summarizeAutoSyncBudgetUsage explains consumed and remaining daily budget", () => {
@@ -293,6 +318,26 @@ test("summarizeAutoSyncBudgetUsage explains consumed and remaining daily budget"
   assert.equal(summary.targets_started_today, 1300);
   assert.equal(summary.remaining_daily_budget, 700);
   assert.equal(summary.daily_budget_exhausted, false);
+});
+
+test("summarizeSourceBudgetUsageRows exposes remaining budget by ATS", () => {
+  const bySource = summarizeSourceBudgetUsageRows(
+    [
+      { ats_key: "applytojob", successful_targets_today: 200 },
+      { ats_key: "breezy", successful_targets_today: 175 }
+    ],
+    { sourceDailyTargetBudget: 200 }
+  );
+
+  assert.deepEqual(bySource.get("applytojob"), {
+    read_only: true,
+    daily_budget: 200,
+    successful_targets_today: 200,
+    remaining_daily_budget: 0,
+    daily_budget_exhausted: true
+  });
+  assert.equal(bySource.get("breezy").remaining_daily_budget, 25);
+  assert.equal(bySource.get("missing"), undefined);
 });
 
 test("summarizeParserDriftRecheck separates current-policy pass from real drift", () => {

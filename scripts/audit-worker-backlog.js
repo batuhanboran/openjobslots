@@ -328,6 +328,23 @@ function buildAutoSyncBudgetUsageQuery(options = {}) {
   };
 }
 
+function buildSourceBudgetUsageQuery(options = {}) {
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
+  const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  return {
+    values: [dayStartEpoch],
+    sql: `
+      SELECT
+        ats_key,
+        COUNT(*)::int AS successful_targets_today
+      FROM company_sync_state
+      WHERE last_success_epoch >= $1
+      GROUP BY ats_key
+      ORDER BY ats_key ASC;
+    `
+  };
+}
+
 function buildParserDriftRecheckQuery(options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
@@ -587,6 +604,32 @@ function summarizeAutoSyncBudgetUsage(rows = [], options = {}) {
   };
 }
 
+function sourceBudgetUsageSummary(successfulTargetsToday, options = {}) {
+  const workerBudgetConfig = readWorkerBudgetConfig(options.env || process.env, options);
+  const dailyBudget = Number(workerBudgetConfig.sourceDailyTargetBudget || 0);
+  const successCount = Number(successfulTargetsToday || 0);
+  const remainingDailyBudget = dailyBudget > 0
+    ? Math.max(0, dailyBudget - successCount)
+    : null;
+  return {
+    read_only: true,
+    daily_budget: dailyBudget,
+    successful_targets_today: successCount,
+    remaining_daily_budget: remainingDailyBudget,
+    daily_budget_exhausted: dailyBudget > 0 && successCount >= dailyBudget
+  };
+}
+
+function summarizeSourceBudgetUsageRows(rows = [], options = {}) {
+  const bySource = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const atsKey = String(row.ats_key || "").trim().toLowerCase();
+    if (!atsKey) continue;
+    bySource.set(atsKey, sourceBudgetUsageSummary(row.successful_targets_today || row.count || 0, options));
+  }
+  return bySource;
+}
+
 function shapePathsFromRowValue(value) {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") {
@@ -675,6 +718,7 @@ function emptyRecentErrorSummary() {
 
 function attachBacklogDiagnostics(report, options = {}) {
   const recentByAts = summarizeRecentErrors(options.recentErrorRows || []);
+  const sourceBudgetUsageByAts = summarizeSourceBudgetUsageRows(options.sourceBudgetUsageRows || [], options);
   const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const parserAttentionCount = Array.from(recentByAts.values())
@@ -712,6 +756,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       const atsKey = String(item.ats_key || "").trim().toLowerCase();
       return {
         ...item,
+        source_daily_budget_usage: sourceBudgetUsageByAts.get(atsKey) || sourceBudgetUsageSummary(0, options),
         recent_errors: recentByAts.get(atsKey) || emptyRecentErrorSummary(),
         fixture_coverage: getFixtureCoverage(atsKey, options)
       };
@@ -741,6 +786,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
   const autoSyncBudgetUsageQuery = buildAutoSyncBudgetUsageQuery({ ...options, nowEpoch });
   const autoSyncBudgetUsage = await pool.query(autoSyncBudgetUsageQuery.sql, autoSyncBudgetUsageQuery.values);
+  const sourceBudgetUsageQuery = buildSourceBudgetUsageQuery({ ...options, nowEpoch });
+  const sourceBudgetUsage = await pool.query(sourceBudgetUsageQuery.sql, sourceBudgetUsageQuery.values);
   const parserDriftRecheckQuery = buildParserDriftRecheckQuery(options);
   const parserDriftRecheck = await pool.query(parserDriftRecheckQuery.sql, parserDriftRecheckQuery.values);
   return attachBacklogDiagnostics(report, {
@@ -749,6 +796,7 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     recentErrorRows: recentErrors.rows,
     latestRunRows: latestRun.rows,
     autoSyncBudgetUsageRows: autoSyncBudgetUsage.rows,
+    sourceBudgetUsageRows: sourceBudgetUsage.rows,
     parserDriftRecheckRows: parserDriftRecheck.rows
   });
 }
@@ -820,6 +868,7 @@ module.exports = {
   buildLatestRunSummaryQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
+  buildSourceBudgetUsageQuery,
   buildWorkerBacklogQuery,
   classifyFailureReason,
   getFixtureCoverage,
@@ -827,6 +876,7 @@ module.exports = {
   runAudit,
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
+  summarizeSourceBudgetUsageRows,
   summarizeParserDriftRecheck,
   summarizeBacklogRows,
   writeOutput
