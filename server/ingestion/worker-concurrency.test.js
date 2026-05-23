@@ -19,6 +19,7 @@ const {
   sanitizeLogMessage,
   sanitizeUrlForLog,
   selectPostgresDueTargets,
+  sortDueTargetCandidates,
   withTransientWriteRetry,
   withWriteLock
 } = require("./worker");
@@ -286,4 +287,39 @@ test("postgres due target selection over-selects when early sources exhaust dail
 
   assert.ok(candidateLimit > 2, "candidate query should over-select beyond the run target limit");
   assert.deepEqual(targets.map((target) => target.atsKey), ["applytojob", "breezy"]);
+});
+
+test("postgres due target sorting prioritizes healthy targets before failure-pressure retries", () => {
+  const sorted = sortDueTargetCandidates([
+    {
+      ats_key: "breezy",
+      company_name: "Old Failing Breezy",
+      next_sync_epoch: 1,
+      protection_status: "normal",
+      ats_rank: 1,
+      consecutive_failures: 3
+    },
+    {
+      ats_key: "breezy",
+      company_name: "Healthy Breezy",
+      next_sync_epoch: 100,
+      protection_status: "normal",
+      ats_rank: 1,
+      consecutive_failures: 0
+    },
+    {
+      ats_key: "applytojob",
+      company_name: "Healthy Apply",
+      next_sync_epoch: 50,
+      protection_status: "normal",
+      ats_rank: 1,
+      consecutive_failures: 0
+    }
+  ]);
+
+  assert.deepEqual(sorted.map((row) => row.company_name), [
+    "Healthy Apply",
+    "Healthy Breezy",
+    "Old Failing Breezy"
+  ]);
 });

@@ -967,6 +967,10 @@ function sortDueTargetCandidates(rows = []) {
   return [...rows].sort((left, right) => {
     const protectionDelta = dueTargetProtectionPriority(left.protection_status) - dueTargetProtectionPriority(right.protection_status);
     if (protectionDelta) return protectionDelta;
+    const failurePressureDelta = Number(left.consecutive_failures || 0) > 0
+      ? Number(right.consecutive_failures || 0) > 0 ? 0 : 1
+      : Number(right.consecutive_failures || 0) > 0 ? -1 : 0;
+    if (failurePressureDelta) return failurePressureDelta;
     const leftRank = Number(left.ats_rank || 0);
     const rightRank = Number(right.ats_rank || 0);
     if (leftRank !== rightRank) return leftRank - rightRank;
@@ -1021,6 +1025,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
           s.default_ttl_seconds,
           s.rate_limit_ms,
           COALESCE(st.next_sync_epoch, 0) AS next_sync_epoch,
+          COALESCE(st.consecutive_failures, 0) AS consecutive_failures,
           CASE COALESCE(NULLIF(s.protection_status, ''), 'normal')
             WHEN 'normal' THEN 0
             WHEN 'public_enabled' THEN 0
@@ -1030,7 +1035,11 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
           END AS protection_priority,
           row_number() OVER (
             PARTITION BY c.ats_key
-            ORDER BY COALESCE(st.next_sync_epoch, 0) ASC, c.company_name ASC, c.url_string ASC
+            ORDER BY
+              CASE WHEN COALESCE(st.consecutive_failures, 0) > 0 THEN 1 ELSE 0 END ASC,
+              COALESCE(st.next_sync_epoch, 0) ASC,
+              c.company_name ASC,
+              c.url_string ASC
           ) AS ats_rank
         FROM companies c
         INNER JOIN ats_sources s
@@ -1052,6 +1061,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
         default_ttl_seconds,
         rate_limit_ms,
         next_sync_epoch,
+        consecutive_failures,
         ats_rank,
         protection_priority
       FROM due_targets
