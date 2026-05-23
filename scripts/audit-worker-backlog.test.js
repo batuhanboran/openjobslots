@@ -1964,6 +1964,23 @@ test("attachBacklogDiagnostics exposes current-policy adjusted failure taxonomy"
         { ats_key: "applytojob", error_scope: "target_failure", error_type: "parser_drift", error_message: "parser drift detected", count: 5 },
         { ats_key: "applytojob", error_scope: "target_failure", error_type: "portal_search_empty", count: 4 }
       ],
+      targetFailurePressureRows: [
+        {
+          ats_key: "bamboohr",
+          company_url: "https://example.bamboohr.com/careers",
+          company_name: "Bamboo",
+          protection_status: "normal",
+          consecutive_failures: 6,
+          last_error: "parser drift detected: payload shape similarity 0.2609 below 0.55",
+          recent_error_groups: [
+            {
+              error_type: "parser_drift",
+              error_message: "payload shape similarity 0.2609 below 0.55",
+              count: 3
+            }
+          ]
+        }
+      ],
       parserDriftRecheckRows: [
         {
           ats_key: "applytojob",
@@ -2027,6 +2044,13 @@ test("attachBacklogDiagnostics exposes current-policy adjusted failure taxonomy"
     withDiagnostics.diagnostics.current_policy_adjusted_failure_reason_counts_by_scope.target_failure.empty_no_jobs,
     5
   );
+  const targetPressure = withDiagnostics.diagnostics.target_failure_pressure;
+  assert.equal(targetPressure.failure_reason_review_groups[0].ats_key, "bamboohr");
+  assert.equal(targetPressure.failure_reason_review_groups[0].failure_reason, "empty_no_jobs");
+  assert.equal(targetPressure.failure_reason_review_groups[0].raw_failure_reason, "parser_bug");
+  assert.equal(targetPressure.failure_reason_review_groups[0].current_policy_adjustment.reason, "parser_drift_recheck_empty_no_jobs");
+  assert.equal(targetPressure.top_targets[0].dominant_failure_reason, "empty_no_jobs");
+  assert.equal(targetPressure.top_targets[0].raw_dominant_failure_reason, "parser_bug");
 });
 
 test("attachBacklogDiagnostics keeps source policy blocks out of parser attention count", () => {

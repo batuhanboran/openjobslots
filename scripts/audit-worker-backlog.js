@@ -2063,6 +2063,60 @@ function lastErrorFailureReason(row = {}) {
   return reason || "";
 }
 
+function currentPolicyFailureReasonAdjustment(atsKey = "", reason = "", parserDriftRecheck = {}) {
+  const rawReason = String(reason || "unknown").trim() || "unknown";
+  if (rawReason !== "parser_bug") return null;
+  const source = parserDriftRecheck?.by_source?.[String(atsKey || "").trim().toLowerCase()];
+  if (!source) return null;
+  const sampleCount = Math.max(0, Number(source.sample_count || 0));
+  const emptyNoJobsCount = Math.max(0, Number(source.current_policy_empty_no_jobs_count || 0));
+  const resolvedCount = Math.max(0, Number(source.current_policy_resolved_count || 0));
+  const stillDriftCount = Math.max(0, Number(source.still_drift_count || 0));
+  const skippedNoBaselineCount = Math.max(0, Number(source.skipped_no_baseline_count || 0));
+  if (
+    sampleCount <= 0 ||
+    emptyNoJobsCount <= 0 ||
+    emptyNoJobsCount < sampleCount ||
+    resolvedCount < sampleCount ||
+    stillDriftCount > 0 ||
+    skippedNoBaselineCount > 0
+  ) {
+    return null;
+  }
+  return {
+    reason: "parser_drift_recheck_empty_no_jobs",
+    raw_failure_reason: rawReason,
+    adjusted_failure_reason: "empty_no_jobs",
+    source_sample_count: sampleCount,
+    current_policy_empty_no_jobs_count: emptyNoJobsCount,
+    current_policy_resolved_count: resolvedCount,
+    still_drift_count: stillDriftCount,
+    skipped_no_baseline_count: skippedNoBaselineCount
+  };
+}
+
+function adjustRecentErrorSummaryForCurrentPolicy(recentErrors = {}, adjustment = null) {
+  if (!adjustment || adjustment.adjusted_failure_reason !== "empty_no_jobs") return recentErrors;
+  const parserBugCount = Math.max(
+    0,
+    Number(recentErrors.parser_bug_count || recentErrors.by_reason?.parser_bug || 0)
+  );
+  if (parserBugCount <= 0) return recentErrors;
+  const adjusted = {
+    ...recentErrors,
+    by_reason: { ...(recentErrors.by_reason || {}) },
+    by_type: { ...(recentErrors.by_type || {}) },
+    raw_by_reason: { ...(recentErrors.by_reason || {}) },
+    current_policy_adjustment: adjustment
+  };
+  adjusted.parser_bug_count = Math.max(0, Number(adjusted.parser_bug_count || 0) - parserBugCount);
+  adjusted.empty_no_jobs_count = Number(adjusted.empty_no_jobs_count || 0) + parserBugCount;
+  adjusted.by_reason.parser_bug = Math.max(0, Number(adjusted.by_reason.parser_bug || 0) - parserBugCount);
+  if (adjusted.by_reason.parser_bug === 0) delete adjusted.by_reason.parser_bug;
+  adjusted.by_reason.empty_no_jobs = Number(adjusted.by_reason.empty_no_jobs || 0) + parserBugCount;
+  return adjusted;
+}
+
 function targetPressureNextAction(reason) {
   if (reason === "parser_bug") return "add fixture and fix parser before counting this source as scalable";
   if (reason === "source_quality") return "review source evidence and quality gates before re-running at higher volume";
@@ -2174,6 +2228,8 @@ function addFailureReasonReviewGroup(groups = [], row = {}, reason = "", sample 
   const errorSignature = cleanupErrorSignature(row);
   const groupKey = `${failureReason}|${atsKey}|${protectionStatus}|${errorSignature}`;
   const boundedSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(sampleLimit || 5))));
+  const rawFailureReason = String(row.raw_failure_reason || sample.raw_failure_reason || "").trim();
+  const currentPolicyAdjustment = row.current_policy_adjustment || sample.current_policy_adjustment || null;
   let group = groups.find((item) => item.group_key === groupKey);
   if (!group) {
     group = {
@@ -2188,6 +2244,11 @@ function addFailureReasonReviewGroup(groups = [], row = {}, reason = "", sample 
       sample_targets: []
     };
     groups.push(group);
+  }
+  if (rawFailureReason && rawFailureReason !== failureReason) {
+    group.raw_failure_reason = rawFailureReason;
+    group.current_policy_adjusted_failure_reason = failureReason;
+    if (currentPolicyAdjustment) group.current_policy_adjustment = currentPolicyAdjustment;
   }
   group.target_count += 1;
   group.failure_pressure += Number(row.consecutive_failures || 0);
@@ -2482,7 +2543,14 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     const recentErrors = summarizeRecentErrorGroups(groups);
     const consecutiveFailures = Number(row?.consecutive_failures || 0);
     const rowRecentErrorCount = Number(row?.recent_error_count || recentErrors.total_count || 0);
-    const reason = dominantFailureReason(recentErrors) || lastErrorFailureReason(row);
+    const rawReason = dominantFailureReason(recentErrors) || lastErrorFailureReason(row);
+    const currentPolicyAdjustment = currentPolicyFailureReasonAdjustment(
+      atsKey,
+      rawReason,
+      options.parserDriftRecheck
+    );
+    const reason = currentPolicyAdjustment?.adjusted_failure_reason || rawReason;
+    const reportRecentErrors = adjustRecentErrorSummaryForCurrentPolicy(recentErrors, currentPolicyAdjustment);
 
     failurePressure += consecutiveFailures;
     recentErrorCount += rowRecentErrorCount;
@@ -2499,11 +2567,11 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     bySource[atsKey].target_count += 1;
     bySource[atsKey].failure_pressure += consecutiveFailures;
     bySource[atsKey].recent_error_count += rowRecentErrorCount;
-    mergeReasonCounts(bySource[atsKey].by_reason, recentErrors.by_reason);
-    if (reason && recentErrors.total_count <= 0) {
+    mergeReasonCounts(bySource[atsKey].by_reason, reportRecentErrors.by_reason);
+    if (reason && reportRecentErrors.total_count <= 0) {
       bySource[atsKey].by_reason[reason] = Number(bySource[atsKey].by_reason[reason] || 0) + 1;
     }
-    const emptyNoJobsClass = classifyEmptyNoJobsTarget(row, recentErrors, reason, options);
+    const emptyNoJobsClass = classifyEmptyNoJobsTarget(row, reportRecentErrors, reason, options);
     if (emptyNoJobsClass) {
       const classificationRow = {
         ats_key: atsKey,
@@ -2521,30 +2589,46 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
       addEmptyNoJobsClassification(emptyNoJobsClassification, emptyNoJobsClass, classificationRow);
       addEmptyNoJobsClassification(bySource[atsKey].empty_no_jobs_classification, emptyNoJobsClass, classificationRow);
     }
-    const reviewSample = createEmptyNoJobsClassificationSample({
-      ats_key: atsKey,
-      company_url: companyUrl,
-      company_name: String(row?.company_name || ""),
-      protection_status: String(row?.protection_status || "normal") || "normal",
-      company_created_at_epoch: Number(row?.company_created_at_epoch || 0),
-      last_success_epoch: Number(row?.last_success_epoch || 0),
-      last_failure_epoch: Number(row?.last_failure_epoch || 0),
-      consecutive_failures: consecutiveFailures,
-      recent_error_count: rowRecentErrorCount,
-      last_http_status: row?.last_http_status,
-      last_error: String(row?.last_error || "")
-    });
+    const reviewSample = {
+      ...createEmptyNoJobsClassificationSample({
+        ats_key: atsKey,
+        company_url: companyUrl,
+        company_name: String(row?.company_name || ""),
+        protection_status: String(row?.protection_status || "normal") || "normal",
+        company_created_at_epoch: Number(row?.company_created_at_epoch || 0),
+        last_success_epoch: Number(row?.last_success_epoch || 0),
+        last_failure_epoch: Number(row?.last_failure_epoch || 0),
+        consecutive_failures: consecutiveFailures,
+        recent_error_count: rowRecentErrorCount,
+        last_http_status: row?.last_http_status,
+        last_error: String(row?.last_error || "")
+      }),
+      ...(currentPolicyAdjustment
+        ? {
+            raw_failure_reason: rawReason,
+            current_policy_adjusted_failure_reason: reason,
+            current_policy_adjustment: currentPolicyAdjustment
+          }
+        : {})
+    };
     const reviewRow = {
       ats_key: atsKey,
       protection_status: String(row?.protection_status || "normal") || "normal",
       consecutive_failures: consecutiveFailures,
       recent_error_count: rowRecentErrorCount,
-      last_error: String(row?.last_error || "")
+      last_error: String(row?.last_error || ""),
+      ...(currentPolicyAdjustment
+        ? {
+            raw_failure_reason: rawReason,
+            current_policy_adjusted_failure_reason: reason,
+            current_policy_adjustment: currentPolicyAdjustment
+          }
+        : {})
     };
     addFailureReasonReviewGroup(failureReasonReviewGroups, reviewRow, reason || "unknown", reviewSample, emptyNoJobsSampleLimit);
     addFailureReasonReviewGroup(bySource[atsKey].failure_reason_review_groups, reviewRow, reason || "unknown", reviewSample, emptyNoJobsSampleLimit);
 
-    topTargets.push({
+    const topTarget = {
       ats_key: atsKey,
       company_url: companyUrl,
       company_name: String(row?.company_name || ""),
@@ -2559,11 +2643,17 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
       last_http_status: normalizeHttpStatus(row?.last_http_status),
       last_error: String(row?.last_error || ""),
       recent_error_count: rowRecentErrorCount,
-      recent_errors: recentErrors,
+      recent_errors: reportRecentErrors,
       dominant_failure_reason: reason,
       empty_no_jobs_class: emptyNoJobsClass || null,
       next_action: targetPressureNextAction(reason)
-    });
+    };
+    if (currentPolicyAdjustment) {
+      topTarget.raw_dominant_failure_reason = rawReason;
+      topTarget.raw_recent_errors = recentErrors;
+      topTarget.current_policy_adjustment = currentPolicyAdjustment;
+    }
+    topTargets.push(topTarget);
   }
 
   finalizeEmptyNoJobsClassificationSummary(emptyNoJobsClassification);
@@ -2635,7 +2725,10 @@ function attachBacklogDiagnostics(report, options = {}) {
     failureReasonCountsByScope,
     parserDriftRecheck
   );
-  const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], options);
+  const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], {
+    ...options,
+    parserDriftRecheck
+  });
   const targetAtsPatchEffect = summarizeTargetAtsPatchEffect({
     targetAtsKeys,
     latestRun,
