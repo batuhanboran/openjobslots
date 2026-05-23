@@ -187,6 +187,74 @@ function annotateCurrentPolicyFailureSources(topFailureSources = [], parserDrift
   });
 }
 
+function buildThroughputReadiness({
+  targetSuccessPct = null,
+  noGeoNoRemoteCount = 0,
+  adjustedFailureReasonCounts = {},
+  minimumSuccessRatePct = 80
+} = {}) {
+  const blockers = [];
+  const successRate = targetSuccessPct === null || targetSuccessPct === undefined
+    ? null
+    : Number(targetSuccessPct);
+  if (successRate === null || !Number.isFinite(successRate)) {
+    blockers.push({
+      code: "target_success_rate_missing",
+      message: "24h worker target success rate is unavailable."
+    });
+  } else if (successRate < minimumSuccessRatePct) {
+    blockers.push({
+      code: "target_success_rate_below_threshold",
+      message: `24h worker target success rate ${successRate}% is below the ${minimumSuccessRatePct}% threshold.`,
+      value: successRate,
+      threshold: minimumSuccessRatePct
+    });
+  }
+
+  const unsafePublicRows = Number(noGeoNoRemoteCount || 0);
+  if (unsafePublicRows > 0) {
+    blockers.push({
+      code: "new_no_geo_no_remote_public_rows_present",
+      message: `24h public freshness introduced ${unsafePublicRows} no_geo_no_remote rows.`,
+      count: unsafePublicRows
+    });
+  }
+
+  for (const reason of ["parser_bug", "source_quality", "rate_limit", "network", "auth", "unknown"]) {
+    const count = Number(adjustedFailureReasonCounts?.[reason] || 0);
+    if (count <= 0) continue;
+    blockers.push({
+      code: `${reason}_failures_present`,
+      message: reason === "parser_bug"
+        ? "current-policy parser_bug failures are present in the 24h worker window."
+        : `${reason} failures are present in the 24h worker window.`,
+      count
+    });
+  }
+
+  return {
+    read_only: true,
+    allowed: blockers.length === 0,
+    decision: blockers.length === 0 ? "candidate_for_small_increase" : "hold",
+    minimum_success_rate_pct: minimumSuccessRatePct,
+    target_success_pct_24h: successRate,
+    new_no_geo_no_remote_public_rows_24h: unsafePublicRows,
+    current_policy_adjusted_failure_reason_counts_24h: sparsePositiveCounts(adjustedFailureReasonCounts),
+    blockers,
+    required_checks_before_increase: [
+      "/health",
+      "search:reindex:check",
+      "search:parity",
+      "worker trend",
+      "parser_attention_count",
+      "due-by-ATS"
+    ],
+    next_action: blockers.length === 0
+      ? "Run required external checks before considering only a small budget or targets-per-run increase."
+      : "Hold throughput and improve worker/source quality before increasing budget or targets-per-run."
+  };
+}
+
 function createDailySourceHealthSummary(rows = {}, options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const windowHours = Math.max(1, Math.min(168, Math.floor(Number(options.healthWindowHours || 24))));
@@ -216,6 +284,8 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     parserDriftRecheck
   );
   const qualityGateSources = summarizeQualityGateSources(rows.qualityGateRows || []);
+  const targetSuccessPct = pct(successCount, successCount + failureCount);
+  const sparseAdjustedFailureCounts = sparsePositiveCounts(adjustedFailureSummary.counts);
 
   return {
     read_only: true,
@@ -228,7 +298,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     targets_processed_24h: targetsProcessed,
     target_success_count_24h: successCount,
     target_failure_count_24h: failureCount,
-    target_success_pct_24h: pct(successCount, successCount + failureCount),
+    target_success_pct_24h: targetSuccessPct,
     rows_seen_24h: Number(postingRow.rows_seen || 0),
     rows_new_24h: Number(postingRow.rows_new || 0),
     new_missing_any_normalized_geo_rows_24h: Number(postingRow.new_missing_any_normalized_geo_rows || 0),
@@ -239,10 +309,15 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     rejected_candidates_24h: Number(runRow.rejected_count || 0),
     failure_reason_counts_24h: failureSummary.failure_reason_counts,
     failure_reason_counts_by_scope_24h: sparseFailureReasonCountsByScope(rawFailureCountsByScope),
-    current_policy_adjusted_failure_reason_counts_24h: sparsePositiveCounts(adjustedFailureSummary.counts),
+    current_policy_adjusted_failure_reason_counts_24h: sparseAdjustedFailureCounts,
     current_policy_failure_adjustments_24h: adjustedFailureSummary.adjustments,
     current_policy_adjusted_failure_reason_counts_by_scope_24h: sparseFailureReasonCountsByScope(adjustedFailureCountsByScope),
     parser_drift_recheck_24h: parserDriftRecheck,
+    throughput_readiness: buildThroughputReadiness({
+      targetSuccessPct,
+      noGeoNoRemoteCount: Number(postingRow.new_no_geo_no_remote_rows || 0),
+      adjustedFailureReasonCounts: sparseAdjustedFailureCounts
+    }),
     top_failure_sources: topFailureSources,
     next_action: "do not increase throughput unless success rate, parity, parser attention, and due-by-ATS gates are clean"
   };

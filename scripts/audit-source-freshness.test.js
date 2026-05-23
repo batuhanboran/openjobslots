@@ -147,6 +147,45 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
   assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.target_failure.parser_bug, 2);
   assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.target_failure.empty_no_jobs, 1);
   assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.posting_rejection.source_quality, 2);
+  assert.deepEqual(summary.throughput_readiness, {
+    read_only: true,
+    allowed: false,
+    decision: "hold",
+    minimum_success_rate_pct: 80,
+    target_success_pct_24h: 80,
+    new_no_geo_no_remote_public_rows_24h: 2,
+    current_policy_adjusted_failure_reason_counts_24h: {
+      parser_bug: 2,
+      empty_no_jobs: 6,
+      rate_limit: 3
+    },
+    blockers: [
+      {
+        code: "new_no_geo_no_remote_public_rows_present",
+        message: "24h public freshness introduced 2 no_geo_no_remote rows.",
+        count: 2
+      },
+      {
+        code: "parser_bug_failures_present",
+        message: "current-policy parser_bug failures are present in the 24h worker window.",
+        count: 2
+      },
+      {
+        code: "rate_limit_failures_present",
+        message: "rate_limit failures are present in the 24h worker window.",
+        count: 3
+      }
+    ],
+    required_checks_before_increase: [
+      "/health",
+      "search:reindex:check",
+      "search:parity",
+      "worker trend",
+      "parser_attention_count",
+      "due-by-ATS"
+    ],
+    next_action: "Hold throughput and improve worker/source quality before increasing budget or targets-per-run."
+  });
   assert.equal(summary.top_failure_sources[0].ats_key, "breezy");
   assert.equal(summary.top_failure_sources[0].dominant_failure_reason, "empty_no_jobs");
   assert.equal(summary.top_failure_sources[1].ats_key, "bamboohr");
