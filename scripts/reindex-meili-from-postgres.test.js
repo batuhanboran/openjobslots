@@ -13,6 +13,7 @@ const {
   indexablePostingsWhereClause,
   parseReindexArgs,
   runReindex,
+  summarizeDriftDiagnosis,
   summarizeSampleMismatches,
   validateMeiliIndexAgainstPostgres,
   validateMeiliSettings
@@ -181,6 +182,34 @@ test("Meili sample mismatch summary separates missing documents from field drift
       country: 1,
       remote_type: 1
     }
+  });
+});
+
+test("drift diagnosis separates active mixed drift from simple extra documents", () => {
+  assert.deepEqual(summarizeDriftDiagnosis({
+    countDelta: -1,
+    documentDrift: {
+      extra_meili_document_count: 1,
+      missing_meili_document_count: 0,
+      extra_meili_documents: [
+        { postgres_index_status: "indexable", postgres_exclusion_reasons: [] }
+      ],
+      missing_meili_documents: []
+    },
+    remoteFacetComparison: { ok: false },
+    sampleMismatchSummary: { missing_documents: 2, field_mismatches: 0 }
+  }), {
+    primary_cause: "mixed_document_drift",
+    count_delta: -1,
+    extra_meili_document_count: 1,
+    missing_meili_document_count: 0,
+    sampled_extra_status_counts: { indexable: 1 },
+    sampled_extra_exclusion_reason_counts: { none: 1 },
+    sampled_missing_document_count: 0,
+    sampled_mismatch_missing_document_count: 2,
+    sample_complete: false,
+    approval_required: true,
+    suggested_next_action: "inspect_document_drift_then_repair_after_explicit_approval"
   });
 });
 
@@ -494,6 +523,7 @@ test("replace validation catches count mismatch", async () => {
       sampled_extra_status_counts: { excluded_visible: 1 },
       sampled_extra_exclusion_reason_counts: { placeholder_title: 1 },
       sampled_missing_document_count: 0,
+      sampled_mismatch_missing_document_count: 0,
       sample_complete: true,
       approval_required: true,
       suggested_next_action: "delete_extra_meili_documents_or_replace_reindex_after_explicit_approval"

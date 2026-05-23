@@ -610,6 +610,7 @@ function summarizeDriftDiagnosis({ countDelta = 0, documentDrift = {}, remoteFac
   const missingDocuments = Array.isArray(documentDrift.missing_meili_documents)
     ? documentDrift.missing_meili_documents
     : [];
+  const sampledMismatchMissingDocumentCount = Number(sampleMismatchSummary.missing_documents || 0);
   const sampledExtraStatusCounts = {};
   const sampledExtraExclusionReasonCounts = {};
   for (const document of extraDocuments) {
@@ -625,7 +626,9 @@ function summarizeDriftDiagnosis({ countDelta = 0, documentDrift = {}, remoteFac
   }
 
   let primaryCause = "in_sync";
-  if (extraMeiliDocumentCount > 0 && missingMeiliDocumentCount > 0) primaryCause = "mixed_document_drift";
+  if (extraMeiliDocumentCount > 0 && (missingMeiliDocumentCount > 0 || sampledMismatchMissingDocumentCount > 0)) {
+    primaryCause = "mixed_document_drift";
+  }
   else if (extraMeiliDocumentCount > 0) primaryCause = "extra_meili_documents";
   else if (missingMeiliDocumentCount > 0) primaryCause = "missing_meili_documents";
   else if (Number(countDelta || 0) !== 0) primaryCause = "count_mismatch_unclassified";
@@ -652,7 +655,10 @@ function summarizeDriftDiagnosis({ countDelta = 0, documentDrift = {}, remoteFac
     sampled_extra_status_counts: sampledExtraStatusCounts,
     sampled_extra_exclusion_reason_counts: sampledExtraExclusionReasonCounts,
     sampled_missing_document_count: missingDocuments.length,
-    sample_complete: extraDocuments.length >= extraMeiliDocumentCount && missingDocuments.length >= missingMeiliDocumentCount,
+    sampled_mismatch_missing_document_count: sampledMismatchMissingDocumentCount,
+    sample_complete: sampledMismatchMissingDocumentCount === 0 &&
+      extraDocuments.length >= extraMeiliDocumentCount &&
+      missingDocuments.length >= missingMeiliDocumentCount,
     approval_required: primaryCause !== "in_sync",
     suggested_next_action: suggestedActions[primaryCause] || suggestedActions.count_mismatch_unclassified
   };
@@ -1046,6 +1052,7 @@ module.exports = {
   meiliRequest,
   parseReindexArgs,
   runReindex,
+  summarizeDriftDiagnosis,
   summarizeSampleMismatches,
   tempIndexUid,
   validateMeiliIndexAgainstPostgres,
