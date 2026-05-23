@@ -1000,11 +1000,15 @@ function parserAttentionPredicate(alias = "") {
   return `
     ${prefix}error_type LIKE 'parser_%'
     AND NOT (
-      ${prefix}error_type = 'parser_validation'
+      ${prefix}error_type IN ('parser_validation', 'parser_quarantine')
       AND lower(btrim(coalesce(${prefix}error_message, ''))) IN (
         'source_disabled_by_threshold',
         'source_auto_disabled',
-        'source_quarantine_only'
+        'source_quarantine_only',
+        'no_geo_no_remote',
+        'ambiguous_location',
+        'weak_remote_evidence',
+        'no_normalized_geo_or_explicit_remote'
       )
     )
   `;

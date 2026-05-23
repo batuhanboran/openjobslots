@@ -204,6 +204,9 @@ async function testParserAttentionGroupsCareerplugRejectionReasons() {
   assert.match(captured.sql, /jsonb_agg/);
   assert.match(captured.sql, /GROUP BY e3\.error_message/);
   assert.match(captured.sql, /source_disabled_by_threshold/);
+  assert.match(captured.sql, /parser_quarantine/);
+  assert.match(captured.sql, /no_geo_no_remote/);
+  assert.match(captured.sql, /ambiguous_location/);
   assert.deepEqual(captured.params, [100]);
   assert.deepEqual(result, [{
     ats_key: "careerplug",
