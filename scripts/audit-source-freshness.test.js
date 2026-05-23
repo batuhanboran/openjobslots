@@ -28,6 +28,9 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
       posting_upsert_count: 77,
       rejected_count: 4
     }],
+    budgetUsageRows: [{
+      targets_started_today: 875
+    }],
     postingRows: [{
       rows_seen: 55,
       rows_new: 12,
@@ -113,6 +116,16 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
   assert.equal(summary.window_hours, 24);
   assert.equal(summary.daily_target_budget, 1000);
   assert.equal(summary.targets_per_run, 25);
+  assert.deepEqual(summary.auto_sync_budget_usage, {
+    read_only: true,
+    utc_day_start_epoch: 1_799_971_200,
+    utc_day_reset_epoch: 1_800_057_600,
+    daily_budget: 1000,
+    targets_per_run: 25,
+    targets_started_today: 875,
+    remaining_daily_budget: 125,
+    daily_budget_exhausted: false
+  });
   assert.equal(summary.targets_due, 42);
   assert.equal(summary.targets_processed_24h, 10);
   assert.equal(summary.target_success_pct_24h, 80);
@@ -214,10 +227,12 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
   });
 
   assert.deepEqual(queries.postings.values, [1_799_913_600]);
+  assert.deepEqual(queries.budgetUsage.values, [1_799_971_200]);
   assert.deepEqual(queries.qualityGateSources.values, [1_799_913_600, 25]);
   assert.deepEqual(queries.failureScopes.values, [24, []]);
   assert.deepEqual(queries.parserDriftRecheck.values, [24, [], 100]);
   assert.match(queries.postings.sql, /first_seen_epoch/i);
+  assert.match(queries.budgetUsage.sql, /targets_started_today/i);
   assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
   assert.match(queries.qualityGateSources.sql, /GROUP BY ats_key/i);
   assert.match(queries.qualityGateSources.sql, /new_no_geo_no_remote_rows/i);

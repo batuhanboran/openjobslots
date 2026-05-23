@@ -11,10 +11,12 @@ const {
 const {
   adjustFailureReasonCountsByScopeForParserDriftRecheck,
   adjustFailureReasonCountsForParserDriftRecheck,
+  buildAutoSyncBudgetUsageQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorScopeQuery,
   classifyFailureReason,
   summarizeFailureReasonCountsByScope,
+  summarizeAutoSyncBudgetUsage,
   summarizeParserDriftRecheck
 } = require("./audit-worker-backlog");
 
@@ -262,6 +264,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
   const budgetConfig = readWorkerBudgetConfig(options.env || process.env, options);
   const dueRow = Array.isArray(rows.dueRows) ? (rows.dueRows[0] || {}) : {};
   const runRow = Array.isArray(rows.runRows) ? (rows.runRows[0] || {}) : {};
+  const budgetUsageRows = Array.isArray(rows.budgetUsageRows) ? rows.budgetUsageRows : [];
   const postingRow = Array.isArray(rows.postingRows) ? (rows.postingRows[0] || {}) : {};
   const successCount = Number(runRow.success_count || 0);
   const failureCount = Number(runRow.failure_count || 0);
@@ -294,6 +297,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     window_end_epoch: nowEpoch,
     daily_target_budget: Number(budgetConfig.autoSyncDailyTargetBudget || 0),
     targets_per_run: Number(budgetConfig.autoSyncTargetsPerRun || 0),
+    auto_sync_budget_usage: summarizeAutoSyncBudgetUsage(budgetUsageRows, { ...options, nowEpoch }),
     targets_due: Number(dueRow.targets_due || dueRow.count || 0),
     targets_processed_24h: targetsProcessed,
     target_success_count_24h: successCount,
@@ -358,6 +362,7 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
         WHERE started_at_epoch >= $1;
       `
     },
+    budgetUsage: buildAutoSyncBudgetUsageQuery({ ...options, nowEpoch }),
     postings: {
       values: [windowStartEpoch],
       sql: `
@@ -486,9 +491,10 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
 
 async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   const queries = buildPostgresDailySourceHealthQueries(options);
-  const [due, runs, postings, qualityGateSources, failures, failureScopes, parserDriftRecheck] = await Promise.all([
+  const [due, runs, budgetUsage, postings, qualityGateSources, failures, failureScopes, parserDriftRecheck] = await Promise.all([
     pool.query(queries.due.sql, queries.due.values),
     pool.query(queries.runs.sql, queries.runs.values),
+    pool.query(queries.budgetUsage.sql, queries.budgetUsage.values),
     pool.query(queries.postings.sql, queries.postings.values),
     pool.query(queries.qualityGateSources.sql, queries.qualityGateSources.values),
     pool.query(queries.failures.sql, queries.failures.values),
@@ -498,6 +504,7 @@ async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   return createDailySourceHealthSummary({
     dueRows: due.rows,
     runRows: runs.rows,
+    budgetUsageRows: budgetUsage.rows,
     postingRows: postings.rows,
     qualityGateRows: qualityGateSources.rows,
     failureRows: failures.rows,
