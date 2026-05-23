@@ -8625,12 +8625,22 @@ function extractApplyToJobDetailFields(detailHtml) {
 function applyToJobSourceFailureReasons(posting) {
   const reasons = [];
   const location = cleanApplyToJobText(posting.location || posting.location_text);
+  const normalizedLocation = location
+    .toLowerCase()
+    .replace(/\s*\(\s*\d+\s*\)\s*$/, "")
+    .replace(/^[\s([{]+/, "")
+    .replace(/[\s)\]}]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
   const remoteType = cleanApplyToJobText(posting.remote_type).toLowerCase();
   const sourceEvidence = posting.source_evidence || {};
   const hasRemoteEvidence = Boolean(sourceEvidence.remote_source || sourceEvidence.remote_path);
   const hasLocationEvidence = Boolean(sourceEvidence.location_source || sourceEvidence.location_path);
   if (!location && !hasRemoteEvidence) reasons.push("no_structured_location", "no_explicit_remote_evidence");
-  if (/^(multiple|various|all locations|anywhere|global|tbd|to be determined)$/i.test(location)) reasons.push("ambiguous_location");
+  if (/^(multiple|various)(?:\s+(?:locations?|states?|countries?|cities?|regions?|areas?))?$/.test(normalizedLocation) ||
+      /^(all locations|anywhere|global|tbd|to be determined)$/.test(normalizedLocation)) {
+    reasons.push("ambiguous_location");
+  }
   if ((remoteType === "remote" || remoteType === "hybrid") && !hasRemoteEvidence) reasons.push("no_explicit_remote_evidence");
   if (!hasLocationEvidence && !hasRemoteEvidence) reasons.push("detail_no_structured_location", "detail_no_explicit_remote");
   return Array.from(new Set(reasons));
@@ -9447,12 +9457,21 @@ function extractBreezyDetailFields(detailHtml) {
 function breezySourceFailureReasons(posting) {
   const reasons = [];
   const location = cleanBreezyText(posting.location || posting.location_text);
+  const normalizedLocation = location
+    .toLowerCase()
+    .replace(/\s*\(\s*\d+\s*\)\s*$/, "")
+    .replace(/^[\s([{]+/, "")
+    .replace(/[\s)\]}]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
   const remoteType = cleanBreezyText(posting.remote_type).toLowerCase();
   const sourceEvidence = posting.source_evidence || {};
   const hasRemoteEvidence = Boolean(sourceEvidence.remote_source || sourceEvidence.remote_path);
   const hasLocationEvidence = Boolean(sourceEvidence.location_source || sourceEvidence.location_path);
   const explicitRemoteOrHybrid = hasRemoteEvidence && (remoteType === "remote" || remoteType === "hybrid");
-  const ambiguousLocation = /^(multiple|multiple locations|various|all locations|anywhere|global|tbd|to be determined)(?:\s|\(|$)/i.test(location);
+  const ambiguousLocation =
+    /^(multiple|various)(?:\s+(?:locations?|states?|countries?|cities?|regions?|areas?))?$/.test(normalizedLocation) ||
+    /^(all locations|anywhere|global|tbd|to be determined)$/.test(normalizedLocation);
   if (!location && !hasRemoteEvidence) reasons.push("no_structured_location", "no_explicit_remote_evidence");
   if (ambiguousLocation && !explicitRemoteOrHybrid) reasons.push("ambiguous_location");
   if ((remoteType === "remote" || remoteType === "hybrid" || remoteType === "onsite") && !hasRemoteEvidence) reasons.push("no_explicit_remote_evidence");

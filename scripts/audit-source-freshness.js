@@ -133,6 +133,21 @@ function summarizeFailureSources(failureRows = [], options = {}) {
   };
 }
 
+function summarizeQualityGateSources(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      ats_key: String(row?.ats_key || "unknown").trim().toLowerCase() || "unknown",
+      new_missing_any_normalized_geo_rows_24h: Number(row?.new_missing_any_normalized_geo_rows || 0),
+      new_weak_unknown_remote_rows_24h: Number(row?.new_weak_unknown_remote_rows || 0),
+      new_no_geo_no_remote_public_rows_24h: Number(row?.new_no_geo_no_remote_rows || 0)
+    }))
+    .filter((row) => (
+      row.new_missing_any_normalized_geo_rows_24h > 0 ||
+      row.new_weak_unknown_remote_rows_24h > 0 ||
+      row.new_no_geo_no_remote_public_rows_24h > 0
+    ));
+}
+
 function createDailySourceHealthSummary(rows = {}, options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const windowHours = Math.max(1, Math.min(168, Math.floor(Number(options.healthWindowHours || 24))));
@@ -145,6 +160,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
   const failureCount = Number(runRow.failure_count || 0);
   const targetsProcessed = Number(runRow.targets_processed || runRow.total_targets || (successCount + failureCount) || 0);
   const failureSummary = summarizeFailureSources(rows.failureRows || [], options);
+  const qualityGateSources = summarizeQualityGateSources(rows.qualityGateRows || []);
 
   return {
     read_only: true,
@@ -163,6 +179,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     new_missing_any_normalized_geo_rows_24h: Number(postingRow.new_missing_any_normalized_geo_rows || 0),
     new_weak_unknown_remote_rows_24h: Number(postingRow.new_weak_unknown_remote_rows || 0),
     new_no_geo_no_remote_public_rows_24h: Number(postingRow.new_no_geo_no_remote_rows || 0),
+    quality_gate_sources_24h: qualityGateSources,
     rows_upserted_24h: Number(runRow.posting_upsert_count || 0),
     rejected_candidates_24h: Number(runRow.rejected_count || 0),
     failure_reason_counts_24h: failureSummary.failure_reason_counts,
@@ -176,6 +193,7 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
   const windowHours = Math.max(1, Math.min(168, Math.floor(Number(options.healthWindowHours || 24))));
   const windowStartEpoch = Math.max(0, nowEpoch - (windowHours * 3600));
   const failureGroupLimit = Math.max(25, Math.min(1000, Math.floor(Number(options.failureGroupLimit || 500))));
+  const qualityGateSourceLimit = Math.max(1, Math.min(100, Math.floor(Number(options.qualityGateSourceLimit || 25))));
   return {
     due: {
       values: [nowEpoch],
@@ -242,6 +260,67 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
         FROM postings;
       `
     },
+    qualityGateSources: {
+      values: [windowStartEpoch, qualityGateSourceLimit],
+      sql: `
+        SELECT
+          COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+          COUNT(*) FILTER (
+            WHERE (
+              NULLIF(btrim(country), '') IS NULL
+              OR NULLIF(btrim(region), '') IS NULL
+              OR NULLIF(btrim(city), '') IS NULL
+            )
+          )::int AS new_missing_any_normalized_geo_rows,
+          COUNT(*) FILTER (
+            WHERE (
+              NULLIF(btrim(remote_type), '') IS NULL
+              OR lower(btrim(remote_type)) IN ('unknown', 'unspecified', 'n/a', 'na', 'none')
+            )
+          )::int AS new_weak_unknown_remote_rows,
+          COUNT(*) FILTER (
+            WHERE NULLIF(btrim(country), '') IS NULL
+              AND NULLIF(btrim(region), '') IS NULL
+              AND NULLIF(btrim(city), '') IS NULL
+              AND (
+                NULLIF(btrim(remote_type), '') IS NULL
+                OR lower(btrim(remote_type)) IN ('unknown', 'unspecified', 'n/a', 'na', 'none')
+              )
+          )::int AS new_no_geo_no_remote_rows
+        FROM postings
+        WHERE hidden = false
+          AND COALESCE(first_seen_epoch, 0) >= $1
+        GROUP BY ats_key
+        HAVING
+          COUNT(*) FILTER (
+            WHERE NULLIF(btrim(country), '') IS NULL
+              AND NULLIF(btrim(region), '') IS NULL
+              AND NULLIF(btrim(city), '') IS NULL
+              AND (
+                NULLIF(btrim(remote_type), '') IS NULL
+                OR lower(btrim(remote_type)) IN ('unknown', 'unspecified', 'n/a', 'na', 'none')
+              )
+          ) > 0
+          OR COUNT(*) FILTER (
+            WHERE (
+              NULLIF(btrim(country), '') IS NULL
+              OR NULLIF(btrim(region), '') IS NULL
+              OR NULLIF(btrim(city), '') IS NULL
+            )
+          ) > 0
+          OR COUNT(*) FILTER (
+            WHERE (
+              NULLIF(btrim(remote_type), '') IS NULL
+              OR lower(btrim(remote_type)) IN ('unknown', 'unspecified', 'n/a', 'na', 'none')
+            )
+          ) > 0
+        ORDER BY new_no_geo_no_remote_rows DESC,
+          new_missing_any_normalized_geo_rows DESC,
+          new_weak_unknown_remote_rows DESC,
+          ats_key ASC
+        LIMIT $2;
+      `
+    },
     failures: {
       values: [windowStartEpoch, failureGroupLimit],
       sql: `
@@ -263,16 +342,18 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
 
 async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   const queries = buildPostgresDailySourceHealthQueries(options);
-  const [due, runs, postings, failures] = await Promise.all([
+  const [due, runs, postings, qualityGateSources, failures] = await Promise.all([
     pool.query(queries.due.sql, queries.due.values),
     pool.query(queries.runs.sql, queries.runs.values),
     pool.query(queries.postings.sql, queries.postings.values),
+    pool.query(queries.qualityGateSources.sql, queries.qualityGateSources.values),
     pool.query(queries.failures.sql, queries.failures.values)
   ]);
   return createDailySourceHealthSummary({
     dueRows: due.rows,
     runRows: runs.rows,
     postingRows: postings.rows,
+    qualityGateRows: qualityGateSources.rows,
     failureRows: failures.rows
   }, options);
 }
@@ -286,6 +367,10 @@ function printReport(report) {
     console.log(`Daily budget: ${health.daily_target_budget} targets / ${health.targets_per_run} per run`);
     console.log(`24h: ${health.targets_processed_24h} targets, ${health.target_success_pct_24h ?? "n/a"}% success, ${health.rows_seen_24h} rows seen, ${health.rows_new_24h} new rows`);
     console.log(`24h quality gate: ${health.new_no_geo_no_remote_public_rows_24h} new no_geo_no_remote public rows`);
+    const topQualitySource = (health.quality_gate_sources_24h || [])[0];
+    if (topQualitySource) {
+      console.log(`Top quality source: ${topQualitySource.ats_key} (${topQualitySource.new_no_geo_no_remote_public_rows_24h} no_geo_no_remote, ${topQualitySource.new_missing_any_normalized_geo_rows_24h} missing geo, ${topQualitySource.new_weak_unknown_remote_rows_24h} weak remote)`);
+    }
     console.log(`Due targets: ${health.targets_due}`);
   }
   console.table((report.items || []).slice(0, 25).map((item) => ({

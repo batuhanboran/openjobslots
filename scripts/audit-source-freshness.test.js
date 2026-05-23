@@ -35,6 +35,20 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
       new_weak_unknown_remote_rows: 3,
       new_no_geo_no_remote_rows: 2
     }],
+    qualityGateRows: [
+      {
+        ats_key: "applytojob",
+        new_missing_any_normalized_geo_rows: 4,
+        new_weak_unknown_remote_rows: 1,
+        new_no_geo_no_remote_rows: 2
+      },
+      {
+        ats_key: "breezy",
+        new_missing_any_normalized_geo_rows: 1,
+        new_weak_unknown_remote_rows: 1,
+        new_no_geo_no_remote_rows: 1
+      }
+    ],
     failureRows: [
       {
         ats_key: "breezy",
@@ -72,6 +86,12 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
   assert.equal(summary.new_missing_any_normalized_geo_rows_24h, 4);
   assert.equal(summary.new_weak_unknown_remote_rows_24h, 3);
   assert.equal(summary.new_no_geo_no_remote_public_rows_24h, 2);
+  assert.deepEqual(summary.quality_gate_sources_24h[0], {
+    ats_key: "applytojob",
+    new_missing_any_normalized_geo_rows_24h: 4,
+    new_weak_unknown_remote_rows_24h: 1,
+    new_no_geo_no_remote_public_rows_24h: 2
+  });
   assert.equal(summary.rejected_candidates_24h, 4);
   assert.deepEqual(summary.failure_reason_counts_24h, {
     empty_no_jobs: 5,
@@ -89,8 +109,11 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
   });
 
   assert.deepEqual(queries.postings.values, [1_799_913_600]);
+  assert.deepEqual(queries.qualityGateSources.values, [1_799_913_600, 25]);
   assert.match(queries.postings.sql, /first_seen_epoch/i);
   assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
+  assert.match(queries.qualityGateSources.sql, /GROUP BY ats_key/i);
+  assert.match(queries.qualityGateSources.sql, /new_no_geo_no_remote_rows/i);
   assert.match(queries.postings.sql, /NULLIF\(btrim\(country\), ''\) IS NULL/i);
   assert.match(queries.postings.sql, /remote_type.*unknown/i);
 });

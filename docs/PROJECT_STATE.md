@@ -2,6 +2,18 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Verified Current State - May 23, 2026
+
+This update supersedes the May 18 worker-gate numbers below for current reliability work.
+
+- Production was verified on `main` at `887a5575d140ea816ef9d0636e79eb25b0564914` before the current ApplyToJob quality-gate patch.
+- Worker budget is aligned at `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=2000` and `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=50`.
+- Read-only worker/source freshness snapshot: due targets about `22.6k`, 24h target success `81.95%`, recent 20-run trend `72.8%`, and throughput scaling decision `hold`.
+- Freshness is above the 1k/day target by volume (`29,912` rows seen in 24h and `19,012` new rows), but quality gates still block throughput increase.
+- New 24h `no_geo_no_remote` public rows were `40`: `39` ApplyToJob and `1` Breezy.
+- Current patch direction: keep throughput fixed, quarantine future ambiguous parenthesized/multi-state ApplyToJob rows, and use `audit:source-freshness` `quality_gate_sources_24h` to target the next parser/source-quality fix.
+- Remaining search-index drift is a single extra Meili document for a Lever demo placeholder title (`count_delta=-1`). Do not repair with delete/reindex without explicit approval.
+
 ## Verified Current State - May 18, 2026
 
 This section supersedes older v1.9.0 recovery notes below when the two conflict.

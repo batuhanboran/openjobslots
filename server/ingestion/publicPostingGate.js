@@ -120,11 +120,20 @@ function createEvidence(value, source, extra = {}) {
   };
 }
 
+function normalizeAmbiguousLocationText(locationText) {
+  return asLower(locationText)
+    .replace(/^[\s([{]+/, "")
+    .replace(/[\s)\]}]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function locationLooksAmbiguous(locationText, posting = {}) {
-  const location = asLower(locationText);
+  const location = normalizeAmbiguousLocationText(locationText);
   if (!location) return false;
   if (AMBIGUOUS_LOCATION_VALUES.has(location)) return true;
   if (/^(multiple|various)\b/.test(location)) return true;
+  if (/^(multiple|various)\s+(locations?|states?|countries?|cities?|regions?|areas?)\b/.test(location)) return true;
   if (/\b(multiple|various) locations?\b/.test(location)) return true;
   const country = asLower(posting.country);
   const region = asLower(posting.region || posting.state);
@@ -134,9 +143,8 @@ function locationLooksAmbiguous(locationText, posting = {}) {
 }
 
 function hasConcreteLocationText(locationText) {
-  const location = asLower(locationText);
-  if (!location || AMBIGUOUS_LOCATION_VALUES.has(location)) return false;
-  if (/^(multiple|various)\b/.test(location)) return false;
+  const location = normalizeAmbiguousLocationText(locationText);
+  if (!location || locationLooksAmbiguous(location)) return false;
   if (/\b(remote|anywhere|worldwide|global|work from home|wfh)\b/.test(location)) return false;
   return true;
 }

@@ -64,6 +64,20 @@ test("public posting gate quarantines ambiguous country-code-only locations", ()
   assert.ok(result.reason_codes.includes("ambiguous_location"));
 });
 
+test("public posting gate quarantines parenthesized multi-state locations without remote evidence", () => {
+  const result = evaluatePublicPosting(basePosting({
+    location_text: "(Multiple states)",
+    country: "",
+    region: "",
+    city: "",
+    remote_type: "unknown"
+  }));
+
+  assert.equal(result.status, "quarantined");
+  assert.ok(result.reason_codes.includes("ambiguous_location"));
+  assert.equal(hasUsefulGeoEvidence({ location_text: "(Multiple states)" }), false);
+});
+
 test("public posting gate accepts explicit remote and hybrid rows without geo", () => {
   const remote = evaluatePublicPosting(basePosting({
     position_name: "Remote Support Engineer",
