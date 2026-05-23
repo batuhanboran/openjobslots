@@ -16,6 +16,7 @@ const {
   buildThroughputScalingGate,
   buildWorkerBacklogQuery,
   classifyEmptyNoJobsSourceProbe,
+  isParserAttentionError,
   parseBacklogArgs,
   probeEmptyNoJobsTargets,
   runPostgresBacklogAudit,
@@ -29,6 +30,11 @@ const {
   summarizeParserDriftRecheck,
   summarizeBacklogRows
 } = require("./audit-worker-backlog");
+
+test("parser attention helper counts typed parser errors but excludes source-quality validation", () => {
+  assert.equal(isParserAttentionError("parser_adapter_not_implemented", "adapter missing"), true);
+  assert.equal(isParserAttentionError("parser_validation", "no_geo_no_remote"), false);
+});
 
 test("parseBacklogArgs accepts read-only backlog controls", () => {
   const options = parseBacklogArgs(["--json", "--limit", "5", "--now-epoch=1800000000", "--output=C:\\tmp\\backlog.json"]);
@@ -2200,7 +2206,8 @@ test("attachBacklogDiagnostics keeps source policy blocks out of parser attentio
   assert.deepEqual(withDiagnostics.diagnostics.error_taxonomy.parser_attention_types, [
     "parser_drift",
     "parser_validation",
-    "invalid_shape"
+    "invalid_shape",
+    "parser_adapter_not_implemented"
   ]);
 });
 

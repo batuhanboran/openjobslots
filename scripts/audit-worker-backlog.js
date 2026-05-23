@@ -19,7 +19,8 @@ const WORKER_FAILURE_REASON_TAXONOMY = Object.freeze([
 const PARSER_ATTENTION_ERROR_TYPES = Object.freeze([
   "parser_drift",
   "parser_validation",
-  "invalid_shape"
+  "invalid_shape",
+  "parser_adapter_not_implemented"
 ]);
 const LEGACY_PARSER_ATTENTION_ERROR_TYPES = Object.freeze([
   "parser_parse",
@@ -2995,6 +2996,7 @@ module.exports = {
   classifyEmptyNoJobsSourceProbe,
   classifyFailureReason,
   getFixtureCoverage,
+  isParserAttentionError,
   parseBacklogArgs,
   probeEmptyNoJobsTargets,
   runAudit,

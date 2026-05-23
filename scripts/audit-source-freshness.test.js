@@ -171,6 +171,21 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
     parser_bug_resolved_total: 2
   });
   assert.equal(summary.parser_drift_recheck_24h.current_policy_resolved_count, 2);
+  assert.equal(summary.parser_attention_count_24h, 4);
+  assert.equal(summary.parser_attention_current_policy_resolved_count_24h, 2);
+  assert.equal(summary.parser_attention_unresolved_count_24h, 2);
+  assert.equal(summary.parser_attention_status_24h, "unresolved");
+  assert.deepEqual(summary.parser_attention_sources_24h, [
+    {
+      ats_key: "bamboohr",
+      parser_attention_count_24h: 4,
+      current_policy_resolved_count_24h: 1,
+      unresolved_count_24h: 3,
+      by_type: {
+        parser_drift: 4
+      }
+    }
+  ]);
   assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.target_failure.parser_bug, 2);
   assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.target_failure.empty_no_jobs, 1);
   assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.posting_rejection.source_quality, 2);
@@ -181,6 +196,10 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
     minimum_success_rate_pct: 80,
     target_success_pct_24h: 80,
     new_no_geo_no_remote_public_rows_24h: 2,
+    parser_attention_count_24h: 4,
+    parser_attention_current_policy_resolved_count_24h: 2,
+    parser_attention_unresolved_count_24h: 2,
+    parser_attention_status_24h: "unresolved",
     current_policy_adjusted_failure_reason_counts_24h: {
       parser_bug: 2,
       empty_no_jobs: 6,
@@ -191,6 +210,13 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
         code: "new_no_geo_no_remote_public_rows_present",
         message: "24h public freshness introduced 2 no_geo_no_remote rows.",
         count: 2
+      },
+      {
+        code: "parser_attention_present",
+        message: "Parser attention unresolved count 2 is present in the 24h worker window.",
+        count: 2,
+        total_count: 4,
+        current_policy_resolved_count: 2
       },
       {
         code: "parser_bug_failures_present",
@@ -309,6 +335,7 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
   assert.deepEqual(queries.budgetUsage.values, [1_799_971_200]);
   assert.deepEqual(queries.dueByAts.values, [1_800_000_000, 25]);
   assert.deepEqual(queries.qualityGateSources.values, [1_799_913_600, 25]);
+  assert.deepEqual(queries.parserAttention.values, [1_799_913_600]);
   assert.deepEqual(queries.failureScopes.values, [24, []]);
   assert.deepEqual(queries.parserDriftRecheck.values, [24, [], 100]);
   assert.match(queries.postings.sql, /first_seen_epoch/i);
@@ -317,6 +344,9 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
   assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
   assert.match(queries.qualityGateSources.sql, /GROUP BY ats_key/i);
   assert.match(queries.qualityGateSources.sql, /new_no_geo_no_remote_rows/i);
+  assert.match(queries.parserAttention.sql, /ingestion_run_errors/i);
+  assert.match(queries.parserAttention.sql, /parser_drift/i);
+  assert.match(queries.parserAttention.sql, /parser_validation/i);
   assert.match(queries.failureScopes.sql, /posting_rejection/i);
   assert.match(queries.parserDriftRecheck.sql, /FROM parser_drift_events/i);
   assert.match(queries.postings.sql, /NULLIF\(btrim\(country\), ''\) IS NULL/i);

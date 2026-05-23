@@ -15,10 +15,21 @@ const {
   buildParserDriftRecheckQuery,
   buildRecentErrorScopeQuery,
   classifyFailureReason,
+  isParserAttentionError,
   summarizeFailureReasonCountsByScope,
   summarizeAutoSyncBudgetUsage,
   summarizeParserDriftRecheck
 } = require("./audit-worker-backlog");
+
+const PARSER_ATTENTION_QUERY_ERROR_TYPES = Object.freeze([
+  "parser_drift",
+  "parser_validation",
+  "invalid_shape",
+  "parser_adapter_not_implemented",
+  "parser_parse",
+  "parser_quarantine",
+  "parser_normalize"
+]);
 
 function parseArgs(argv = process.argv.slice(2)) {
   const options = {
@@ -198,6 +209,65 @@ function annotateCurrentPolicyFailureSources(topFailureSources = [], parserDrift
   });
 }
 
+function summarizeParserAttention(failureRows = [], parserDriftRecheck = {}) {
+  const bySource = new Map();
+  let parserAttentionCount = 0;
+  for (const row of Array.isArray(failureRows) ? failureRows : []) {
+    const atsKey = String(row?.ats_key || "unknown").trim().toLowerCase() || "unknown";
+    const errorType = String(row?.error_type || "unknown").trim().toLowerCase() || "unknown";
+    const errorMessage = String(row?.error_message || "");
+    const count = Number(row?.count || 0);
+    if (count <= 0 || !isParserAttentionError(errorType, errorMessage)) continue;
+    parserAttentionCount += count;
+    const current = bySource.get(atsKey) || {
+      ats_key: atsKey,
+      parser_attention_count_24h: 0,
+      by_type: {}
+    };
+    current.parser_attention_count_24h += count;
+    addCount(current.by_type, errorType, count);
+    bySource.set(atsKey, current);
+  }
+
+  const currentPolicyResolvedCount = Math.min(
+    parserAttentionCount,
+    Number(parserDriftRecheck?.current_policy_resolved_count || 0)
+  );
+  const unresolvedCount = Math.max(0, parserAttentionCount - currentPolicyResolvedCount);
+  const sources = Array.from(bySource.values())
+    .map((source) => {
+      const sourceRecheck = parserDriftRecheck?.by_source?.[source.ats_key] || {};
+      const sourceResolvedCount = Math.min(
+        Number(source.parser_attention_count_24h || 0),
+        Number(sourceRecheck.current_policy_resolved_count || 0)
+      );
+      return {
+        ats_key: source.ats_key,
+        parser_attention_count_24h: Number(source.parser_attention_count_24h || 0),
+        current_policy_resolved_count_24h: sourceResolvedCount,
+        unresolved_count_24h: Math.max(0, Number(source.parser_attention_count_24h || 0) - sourceResolvedCount),
+        by_type: sparsePositiveCounts(source.by_type)
+      };
+    })
+    .sort((left, right) =>
+      Number(right.unresolved_count_24h || 0) - Number(left.unresolved_count_24h || 0) ||
+      Number(right.parser_attention_count_24h || 0) - Number(left.parser_attention_count_24h || 0) ||
+      String(left.ats_key || "").localeCompare(String(right.ats_key || ""))
+    );
+
+  return {
+    parser_attention_count_24h: parserAttentionCount,
+    parser_attention_current_policy_resolved_count_24h: currentPolicyResolvedCount,
+    parser_attention_unresolved_count_24h: unresolvedCount,
+    parser_attention_status_24h: unresolvedCount > 0
+      ? "unresolved"
+      : parserAttentionCount > 0
+        ? "resolved_by_current_policy"
+        : "clean",
+    parser_attention_sources_24h: sources
+  };
+}
+
 function emptyQualityGatePressure() {
   return {
     new_missing_any_normalized_geo_rows_24h: 0,
@@ -367,6 +437,7 @@ function buildSourceRecoveryPriorities({
 function buildThroughputReadiness({
   targetSuccessPct = null,
   noGeoNoRemoteCount = 0,
+  parserAttention = {},
   adjustedFailureReasonCounts = {},
   minimumSuccessRatePct = 80
 } = {}) {
@@ -397,6 +468,20 @@ function buildThroughputReadiness({
     });
   }
 
+  const parserAttentionCount = Number(parserAttention.parser_attention_count_24h || 0);
+  const parserAttentionResolvedCount = Number(parserAttention.parser_attention_current_policy_resolved_count_24h || 0);
+  const parserAttentionUnresolvedCount = Number(parserAttention.parser_attention_unresolved_count_24h || 0);
+  const parserAttentionStatus = String(parserAttention.parser_attention_status_24h || "clean");
+  if (parserAttentionUnresolvedCount > 0) {
+    blockers.push({
+      code: "parser_attention_present",
+      message: `Parser attention unresolved count ${parserAttentionUnresolvedCount} is present in the 24h worker window.`,
+      count: parserAttentionUnresolvedCount,
+      total_count: parserAttentionCount,
+      current_policy_resolved_count: parserAttentionResolvedCount
+    });
+  }
+
   for (const reason of ["parser_bug", "source_quality", "empty_no_jobs", "rate_limit", "network", "auth", "unknown"]) {
     const count = Number(adjustedFailureReasonCounts?.[reason] || 0);
     if (count <= 0) continue;
@@ -416,6 +501,10 @@ function buildThroughputReadiness({
     minimum_success_rate_pct: minimumSuccessRatePct,
     target_success_pct_24h: successRate,
     new_no_geo_no_remote_public_rows_24h: unsafePublicRows,
+    parser_attention_count_24h: parserAttentionCount,
+    parser_attention_current_policy_resolved_count_24h: parserAttentionResolvedCount,
+    parser_attention_unresolved_count_24h: parserAttentionUnresolvedCount,
+    parser_attention_status_24h: parserAttentionStatus,
     current_policy_adjusted_failure_reason_counts_24h: sparsePositiveCounts(adjustedFailureReasonCounts),
     blockers,
     required_checks_before_increase: [
@@ -461,6 +550,8 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     failureSummary.top_failure_sources,
     parserDriftRecheck
   );
+  const parserAttentionRows = Array.isArray(rows.parserAttentionRows) ? rows.parserAttentionRows : (rows.failureRows || []);
+  const parserAttention = summarizeParserAttention(parserAttentionRows, parserDriftRecheck);
   const qualityGateSources = summarizeQualityGateSources(rows.qualityGateRows || []);
   const dueByAts = summarizeDueByAtsRows(rows.dueByAtsRows || []);
   const targetSuccessPct = pct(successCount, successCount + failureCount);
@@ -494,9 +585,11 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     current_policy_failure_adjustments_24h: adjustedFailureSummary.adjustments,
     current_policy_adjusted_failure_reason_counts_by_scope_24h: sparseFailureReasonCountsByScope(adjustedFailureCountsByScope),
     parser_drift_recheck_24h: parserDriftRecheck,
+    ...parserAttention,
     throughput_readiness: buildThroughputReadiness({
       targetSuccessPct,
       noGeoNoRemoteCount: Number(postingRow.new_no_geo_no_remote_rows || 0),
+      parserAttention,
       adjustedFailureReasonCounts: sparseAdjustedFailureCounts
     }),
     top_failure_sources: topFailureSources,
@@ -665,6 +758,22 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
         LIMIT $2;
       `
     },
+    parserAttention: {
+      values: [windowStartEpoch],
+      sql: `
+        SELECT
+          ats_key,
+          error_type,
+          COALESCE(http_status, 0)::int AS http_status,
+          COALESCE(error_message, '') AS error_message,
+          COUNT(*)::int AS count
+        FROM ingestion_run_errors
+        WHERE created_at >= to_timestamp($1)
+          AND lower(COALESCE(error_type, '')) = ANY(ARRAY[${PARSER_ATTENTION_QUERY_ERROR_TYPES.map((type) => `'${type}'`).join(", ")}]::text[])
+        GROUP BY ats_key, error_type, COALESCE(http_status, 0), COALESCE(error_message, '')
+        ORDER BY count DESC, ats_key ASC, error_type ASC;
+      `
+    },
     failures: {
       values: [windowStartEpoch, failureGroupLimit],
       sql: `
@@ -695,13 +804,14 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
 
 async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   const queries = buildPostgresDailySourceHealthQueries(options);
-  const [due, dueByAts, runs, budgetUsage, postings, qualityGateSources, failures, failureScopes, parserDriftRecheck] = await Promise.all([
+  const [due, dueByAts, runs, budgetUsage, postings, qualityGateSources, parserAttention, failures, failureScopes, parserDriftRecheck] = await Promise.all([
     pool.query(queries.due.sql, queries.due.values),
     pool.query(queries.dueByAts.sql, queries.dueByAts.values),
     pool.query(queries.runs.sql, queries.runs.values),
     pool.query(queries.budgetUsage.sql, queries.budgetUsage.values),
     pool.query(queries.postings.sql, queries.postings.values),
     pool.query(queries.qualityGateSources.sql, queries.qualityGateSources.values),
+    pool.query(queries.parserAttention.sql, queries.parserAttention.values),
     pool.query(queries.failures.sql, queries.failures.values),
     pool.query(queries.failureScopes.sql, queries.failureScopes.values),
     pool.query(queries.parserDriftRecheck.sql, queries.parserDriftRecheck.values)
@@ -713,6 +823,7 @@ async function getPostgresDailySourceHealthSummary(pool, options = {}) {
     budgetUsageRows: budgetUsage.rows,
     postingRows: postings.rows,
     qualityGateRows: qualityGateSources.rows,
+    parserAttentionRows: parserAttention.rows,
     failureRows: failures.rows,
     failureScopeRows: failureScopes.rows,
     parserDriftRecheckRows: parserDriftRecheck.rows
@@ -728,6 +839,7 @@ function printReport(report) {
     console.log(`Daily budget: ${health.daily_target_budget} targets / ${health.targets_per_run} per run`);
     console.log(`24h: ${health.targets_processed_24h} targets, ${health.target_success_pct_24h ?? "n/a"}% success, ${health.rows_seen_24h} rows seen, ${health.rows_new_24h} new rows`);
     console.log(`24h quality gate: ${health.new_no_geo_no_remote_public_rows_24h} new no_geo_no_remote public rows`);
+    console.log(`24h parser attention: ${health.parser_attention_unresolved_count_24h || 0} unresolved / ${health.parser_attention_count_24h || 0} total`);
     const topQualitySource = (health.quality_gate_sources_24h || [])[0];
     if (topQualitySource) {
       console.log(`Top quality source: ${topQualitySource.ats_key} (${topQualitySource.new_no_geo_no_remote_public_rows_24h} no_geo_no_remote, ${topQualitySource.new_missing_any_normalized_geo_rows_24h} missing geo, ${topQualitySource.new_weak_unknown_remote_rows_24h} weak remote)`);
