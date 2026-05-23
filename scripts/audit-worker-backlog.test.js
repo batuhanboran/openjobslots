@@ -1386,6 +1386,8 @@ test("buildThroughputScalingGate reports parser drift recheck context for partia
     sample_count: 100,
     still_drift_count: 0,
     current_policy_pass_count: 100,
+    current_policy_empty_no_jobs_count: 0,
+    current_policy_resolved_count: 100,
     skipped_no_baseline_count: 0
   });
   assert.ok(gate.cautions.some((item) => item.code === "parser_drift_current_policy_pass"));
@@ -1468,6 +1470,52 @@ test("summarizeParserDriftRecheck separates current-policy pass from real drift"
   assert.equal(report.by_source.applytojob.current_policy_pass_count, 1);
   assert.equal(report.by_source.breezy.still_drift_count, 1);
   assert.equal(report.by_source.breezy.skipped_no_baseline_count, 1);
+});
+
+test("summarizeParserDriftRecheck downgrades explicit empty job-list shapes", () => {
+  const report = summarizeParserDriftRecheck([
+    {
+      ats_key: "bamboohr",
+      stored_similarity: 0.2609,
+      baseline_shape_paths: [
+        "meta.totalCount:number",
+        "meta:object",
+        "result:array",
+        "result[]:object",
+        "result[].id:string",
+        "result[].jobOpeningName:string"
+      ],
+      observed_shape_paths: [
+        "meta.totalCount:number",
+        "meta:object",
+        "result:array",
+        "result[]:empty"
+      ]
+    },
+    {
+      ats_key: "ashby",
+      stored_similarity: 0.1852,
+      baseline_shape_paths: [
+        "apiVersion:string",
+        "jobs:array",
+        "jobs[]:object",
+        "jobs[].id:string",
+        "jobs[].title:string"
+      ],
+      observed_shape_paths: [
+        "apiVersion:string",
+        "jobs:array",
+        "jobs[]:empty"
+      ]
+    }
+  ], { parserDriftRecheckLimit: 50 });
+
+  assert.equal(report.sample_count, 2);
+  assert.equal(report.still_drift_count, 0);
+  assert.equal(report.current_policy_empty_no_jobs_count, 2);
+  assert.equal(report.current_policy_resolved_count, 2);
+  assert.equal(report.by_source.bamboohr.current_policy_empty_no_jobs_count, 1);
+  assert.equal(report.by_source.ashby.current_policy_empty_no_jobs_count, 1);
 });
 
 test("attachBacklogDiagnostics joins recent errors and fixture coverage without mutating totals", () => {

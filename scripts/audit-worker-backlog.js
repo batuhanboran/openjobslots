@@ -1289,10 +1289,14 @@ function selectGateLatestRun(latestRun = {}, recentRunTrendBySource = {}, target
 }
 
 function normalizeParserDriftRecheckForGate(value = {}) {
+  const currentPolicyPassCount = Number(value?.current_policy_pass_count || 0);
+  const currentPolicyEmptyNoJobsCount = Number(value?.current_policy_empty_no_jobs_count || 0);
   return {
     sample_count: Number(value?.sample_count || 0),
     still_drift_count: Number(value?.still_drift_count || 0),
-    current_policy_pass_count: Number(value?.current_policy_pass_count || 0),
+    current_policy_pass_count: currentPolicyPassCount,
+    current_policy_empty_no_jobs_count: currentPolicyEmptyNoJobsCount,
+    current_policy_resolved_count: Number(value?.current_policy_resolved_count || currentPolicyPassCount + currentPolicyEmptyNoJobsCount),
     skipped_no_baseline_count: Number(value?.skipped_no_baseline_count || 0)
   };
 }
@@ -1331,10 +1335,19 @@ function buildThroughputScalingGate({
   const parserAttentionTotal = Number(parserAttentionCount || 0);
   const parserBugTargetFailureCount = Number(targetFailureCounts?.parser_bug || 0);
   const parserDriftRecheckHasCoverage = parserDriftRecheckSummary.sample_count > 0;
-  const parserAttentionCurrentPolicyPassCount = parserDriftRecheckHasCoverage
-    ? Math.min(parserAttentionTotal, parserDriftRecheckSummary.current_policy_pass_count)
+  const parserAttentionCurrentPolicyResolvedCount = parserDriftRecheckHasCoverage
+    ? Math.min(parserAttentionTotal, parserDriftRecheckSummary.current_policy_resolved_count)
     : 0;
-  const parserAttentionUnresolvedCount = Math.max(0, parserAttentionTotal - parserAttentionCurrentPolicyPassCount);
+  const parserAttentionCurrentPolicyPassCount = parserDriftRecheckHasCoverage
+    ? Math.min(parserAttentionCurrentPolicyResolvedCount, parserDriftRecheckSummary.current_policy_pass_count)
+    : 0;
+  const parserAttentionCurrentPolicyEmptyNoJobsCount = parserDriftRecheckHasCoverage
+    ? Math.min(
+        Math.max(0, parserAttentionCurrentPolicyResolvedCount - parserAttentionCurrentPolicyPassCount),
+        parserDriftRecheckSummary.current_policy_empty_no_jobs_count
+      )
+    : 0;
+  const parserAttentionUnresolvedCount = Math.max(0, parserAttentionTotal - parserAttentionCurrentPolicyResolvedCount);
   const parserAttentionStatus = parserAttentionTotal <= parserAttentionThreshold
     ? "none"
     : !parserDriftRecheckHasCoverage
@@ -1348,9 +1361,9 @@ function buildThroughputScalingGate({
     parserDriftRecheckSummary.still_drift_count === 0 &&
     parserDriftRecheckSummary.skipped_no_baseline_count === 0;
   const parserAttentionFullyRechecked = parserDriftFullyCurrentPolicyPass &&
-    parserDriftRecheckSummary.current_policy_pass_count >= parserAttentionTotal;
+    parserDriftRecheckSummary.current_policy_resolved_count >= parserAttentionTotal;
   const parserBugFailuresFullyRechecked = parserDriftFullyCurrentPolicyPass &&
-    parserDriftRecheckSummary.current_policy_pass_count >= parserBugTargetFailureCount;
+    parserDriftRecheckSummary.current_policy_resolved_count >= parserBugTargetFailureCount;
 
   if (!Number(latestRun.latest_run_id || 0) || Number(latestRun.total_targets || 0) <= 0 || successRatePct == null) {
     blockers.push({
@@ -1390,6 +1403,16 @@ function buildThroughputScalingGate({
     });
   }
 
+  if (parserDriftRecheckHasCoverage && parserDriftRecheckSummary.current_policy_empty_no_jobs_count > 0) {
+    cautions.push({
+      code: "parser_drift_current_policy_empty_no_jobs",
+      message: `Parser drift recheck matched explicit empty job-list shape for ${parserDriftRecheckSummary.current_policy_empty_no_jobs_count} sampled events.`,
+      count: parserDriftRecheckSummary.current_policy_empty_no_jobs_count,
+      still_drift_count: parserDriftRecheckSummary.still_drift_count,
+      skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count
+    });
+  }
+
   if (parserAttentionUnresolvedCount > parserAttentionThreshold && !parserAttentionFullyRechecked) {
     blockers.push({
       code: "parser_attention_present",
@@ -1397,9 +1420,11 @@ function buildThroughputScalingGate({
       count: parserAttentionUnresolvedCount,
       total_count: parserAttentionTotal,
       current_policy_pass_count: parserDriftRecheckSummary.current_policy_pass_count,
+      current_policy_empty_no_jobs_count: parserDriftRecheckSummary.current_policy_empty_no_jobs_count,
+      current_policy_resolved_count: parserDriftRecheckSummary.current_policy_resolved_count,
       still_drift_count: parserDriftRecheckSummary.still_drift_count,
       skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count,
-      unrechecked_or_non_drift_count: Math.max(0, parserAttentionTotal - parserDriftRecheckSummary.current_policy_pass_count)
+      unrechecked_or_non_drift_count: Math.max(0, parserAttentionTotal - parserDriftRecheckSummary.current_policy_resolved_count)
     });
   }
 
@@ -1409,7 +1434,7 @@ function buildThroughputScalingGate({
     if (count > 0) {
       if (reason === "parser_bug" && parserBugFailuresFullyRechecked) continue;
       const blockerCount = reason === "parser_bug"
-        ? Math.max(0, count - Math.min(count, parserDriftRecheckSummary.current_policy_pass_count))
+        ? Math.max(0, count - Math.min(count, parserDriftRecheckSummary.current_policy_resolved_count))
         : count;
       if (blockerCount <= 0) continue;
       blockers.push({
@@ -1420,9 +1445,11 @@ function buildThroughputScalingGate({
         ...(reason === "parser_bug"
           ? {
               current_policy_pass_count: parserDriftRecheckSummary.current_policy_pass_count,
+              current_policy_empty_no_jobs_count: parserDriftRecheckSummary.current_policy_empty_no_jobs_count,
+              current_policy_resolved_count: parserDriftRecheckSummary.current_policy_resolved_count,
               still_drift_count: parserDriftRecheckSummary.still_drift_count,
               skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count,
-              unrechecked_or_non_drift_count: Math.max(0, count - parserDriftRecheckSummary.current_policy_pass_count)
+              unrechecked_or_non_drift_count: Math.max(0, count - parserDriftRecheckSummary.current_policy_resolved_count)
             }
           : {})
       });
@@ -1464,6 +1491,8 @@ function buildThroughputScalingGate({
     minimum_trend_target_count: minimumTrendTargetCount,
     parser_attention_count: parserAttentionTotal,
     parser_attention_current_policy_pass_count: parserAttentionCurrentPolicyPassCount,
+    parser_attention_current_policy_empty_no_jobs_count: parserAttentionCurrentPolicyEmptyNoJobsCount,
+    parser_attention_current_policy_resolved_count: parserAttentionCurrentPolicyResolvedCount,
     parser_attention_unresolved_count: parserAttentionUnresolvedCount,
     parser_attention_status: parserAttentionStatus,
     parser_attention_threshold: parserAttentionThreshold,
@@ -1562,11 +1591,37 @@ function shapePathsFromRowValue(value) {
   return [];
 }
 
+function emptyArrayPathStem(path) {
+  const match = String(path || "").match(/^(.*)\[\]:empty$/);
+  return match ? match[1] : "";
+}
+
+function isJobListArrayStem(stem) {
+  const leaf = String(stem || "").split(".").pop().toLowerCase();
+  return /^(jobs?|postings?|positions?|openings?|offers?|result|items|records)$/.test(leaf);
+}
+
+function hasPopulatedArrayItemShape(paths = [], stem = "") {
+  return (Array.isArray(paths) ? paths : []).some((path) =>
+    String(path || "").startsWith(`${stem}[]:`) && String(path || "") !== `${stem}[]:empty`
+  );
+}
+
+function hasExplicitEmptyJobListShape(paths = []) {
+  const shapePaths = Array.isArray(paths) ? paths : [];
+  const emptyJobListStems = shapePaths
+    .map(emptyArrayPathStem)
+    .filter((stem) => stem && isJobListArrayStem(stem));
+  return emptyJobListStems.some((stem) => !hasPopulatedArrayItemShape(shapePaths, stem));
+}
+
 function createParserDriftRecheckSourceSummary() {
   return {
     sample_count: 0,
     still_drift_count: 0,
     current_policy_pass_count: 0,
+    current_policy_empty_no_jobs_count: 0,
+    current_policy_resolved_count: 0,
     skipped_no_baseline_count: 0
   };
 }
@@ -1580,6 +1635,8 @@ function summarizeParserDriftRecheck(rows = [], options = {}) {
     sample_count: 0,
     still_drift_count: 0,
     current_policy_pass_count: 0,
+    current_policy_empty_no_jobs_count: 0,
+    current_policy_resolved_count: 0,
     skipped_no_baseline_count: 0,
     by_source: {}
   };
@@ -1594,6 +1651,13 @@ function summarizeParserDriftRecheck(rows = [], options = {}) {
 
     const baselineShapePaths = shapePathsFromRowValue(row.baseline_shape_paths);
     const observedShapePaths = shapePathsFromRowValue(row.observed_shape_paths || row.shape_paths);
+    if (hasExplicitEmptyJobListShape(observedShapePaths)) {
+      summary.current_policy_empty_no_jobs_count += 1;
+      summary.current_policy_resolved_count += 1;
+      source.current_policy_empty_no_jobs_count += 1;
+      source.current_policy_resolved_count += 1;
+      continue;
+    }
     if (baselineShapePaths.length === 0) {
       summary.skipped_no_baseline_count += 1;
       source.skipped_no_baseline_count += 1;
@@ -1610,7 +1674,9 @@ function summarizeParserDriftRecheck(rows = [], options = {}) {
       source.still_drift_count += 1;
     } else {
       summary.current_policy_pass_count += 1;
+      summary.current_policy_resolved_count += 1;
       source.current_policy_pass_count += 1;
+      source.current_policy_resolved_count += 1;
     }
   }
 
