@@ -15,6 +15,7 @@ This update supersedes the May 18 worker-gate numbers below for current reliabil
 - Worker failure taxonomy is being tightened before throughput increases: explicit empty job-list payloads are now `empty_no_jobs` instead of parser drift for sources such as BambooHR/Ashby.
 - Worker backlog diagnostics recheck old parser-drift events against current policy and now report empty job-list shapes as `current_policy_empty_no_jobs_count` / `current_policy_resolved_count`, instead of leaving BambooHR/Ashby empty-board samples as unresolved parser bugs.
 - Worker backlog diagnostics now expose raw and current-policy adjusted failure buckets, including `parser_drift_recheck_adjustments`, so the daily report can separate historical parser-drift noise from unresolved parser bugs.
+- Targeted worker diagnostics now expose whether requested ATS keys were included in the latest worker run and rank recovery priorities by current-policy parser bugs, source-quality failures, due backlog, and failure pressure.
 - `audit:source-freshness` `quality_gate_sources_24h` should be used after the next worker run to measure ApplyToJob/Breezy post-patch impact before any throughput increase.
 - Remaining search-index drift is a single extra Meili document for a Lever demo placeholder title (`count_delta=-1`). Do not repair with delete/reindex without explicit approval.
 

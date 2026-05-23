@@ -1345,6 +1345,187 @@ function selectGateLatestRun(latestRun = {}, recentRunTrendBySource = {}, target
   };
 }
 
+function summarizeTargetAtsPatchEffect({
+  targetAtsKeys = [],
+  latestRun = {},
+  latestRunBySource = {},
+  recentRunTrendBySource = {}
+} = {}) {
+  const targets = normalizeTargetAtsKeys(targetAtsKeys);
+  const latestRunId = Number(latestRun.latest_run_id || 0);
+  const sources = targets.map((atsKey) => {
+    const latestSourceRun = latestRunBySource[atsKey] || emptyLatestRunBySourceSummary(latestRunId);
+    const recentTrend = recentRunTrendBySource[atsKey] || null;
+    const latestSourceRunId = Number(latestSourceRun.latest_run_id || 0);
+    const latestRunTotalTargets = Number(latestSourceRun.total_targets || 0);
+    const measuredInLatestRun = latestRunId > 0 &&
+      latestSourceRunId === latestRunId &&
+      latestRunTotalTargets > 0;
+    return {
+      ats_key: atsKey,
+      latest_run_id: latestRunId,
+      latest_source_run_id: latestSourceRunId,
+      latest_run_total_targets: latestRunTotalTargets,
+      latest_run_success_count: Number(latestSourceRun.success_count || 0),
+      latest_run_failure_count: Number(latestSourceRun.failure_count || 0),
+      latest_run_success_rate_pct: latestSourceRun.success_rate_pct ?? null,
+      recent_run_total_targets: Number(recentTrend?.total_targets || 0),
+      recent_run_success_rate_pct: recentTrend?.success_rate_pct ?? null,
+      measured_in_latest_run: measuredInLatestRun,
+      status: measuredInLatestRun ? "measured_in_latest_run" : "pending_new_worker_run",
+      next_action: measuredInLatestRun
+        ? "Use latest-run source success and failure taxonomy before changing throughput."
+        : "Wait for a new worker run that includes this ATS before judging the patch effect."
+    };
+  });
+  const allTargetsMeasured = sources.length > 0 && sources.every((source) => source.measured_in_latest_run);
+  return {
+    read_only: true,
+    latest_run_id: latestRunId,
+    target_ats_keys: targets,
+    source_count: sources.length,
+    all_targets_measured_in_latest_run: allTargetsMeasured,
+    status: targets.length === 0
+      ? "not_scoped"
+      : allTargetsMeasured
+        ? "measured_in_latest_run"
+        : "pending_new_worker_run",
+    next_action: targets.length === 0
+      ? "Run diagnostics with --targets=<ats_key,...> to measure a specific parser or source patch."
+      : allTargetsMeasured
+        ? "Compare latest-run source success, failures, and quality-gate output before any throughput change."
+        : "Hold throughput until the target ATS appears in a completed worker run.",
+    sources
+  };
+}
+
+function failureReasonCountsFromRecentErrorSummary(summary = {}) {
+  const counts = createFailureReasonCounts();
+  for (const bucket of FAILURE_REASON_BUCKETS) {
+    counts[bucket] = Number(summary?.by_reason?.[bucket] || summary?.[`${bucket}_count`] || 0);
+  }
+  return counts;
+}
+
+function priorityLaneForFailureCounts(counts = {}) {
+  if (Number(counts.parser_bug || 0) > 0) return "parser_bug";
+  if (Number(counts.source_quality || 0) > 0) return "source_quality";
+  if (
+    Number(counts.rate_limit || 0) > 0 ||
+    Number(counts.network || 0) > 0 ||
+    Number(counts.auth || 0) > 0 ||
+    Number(counts.unknown || 0) > 0
+  ) return "stability";
+  if (Number(counts.empty_no_jobs || 0) > 0) return "empty_no_jobs_cleanup";
+  return "healthy_or_no_recent_failures";
+}
+
+function priorityLaneRank(lane) {
+  switch (lane) {
+    case "parser_bug":
+      return 0;
+    case "source_quality":
+      return 1;
+    case "stability":
+      return 2;
+    case "empty_no_jobs_cleanup":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function buildWorkerSuccessRecoveryPriorities({
+  items = [],
+  recentByAts = new Map(),
+  recentRunTrendBySource = {},
+  parserDriftRecheck = {},
+  options = {}
+} = {}) {
+  const limit = Math.max(1, Math.min(50, Math.floor(Number(options.workerSuccessPriorityLimit || 10))));
+  const minimumSuccessRatePct = Number.isFinite(Number(options.minimumSuccessRatePct))
+    ? Number(options.minimumSuccessRatePct)
+    : 80;
+  const parserDriftBySource = parserDriftRecheck?.by_source || {};
+  const sources = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const atsKey = String(item?.ats_key || "").trim().toLowerCase();
+    if (!atsKey) continue;
+    const rawFailureCounts = failureReasonCountsFromRecentErrorSummary(recentByAts.get(atsKey) || {});
+    const adjusted = adjustFailureReasonCountsForParserDriftRecheck(rawFailureCounts, parserDriftBySource[atsKey] || {});
+    const adjustedCounts = adjusted.counts;
+    const recentTrend = recentRunTrendBySource[atsKey] || null;
+    const recentSuccessRate = recentTrend?.success_rate_pct ?? null;
+    const runnableDueCount = Number(item.runnable_due_count || item.due_count || 0);
+    const failurePressure = Number(item.failure_pressure || 0);
+    const actionableFailureCount =
+      Number(adjustedCounts.parser_bug || 0) +
+      Number(adjustedCounts.source_quality || 0) +
+      Number(adjustedCounts.rate_limit || 0) +
+      Number(adjustedCounts.network || 0) +
+      Number(adjustedCounts.auth || 0) +
+      Number(adjustedCounts.unknown || 0);
+    const lane = priorityLaneForFailureCounts(adjustedCounts);
+    const reasons = [];
+    if (Number(adjustedCounts.parser_bug || 0) > 0) reasons.push("real_parser_bug");
+    if (Number(adjustedCounts.source_quality || 0) > 0) reasons.push("source_quality");
+    if (Number(adjustedCounts.rate_limit || 0) > 0) reasons.push("rate_limit");
+    if (Number(adjustedCounts.network || 0) > 0) reasons.push("network");
+    if (Number(adjustedCounts.auth || 0) > 0) reasons.push("auth");
+    if (Number(adjustedCounts.unknown || 0) > 0) reasons.push("unknown");
+    if (Number(adjustedCounts.empty_no_jobs || 0) > 0) reasons.push("empty_no_jobs_cleanup");
+    if (recentSuccessRate != null && recentSuccessRate < minimumSuccessRatePct) reasons.push("low_success_rate");
+    if (failurePressure > 0) reasons.push("failure_pressure");
+    if (runnableDueCount > 0) reasons.push("due_backlog");
+    if (reasons.length === 0) continue;
+
+    const nextAction = lane === "parser_bug"
+      ? "Add or update raw fixtures and fix the parser before counting this source as scalable."
+      : lane === "source_quality"
+        ? "Review source evidence and quality-gate rejects; do not relax thresholds or invent missing fields."
+        : lane === "stability"
+          ? "Separate rate-limit, network, and auth handling before increasing target volume."
+          : lane === "empty_no_jobs_cleanup"
+            ? "Audit stale or empty boards so worker slots are not spent on no-job targets."
+            : "Keep monitoring; no active failure lane is dominant.";
+
+    sources.push({
+      ats_key: atsKey,
+      priority_lane: lane,
+      lane_rank: priorityLaneRank(lane),
+      runnable_due_count: runnableDueCount,
+      failure_pressure: failurePressure,
+      recent_run_total_targets: Number(recentTrend?.total_targets || 0),
+      recent_run_success_rate_pct: recentSuccessRate,
+      current_policy_adjusted_failure_reason_counts: adjustedCounts,
+      parser_drift_recheck_adjustments: adjusted.adjustments,
+      actionable_failure_count: actionableFailureCount,
+      empty_no_jobs_count: Number(adjustedCounts.empty_no_jobs || 0),
+      reasons,
+      next_action: nextAction
+    });
+  }
+
+  sources.sort((left, right) =>
+    left.lane_rank - right.lane_rank ||
+    Number(right.failure_pressure || 0) - Number(left.failure_pressure || 0) ||
+    Number(right.current_policy_adjusted_failure_reason_counts?.parser_bug || 0) -
+      Number(left.current_policy_adjusted_failure_reason_counts?.parser_bug || 0) ||
+    Number(right.actionable_failure_count || 0) - Number(left.actionable_failure_count || 0) ||
+    Number(right.runnable_due_count || 0) - Number(left.runnable_due_count || 0) ||
+    String(left.ats_key || "").localeCompare(String(right.ats_key || ""))
+  );
+
+  return {
+    read_only: true,
+    minimum_success_rate_pct: minimumSuccessRatePct,
+    source_count: sources.length,
+    prioritization: "parser_bug lane first, then source_quality, stability, and empty/no-jobs cleanup; ties use failure pressure, adjusted parser bugs, actionable failures, and runnable due.",
+    sources: sources.slice(0, limit)
+  };
+}
+
 function normalizeParserDriftRecheckForGate(value = {}) {
   const currentPolicyPassCount = Number(value?.current_policy_pass_count || 0);
   const currentPolicyEmptyNoJobsCount = Number(value?.current_policy_empty_no_jobs_count || 0);
@@ -2378,6 +2559,19 @@ function attachBacklogDiagnostics(report, options = {}) {
     parserDriftRecheck
   );
   const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], options);
+  const targetAtsPatchEffect = summarizeTargetAtsPatchEffect({
+    targetAtsKeys,
+    latestRun,
+    latestRunBySource,
+    recentRunTrendBySource
+  });
+  const workerSuccessRecoveryPriorities = buildWorkerSuccessRecoveryPriorities({
+    items: report.items || [],
+    recentByAts,
+    recentRunTrendBySource,
+    parserDriftRecheck,
+    options
+  });
   const gateLatestRun = selectGateLatestRun(latestRun, recentRunTrendBySource, targetAtsKeys);
   const gateRecentRunTrend = selectGateRecentRunTrend(recentRunTrend, recentRunTrendBySource, targetAtsKeys);
   const throughputScalingGate = buildThroughputScalingGate({
@@ -2408,6 +2602,8 @@ function attachBacklogDiagnostics(report, options = {}) {
       recent_run_trend: recentRunTrend,
       recent_run_trend_by_source: recentRunTrendBySource,
       latest_run_by_source: latestRunBySource,
+      target_ats_patch_effect: targetAtsPatchEffect,
+      worker_success_recovery_priorities: workerSuccessRecoveryPriorities,
       auto_sync_budget_usage: autoSyncBudgetUsage,
       parser_drift_recheck: parserDriftRecheck,
       target_failure_pressure: targetFailurePressure,

@@ -1309,6 +1309,166 @@ test("attachBacklogDiagnostics uses source-specific trend for target-scoped gate
   assert.ok(report.diagnostics.throughput_scaling_gate.blockers.some((item) => item.code === "recent_run_success_rate_below_threshold"));
 });
 
+test("attachBacklogDiagnostics marks target patch effect pending until the latest run covers those ATS", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "applytojob",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 80,
+      runnable_due_count: 80,
+      failure_pressure: 10,
+      failing_due_count: 10
+    },
+    {
+      ats_key: "breezy",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 70,
+      runnable_due_count: 70,
+      failure_pressure: 20,
+      failing_due_count: 20
+    }
+  ]);
+
+  const report = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      targetAtsKeys: ["applytojob", "breezy"],
+      latestRunRows: [
+        { id: 300, status: "completed", total_targets: 2, success_count: 2, failure_count: 0 }
+      ],
+      latestRunBySourceRows: [
+        { latest_run_id: 300, ats_key: "lever", success_count: 2, failure_count: 0 }
+      ],
+      recentRunTrendBySourceRows: [
+        { run_id: 299, status: "completed_with_errors", ats_key: "applytojob", total_targets: 10, success_count: 7, failure_count: 3 },
+        { run_id: 298, status: "completed_with_errors", ats_key: "breezy", total_targets: 10, success_count: 5, failure_count: 5 }
+      ]
+    }
+  );
+
+  assert.equal(report.diagnostics.target_ats_patch_effect.status, "pending_new_worker_run");
+  assert.equal(report.diagnostics.target_ats_patch_effect.latest_run_id, 300);
+  assert.equal(report.diagnostics.target_ats_patch_effect.all_targets_measured_in_latest_run, false);
+  assert.deepEqual(
+    report.diagnostics.target_ats_patch_effect.sources.map((source) => ({
+      ats_key: source.ats_key,
+      measured_in_latest_run: source.measured_in_latest_run,
+      status: source.status,
+      recent_run_success_rate_pct: source.recent_run_success_rate_pct
+    })),
+    [
+      {
+        ats_key: "applytojob",
+        measured_in_latest_run: false,
+        status: "pending_new_worker_run",
+        recent_run_success_rate_pct: 70
+      },
+      {
+        ats_key: "breezy",
+        measured_in_latest_run: false,
+        status: "pending_new_worker_run",
+        recent_run_success_rate_pct: 50
+      }
+    ]
+  );
+});
+
+test("attachBacklogDiagnostics ranks success-rate recovery priorities with current-policy parser adjustments", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "applytojob",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 90,
+      runnable_due_count: 90,
+      failure_pressure: 40,
+      failing_due_count: 40
+    },
+    {
+      ats_key: "breezy",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 95,
+      runnable_due_count: 95,
+      failure_pressure: 60,
+      failing_due_count: 60
+    },
+    {
+      ats_key: "hrmdirect",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 85,
+      runnable_due_count: 85,
+      failure_pressure: 20,
+      failing_due_count: 20
+    }
+  ]);
+
+  const report = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      recentErrorRows: [
+        { ats_key: "applytojob", error_type: "parser_drift", error_message: "parser drift detected", count: 5 },
+        { ats_key: "breezy", error_type: "parser_drift", error_message: "parser drift detected", count: 4 },
+        { ats_key: "breezy", error_type: "no_jobs", error_message: "Breezy public portal returned no parseable postings", count: 20 },
+        { ats_key: "hrmdirect", error_type: "parser_validation", error_message: "no_geo_no_remote", count: 30 }
+      ],
+      recentRunTrendBySourceRows: [
+        { run_id: 300, status: "completed_with_errors", ats_key: "applytojob", total_targets: 20, success_count: 12, failure_count: 8 },
+        { run_id: 300, status: "completed_with_errors", ats_key: "breezy", total_targets: 20, success_count: 10, failure_count: 10 },
+        { run_id: 300, status: "completed_with_errors", ats_key: "hrmdirect", total_targets: 20, success_count: 18, failure_count: 2 }
+      ],
+      parserDriftRecheckRows: [
+        {
+          ats_key: "applytojob",
+          baseline_shape_paths: ["html:string", "__detailHtmlByUrl.first:string"],
+          observed_shape_paths: ["html:string", "__detailHtmlByUrl.second:string"]
+        },
+        {
+          ats_key: "applytojob",
+          baseline_shape_paths: ["html:string", "__detailHtmlByUrl.first:string"],
+          observed_shape_paths: ["html:string", "__detailHtmlByUrl.third:string"]
+        },
+        {
+          ats_key: "breezy",
+          baseline_shape_paths: ["jobs:array", "jobs[]:object", "jobs[].id:string"],
+          observed_shape_paths: ["jobs:array", "jobs[]:empty"]
+        }
+      ]
+    }
+  );
+
+  const priorities = report.diagnostics.worker_success_recovery_priorities.sources;
+  const applytojob = priorities.find((source) => source.ats_key === "applytojob");
+  const breezy = priorities.find((source) => source.ats_key === "breezy");
+  const hrmdirect = priorities.find((source) => source.ats_key === "hrmdirect");
+
+  assert.equal(priorities[0].ats_key, "breezy");
+  assert.equal(applytojob.current_policy_adjusted_failure_reason_counts.parser_bug, 3);
+  assert.equal(applytojob.current_policy_adjusted_failure_reason_counts.empty_no_jobs, 0);
+  assert.equal(breezy.current_policy_adjusted_failure_reason_counts.parser_bug, 3);
+  assert.equal(breezy.current_policy_adjusted_failure_reason_counts.empty_no_jobs, 21);
+  assert.equal(hrmdirect.priority_lane, "source_quality");
+  assert.ok(applytojob.reasons.includes("real_parser_bug"));
+  assert.ok(breezy.reasons.includes("empty_no_jobs_cleanup"));
+  assert.ok(hrmdirect.reasons.includes("source_quality"));
+});
+
 test("buildThroughputScalingGate allows only small increase after clean worker evidence", () => {
   const gate = buildThroughputScalingGate({
     latestRun: {
