@@ -911,6 +911,46 @@ test("buildThroughputScalingGate holds scaling when recent run trend is below th
   assert.ok(gate.blockers.some((item) => item.code === "recent_run_success_rate_below_threshold"));
 });
 
+test("attachBacklogDiagnostics uses source-specific trend for target-scoped gate", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "breezy",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 80,
+      runnable_due_count: 80,
+      failure_pressure: 0,
+      failing_due_count: 0
+    }
+  ]);
+
+  const report = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      targetAtsKeys: ["breezy"],
+      latestRunRows: [
+        { id: 300, status: "completed", total_targets: 10, success_count: 10, failure_count: 0 }
+      ],
+      recentRunTrendRows: [
+        { id: 300, status: "completed", total_targets: 100, success_count: 90, failure_count: 10 }
+      ],
+      recentRunTrendBySourceRows: [
+        { run_id: 300, status: "completed", ats_key: "breezy", total_targets: 50, success_count: 25, failure_count: 25 }
+      ]
+    }
+  );
+
+  assert.equal(report.diagnostics.throughput_scaling_gate.recent_run_scope, "target_sources");
+  assert.equal(report.diagnostics.throughput_scaling_gate.recent_run_success_rate_pct, 50);
+  assert.equal(report.diagnostics.throughput_scaling_gate.recent_run_total_targets, 50);
+  assert.ok(report.diagnostics.throughput_scaling_gate.blockers.some((item) => item.code === "recent_run_success_rate_below_threshold"));
+});
+
 test("buildThroughputScalingGate allows only small increase after clean worker evidence", () => {
   const gate = buildThroughputScalingGate({
     latestRun: {

@@ -1136,6 +1136,119 @@ function summarizeLatestRunBySourceRows(rows = []) {
   return bySource;
 }
 
+function calculateSuccessRate(successCount, totalTargets) {
+  return totalTargets > 0
+    ? Number(((successCount / totalTargets) * 100).toFixed(2))
+    : null;
+}
+
+function normalizeTargetAtsKeys(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((item) => String(item || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function selectGateRecentRunTrend(recentRunTrend = {}, recentRunTrendBySource = {}, targetAtsKeys = []) {
+  const targets = normalizeTargetAtsKeys(targetAtsKeys);
+  if (targets.length === 0) {
+    return {
+      ...recentRunTrend,
+      scope: "all_runs"
+    };
+  }
+
+  const selectedSources = targets
+    .map((atsKey) => recentRunTrendBySource[atsKey])
+    .filter(Boolean);
+  const totals = selectedSources.reduce((acc, source) => {
+    acc.total_targets += Number(source.total_targets || 0);
+    acc.success_count += Number(source.success_count || 0);
+    acc.failure_count += Number(source.failure_count || 0);
+    for (const run of Array.isArray(source.runs) ? source.runs : []) {
+      acc.run_ids.add(Number(run.run_id || 0));
+      acc.runs.push({ ...run });
+    }
+    return acc;
+  }, {
+    total_targets: 0,
+    success_count: 0,
+    failure_count: 0,
+    run_ids: new Set(),
+    runs: []
+  });
+
+  totals.runs.sort((left, right) => Number(right.run_id || 0) - Number(left.run_id || 0));
+  return {
+    read_only: true,
+    scope: "target_sources",
+    recent_run_limit: Number(recentRunTrend.recent_run_limit || selectedSources[0]?.recent_run_limit || 0),
+    target_ats_keys: targets,
+    source_count: selectedSources.length,
+    run_count: totals.run_ids.size,
+    total_targets: totals.total_targets,
+    success_count: totals.success_count,
+    failure_count: totals.failure_count,
+    success_rate_pct: calculateSuccessRate(totals.success_count, totals.total_targets),
+    failure_rate_pct: calculateSuccessRate(totals.failure_count, totals.total_targets),
+    runs: totals.runs
+  };
+}
+
+function selectGateLatestRun(latestRun = {}, recentRunTrendBySource = {}, targetAtsKeys = []) {
+  const targets = normalizeTargetAtsKeys(targetAtsKeys);
+  if (targets.length === 0) {
+    return {
+      ...latestRun,
+      scope: "all_runs"
+    };
+  }
+
+  const sourceRuns = [];
+  for (const atsKey of targets) {
+    const source = recentRunTrendBySource[atsKey];
+    for (const run of Array.isArray(source?.runs) ? source.runs : []) {
+      sourceRuns.push({ ...run, ats_key: atsKey });
+    }
+  }
+  if (sourceRuns.length === 0) {
+    return {
+      latest_run_id: Number(latestRun.latest_run_id || 0),
+      latest_status: "",
+      started_at_epoch: 0,
+      finished_at_epoch: 0,
+      total_targets: 0,
+      success_count: 0,
+      failure_count: 0,
+      success_rate_pct: null,
+      failure_rate_pct: null,
+      scope: "target_sources",
+      target_ats_keys: targets
+    };
+  }
+
+  const latestRunId = Math.max(...sourceRuns.map((run) => Number(run.run_id || 0)));
+  const latestSourceRuns = sourceRuns.filter((run) => Number(run.run_id || 0) === latestRunId);
+  const totalTargets = latestSourceRuns.reduce((sum, run) => sum + Number(run.total_targets || 0), 0);
+  const successCount = latestSourceRuns.reduce((sum, run) => sum + Number(run.success_count || 0), 0);
+  const failureCount = latestSourceRuns.reduce((sum, run) => sum + Number(run.failure_count || 0), 0);
+  const status = latestSourceRuns.some((run) => Number(run.failure_count || 0) > 0)
+    ? "completed_with_errors"
+    : String(latestSourceRuns[0]?.status || "");
+  return {
+    latest_run_id: latestRunId,
+    latest_status: status,
+    started_at_epoch: Math.min(...latestSourceRuns.map((run) => Number(run.started_at_epoch || 0))),
+    finished_at_epoch: Math.max(...latestSourceRuns.map((run) => Number(run.finished_at_epoch || 0))),
+    total_targets: totalTargets,
+    success_count: successCount,
+    failure_count: failureCount,
+    success_rate_pct: calculateSuccessRate(successCount, totalTargets),
+    failure_rate_pct: calculateSuccessRate(failureCount, totalTargets),
+    scope: "target_sources",
+    target_ats_keys: targets
+  };
+}
+
 function buildThroughputScalingGate({
   latestRun = {},
   recentRunTrend = {},
@@ -1238,8 +1351,10 @@ function buildThroughputScalingGate({
     allowed,
     decision: allowed ? "eligible_for_small_increase" : "hold",
     latest_run_id: Number(latestRun.latest_run_id || 0),
+    latest_run_scope: String(latestRun.scope || "all_runs"),
     latest_run_status: latestStatus,
     latest_run_success_rate_pct: successRatePct,
+    recent_run_scope: String(recentRunTrend.scope || "all_runs"),
     recent_run_success_rate_pct: recentRunSuccessRatePct,
     recent_run_total_targets: recentRunTotalTargets,
     minimum_success_rate_pct: minimumSuccessRatePct,
@@ -1589,9 +1704,11 @@ function attachBacklogDiagnostics(report, options = {}) {
   const recentRunTrendBySource = summarizeRecentRunTrendBySourceRows(options.recentRunTrendBySourceRows || [], options);
   const parserDriftRecheck = summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options);
   const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], options);
+  const gateLatestRun = selectGateLatestRun(latestRun, recentRunTrendBySource, targetAtsKeys);
+  const gateRecentRunTrend = selectGateRecentRunTrend(recentRunTrend, recentRunTrendBySource, targetAtsKeys);
   const throughputScalingGate = buildThroughputScalingGate({
-    latestRun,
-    recentRunTrend,
+    latestRun: gateLatestRun,
+    recentRunTrend: gateRecentRunTrend,
     parserAttentionCount,
     failureReasonCounts,
     targetFailureReasonCounts: failureReasonCountsByScope.target_failure,
