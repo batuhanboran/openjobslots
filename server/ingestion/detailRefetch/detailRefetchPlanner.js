@@ -11,11 +11,13 @@ const {
 } = require("../posting");
 const {
   buildApplitrackDetailUrl,
-  extractApplitrackDetailFields,
+  extractApplitrackDetailFields
+} = require("../sources/applitrack/parse");
+const {
   extractIcimsLocationFromHtml,
   extractIcimsPostingDateFromHtml,
   extractIcimsRemoteTypeFromHtml
-} = require("../../index");
+} = require("../sources/icims/parse");
 
 const DETAIL_REFETCH_SCHEMA_VERSION = "detail-refetch-audit-v1";
 const SUPPORTED_SOURCES = new Set(["icims", "applitrack"]);

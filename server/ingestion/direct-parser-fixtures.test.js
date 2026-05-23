@@ -5,46 +5,42 @@ const assert = require("node:assert/strict");
 const { adapters } = require("./adapters");
 const { normalizeCountryFromAtsCodeLocation, validatePosting } = require("./posting");
 const { evaluatePublicPosting } = require("./publicPostingGate");
+const { parseAdpWorkforcenowPostingsFromApi, resolveAdpWorkforcenowCompanyName } = require("./sources/adp_workforcenow/parse");
+const { buildApplitrackDetailUrl, extractApplitrackDetailFields, parseApplitrackPostings } = require("./sources/applitrack/parse");
+const { extractApplicantProDomainId, parseApplicantProPostingsFromApi } = require("./sources/applicantpro/parse");
+const { parseApplyToJobPostingsFromHtml } = require("./sources/applytojob/parse");
+const { parseAshbyPostingsFromApi } = require("./sources/ashby/parse");
+const { parseBambooHrPostingsFromApi } = require("./sources/bamboohr/parse");
+const { parseBreezyPostingsFromHtml } = require("./sources/breezy/parse");
+const { parseCareerplugPostingsFromHtml } = require("./sources/careerplug/parse");
+const { parseFountainPostingsFromApi } = require("./sources/fountain/parse");
+const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
+const { parseHrmDirectPostingsFromHtml } = require("./sources/hrmdirect/parse");
 const {
-  buildApplitrackDetailUrl,
-  extractApplitrackDetailFields,
-  extractApplicantProDomainId,
-  parseAdpWorkforcenowPostingsFromApi,
-  parseApplicantProPostingsFromApi,
-  parseApplitrackPostings,
-  parseApplyToJobPostingsFromHtml,
-  parseAshbyPostingsFromApi,
-  parseBambooHrPostingsFromApi,
-  parseBreezyPostingsFromHtml,
-  parseCareerplugPostingsFromHtml,
-  parseRecruiteePostingsFromPublicApp,
-  extractSourceIdFromPostingUrl,
-  extractTaleoPostingsFromAjax,
-  extractTaleoPostingsFromRest,
-  extractWorkdayLocationLabel,
-  extractWorkdaySourceJobId,
   extractIcimsLocationFromHtml,
   extractIcimsPostingDateFromHtml,
   extractIcimsRemoteTypeFromHtml,
-  parseFountainPostingsFromApi,
-  parseGreenhousePostingsFromApi,
-  parseHrmDirectPostingsFromHtml,
-  parseIcimsPostingsFromHtml,
-  parseJobvitePostingsFromHtml,
-  parseLeverPostingsFromApi,
-  parseManatalPostingsFromApi,
-  parseManatalPostingsFromHtml,
-  parseOraclePostingsFromApi,
-  parsePaylocityPostingsFromPageData,
-  parsePinpointHqPostingsFromApi,
-  parseRecruitCrmPostingsFromApi,
-  parseSmartRecruitersPostingsFromApi,
-  parseTeamtailorPostingsFromHtml,
-  parseUsajobsPostingsFromPayload,
-  parseWorkdayPostingsFromApi,
-  parseZohoPostingsFromHtml,
-  resolveAdpWorkforcenowCompanyName
-} = require("../index");
+  parseIcimsPostingsFromHtml
+} = require("./sources/icims/parse");
+const { parseJobvitePostingsFromHtml } = require("./sources/jobvite/parse");
+const { parseLeverPostingsFromApi } = require("./sources/lever/parse");
+const { parseManatalPostingsFromApi, parseManatalPostingsFromHtml } = require("./sources/manatal/parse");
+const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
+const { parsePaylocityPostingsFromPageData } = require("./sources/paylocity/parse");
+const { parsePinpointHqPostingsFromApi } = require("./sources/pinpointhq/parse");
+const { parseRecruitCrmPostingsFromApi } = require("./sources/recruitcrm/parse");
+const { parseRecruiteePostingsFromPublicApp } = require("./sources/recruitee/parse");
+const { parseSmartRecruitersPostingsFromApi } = require("./sources/smartrecruiters/parse");
+const { extractTaleoPostingsFromAjax, extractTaleoPostingsFromRest } = require("./sources/taleo/parse");
+const { parseTeamtailorPostingsFromHtml } = require("./sources/teamtailor/parse");
+const { parseUsajobsPostingsFromPayload } = require("./sources/usajobs/parse");
+const {
+  extractWorkdayLocationLabel,
+  extractWorkdaySourceJobId,
+  parseWorkdayPostingsFromApi
+} = require("./sources/workday/parse");
+const { parseZohoPostingsFromHtml } = require("./sources/zoho/parse");
+const { extractSourceIdFromPostingUrl } = require("./parsers/shared/sourceIds");
 
 const fixtureDir = path.join(__dirname, "fixtures");
 
