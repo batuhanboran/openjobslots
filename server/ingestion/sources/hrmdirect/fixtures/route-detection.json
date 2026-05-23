@@ -1,0 +1,23 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://fixture.hrmdirect.com/employment/job-openings.php?search=true"
+  },
+  "list_html": "<table><tr class=\"reqitem\"><td class=\"posTitle\"><a href=\"job-opening.php?req=HRM3001&req_loc=111&&#job\">Administrative Coordinator</a></td></tr><tr class=\"reqitem1\"><td class=\"posTitle\"><a href=\"job-opening.php?req=HRM3002&req_loc=222&&#job\">Campus Assistant</a></td></tr></table>",
+  "details": {
+    "HRM3001": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\">Department:</td><td class=\"viewFieldValue\">Administration</td></tr><tr><td class=\"viewFieldName\">Location:</td><td class=\"viewFieldValue\">Shallotte, NC</td></tr></table><div class=\"description\">Location: Onsite/New Hanover and Brunswick Counties</div></body></html>",
+    "HRM3002": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\">Department:</td><td class=\"viewFieldValue\">3 YO Dept.</td></tr></table><div class=\"description\">Work occurs across the campus community.</div></body></html>"
+  },
+  "expected": {
+    "HRM3001": {
+      "country": "United States",
+      "city": "Shallotte",
+      "department": "Administration",
+      "location_source": "labeled_detail_html"
+    },
+    "HRM3002": {
+      "reason": "no_geo_no_remote"
+    }
+  }
+}

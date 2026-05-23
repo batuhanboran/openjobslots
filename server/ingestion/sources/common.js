@@ -957,6 +957,102 @@ async function fetchBreezySourceList(company = {}, target = {}, options = {}) {
   };
 }
 
+function hrmDirectDetailKey(urlValue) {
+  try {
+    const parsed = new URL(clean(urlValue));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function hrmDirectPostingNeedsDetail(posting = {}) {
+  const location = clean(posting.location || posting.location_text);
+  const remoteType = clean(posting.remote_type).toLowerCase();
+  const hasExplicitRemote = ["remote", "hybrid"].includes(remoteType) ||
+    /\b(remote|hybrid|work from home|wfh|telework|virtual)\b/i.test(location);
+  const hasConcreteListLocation = Boolean(location) &&
+    !/^(multiple|multiple locations|various|all locations|anywhere|global|remote|hybrid|tbd|to be determined)(?:\s|\(|$)/i.test(location);
+  return !hasConcreteListLocation && !hasExplicitRemote;
+}
+
+async function fetchHrmDirectSourceList(company = {}, target = {}, options = {}) {
+  const context = buildCompanyContext(company);
+  const discovered = target && target.list_url ? target : SOURCE_SPECS.hrmdirect.discover(context);
+  const listUrl = clean(discovered?.list_url || context.url_string);
+  if (!listUrl) {
+    throw makeSourceFetchError("no_public_jobs_route", "HRMDirect source has no public job-openings route", {
+      url: context.url_string
+    });
+  }
+
+  const list = await fetchText(listUrl, {
+    ...options,
+    target: discovered,
+    sourceLabel: "HRMDirect"
+  });
+  const config = {
+    ...(discovered.config || {}),
+    list_url: list.finalUrl || listUrl
+  };
+  const companyName = normalizeCompanyName(context, hostSlug(listUrl) || "HRMDirect");
+  const parsed = parseHrmDirectPostingsFromHtml(companyName, config, {
+    html: list.text,
+    __listUrl: list.finalUrl || listUrl
+  });
+
+  if (parsed.length === 0) {
+    throw makeSourceFetchError("portal_search_empty", "HRMDirect public job-openings table returned no parseable postings", {
+      url: listUrl
+    });
+  }
+
+  const configuredDetailLimit = Number(process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY ?? 10);
+  const detailLimit = Math.max(0, Math.min(75, Number.isFinite(configuredDetailLimit) ? configuredDetailLimit : 10));
+  let detailFetches = 0;
+  const detailHtmlByUrl = {};
+  const detailStatusByUrl = {};
+  const detailFailureByUrl = {};
+
+  for (const posting of parsed) {
+    if (detailFetches >= detailLimit) break;
+    if (!hrmDirectPostingNeedsDetail(posting)) continue;
+    const detailUrl = clean(posting.job_posting_url);
+    if (!detailUrl) continue;
+    try {
+      const detail = await fetchText(detailUrl, {
+        ...options,
+        target: discovered,
+        sourceLabel: "HRMDirect"
+      });
+      detailFetches += 1;
+      const key = hrmDirectDetailKey(detailUrl);
+      detailHtmlByUrl[detailUrl] = detail.text;
+      detailHtmlByUrl[key] = detail.text;
+      detailStatusByUrl[detailUrl] = detail.status;
+      detailStatusByUrl[key] = detail.status;
+    } catch (error) {
+      detailFetches += 1;
+      const key = hrmDirectDetailKey(detailUrl);
+      detailFailureByUrl[detailUrl] = classifyPublicRouteStatus(Number(error?.status || 0), "unsupported_html_shape");
+      detailFailureByUrl[key] = detailFailureByUrl[detailUrl];
+    }
+  }
+
+  return {
+    html: list.text,
+    __listUrl: list.finalUrl || listUrl,
+    __detailHtmlByUrl: detailHtmlByUrl,
+    __detailStatusByUrl: detailStatusByUrl,
+    __detailFailureByUrl: detailFailureByUrl,
+    __sourceConfig: {
+      ...config,
+      detail_fetch_count: detailFetches
+    }
+  };
+}
+
 async function fetchWorkdaySourceList(company = {}, target = {}, options = {}) {
   const discovered = target && target.list_url ? target : SOURCE_SPECS.workday.discover(company);
   const config = discovered?.config || {};
@@ -1480,7 +1576,8 @@ const SOURCE_SPECS = Object.freeze({
   hrmdirect: {
     sourceFamily: "html_detail",
     confidence: 0.75,
-    parser: (companyName, config, payload) => parseHrmDirectPostingsFromHtml(companyName, config, payload?.html || payload),
+    parser: (companyName, config, payload) => parseHrmDirectPostingsFromHtml(companyName, config, payload),
+    fetchList: fetchHrmDirectSourceList,
     officialDocs: "observed HRMDirect public job-openings table HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);

@@ -304,3 +304,34 @@ test("breezy source module quarantines narrative detail text captured as locatio
   assert.equal(gate.status, "quarantined");
   assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
 });
+
+test("hrmdirect source module enriches title-only rows from deterministic detail pages", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      const value = String(url || "");
+      if (value === fixture.company.url_string) return { html: fixture.list_html, status: 200, url: value };
+      const parsed = new URL(value);
+      const req = parsed.searchParams.get("req");
+      if (fixture.details[req]) return { html: fixture.details[req], status: 200, url: value };
+      return { html: "", status: 404, url: value };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, fixture.company));
+  const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId.HRM3001.location_text, "Shallotte, NC");
+  assert.equal(byId.HRM3001.country, fixture.expected.HRM3001.country);
+  assert.equal(byId.HRM3001.city, fixture.expected.HRM3001.city);
+  assert.equal(byId.HRM3001.department, fixture.expected.HRM3001.department);
+  assert.equal(byId.HRM3001.source_evidence.location_source, fixture.expected.HRM3001.location_source);
+  assert.equal(evaluatePublicPosting(byId.HRM3001, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.ok(byId.HRM3002.source_failure_reasons.includes(fixture.expected.HRM3002.reason));
+  assert.equal(evaluatePublicPosting(byId.HRM3002, { parserVersion: source.parserVersion }).status, "quarantined");
+});
