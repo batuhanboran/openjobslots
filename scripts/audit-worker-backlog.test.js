@@ -1295,9 +1295,17 @@ test("buildThroughputScalingGate reports parser drift recheck context for partia
 
   const parserBugBlocker = gate.blockers.find((item) => item.code === "parser_bug_failures_present");
   assert.ok(parserBugBlocker);
-  assert.equal(parserBugBlocker.count, 296);
+  assert.equal(gate.parser_attention_unresolved_count, 196);
+  assert.equal(gate.parser_attention_current_policy_pass_count, 100);
+  assert.equal(gate.parser_attention_status, "partially_rechecked_unresolved");
+  assert.equal(parserBugBlocker.count, 196);
+  assert.equal(parserBugBlocker.total_count, 296);
   assert.equal(parserBugBlocker.current_policy_pass_count, 100);
   assert.equal(parserBugBlocker.unrechecked_or_non_drift_count, 196);
+  const parserAttentionBlocker = gate.blockers.find((item) => item.code === "parser_attention_present");
+  assert.ok(parserAttentionBlocker);
+  assert.equal(parserAttentionBlocker.count, 196);
+  assert.equal(parserAttentionBlocker.total_count, 296);
   assert.deepEqual(gate.parser_drift_recheck, {
     sample_count: 100,
     still_drift_count: 0,

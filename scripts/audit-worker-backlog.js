@@ -1306,6 +1306,19 @@ function buildThroughputScalingGate({
   const parserAttentionTotal = Number(parserAttentionCount || 0);
   const parserBugTargetFailureCount = Number(targetFailureCounts?.parser_bug || 0);
   const parserDriftRecheckHasCoverage = parserDriftRecheckSummary.sample_count > 0;
+  const parserAttentionCurrentPolicyPassCount = parserDriftRecheckHasCoverage
+    ? Math.min(parserAttentionTotal, parserDriftRecheckSummary.current_policy_pass_count)
+    : 0;
+  const parserAttentionUnresolvedCount = Math.max(0, parserAttentionTotal - parserAttentionCurrentPolicyPassCount);
+  const parserAttentionStatus = parserAttentionTotal <= parserAttentionThreshold
+    ? "none"
+    : !parserDriftRecheckHasCoverage
+      ? "unrechecked"
+      : parserAttentionUnresolvedCount <= parserAttentionThreshold
+        ? "rechecked_current_policy_pass"
+        : parserAttentionCurrentPolicyPassCount > 0
+          ? "partially_rechecked_unresolved"
+          : "unresolved";
   const parserDriftFullyCurrentPolicyPass = parserDriftRecheckHasCoverage &&
     parserDriftRecheckSummary.still_drift_count === 0 &&
     parserDriftRecheckSummary.skipped_no_baseline_count === 0;
@@ -1352,10 +1365,12 @@ function buildThroughputScalingGate({
     });
   }
 
-  if (parserAttentionTotal > parserAttentionThreshold && !parserAttentionFullyRechecked) {
+  if (parserAttentionUnresolvedCount > parserAttentionThreshold && !parserAttentionFullyRechecked) {
     blockers.push({
       code: "parser_attention_present",
-      message: `Parser attention count ${parserAttentionTotal} is above the ${parserAttentionThreshold} threshold.`,
+      message: `Parser attention unresolved count ${parserAttentionUnresolvedCount} is above the ${parserAttentionThreshold} threshold.`,
+      count: parserAttentionUnresolvedCount,
+      total_count: parserAttentionTotal,
       current_policy_pass_count: parserDriftRecheckSummary.current_policy_pass_count,
       still_drift_count: parserDriftRecheckSummary.still_drift_count,
       skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count,
@@ -1368,10 +1383,15 @@ function buildThroughputScalingGate({
     const count = Number(targetFailureCounts?.[reason] || 0);
     if (count > 0) {
       if (reason === "parser_bug" && parserBugFailuresFullyRechecked) continue;
+      const blockerCount = reason === "parser_bug"
+        ? Math.max(0, count - Math.min(count, parserDriftRecheckSummary.current_policy_pass_count))
+        : count;
+      if (blockerCount <= 0) continue;
       blockers.push({
         code: `${reason}_failures_present`,
         message: `${reason} target failures are present in the diagnostics window.`,
-        count,
+        count: blockerCount,
+        total_count: count,
         ...(reason === "parser_bug"
           ? {
               current_policy_pass_count: parserDriftRecheckSummary.current_policy_pass_count,
@@ -1418,6 +1438,9 @@ function buildThroughputScalingGate({
     minimum_success_rate_pct: minimumSuccessRatePct,
     minimum_trend_target_count: minimumTrendTargetCount,
     parser_attention_count: parserAttentionTotal,
+    parser_attention_current_policy_pass_count: parserAttentionCurrentPolicyPassCount,
+    parser_attention_unresolved_count: parserAttentionUnresolvedCount,
+    parser_attention_status: parserAttentionStatus,
     parser_attention_threshold: parserAttentionThreshold,
     parser_drift_recheck: parserDriftRecheckSummary,
     target_failure_reason_counts: targetFailureCounts,
