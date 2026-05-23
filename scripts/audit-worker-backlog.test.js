@@ -435,6 +435,16 @@ test("summarizeTargetFailurePressureRows classifies empty/no-jobs targets by pri
   const breezyStaleClass = summary.by_source.breezy.empty_no_jobs_classification.by_class.stale_never_success_empty;
   assert.equal(breezyStaleClass.sample_targets.length, 1);
   assert.equal(breezyStaleClass.sample_targets[0].company_url, "https://stale-empty.breezy.hr");
+
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.read_only, true);
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.write_actions_performed, false);
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.requires_explicit_approval, true);
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.criteria.empty_no_jobs_class, "stale_never_success_empty");
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.candidate_count, 1);
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.worker_slot_pressure, 1);
+  assert.equal(summary.empty_no_jobs_classification.cleanup_candidates.sample_targets[0].company_url, "https://stale-empty.breezy.hr");
+  assert.match(summary.empty_no_jobs_classification.cleanup_candidates.next_action, /explicit approval/);
+  assert.equal(summary.by_source.breezy.empty_no_jobs_classification.cleanup_candidates.candidate_count, 1);
 });
 
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {

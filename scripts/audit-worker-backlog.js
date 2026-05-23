@@ -1664,6 +1664,26 @@ function emptyNoJobsClassificationNextAction(className) {
   return "review empty/no-jobs target classification before changing throughput";
 }
 
+function createEmptyNoJobsCleanupCandidates(staleDays = 7, sampleLimit = 5) {
+  const boundedSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(sampleLimit || 5))));
+  return {
+    read_only: true,
+    write_actions_performed: false,
+    requires_explicit_approval: true,
+    criteria: {
+      empty_no_jobs_class: "stale_never_success_empty",
+      no_prior_success: true,
+      stale_never_success_after_days: staleDays
+    },
+    candidate_count: 0,
+    worker_slot_pressure: 0,
+    recent_error_count: 0,
+    sample_limit: boundedSampleLimit,
+    sample_targets: [],
+    next_action: "review stale never-success empty targets for quarantine or removal only after explicit approval"
+  };
+}
+
 function createEmptyNoJobsClassificationSummary(staleDays = 7, sampleLimit = 5) {
   const byClass = {};
   const boundedSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(sampleLimit || 5))));
@@ -1687,6 +1707,7 @@ function createEmptyNoJobsClassificationSummary(staleDays = 7, sampleLimit = 5) 
     total_targets: 0,
     failure_pressure: 0,
     recent_error_count: 0,
+    cleanup_candidates: createEmptyNoJobsCleanupCandidates(staleDays, boundedSampleLimit),
     by_class: byClass
   };
 }
@@ -1712,6 +1733,7 @@ function addEmptyNoJobsClassification(summary, className, row = {}) {
   const consecutiveFailures = Number(row.consecutive_failures || 0);
   const recentErrorCount = Number(row.recent_error_count || 0);
   const classSummary = summary.by_class[className];
+  const sample = createEmptyNoJobsClassificationSample(row);
   summary.total_targets += 1;
   summary.failure_pressure += consecutiveFailures;
   summary.recent_error_count += recentErrorCount;
@@ -1720,7 +1742,17 @@ function addEmptyNoJobsClassification(summary, className, row = {}) {
   classSummary.recent_error_count += recentErrorCount;
   const sampleLimit = Math.max(1, Math.min(25, Math.floor(Number(summary.sample_limit || 5))));
   if (classSummary.sample_targets.length < sampleLimit) {
-    classSummary.sample_targets.push(createEmptyNoJobsClassificationSample(row));
+    classSummary.sample_targets.push(sample);
+  }
+  if (className === "stale_never_success_empty" && summary.cleanup_candidates) {
+    const cleanup = summary.cleanup_candidates;
+    cleanup.candidate_count += 1;
+    cleanup.worker_slot_pressure += consecutiveFailures;
+    cleanup.recent_error_count += recentErrorCount;
+    const cleanupSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(cleanup.sample_limit || sampleLimit))));
+    if (cleanup.sample_targets.length < cleanupSampleLimit) {
+      cleanup.sample_targets.push(sample);
+    }
   }
 }
 
