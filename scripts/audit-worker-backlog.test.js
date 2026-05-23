@@ -206,6 +206,10 @@ test("buildTargetFailurePressureQuery is read-only and returns full due failure 
   assert.match(query.sql, /WITH due_targets AS/i);
   assert.match(query.sql, /JOIN company_sync_state/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
+  assert.match(query.sql, /LEFT JOIN ingestion_runs r\s+ON r\.id = e\.run_id/i);
+  assert.match(query.sql, /LEFT JOIN company_sync_state error_state/i);
+  assert.match(query.sql, /error_state\.last_success_epoch < r\.started_at_epoch/i);
+  assert.match(query.sql, /error_state\.last_success_epoch > COALESCE\(r\.finished_at_epoch/i);
   assert.match(query.sql, /COALESCE\(st\.consecutive_failures, 0\)/i);
   assert.doesNotMatch(query.sql, /LIMIT \$4/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);

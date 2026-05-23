@@ -657,8 +657,19 @@ function buildTargetFailurePressureQuery(options = {}) {
           COALESCE(e.error_message, '') AS error_message,
           COUNT(*)::int AS count
         FROM ingestion_run_errors e
+        LEFT JOIN ingestion_runs r
+          ON r.id = e.run_id
+        LEFT JOIN company_sync_state error_state
+          ON error_state.ats_key = e.ats_key
+          AND error_state.company_url = e.company_url
         WHERE e.created_at >= now() - ($2::int * interval '1 hour')
           AND COALESCE(e.company_url, '') <> ''
+          AND (
+            r.id IS NULL
+            OR error_state.last_success_epoch IS NULL
+            OR error_state.last_success_epoch < r.started_at_epoch
+            OR error_state.last_success_epoch > COALESCE(r.finished_at_epoch, EXTRACT(EPOCH FROM now())::bigint)
+          )
           AND (
             cardinality($3::text[]) = 0
             OR e.ats_key = ANY($3::text[])
