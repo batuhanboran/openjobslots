@@ -442,6 +442,104 @@ function buildSourceBudgetUsageQuery(options = {}) {
   };
 }
 
+function buildTargetFailurePressureQuery(options = {}) {
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
+  const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.targetPressureLimit || options.limit || 25))));
+  return {
+    values: [nowEpoch, errorWindowHours, targetAtsKeys, limit],
+    sql: `
+      WITH due_targets AS (
+        SELECT
+          c.ats_key,
+          c.url_string AS company_url,
+          c.company_name,
+          COALESCE(NULLIF(s.protection_status, ''), 'normal') AS protection_status,
+          COALESCE(st.next_sync_epoch, 0)::bigint AS next_sync_epoch,
+          COALESCE(st.last_success_epoch, 0)::bigint AS last_success_epoch,
+          COALESCE(st.last_failure_epoch, 0)::bigint AS last_failure_epoch,
+          COALESCE(st.consecutive_failures, 0)::bigint AS consecutive_failures,
+          COALESCE(st.last_http_status, 0)::int AS last_http_status,
+          COALESCE(st.last_error, '') AS last_error
+        FROM companies c
+        INNER JOIN ats_sources s
+          ON s.ats_key = c.ats_key
+        LEFT JOIN company_sync_state st
+          ON st.ats_key = c.ats_key
+          AND st.company_url = c.url_string
+        WHERE s.enabled = true
+          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
+          AND COALESCE(st.next_sync_epoch, 0) <= $1
+          AND (
+            cardinality($3::text[]) = 0
+            OR c.ats_key = ANY($3::text[])
+          )
+      ),
+      recent_error_groups AS (
+        SELECT
+          e.ats_key,
+          e.company_url,
+          e.error_type,
+          COALESCE(e.http_status, 0)::int AS http_status,
+          COALESCE(e.error_message, '') AS error_message,
+          COUNT(*)::int AS count
+        FROM ingestion_run_errors e
+        WHERE e.created_at >= now() - ($2::int * interval '1 hour')
+          AND COALESCE(e.company_url, '') <> ''
+          AND (
+            cardinality($3::text[]) = 0
+            OR e.ats_key = ANY($3::text[])
+          )
+        GROUP BY e.ats_key, e.company_url, e.error_type, COALESCE(e.http_status, 0), e.error_message
+      ),
+      recent_target_errors AS (
+        SELECT
+          ats_key,
+          company_url,
+          COALESCE(SUM(count), 0)::int AS recent_error_count,
+          jsonb_agg(
+            jsonb_build_object(
+              'error_type', error_type,
+              'http_status', http_status,
+              'error_message', error_message,
+              'count', count
+            )
+            ORDER BY count DESC, error_type ASC, http_status ASC, error_message ASC
+          ) AS recent_error_groups
+        FROM recent_error_groups
+        GROUP BY ats_key, company_url
+      )
+      SELECT
+        d.ats_key,
+        d.company_url,
+        d.company_name,
+        d.protection_status,
+        d.next_sync_epoch,
+        d.last_success_epoch,
+        d.last_failure_epoch,
+        d.consecutive_failures,
+        d.last_http_status,
+        d.last_error,
+        COALESCE(r.recent_error_count, 0)::int AS recent_error_count,
+        COALESCE(r.recent_error_groups, '[]'::jsonb) AS recent_error_groups
+      FROM due_targets d
+      LEFT JOIN recent_target_errors r
+        ON r.ats_key = d.ats_key
+        AND r.company_url = d.company_url
+      WHERE d.consecutive_failures > 0
+        OR COALESCE(r.recent_error_count, 0) > 0
+      ORDER BY d.consecutive_failures DESC,
+        COALESCE(r.recent_error_count, 0) DESC,
+        d.last_failure_epoch DESC,
+        d.ats_key ASC,
+        d.company_name ASC,
+        d.company_url ASC
+      LIMIT $4;
+    `
+  };
+}
+
 function buildParserDriftRecheckQuery(options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
@@ -946,6 +1044,133 @@ function emptyRecentErrorSummary() {
   };
 }
 
+function parseRecentErrorGroups(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function summarizeRecentErrorGroups(groups = []) {
+  const summary = emptyRecentErrorSummary();
+  for (const group of Array.isArray(groups) ? groups : []) {
+    const errorType = String(group?.error_type || "unknown").trim() || "unknown";
+    const errorMessage = String(group?.error_message || "");
+    const httpStatus = normalizeHttpStatus(group?.http_status);
+    const count = Number(group?.count || 0);
+    if (count <= 0) continue;
+    const failureReason = classifyFailureReason(errorType, httpStatus, errorMessage);
+    summary.total_count += count;
+    summary.by_type[errorType] = (summary.by_type[errorType] || 0) + count;
+    summary.by_reason[failureReason] = (summary.by_reason[failureReason] || 0) + count;
+    if (errorType === "parser_drift") summary.parser_drift_count += count;
+    if (isParserAttentionErrorType(errorType)) summary.parser_attention_count += count;
+    if (SOURCE_POLICY_BLOCK_ERROR_TYPES.includes(errorType)) summary.source_policy_block_count += count;
+    summary[`${failureReason}_count`] = Number(summary[`${failureReason}_count`] || 0) + count;
+  }
+  return summary;
+}
+
+function dominantFailureReason(summary = {}) {
+  const entries = Object.entries(summary.by_reason || {})
+    .filter(([, count]) => Number(count || 0) > 0)
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || left[0].localeCompare(right[0]));
+  return entries[0]?.[0] || "";
+}
+
+function targetPressureNextAction(reason) {
+  if (reason === "parser_bug") return "add fixture and fix parser before counting this source as scalable";
+  if (reason === "source_quality") return "review source evidence and quality gates before re-running at higher volume";
+  if (reason === "rate_limit") return "review backoff, target pacing, and source rate limits before increasing volume";
+  if (reason === "network") return "confirm network failure pattern before retrying at scale";
+  if (reason === "empty_no_jobs") return "audit stale or empty boards so worker slots are not spent on no-job targets";
+  if (reason === "auth") return "remove or quarantine inaccessible targets before increasing volume";
+  if (reason === "unknown") return "classify unknown worker errors before changing throughput";
+  return "keep target under observation";
+}
+
+function mergeReasonCounts(target, source = {}) {
+  for (const [reason, count] of Object.entries(source || {})) {
+    target[reason] = Number(target[reason] || 0) + Number(count || 0);
+  }
+}
+
+function summarizeTargetFailurePressureRows(rows = [], options = {}) {
+  const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.targetPressureLimit || options.limit || 25))));
+  const bySource = {};
+  const topTargets = [];
+  let failurePressure = 0;
+  let recentErrorCount = 0;
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const atsKey = String(row?.ats_key || "").trim().toLowerCase();
+    const companyUrl = String(row?.company_url || "").trim();
+    if (!atsKey || !companyUrl) continue;
+    const groups = parseRecentErrorGroups(row.recent_error_groups);
+    const recentErrors = summarizeRecentErrorGroups(groups);
+    const consecutiveFailures = Number(row?.consecutive_failures || 0);
+    const rowRecentErrorCount = Number(row?.recent_error_count || recentErrors.total_count || 0);
+    const reason = dominantFailureReason(recentErrors);
+
+    failurePressure += consecutiveFailures;
+    recentErrorCount += rowRecentErrorCount;
+    if (!bySource[atsKey]) {
+      bySource[atsKey] = {
+        target_count: 0,
+        failure_pressure: 0,
+        recent_error_count: 0,
+        by_reason: {}
+      };
+    }
+    bySource[atsKey].target_count += 1;
+    bySource[atsKey].failure_pressure += consecutiveFailures;
+    bySource[atsKey].recent_error_count += rowRecentErrorCount;
+    mergeReasonCounts(bySource[atsKey].by_reason, recentErrors.by_reason);
+
+    topTargets.push({
+      ats_key: atsKey,
+      company_url: companyUrl,
+      company_name: String(row?.company_name || ""),
+      protection_status: String(row?.protection_status || "normal") || "normal",
+      next_sync_epoch: Number(row?.next_sync_epoch || 0),
+      next_sync_at: epochToIso(row?.next_sync_epoch),
+      last_success_epoch: Number(row?.last_success_epoch || 0),
+      last_success_at: epochToIso(row?.last_success_epoch),
+      last_failure_epoch: Number(row?.last_failure_epoch || 0),
+      last_failure_at: epochToIso(row?.last_failure_epoch),
+      consecutive_failures: consecutiveFailures,
+      last_http_status: normalizeHttpStatus(row?.last_http_status),
+      last_error: String(row?.last_error || ""),
+      recent_error_count: rowRecentErrorCount,
+      recent_errors: recentErrors,
+      dominant_failure_reason: reason,
+      next_action: targetPressureNextAction(reason)
+    });
+  }
+
+  for (const source of Object.values(bySource)) {
+    source.dominant_failure_reason = dominantFailureReason({ by_reason: source.by_reason });
+  }
+
+  return {
+    read_only: true,
+    error_window_hours: errorWindowHours,
+    sample_limit: limit,
+    target_count: topTargets.length,
+    failure_pressure: failurePressure,
+    recent_error_count: recentErrorCount,
+    by_source: bySource,
+    top_targets: topTargets
+  };
+}
+
 function attachBacklogDiagnostics(report, options = {}) {
   const recentByAts = summarizeRecentErrors(options.recentErrorRows || []);
   const sourceBudgetUsageByAts = summarizeSourceBudgetUsageRows(options.sourceBudgetUsageRows || [], options);
@@ -981,6 +1206,7 @@ function attachBacklogDiagnostics(report, options = {}) {
   }
   const autoSyncBudgetUsage = summarizeAutoSyncBudgetUsage(options.autoSyncBudgetUsageRows || [], options);
   const parserDriftRecheck = summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options);
+  const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], options);
   const throughputScalingGate = buildThroughputScalingGate({
     latestRun,
     parserAttentionCount,
@@ -1001,6 +1227,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       latest_run_by_source: latestRunBySource,
       auto_sync_budget_usage: autoSyncBudgetUsage,
       parser_drift_recheck: parserDriftRecheck,
+      target_failure_pressure: targetFailurePressure,
       throughput_scaling_gate: throughputScalingGate,
       error_taxonomy: {
         failure_reason_buckets: [...FAILURE_REASON_BUCKETS],
@@ -1053,6 +1280,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const sourceBudgetUsage = await pool.query(sourceBudgetUsageQuery.sql, sourceBudgetUsageQuery.values);
   const parserDriftRecheckQuery = buildParserDriftRecheckQuery(options);
   const parserDriftRecheck = await pool.query(parserDriftRecheckQuery.sql, parserDriftRecheckQuery.values);
+  const targetFailurePressureQuery = buildTargetFailurePressureQuery({ ...options, nowEpoch });
+  const targetFailurePressure = await pool.query(targetFailurePressureQuery.sql, targetFailurePressureQuery.values);
   return attachBacklogDiagnostics(report, {
     ...options,
     nowEpoch,
@@ -1062,7 +1291,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     latestRunFailureReasonRows: latestRunFailureReasons.rows,
     autoSyncBudgetUsageRows: autoSyncBudgetUsage.rows,
     sourceBudgetUsageRows: sourceBudgetUsage.rows,
-    parserDriftRecheckRows: parserDriftRecheck.rows
+    parserDriftRecheckRows: parserDriftRecheck.rows,
+    targetFailurePressureRows: targetFailurePressure.rows
   });
 }
 
@@ -1136,6 +1366,7 @@ module.exports = {
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildSourceBudgetUsageQuery,
+  buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
   buildWorkerBacklogQuery,
   classifyFailureReason,
@@ -1146,6 +1377,7 @@ module.exports = {
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
   summarizeSourceBudgetUsageRows,
+  summarizeTargetFailurePressureRows,
   summarizeParserDriftRecheck,
   summarizeBacklogRows,
   writeOutput

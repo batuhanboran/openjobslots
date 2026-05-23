@@ -9,6 +9,7 @@ const {
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildSourceBudgetUsageQuery,
+  buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
@@ -16,6 +17,7 @@ const {
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
   summarizeSourceBudgetUsageRows,
+  summarizeTargetFailurePressureRows,
   summarizeParserDriftRecheck,
   summarizeBacklogRows
 } = require("./audit-worker-backlog");
@@ -123,6 +125,73 @@ test("buildSourceBudgetUsageQuery mirrors worker source budget accounting", () =
   assert.match(query.sql, /last_success_epoch >= \$1/i);
   assert.match(query.sql, /GROUP BY ats_key/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildTargetFailurePressureQuery is read-only and bounded by due targets", () => {
+  const query = buildTargetFailurePressureQuery({
+    nowEpoch: 1_800_086_400,
+    errorWindowHours: 48,
+    targetAtsKeys: ["applytojob", "breezy"],
+    limit: 15
+  });
+
+  assert.deepEqual(query.values, [1_800_086_400, 48, ["applytojob", "breezy"], 15]);
+  assert.match(query.sql, /WITH due_targets AS/i);
+  assert.match(query.sql, /JOIN company_sync_state/i);
+  assert.match(query.sql, /FROM ingestion_run_errors/i);
+  assert.match(query.sql, /COALESCE\(st\.consecutive_failures, 0\)/i);
+  assert.match(query.sql, /LIMIT \$4/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("summarizeTargetFailurePressureRows ranks target-level worker blockers", () => {
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "breezy",
+      company_url: "https://example.breezy.hr",
+      company_name: "Example Breezy",
+      protection_status: "normal",
+      next_sync_epoch: 1_800_000_000,
+      last_success_epoch: 1_799_000_000,
+      last_failure_epoch: 1_800_000_100,
+      consecutive_failures: 5,
+      last_http_status: 0,
+      last_error: "No jobs found",
+      recent_error_groups: JSON.stringify([
+        { error_type: "portal_search_empty", http_status: 0, error_message: "no jobs", count: 4 },
+        { error_type: "parser_validation", http_status: 0, error_message: "ambiguous_location", count: 1 }
+      ])
+    },
+    {
+      ats_key: "applytojob",
+      company_url: "https://jobs.example.com",
+      company_name: "Example Apply",
+      protection_status: "normal",
+      next_sync_epoch: 1_800_000_010,
+      last_success_epoch: 1_799_500_000,
+      last_failure_epoch: 1_800_000_090,
+      consecutive_failures: 2,
+      last_http_status: 0,
+      last_error: "shape drift",
+      recent_error_groups: [
+        { error_type: "parser_drift", http_status: 0, error_message: "shape drift", count: 2 }
+      ]
+    }
+  ], { errorWindowHours: 48, limit: 15 });
+
+  assert.equal(summary.read_only, true);
+  assert.equal(summary.error_window_hours, 48);
+  assert.equal(summary.sample_limit, 15);
+  assert.equal(summary.target_count, 2);
+  assert.equal(summary.by_source.breezy.target_count, 1);
+  assert.equal(summary.by_source.breezy.failure_pressure, 5);
+  assert.equal(summary.by_source.breezy.by_reason.empty_no_jobs, 4);
+  assert.equal(summary.by_source.breezy.by_reason.source_quality, 1);
+  assert.equal(summary.by_source.applytojob.by_reason.parser_bug, 2);
+  assert.equal(summary.top_targets[0].ats_key, "breezy");
+  assert.equal(summary.top_targets[0].recent_errors.empty_no_jobs_count, 4);
+  assert.equal(summary.top_targets[0].dominant_failure_reason, "empty_no_jobs");
+  assert.equal(summary.top_targets[1].dominant_failure_reason, "parser_bug");
 });
 
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {
@@ -281,6 +350,27 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
           ]
         };
       }
+      if (/WITH due_targets AS/i.test(sql)) {
+        return {
+          rows: [
+            {
+              ats_key: "applytojob",
+              company_url: "https://jobs.example.com",
+              company_name: "Example Apply",
+              protection_status: "normal",
+              next_sync_epoch: 1_800_000_010,
+              last_success_epoch: 1_799_500_000,
+              last_failure_epoch: 1_800_000_090,
+              consecutive_failures: 2,
+              last_http_status: 0,
+              last_error: "shape drift",
+              recent_error_groups: [
+                { error_type: "parser_drift", http_status: 0, error_message: "shape drift", count: 2 }
+              ]
+            }
+          ]
+        };
+      }
       if (/FROM ingestion_run_errors/i.test(sql)) {
         if (/e\.run_id = l\.id/i.test(sql)) {
           if (/GROUP BY e\.ats_key, e\.error_type/i.test(sql)) {
@@ -341,7 +431,7 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 8);
+  assert.equal(calls.length, 9);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
@@ -360,6 +450,9 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   assert.equal(report.items[0].latest_run.failure_reasons.parser_bug_count, 3);
   assert.equal(report.diagnostics.failure_reason_counts.rate_limit, 3);
   assert.equal(report.diagnostics.parser_drift_recheck.sample_count, 0);
+  assert.equal(report.diagnostics.target_failure_pressure.target_count, 1);
+  assert.equal(report.diagnostics.target_failure_pressure.top_targets[0].ats_key, "applytojob");
+  assert.equal(report.diagnostics.target_failure_pressure.top_targets[0].dominant_failure_reason, "parser_bug");
   assert.equal(report.diagnostics.auto_sync_budget_usage.targets_started_today, 2000);
   assert.equal(report.diagnostics.auto_sync_budget_usage.remaining_daily_budget, 0);
   assert.equal(report.diagnostics.auto_sync_budget_usage.daily_budget_exhausted, true);
