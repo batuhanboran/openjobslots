@@ -2,27 +2,15 @@ const {
   collectPostingsForCompany,
   buildApplitrackDetailUrl,
   extractApplitrackDetailFields,
-  extractTaleoPostingsFromAjax,
-  extractTaleoPostingsFromRest,
   parseApplitrackPostings,
-  parseApplyToJobPostingsFromHtml,
   parseAshbyPostingsFromApi,
   parseBambooHrPostingsFromApi,
   parseAdpMyjobsPostingsFromApi,
   parseAdpWorkforcenowPostingsFromApi,
   parseBrassringPostingsFromApi,
-  parseBreezyPostingsFromHtml,
-  parseCareerplugPostingsFromHtml,
   parseFountainPostingsFromApi,
-  parseGreenhousePostingsFromApi,
   parseHirebridgePostingsFromHtml,
   parseHrmDirectPostingsFromHtml,
-  extractIcimsLocationFromHtml,
-  extractIcimsPostingDateFromHtml,
-  extractIcimsRemoteTypeFromHtml,
-  parseIcimsPostingsFromHtml,
-  parseJobvitePostingsFromHtml,
-  parseLeverPostingsFromApi,
   parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
   parsePageupPostingsFromResults,
@@ -37,6 +25,22 @@ const {
   parseWorkdayPostingsFromApi,
   parseZohoPostingsFromHtml
 } = require("../../index");
+const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
+const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
+const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
+const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
+const {
+  extractIcimsLocationFromHtml,
+  extractIcimsPostingDateFromHtml,
+  extractIcimsRemoteTypeFromHtml,
+  parseIcimsPostingsFromHtml
+} = require("./icims/parse");
+const { parseJobvitePostingsFromHtml } = require("./jobvite/parse");
+const { parseLeverPostingsFromApi } = require("./lever/parse");
+const {
+  extractTaleoPostingsFromAjax,
+  extractTaleoPostingsFromRest
+} = require("./taleo/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");

@@ -107,7 +107,7 @@ const ATS_CERTIFICATION_OVERRIDES = {
   icims: {
     priority: "P0",
     sourcePattern: "iCIMS public wrapper page, iframe/list pages, next-page links, and job detail pages.",
-    parserPath: "server/index.js parseIcimsPostingsFromHtml plus detail helpers",
+    parserPath: "server/ingestion/sources/icims/parse.js parseIcimsPostingsFromHtml plus detail helpers",
     requiredFixtures: ["wrapper html", "iframe/list html", "next page html", "detail html"],
     fieldDecisions: {
       geo: decision("detail-page", "Saved raw fixtures cover iCIMS CC-state-city and CC-remote list/detail evidence; blank-card tenants still need detail sampling."),
@@ -130,7 +130,7 @@ const ATS_CERTIFICATION_OVERRIDES = {
   },
   careerplug: {
     sourcePattern: "CareerPlug public jobs HTML at https://{tenant}.careerplug.com/jobs with /jobs/{id} posting links.",
-    parserPath: "server/index.js parseCareerplugPostingsFromHtml",
+    parserPath: "server/ingestion/sources/careerplug/parse.js parseCareerplugPostingsFromHtml",
     requiredFixtures: ["list/source fixture", "placeholder title fixture", "expected normalized fixture"],
     fieldDecisions: {
       geo: decision("list-payload", "Saved raw fixture covers .job-location parsing and US state-code geo normalization."),
@@ -262,7 +262,7 @@ const ATS_CERTIFICATION_OVERRIDES = {
   taleo: {
     priority: "P1",
     sourcePattern: "Taleo bootstrap, REST requisition search, and AJAX fallback.",
-    parserPath: "server/index.js extractTaleoPostingsFromRest",
+    parserPath: "server/ingestion/sources/taleo/parse.js extractTaleoPostingsFromRest",
     requiredFixtures: ["REST requisition fixture", "missing-title fixture", "missing-url fixture"],
     fieldDecisions: {
       geo: decision("list-payload", "Saved REST fixture scans source columns for country, city/state, or remote location evidence."),
@@ -349,7 +349,7 @@ const PARSER_PATHS = {
   breezy: "server/ingestion/sources/breezy/parse.js parseBreezyPostingsFromHtml",
   calcareers: "server/index.js CalCareers collector",
   calopps: "server/index.js CalOpps collector",
-  careerplug: "server/index.js parseCareerplugPostingsFromHtml",
+  careerplug: "server/ingestion/sources/careerplug/parse.js parseCareerplugPostingsFromHtml",
   careerpuck: "server/index.js parseCareerpuckPostingsFromApi",
   careerspage: "server/index.js parseCareerspagePostingsFromHtml",
   eightfold: "server/index.js parseEightfoldPostingsFromApi",
@@ -363,7 +363,7 @@ const PARSER_PATHS = {
   hrmdirect: "server/index.js parseHrmDirectPostingsFromHtml",
   isolvisolvedhire: "server/index.js parseIsolvisolvedhirePostingsFromApi",
   jobaps: "server/index.js JobAps collector",
-  jobvite: "server/index.js parseJobvitePostingsFromHtml",
+  jobvite: "server/ingestion/sources/jobvite/parse.js parseJobvitePostingsFromHtml",
   join: "server/index.js parseJoinPostingsFromNextData",
   k12jobspot: "server/index.js K12JobSpot collector",
   loxo: "server/index.js parseLoxoPostingsFromHtml",
@@ -383,7 +383,7 @@ const PARSER_PATHS = {
   simplicant: "server/index.js parseSimplicantPostingsFromHtml",
   smartrecruiters: "server/index.js SmartRecruiters collector",
   statejobsny: "server/index.js StateJobsNY collector",
-  taleo: "server/index.js extractTaleoPostingsFromRest and fallback collector",
+  taleo: "server/ingestion/sources/taleo/parse.js extractTaleoPostingsFromRest and extractTaleoPostingsFromAjax",
   talentreef: "server/index.js parseTalentreefPostingsFromSearchResponse",
   talentlyft: "server/index.js parseTalentlyftPostingsFromFragment",
   talexio: "server/index.js parseTalexioPostingsFromApi",
