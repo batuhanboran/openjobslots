@@ -9,6 +9,7 @@ const {
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildSourceBudgetUsageQuery,
+  buildThroughputScalingGate,
   buildWorkerBacklogQuery,
   parseBacklogArgs,
   runPostgresBacklogAudit,
@@ -344,6 +345,9 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
+  assert.equal(report.diagnostics.throughput_scaling_gate.allowed, false);
+  assert.equal(report.diagnostics.throughput_scaling_gate.decision, "hold");
+  assert.ok(report.diagnostics.throughput_scaling_gate.blockers.some((item) => item.code === "rate_limit_failures_present"));
   assert.equal(report.diagnostics.latest_run_by_source.applytojob.success_rate_pct, 25);
   assert.equal(report.diagnostics.latest_run_by_source.applytojob.failure_rate_pct, 75);
   assert.equal(report.diagnostics.latest_run_by_source.applytojob.failure_reasons.parser_bug_count, 3);
@@ -415,6 +419,72 @@ test("summarizeSourceBudgetUsageRows exposes remaining budget by ATS", () => {
   });
   assert.equal(bySource.get("breezy").remaining_daily_budget, 25);
   assert.equal(bySource.get("missing"), undefined);
+});
+
+test("buildThroughputScalingGate holds scaling when latest run success is below threshold", () => {
+  const gate = buildThroughputScalingGate({
+    latestRun: {
+      latest_run_id: 245,
+      latest_status: "completed_with_errors",
+      total_targets: 50,
+      success_count: 37,
+      failure_count: 13,
+      success_rate_pct: 74
+    },
+    parserAttentionCount: 0,
+    failureReasonCounts: {
+      parser_bug: 0,
+      source_quality: 0,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 13,
+      auth: 0,
+      unknown: 0
+    },
+    totals: {
+      runnable_due_count: 18000,
+      failure_pressure: 1300
+    }
+  });
+
+  assert.equal(gate.allowed, false);
+  assert.equal(gate.decision, "hold");
+  assert.equal(gate.latest_run_success_rate_pct, 74);
+  assert.equal(gate.minimum_success_rate_pct, 80);
+  assert.ok(gate.blockers.some((item) => item.code === "latest_run_success_rate_below_threshold"));
+  assert.ok(gate.required_checks_before_increase.includes("search:reindex:check"));
+});
+
+test("buildThroughputScalingGate allows only small increase after clean worker evidence", () => {
+  const gate = buildThroughputScalingGate({
+    latestRun: {
+      latest_run_id: 246,
+      latest_status: "completed",
+      total_targets: 50,
+      success_count: 46,
+      failure_count: 4,
+      success_rate_pct: 92
+    },
+    parserAttentionCount: 0,
+    failureReasonCounts: {
+      parser_bug: 0,
+      source_quality: 0,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 4,
+      auth: 0,
+      unknown: 0
+    },
+    totals: {
+      runnable_due_count: 12000,
+      failure_pressure: 0
+    }
+  });
+
+  assert.equal(gate.allowed, true);
+  assert.equal(gate.decision, "eligible_for_small_increase");
+  assert.deepEqual(gate.blockers, []);
+  assert.equal(gate.max_recommended_step, "small");
 });
 
 test("summarizeParserDriftRecheck separates current-policy pass from real drift", () => {

@@ -708,6 +708,98 @@ function summarizeLatestRunBySourceRows(rows = []) {
   return bySource;
 }
 
+function buildThroughputScalingGate({
+  latestRun = {},
+  parserAttentionCount = 0,
+  failureReasonCounts = {},
+  totals = {},
+  options = {}
+} = {}) {
+  const minimumSuccessRatePct = Number.isFinite(Number(options.minimumSuccessRatePct))
+    ? Number(options.minimumSuccessRatePct)
+    : 80;
+  const parserAttentionThreshold = Number.isFinite(Number(options.parserAttentionThreshold))
+    ? Number(options.parserAttentionThreshold)
+    : 0;
+  const successRatePct = latestRun.success_rate_pct == null ? null : Number(latestRun.success_rate_pct);
+  const latestStatus = String(latestRun.latest_status || "").trim();
+  const blockers = [];
+  const cautions = [];
+
+  if (!Number(latestRun.latest_run_id || 0) || Number(latestRun.total_targets || 0) <= 0 || successRatePct == null) {
+    blockers.push({
+      code: "latest_run_missing",
+      message: "Latest worker run evidence is missing or has no targets."
+    });
+  } else if (latestStatus === "running") {
+    blockers.push({
+      code: "latest_run_still_running",
+      message: "Latest worker run is still running; wait for a completed run before changing throughput."
+    });
+  } else if (successRatePct < minimumSuccessRatePct) {
+    blockers.push({
+      code: "latest_run_success_rate_below_threshold",
+      message: `Latest worker success rate ${successRatePct}% is below the ${minimumSuccessRatePct}% threshold.`
+    });
+  }
+
+  if (Number(parserAttentionCount || 0) > parserAttentionThreshold) {
+    blockers.push({
+      code: "parser_attention_present",
+      message: `Parser attention count ${Number(parserAttentionCount || 0)} is above the ${parserAttentionThreshold} threshold.`
+    });
+  }
+
+  const blockingFailureReasons = ["parser_bug", "source_quality", "rate_limit", "network", "auth", "unknown"];
+  for (const reason of blockingFailureReasons) {
+    const count = Number(failureReasonCounts?.[reason] || 0);
+    if (count > 0) {
+      blockers.push({
+        code: `${reason}_failures_present`,
+        message: `${reason} failures are present in the diagnostics window.`,
+        count
+      });
+    }
+  }
+
+  if (Number(totals.failure_pressure || 0) > 0) {
+    cautions.push({
+      code: "failure_pressure_present",
+      message: "Due queue still contains targets with prior consecutive failures.",
+      count: Number(totals.failure_pressure || 0)
+    });
+  }
+
+  const allowed = blockers.length === 0;
+  return {
+    read_only: true,
+    allowed,
+    decision: allowed ? "eligible_for_small_increase" : "hold",
+    latest_run_id: Number(latestRun.latest_run_id || 0),
+    latest_run_status: latestStatus,
+    latest_run_success_rate_pct: successRatePct,
+    minimum_success_rate_pct: minimumSuccessRatePct,
+    parser_attention_count: Number(parserAttentionCount || 0),
+    parser_attention_threshold: parserAttentionThreshold,
+    runnable_due_count: Number(totals.runnable_due_count || 0),
+    failure_pressure: Number(totals.failure_pressure || 0),
+    max_recommended_step: allowed ? "small" : "none",
+    blockers,
+    cautions,
+    required_checks_before_increase: [
+      "/health",
+      "search:reindex:check",
+      "search:parity",
+      "worker trend",
+      "parser_attention_count",
+      "due_by_source"
+    ],
+    next_action: allowed
+      ? "Consider only a small budget or targets-per-run increase after external health and parity checks pass."
+      : "Hold throughput and improve worker success rate before increasing budget or targets-per-run."
+  };
+}
+
 function emptyLatestRunBySourceSummary(latestRunId = 0) {
   return {
     latest_run_id: Number(latestRunId || 0),
@@ -887,6 +979,15 @@ function attachBacklogDiagnostics(report, options = {}) {
       };
     }
   }
+  const autoSyncBudgetUsage = summarizeAutoSyncBudgetUsage(options.autoSyncBudgetUsageRows || [], options);
+  const parserDriftRecheck = summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options);
+  const throughputScalingGate = buildThroughputScalingGate({
+    latestRun,
+    parserAttentionCount,
+    failureReasonCounts,
+    totals: report.totals || {},
+    options
+  });
   return {
     ...report,
     diagnostics: {
@@ -898,8 +999,9 @@ function attachBacklogDiagnostics(report, options = {}) {
       failure_reason_counts: failureReasonCounts,
       latest_run: latestRun,
       latest_run_by_source: latestRunBySource,
-      auto_sync_budget_usage: summarizeAutoSyncBudgetUsage(options.autoSyncBudgetUsageRows || [], options),
-      parser_drift_recheck: summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options),
+      auto_sync_budget_usage: autoSyncBudgetUsage,
+      parser_drift_recheck: parserDriftRecheck,
+      throughput_scaling_gate: throughputScalingGate,
       error_taxonomy: {
         failure_reason_buckets: [...FAILURE_REASON_BUCKETS],
         failure_reason_types: [...WORKER_FAILURE_REASON_TAXONOMY],
@@ -1034,6 +1136,7 @@ module.exports = {
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildSourceBudgetUsageQuery,
+  buildThroughputScalingGate,
   buildWorkerBacklogQuery,
   classifyFailureReason,
   getFixtureCoverage,
