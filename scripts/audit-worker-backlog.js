@@ -193,6 +193,17 @@ function isParserAttentionErrorType(errorType) {
     LEGACY_PARSER_ATTENTION_ERROR_TYPES.includes(errorType);
 }
 
+function isSourceQualityParserValidation(errorType, errorMessage) {
+  const type = String(errorType || "unknown").trim().toLowerCase() || "unknown";
+  return isSourceQualityValidationMessage(errorMessage) &&
+    (type === "parser_validation" || LEGACY_PARSER_ATTENTION_ERROR_TYPES.includes(type));
+}
+
+function isParserAttentionError(errorType, errorMessage = "") {
+  if (isSourceQualityParserValidation(errorType, errorMessage)) return false;
+  return isParserAttentionErrorType(String(errorType || "unknown").trim().toLowerCase() || "unknown");
+}
+
 function normalizeHttpStatus(value) {
   const status = Number(value || 0);
   if (!Number.isFinite(status) || status <= 0) return 0;
@@ -211,7 +222,7 @@ function classifyFailureReason(errorType, httpStatus = 0, errorMessage = "") {
   const type = String(errorType || "unknown").trim().toLowerCase() || "unknown";
   const status = normalizeHttpStatus(httpStatus);
   if (status === 429 || RATE_LIMIT_ERROR_TYPES.includes(type)) return "rate_limit";
-  if (type === "parser_validation" && isSourceQualityValidationMessage(errorMessage)) return "source_quality";
+  if (isSourceQualityParserValidation(type, errorMessage)) return "source_quality";
   if (isParserAttentionErrorType(type) || type.startsWith("parser_")) return "parser_bug";
   if (SOURCE_QUALITY_ERROR_TYPES.includes(type)) return "source_quality";
   if (EMPTY_NO_JOBS_ERROR_TYPES.includes(type)) return "empty_no_jobs";
@@ -748,7 +759,7 @@ function summarizeRecentErrors(rows = []) {
     current.by_type[errorType] = (current.by_type[errorType] || 0) + count;
     current.by_reason[failureReason] = (current.by_reason[failureReason] || 0) + count;
     if (errorType === "parser_drift") current.parser_drift_count += count;
-    if (isParserAttentionErrorType(errorType)) current.parser_attention_count += count;
+    if (isParserAttentionError(errorType, errorMessage)) current.parser_attention_count += count;
     if (SOURCE_POLICY_BLOCK_ERROR_TYPES.includes(errorType)) current.source_policy_block_count += count;
     current[`${failureReason}_count`] = Number(current[`${failureReason}_count`] || 0) + count;
   }
@@ -1070,7 +1081,7 @@ function summarizeRecentErrorGroups(groups = []) {
     summary.by_type[errorType] = (summary.by_type[errorType] || 0) + count;
     summary.by_reason[failureReason] = (summary.by_reason[failureReason] || 0) + count;
     if (errorType === "parser_drift") summary.parser_drift_count += count;
-    if (isParserAttentionErrorType(errorType)) summary.parser_attention_count += count;
+    if (isParserAttentionError(errorType, errorMessage)) summary.parser_attention_count += count;
     if (SOURCE_POLICY_BLOCK_ERROR_TYPES.includes(errorType)) summary.source_policy_block_count += count;
     summary[`${failureReason}_count`] = Number(summary[`${failureReason}_count`] || 0) + count;
   }

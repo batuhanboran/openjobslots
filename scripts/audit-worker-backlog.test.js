@@ -808,3 +808,43 @@ test("attachBacklogDiagnostics keeps source policy blocks out of parser attentio
     "invalid_shape"
   ]);
 });
+
+test("attachBacklogDiagnostics treats legacy quality quarantines as source quality", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "hrmdirect",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 10,
+      due_count: 10,
+      runnable_due_count: 10
+    }
+  ]);
+
+  const withDiagnostics = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      errorWindowHours: 24,
+      recentErrorRows: [
+        { ats_key: "hrmdirect", error_type: "parser_quarantine", error_message: "no_geo_no_remote", count: 5 },
+        { ats_key: "hrmdirect", error_type: "parser_quarantine", error_message: "ambiguous_location", count: 3 },
+        { ats_key: "hrmdirect", error_type: "parser_quarantine", error_message: "unexpected parser shape", count: 2 }
+      ]
+    }
+  );
+
+  const hrmdirect = withDiagnostics.items[0];
+  assert.equal(hrmdirect.recent_errors.source_quality_count, 8);
+  assert.equal(hrmdirect.recent_errors.parser_bug_count, 2);
+  assert.equal(hrmdirect.recent_errors.parser_attention_count, 2);
+  assert.deepEqual(hrmdirect.recent_errors.by_reason, {
+    source_quality: 8,
+    parser_bug: 2
+  });
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.source_quality, 8);
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.parser_bug, 2);
+});
