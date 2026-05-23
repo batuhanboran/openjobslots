@@ -82,6 +82,8 @@ const { isRemoteOnlyLocationValue } = require("./ingestion/parsers/shared/locati
 const { normalizeExplicitRemoteValue } = require("./ingestion/parsers/shared/remote");
 const { extractSourceIdFromPostingUrl } = require("./ingestion/parsers/shared/sourceIds");
 const { parseApplyToJobPostingsFromHtml } = require("./ingestion/sources/applytojob/parse");
+const { parseAshbyPostingsFromApi } = require("./ingestion/sources/ashby/parse");
+const { parseBambooHrPostingsFromApi } = require("./ingestion/sources/bamboohr/parse");
 const { parseBreezyPostingsFromHtml } = require("./ingestion/sources/breezy/parse");
 const { extractTaleoPostingsFromAjax, extractTaleoPostingsFromRest } = require("./ingestion/sources/taleo/parse");
 const { parseCareerplugPostingsFromHtml } = require("./ingestion/sources/careerplug/parse");
@@ -105,11 +107,14 @@ const {
   extractPageupPostingDateFromDetailHtml,
   parsePageupPostingsFromResults
 } = require("./ingestion/sources/pageup/parse");
+const { parsePinpointHqPostingsFromApi } = require("./ingestion/sources/pinpointhq/parse");
+const { parseRecruitCrmPostingsFromApi } = require("./ingestion/sources/recruitcrm/parse");
 const {
   extractRecruiteePropsFromHtml,
   parseRecruiteePostingsFromPublicApp
 } = require("./ingestion/sources/recruitee/parse");
 const { extractIcimsLocationFromHtml, extractIcimsLocationFromTitleOrUrl, extractIcimsPostingDateFromHtml, extractIcimsRemoteTypeFromHtml, parseIcimsPostingsFromHtml } = require("./ingestion/sources/icims/parse");
+const { parseSmartRecruitersPostingsFromApi } = require("./ingestion/sources/smartrecruiters/parse");
 const { parseZohoPostingsFromHtml } = require("./ingestion/sources/zoho/parse");
 
 const PORT = Number(process.env.PORT || 8787);
@@ -3549,55 +3554,6 @@ function inferPostingLocationFromJobUrl(jobPostingUrl) {
   }
 }
 
-function pushUniqueText(values, value) {
-  const text = String(value || "").trim();
-  if (!text) return;
-  if (values.some((existing) => existing.toLowerCase() === text.toLowerCase())) return;
-  values.push(text);
-}
-
-function buildAddressLocationLabel(address) {
-  const postalAddress = address?.postalAddress && typeof address.postalAddress === "object"
-    ? address.postalAddress
-    : address && typeof address === "object"
-      ? address
-      : {};
-  const city = String(postalAddress?.addressLocality || postalAddress?.city || "").trim();
-  const state = String(postalAddress?.addressRegion || postalAddress?.state || postalAddress?.region || "").trim();
-  const country = String(postalAddress?.addressCountry || postalAddress?.country || "").trim();
-  const parts = [city, state, country].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "";
-}
-
-function extractAshbyLocationName(posting) {
-  const names = [];
-  pushUniqueText(names, posting?.locationName);
-  pushUniqueText(names, posting?.location);
-  pushUniqueText(names, buildAddressLocationLabel(posting?.address));
-
-  const secondary = Array.isArray(posting?.secondaryLocations) ? posting.secondaryLocations : [];
-  for (const location of secondary) {
-    pushUniqueText(names, location?.locationName);
-    pushUniqueText(names, location?.location);
-    pushUniqueText(names, buildAddressLocationLabel(location?.address));
-  }
-
-  return names.length > 0 ? names.join(" / ") : null;
-}
-
-function extractAshbyPrimaryLocationParts(posting) {
-  const address = posting?.address && typeof posting.address === "object" ? posting.address : {};
-  const rawLocation = String(posting?.locationName || posting?.location || "").trim();
-  const city = String(address?.addressLocality || address?.city || "").trim();
-  const state = String(address?.addressRegion || address?.state || address?.region || "").trim();
-  const country = String(address?.addressCountry || address?.country || "").trim();
-  return {
-    city: isRemoteOnlyLocationValue(city) ? "" : city,
-    state,
-    country: normalizeCountryName(country) || normalizeCountryFromLocation(rawLocation)
-  };
-}
-
 function parseAshbyCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -5696,106 +5652,6 @@ function parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson) {
   return postings;
 }
 
-function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJson) {
-  const result = Array.isArray(responseJson?.result) ? responseJson.result : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const row of result) {
-    const item = row && typeof row === "object" ? row : {};
-    const postingId = String(item?.id || "").trim();
-    const itemUrlRaw = String(item?.url || item?.jobUrl || item?.applyUrl || item?.applicationUrl || "").trim();
-    if (!itemUrlRaw && !postingId) continue;
-    const jobUrl = itemUrlRaw
-      ? new URL(itemUrlRaw, `${config.baseOrigin || config.boardUrl || ""}/`).toString()
-      : postingId
-        ? `${config.boardUrl}/${encodeURIComponent(postingId)}`
-        : "";
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-    const locationObject = item?.location && typeof item.location === "object" ? item.location : {};
-    const atsLocationObject = item?.atsLocation && typeof item.atsLocation === "object" ? item.atsLocation : {};
-    const rawLocationText = typeof item?.location === "string" ? String(item.location || "").trim() : "";
-    const rawAtsLocationText = typeof item?.atsLocation === "string" ? String(item.atsLocation || "").trim() : "";
-    const city = String(locationObject?.city || atsLocationObject?.city || "").trim();
-    const state = String(
-      locationObject?.state ||
-        locationObject?.province ||
-        locationObject?.region ||
-        atsLocationObject?.state ||
-        atsLocationObject?.province ||
-        atsLocationObject?.region ||
-        ""
-    ).trim();
-    const country = String(
-      locationObject?.country ||
-        atsLocationObject?.country ||
-        locationObject?.countryName ||
-        atsLocationObject?.countryName ||
-        locationObject?.countryCode ||
-        atsLocationObject?.countryCode ||
-        ""
-    ).trim();
-    const locationName = String(
-      locationObject?.name ||
-        atsLocationObject?.name ||
-        locationObject?.label ||
-        atsLocationObject?.label ||
-        locationObject?.displayName ||
-        atsLocationObject?.displayName ||
-        ""
-    ).trim();
-    const structuredLocation = [city, state, country].filter(Boolean).join(", ");
-    const location =
-      structuredLocation ||
-      locationName ||
-      rawLocationText ||
-      rawAtsLocationText ||
-      String(item?.employmentLocation || item?.workplaceLocation || "").trim() ||
-      (item?.isRemote ? "Remote" : null);
-
-    const postingDate =
-      String(
-        item?.postingDate ||
-          item?.postedDate ||
-          item?.postedAt ||
-          item?.publishedAt ||
-          item?.publishDate ||
-          item?.datePosted ||
-          item?.createdDate ||
-          item?.createdAt ||
-          item?.updatedDate ||
-          item?.updatedAt ||
-          item?.openedDate ||
-          item?.openDate ||
-          ""
-      ).trim() ||
-      null;
-
-    postings.push({
-      company_name: companyNameForPostings,
-      source_job_id: postingId || extractSourceIdFromPostingUrl(jobUrl, "bamboohr"),
-      id: postingId,
-      position_name: String(item?.jobOpeningName || item?.title || "").trim() || "Untitled Position",
-      job_posting_url: jobUrl,
-      posting_date: postingDate,
-      location,
-      city: isRemoteOnlyLocationValue(city) ? null : city || null,
-      country: country || null,
-      remote: item?.isRemote === true,
-      is_remote: item?.isRemote === true,
-      workplaceType:
-        String(item?.workplaceType || item?.workplace_type || item?.remoteStatus || item?.locationType || "").trim() ||
-        (item?.isRemote === true ? "remote" : null),
-      department: String(item?.departmentLabel || item?.department || "").trim() || null,
-      employment_type: String(item?.employmentStatusLabel || item?.employmentStatus || "").trim() || null
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return postings;
-}
-
 function extractAdpMyjobsLocationParts(locationItem) {
   const item = locationItem && typeof locationItem === "object" ? locationItem : {};
   const nameCode = item?.nameCode && typeof item.nameCode === "object" ? item.nameCode : {};
@@ -6227,279 +6083,6 @@ function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJ
     });
     seenUrls.add(jobUrl);
     if (reqId) seenIds.add(reqId);
-  }
-
-  return postings;
-}
-
-function formatPinpointHqLocation(locationValue) {
-  const location = locationValue && typeof locationValue === "object" ? locationValue : {};
-  const city = String(location?.city || "").trim();
-  const province = String(location?.province || "").trim();
-  const countryOrName = String(location?.name || "").trim();
-  const parts = [city, province, countryOrName].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
-}
-
-function parsePinpointHqPostingsFromApi(companyNameForPostings, config, responseJson) {
-  const data = Array.isArray(responseJson?.data) ? responseJson.data : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const row of data) {
-    const item = row && typeof row === "object" ? row : {};
-    const itemUrlRaw = String(item?.url || "").trim();
-    const itemPathRaw = String(item?.path || "").trim();
-    const jobUrl = itemUrlRaw
-      ? itemUrlRaw
-      : itemPathRaw
-        ? new URL(itemPathRaw, `${config.baseOrigin || config.boardUrl || ""}/`).toString()
-        : "";
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-    const postingDate =
-      String(item?.posted_at || item?.published_at || item?.created_at || item?.updated_at || item?.deadline_at || "").trim() ||
-      null;
-    const department = String(item?.job?.department?.name || "").trim() || null;
-
-    postings.push({
-      company_name: companyNameForPostings,
-      source_job_id:
-        String(item?.id ?? item?.uuid ?? item?.job_id ?? item?.jobId ?? "").trim() ||
-        extractSourceIdFromPostingUrl(jobUrl, "pinpointhq"),
-      id: String(item?.id ?? item?.uuid ?? "").trim() || undefined,
-      position_name: String(item?.title || "").trim() || "Untitled Position",
-      job_posting_url: jobUrl,
-      posting_date: postingDate,
-      location: formatPinpointHqLocation(item?.location),
-      department,
-      employment_type: String(item?.employment_type_text || item?.employment_type || "").trim() || null,
-      workplace_type: String(item?.workplace_type_text || item?.workplace_type || "").trim() || null
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return postings;
-}
-
-function formatRecruitCrmLocation(item) {
-  const parts = extractRecruitCrmLocationParts(item);
-  if (parts.locationText) return parts.locationText;
-  const values = [parts.city, parts.locality, parts.state, parts.country, parts.postalCode].filter(Boolean);
-  return values.length > 0 ? values.join(", ") : null;
-}
-
-function recruitCrmLocationObject(item = {}) {
-  const candidates = [
-    item?.location,
-    item?.job_location,
-    item?.jobLocation,
-    item?.job_location_data,
-    item?.work_location,
-    item?.workLocation,
-    item?.address
-  ];
-  for (const candidate of candidates) {
-    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) return candidate;
-  }
-  return {};
-}
-
-function recruitCrmLocationText(item = {}) {
-  const direct = [
-    item?.location,
-    item?.job_location,
-    item?.jobLocation,
-    item?.location_name,
-    item?.locationName,
-    item?.work_location,
-    item?.workLocation,
-    item?.address
-  ].find((value) => typeof value === "string" && value.trim());
-  if (direct) return String(direct).trim();
-
-  const location = recruitCrmLocationObject(item);
-  return String(
-    location?.name ||
-      location?.label ||
-      location?.display_name ||
-      location?.displayName ||
-      location?.formatted_address ||
-      location?.formattedAddress ||
-      location?.address ||
-      ""
-  ).trim();
-}
-
-function extractRecruitCrmLocationParts(item = {}) {
-  const location = recruitCrmLocationObject(item);
-  const city = String(item?.city || location?.city || location?.city_name || location?.cityName || "").trim();
-  const locality = String(item?.locality || location?.locality || location?.suburb || "").trim();
-  const state = String(
-    item?.state ||
-      item?.province ||
-      item?.region ||
-      item?.state_name ||
-      location?.state ||
-      location?.province ||
-      location?.region ||
-      location?.state_name ||
-      location?.stateName ||
-      ""
-  ).trim();
-  const country = String(
-    item?.country ||
-      item?.country_name ||
-      item?.countryCode ||
-      item?.country_code ||
-      location?.country ||
-      location?.country_name ||
-      location?.countryName ||
-      location?.countryCode ||
-      location?.country_code ||
-      ""
-  ).trim();
-  const postalCode = String(item?.postalcode || item?.postal_code || location?.postalcode || location?.postal_code || "").trim();
-  const locationText = recruitCrmLocationText(item);
-  return {
-    city,
-    locality,
-    state,
-    country,
-    postalCode,
-    locationText
-  };
-}
-
-function normalizeRecruitCrmJobUrl(config = {}, itemUrlRaw, slug) {
-  const publicJobsUrl = String(config.publicJobsUrl || "").replace(/\/+$/, "");
-  const rawUrl = String(itemUrlRaw || "").trim();
-  if (rawUrl) {
-    const parsed = parseUrl(rawUrl);
-    if (parsed?.protocol && parsed?.host) return parsed.toString();
-    if (publicJobsUrl && rawUrl.startsWith("/")) {
-      try {
-        return new URL(rawUrl, `${publicJobsUrl}/`).toString();
-      } catch {
-        // Fall through to slug fallback.
-      }
-    }
-  }
-  const stableSlug = String(slug || "").trim();
-  return publicJobsUrl && stableSlug ? `${publicJobsUrl}/${encodeURIComponent(stableSlug)}` : "";
-}
-
-function normalizeRecruitCrmRemoteType(item = {}) {
-  const rawRemote = String(item?.remote ?? item?.is_remote ?? item?.isRemote ?? "").trim().toLowerCase();
-  if (["1", "true", "yes", "remote"].includes(rawRemote)) return "remote";
-  if (["0", "false", "no", "onsite", "on-site", "non-remote"].includes(rawRemote)) return "onsite";
-
-  const workplaceType = String(item?.workplace_type || item?.workplaceType || item?.workplace_type_text || "").trim().toLowerCase();
-  if (["remote", "hybrid", "onsite", "on-site"].includes(workplaceType)) {
-    return workplaceType === "on-site" ? "onsite" : workplaceType;
-  }
-  return "";
-}
-
-function extractRecruitCrmJobs(responseJson) {
-  const data = responseJson?.data;
-  const candidates = [
-    data?.jobs,
-    data?.records,
-    data?.items,
-    data?.jobs?.data,
-    data?.result?.jobs,
-    responseJson?.jobs,
-    responseJson?.records,
-    responseJson?.items,
-    responseJson?.result?.jobs,
-    data
-  ];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate;
-  }
-  return [];
-}
-
-function isRecruitCrmPlaceholderTitle(value) {
-  return /^(untitled|unknown|n\/?a|not available|job opening|new job|open position|position)$/i.test(
-    String(value || "").replace(/\s+/g, " ").trim()
-  );
-}
-
-function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, responseJson) {
-  const jobs = extractRecruitCrmJobs(responseJson);
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const row of jobs) {
-    const item = row && typeof row === "object" ? row : {};
-    const slug = String(item?.slug || "").trim();
-    const itemUrlRaw = String(item?.url || item?.job_url || item?.jobUrl || item?.public_url || item?.publicUrl || item?.apply_url || item?.applyUrl || "").trim();
-    const itemUrl = normalizeRecruitCrmJobUrl(config, itemUrlRaw, slug);
-    if (!itemUrl || seenUrls.has(itemUrl)) continue;
-
-    const postingDate =
-      String(
-        item?.posted_at ||
-          item?.published_at ||
-          item?.publishedAt ||
-          item?.postedAt ||
-          item?.created_at ||
-          item?.createdAt ||
-          item?.updated_at ||
-          item?.updatedAt ||
-          item?.createdon ||
-          item?.updatedon ||
-          ""
-      ).trim() || null;
-    const remoteType = normalizeRecruitCrmRemoteType(item);
-    const locationParts = extractRecruitCrmLocationParts(item);
-    const sourceCountry = locationParts.country;
-    const sourceCity = locationParts.city;
-    const sourceState = locationParts.state;
-    const sourceLocality = locationParts.locality;
-    const sourcePostalCode = locationParts.postalCode;
-    const formattedLocation = formatRecruitCrmLocation(item);
-    const hasStructuredGeo = Boolean(sourceCity || sourceLocality || sourceState || sourceCountry || sourcePostalCode);
-    const sourceFailureReasons = [];
-    if (remoteType === "onsite" && !hasStructuredGeo && !formattedLocation) {
-      sourceFailureReasons.push("no_structured_location");
-    }
-    const sourceJobId =
-      String(item?.id ?? item?.job_id ?? item?.jobId ?? item?.uuid ?? item?.jobcode ?? item?.job_code ?? item?.code ?? slug).trim() ||
-      extractSourceIdFromPostingUrl(itemUrl, "recruitcrm");
-    const rawTitle = String(item?.name || item?.job_title || item?.jobTitle || item?.title || "").trim();
-
-    postings.push({
-      company_name: companyNameForPostings,
-      source_job_id: sourceJobId,
-      id: String(item?.id ?? item?.job_id ?? item?.jobId ?? "").trim() || undefined,
-      position_name: rawTitle && !isRecruitCrmPlaceholderTitle(rawTitle) ? rawTitle : "Untitled Position",
-      job_posting_url: itemUrl,
-      posting_date: postingDate,
-      location: remoteType === "remote" ? "Remote" : formattedLocation,
-      city: sourceCity || null,
-      state: sourceState || null,
-      country: normalizeCountryName(sourceCountry) ||
-        normalizeCountryFromLocation(sourceCountry) ||
-        normalizeCountryFromLocation(formattedLocation) ||
-        null,
-      remote_type: remoteType || null,
-      employment_type: String(item?.employment_type || item?.job_type || item?.jobType || "").trim() || null,
-      department: String(item?.department?.name || item?.department || item?.team?.name || item?.team || "").trim() || null,
-      source_evidence: {
-        route_kind: "recruitcrm_jobs_api",
-        location_source: formattedLocation ? "list_api" : "",
-        location_path: formattedLocation ? "location/job_location/city/state/country" : "",
-        remote_source: remoteType ? "list_api" : "",
-        remote_path: remoteType ? "remote/workplace_type" : "",
-        posting_date_source: postingDate ? "list_api" : "",
-        posting_date_path: postingDate ? "posted_at/published_at/created_at/updated_at" : ""
-      },
-      source_failure_reasons: sourceFailureReasons
-    });
-    seenUrls.add(itemUrl);
   }
 
   return postings;
@@ -7559,11 +7142,6 @@ function extractIcimsNextPageUrlFromHtml(pageHtml, currentUrl) {
   }
 
   return null;
-}
-
-function buildAshbyJobUrl(organizationHostedJobsPageName, jobId) {
-  if (!organizationHostedJobsPageName || !jobId) return "";
-  return `https://jobs.ashbyhq.com/${organizationHostedJobsPageName}/${jobId}`;
 }
 
 function sleep(ms) {
@@ -9355,57 +8933,6 @@ function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
   return collected;
 }
 
-function parseAshbyPostingsFromApi(companyNameForPostings, config, response) {
-  const graphQlJobBoard = response?.data?.jobBoard;
-  const jobPostings = Array.isArray(graphQlJobBoard?.jobPostings)
-    ? graphQlJobBoard.jobPostings
-    : Array.isArray(response?.jobs)
-      ? response.jobs
-      : [];
-  const teams = Array.isArray(graphQlJobBoard?.teams) ? graphQlJobBoard.teams : [];
-  const teamNameById = new Map(
-    teams
-      .map((team) => [String(team?.id || "").trim(), String(team?.externalName || team?.name || "").trim()])
-      .filter(([id, name]) => id && name)
-  );
-  const companyName = String(companyNameForPostings || config?.organizationHostedJobsPageNameLower || "").trim();
-  const collected = [];
-  const seenUrls = new Set();
-
-  for (const posting of jobPostings) {
-    const jobId = String(posting?.id || "").trim();
-    const jobUrl = String(posting?.jobUrl || "").trim() || buildAshbyJobUrl(config?.organizationHostedJobsPageName, jobId);
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-    const primaryLocation = extractAshbyPrimaryLocationParts(posting);
-
-    collected.push({
-      company_name: companyName,
-      source_job_id: jobId || extractSourceIdFromPostingUrl(jobUrl, "ashby"),
-      id: jobId || undefined,
-      position_name: String(posting?.title || "").trim() || "Untitled Position",
-      job_posting_url: jobUrl,
-      apply_url: String(posting?.applyUrl || "").trim() || jobUrl,
-      posting_date: String(posting?.publishedAt || posting?.createdAt || "").trim() || null,
-      location: extractAshbyLocationName(posting),
-      city: primaryLocation.city || null,
-      state: primaryLocation.state || null,
-      country: primaryLocation.country || null,
-      workplaceType: String(posting?.workplaceType || "").trim() || (posting?.isRemote === true ? "Remote" : null),
-      remote: posting?.isRemote === true,
-      employment_type: String(posting?.employmentType || "").trim() || null,
-      department:
-        String(posting?.department || posting?.team || "").trim() ||
-        teamNameById.get(String(posting?.teamId || "").trim()) ||
-        null,
-      description_html: String(posting?.descriptionHtml || "").trim() || null,
-      description_plain: String(posting?.descriptionPlain || "").trim() || null
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return collected;
-}
-
 async function collectPostingsForAshbyCompany(company) {
   const config = parseAshbyCompany(company.url_string);
   if (!config) return [];
@@ -9861,6 +9388,13 @@ async function collectPostingsForBrassringCompany(company) {
     String(companyName || "").trim() ||
     `${String(config.partnerId || "").trim()}_${String(config.siteId || "").trim()}`;
   return parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson);
+}
+
+function cleanSmartRecruitersText(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeApplitrackUrl(url) {
@@ -11141,104 +10675,6 @@ async function collectPostingsForGovernmentJobsDynamic() {
       seenUrls.add(posting.job_posting_url);
       postings.push(posting);
     }
-  }
-
-  return postings;
-}
-
-function cleanSmartRecruitersText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function buildSmartRecruitersLocationLabel(locationObj, shortLocation) {
-  const locationData = locationObj && typeof locationObj === "object" ? locationObj : {};
-  const city = cleanSmartRecruitersText(locationData.city);
-  const region = cleanSmartRecruitersText(locationData.region);
-  const country = cleanSmartRecruitersText(locationData.country);
-  const structuredParts = [city, region, country].filter(Boolean);
-  const structured = structuredParts.length > 0 ? structuredParts.join(", ") : "";
-  const shortValue = cleanSmartRecruitersText(shortLocation);
-  if (structured && shortValue && normalizeRemoteType(shortValue) !== "unknown") {
-    return `${shortValue} - ${structured}`;
-  }
-  return structured || shortValue || null;
-}
-
-function extractSmartRecruitersLocationParts(locationObj) {
-  const locationData = locationObj && typeof locationObj === "object" ? locationObj : {};
-  const city = cleanSmartRecruitersText(locationData.city);
-  const region = cleanSmartRecruitersText(locationData.region);
-  const country = cleanSmartRecruitersText(locationData.country);
-  return {
-    city: isRemoteOnlyLocationValue(city) ? "" : city,
-    state: region,
-    country: normalizeCountryName(country) || normalizeCountryFromLocation(country)
-  };
-}
-
-function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, payload) {
-  const contentItems = Array.isArray(payload?.content)
-    ? payload.content
-    : Array.isArray(payload?.jobs)
-      ? payload.jobs
-      : Array.isArray(payload)
-        ? payload
-        : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const item of contentItems) {
-    if (!item || typeof item !== "object") continue;
-
-    const rawJobUrl =
-      cleanSmartRecruitersText(item.applyUrl) ||
-      cleanSmartRecruitersText(item.ref) ||
-      cleanSmartRecruitersText(item.jobUrl) ||
-      cleanSmartRecruitersText(item.url);
-    if (!rawJobUrl || seenUrls.has(rawJobUrl)) continue;
-
-    const company = item.company && typeof item.company === "object" ? item.company : {};
-    const companyName =
-      cleanSmartRecruitersText(companyNameForPostings) ||
-      cleanSmartRecruitersText(company.name) ||
-      cleanSmartRecruitersText(config?.companySlug);
-    const title = cleanSmartRecruitersText(item.name || item.title) || "Untitled Position";
-    const location = buildSmartRecruitersLocationLabel(item.location, item.shortLocation);
-    const locationParts = extractSmartRecruitersLocationParts(item.location);
-    const postedDate = cleanSmartRecruitersText(item.releasedDate || item.updatedOn || item.createdOn) || null;
-    const department =
-      cleanSmartRecruitersText(item.department?.label || item.department?.name || item.department) || null;
-    const employmentType =
-      cleanSmartRecruitersText(item.typeOfEmployment?.label || item.typeOfEmployment?.name || item.typeOfEmployment || item.employmentType) || null;
-    const jobAdSections = item.jobAd?.sections && typeof item.jobAd.sections === "object" ? item.jobAd.sections : {};
-
-    postings.push({
-      company_name: companyName,
-      source_job_id:
-        String(item?.id ?? item?.uuid ?? item?.refNumber ?? "").trim() ||
-        extractSourceIdFromPostingUrl(rawJobUrl, "smartrecruiters"),
-      id: String(item?.id ?? "").trim() || undefined,
-      position_name: title,
-      job_posting_url: rawJobUrl,
-      posting_date: postedDate,
-      location,
-      city: locationParts.city || null,
-      state: locationParts.state || null,
-      country: locationParts.country || null,
-      department,
-      employment_type: employmentType,
-      workplaceType:
-        cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
-        (item.remote === true ? "remote" : null),
-      remote: item.remote === true || item.isRemote === true,
-      industry: cleanSmartRecruitersText(item.industry?.label || item.industry?.name || item.industry) || null,
-      description_html: cleanSmartRecruitersText(jobAdSections.jobDescription || item.descriptionHtml) || null,
-      description_plain: cleanSmartRecruitersText(item.descriptionPlain || item.description) || null
-    });
-    seenUrls.add(rawJobUrl);
   }
 
   return postings;
