@@ -54,6 +54,19 @@ test("parseBacklogArgs accepts diagnostics, target ATS list, and error window", 
   assert.equal(options.recentRunLimit, 10);
 });
 
+test("parseBacklogArgs treats --sources as a target ATS alias for scoped audits", () => {
+  const options = parseBacklogArgs([
+    "--diagnostics",
+    "--sources=applytojob,breezy,applytojob",
+    "--recent-run-limit",
+    "10"
+  ]);
+
+  assert.equal(options.diagnostics, true);
+  assert.deepEqual(options.targetAtsKeys, ["applytojob", "breezy"]);
+  assert.equal(options.recentRunLimit, 10);
+});
+
 test("parseBacklogArgs accepts optional read-only empty target probe controls", () => {
   const options = parseBacklogArgs([
     "--diagnostics",

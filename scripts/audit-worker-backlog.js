@@ -103,7 +103,9 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     if (arg === "--json") options.json = true;
     else if (arg === "--diagnostics") options.diagnostics = true;
     else if (arg.startsWith("--targets=")) options.targetAtsKeys = parseTargetAtsKeys(arg.slice("--targets=".length));
+    else if (arg.startsWith("--sources=")) options.targetAtsKeys = parseTargetAtsKeys(arg.slice("--sources=".length));
     else if (arg === "--targets") options.expectTargets = true;
+    else if (arg === "--sources") options.expectTargets = true;
     else if (arg.startsWith("--error-window-hours=")) options.errorWindowHours = Number(arg.slice("--error-window-hours=".length));
     else if (arg === "--error-window-hours") options.expectErrorWindowHours = true;
     else if (arg.startsWith("--limit=")) options.limit = Number(arg.slice("--limit=".length));
