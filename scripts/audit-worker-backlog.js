@@ -1431,19 +1431,19 @@ function summarizeParserBugEvidenceForPriority(recentSummary = {}, parserDriftRe
     Number(parserDriftRecheck?.current_policy_resolved_count || currentPolicyPassCount + currentPolicyEmptyNoJobsCount)
   );
   const skippedNoBaselineCount = Math.max(0, Number(parserDriftRecheck?.skipped_no_baseline_count || 0));
+  const adjustedParserBugCount = Math.max(0, Number(adjustedCounts?.parser_bug || 0));
   const parserDriftUnrecheckedCount = Math.max(0, rawParserDriftCount - sampleCount);
   const parserDriftUnverifiedCount = parserDriftUnrecheckedCount + skippedNoBaselineCount;
-  const confirmedParserBugCount = rawNonDriftParserBugCount + stillDriftCount;
-  const adjustedParserBugCount = Math.max(0, Number(adjustedCounts?.parser_bug || 0));
+  const confirmedParserBugCount = Math.min(adjustedParserBugCount, rawNonDriftParserBugCount + stillDriftCount);
   const status = rawParserBugCount <= 0
     ? "none"
-    : confirmedParserBugCount > 0
+    : adjustedParserBugCount <= 0
+      ? "current_policy_resolved"
+      : confirmedParserBugCount > 0
       ? "confirmed_parser_bug"
       : parserDriftUnverifiedCount > 0
         ? "parser_bug_unrechecked"
-        : adjustedParserBugCount > 0
-          ? "parser_bug_unclassified"
-          : "current_policy_resolved";
+        : "parser_bug_unclassified";
 
   return {
     status,

@@ -1533,6 +1533,54 @@ test("attachBacklogDiagnostics separates unrechecked parser drift from real pars
   assert.ok(!applytojob.reasons.includes("real_parser_bug"));
 });
 
+test("attachBacklogDiagnostics marks parser bug evidence resolved when current-policy adjustment clears it", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "ashby",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 25,
+      due_count: 20,
+      runnable_due_count: 20,
+      failure_pressure: 5,
+      failing_due_count: 5
+    }
+  ]);
+
+  const report = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      recentErrorRows: [
+        { ats_key: "ashby", error_type: "parser_validation", error_message: "parser drift detected", count: 2 },
+        { ats_key: "ashby", error_type: "source_quality", error_message: "no_geo_no_remote", count: 1 }
+      ],
+      parserDriftRecheckRows: [
+        {
+          ats_key: "ashby",
+          baseline_shape_paths: ["jobs:array", "jobs[]:object", "jobs[].id:string"],
+          observed_shape_paths: ["jobs:array", "jobs[]:empty"]
+        },
+        {
+          ats_key: "ashby",
+          baseline_shape_paths: ["jobs:array", "jobs[]:object", "jobs[].id:string"],
+          observed_shape_paths: ["jobs:array", "jobs[]:empty"]
+        }
+      ]
+    }
+  );
+
+  const [ashby] = report.diagnostics.worker_success_recovery_priorities.sources;
+  assert.equal(ashby.current_policy_adjusted_failure_reason_counts.parser_bug, 0);
+  assert.equal(ashby.current_policy_adjusted_failure_reason_counts.empty_no_jobs, 2);
+  assert.equal(ashby.parser_bug_evidence.status, "current_policy_resolved");
+  assert.equal(ashby.parser_bug_evidence.confirmed_parser_bug_count, 0);
+  assert.ok(!ashby.reasons.includes("real_parser_bug"));
+});
+
 test("buildThroughputScalingGate allows only small increase after clean worker evidence", () => {
   const gate = buildThroughputScalingGate({
     latestRun: {
