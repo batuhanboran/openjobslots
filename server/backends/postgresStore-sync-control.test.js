@@ -1127,6 +1127,63 @@ async function testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape() 
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "empty-jobs",
+            shape_paths: [
+              "__sourceConfig.account:string",
+              "__sourceConfig.apiUrl:string",
+              "__sourceConfig.publicJobsUrl:string",
+              "__sourceConfig:object",
+              "data.jobs:array",
+              "data.jobs[]:empty",
+              "data:object"
+            ],
+            observed_count: 13
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected payload drift query: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    { atsKey: "recruitcrm", companyUrl: "https://recruitcrm.io/jobs/acme", company: { company_name: "Acme" } },
+    {
+      data: {
+        jobs: [
+          {
+            srno: "1",
+            slug: "remote-engineer",
+            name: "Remote Engineer",
+            remote: "1",
+            city: "Berlin"
+          }
+        ]
+      },
+      __sourceConfig: {
+        account: "acme",
+        apiUrl: "https://albatross.recruitcrm.io/v1/external-pages/jobs-by-account/get?account=acme&batch=true",
+        publicJobsUrl: "https://recruitcrm.io/jobs/acme"
+      }
+    },
+    "source-recruitcrm-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.baseline_replaced, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPublicSearchEventInsertIsPrivacyBounded() {
   const calls = [];
   const pool = {
@@ -1327,6 +1384,7 @@ async function main() {
   await testPostgresCountsCacheReusesShortTtlSnapshot();
   await testPayloadDriftDoesNotBootstrapEmptyShapes();
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
+  await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
   await testPublicSearchEventInsertIsPrivacyBounded();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
   await testPublicSearchReportResolvesTodayInRequestedTimezone();

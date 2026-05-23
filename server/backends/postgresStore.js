@@ -1996,6 +1996,32 @@ async function listPostgresParserDriftEvents(pool, limit = 100) {
   }));
 }
 
+function emptyArrayPathStem(path) {
+  const match = String(path || "").match(/^(.*)\[\]:empty$/);
+  return match ? match[1] : "";
+}
+
+function shouldReplaceEmptyArrayBaseline(baselinePaths = [], observedPaths = []) {
+  const baseline = Array.isArray(baselinePaths) ? baselinePaths : [];
+  const observed = Array.isArray(observedPaths) ? observedPaths : [];
+  const observedSet = new Set(observed);
+  const emptyArrayStems = baseline.map(emptyArrayPathStem).filter(Boolean);
+  if (emptyArrayStems.length === 0) return false;
+
+  for (const stem of emptyArrayStems) {
+    const baselineHasPopulatedShape = baseline.some((path) =>
+      String(path || "").startsWith(`${stem}[]:`) && String(path || "") !== `${stem}[]:empty`
+    );
+    if (baselineHasPopulatedShape) continue;
+    if (observedSet.has(`${stem}:array`) && observed.some((path) =>
+      String(path || "").startsWith(`${stem}[]:`) && String(path || "") !== `${stem}[]:empty`
+    )) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersion, options = {}) {
   const { analyzePayloadShape, detectParserDrift } = require("../ingestion/sourceQualityPolicy");
   const atsKey = String(target?.atsKey || "").trim();
@@ -2039,6 +2065,20 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
       [atsKey, version, observed.shape_hash, JSON.stringify(observed.shape_paths)]
     );
     return { drift: false, baseline_replaced: true, observed, baseline };
+  }
+  if (shouldReplaceEmptyArrayBaseline(baselinePaths, observedPaths)) {
+    await pool.query(
+      `
+        UPDATE source_payload_shapes
+        SET shape_hash = $3,
+            shape_paths = $4::jsonb,
+            observed_count = GREATEST(observed_count, 0) + 1,
+            last_seen_at = now()
+        WHERE ats_key = $1 AND parser_version = $2;
+      `,
+      [atsKey, version, observed.shape_hash, JSON.stringify(observed.shape_paths)]
+    );
+    return { drift: false, baseline_replaced: true, empty_array_baseline_replaced: true, observed, baseline };
   }
   const drift = detectParserDrift(
     {
