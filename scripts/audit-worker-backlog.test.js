@@ -194,7 +194,7 @@ test("buildSourceBudgetUsageQuery mirrors worker source budget accounting", () =
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
-test("buildTargetFailurePressureQuery is read-only and bounded by due targets", () => {
+test("buildTargetFailurePressureQuery is read-only and returns full due failure pressure", () => {
   const query = buildTargetFailurePressureQuery({
     nowEpoch: 1_800_086_400,
     errorWindowHours: 48,
@@ -202,12 +202,12 @@ test("buildTargetFailurePressureQuery is read-only and bounded by due targets", 
     limit: 15
   });
 
-  assert.deepEqual(query.values, [1_800_086_400, 48, ["applytojob", "breezy"], 15]);
+  assert.deepEqual(query.values, [1_800_086_400, 48, ["applytojob", "breezy"]]);
   assert.match(query.sql, /WITH due_targets AS/i);
   assert.match(query.sql, /JOIN company_sync_state/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
   assert.match(query.sql, /COALESCE\(st\.consecutive_failures, 0\)/i);
-  assert.match(query.sql, /LIMIT \$4/i);
+  assert.doesNotMatch(query.sql, /LIMIT \$4/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -283,6 +283,52 @@ test("summarizeTargetFailurePressureRows falls back to last error when recent gr
   assert.equal(summary.by_source.recruitcrm.by_reason.parser_bug, 1);
   assert.equal(summary.top_targets[0].dominant_failure_reason, "parser_bug");
   assert.equal(summary.top_targets[0].next_action, "add fixture and fix parser before counting this source as scalable");
+});
+
+test("summarizeTargetFailurePressureRows keeps full source totals while bounding top targets", () => {
+  const rows = [
+    {
+      ats_key: "breezy",
+      company_url: "https://one.breezy.hr",
+      company_name: "One",
+      protection_status: "normal",
+      consecutive_failures: 3,
+      recent_error_groups: [
+        { error_type: "portal_search_empty", error_message: "no jobs", count: 2 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://two.breezy.hr",
+      company_name: "Two",
+      protection_status: "normal",
+      consecutive_failures: 2,
+      recent_error_groups: [
+        { error_type: "portal_search_empty", error_message: "no jobs", count: 1 }
+      ]
+    },
+    {
+      ats_key: "applytojob",
+      company_url: "https://jobs.example.com",
+      company_name: "Apply",
+      protection_status: "normal",
+      consecutive_failures: 1,
+      recent_error_groups: [
+        { error_type: "parser_drift", error_message: "shape drift", count: 1 }
+      ]
+    }
+  ];
+
+  const summary = summarizeTargetFailurePressureRows(rows, { limit: 1 });
+
+  assert.equal(summary.target_count, 3);
+  assert.equal(summary.sample_limit, 1);
+  assert.equal(summary.by_source.breezy.target_count, 2);
+  assert.equal(summary.by_source.breezy.failure_pressure, 5);
+  assert.equal(summary.by_source.breezy.by_reason.empty_no_jobs, 3);
+  assert.equal(summary.by_source.applytojob.by_reason.parser_bug, 1);
+  assert.equal(summary.top_targets.length, 1);
+  assert.equal(summary.top_targets[0].company_url, "https://one.breezy.hr");
 });
 
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {

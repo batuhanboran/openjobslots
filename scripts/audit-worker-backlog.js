@@ -619,9 +619,8 @@ function buildTargetFailurePressureQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
-  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.targetPressureLimit || options.limit || 25))));
   return {
-    values: [nowEpoch, errorWindowHours, targetAtsKeys, limit],
+    values: [nowEpoch, errorWindowHours, targetAtsKeys],
     sql: `
       WITH due_targets AS (
         SELECT
@@ -707,8 +706,7 @@ function buildTargetFailurePressureQuery(options = {}) {
         d.last_failure_epoch DESC,
         d.ats_key ASC,
         d.company_name ASC,
-        d.company_url ASC
-      LIMIT $4;
+        d.company_url ASC;
     `
   };
 }
@@ -1661,7 +1659,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     failure_pressure: failurePressure,
     recent_error_count: recentErrorCount,
     by_source: bySource,
-    top_targets: topTargets
+    top_targets: topTargets.slice(0, limit)
   };
 }
 
