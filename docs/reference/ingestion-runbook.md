@@ -53,6 +53,12 @@ The runner acquires the global heavy-job lock, uses bounded Postgres statement t
 - Disabled ATS sources are excluded from due-target selection.
 - Worker startup marks stale `running`/`stopping` runs as `interrupted` and clears stale sync control.
 
+## Throughput Budget Gate
+
+Use `npm run audit:source-freshness -- --json` and `npm run audit:worker-backlog -- --diagnostics --json` before changing worker budget or targets per run. Increase throughput only when target success is at least `80%`, Meili/Postgres delta is `0`, no heavy job is active, `parser_attention_unresolved_count` is clean, due-by-ATS does not show a single failing source consuming the queue, and the last 24 hours added `0` new `no_geo_no_remote` public rows.
+
+When the gate is not clean, keep the current budget and fix the dominant failure reason first: `parser_bug`, `source_quality`, `rate_limit`, `network`, `empty_no_jobs`, or `auth`. Do not use a higher budget to compensate for low success rate.
+
 ## Status And Diagnostics
 
 Public coarse endpoints:

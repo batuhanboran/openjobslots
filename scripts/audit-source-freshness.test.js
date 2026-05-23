@@ -1,6 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parseArgs } = require("./audit-source-freshness");
+const {
+  createDailySourceHealthSummary,
+  parseArgs
+} = require("./audit-source-freshness");
 const {
   createSourceFreshnessReportFromRows,
   cutoffEpochForDays
@@ -12,6 +15,64 @@ test("parseArgs accepts source freshness window and output controls", () => {
   assert.equal(options.days, 30);
   assert.equal(options.limit, 5);
   assert.equal(options.output, "C:\\tmp\\fresh.json");
+});
+
+test("createDailySourceHealthSummary reports read-only worker budget, freshness, and failure taxonomy", () => {
+  const summary = createDailySourceHealthSummary({
+    dueRows: [{ targets_due: 42 }],
+    runRows: [{
+      targets_processed: 10,
+      success_count: 8,
+      failure_count: 2,
+      posting_upsert_count: 77,
+      rejected_count: 4
+    }],
+    postingRows: [{
+      rows_seen: 55,
+      rows_new: 12
+    }],
+    failureRows: [
+      {
+        ats_key: "breezy",
+        error_type: "portal_search_empty",
+        http_status: 200,
+        error_message: "Breezy public portal returned no parseable postings",
+        count: 5
+      },
+      {
+        ats_key: "greenhouse",
+        error_type: "fetch_error",
+        http_status: 429,
+        error_message: "rate limited",
+        count: 3
+      }
+    ]
+  }, {
+    nowEpoch: 1_800_000_000,
+    healthWindowHours: 24,
+    env: {
+      INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET: "1000",
+      INGESTION_AUTO_SYNC_TARGETS_PER_RUN: "25"
+    }
+  });
+
+  assert.equal(summary.read_only, true);
+  assert.equal(summary.window_hours, 24);
+  assert.equal(summary.daily_target_budget, 1000);
+  assert.equal(summary.targets_per_run, 25);
+  assert.equal(summary.targets_due, 42);
+  assert.equal(summary.targets_processed_24h, 10);
+  assert.equal(summary.target_success_pct_24h, 80);
+  assert.equal(summary.rows_seen_24h, 55);
+  assert.equal(summary.rows_new_24h, 12);
+  assert.equal(summary.rejected_candidates_24h, 4);
+  assert.deepEqual(summary.failure_reason_counts_24h, {
+    empty_no_jobs: 5,
+    rate_limit: 3
+  });
+  assert.equal(summary.top_failure_sources[0].ats_key, "breezy");
+  assert.equal(summary.top_failure_sources[0].dominant_failure_reason, "empty_no_jobs");
+  assert.equal(summary.top_failure_sources[1].dominant_failure_reason, "rate_limit");
 });
 
 test("source freshness report marks stale sources due without mutating data", () => {
