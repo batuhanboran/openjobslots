@@ -1,3 +1,7 @@
 const { createSourceModule } = require("../common");
+const parser = require("./parse");
 
-module.exports = createSourceModule("pageup");
+module.exports = {
+  ...createSourceModule("pageup"),
+  ...parser
+};

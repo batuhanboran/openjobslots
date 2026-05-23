@@ -8,12 +8,8 @@ const {
   parseAdpMyjobsPostingsFromApi,
   parseAdpWorkforcenowPostingsFromApi,
   parseBrassringPostingsFromApi,
-  parseFountainPostingsFromApi,
-  parseHirebridgePostingsFromHtml,
-  parseHrmDirectPostingsFromHtml,
   parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
-  parsePageupPostingsFromResults,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
@@ -28,7 +24,10 @@ const {
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
+const { parseFountainPostingsFromApi } = require("./fountain/parse");
 const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
+const { parseHirebridgePostingsFromHtml } = require("./hirebridge/parse");
+const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsPostingDateFromHtml,
@@ -37,6 +36,7 @@ const {
 } = require("./icims/parse");
 const { parseJobvitePostingsFromHtml } = require("./jobvite/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
+const { parsePageupPostingsFromResults } = require("./pageup/parse");
 const {
   extractTaleoPostingsFromAjax,
   extractTaleoPostingsFromRest
