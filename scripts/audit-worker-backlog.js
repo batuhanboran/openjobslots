@@ -221,8 +221,11 @@ function isSourceQualityValidationMessage(message) {
 function classifyFailureReason(errorType, httpStatus = 0, errorMessage = "") {
   const type = String(errorType || "unknown").trim().toLowerCase() || "unknown";
   const status = normalizeHttpStatus(httpStatus);
+  const message = String(errorMessage || "").trim().toLowerCase();
   if (status === 429 || RATE_LIMIT_ERROR_TYPES.includes(type)) return "rate_limit";
   if (isSourceQualityParserValidation(type, errorMessage)) return "source_quality";
+  if (type === "unknown" && isSourceQualityValidationMessage(errorMessage)) return "source_quality";
+  if (message.includes("parser drift") || message.includes("payload shape similarity")) return "parser_bug";
   if (isParserAttentionErrorType(type) || type.startsWith("parser_")) return "parser_bug";
   if (SOURCE_QUALITY_ERROR_TYPES.includes(type)) return "source_quality";
   if (EMPTY_NO_JOBS_ERROR_TYPES.includes(type)) return "empty_no_jobs";
@@ -1095,6 +1098,13 @@ function dominantFailureReason(summary = {}) {
   return entries[0]?.[0] || "";
 }
 
+function lastErrorFailureReason(row = {}) {
+  const message = String(row?.last_error || "").trim();
+  if (!message) return "";
+  const reason = classifyFailureReason("unknown", row?.last_http_status, message);
+  return reason || "";
+}
+
 function targetPressureNextAction(reason) {
   if (reason === "parser_bug") return "add fixture and fix parser before counting this source as scalable";
   if (reason === "source_quality") return "review source evidence and quality gates before re-running at higher volume";
@@ -1128,7 +1138,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     const recentErrors = summarizeRecentErrorGroups(groups);
     const consecutiveFailures = Number(row?.consecutive_failures || 0);
     const rowRecentErrorCount = Number(row?.recent_error_count || recentErrors.total_count || 0);
-    const reason = dominantFailureReason(recentErrors);
+    const reason = dominantFailureReason(recentErrors) || lastErrorFailureReason(row);
 
     failurePressure += consecutiveFailures;
     recentErrorCount += rowRecentErrorCount;
@@ -1144,6 +1154,9 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     bySource[atsKey].failure_pressure += consecutiveFailures;
     bySource[atsKey].recent_error_count += rowRecentErrorCount;
     mergeReasonCounts(bySource[atsKey].by_reason, recentErrors.by_reason);
+    if (reason && recentErrors.total_count <= 0) {
+      bySource[atsKey].by_reason[reason] = Number(bySource[atsKey].by_reason[reason] || 0) + 1;
+    }
 
     topTargets.push({
       ats_key: atsKey,

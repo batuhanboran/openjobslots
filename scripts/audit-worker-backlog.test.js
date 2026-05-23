@@ -195,6 +195,30 @@ test("summarizeTargetFailurePressureRows ranks target-level worker blockers", ()
   assert.equal(summary.top_targets[1].dominant_failure_reason, "parser_bug");
 });
 
+test("summarizeTargetFailurePressureRows falls back to last error when recent groups expired", () => {
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "recruitcrm",
+      company_url: "https://recruitcrm.io/jobs/acme",
+      company_name: "Acme",
+      protection_status: "quarantine_only",
+      next_sync_epoch: 1_800_000_000,
+      last_success_epoch: 1_799_000_000,
+      last_failure_epoch: 1_799_900_000,
+      consecutive_failures: 7,
+      last_http_status: 0,
+      last_error: "parser drift detected: payload shape similarity 0.2609 below 0.55",
+      recent_error_count: 0,
+      recent_error_groups: []
+    }
+  ]);
+
+  assert.equal(summary.by_source.recruitcrm.dominant_failure_reason, "parser_bug");
+  assert.equal(summary.by_source.recruitcrm.by_reason.parser_bug, 1);
+  assert.equal(summary.top_targets[0].dominant_failure_reason, "parser_bug");
+  assert.equal(summary.top_targets[0].next_action, "add fixture and fix parser before counting this source as scalable");
+});
+
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {
   const report = summarizeBacklogRows(
     [
