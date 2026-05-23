@@ -7,6 +7,7 @@ const {
   buildLatestRunFailureReasonsQuery,
   buildLatestRunBySourceQuery,
   buildParserDriftRecheckQuery,
+  buildRecentErrorScopeQuery,
   buildRecentErrorsQuery,
   buildRecentRunTrendQuery,
   buildRecentRunTrendBySourceQuery,
@@ -18,6 +19,7 @@ const {
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
+  summarizeFailureReasonCountsByScope,
   summarizeRecentRunTrendRows,
   summarizeRecentRunTrendBySourceRows,
   summarizeSourceBudgetUsageRows,
@@ -82,6 +84,22 @@ test("buildRecentErrorsQuery groups http status for failure taxonomy", () => {
   assert.match(query.sql, /http_status/i);
   assert.match(query.sql, /error_message/i);
   assert.match(query.sql, /GROUP BY ats_key, error_type, http_status, error_message/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildRecentErrorScopeQuery separates target failures from posting rejections", () => {
+  const query = buildRecentErrorScopeQuery({
+    errorWindowHours: 48,
+    targetAtsKeys: ["applytojob", "breezy"]
+  });
+
+  assert.deepEqual(query.values, [48, ["applytojob", "breezy"]]);
+  assert.match(query.sql, /CASE WHEN st\.last_success_epoch >= r\.started_at_epoch/i);
+  assert.match(query.sql, /THEN 'posting_rejection'/i);
+  assert.match(query.sql, /ELSE 'target_failure'/i);
+  assert.match(query.sql, /LEFT JOIN ingestion_runs r/i);
+  assert.match(query.sql, /LEFT JOIN company_sync_state st/i);
+  assert.match(query.sql, /GROUP BY e\.ats_key, error_scope, e\.error_type/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -509,6 +527,15 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
           ]
         };
       }
+      if (/error_scope/i.test(sql)) {
+        return {
+          rows: [
+            { error_scope: "target_failure", ats_key: "breezy", error_type: "portal_search_empty", http_status: 0, count: 2 },
+            { error_scope: "target_failure", ats_key: "breezy", error_type: "blocked_or_rate_limited", http_status: 403, count: 1 },
+            { error_scope: "posting_rejection", ats_key: "applytojob", error_type: "parser_validation", error_message: "no_geo_no_remote", count: 5 }
+          ]
+        };
+      }
       if (/FROM ingestion_run_errors/i.test(sql)) {
         if (/e\.run_id = l\.id/i.test(sql)) {
           if (/GROUP BY e\.ats_key, e\.error_type/i.test(sql)) {
@@ -569,7 +596,7 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 11);
+  assert.equal(calls.length, 12);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
@@ -579,6 +606,8 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   assert.equal(report.diagnostics.recent_run_trend_by_source.applytojob.success_rate_pct, 21.43);
   assert.equal(report.diagnostics.recent_run_trend_by_source.breezy.success_rate_pct, 33.33);
   assert.equal(report.diagnostics.throughput_scaling_gate.recent_run_success_rate_pct, 70);
+  assert.equal(report.diagnostics.failure_reason_counts_by_scope.target_failure.empty_no_jobs, 2);
+  assert.equal(report.diagnostics.failure_reason_counts_by_scope.posting_rejection.source_quality, 5);
   assert.equal(report.diagnostics.throughput_scaling_gate.allowed, false);
   assert.equal(report.diagnostics.throughput_scaling_gate.decision, "hold");
   assert.ok(report.diagnostics.throughput_scaling_gate.blockers.some((item) => item.code === "rate_limit_failures_present"));
@@ -734,6 +763,78 @@ test("summarizeSourceBudgetUsageRows exposes remaining budget by ATS", () => {
   });
   assert.equal(bySource.get("breezy").remaining_daily_budget, 25);
   assert.equal(bySource.get("missing"), undefined);
+});
+
+test("summarizeFailureReasonCountsByScope keeps target failures separate from posting rejections", () => {
+  const summary = summarizeFailureReasonCountsByScope([
+    { error_scope: "target_failure", error_type: "portal_search_empty", http_status: 0, count: 4 },
+    { error_scope: "target_failure", error_type: "parser_drift", http_status: 0, count: 2 },
+    { error_scope: "posting_rejection", error_type: "parser_validation", error_message: "no_geo_no_remote", count: 9 },
+    { error_scope: "posting_rejection", error_type: "source_quality", error_message: "source_disabled_by_threshold", count: 3 }
+  ]);
+
+  assert.equal(summary.target_failure.empty_no_jobs, 4);
+  assert.equal(summary.target_failure.parser_bug, 2);
+  assert.equal(summary.target_failure.source_quality, 0);
+  assert.equal(summary.posting_rejection.source_quality, 12);
+  assert.equal(summary.posting_rejection.parser_bug, 0);
+  assert.equal(summary.total.target_failure_count, 6);
+  assert.equal(summary.total.posting_rejection_count, 12);
+});
+
+test("buildThroughputScalingGate names posting quality rejections separately from target failures", () => {
+  const gate = buildThroughputScalingGate({
+    latestRun: {
+      latest_run_id: 260,
+      latest_status: "completed",
+      total_targets: 50,
+      success_count: 48,
+      failure_count: 2,
+      success_rate_pct: 96
+    },
+    recentRunTrend: {
+      total_targets: 200,
+      success_count: 190,
+      failure_count: 10,
+      success_rate_pct: 95
+    },
+    parserAttentionCount: 0,
+    failureReasonCounts: {
+      parser_bug: 0,
+      source_quality: 25,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 0,
+      auth: 0,
+      unknown: 0
+    },
+    targetFailureReasonCounts: {
+      parser_bug: 0,
+      source_quality: 0,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 0,
+      auth: 0,
+      unknown: 0
+    },
+    postingRejectionReasonCounts: {
+      parser_bug: 0,
+      source_quality: 25,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 0,
+      auth: 0,
+      unknown: 0
+    },
+    totals: {
+      runnable_due_count: 1000,
+      failure_pressure: 0
+    }
+  });
+
+  assert.equal(gate.allowed, false);
+  assert.ok(gate.blockers.some((item) => item.code === "posting_source_quality_rejections_present"));
+  assert.ok(!gate.blockers.some((item) => item.code === "source_quality_failures_present"));
 });
 
 test("buildThroughputScalingGate holds scaling when latest run success is below threshold", () => {

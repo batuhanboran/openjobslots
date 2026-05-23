@@ -332,6 +332,44 @@ function buildRecentErrorsQuery(options = {}) {
   };
 }
 
+function buildRecentErrorScopeQuery(options = {}) {
+  const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  return {
+    values: [errorWindowHours, targetAtsKeys],
+    sql: `
+      WITH scoped_errors AS (
+        SELECT
+          e.ats_key,
+          CASE WHEN st.last_success_epoch >= r.started_at_epoch
+              AND st.last_success_epoch <= COALESCE(r.finished_at_epoch, EXTRACT(EPOCH FROM now())::bigint)
+            THEN 'posting_rejection'
+            ELSE 'target_failure'
+          END AS error_scope,
+          e.error_type,
+          COALESCE(e.http_status, 0)::int AS http_status,
+          COALESCE(e.error_message, '') AS error_message,
+          COUNT(*)::int AS count
+        FROM ingestion_run_errors e
+        LEFT JOIN ingestion_runs r
+          ON r.id = e.run_id
+        LEFT JOIN company_sync_state st
+          ON st.ats_key = e.ats_key
+          AND st.company_url = e.company_url
+        WHERE e.created_at >= now() - ($1::int * interval '1 hour')
+          AND (
+            cardinality($2::text[]) = 0
+            OR e.ats_key = ANY($2::text[])
+          )
+        GROUP BY e.ats_key, error_scope, e.error_type, COALESCE(e.http_status, 0), e.error_message
+      )
+      SELECT *
+      FROM scoped_errors
+      ORDER BY count DESC, ats_key ASC, error_scope ASC, error_type ASC, http_status ASC, error_message ASC;
+    `
+  };
+}
+
 function buildLatestRunSummaryQuery() {
   return {
     values: [],
@@ -890,6 +928,42 @@ function summarizeRecentErrors(rows = []) {
   return byAts;
 }
 
+function summarizeFailureReasonCountsByScope(rows = []) {
+  const targetFailure = createFailureReasonCounts();
+  const postingRejection = createFailureReasonCounts();
+  const unknown = createFailureReasonCounts();
+  const total = {
+    target_failure_count: 0,
+    posting_rejection_count: 0,
+    unknown_count: 0
+  };
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const scope = String(row?.error_scope || "").trim().toLowerCase();
+    const errorType = String(row?.error_type || "unknown").trim().toLowerCase() || "unknown";
+    const errorMessage = String(row?.error_message || "");
+    const httpStatus = normalizeHttpStatus(row?.http_status);
+    const count = Number(row?.count || 0);
+    if (count <= 0) continue;
+    const failureReason = classifyFailureReason(errorType, httpStatus, errorMessage);
+    if (scope === "posting_rejection") {
+      addFailureReasonCount(postingRejection, failureReason, count);
+      total.posting_rejection_count += count;
+    } else if (scope === "target_failure") {
+      addFailureReasonCount(targetFailure, failureReason, count);
+      total.target_failure_count += count;
+    } else {
+      addFailureReasonCount(unknown, failureReason, count);
+      total.unknown_count += count;
+    }
+  }
+  return {
+    target_failure: targetFailure,
+    posting_rejection: postingRejection,
+    unknown,
+    total
+  };
+}
+
 function summarizeLatestRun(row = {}) {
   const totalTargets = Number(row?.total_targets || 0);
   const successCount = Number(row?.success_count || 0);
@@ -1067,6 +1141,8 @@ function buildThroughputScalingGate({
   recentRunTrend = {},
   parserAttentionCount = 0,
   failureReasonCounts = {},
+  targetFailureReasonCounts = null,
+  postingRejectionReasonCounts = null,
   totals = {},
   options = {}
 } = {}) {
@@ -1087,6 +1163,8 @@ function buildThroughputScalingGate({
   const latestStatus = String(latestRun.latest_status || "").trim();
   const blockers = [];
   const cautions = [];
+  const targetFailureCounts = targetFailureReasonCounts || failureReasonCounts || {};
+  const postingRejectionCounts = postingRejectionReasonCounts || {};
 
   if (!Number(latestRun.latest_run_id || 0) || Number(latestRun.total_targets || 0) <= 0 || successRatePct == null) {
     blockers.push({
@@ -1125,11 +1203,22 @@ function buildThroughputScalingGate({
 
   const blockingFailureReasons = ["parser_bug", "source_quality", "rate_limit", "network", "auth", "unknown"];
   for (const reason of blockingFailureReasons) {
-    const count = Number(failureReasonCounts?.[reason] || 0);
+    const count = Number(targetFailureCounts?.[reason] || 0);
     if (count > 0) {
       blockers.push({
         code: `${reason}_failures_present`,
-        message: `${reason} failures are present in the diagnostics window.`,
+        message: `${reason} target failures are present in the diagnostics window.`,
+        count
+      });
+    }
+  }
+
+  for (const reason of ["parser_bug", "source_quality"]) {
+    const count = Number(postingRejectionCounts?.[reason] || 0);
+    if (count > 0) {
+      blockers.push({
+        code: `posting_${reason}_rejections_present`,
+        message: `${reason} posting rejections are present in the diagnostics window.`,
         count
       });
     }
@@ -1157,6 +1246,8 @@ function buildThroughputScalingGate({
     minimum_trend_target_count: minimumTrendTargetCount,
     parser_attention_count: Number(parserAttentionCount || 0),
     parser_attention_threshold: parserAttentionThreshold,
+    target_failure_reason_counts: targetFailureCounts,
+    posting_rejection_reason_counts: postingRejectionCounts,
     runnable_due_count: Number(totals.runnable_due_count || 0),
     failure_pressure: Number(totals.failure_pressure || 0),
     max_recommended_step: allowed ? "small" : "none",
@@ -1474,6 +1565,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       addFailureReasonCount(failureReasonCounts, reason, count);
     }
   }
+  const failureReasonCountsByScope = summarizeFailureReasonCountsByScope(options.scopedRecentErrorRows || []);
   const latestRunRows = Array.isArray(options.latestRunRows) ? options.latestRunRows : [];
   const latestRun = summarizeLatestRun(latestRunRows[0] || options.latestRun || {});
   const latestRunBySource = summarizeLatestRunBySourceRows(options.latestRunBySourceRows || []);
@@ -1502,6 +1594,8 @@ function attachBacklogDiagnostics(report, options = {}) {
     recentRunTrend,
     parserAttentionCount,
     failureReasonCounts,
+    targetFailureReasonCounts: failureReasonCountsByScope.target_failure,
+    postingRejectionReasonCounts: failureReasonCountsByScope.posting_rejection,
     totals: report.totals || {},
     options
   });
@@ -1514,6 +1608,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       parser_attention_count: parserAttentionCount,
       source_policy_block_count: sourcePolicyBlockCount,
       failure_reason_counts: failureReasonCounts,
+      failure_reason_counts_by_scope: failureReasonCountsByScope,
       latest_run: latestRun,
       recent_run_trend: recentRunTrend,
       recent_run_trend_by_source: recentRunTrendBySource,
@@ -1563,6 +1658,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   if (!options.diagnostics) return report;
   const recentErrorsQuery = buildRecentErrorsQuery(options);
   const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
+  const recentErrorScopeQuery = buildRecentErrorScopeQuery(options);
+  const recentErrorScope = await pool.query(recentErrorScopeQuery.sql, recentErrorScopeQuery.values);
   const latestRunQuery = buildLatestRunSummaryQuery();
   const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
   const recentRunTrendQuery = buildRecentRunTrendQuery(options);
@@ -1585,6 +1682,7 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     ...options,
     nowEpoch,
     recentErrorRows: recentErrors.rows,
+    scopedRecentErrorRows: recentErrorScope.rows,
     latestRunRows: latestRun.rows,
     recentRunTrendRows: recentRunTrend.rows,
     recentRunTrendBySourceRows: recentRunTrendBySource.rows,
@@ -1665,6 +1763,7 @@ module.exports = {
   buildLatestRunBySourceQuery,
   buildLatestRunSummaryQuery,
   buildParserDriftRecheckQuery,
+  buildRecentErrorScopeQuery,
   buildRecentErrorsQuery,
   buildRecentRunTrendQuery,
   buildRecentRunTrendBySourceQuery,
@@ -1678,6 +1777,7 @@ module.exports = {
   runAudit,
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
+  summarizeFailureReasonCountsByScope,
   summarizeLatestRunBySourceRows,
   summarizeRecentRunTrendRows,
   summarizeRecentRunTrendBySourceRows,
