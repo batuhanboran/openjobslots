@@ -49,6 +49,7 @@ The runner acquires the global heavy-job lock, uses bounded Postgres statement t
 - `ats_sources.default_ttl_seconds` controls normal refresh cadence.
 - `computeNextSyncEpoch` adds deterministic jitter to avoid bursts.
 - Consecutive failures use exponential backoff.
+- `no_jobs` failures start with `INGESTION_NO_JOBS_COOLDOWN_SECONDS` and progressively back off on repeated empty-board results before the long failure cooldown.
 - After `INGESTION_MAX_CONSECUTIVE_FAILURES` failures, the target enters a longer cooldown controlled by `INGESTION_FAILURE_COOLDOWN_SECONDS`.
 - Disabled ATS sources are excluded from due-target selection.
 - Worker startup marks stale `running`/`stopping` runs as `interrupted` and clears stale sync control.

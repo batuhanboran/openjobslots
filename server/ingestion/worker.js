@@ -200,10 +200,14 @@ function computeRetryEpoch(baseEpoch, consecutiveFailures) {
 function computeFailureRetryEpoch(baseEpoch, consecutiveFailures, failureReason = "") {
   const normalizedReason = normalizeFailureReason(failureReason, "");
   if (normalizedReason === "no_jobs") {
-    if (Number(consecutiveFailures || 0) >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
+    const failures = Math.max(1, Number(consecutiveFailures || 1));
+    if (failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
       return computeRetryEpoch(baseEpoch, consecutiveFailures);
     }
-    return Number(baseEpoch || nowEpochSeconds()) + NO_JOBS_COOLDOWN_SECONDS;
+    return Number(baseEpoch || nowEpochSeconds()) + Math.min(
+      FAILURE_COOLDOWN_SECONDS,
+      NO_JOBS_COOLDOWN_SECONDS * failures
+    );
   }
   return computeRetryEpoch(baseEpoch, consecutiveFailures);
 }
@@ -282,6 +286,7 @@ function classifyIngestionError(error, fallback = "network") {
     if (normalizedExplicit === "fetch") {
       if (httpStatus === 429) return "rate_limit";
       if (httpStatus === 401 || httpStatus === 403) return "auth";
+      if (httpStatus === 404 || httpStatus === 410) return "source_quality";
       if (httpStatus === 408) return "timeout";
       if (httpStatus >= 500) return "network";
     }
@@ -294,6 +299,7 @@ function classifyIngestionError(error, fallback = "network") {
   if (message.includes("cooldown")) return "cooldown";
   if (httpStatus === 429 || message.includes("rate limit") || message.includes("too many request")) return "rate_limit";
   if (httpStatus === 401 || httpStatus === 403 || message.includes("unauthorized") || message.includes("forbidden")) return "auth";
+  if (httpStatus === 404 || httpStatus === 410) return "source_quality";
   if (httpStatus === 408 || code === "ETIMEDOUT" || message.includes("timeout") || message.includes("timed out")) return "timeout";
   if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"].includes(code) ||
     message.includes("request failed") ||

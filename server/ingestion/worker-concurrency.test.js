@@ -70,6 +70,11 @@ test("ingestion error classifier separates parser attention from fetch failures"
   assert.equal(classifyIngestionError(new Error("source cooldown active")), "cooldown");
   assert.equal(classifyIngestionError(Object.assign(new Error("HTTP 429"), { status: 429 })), "rate_limit");
   assert.equal(classifyIngestionError(Object.assign(new Error("HTTP 401"), { status: 401 })), "auth");
+  assert.equal(classifyIngestionError(Object.assign(new Error("source fetch failed with HTTP 404"), { status: 404 })), "source_quality");
+  assert.equal(
+    classifyIngestionError({ message: "source fetch failed with HTTP 410", ingestionErrorType: "fetch", status: 410 }),
+    "source_quality"
+  );
   assert.equal(classifyIngestionError(Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" })), "timeout");
   assert.equal(classifyIngestionError(Object.assign(new Error("ECONNRESET"), { code: "ECONNRESET" })), "network");
   assert.equal(classifyIngestionError(new Error("empty payload returned by source")), "empty_payload");
@@ -159,6 +164,17 @@ test("no-jobs failures use daily cooldown without being counted as success", () 
 
   assert.ok(noJobsRetry >= base + 24 * 60 * 60);
   assert.equal(normalRetry, computeRetryEpoch(base, 1));
+});
+
+test("repeated no-jobs failures progressively back off before the long cooldown", () => {
+  const base = 1_000_000;
+  const firstNoJobsRetry = computeFailureRetryEpoch(base, 1, "no_jobs");
+  const secondNoJobsRetry = computeFailureRetryEpoch(base, 2, "no_jobs");
+  const thirdNoJobsRetry = computeFailureRetryEpoch(base, 3, "no_jobs");
+
+  assert.equal(secondNoJobsRetry, base + 2 * (firstNoJobsRetry - base));
+  assert.equal(thirdNoJobsRetry, base + 3 * (firstNoJobsRetry - base));
+  assert.ok(thirdNoJobsRetry < computeRetryEpoch(base, 8));
 });
 
 test("repeated no-jobs failures enter the long failure cooldown", () => {
