@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  buildPostgresDailySourceHealthQueries,
   createDailySourceHealthSummary,
   parseArgs
 } = require("./audit-source-freshness");
@@ -29,7 +30,10 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
     }],
     postingRows: [{
       rows_seen: 55,
-      rows_new: 12
+      rows_new: 12,
+      new_missing_any_normalized_geo_rows: 4,
+      new_weak_unknown_remote_rows: 3,
+      new_no_geo_no_remote_rows: 2
     }],
     failureRows: [
       {
@@ -65,6 +69,9 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
   assert.equal(summary.target_success_pct_24h, 80);
   assert.equal(summary.rows_seen_24h, 55);
   assert.equal(summary.rows_new_24h, 12);
+  assert.equal(summary.new_missing_any_normalized_geo_rows_24h, 4);
+  assert.equal(summary.new_weak_unknown_remote_rows_24h, 3);
+  assert.equal(summary.new_no_geo_no_remote_public_rows_24h, 2);
   assert.equal(summary.rejected_candidates_24h, 4);
   assert.deepEqual(summary.failure_reason_counts_24h, {
     empty_no_jobs: 5,
@@ -73,6 +80,19 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
   assert.equal(summary.top_failure_sources[0].ats_key, "breezy");
   assert.equal(summary.top_failure_sources[0].dominant_failure_reason, "empty_no_jobs");
   assert.equal(summary.top_failure_sources[1].dominant_failure_reason, "rate_limit");
+});
+
+test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from first seen only", () => {
+  const queries = buildPostgresDailySourceHealthQueries({
+    nowEpoch: 1_800_000_000,
+    healthWindowHours: 24
+  });
+
+  assert.deepEqual(queries.postings.values, [1_799_913_600]);
+  assert.match(queries.postings.sql, /first_seen_epoch/i);
+  assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
+  assert.match(queries.postings.sql, /NULLIF\(btrim\(country\), ''\) IS NULL/i);
+  assert.match(queries.postings.sql, /remote_type.*unknown/i);
 });
 
 test("source freshness report marks stale sources due without mutating data", () => {

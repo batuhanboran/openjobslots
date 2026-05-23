@@ -160,6 +160,9 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     target_success_pct_24h: pct(successCount, successCount + failureCount),
     rows_seen_24h: Number(postingRow.rows_seen || 0),
     rows_new_24h: Number(postingRow.rows_new || 0),
+    new_missing_any_normalized_geo_rows_24h: Number(postingRow.new_missing_any_normalized_geo_rows || 0),
+    new_weak_unknown_remote_rows_24h: Number(postingRow.new_weak_unknown_remote_rows || 0),
+    new_no_geo_no_remote_public_rows_24h: Number(postingRow.new_no_geo_no_remote_rows || 0),
     rows_upserted_24h: Number(runRow.posting_upsert_count || 0),
     rejected_candidates_24h: Number(runRow.rejected_count || 0),
     failure_reason_counts_24h: failureSummary.failure_reason_counts,
@@ -207,7 +210,35 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
       sql: `
         SELECT
           COUNT(*) FILTER (WHERE hidden = false AND COALESCE(last_seen_epoch, 0) >= $1)::int AS rows_seen,
-          COUNT(*) FILTER (WHERE hidden = false AND COALESCE(first_seen_epoch, 0) >= $1)::int AS rows_new
+          COUNT(*) FILTER (WHERE hidden = false AND COALESCE(first_seen_epoch, 0) >= $1)::int AS rows_new,
+          COUNT(*) FILTER (
+            WHERE hidden = false
+              AND COALESCE(first_seen_epoch, 0) >= $1
+              AND (
+                NULLIF(btrim(country), '') IS NULL
+                OR NULLIF(btrim(region), '') IS NULL
+                OR NULLIF(btrim(city), '') IS NULL
+              )
+          )::int AS new_missing_any_normalized_geo_rows,
+          COUNT(*) FILTER (
+            WHERE hidden = false
+              AND COALESCE(first_seen_epoch, 0) >= $1
+              AND (
+                NULLIF(btrim(remote_type), '') IS NULL
+                OR lower(btrim(remote_type)) IN ('unknown', 'unspecified', 'n/a', 'na', 'none')
+              )
+          )::int AS new_weak_unknown_remote_rows,
+          COUNT(*) FILTER (
+            WHERE hidden = false
+              AND COALESCE(first_seen_epoch, 0) >= $1
+              AND NULLIF(btrim(country), '') IS NULL
+              AND NULLIF(btrim(region), '') IS NULL
+              AND NULLIF(btrim(city), '') IS NULL
+              AND (
+                NULLIF(btrim(remote_type), '') IS NULL
+                OR lower(btrim(remote_type)) IN ('unknown', 'unspecified', 'n/a', 'na', 'none')
+              )
+          )::int AS new_no_geo_no_remote_rows
         FROM postings;
       `
     },
@@ -254,6 +285,7 @@ function printReport(report) {
     const health = report.daily_source_health;
     console.log(`Daily budget: ${health.daily_target_budget} targets / ${health.targets_per_run} per run`);
     console.log(`24h: ${health.targets_processed_24h} targets, ${health.target_success_pct_24h ?? "n/a"}% success, ${health.rows_seen_24h} rows seen, ${health.rows_new_24h} new rows`);
+    console.log(`24h quality gate: ${health.new_no_geo_no_remote_public_rows_24h} new no_geo_no_remote public rows`);
     console.log(`Due targets: ${health.targets_due}`);
   }
   console.table((report.items || []).slice(0, 25).map((item) => ({
