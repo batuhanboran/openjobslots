@@ -3,19 +3,14 @@ const {
   buildApplitrackDetailUrl,
   extractApplitrackDetailFields,
   parseApplitrackPostings,
-  parseAdpMyjobsPostingsFromApi,
-  parseAdpWorkforcenowPostingsFromApi,
-  parseBrassringPostingsFromApi,
-  parseOraclePostingsFromApi,
-  parsePaylocityPostingsFromPageData,
-  parseSapHrCloudPostingsFromApi,
-  parseTalentreefPostingsFromSearchResponse,
-  parseUltiProPostingsFromApi,
-  parseWorkdayPostingsFromApi
+  parseTalentreefPostingsFromSearchResponse
 } = require("../../index");
+const { parseAdpMyjobsPostingsFromApi } = require("./adp_myjobs/parse");
+const { parseAdpWorkforcenowPostingsFromApi } = require("./adp_workforcenow/parse");
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
+const { parseBrassringPostingsFromApi } = require("./brassring/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseFountainPostingsFromApi } = require("./fountain/parse");
@@ -31,15 +26,20 @@ const {
 const { parseJobvitePostingsFromHtml } = require("./jobvite/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
+const { parseOraclePostingsFromApi } = require("./oracle/parse");
 const { parsePageupPostingsFromResults } = require("./pageup/parse");
+const { parsePaylocityPostingsFromPageData } = require("./paylocity/parse");
 const { parsePinpointHqPostingsFromApi } = require("./pinpointhq/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
+const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { parseSmartRecruitersPostingsFromApi } = require("./smartrecruiters/parse");
 const {
   extractTaleoPostingsFromAjax,
   extractTaleoPostingsFromRest
 } = require("./taleo/parse");
+const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
+const { parseWorkdayPostingsFromApi } = require("./workday/parse");
 const { parseZohoPostingsFromHtml } = require("./zoho/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");

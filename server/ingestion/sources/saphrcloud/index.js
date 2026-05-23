@@ -1,3 +1,7 @@
 const { createSourceModule } = require("../common");
+const parser = require("./parse");
 
-module.exports = createSourceModule("saphrcloud");
+module.exports = {
+  ...createSourceModule("saphrcloud"),
+  ...parser
+};
