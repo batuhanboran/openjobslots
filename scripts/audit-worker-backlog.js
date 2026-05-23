@@ -2758,6 +2758,8 @@ if (require.main === module) {
 
 module.exports = {
   attachBacklogDiagnostics,
+  adjustFailureReasonCountsByScopeForParserDriftRecheck,
+  adjustFailureReasonCountsForParserDriftRecheck,
   buildAutoSyncBudgetUsageQuery,
   buildLatestRunFailureReasonsQuery,
   buildLatestRunBySourceQuery,

@@ -51,6 +51,13 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
     ],
     failureRows: [
       {
+        ats_key: "bamboohr",
+        error_type: "parser_drift",
+        http_status: 0,
+        error_message: "parser drift detected: payload shape similarity 0.2609 below 0.55",
+        count: 4
+      },
+      {
         ats_key: "breezy",
         error_type: "portal_search_empty",
         http_status: 200,
@@ -63,6 +70,34 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
         http_status: 429,
         error_message: "rate limited",
         count: 3
+      }
+    ],
+    failureScopeRows: [
+      {
+        error_scope: "target_failure",
+        error_type: "parser_drift",
+        http_status: 0,
+        error_message: "parser drift detected: payload shape similarity 0.2609 below 0.55",
+        count: 4
+      },
+      {
+        error_scope: "posting_rejection",
+        error_type: "parser_validation",
+        http_status: 0,
+        error_message: "no_geo_no_remote",
+        count: 2
+      }
+    ],
+    parserDriftRecheckRows: [
+      {
+        ats_key: "bamboohr",
+        observed_shape_paths: ["meta.totalCount:number", "meta:object", "result:array", "result[]:empty"],
+        baseline_shape_paths: ["meta.totalCount:number", "meta:object", "result:array", "result[].id:string", "result[]:object"]
+      },
+      {
+        ats_key: "applytojob",
+        observed_shape_paths: ["jobs:array", "jobs[].id:string", "jobs[]:object"],
+        baseline_shape_paths: ["jobs:array", "jobs[].id:string", "jobs[]:object"]
       }
     ]
   }, {
@@ -94,12 +129,38 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
   });
   assert.equal(summary.rejected_candidates_24h, 4);
   assert.deepEqual(summary.failure_reason_counts_24h, {
+    parser_bug: 4,
     empty_no_jobs: 5,
     rate_limit: 3
   });
+  assert.deepEqual(summary.current_policy_adjusted_failure_reason_counts_24h, {
+    parser_bug: 2,
+    empty_no_jobs: 6,
+    rate_limit: 3
+  });
+  assert.deepEqual(summary.current_policy_failure_adjustments_24h, {
+    parser_bug_to_current_policy_pass: 1,
+    parser_bug_to_empty_no_jobs: 1,
+    parser_bug_resolved_total: 2
+  });
+  assert.equal(summary.parser_drift_recheck_24h.current_policy_resolved_count, 2);
+  assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.target_failure.parser_bug, 2);
+  assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.target_failure.empty_no_jobs, 1);
+  assert.equal(summary.current_policy_adjusted_failure_reason_counts_by_scope_24h.posting_rejection.source_quality, 2);
   assert.equal(summary.top_failure_sources[0].ats_key, "breezy");
   assert.equal(summary.top_failure_sources[0].dominant_failure_reason, "empty_no_jobs");
-  assert.equal(summary.top_failure_sources[1].dominant_failure_reason, "rate_limit");
+  assert.equal(summary.top_failure_sources[1].ats_key, "bamboohr");
+  assert.equal(summary.top_failure_sources[1].dominant_failure_reason, "parser_bug");
+  assert.deepEqual(summary.top_failure_sources[1].current_policy_adjusted_by_reason, {
+    parser_bug: 3,
+    empty_no_jobs: 1
+  });
+  assert.deepEqual(summary.top_failure_sources[1].current_policy_failure_adjustments, {
+    parser_bug_to_current_policy_pass: 0,
+    parser_bug_to_empty_no_jobs: 1,
+    parser_bug_resolved_total: 1
+  });
+  assert.equal(summary.top_failure_sources[2].dominant_failure_reason, "rate_limit");
 });
 
 test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from first seen only", () => {
@@ -110,10 +171,14 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
 
   assert.deepEqual(queries.postings.values, [1_799_913_600]);
   assert.deepEqual(queries.qualityGateSources.values, [1_799_913_600, 25]);
+  assert.deepEqual(queries.failureScopes.values, [24, []]);
+  assert.deepEqual(queries.parserDriftRecheck.values, [24, [], 100]);
   assert.match(queries.postings.sql, /first_seen_epoch/i);
   assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
   assert.match(queries.qualityGateSources.sql, /GROUP BY ats_key/i);
   assert.match(queries.qualityGateSources.sql, /new_no_geo_no_remote_rows/i);
+  assert.match(queries.failureScopes.sql, /posting_rejection/i);
+  assert.match(queries.parserDriftRecheck.sql, /FROM parser_drift_events/i);
   assert.match(queries.postings.sql, /NULLIF\(btrim\(country\), ''\) IS NULL/i);
   assert.match(queries.postings.sql, /remote_type.*unknown/i);
 });

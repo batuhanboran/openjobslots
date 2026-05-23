@@ -8,7 +8,15 @@ const {
   getSqliteSourceFreshnessReport,
   openSqliteReadOnly
 } = require("../server/ingestion/dataQualityAudit");
-const { classifyFailureReason } = require("./audit-worker-backlog");
+const {
+  adjustFailureReasonCountsByScopeForParserDriftRecheck,
+  adjustFailureReasonCountsForParserDriftRecheck,
+  buildParserDriftRecheckQuery,
+  buildRecentErrorScopeQuery,
+  classifyFailureReason,
+  summarizeFailureReasonCountsByScope,
+  summarizeParserDriftRecheck
+} = require("./audit-worker-backlog");
 
 function parseArgs(argv = process.argv.slice(2)) {
   const options = {
@@ -148,6 +156,37 @@ function summarizeQualityGateSources(rows = []) {
     ));
 }
 
+function sparseFailureReasonCountsByScope(countsByScope = {}) {
+  return {
+    target_failure: sparsePositiveCounts(countsByScope.target_failure || {}),
+    posting_rejection: sparsePositiveCounts(countsByScope.posting_rejection || {}),
+    unknown: sparsePositiveCounts(countsByScope.unknown || {}),
+    total: countsByScope.total || {},
+    adjustments: countsByScope.adjustments || {}
+  };
+}
+
+function dominantFailureReason(counts = {}) {
+  return Object.entries(counts || {})
+    .filter(([, value]) => Number(value || 0) > 0)
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || left[0].localeCompare(right[0]))[0]?.[0] || "unknown";
+}
+
+function annotateCurrentPolicyFailureSources(topFailureSources = [], parserDriftRecheck = {}) {
+  return (Array.isArray(topFailureSources) ? topFailureSources : []).map((source) => {
+    const atsKey = String(source?.ats_key || "").trim().toLowerCase();
+    const sourceRecheck = parserDriftRecheck?.by_source?.[atsKey] || {};
+    const adjusted = adjustFailureReasonCountsForParserDriftRecheck(source?.by_reason || {}, sourceRecheck);
+    const adjustedByReason = sparsePositiveCounts(adjusted.counts);
+    return {
+      ...source,
+      current_policy_adjusted_by_reason: adjustedByReason,
+      current_policy_dominant_failure_reason: dominantFailureReason(adjustedByReason),
+      current_policy_failure_adjustments: adjusted.adjustments
+    };
+  });
+}
+
 function createDailySourceHealthSummary(rows = {}, options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const windowHours = Math.max(1, Math.min(168, Math.floor(Number(options.healthWindowHours || 24))));
@@ -160,6 +199,22 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
   const failureCount = Number(runRow.failure_count || 0);
   const targetsProcessed = Number(runRow.targets_processed || runRow.total_targets || (successCount + failureCount) || 0);
   const failureSummary = summarizeFailureSources(rows.failureRows || [], options);
+  const parserDriftRecheck = summarizeParserDriftRecheck(rows.parserDriftRecheckRows || [], {
+    parserDriftRecheckLimit: options.parserDriftRecheckLimit || 100
+  });
+  const adjustedFailureSummary = adjustFailureReasonCountsForParserDriftRecheck(
+    failureSummary.failure_reason_counts,
+    parserDriftRecheck
+  );
+  const rawFailureCountsByScope = summarizeFailureReasonCountsByScope(rows.failureScopeRows || []);
+  const adjustedFailureCountsByScope = adjustFailureReasonCountsByScopeForParserDriftRecheck(
+    rawFailureCountsByScope,
+    parserDriftRecheck
+  );
+  const topFailureSources = annotateCurrentPolicyFailureSources(
+    failureSummary.top_failure_sources,
+    parserDriftRecheck
+  );
   const qualityGateSources = summarizeQualityGateSources(rows.qualityGateRows || []);
 
   return {
@@ -183,7 +238,12 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     rows_upserted_24h: Number(runRow.posting_upsert_count || 0),
     rejected_candidates_24h: Number(runRow.rejected_count || 0),
     failure_reason_counts_24h: failureSummary.failure_reason_counts,
-    top_failure_sources: failureSummary.top_failure_sources,
+    failure_reason_counts_by_scope_24h: sparseFailureReasonCountsByScope(rawFailureCountsByScope),
+    current_policy_adjusted_failure_reason_counts_24h: sparsePositiveCounts(adjustedFailureSummary.counts),
+    current_policy_failure_adjustments_24h: adjustedFailureSummary.adjustments,
+    current_policy_adjusted_failure_reason_counts_by_scope_24h: sparseFailureReasonCountsByScope(adjustedFailureCountsByScope),
+    parser_drift_recheck_24h: parserDriftRecheck,
+    top_failure_sources: topFailureSources,
     next_action: "do not increase throughput unless success rate, parity, parser attention, and due-by-ATS gates are clean"
   };
 }
@@ -336,25 +396,38 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
         ORDER BY count DESC, ats_key ASC, error_type ASC
         LIMIT $2;
       `
-    }
+    },
+    failureScopes: buildRecentErrorScopeQuery({
+      errorWindowHours: windowHours,
+      targetAtsKeys: []
+    }),
+    parserDriftRecheck: buildParserDriftRecheckQuery({
+      errorWindowHours: windowHours,
+      targetAtsKeys: [],
+      parserDriftRecheckLimit: options.parserDriftRecheckLimit || 100
+    })
   };
 }
 
 async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   const queries = buildPostgresDailySourceHealthQueries(options);
-  const [due, runs, postings, qualityGateSources, failures] = await Promise.all([
+  const [due, runs, postings, qualityGateSources, failures, failureScopes, parserDriftRecheck] = await Promise.all([
     pool.query(queries.due.sql, queries.due.values),
     pool.query(queries.runs.sql, queries.runs.values),
     pool.query(queries.postings.sql, queries.postings.values),
     pool.query(queries.qualityGateSources.sql, queries.qualityGateSources.values),
-    pool.query(queries.failures.sql, queries.failures.values)
+    pool.query(queries.failures.sql, queries.failures.values),
+    pool.query(queries.failureScopes.sql, queries.failureScopes.values),
+    pool.query(queries.parserDriftRecheck.sql, queries.parserDriftRecheck.values)
   ]);
   return createDailySourceHealthSummary({
     dueRows: due.rows,
     runRows: runs.rows,
     postingRows: postings.rows,
     qualityGateRows: qualityGateSources.rows,
-    failureRows: failures.rows
+    failureRows: failures.rows,
+    failureScopeRows: failureScopes.rows,
+    parserDriftRecheckRows: parserDriftRecheck.rows
   }, options);
 }
 
