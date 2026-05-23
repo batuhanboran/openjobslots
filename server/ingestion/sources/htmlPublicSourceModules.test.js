@@ -269,3 +269,38 @@ test("breezy source module parses card titles outside heading tags", () => {
   assert.equal(normalized.posting_date, "2026-05-13");
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
+
+test("breezy source module quarantines narrative detail text captured as location", () => {
+  const source = getSourceModule("breezy");
+  const company = readJson(path.join(__dirname, "breezy", "fixtures", "company.json"));
+  const detailUrl = "https://fixture.breezy.hr/p/BRZ4001-sales-specialist";
+  const narrativeLocation = "client-specific needs while ensuring compliance with internal and external regulations.";
+  const parsed = source.parse({
+    html: `
+      <a href="/p/BRZ4001-sales-specialist">
+        <h2>Sales Specialist - Cash Management</h2>
+      </a>
+    `,
+    __listUrl: company.url_string,
+    __detailHtmlByUrl: {
+      [detailUrl]: `
+        <html>
+          <body>
+            <dl>
+              <dt>Location</dt>
+              <dd>${narrativeLocation}</dd>
+            </dl>
+          </body>
+        </html>
+      `
+    }
+  }, company);
+
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.notEqual(normalized.city, narrativeLocation);
+  assert.ok(normalized.source_failure_reasons.includes("detail_no_structured_location"));
+  const gate = source.validatePublic(normalized);
+  assert.equal(gate.status, "quarantined");
+  assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
+});

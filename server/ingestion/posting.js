@@ -251,10 +251,22 @@ function normalizeCountryFromDelimitedCode(location) {
   return "";
 }
 
+function locationLooksNarrativeText(value) {
+  const text = normalizePostingValue(value);
+  if (!text || text.length < 45) return false;
+  const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+  if (words.length < 7) return false;
+  const hasSentenceEnd = /[.!?]$/.test(text);
+  const hasNarrativeCue = /\b(?:ability to|client[-\s]specific|collaborating|compliance|customers?|develop|ensuring|experience|external|internal|manage|provide|requirements?|responsibilit(?:y|ies)|skills?|supporting|team|while|working)\b/i.test(text);
+  if (hasSentenceEnd && hasNarrativeCue) return true;
+  return words.length >= 10 && /\b(?:responsible for|you will|we are|ability to|experience with|ensuring that)\b/i.test(text);
+}
+
 function normalizeCountryFromLocation(value) {
   const location = normalizePostingValue(value);
   const normalized = normalizeSearchText(location);
   if (!normalized) return "";
+  if (locationLooksNarrativeText(location)) return "";
   const atsCodeCountry = normalizeCountryFromAtsCodeLocation(location);
   if (atsCodeCountry) return atsCodeCountry;
   if (US_STATE_ABBREVIATION_PATTERN.test(location)) return "United States";
@@ -509,6 +521,7 @@ function extractCityText(posting, location, country) {
   if (/^[A-Z]{2}\s+[A-Z0-9]{2,}\s+.*\bwork from home\b/i.test(firstSegment)) return "";
   if (/^\(?\s*(multiple|various|several|all)\s+(locations|states|sites|schools|campuses)\s*\)?$/i.test(firstSegment)) return "";
   if (/^(district[- ]?wide|statewide|nationwide|tbd|n\/?a|unknown)$/i.test(firstSegment)) return "";
+  if (locationLooksNarrativeText(firstSegment)) return "";
   const normalizedFirst = normalizeSearchText(firstSegment);
   const normalizedCountry = normalizeSearchText(country);
   if (normalizedCountry && normalizedFirst === normalizedCountry) return "";

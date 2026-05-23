@@ -11,7 +11,8 @@ This update supersedes the May 18 worker-gate numbers below for current reliabil
 - Read-only worker/source freshness snapshot: due targets about `22.6k`, 24h target success `81.95%`, recent 20-run trend `72.8%`, and throughput scaling decision `hold`.
 - Freshness is above the 1k/day target by volume (`29,912` rows seen in 24h and `19,012` new rows), but quality gates still block throughput increase.
 - New 24h `no_geo_no_remote` public rows were `40`: `39` ApplyToJob and `1` Breezy.
-- Current patch direction: keep throughput fixed, quarantine future ambiguous parenthesized/multi-state ApplyToJob rows, and use `audit:source-freshness` `quality_gate_sources_24h` to target the next parser/source-quality fix.
+- Current patch direction: keep throughput fixed, quarantine future ambiguous parenthesized/multi-state ApplyToJob rows, and reject Breezy narrative description text as location evidence instead of public geo.
+- `audit:source-freshness` `quality_gate_sources_24h` should be used after the next worker run to measure ApplyToJob/Breezy post-patch impact before any throughput increase.
 - Remaining search-index drift is a single extra Meili document for a Lever demo placeholder title (`count_delta=-1`). Do not repair with delete/reindex without explicit approval.
 
 ## Verified Current State - May 18, 2026

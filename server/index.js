@@ -9084,6 +9084,22 @@ function cleanBreezyText(value) {
     .trim();
 }
 
+function breezyLocationLooksNarrativeText(value) {
+  const text = cleanBreezyText(value);
+  if (!text || text.length < 45) return false;
+  const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+  if (words.length < 7) return false;
+  const hasSentenceEnd = /[.!?]$/.test(text);
+  const hasNarrativeCue = /\b(?:ability to|client[-\s]specific|collaborating|compliance|customers?|develop|ensuring|experience|external|internal|manage|provide|requirements?|responsibilit(?:y|ies)|skills?|supporting|team|while|working)\b/i.test(text);
+  if (hasSentenceEnd && hasNarrativeCue) return true;
+  return words.length >= 10 && /\b(?:responsible for|you will|we are|ability to|experience with|ensuring that)\b/i.test(text);
+}
+
+function cleanBreezyLocationText(value) {
+  const text = cleanBreezyText(value);
+  return breezyLocationLooksNarrativeText(text) ? "" : text;
+}
+
 const BREEZY_POLYGOT_LABELS = Object.freeze({
   "%LABEL_MULTIPLE_LOCATIONS%": "Multiple Locations",
   "%LABEL_POSITION_TYPE_FULL_TIME%": "Full-time",
@@ -9406,7 +9422,7 @@ function extractBreezyLabeledRemoteType(sourceHtml) {
 
 function extractBreezyDetailFields(detailHtml) {
   const jsonLd = extractBreezyJsonLdFields(detailHtml);
-  const labeledLocation = extractBreezyStructuredLabeledField(detailHtml, [
+  const rawLabeledLocation = extractBreezyStructuredLabeledField(detailHtml, [
     "Location",
     "Location(s)",
     "Job Location",
@@ -9416,6 +9432,7 @@ function extractBreezyDetailFields(detailHtml) {
     "Address",
     "City"
   ]);
+  const labeledLocation = cleanBreezyLocationText(rawLabeledLocation);
   const labeledRemote = extractBreezyLabeledRemoteType(detailHtml);
   const labeledPostingDate = extractBreezyStructuredLabeledField(detailHtml, [
     "Posted",
@@ -9536,7 +9553,7 @@ function extractBreezyListLocation(linkBody) {
   const segment = extractBreezyListSegment(linkBody, "location");
   if (!segment) return "";
   const beforeRemoteIcon = segment.split(/<br\b|<i[^>]*class=["'][^"']*\bfa-(?:wifi|globe|home)\b/i)[0] || segment;
-  return cleanBreezyText(beforeRemoteIcon);
+  return cleanBreezyLocationText(beforeRemoteIcon);
 }
 
 function extractBreezyListGroupHeader(contextBefore) {
@@ -9607,10 +9624,10 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     const groupHeader = extractBreezyListGroupHeader(contextBefore);
     const cardLocation =
       extractBreezyListLocation(linkBody) ||
-      cleanBreezyText(locationMatch?.[1] || "") ||
-      extractBreezyLabeledField(linkBody, ["Location", "Office", "Workplace"]) ||
+      cleanBreezyLocationText(locationMatch?.[1] || "") ||
+      cleanBreezyLocationText(extractBreezyLabeledField(linkBody, ["Location", "Office", "Workplace"])) ||
       "";
-    const location = cardLocation || (groupHeader.kind === "location" ? groupHeader.text : "");
+    const location = cardLocation || (groupHeader.kind === "location" ? cleanBreezyLocationText(groupHeader.text) : "");
     const listRemote = extractBreezyLabeledRemoteType(linkBody) ||
       (() => {
         const remoteFromLocation = extractBreezyRemoteTypeFromValue(cardLocation);

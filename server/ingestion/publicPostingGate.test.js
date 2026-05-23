@@ -78,6 +78,21 @@ test("public posting gate quarantines parenthesized multi-state locations withou
   assert.equal(hasUsefulGeoEvidence({ location_text: "(Multiple states)" }), false);
 });
 
+test("public posting gate does not count narrative sentences as concrete geo", () => {
+  const locationText = "client-specific needs while ensuring compliance with internal and external regulations.";
+  const result = evaluatePublicPosting(basePosting({
+    location_text: locationText,
+    country: "",
+    region: "",
+    city: "",
+    remote_type: "unknown"
+  }));
+
+  assert.equal(result.status, "quarantined");
+  assert.ok(result.reason_codes.includes("no_geo_no_remote"));
+  assert.equal(hasUsefulGeoEvidence({ location_text: locationText }), false);
+});
+
 test("public posting gate accepts explicit remote and hybrid rows without geo", () => {
   const remote = evaluatePublicPosting(basePosting({
     position_name: "Remote Support Engineer",

@@ -128,6 +128,17 @@ function normalizeAmbiguousLocationText(locationText) {
     .trim();
 }
 
+function locationLooksNarrativeText(locationText) {
+  const text = asString(locationText).replace(/\s+/g, " ").trim();
+  if (!text || text.length < 45) return false;
+  const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+  if (words.length < 7) return false;
+  const hasSentenceEnd = /[.!?]$/.test(text);
+  const hasNarrativeCue = /\b(?:ability to|client[-\s]specific|collaborating|compliance|customers?|develop|ensuring|experience|external|internal|manage|provide|requirements?|responsibilit(?:y|ies)|skills?|supporting|team|while|working)\b/i.test(text);
+  if (hasSentenceEnd && hasNarrativeCue) return true;
+  return words.length >= 10 && /\b(?:responsible for|you will|we are|ability to|experience with|ensuring that)\b/i.test(text);
+}
+
 function locationLooksAmbiguous(locationText, posting = {}) {
   const location = normalizeAmbiguousLocationText(locationText);
   if (!location) return false;
@@ -145,12 +156,14 @@ function locationLooksAmbiguous(locationText, posting = {}) {
 function hasConcreteLocationText(locationText) {
   const location = normalizeAmbiguousLocationText(locationText);
   if (!location || locationLooksAmbiguous(location)) return false;
+  if (locationLooksNarrativeText(locationText)) return false;
   if (/\b(remote|anywhere|worldwide|global|work from home|wfh)\b/.test(location)) return false;
   return true;
 }
 
 function hasUsefulGeoEvidence(posting = {}) {
-  if (hasValue(posting.country) || hasValue(posting.region || posting.state) || hasValue(posting.city)) return true;
+  if (hasValue(posting.country) || hasValue(posting.region || posting.state)) return true;
+  if (hasValue(posting.city) && !locationLooksNarrativeText(posting.city)) return true;
   return hasConcreteLocationText(getLocationText(posting));
 }
 
