@@ -198,6 +198,172 @@ function annotateCurrentPolicyFailureSources(topFailureSources = [], parserDrift
   });
 }
 
+function emptyQualityGatePressure() {
+  return {
+    new_missing_any_normalized_geo_rows_24h: 0,
+    new_weak_unknown_remote_rows_24h: 0,
+    new_no_geo_no_remote_public_rows_24h: 0
+  };
+}
+
+function sourceRecoveryPriorityLane(counts = {}, qualityGate = {}) {
+  if (Number(counts.parser_bug || 0) > 0) return "parser_bug";
+  if (
+    Number(counts.source_quality || 0) > 0 ||
+    Number(qualityGate.new_no_geo_no_remote_public_rows_24h || 0) > 0 ||
+    Number(qualityGate.new_missing_any_normalized_geo_rows_24h || 0) > 0 ||
+    Number(qualityGate.new_weak_unknown_remote_rows_24h || 0) > 0
+  ) return "source_quality";
+  if (
+    Number(counts.rate_limit || 0) > 0 ||
+    Number(counts.network || 0) > 0 ||
+    Number(counts.auth || 0) > 0 ||
+    Number(counts.unknown || 0) > 0
+  ) return "stability";
+  if (Number(counts.empty_no_jobs || 0) > 0) return "empty_no_jobs_cleanup";
+  return "due_backlog";
+}
+
+function sourceRecoveryNextAction(lane) {
+  switch (lane) {
+    case "parser_bug":
+      return "Add or update raw fixtures and fix the parser before counting this source as scalable.";
+    case "source_quality":
+      return "Review source evidence and quality-gate rejects; do not relax thresholds or invent missing fields.";
+    case "stability":
+      return "Separate rate-limit, network, auth, and unknown failures before increasing target volume.";
+    case "empty_no_jobs_cleanup":
+      return "Audit stale or empty boards so worker slots are not spent on no-job targets.";
+    default:
+      return "Monitor due backlog and only increase throughput after the required health gates pass.";
+  }
+}
+
+function buildSourceRecoveryPriorityReasons({ counts = {}, qualityGate = {}, failurePressure = 0, targetsDue = 0 } = {}) {
+  const reasons = [];
+  if (Number(counts.parser_bug || 0) > 0) reasons.push("parser_bug");
+  if (Number(counts.source_quality || 0) > 0) reasons.push("source_quality");
+  if (Number(qualityGate.new_no_geo_no_remote_public_rows_24h || 0) > 0) reasons.push("new_no_geo_no_remote_public_rows");
+  if (
+    Number(qualityGate.new_missing_any_normalized_geo_rows_24h || 0) > 0 ||
+    Number(qualityGate.new_weak_unknown_remote_rows_24h || 0) > 0
+  ) reasons.push("quality_gate_pressure");
+  if (Number(counts.rate_limit || 0) > 0) reasons.push("rate_limit");
+  if (Number(counts.network || 0) > 0) reasons.push("network");
+  if (Number(counts.auth || 0) > 0) reasons.push("auth");
+  if (Number(counts.unknown || 0) > 0) reasons.push("unknown");
+  if (Number(counts.empty_no_jobs || 0) > 0) reasons.push("empty_no_jobs");
+  if (Number(failurePressure || 0) > 0) reasons.push("failure_pressure");
+  if (Number(targetsDue || 0) > 0) reasons.push("due_backlog");
+  return reasons;
+}
+
+function calculateSourceRecoveryPriorityScore({ counts = {}, qualityGate = {}, failurePressure = 0, targetsDue = 0 } = {}) {
+  return (
+    Number(targetsDue || 0) +
+    (Number(failurePressure || 0) * 10) +
+    (Number(counts.parser_bug || 0) * 100) +
+    (Number(counts.source_quality || 0) * 80) +
+    (Number(counts.rate_limit || 0) * 40) +
+    (Number(counts.network || 0) * 30) +
+    (Number(counts.auth || 0) * 40) +
+    (Number(counts.unknown || 0) * 20) +
+    (Number(counts.empty_no_jobs || 0) * 10) +
+    (Number(qualityGate.new_no_geo_no_remote_public_rows_24h || 0) * 60) +
+    (Number(qualityGate.new_missing_any_normalized_geo_rows_24h || 0) * 5) +
+    (Number(qualityGate.new_weak_unknown_remote_rows_24h || 0) * 5)
+  );
+}
+
+function buildSourceRecoveryPriorities({
+  dueByAts = [],
+  topFailureSources = [],
+  qualityGateSources = [],
+  options = {}
+} = {}) {
+  const sourcesByAts = new Map();
+  const getSource = (atsKey) => {
+    const key = String(atsKey || "unknown").trim().toLowerCase() || "unknown";
+    const existing = sourcesByAts.get(key);
+    if (existing) return existing;
+    const created = {
+      ats_key: key,
+      targets_due: 0,
+      failure_pressure_24h: 0,
+      dominant_failure_reason_24h: "unknown",
+      current_policy_adjusted_failure_reason_counts_24h: {},
+      quality_gate_24h: emptyQualityGatePressure()
+    };
+    sourcesByAts.set(key, created);
+    return created;
+  };
+
+  for (const row of Array.isArray(dueByAts) ? dueByAts : []) {
+    const source = getSource(row?.ats_key);
+    source.targets_due += Number(row?.targets_due || 0);
+  }
+
+  for (const row of Array.isArray(topFailureSources) ? topFailureSources : []) {
+    const source = getSource(row?.ats_key);
+    const failurePressure = Number(row?.total_count || 0);
+    const adjustedCounts = sparsePositiveCounts(row?.current_policy_adjusted_by_reason || row?.by_reason || {});
+    source.failure_pressure_24h += failurePressure;
+    for (const [reason, count] of Object.entries(adjustedCounts)) {
+      addCount(source.current_policy_adjusted_failure_reason_counts_24h, reason, count);
+    }
+    source.current_policy_adjusted_failure_reason_counts_24h = sparsePositiveCounts(source.current_policy_adjusted_failure_reason_counts_24h);
+    source.dominant_failure_reason_24h = row?.current_policy_dominant_failure_reason || row?.dominant_failure_reason || source.dominant_failure_reason_24h;
+  }
+
+  for (const row of Array.isArray(qualityGateSources) ? qualityGateSources : []) {
+    const source = getSource(row?.ats_key);
+    source.quality_gate_24h.new_missing_any_normalized_geo_rows_24h += Number(row?.new_missing_any_normalized_geo_rows_24h || 0);
+    source.quality_gate_24h.new_weak_unknown_remote_rows_24h += Number(row?.new_weak_unknown_remote_rows_24h || 0);
+    source.quality_gate_24h.new_no_geo_no_remote_public_rows_24h += Number(row?.new_no_geo_no_remote_public_rows_24h || 0);
+  }
+
+  const limit = Math.max(1, Math.min(50, Math.floor(Number(options.sourceRecoveryPriorityLimit || 10))));
+  const sources = Array.from(sourcesByAts.values())
+    .map((source) => {
+      const counts = sparsePositiveCounts(source.current_policy_adjusted_failure_reason_counts_24h);
+      const qualityGate = source.quality_gate_24h;
+      const priorityLane = sourceRecoveryPriorityLane(counts, qualityGate);
+      const priorityScore = calculateSourceRecoveryPriorityScore({
+        counts,
+        qualityGate,
+        failurePressure: source.failure_pressure_24h,
+        targetsDue: source.targets_due
+      });
+      return {
+        ...source,
+        current_policy_adjusted_failure_reason_counts_24h: counts,
+        priority_lane: priorityLane,
+        priority_score: priorityScore,
+        reasons: buildSourceRecoveryPriorityReasons({
+          counts,
+          qualityGate,
+          failurePressure: source.failure_pressure_24h,
+          targetsDue: source.targets_due
+        }),
+        next_action: sourceRecoveryNextAction(priorityLane)
+      };
+    })
+    .filter((source) => Number(source.priority_score || 0) > 0 || source.reasons.length > 0)
+    .sort((left, right) =>
+      Number(right.priority_score || 0) - Number(left.priority_score || 0) ||
+      Number(right.targets_due || 0) - Number(left.targets_due || 0) ||
+      Number(right.failure_pressure_24h || 0) - Number(left.failure_pressure_24h || 0) ||
+      String(left.ats_key || "").localeCompare(String(right.ats_key || ""))
+    );
+
+  return {
+    read_only: true,
+    source_count: sources.length,
+    prioritization: "Higher score means due targets plus 24h failure pressure, current-policy failure taxonomy, and quality-gate pressure are more urgent; this is diagnostic only and does not approve throughput increases.",
+    sources: sources.slice(0, limit)
+  };
+}
+
 function buildThroughputReadiness({
   targetSuccessPct = null,
   noGeoNoRemoteCount = 0,
@@ -334,6 +500,12 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
       adjustedFailureReasonCounts: sparseAdjustedFailureCounts
     }),
     top_failure_sources: topFailureSources,
+    source_recovery_priorities: buildSourceRecoveryPriorities({
+      dueByAts,
+      topFailureSources,
+      qualityGateSources,
+      options
+    }),
     next_action: "do not increase throughput unless success rate, parity, parser attention, and due-by-ATS gates are clean"
   };
 }
@@ -565,6 +737,10 @@ function printReport(report) {
     if (topDueSource) {
       console.log(`Top due source: ${topDueSource.ats_key} (${topDueSource.targets_due} due targets)`);
     }
+    const topRecoverySource = health.source_recovery_priorities?.sources?.[0];
+    if (topRecoverySource) {
+      console.log(`Top recovery priority: ${topRecoverySource.ats_key} (${topRecoverySource.priority_lane}, score ${topRecoverySource.priority_score}, ${topRecoverySource.targets_due} due, ${topRecoverySource.failure_pressure_24h} failures)`);
+    }
   }
   console.table((report.items || []).slice(0, 25).map((item) => ({
     ats: item.ats_key,
@@ -650,6 +826,7 @@ module.exports = {
   getPostgresDailySourceHealthSummary,
   parseArgs,
   runAudit,
+  buildSourceRecoveryPriorities,
   summarizeFailureSources,
   writeOutput
 };

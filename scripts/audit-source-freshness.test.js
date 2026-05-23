@@ -232,6 +232,71 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
     parser_bug_resolved_total: 1
   });
   assert.equal(summary.top_failure_sources[2].dominant_failure_reason, "rate_limit");
+  assert.equal(summary.source_recovery_priorities.read_only, true);
+  assert.equal(summary.source_recovery_priorities.source_count, 4);
+  assert.deepEqual(
+    summary.source_recovery_priorities.sources.map((source) => ({
+      ats_key: source.ats_key,
+      priority_lane: source.priority_lane,
+      priority_score: source.priority_score,
+      targets_due: source.targets_due,
+      failure_pressure_24h: source.failure_pressure_24h,
+      reasons: source.reasons
+    })),
+    [
+      {
+        ats_key: "bamboohr",
+        priority_lane: "parser_bug",
+        priority_score: 350,
+        targets_due: 0,
+        failure_pressure_24h: 4,
+        reasons: ["parser_bug", "empty_no_jobs", "failure_pressure"]
+      },
+      {
+        ats_key: "breezy",
+        priority_lane: "source_quality",
+        priority_score: 188,
+        targets_due: 18,
+        failure_pressure_24h: 5,
+        reasons: [
+          "new_no_geo_no_remote_public_rows",
+          "quality_gate_pressure",
+          "empty_no_jobs",
+          "failure_pressure",
+          "due_backlog"
+        ]
+      },
+      {
+        ats_key: "applytojob",
+        priority_lane: "source_quality",
+        priority_score: 169,
+        targets_due: 24,
+        failure_pressure_24h: 0,
+        reasons: [
+          "new_no_geo_no_remote_public_rows",
+          "quality_gate_pressure",
+          "due_backlog"
+        ]
+      },
+      {
+        ats_key: "greenhouse",
+        priority_lane: "stability",
+        priority_score: 150,
+        targets_due: 0,
+        failure_pressure_24h: 3,
+        reasons: ["rate_limit", "failure_pressure"]
+      }
+    ]
+  );
+  assert.deepEqual(summary.source_recovery_priorities.sources[0].current_policy_adjusted_failure_reason_counts_24h, {
+    parser_bug: 3,
+    empty_no_jobs: 1
+  });
+  assert.deepEqual(summary.source_recovery_priorities.sources[1].quality_gate_24h, {
+    new_missing_any_normalized_geo_rows_24h: 1,
+    new_weak_unknown_remote_rows_24h: 1,
+    new_no_geo_no_remote_public_rows_24h: 1
+  });
 });
 
 test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from first seen only", () => {
