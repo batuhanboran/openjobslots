@@ -46,10 +46,23 @@ test("parseBacklogArgs accepts diagnostics, target ATS list, and error window", 
 
 test("buildWorkerBacklogQuery is read-only and reports due source fields", () => {
   const query = buildWorkerBacklogQuery({ nowEpoch: 1_800_000_000, limit: 10 });
-  assert.deepEqual(query.values, [1_800_000_000, 10]);
+  assert.deepEqual(query.values, [1_800_000_000, 10, []]);
   assert.match(query.sql, /WITH target_state AS/i);
   assert.match(query.sql, /due_count/i);
   assert.match(query.sql, /runnable_due_count/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildWorkerBacklogQuery applies target ATS filter to top-level backlog", () => {
+  const query = buildWorkerBacklogQuery({
+    nowEpoch: 1_800_000_000,
+    limit: 10,
+    targetAtsKeys: ["recruitcrm"]
+  });
+
+  assert.deepEqual(query.values, [1_800_000_000, 10, ["recruitcrm"]]);
+  assert.match(query.sql, /cardinality\(\$3::text\[\]\) = 0/i);
+  assert.match(query.sql, /s\.ats_key = ANY\(\$3::text\[\]\)/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -343,13 +356,16 @@ test("runPostgresBacklogAudit performs one read-only query", async () => {
   const report = await runPostgresBacklogAudit(pool, {
     nowEpoch: 1_800_000_000,
     limit: 25,
+    targetAtsKeys: ["applytojob"],
     autoSyncDailyTargetBudget: 250,
     autoSyncTargetsPerRun: 50,
     sourceDailyTargetBudget: 100
   });
   assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].params, [1_800_000_000, 25, ["applytojob"]]);
   assert.equal(report.ok, true);
   assert.equal(report.read_only, true);
+  assert.deepEqual(report.filters.target_ats_keys, ["applytojob"]);
   assert.equal(report.totals.due_count, 3);
   assert.equal(report.items[0].ats_key, "applytojob");
 });

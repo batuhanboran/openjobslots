@@ -248,8 +248,9 @@ function addFailureReasonCount(counts, reason, count) {
 function buildWorkerBacklogQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const limit = Math.max(1, Math.min(500, Math.floor(Number(options.limit || 100))));
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
   return {
-    values: [nowEpoch, limit],
+    values: [nowEpoch, limit, targetAtsKeys],
     sql: `
       WITH target_state AS (
         SELECT
@@ -289,6 +290,10 @@ function buildWorkerBacklogQuery(options = {}) {
       FROM ats_sources s
       LEFT JOIN target_state t
         ON t.ats_key = s.ats_key
+      WHERE (
+        cardinality($3::text[]) = 0
+        OR s.ats_key = ANY($3::text[])
+      )
       GROUP BY s.ats_key, s.display_name, s.enabled, s.protection_status, s.disabled_reason
       ORDER BY due_count DESC, failure_pressure DESC, s.ats_key ASC
       LIMIT $2;
@@ -1285,7 +1290,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     read_only: true,
     generated_at_epoch: nowEpoch,
     filters: {
-      limit: query.values[1]
+      limit: query.values[1],
+      target_ats_keys: query.values[2]
     },
     ...summary
   };
