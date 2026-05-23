@@ -12,6 +12,7 @@ This update records the ATS parser modularization decision. It is architecture-o
 - `server/ingestion/sources/common.js`, `server/ingestion/direct-parser-fixtures.test.js`, and detail-refetch planning now import parser modules directly where possible.
 - The only intentional remaining source-layer dependency on `server/index.js` is the legacy `collectPostingsForCompany` fallback. The next architecture phase is to move collector/discovery/fetch orchestration into ATS source modules, then shrink `server/index.js` again.
 - Future parser/source fixes must target the relevant source module plus raw/expected fixtures. Do not fix ATS parser behavior by adding new parser code to `server/index.js`.
+- Production deployment posture after this architecture update is `main` on production `/root/OpenJobSlots`; app and worker should be rebuilt/recreated when parser modules change.
 
 ## Verified Current State - May 23, 2026
 
@@ -102,9 +103,9 @@ Scale posture:
 
 - Package/public release line: `v1.9.3`.
 - Previous public release tag: `v1.9.2`.
-- Current release branch: `codex/production-baseline-audit`.
-- Last verified production checkout before this patch metadata/docs refresh: `89a997036257a9a162014a9f8e3f68ffcab8833c`.
-- Last verified production deployment date: May 18, 2026.
+- Current release branch: `main`.
+- Last verified production checkout before this patch metadata/docs refresh: May 24, 2026 architecture deployment on `main`.
+- Last verified production deployment date: May 24, 2026.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 
@@ -113,7 +114,7 @@ Scale posture:
 - Production host: production / `public-services`.
 - Production checkout: `/root/OpenJobSlots`.
 - Deployment source: private GitHub repository `batuhanboran/openjobslots`.
-- Auto-deploy: `openjobslots-deploy.timer`, stopped/inactive after the Taleo canary to prevent another recovery-branch rollback.
+- Auto-deploy: `openjobslots-deploy.timer`, active and checking `origin/main`.
 - Deploy log: `/var/log/openjobslots-deploy.log`.
 - Deployment details and rollback notes: `docs/reference/deployment.md`.
 
