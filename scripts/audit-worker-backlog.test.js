@@ -8,6 +8,7 @@ const {
   buildLatestRunBySourceQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
+  buildRecentRunTrendQuery,
   buildSourceBudgetUsageQuery,
   buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
@@ -16,6 +17,7 @@ const {
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
+  summarizeRecentRunTrendRows,
   summarizeSourceBudgetUsageRows,
   summarizeTargetFailurePressureRows,
   summarizeParserDriftRecheck,
@@ -35,13 +37,15 @@ test("parseBacklogArgs accepts diagnostics, target ATS list, and error window", 
     "--json",
     "--diagnostics",
     "--targets=applytojob,breezy,icims",
-    "--error-window-hours=48"
+    "--error-window-hours=48",
+    "--recent-run-limit=10"
   ]);
 
   assert.equal(options.json, true);
   assert.equal(options.diagnostics, true);
   assert.deepEqual(options.targetAtsKeys, ["applytojob", "breezy", "icims"]);
   assert.equal(options.errorWindowHours, 48);
+  assert.equal(options.recentRunLimit, 10);
 });
 
 test("buildWorkerBacklogQuery is read-only and reports due source fields", () => {
@@ -128,6 +132,19 @@ test("buildLatestRunFailureReasonsQuery groups only the latest run by source", (
   assert.match(query.sql, /e\.run_id = l\.id/i);
   assert.match(query.sql, /error_message/i);
   assert.match(query.sql, /GROUP BY e\.ats_key, e\.error_type, COALESCE\(e\.http_status, 0\), e\.error_message/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildRecentRunTrendQuery is read-only and bounded", () => {
+  const query = buildRecentRunTrendQuery({
+    recentRunLimit: 20,
+    targetAtsKeys: ["applytojob", "breezy"]
+  });
+
+  assert.deepEqual(query.values, [20, ["applytojob", "breezy"]]);
+  assert.match(query.sql, /WITH recent_runs AS/i);
+  assert.match(query.sql, /active_ats \?\| \$2::text\[\]/i);
+  assert.match(query.sql, /LIMIT \$1/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -432,6 +449,32 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
         }
         return { rows: [{ ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 }] };
       }
+      if (/WITH recent_runs AS/i.test(sql)) {
+        return {
+          rows: [
+            {
+              id: 211,
+              status: "completed_with_errors",
+              started_at_epoch: 1_800_000_000,
+              finished_at_epoch: 1_800_000_060,
+              total_targets: 25,
+              success_count: 20,
+              failure_count: 5,
+              active_ats: ["applytojob", "breezy"]
+            },
+            {
+              id: 210,
+              status: "completed_with_errors",
+              started_at_epoch: 1_799_999_000,
+              finished_at_epoch: 1_799_999_050,
+              total_targets: 25,
+              success_count: 15,
+              failure_count: 10,
+              active_ats: ["applytojob"]
+            }
+          ]
+        };
+      }
       if (/FROM ingestion_runs/i.test(sql)) {
         if (/SUM\(total_targets\)/i.test(sql)) {
           return { rows: [{ targets_started_today: 2000 }] };
@@ -472,10 +515,13 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 9);
+  assert.equal(calls.length, 10);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
+  assert.equal(report.diagnostics.recent_run_trend.run_count, 2);
+  assert.equal(report.diagnostics.recent_run_trend.success_rate_pct, 70);
+  assert.equal(report.diagnostics.throughput_scaling_gate.recent_run_success_rate_pct, 70);
   assert.equal(report.diagnostics.throughput_scaling_gate.allowed, false);
   assert.equal(report.diagnostics.throughput_scaling_gate.decision, "hold");
   assert.ok(report.diagnostics.throughput_scaling_gate.blockers.some((item) => item.code === "rate_limit_failures_present"));
@@ -515,6 +561,41 @@ test("summarizeAutoSyncBudgetUsage explains consumed and remaining daily budget"
   assert.equal(summary.targets_started_today, 1300);
   assert.equal(summary.remaining_daily_budget, 700);
   assert.equal(summary.daily_budget_exhausted, false);
+});
+
+test("summarizeRecentRunTrendRows exposes multi-run worker success rate", () => {
+  const summary = summarizeRecentRunTrendRows([
+    {
+      id: 254,
+      status: "completed",
+      started_at_epoch: 1_800_000_000,
+      finished_at_epoch: 1_800_000_010,
+      total_targets: 9,
+      success_count: 9,
+      failure_count: 0,
+      active_ats: ["careerplug"]
+    },
+    {
+      id: 253,
+      status: "completed_with_errors",
+      started_at_epoch: 1_799_999_000,
+      finished_at_epoch: 1_799_999_030,
+      total_targets: 50,
+      success_count: 25,
+      failure_count: 25,
+      active_ats: ["breezy"]
+    }
+  ], { recentRunLimit: 20, targetAtsKeys: ["breezy"] });
+
+  assert.equal(summary.run_count, 2);
+  assert.equal(summary.total_targets, 59);
+  assert.equal(summary.success_count, 34);
+  assert.equal(summary.failure_count, 25);
+  assert.equal(summary.success_rate_pct, 57.63);
+  assert.equal(summary.failure_rate_pct, 42.37);
+  assert.deepEqual(summary.target_ats_keys, ["breezy"]);
+  assert.equal(summary.runs[0].success_rate_pct, 100);
+  assert.equal(summary.runs[1].success_rate_pct, 50);
 });
 
 test("summarizeLatestRunBySourceRows exposes per-source run success rates", () => {
@@ -587,6 +668,46 @@ test("buildThroughputScalingGate holds scaling when latest run success is below 
   assert.equal(gate.minimum_success_rate_pct, 80);
   assert.ok(gate.blockers.some((item) => item.code === "latest_run_success_rate_below_threshold"));
   assert.ok(gate.required_checks_before_increase.includes("search:reindex:check"));
+});
+
+test("buildThroughputScalingGate holds scaling when recent run trend is below threshold", () => {
+  const gate = buildThroughputScalingGate({
+    latestRun: {
+      latest_run_id: 254,
+      latest_status: "completed",
+      total_targets: 9,
+      success_count: 9,
+      failure_count: 0,
+      success_rate_pct: 100
+    },
+    recentRunTrend: {
+      total_targets: 736,
+      success_count: 551,
+      failure_count: 185,
+      success_rate_pct: 74.86
+    },
+    parserAttentionCount: 0,
+    failureReasonCounts: {
+      parser_bug: 0,
+      source_quality: 0,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 0,
+      auth: 0,
+      unknown: 0
+    },
+    totals: {
+      runnable_due_count: 1000,
+      failure_pressure: 0
+    },
+    options: {
+      minimumSuccessRatePct: 80
+    }
+  });
+
+  assert.equal(gate.allowed, false);
+  assert.equal(gate.recent_run_success_rate_pct, 74.86);
+  assert.ok(gate.blockers.some((item) => item.code === "recent_run_success_rate_below_threshold"));
 });
 
 test("buildThroughputScalingGate allows only small increase after clean worker evidence", () => {

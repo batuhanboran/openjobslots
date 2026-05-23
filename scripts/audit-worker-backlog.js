@@ -93,6 +93,7 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     limit: 100,
     output: "",
     nowEpoch: 0,
+    recentRunLimit: 20,
     targetAtsKeys: []
   };
   for (const arg of argv) {
@@ -104,12 +105,17 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     else if (arg === "--error-window-hours") options.expectErrorWindowHours = true;
     else if (arg.startsWith("--limit=")) options.limit = Number(arg.slice("--limit=".length));
     else if (arg === "--limit") options.expectLimit = true;
+    else if (arg.startsWith("--recent-run-limit=")) options.recentRunLimit = Number(arg.slice("--recent-run-limit=".length));
+    else if (arg === "--recent-run-limit") options.expectRecentRunLimit = true;
     else if (arg.startsWith("--now-epoch=")) options.nowEpoch = Number(arg.slice("--now-epoch=".length));
     else if (arg === "--now-epoch") options.expectNowEpoch = true;
     else if (arg.startsWith("--output=")) options.output = arg.slice("--output=".length);
     else if (options.expectLimit) {
       options.limit = Number(arg);
       options.expectLimit = false;
+    } else if (options.expectRecentRunLimit) {
+      options.recentRunLimit = Number(arg);
+      options.expectRecentRunLimit = false;
     } else if (options.expectNowEpoch) {
       options.nowEpoch = Number(arg);
       options.expectNowEpoch = false;
@@ -122,6 +128,7 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     }
   }
   options.limit = Math.max(1, Math.min(500, Math.floor(Number(options.limit || 100))));
+  options.recentRunLimit = Math.max(1, Math.min(100, Math.floor(Number(options.recentRunLimit || 20))));
   options.nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || 0)));
   options.errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   return options;
@@ -340,6 +347,37 @@ function buildLatestRunSummaryQuery() {
       FROM ingestion_runs
       ORDER BY id DESC
       LIMIT 1;
+    `
+  };
+}
+
+function buildRecentRunTrendQuery(options = {}) {
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.recentRunLimit || 20))));
+  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  return {
+    values: [limit, targetAtsKeys],
+    sql: `
+      WITH recent_runs AS (
+        SELECT
+          id,
+          status,
+          started_at_epoch,
+          finished_at_epoch,
+          total_targets,
+          success_count,
+          failure_count,
+          active_ats
+        FROM ingestion_runs
+        WHERE (
+          cardinality($2::text[]) = 0
+          OR active_ats ?| $2::text[]
+        )
+        ORDER BY id DESC
+        LIMIT $1
+      )
+      SELECT *
+      FROM recent_runs
+      ORDER BY id DESC;
     `
   };
 }
@@ -797,6 +835,73 @@ function summarizeLatestRun(row = {}) {
   };
 }
 
+function normalizeActiveAts(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+    } catch (_) {
+      return value.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function summarizeRecentRunTrendRows(rows = [], options = {}) {
+  const normalizedRuns = (Array.isArray(rows) ? rows : []).map((row) => {
+    const totalTargets = Number(row?.total_targets || 0);
+    const successCount = Number(row?.success_count || 0);
+    const failureCount = Number(row?.failure_count || 0);
+    return {
+      run_id: Number(row?.id || row?.run_id || 0),
+      status: String(row?.status || ""),
+      started_at_epoch: Number(row?.started_at_epoch || 0),
+      finished_at_epoch: Number(row?.finished_at_epoch || 0),
+      total_targets: totalTargets,
+      success_count: successCount,
+      failure_count: failureCount,
+      success_rate_pct: totalTargets > 0
+        ? Number(((successCount / totalTargets) * 100).toFixed(2))
+        : null,
+      failure_rate_pct: totalTargets > 0
+        ? Number(((failureCount / totalTargets) * 100).toFixed(2))
+        : null,
+      active_ats: normalizeActiveAts(row?.active_ats)
+    };
+  });
+  const totals = normalizedRuns.reduce((acc, run) => {
+    acc.total_targets += run.total_targets;
+    acc.success_count += run.success_count;
+    acc.failure_count += run.failure_count;
+    if (run.status === "completed") acc.completed_count += 1;
+    else if (run.status === "completed_with_errors") acc.completed_with_errors_count += 1;
+    else if (run.status === "running") acc.running_count += 1;
+    return acc;
+  }, {
+    total_targets: 0,
+    success_count: 0,
+    failure_count: 0,
+    completed_count: 0,
+    completed_with_errors_count: 0,
+    running_count: 0
+  });
+  return {
+    read_only: true,
+    recent_run_limit: Math.max(1, Math.min(100, Math.floor(Number(options.recentRunLimit || 20)))),
+    target_ats_keys: Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [],
+    run_count: normalizedRuns.length,
+    ...totals,
+    success_rate_pct: totals.total_targets > 0
+      ? Number(((totals.success_count / totals.total_targets) * 100).toFixed(2))
+      : null,
+    failure_rate_pct: totals.total_targets > 0
+      ? Number(((totals.failure_count / totals.total_targets) * 100).toFixed(2))
+      : null,
+    runs: normalizedRuns
+  };
+}
+
 function summarizeLatestRunBySourceRow(row = {}) {
   const successCount = Number(row?.success_count || 0);
   const failureCount = Number(row?.failure_count || 0);
@@ -827,6 +932,7 @@ function summarizeLatestRunBySourceRows(rows = []) {
 
 function buildThroughputScalingGate({
   latestRun = {},
+  recentRunTrend = {},
   parserAttentionCount = 0,
   failureReasonCounts = {},
   totals = {},
@@ -839,6 +945,13 @@ function buildThroughputScalingGate({
     ? Number(options.parserAttentionThreshold)
     : 0;
   const successRatePct = latestRun.success_rate_pct == null ? null : Number(latestRun.success_rate_pct);
+  const recentRunSuccessRatePct = recentRunTrend.success_rate_pct == null
+    ? null
+    : Number(recentRunTrend.success_rate_pct);
+  const recentRunTotalTargets = Number(recentRunTrend.total_targets || 0);
+  const minimumTrendTargetCount = Number.isFinite(Number(options.minimumTrendTargetCount))
+    ? Number(options.minimumTrendTargetCount)
+    : 50;
   const latestStatus = String(latestRun.latest_status || "").trim();
   const blockers = [];
   const cautions = [];
@@ -857,6 +970,17 @@ function buildThroughputScalingGate({
     blockers.push({
       code: "latest_run_success_rate_below_threshold",
       message: `Latest worker success rate ${successRatePct}% is below the ${minimumSuccessRatePct}% threshold.`
+    });
+  }
+
+  if (
+    recentRunTotalTargets >= minimumTrendTargetCount &&
+    recentRunSuccessRatePct != null &&
+    recentRunSuccessRatePct < minimumSuccessRatePct
+  ) {
+    blockers.push({
+      code: "recent_run_success_rate_below_threshold",
+      message: `Recent worker trend success rate ${recentRunSuccessRatePct}% over ${recentRunTotalTargets} targets is below the ${minimumSuccessRatePct}% threshold.`
     });
   }
 
@@ -895,7 +1019,10 @@ function buildThroughputScalingGate({
     latest_run_id: Number(latestRun.latest_run_id || 0),
     latest_run_status: latestStatus,
     latest_run_success_rate_pct: successRatePct,
+    recent_run_success_rate_pct: recentRunSuccessRatePct,
+    recent_run_total_targets: recentRunTotalTargets,
     minimum_success_rate_pct: minimumSuccessRatePct,
+    minimum_trend_target_count: minimumTrendTargetCount,
     parser_attention_count: Number(parserAttentionCount || 0),
     parser_attention_threshold: parserAttentionThreshold,
     runnable_due_count: Number(totals.runnable_due_count || 0),
@@ -1234,10 +1361,12 @@ function attachBacklogDiagnostics(report, options = {}) {
     }
   }
   const autoSyncBudgetUsage = summarizeAutoSyncBudgetUsage(options.autoSyncBudgetUsageRows || [], options);
+  const recentRunTrend = summarizeRecentRunTrendRows(options.recentRunTrendRows || [], options);
   const parserDriftRecheck = summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options);
   const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], options);
   const throughputScalingGate = buildThroughputScalingGate({
     latestRun,
+    recentRunTrend,
     parserAttentionCount,
     failureReasonCounts,
     totals: report.totals || {},
@@ -1253,6 +1382,7 @@ function attachBacklogDiagnostics(report, options = {}) {
       source_policy_block_count: sourcePolicyBlockCount,
       failure_reason_counts: failureReasonCounts,
       latest_run: latestRun,
+      recent_run_trend: recentRunTrend,
       latest_run_by_source: latestRunBySource,
       auto_sync_budget_usage: autoSyncBudgetUsage,
       parser_drift_recheck: parserDriftRecheck,
@@ -1300,6 +1430,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const recentErrors = await pool.query(recentErrorsQuery.sql, recentErrorsQuery.values);
   const latestRunQuery = buildLatestRunSummaryQuery();
   const latestRun = await pool.query(latestRunQuery.sql, latestRunQuery.values);
+  const recentRunTrendQuery = buildRecentRunTrendQuery(options);
+  const recentRunTrend = await pool.query(recentRunTrendQuery.sql, recentRunTrendQuery.values);
   const latestRunBySourceQuery = buildLatestRunBySourceQuery(options);
   const latestRunBySource = await pool.query(latestRunBySourceQuery.sql, latestRunBySourceQuery.values);
   const latestRunFailureReasonsQuery = buildLatestRunFailureReasonsQuery(options);
@@ -1317,6 +1449,7 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     nowEpoch,
     recentErrorRows: recentErrors.rows,
     latestRunRows: latestRun.rows,
+    recentRunTrendRows: recentRunTrend.rows,
     latestRunBySourceRows: latestRunBySource.rows,
     latestRunFailureReasonRows: latestRunFailureReasons.rows,
     autoSyncBudgetUsageRows: autoSyncBudgetUsage.rows,
@@ -1395,6 +1528,7 @@ module.exports = {
   buildLatestRunSummaryQuery,
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
+  buildRecentRunTrendQuery,
   buildSourceBudgetUsageQuery,
   buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
@@ -1406,6 +1540,7 @@ module.exports = {
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
+  summarizeRecentRunTrendRows,
   summarizeSourceBudgetUsageRows,
   summarizeTargetFailurePressureRows,
   summarizeParserDriftRecheck,
