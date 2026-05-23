@@ -244,6 +244,13 @@ function normalizeHttpStatus(value) {
   return Math.floor(status);
 }
 
+function extractHttpStatusFromMessage(message = "") {
+  const text = String(message || "").trim().toLowerCase();
+  const match = text.match(/\b(?:http|status|code)\s*[:=]?\s*(\d{3})\b/);
+  if (!match) return 0;
+  return normalizeHttpStatus(match[1]);
+}
+
 function isSourceQualityValidationMessage(message) {
   const text = String(message || "").trim().toLowerCase();
   return text.includes("no_geo_no_remote") ||
@@ -254,8 +261,8 @@ function isSourceQualityValidationMessage(message) {
 
 function classifyFailureReason(errorType, httpStatus = 0, errorMessage = "") {
   const type = String(errorType || "unknown").trim().toLowerCase() || "unknown";
-  const status = normalizeHttpStatus(httpStatus);
   const message = String(errorMessage || "").trim().toLowerCase();
+  const status = normalizeHttpStatus(httpStatus) || extractHttpStatusFromMessage(message);
   if (status === 429 || RATE_LIMIT_ERROR_TYPES.includes(type)) return "rate_limit";
   if (isSourceQualityParserValidation(type, errorMessage)) return "source_quality";
   if (type === "unknown" && isSourceQualityValidationMessage(errorMessage)) return "source_quality";
@@ -266,6 +273,7 @@ function classifyFailureReason(errorType, httpStatus = 0, errorMessage = "") {
   if (isParserAttentionErrorType(type) || type.startsWith("parser_")) return "parser_bug";
   if (SOURCE_QUALITY_ERROR_TYPES.includes(type)) return "source_quality";
   if (EMPTY_NO_JOBS_ERROR_TYPES.includes(type)) return "empty_no_jobs";
+  if (status === 404 || status === 410) return "source_quality";
   if (AUTH_ERROR_TYPES.includes(type) || status === 401 || status === 403) return "auth";
   if (NETWORK_ERROR_TYPES.includes(type) || status >= 500) return "network";
   return "unknown";

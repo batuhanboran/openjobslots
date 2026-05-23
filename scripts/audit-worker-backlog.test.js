@@ -379,6 +379,62 @@ test("summarizeTargetFailurePressureRows falls back to last error when recent gr
   assert.equal(summary.top_targets[0].next_action, "add fixture and fix parser before counting this source as scalable");
 });
 
+test("summarizeTargetFailurePressureRows classifies HTTP status from last-error text", () => {
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "ashby",
+      company_url: "https://jobs.ashbyhq.com/missing",
+      company_name: "Missing",
+      protection_status: "normal",
+      consecutive_failures: 4,
+      last_http_status: 0,
+      last_error: "source fetch failed with HTTP 404",
+      recent_error_count: 0,
+      recent_error_groups: []
+    },
+    {
+      ats_key: "bamboohr",
+      company_url: "https://private.bamboohr.com/careers",
+      company_name: "Private",
+      protection_status: "normal",
+      consecutive_failures: 3,
+      last_http_status: 0,
+      last_error: "source fetch failed with http 401",
+      recent_error_count: 0,
+      recent_error_groups: []
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://limited.breezy.hr",
+      company_name: "Limited",
+      protection_status: "normal",
+      consecutive_failures: 2,
+      last_http_status: 0,
+      last_error: "source fetch failed with status 429",
+      recent_error_count: 0,
+      recent_error_groups: []
+    },
+    {
+      ats_key: "hrmdirect",
+      company_url: "https://down.hrmdirect.com/employment/job-openings.php",
+      company_name: "Down",
+      protection_status: "normal",
+      consecutive_failures: 1,
+      last_http_status: 0,
+      last_error: "source fetch failed with code 503",
+      recent_error_count: 0,
+      recent_error_groups: []
+    }
+  ]);
+
+  assert.equal(summary.by_source.ashby.dominant_failure_reason, "source_quality");
+  assert.equal(summary.by_source.bamboohr.dominant_failure_reason, "auth");
+  assert.equal(summary.by_source.breezy.dominant_failure_reason, "rate_limit");
+  assert.equal(summary.by_source.hrmdirect.dominant_failure_reason, "network");
+  assert.equal(summary.failure_reason_review_groups.find((group) => group.ats_key === "ashby").failure_reason, "source_quality");
+  assert.equal(summary.failure_reason_review_groups.find((group) => group.ats_key === "bamboohr").failure_reason, "auth");
+});
+
 test("summarizeTargetFailurePressureRows classifies no-parseable last errors as empty/no-jobs", () => {
   const summary = summarizeTargetFailurePressureRows([
     {
