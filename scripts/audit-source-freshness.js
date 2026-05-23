@@ -158,6 +158,15 @@ function summarizeQualityGateSources(rows = []) {
     ));
 }
 
+function summarizeDueByAtsRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      ats_key: String(row?.ats_key || "unknown").trim().toLowerCase() || "unknown",
+      targets_due: Number(row?.targets_due || row?.count || 0)
+    }))
+    .filter((row) => row.targets_due > 0);
+}
+
 function sparseFailureReasonCountsByScope(countsByScope = {}) {
   return {
     target_failure: sparsePositiveCounts(countsByScope.target_failure || {}),
@@ -287,6 +296,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     parserDriftRecheck
   );
   const qualityGateSources = summarizeQualityGateSources(rows.qualityGateRows || []);
+  const dueByAts = summarizeDueByAtsRows(rows.dueByAtsRows || []);
   const targetSuccessPct = pct(successCount, successCount + failureCount);
   const sparseAdjustedFailureCounts = sparsePositiveCounts(adjustedFailureSummary.counts);
 
@@ -299,6 +309,7 @@ function createDailySourceHealthSummary(rows = {}, options = {}) {
     targets_per_run: Number(budgetConfig.autoSyncTargetsPerRun || 0),
     auto_sync_budget_usage: summarizeAutoSyncBudgetUsage(budgetUsageRows, { ...options, nowEpoch }),
     targets_due: Number(dueRow.targets_due || dueRow.count || 0),
+    targets_due_by_ats: dueByAts,
     targets_processed_24h: targetsProcessed,
     target_success_count_24h: successCount,
     target_failure_count_24h: failureCount,
@@ -333,6 +344,7 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
   const windowStartEpoch = Math.max(0, nowEpoch - (windowHours * 3600));
   const failureGroupLimit = Math.max(25, Math.min(1000, Math.floor(Number(options.failureGroupLimit || 500))));
   const qualityGateSourceLimit = Math.max(1, Math.min(100, Math.floor(Number(options.qualityGateSourceLimit || 25))));
+  const dueByAtsLimit = Math.max(1, Math.min(100, Math.floor(Number(options.dueByAtsLimit || 25))));
   return {
     due: {
       values: [nowEpoch],
@@ -347,6 +359,26 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
           AND COALESCE(st.next_sync_epoch, 0) <= $1;
+      `
+    },
+    dueByAts: {
+      values: [nowEpoch, dueByAtsLimit],
+      sql: `
+        SELECT
+          c.ats_key,
+          COUNT(c.id)::int AS targets_due
+        FROM companies c
+        INNER JOIN ats_sources s
+          ON s.ats_key = c.ats_key
+        LEFT JOIN company_sync_state st
+          ON st.ats_key = c.ats_key
+          AND st.company_url = c.url_string
+        WHERE s.enabled = true
+          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
+          AND COALESCE(st.next_sync_epoch, 0) <= $1
+        GROUP BY c.ats_key
+        ORDER BY targets_due DESC, c.ats_key ASC
+        LIMIT $2;
       `
     },
     runs: {
@@ -491,8 +523,9 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
 
 async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   const queries = buildPostgresDailySourceHealthQueries(options);
-  const [due, runs, budgetUsage, postings, qualityGateSources, failures, failureScopes, parserDriftRecheck] = await Promise.all([
+  const [due, dueByAts, runs, budgetUsage, postings, qualityGateSources, failures, failureScopes, parserDriftRecheck] = await Promise.all([
     pool.query(queries.due.sql, queries.due.values),
+    pool.query(queries.dueByAts.sql, queries.dueByAts.values),
     pool.query(queries.runs.sql, queries.runs.values),
     pool.query(queries.budgetUsage.sql, queries.budgetUsage.values),
     pool.query(queries.postings.sql, queries.postings.values),
@@ -503,6 +536,7 @@ async function getPostgresDailySourceHealthSummary(pool, options = {}) {
   ]);
   return createDailySourceHealthSummary({
     dueRows: due.rows,
+    dueByAtsRows: dueByAts.rows,
     runRows: runs.rows,
     budgetUsageRows: budgetUsage.rows,
     postingRows: postings.rows,
@@ -527,6 +561,10 @@ function printReport(report) {
       console.log(`Top quality source: ${topQualitySource.ats_key} (${topQualitySource.new_no_geo_no_remote_public_rows_24h} no_geo_no_remote, ${topQualitySource.new_missing_any_normalized_geo_rows_24h} missing geo, ${topQualitySource.new_weak_unknown_remote_rows_24h} weak remote)`);
     }
     console.log(`Due targets: ${health.targets_due}`);
+    const topDueSource = (health.targets_due_by_ats || [])[0];
+    if (topDueSource) {
+      console.log(`Top due source: ${topDueSource.ats_key} (${topDueSource.targets_due} due targets)`);
+    }
   }
   console.table((report.items || []).slice(0, 25).map((item) => ({
     ats: item.ats_key,

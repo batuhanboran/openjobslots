@@ -21,6 +21,10 @@ test("parseArgs accepts source freshness window and output controls", () => {
 test("createDailySourceHealthSummary reports read-only worker budget, freshness, and failure taxonomy", () => {
   const summary = createDailySourceHealthSummary({
     dueRows: [{ targets_due: 42 }],
+    dueByAtsRows: [
+      { ats_key: "applytojob", targets_due: 24 },
+      { ats_key: "breezy", targets_due: 18 }
+    ],
     runRows: [{
       targets_processed: 10,
       success_count: 8,
@@ -127,6 +131,16 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
     daily_budget_exhausted: false
   });
   assert.equal(summary.targets_due, 42);
+  assert.deepEqual(summary.targets_due_by_ats, [
+    {
+      ats_key: "applytojob",
+      targets_due: 24
+    },
+    {
+      ats_key: "breezy",
+      targets_due: 18
+    }
+  ]);
   assert.equal(summary.targets_processed_24h, 10);
   assert.equal(summary.target_success_pct_24h, 80);
   assert.equal(summary.rows_seen_24h, 55);
@@ -228,11 +242,13 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
 
   assert.deepEqual(queries.postings.values, [1_799_913_600]);
   assert.deepEqual(queries.budgetUsage.values, [1_799_971_200]);
+  assert.deepEqual(queries.dueByAts.values, [1_800_000_000, 25]);
   assert.deepEqual(queries.qualityGateSources.values, [1_799_913_600, 25]);
   assert.deepEqual(queries.failureScopes.values, [24, []]);
   assert.deepEqual(queries.parserDriftRecheck.values, [24, [], 100]);
   assert.match(queries.postings.sql, /first_seen_epoch/i);
   assert.match(queries.budgetUsage.sql, /targets_started_today/i);
+  assert.match(queries.dueByAts.sql, /GROUP BY c\.ats_key/i);
   assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
   assert.match(queries.qualityGateSources.sql, /GROUP BY ats_key/i);
   assert.match(queries.qualityGateSources.sql, /new_no_geo_no_remote_rows/i);
