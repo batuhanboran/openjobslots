@@ -15,7 +15,9 @@ const {
   buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
   buildWorkerBacklogQuery,
+  classifyEmptyNoJobsSourceProbe,
   parseBacklogArgs,
+  probeEmptyNoJobsTargets,
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
@@ -50,6 +52,80 @@ test("parseBacklogArgs accepts diagnostics, target ATS list, and error window", 
   assert.deepEqual(options.targetAtsKeys, ["applytojob", "breezy", "icims"]);
   assert.equal(options.errorWindowHours, 48);
   assert.equal(options.recentRunLimit, 10);
+});
+
+test("parseBacklogArgs accepts optional read-only empty target probe controls", () => {
+  const options = parseBacklogArgs([
+    "--diagnostics",
+    "--probe-empty-targets",
+    "--probe-empty-target-limit=12",
+    "--probe-empty-target-timeout-ms=9000"
+  ]);
+
+  assert.equal(options.probeEmptyTargets, true);
+  assert.equal(options.probeEmptyTargetLimit, 12);
+  assert.equal(options.probeEmptyTargetTimeoutMs, 9000);
+});
+
+test("classifyEmptyNoJobsSourceProbe recognizes Breezy source-empty labels", () => {
+  const classification = classifyEmptyNoJobsSourceProbe({
+    status: 200,
+    html: "%HEADER_OUR_OPENINGS% %LABEL_NO_POSITIONS% %FOOTER_POWERED_BY% breezy",
+    parseCount: 0
+  });
+
+  assert.equal(classification.classification, "source_reported_empty_board");
+  assert.equal(classification.signals.has_no_positions_token, true);
+  assert.equal(classification.signals.has_job_link, false);
+});
+
+test("probeEmptyNoJobsTargets samples empty boards without writing", async () => {
+  const report = await probeEmptyNoJobsTargets([
+    {
+      ats_key: "breezy",
+      company_url: "https://empty.breezy.hr/",
+      company_name: "empty",
+      last_error: "Breezy public portal returned no parseable postings",
+      consecutive_failures: 3,
+      recent_error_count: 2,
+      recent_error_groups: [
+        { error_type: "portal_search_empty", error_message: "Breezy public portal returned no parseable postings", count: 2 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://active.breezy.hr/",
+      company_name: "active",
+      last_error: "Breezy public portal returned no parseable postings",
+      consecutive_failures: 1,
+      recent_error_groups: []
+    }
+  ], {
+    probeEmptyTargetLimit: 5,
+    getSourceModule: () => ({
+      parse(payload) {
+        return String(payload.__listUrl || "").includes("active")
+          ? [{ title: "Support Engineer", job_posting_url: "https://active.breezy.hr/p/BRZ1-support-engineer" }]
+          : [];
+      }
+    }),
+    fetcher: async (url) => ({
+      status: 200,
+      url,
+      headers: { get: () => "text/html" },
+      text: async () => String(url).includes("active")
+        ? "<a href=\"/p/BRZ1-support-engineer\">Support Engineer</a>"
+        : "%HEADER_OUR_OPENINGS% %LABEL_NO_POSITIONS% %FOOTER_POWERED_BY% breezy"
+    })
+  });
+
+  assert.equal(report.read_only, true);
+  assert.equal(report.write_actions_performed, false);
+  assert.equal(report.sampled_target_count, 2);
+  assert.equal(report.by_classification.source_reported_empty_board, 1);
+  assert.equal(report.by_classification.current_parser_success_previous_failure_stale, 1);
+  assert.equal(report.samples[0].classification, "source_reported_empty_board");
+  assert.equal(report.samples[1].parse_count, 1);
 });
 
 test("buildWorkerBacklogQuery is read-only and reports due source fields", () => {

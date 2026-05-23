@@ -94,7 +94,10 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     output: "",
     nowEpoch: 0,
     recentRunLimit: 20,
-    targetAtsKeys: []
+    targetAtsKeys: [],
+    probeEmptyTargets: false,
+    probeEmptyTargetLimit: 10,
+    probeEmptyTargetTimeoutMs: 12000
   };
   for (const arg of argv) {
     if (arg === "--json") options.json = true;
@@ -107,6 +110,20 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     else if (arg === "--limit") options.expectLimit = true;
     else if (arg.startsWith("--recent-run-limit=")) options.recentRunLimit = Number(arg.slice("--recent-run-limit=".length));
     else if (arg === "--recent-run-limit") options.expectRecentRunLimit = true;
+    else if (arg === "--probe-empty-targets") options.probeEmptyTargets = true;
+    else if (arg.startsWith("--probe-empty-target-limit=")) {
+      options.probeEmptyTargets = true;
+      options.probeEmptyTargetLimit = Number(arg.slice("--probe-empty-target-limit=".length));
+    } else if (arg === "--probe-empty-target-limit") {
+      options.probeEmptyTargets = true;
+      options.expectProbeEmptyTargetLimit = true;
+    } else if (arg.startsWith("--probe-empty-target-timeout-ms=")) {
+      options.probeEmptyTargets = true;
+      options.probeEmptyTargetTimeoutMs = Number(arg.slice("--probe-empty-target-timeout-ms=".length));
+    } else if (arg === "--probe-empty-target-timeout-ms") {
+      options.probeEmptyTargets = true;
+      options.expectProbeEmptyTargetTimeoutMs = true;
+    }
     else if (arg.startsWith("--now-epoch=")) options.nowEpoch = Number(arg.slice("--now-epoch=".length));
     else if (arg === "--now-epoch") options.expectNowEpoch = true;
     else if (arg.startsWith("--output=")) options.output = arg.slice("--output=".length);
@@ -116,6 +133,12 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
     } else if (options.expectRecentRunLimit) {
       options.recentRunLimit = Number(arg);
       options.expectRecentRunLimit = false;
+    } else if (options.expectProbeEmptyTargetLimit) {
+      options.probeEmptyTargetLimit = Number(arg);
+      options.expectProbeEmptyTargetLimit = false;
+    } else if (options.expectProbeEmptyTargetTimeoutMs) {
+      options.probeEmptyTargetTimeoutMs = Number(arg);
+      options.expectProbeEmptyTargetTimeoutMs = false;
     } else if (options.expectNowEpoch) {
       options.nowEpoch = Number(arg);
       options.expectNowEpoch = false;
@@ -129,6 +152,8 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
   }
   options.limit = Math.max(1, Math.min(500, Math.floor(Number(options.limit || 100))));
   options.recentRunLimit = Math.max(1, Math.min(100, Math.floor(Number(options.recentRunLimit || 20))));
+  options.probeEmptyTargetLimit = Math.max(1, Math.min(50, Math.floor(Number(options.probeEmptyTargetLimit || 10))));
+  options.probeEmptyTargetTimeoutMs = Math.max(1000, Math.min(30000, Math.floor(Number(options.probeEmptyTargetTimeoutMs || 12000))));
   options.nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || 0)));
   options.errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   return options;
@@ -1885,6 +1910,177 @@ function classifyEmptyNoJobsTarget(row = {}, recentErrors = {}, reason = "", opt
   return "stale_never_success_empty";
 }
 
+function extractEmptyNoJobsProbeSignals(html = "") {
+  const raw = String(html || "");
+  const text = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  return {
+    has_no_positions_token: /%LABEL_NO_POSITIONS%|LABEL_NO_POSITIONS/i.test(raw),
+    has_no_openings_copy: [
+      /no open positions/,
+      /no current openings/,
+      /currently no open/,
+      /not currently hiring/,
+      /there are no jobs/,
+      /check back later/,
+      /no positions available/
+    ].some((pattern) => pattern.test(text)),
+    has_job_link: /href=["'][^"']*\/p\/[^"']+["']|https?:\/\/[^"']*\.breezy\.hr\/p\//i.test(raw),
+    has_breezy_marker: /breezy|breezy\.hr|breezy-portal/i.test(raw),
+    has_position_card_marker: /position-card|positions-list|bzy-positions|job-list|opening/i.test(raw)
+  };
+}
+
+function classifyEmptyNoJobsSourceProbe(probe = {}) {
+  const status = normalizeHttpStatus(probe.status);
+  const parseCount = Math.max(0, Math.floor(Number(probe.parseCount || 0)));
+  const fetchError = String(probe.fetchError || "").trim();
+  const signals = extractEmptyNoJobsProbeSignals(probe.html || "");
+  let classification = "unknown";
+  if (fetchError) classification = "network_or_fetch_error";
+  else if (status === 429) classification = "rate_limited";
+  else if (status === 401 || status === 403) classification = "auth_or_blocked";
+  else if (status === 404 || status === 410) classification = "stale_removed_or_bad_target";
+  else if (status >= 500) classification = "source_server_error";
+  else if (parseCount > 0) classification = "current_parser_success_previous_failure_stale";
+  else if (status >= 200 && status < 300 && (signals.has_no_positions_token || signals.has_no_openings_copy) && !signals.has_job_link) {
+    classification = "source_reported_empty_board";
+  } else if (status >= 200 && status < 300 && signals.has_job_link) {
+    classification = "parser_bug_candidate";
+  } else if (status >= 200 && status < 300 && signals.has_breezy_marker) {
+    classification = "unsupported_or_empty_breezy_shape";
+  } else if (status >= 200 && status < 300) {
+    classification = "non_breezy_or_unrecognized_empty_shape";
+  }
+  return {
+    classification,
+    signals
+  };
+}
+
+async function readProbeResponseBody(response = {}) {
+  if (typeof response.text === "function") return response.text();
+  if (typeof response.html === "string") return response.html;
+  if (typeof response.body === "string") return response.body;
+  return "";
+}
+
+async function fetchProbeResponse(url, options = {}) {
+  if (typeof options.fetcher === "function") return options.fetcher(url);
+  const timeoutMs = Math.max(1000, Math.min(30000, Math.floor(Number(options.probeEmptyTargetTimeoutMs || 12000))));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "OpenJobSlotsAudit/1.0 (+https://openjobslots.com; read-only)",
+        accept: "text/html,application/xhtml+xml"
+      }
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function probeEmptyNoJobsTargets(rows = [], options = {}) {
+  const limit = Math.max(1, Math.min(50, Math.floor(Number(options.probeEmptyTargetLimit || 10))));
+  const getSourceModule = typeof options.getSourceModule === "function"
+    ? options.getSourceModule
+    : require("../server/ingestion/sources").getSourceModule;
+  const candidates = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const groups = parseRecentErrorGroups(row?.recent_error_groups);
+    const recentErrors = summarizeRecentErrorGroups(groups);
+    const reason = dominantFailureReason(recentErrors) || lastErrorFailureReason(row);
+    if (reason !== "empty_no_jobs") continue;
+    candidates.push(row);
+    if (candidates.length >= limit) break;
+  }
+
+  const samples = [];
+  const byClassification = {};
+  for (const row of candidates) {
+    const atsKey = String(row?.ats_key || "").trim().toLowerCase();
+    const companyUrl = String(row?.company_url || "").trim();
+    const source = getSourceModule(atsKey);
+    let status = 0;
+    let finalUrl = companyUrl;
+    let html = "";
+    let parseCount = 0;
+    let parserError = "";
+    let fetchError = "";
+
+    if (!source || typeof source.parse !== "function") {
+      fetchError = "source module unavailable for empty target probe";
+    } else {
+      try {
+        const response = await fetchProbeResponse(companyUrl, options);
+        status = normalizeHttpStatus(response?.status);
+        finalUrl = String(response?.url || companyUrl);
+        html = await readProbeResponseBody(response);
+        try {
+          const parsed = source.parse({
+            html,
+            __listUrl: finalUrl || companyUrl
+          }, {
+            url_string: companyUrl,
+            company_name: String(row?.company_name || ""),
+            ATS_name: atsKey
+          });
+          parseCount = Array.isArray(parsed) ? parsed.length : 0;
+        } catch (error) {
+          parserError = String(error?.message || error || "").slice(0, 240);
+        }
+      } catch (error) {
+        fetchError = String(error?.message || error || "").slice(0, 240);
+      }
+    }
+
+    const classification = classifyEmptyNoJobsSourceProbe({
+      status,
+      html,
+      parseCount,
+      fetchError
+    });
+    byClassification[classification.classification] = Number(byClassification[classification.classification] || 0) + 1;
+    samples.push({
+      ats_key: atsKey,
+      company_url: companyUrl,
+      company_name: String(row?.company_name || ""),
+      stored_last_error: String(row?.last_error || "").slice(0, 240),
+      consecutive_failures: Number(row?.consecutive_failures || 0),
+      recent_error_count: Number(row?.recent_error_count || 0),
+      http_status: status,
+      final_url: finalUrl,
+      html_bytes: Buffer.byteLength(html || "", "utf8"),
+      parse_count: parseCount,
+      parser_error: parserError,
+      fetch_error: fetchError,
+      classification: classification.classification,
+      signals: classification.signals
+    });
+  }
+
+  return {
+    read_only: true,
+    write_actions_performed: false,
+    requires_explicit_approval_for_cleanup: true,
+    sampled_target_count: samples.length,
+    sample_limit: limit,
+    by_classification: byClassification,
+    samples,
+    next_action: "use source-reported empty boards as cleanup candidates only after explicit approval; parser_bug_candidate requires fixture-backed parser work"
+  };
+}
+
 function summarizeTargetFailurePressureRows(rows = [], options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.targetPressureLimit || options.limit || 25))));
@@ -2081,6 +2277,9 @@ function attachBacklogDiagnostics(report, options = {}) {
       auto_sync_budget_usage: autoSyncBudgetUsage,
       parser_drift_recheck: parserDriftRecheck,
       target_failure_pressure: targetFailurePressure,
+      ...(options.emptyNoJobsSourceProbe
+        ? { empty_no_jobs_source_probe: options.emptyNoJobsSourceProbe }
+        : {}),
       throughput_scaling_gate: throughputScalingGate,
       error_taxonomy: {
         failure_reason_buckets: [...FAILURE_REASON_BUCKETS],
@@ -2143,6 +2342,9 @@ async function runPostgresBacklogAudit(pool, options = {}) {
   const parserDriftRecheck = await pool.query(parserDriftRecheckQuery.sql, parserDriftRecheckQuery.values);
   const targetFailurePressureQuery = buildTargetFailurePressureQuery({ ...options, nowEpoch });
   const targetFailurePressure = await pool.query(targetFailurePressureQuery.sql, targetFailurePressureQuery.values);
+  const emptyNoJobsSourceProbe = options.probeEmptyTargets
+    ? await probeEmptyNoJobsTargets(targetFailurePressure.rows, options)
+    : null;
   return attachBacklogDiagnostics(report, {
     ...options,
     nowEpoch,
@@ -2156,7 +2358,8 @@ async function runPostgresBacklogAudit(pool, options = {}) {
     autoSyncBudgetUsageRows: autoSyncBudgetUsage.rows,
     sourceBudgetUsageRows: sourceBudgetUsage.rows,
     parserDriftRecheckRows: parserDriftRecheck.rows,
-    targetFailurePressureRows: targetFailurePressure.rows
+    targetFailurePressureRows: targetFailurePressure.rows,
+    emptyNoJobsSourceProbe
   });
 }
 
@@ -2236,9 +2439,11 @@ module.exports = {
   buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
   buildWorkerBacklogQuery,
+  classifyEmptyNoJobsSourceProbe,
   classifyFailureReason,
   getFixtureCoverage,
   parseBacklogArgs,
+  probeEmptyNoJobsTargets,
   runAudit,
   runPostgresBacklogAudit,
   summarizeAutoSyncBudgetUsage,
