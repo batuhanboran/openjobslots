@@ -1295,6 +1295,15 @@ test("buildThroughputScalingGate holds scaling when latest run success is below 
   assert.equal(gate.latest_run_success_rate_pct, 74);
   assert.equal(gate.minimum_success_rate_pct, 80);
   assert.ok(gate.blockers.some((item) => item.code === "latest_run_success_rate_below_threshold"));
+  assert.deepEqual(
+    gate.blockers.find((item) => item.code === "empty_no_jobs_failures_present"),
+    {
+      code: "empty_no_jobs_failures_present",
+      message: "empty_no_jobs target failures are present in the diagnostics window.",
+      count: 13,
+      total_count: 13
+    }
+  );
   assert.ok(gate.required_checks_before_increase.includes("search:reindex:check"));
 });
 
@@ -1664,9 +1673,9 @@ test("buildThroughputScalingGate allows only small increase after clean worker e
       latest_run_id: 246,
       latest_status: "completed",
       total_targets: 50,
-      success_count: 46,
-      failure_count: 4,
-      success_rate_pct: 92
+      success_count: 50,
+      failure_count: 0,
+      success_rate_pct: 100
     },
     parserAttentionCount: 0,
     failureReasonCounts: {
@@ -1674,7 +1683,7 @@ test("buildThroughputScalingGate allows only small increase after clean worker e
       source_quality: 0,
       rate_limit: 0,
       network: 0,
-      empty_no_jobs: 4,
+      empty_no_jobs: 0,
       auth: 0,
       unknown: 0
     },

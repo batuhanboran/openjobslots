@@ -1774,7 +1774,7 @@ function buildThroughputScalingGate({
     });
   }
 
-  const blockingFailureReasons = ["parser_bug", "source_quality", "rate_limit", "network", "auth", "unknown"];
+  const blockingFailureReasons = ["parser_bug", "source_quality", "empty_no_jobs", "rate_limit", "network", "auth", "unknown"];
   for (const reason of blockingFailureReasons) {
     const count = Number(targetFailureCounts?.[reason] || 0);
     if (count > 0) {

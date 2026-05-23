@@ -220,7 +220,7 @@ function buildThroughputReadiness({
     });
   }
 
-  for (const reason of ["parser_bug", "source_quality", "rate_limit", "network", "auth", "unknown"]) {
+  for (const reason of ["parser_bug", "source_quality", "empty_no_jobs", "rate_limit", "network", "auth", "unknown"]) {
     const count = Number(adjustedFailureReasonCounts?.[reason] || 0);
     if (count <= 0) continue;
     blockers.push({

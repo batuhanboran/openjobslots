@@ -171,6 +171,11 @@ test("createDailySourceHealthSummary reports read-only worker budget, freshness,
         count: 2
       },
       {
+        code: "empty_no_jobs_failures_present",
+        message: "empty_no_jobs failures are present in the 24h worker window.",
+        count: 6
+      },
+      {
         code: "rate_limit_failures_present",
         message: "rate_limit failures are present in the 24h worker window.",
         count: 3
