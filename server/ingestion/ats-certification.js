@@ -154,7 +154,7 @@ const ATS_CERTIFICATION_OVERRIDES = {
   manatal: {
     priority: "P1",
     sourcePattern: "Manatal careers-page runtime config plus public jobs API at /api/v1.0/c/{clientSlug}/jobs/.",
-    parserPath: "server/index.js parseManatalPostingsFromApi and fallback HTML parser",
+    parserPath: "server/ingestion/sources/manatal/parse.js parseManatalPostingsFromApi and fallback HTML parser",
     requiredFixtures: ["jobs API response fixture", "missing-title fixture", "missing-url fixture"],
     fieldDecisions: {
       geo: decision("list-payload", "Saved raw API fixture covers city/state/country and location_display fields."),
@@ -367,7 +367,7 @@ const PARSER_PATHS = {
   join: "server/index.js parseJoinPostingsFromNextData",
   k12jobspot: "server/index.js K12JobSpot collector",
   loxo: "server/index.js parseLoxoPostingsFromHtml",
-  manatal: "server/index.js parseManatalPostingsFromApi and fallback HTML parser",
+  manatal: "server/ingestion/sources/manatal/parse.js parseManatalPostingsFromApi and fallback HTML parser",
   oracle: "server/index.js parseOraclePostingsFromApi",
   pageup: "server/ingestion/sources/pageup/parse.js parsePageupPostingsFromResults",
   paylocity: "server/index.js parsePaylocityPostingsFromPageData",
@@ -375,7 +375,7 @@ const PARSER_PATHS = {
   pinpointhq: "server/index.js parsePinpointHqPostingsFromApi",
   policeapp: "server/index.js PoliceApp AJAX collector",
   recruitcrm: "server/index.js parseRecruitCrmPostingsFromApi",
-  recruitee: "server/index.js parseRecruiteePostingsFromPublicApp",
+  recruitee: "server/ingestion/sources/recruitee/parse.js parseRecruiteePostingsFromPublicApp",
   rippling: "server/index.js parseRipplingPostingsFromApi",
   sagehr: "server/index.js parseSagehrPostingsFromHtml",
   saphrcloud: "server/index.js SAP HR Cloud HTML/API parsers",
@@ -391,7 +391,7 @@ const PARSER_PATHS = {
   theapplicantmanager: "server/index.js parseTheApplicantManagerPostingsFromHtml",
   ultipro: "server/index.js UltiPro collector/opportunities parser",
   usajobs: "server/index.js USAJobs official Search API collector",
-  zoho: "server/index.js parseZohoPostingsFromHtml"
+  zoho: "server/ingestion/sources/zoho/parse.js parseZohoPostingsFromHtml"
 };
 
 function priorityForKey(key) {

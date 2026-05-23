@@ -8,18 +8,15 @@ const {
   parseAdpMyjobsPostingsFromApi,
   parseAdpWorkforcenowPostingsFromApi,
   parseBrassringPostingsFromApi,
-  parseManatalPostingsFromApi,
   parseOraclePostingsFromApi,
   parsePaylocityPostingsFromPageData,
   parsePinpointHqPostingsFromApi,
   parseRecruitCrmPostingsFromApi,
-  parseRecruiteePostingsFromPublicApp,
   parseSapHrCloudPostingsFromApi,
   parseSmartRecruitersPostingsFromApi,
   parseTalentreefPostingsFromSearchResponse,
   parseUltiProPostingsFromApi,
-  parseWorkdayPostingsFromApi,
-  parseZohoPostingsFromHtml
+  parseWorkdayPostingsFromApi
 } = require("../../index");
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
@@ -36,11 +33,14 @@ const {
 } = require("./icims/parse");
 const { parseJobvitePostingsFromHtml } = require("./jobvite/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
+const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parsePageupPostingsFromResults } = require("./pageup/parse");
+const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const {
   extractTaleoPostingsFromAjax,
   extractTaleoPostingsFromRest
 } = require("./taleo/parse");
+const { parseZohoPostingsFromHtml } = require("./zoho/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");

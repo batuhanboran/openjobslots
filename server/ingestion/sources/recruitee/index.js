@@ -1,3 +1,7 @@
 const { createSourceModule } = require("../common");
+const parser = require("./parse");
 
-module.exports = createSourceModule("recruitee");
+module.exports = {
+  ...createSourceModule("recruitee"),
+  ...parser
+};
