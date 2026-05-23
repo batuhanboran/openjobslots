@@ -1033,6 +1033,87 @@ test("buildThroughputScalingGate allows only small increase after clean worker e
   assert.equal(gate.max_recommended_step, "small");
 });
 
+test("buildThroughputScalingGate reports parser drift recheck context for partial coverage", () => {
+  const gate = buildThroughputScalingGate({
+    latestRun: {
+      latest_run_id: 260,
+      latest_status: "completed",
+      total_targets: 50,
+      success_count: 48,
+      failure_count: 2,
+      success_rate_pct: 96
+    },
+    parserAttentionCount: 296,
+    targetFailureReasonCounts: {
+      parser_bug: 296,
+      source_quality: 0,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 0,
+      auth: 0,
+      unknown: 0
+    },
+    parserDriftRecheck: {
+      sample_count: 100,
+      still_drift_count: 0,
+      current_policy_pass_count: 100,
+      skipped_no_baseline_count: 0
+    }
+  });
+
+  const parserBugBlocker = gate.blockers.find((item) => item.code === "parser_bug_failures_present");
+  assert.ok(parserBugBlocker);
+  assert.equal(parserBugBlocker.count, 296);
+  assert.equal(parserBugBlocker.current_policy_pass_count, 100);
+  assert.equal(parserBugBlocker.unrechecked_or_non_drift_count, 196);
+  assert.deepEqual(gate.parser_drift_recheck, {
+    sample_count: 100,
+    still_drift_count: 0,
+    current_policy_pass_count: 100,
+    skipped_no_baseline_count: 0
+  });
+  assert.ok(gate.cautions.some((item) => item.code === "parser_drift_current_policy_pass"));
+});
+
+test("buildThroughputScalingGate downgrades fully rechecked current-policy parser drift", () => {
+  const gate = buildThroughputScalingGate({
+    latestRun: {
+      latest_run_id: 261,
+      latest_status: "completed",
+      total_targets: 50,
+      success_count: 49,
+      failure_count: 1,
+      success_rate_pct: 98
+    },
+    parserAttentionCount: 10,
+    targetFailureReasonCounts: {
+      parser_bug: 10,
+      source_quality: 0,
+      rate_limit: 0,
+      network: 0,
+      empty_no_jobs: 0,
+      auth: 0,
+      unknown: 0
+    },
+    parserDriftRecheck: {
+      sample_count: 10,
+      still_drift_count: 0,
+      current_policy_pass_count: 10,
+      skipped_no_baseline_count: 0
+    },
+    totals: {
+      runnable_due_count: 100,
+      failure_pressure: 0
+    }
+  });
+
+  assert.equal(gate.allowed, true);
+  assert.equal(gate.decision, "eligible_for_small_increase");
+  assert.ok(!gate.blockers.some((item) => item.code === "parser_attention_present"));
+  assert.ok(!gate.blockers.some((item) => item.code === "parser_bug_failures_present"));
+  assert.ok(gate.cautions.some((item) => item.code === "parser_drift_current_policy_pass"));
+});
+
 test("summarizeParserDriftRecheck separates current-policy pass from real drift", () => {
   const report = summarizeParserDriftRecheck([
     {

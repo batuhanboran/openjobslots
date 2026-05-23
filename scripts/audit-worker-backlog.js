@@ -1258,6 +1258,15 @@ function selectGateLatestRun(latestRun = {}, recentRunTrendBySource = {}, target
   };
 }
 
+function normalizeParserDriftRecheckForGate(value = {}) {
+  return {
+    sample_count: Number(value?.sample_count || 0),
+    still_drift_count: Number(value?.still_drift_count || 0),
+    current_policy_pass_count: Number(value?.current_policy_pass_count || 0),
+    skipped_no_baseline_count: Number(value?.skipped_no_baseline_count || 0)
+  };
+}
+
 function buildThroughputScalingGate({
   latestRun = {},
   recentRunTrend = {},
@@ -1265,6 +1274,7 @@ function buildThroughputScalingGate({
   failureReasonCounts = {},
   targetFailureReasonCounts = null,
   postingRejectionReasonCounts = null,
+  parserDriftRecheck = null,
   totals = {},
   options = {}
 } = {}) {
@@ -1287,6 +1297,17 @@ function buildThroughputScalingGate({
   const cautions = [];
   const targetFailureCounts = targetFailureReasonCounts || failureReasonCounts || {};
   const postingRejectionCounts = postingRejectionReasonCounts || {};
+  const parserDriftRecheckSummary = normalizeParserDriftRecheckForGate(parserDriftRecheck || {});
+  const parserAttentionTotal = Number(parserAttentionCount || 0);
+  const parserBugTargetFailureCount = Number(targetFailureCounts?.parser_bug || 0);
+  const parserDriftRecheckHasCoverage = parserDriftRecheckSummary.sample_count > 0;
+  const parserDriftFullyCurrentPolicyPass = parserDriftRecheckHasCoverage &&
+    parserDriftRecheckSummary.still_drift_count === 0 &&
+    parserDriftRecheckSummary.skipped_no_baseline_count === 0;
+  const parserAttentionFullyRechecked = parserDriftFullyCurrentPolicyPass &&
+    parserDriftRecheckSummary.current_policy_pass_count >= parserAttentionTotal;
+  const parserBugFailuresFullyRechecked = parserDriftFullyCurrentPolicyPass &&
+    parserDriftRecheckSummary.current_policy_pass_count >= parserBugTargetFailureCount;
 
   if (!Number(latestRun.latest_run_id || 0) || Number(latestRun.total_targets || 0) <= 0 || successRatePct == null) {
     blockers.push({
@@ -1316,10 +1337,24 @@ function buildThroughputScalingGate({
     });
   }
 
-  if (Number(parserAttentionCount || 0) > parserAttentionThreshold) {
+  if (parserDriftRecheckHasCoverage && parserDriftRecheckSummary.current_policy_pass_count > 0) {
+    cautions.push({
+      code: "parser_drift_current_policy_pass",
+      message: `Parser drift recheck passed current policy for ${parserDriftRecheckSummary.current_policy_pass_count} sampled events.`,
+      count: parserDriftRecheckSummary.current_policy_pass_count,
+      still_drift_count: parserDriftRecheckSummary.still_drift_count,
+      skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count
+    });
+  }
+
+  if (parserAttentionTotal > parserAttentionThreshold && !parserAttentionFullyRechecked) {
     blockers.push({
       code: "parser_attention_present",
-      message: `Parser attention count ${Number(parserAttentionCount || 0)} is above the ${parserAttentionThreshold} threshold.`
+      message: `Parser attention count ${parserAttentionTotal} is above the ${parserAttentionThreshold} threshold.`,
+      current_policy_pass_count: parserDriftRecheckSummary.current_policy_pass_count,
+      still_drift_count: parserDriftRecheckSummary.still_drift_count,
+      skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count,
+      unrechecked_or_non_drift_count: Math.max(0, parserAttentionTotal - parserDriftRecheckSummary.current_policy_pass_count)
     });
   }
 
@@ -1327,10 +1362,19 @@ function buildThroughputScalingGate({
   for (const reason of blockingFailureReasons) {
     const count = Number(targetFailureCounts?.[reason] || 0);
     if (count > 0) {
+      if (reason === "parser_bug" && parserBugFailuresFullyRechecked) continue;
       blockers.push({
         code: `${reason}_failures_present`,
         message: `${reason} target failures are present in the diagnostics window.`,
-        count
+        count,
+        ...(reason === "parser_bug"
+          ? {
+              current_policy_pass_count: parserDriftRecheckSummary.current_policy_pass_count,
+              still_drift_count: parserDriftRecheckSummary.still_drift_count,
+              skipped_no_baseline_count: parserDriftRecheckSummary.skipped_no_baseline_count,
+              unrechecked_or_non_drift_count: Math.max(0, count - parserDriftRecheckSummary.current_policy_pass_count)
+            }
+          : {})
       });
     }
   }
@@ -1368,8 +1412,9 @@ function buildThroughputScalingGate({
     recent_run_total_targets: recentRunTotalTargets,
     minimum_success_rate_pct: minimumSuccessRatePct,
     minimum_trend_target_count: minimumTrendTargetCount,
-    parser_attention_count: Number(parserAttentionCount || 0),
+    parser_attention_count: parserAttentionTotal,
     parser_attention_threshold: parserAttentionThreshold,
+    parser_drift_recheck: parserDriftRecheckSummary,
     target_failure_reason_counts: targetFailureCounts,
     posting_rejection_reason_counts: postingRejectionCounts,
     runnable_due_count: Number(totals.runnable_due_count || 0),
@@ -1722,6 +1767,7 @@ function attachBacklogDiagnostics(report, options = {}) {
     failureReasonCounts,
     targetFailureReasonCounts: failureReasonCountsByScope.target_failure,
     postingRejectionReasonCounts: failureReasonCountsByScope.posting_rejection,
+    parserDriftRecheck,
     totals: report.totals || {},
     options
   });
