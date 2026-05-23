@@ -486,6 +486,18 @@ test("replace validation catches count mismatch", async () => {
         postgres_exclusion_reasons: ["placeholder_title"]
       }
     ]);
+    assert.deepEqual(result.drift_diagnosis, {
+      primary_cause: "extra_meili_documents",
+      count_delta: -1,
+      extra_meili_document_count: 1,
+      missing_meili_document_count: 0,
+      sampled_extra_status_counts: { excluded_visible: 1 },
+      sampled_extra_exclusion_reason_counts: { placeholder_title: 1 },
+      sampled_missing_document_count: 0,
+      sample_complete: true,
+      approval_required: true,
+      suggested_next_action: "delete_extra_meili_documents_or_replace_reindex_after_explicit_approval"
+    });
   } finally {
     mock.restore();
   }

@@ -596,6 +596,68 @@ function summarizeSampleMismatches(samples = []) {
   return summary;
 }
 
+function incrementCount(target, key, amount = 1) {
+  const normalizedKey = String(key || "unknown").trim() || "unknown";
+  target[normalizedKey] = Number(target[normalizedKey] || 0) + Number(amount || 0);
+}
+
+function summarizeDriftDiagnosis({ countDelta = 0, documentDrift = {}, remoteFacetComparison = {}, sampleMismatchSummary = {} } = {}) {
+  const extraMeiliDocumentCount = Number(documentDrift.extra_meili_document_count || 0);
+  const missingMeiliDocumentCount = Number(documentDrift.missing_meili_document_count || 0);
+  const extraDocuments = Array.isArray(documentDrift.extra_meili_documents)
+    ? documentDrift.extra_meili_documents
+    : [];
+  const missingDocuments = Array.isArray(documentDrift.missing_meili_documents)
+    ? documentDrift.missing_meili_documents
+    : [];
+  const sampledExtraStatusCounts = {};
+  const sampledExtraExclusionReasonCounts = {};
+  for (const document of extraDocuments) {
+    incrementCount(sampledExtraStatusCounts, document?.postgres_index_status);
+    const reasons = Array.isArray(document?.postgres_exclusion_reasons)
+      ? document.postgres_exclusion_reasons
+      : [];
+    if (reasons.length === 0) {
+      incrementCount(sampledExtraExclusionReasonCounts, "none");
+      continue;
+    }
+    for (const reason of reasons) incrementCount(sampledExtraExclusionReasonCounts, reason);
+  }
+
+  let primaryCause = "in_sync";
+  if (extraMeiliDocumentCount > 0 && missingMeiliDocumentCount > 0) primaryCause = "mixed_document_drift";
+  else if (extraMeiliDocumentCount > 0) primaryCause = "extra_meili_documents";
+  else if (missingMeiliDocumentCount > 0) primaryCause = "missing_meili_documents";
+  else if (Number(countDelta || 0) !== 0) primaryCause = "count_mismatch_unclassified";
+  else if (remoteFacetComparison.ok === false) primaryCause = "remote_facet_mismatch";
+  else if (Number(sampleMismatchSummary.missing_documents || 0) > 0 || Number(sampleMismatchSummary.field_mismatches || 0) > 0) {
+    primaryCause = "sampled_document_mismatch";
+  }
+
+  const suggestedActions = {
+    extra_meili_documents: "delete_extra_meili_documents_or_replace_reindex_after_explicit_approval",
+    missing_meili_documents: "process_search_outbox_or_replace_reindex_after_explicit_approval",
+    mixed_document_drift: "inspect_document_drift_then_repair_after_explicit_approval",
+    count_mismatch_unclassified: "increase_drift_sample_or_inspect_index_before_repair",
+    remote_facet_mismatch: "inspect_stale_meili_documents_or_replace_reindex_after_explicit_approval",
+    sampled_document_mismatch: "inspect_sampled_field_mismatches_then_repair_after_explicit_approval",
+    in_sync: "none"
+  };
+
+  return {
+    primary_cause: primaryCause,
+    count_delta: Number(countDelta || 0),
+    extra_meili_document_count: extraMeiliDocumentCount,
+    missing_meili_document_count: missingMeiliDocumentCount,
+    sampled_extra_status_counts: sampledExtraStatusCounts,
+    sampled_extra_exclusion_reason_counts: sampledExtraExclusionReasonCounts,
+    sampled_missing_document_count: missingDocuments.length,
+    sample_complete: extraDocuments.length >= extraMeiliDocumentCount && missingDocuments.length >= missingMeiliDocumentCount,
+    approval_required: primaryCause !== "in_sync",
+    suggested_next_action: suggestedActions[primaryCause] || suggestedActions.count_mismatch_unclassified
+  };
+}
+
 async function runSampleSearches(config, indexName, queries = DEFAULT_SAMPLE_QUERIES) {
   const results = [];
   for (const query of queries) {
@@ -638,6 +700,7 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
       sampleLimit: options.driftSampleLimit ?? 20
     })
     : { extra_meili_documents: [], missing_meili_documents: [] };
+  const sampleMismatchSummary = summarizeSampleMismatches(samples.sample_mismatches);
   const sampleSearches = config.enabled && index?.uid && options.sampleSearches !== false
     ? await runSampleSearches(config, indexName)
     : [];
@@ -661,11 +724,17 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
     meili_settings_mismatches: settingsValidation.mismatches || [],
     sampled: samples.sampled,
     sample_mismatches: samples.sample_mismatches,
-    sample_mismatch_summary: summarizeSampleMismatches(samples.sample_mismatches),
+    sample_mismatch_summary: sampleMismatchSummary,
     extra_meili_document_count: Number(documentDrift.extra_meili_document_count || 0),
     extra_meili_documents: documentDrift.extra_meili_documents,
     missing_meili_document_count: Number(documentDrift.missing_meili_document_count || 0),
     missing_meili_documents: documentDrift.missing_meili_documents,
+    drift_diagnosis: summarizeDriftDiagnosis({
+      countDelta,
+      documentDrift,
+      remoteFacetComparison,
+      sampleMismatchSummary
+    }),
     sample_searches: sampleSearches
   };
 }
