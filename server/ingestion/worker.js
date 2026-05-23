@@ -89,6 +89,10 @@ const FAILURE_COOLDOWN_SECONDS = Math.max(60 * 60, Math.floor(positiveNumber(
   process.env.INGESTION_FAILURE_COOLDOWN_SECONDS,
   7 * 24 * 60 * 60
 )));
+const NO_JOBS_COOLDOWN_SECONDS = Math.max(60 * 60, Math.floor(positiveNumber(
+  process.env.INGESTION_NO_JOBS_COOLDOWN_SECONDS,
+  24 * 60 * 60
+)));
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
 const WORKER_FAILURE_REASON_TAXONOMY = Object.freeze([
@@ -191,6 +195,14 @@ function computeRetryEpoch(baseEpoch, consecutiveFailures) {
   }
   const backoffSeconds = Math.min(24 * 60 * 60, 60 * 60 * 2 ** Math.min(6, failures - 1));
   return Number(baseEpoch || nowEpochSeconds()) + backoffSeconds;
+}
+
+function computeFailureRetryEpoch(baseEpoch, consecutiveFailures, failureReason = "") {
+  const normalizedReason = normalizeFailureReason(failureReason, "");
+  if (normalizedReason === "no_jobs") {
+    return Number(baseEpoch || nowEpochSeconds()) + NO_JOBS_COOLDOWN_SECONDS;
+  }
+  return computeRetryEpoch(baseEpoch, consecutiveFailures);
 }
 
 function startOfUtcDayEpoch(epoch = nowEpochSeconds()) {
@@ -688,7 +700,7 @@ async function markCompanySuccess(db, target, nowEpoch) {
   ));
 }
 
-async function markCompanyFailure(db, target, error, nowEpoch) {
+async function markCompanyFailure(db, target, error, nowEpoch, failureReason = "") {
   await withWriteLock(async () => {
     const existing = await db.get(
       `
@@ -728,7 +740,7 @@ async function markCompanyFailure(db, target, error, nowEpoch) {
         Number(target.company?.id || 0) || null,
         String(target.company?.company_name || ""),
         nowEpoch,
-        computeRetryEpoch(nowEpoch, failures),
+        computeFailureRetryEpoch(nowEpoch, failures, failureReason || classifyIngestionError(error)),
         failures,
         sanitizeLogMessage(error?.message || error, 1000)
       ]
@@ -818,7 +830,7 @@ async function processTarget(db, runId, target, counters) {
     const httpStatus = extractHttpStatus(error);
     const reason = classifyIngestionError(error);
     incrementHttpStatusCount(counters, httpStatus);
-    await markCompanyFailure(db, target, error, nowEpoch);
+    await markCompanyFailure(db, target, error, nowEpoch, reason);
     recordTargetOutcome(counters, target, "failure", reason);
     await recordRunError(db, runId, target, error, httpStatus, reason);
   }
@@ -1414,7 +1426,7 @@ async function markPostgresCompanySuccess(pool, target, nowEpoch) {
   );
 }
 
-async function markPostgresCompanyFailure(pool, target, error, nowEpoch) {
+async function markPostgresCompanyFailure(pool, target, error, nowEpoch, failureReason = "") {
   const existing = await pool.query(
     `
       SELECT consecutive_failures
@@ -1453,7 +1465,7 @@ async function markPostgresCompanyFailure(pool, target, error, nowEpoch) {
       Number(target.company?.id || 0) || null,
       String(target.company?.company_name || ""),
       nowEpoch,
-      computeRetryEpoch(nowEpoch, failures),
+      computeFailureRetryEpoch(nowEpoch, failures, failureReason || classifyIngestionError(error)),
       failures,
       sanitizeLogMessage(error?.message || error, 1000)
     ]
@@ -1561,7 +1573,7 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
     const reason = classifyIngestionError(error);
     incrementHttpStatusCount(counters, httpStatus);
     await markFetchRateLimitCooldown(options.rateLimitStore, target, error);
-    await markPostgresCompanyFailure(pool, target, error, nowEpoch);
+    await markPostgresCompanyFailure(pool, target, error, nowEpoch, reason);
     recordTargetOutcome(counters, target, "failure", reason);
     await recordPostgresRunError(pool, runId, target, error, httpStatus, reason);
     return "failed";
@@ -1911,6 +1923,7 @@ if (require.main === module) {
 
 module.exports = {
   computeDueTargetCandidateLimit,
+  computeFailureRetryEpoch,
   computeNextSyncEpoch,
   computeRetryEpoch,
   createRunCounters,

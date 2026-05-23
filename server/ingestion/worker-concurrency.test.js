@@ -4,6 +4,7 @@ const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
 const {
   classifyIngestionError,
+  computeFailureRetryEpoch,
   computeRetryEpoch,
   createRunCounters,
   dedupeValidPosting,
@@ -148,6 +149,15 @@ test("retry backoff cools down after repeated company failures", () => {
   assert.ok(early > base);
   assert.ok(early < base + 24 * 60 * 60);
   assert.ok(cooled >= base + 7 * 24 * 60 * 60);
+});
+
+test("no-jobs failures use daily cooldown without being counted as success", () => {
+  const base = 1_000_000;
+  const noJobsRetry = computeFailureRetryEpoch(base, 1, "no_jobs");
+  const normalRetry = computeFailureRetryEpoch(base, 1, "network");
+
+  assert.ok(noJobsRetry >= base + 24 * 60 * 60);
+  assert.equal(normalRetry, computeRetryEpoch(base, 1));
 });
 
 test("http status metrics are extracted and counted", () => {
