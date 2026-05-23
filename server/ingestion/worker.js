@@ -200,6 +200,9 @@ function computeRetryEpoch(baseEpoch, consecutiveFailures) {
 function computeFailureRetryEpoch(baseEpoch, consecutiveFailures, failureReason = "") {
   const normalizedReason = normalizeFailureReason(failureReason, "");
   if (normalizedReason === "no_jobs") {
+    if (Number(consecutiveFailures || 0) >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
+      return computeRetryEpoch(baseEpoch, consecutiveFailures);
+    }
     return Number(baseEpoch || nowEpochSeconds()) + NO_JOBS_COOLDOWN_SECONDS;
   }
   return computeRetryEpoch(baseEpoch, consecutiveFailures);

@@ -161,6 +161,13 @@ test("no-jobs failures use daily cooldown without being counted as success", () 
   assert.equal(normalRetry, computeRetryEpoch(base, 1));
 });
 
+test("repeated no-jobs failures enter the long failure cooldown", () => {
+  const base = 1_000_000;
+  const repeatedNoJobsRetry = computeFailureRetryEpoch(base, 8, "no_jobs");
+
+  assert.equal(repeatedNoJobsRetry, computeRetryEpoch(base, 8));
+});
+
 test("http status metrics are extracted and counted", () => {
   const counters = createRunCounters();
   incrementHttpStatusCount(counters, extractHttpStatus(new Error("request failed (429)")));
