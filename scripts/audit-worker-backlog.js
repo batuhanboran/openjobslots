@@ -2070,24 +2070,37 @@ function currentPolicyFailureReasonAdjustment(atsKey = "", reason = "", parserDr
   if (!source) return null;
   const sampleCount = Math.max(0, Number(source.sample_count || 0));
   const emptyNoJobsCount = Math.max(0, Number(source.current_policy_empty_no_jobs_count || 0));
+  const passCount = Math.max(0, Number(source.current_policy_pass_count || 0));
   const resolvedCount = Math.max(0, Number(source.current_policy_resolved_count || 0));
   const stillDriftCount = Math.max(0, Number(source.still_drift_count || 0));
   const skippedNoBaselineCount = Math.max(0, Number(source.skipped_no_baseline_count || 0));
   if (
     sampleCount <= 0 ||
-    emptyNoJobsCount <= 0 ||
-    emptyNoJobsCount < sampleCount ||
     resolvedCount < sampleCount ||
     stillDriftCount > 0 ||
     skippedNoBaselineCount > 0
   ) {
     return null;
   }
+  if (emptyNoJobsCount > 0 && emptyNoJobsCount >= sampleCount) {
+    return {
+      reason: "parser_drift_recheck_empty_no_jobs",
+      raw_failure_reason: rawReason,
+      adjusted_failure_reason: "empty_no_jobs",
+      source_sample_count: sampleCount,
+      current_policy_pass_count: passCount,
+      current_policy_empty_no_jobs_count: emptyNoJobsCount,
+      current_policy_resolved_count: resolvedCount,
+      still_drift_count: stillDriftCount,
+      skipped_no_baseline_count: skippedNoBaselineCount
+    };
+  }
   return {
-    reason: "parser_drift_recheck_empty_no_jobs",
+    reason: "parser_drift_recheck_passed_current_policy",
     raw_failure_reason: rawReason,
-    adjusted_failure_reason: "empty_no_jobs",
+    adjusted_failure_reason: "current_policy_resolved",
     source_sample_count: sampleCount,
+    current_policy_pass_count: passCount,
     current_policy_empty_no_jobs_count: emptyNoJobsCount,
     current_policy_resolved_count: resolvedCount,
     still_drift_count: stillDriftCount,
@@ -2096,7 +2109,7 @@ function currentPolicyFailureReasonAdjustment(atsKey = "", reason = "", parserDr
 }
 
 function adjustRecentErrorSummaryForCurrentPolicy(recentErrors = {}, adjustment = null) {
-  if (!adjustment || adjustment.adjusted_failure_reason !== "empty_no_jobs") return recentErrors;
+  if (!adjustment) return recentErrors;
   const parserBugCount = Math.max(
     0,
     Number(recentErrors.parser_bug_count || recentErrors.by_reason?.parser_bug || 0)
@@ -2110,14 +2123,20 @@ function adjustRecentErrorSummaryForCurrentPolicy(recentErrors = {}, adjustment 
     current_policy_adjustment: adjustment
   };
   adjusted.parser_bug_count = Math.max(0, Number(adjusted.parser_bug_count || 0) - parserBugCount);
-  adjusted.empty_no_jobs_count = Number(adjusted.empty_no_jobs_count || 0) + parserBugCount;
   adjusted.by_reason.parser_bug = Math.max(0, Number(adjusted.by_reason.parser_bug || 0) - parserBugCount);
   if (adjusted.by_reason.parser_bug === 0) delete adjusted.by_reason.parser_bug;
-  adjusted.by_reason.empty_no_jobs = Number(adjusted.by_reason.empty_no_jobs || 0) + parserBugCount;
+  if (adjustment.adjusted_failure_reason === "empty_no_jobs") {
+    adjusted.empty_no_jobs_count = Number(adjusted.empty_no_jobs_count || 0) + parserBugCount;
+    adjusted.by_reason.empty_no_jobs = Number(adjusted.by_reason.empty_no_jobs || 0) + parserBugCount;
+  } else {
+    adjusted.current_policy_resolved_count = Number(adjusted.current_policy_resolved_count || 0) + parserBugCount;
+    adjusted.by_reason.current_policy_resolved = Number(adjusted.by_reason.current_policy_resolved || 0) + parserBugCount;
+  }
   return adjusted;
 }
 
 function targetPressureNextAction(reason) {
+  if (reason === "current_policy_resolved") return "wait for a new worker run before treating this historical parser drift as an active parser bug";
   if (reason === "parser_bug") return "add fixture and fix parser before counting this source as scalable";
   if (reason === "source_quality") return "review source evidence and quality gates before re-running at higher volume";
   if (reason === "rate_limit") return "review backoff, target pacing, and source rate limits before increasing volume";

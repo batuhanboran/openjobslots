@@ -1966,6 +1966,21 @@ test("attachBacklogDiagnostics exposes current-policy adjusted failure taxonomy"
       ],
       targetFailurePressureRows: [
         {
+          ats_key: "applytojob",
+          company_url: "https://example.applytojob.com",
+          company_name: "Apply",
+          protection_status: "normal",
+          consecutive_failures: 5,
+          last_error: "parser drift detected: payload shape similarity 0.3913 below 0.55",
+          recent_error_groups: [
+            {
+              error_type: "parser_drift",
+              error_message: "payload shape similarity 0.3913 below 0.55",
+              count: 2
+            }
+          ]
+        },
+        {
           ats_key: "bamboohr",
           company_url: "https://example.bamboohr.com/careers",
           company_name: "Bamboo",
@@ -2049,8 +2064,16 @@ test("attachBacklogDiagnostics exposes current-policy adjusted failure taxonomy"
   assert.equal(targetPressure.failure_reason_review_groups[0].failure_reason, "empty_no_jobs");
   assert.equal(targetPressure.failure_reason_review_groups[0].raw_failure_reason, "parser_bug");
   assert.equal(targetPressure.failure_reason_review_groups[0].current_policy_adjustment.reason, "parser_drift_recheck_empty_no_jobs");
-  assert.equal(targetPressure.top_targets[0].dominant_failure_reason, "empty_no_jobs");
-  assert.equal(targetPressure.top_targets[0].raw_dominant_failure_reason, "parser_bug");
+  const bambooTarget = targetPressure.top_targets.find((target) => target.ats_key === "bamboohr");
+  assert.equal(bambooTarget.dominant_failure_reason, "empty_no_jobs");
+  assert.equal(bambooTarget.raw_dominant_failure_reason, "parser_bug");
+  const applyGroup = targetPressure.failure_reason_review_groups.find((group) => group.ats_key === "applytojob");
+  assert.equal(applyGroup.failure_reason, "current_policy_resolved");
+  assert.equal(applyGroup.raw_failure_reason, "parser_bug");
+  assert.equal(applyGroup.current_policy_adjustment.reason, "parser_drift_recheck_passed_current_policy");
+  const applyTarget = targetPressure.top_targets.find((target) => target.ats_key === "applytojob");
+  assert.equal(applyTarget.dominant_failure_reason, "current_policy_resolved");
+  assert.equal(applyTarget.raw_dominant_failure_reason, "parser_bug");
 });
 
 test("attachBacklogDiagnostics keeps source policy blocks out of parser attention count", () => {
