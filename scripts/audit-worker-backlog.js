@@ -275,9 +275,66 @@ function createFailureReasonCounts() {
   return counts;
 }
 
+function cloneFailureReasonCounts(counts = {}) {
+  const cloned = createFailureReasonCounts();
+  for (const bucket of FAILURE_REASON_BUCKETS) {
+    cloned[bucket] = Number(counts?.[bucket] || 0);
+  }
+  return cloned;
+}
+
+function sumFailureReasonCounts(counts = {}) {
+  return FAILURE_REASON_BUCKETS.reduce((sum, bucket) => sum + Number(counts?.[bucket] || 0), 0);
+}
+
 function addFailureReasonCount(counts, reason, count) {
   if (!counts || !reason) return;
   counts[reason] = Number(counts[reason] || 0) + Number(count || 0);
+}
+
+function adjustFailureReasonCountsForParserDriftRecheck(counts = {}, parserDriftRecheck = {}) {
+  const adjusted = cloneFailureReasonCounts(counts);
+  const parserBugCount = Math.max(0, Number(adjusted.parser_bug || 0));
+  const emptyNoJobsResolvedCount = Math.max(0, Number(parserDriftRecheck?.current_policy_empty_no_jobs_count || 0));
+  const currentPolicyPassCount = Math.max(0, Number(parserDriftRecheck?.current_policy_pass_count || 0));
+  const parserBugToEmptyNoJobs = Math.min(parserBugCount, emptyNoJobsResolvedCount);
+  const parserBugAfterEmptyNoJobs = Math.max(0, parserBugCount - parserBugToEmptyNoJobs);
+  const parserBugToCurrentPolicyPass = Math.min(parserBugAfterEmptyNoJobs, currentPolicyPassCount);
+  const parserBugResolvedTotal = parserBugToEmptyNoJobs + parserBugToCurrentPolicyPass;
+
+  adjusted.parser_bug = Math.max(0, parserBugCount - parserBugResolvedTotal);
+  adjusted.empty_no_jobs = Number(adjusted.empty_no_jobs || 0) + parserBugToEmptyNoJobs;
+
+  return {
+    counts: adjusted,
+    adjustments: {
+      parser_bug_to_current_policy_pass: parserBugToCurrentPolicyPass,
+      parser_bug_to_empty_no_jobs: parserBugToEmptyNoJobs,
+      parser_bug_resolved_total: parserBugResolvedTotal
+    }
+  };
+}
+
+function adjustFailureReasonCountsByScopeForParserDriftRecheck(countsByScope = {}, parserDriftRecheck = {}) {
+  const targetFailure = adjustFailureReasonCountsForParserDriftRecheck(
+    countsByScope?.target_failure || {},
+    parserDriftRecheck
+  );
+  const postingRejection = cloneFailureReasonCounts(countsByScope?.posting_rejection || {});
+  const unknown = cloneFailureReasonCounts(countsByScope?.unknown || {});
+  return {
+    target_failure: targetFailure.counts,
+    posting_rejection: postingRejection,
+    unknown,
+    total: {
+      target_failure_count: sumFailureReasonCounts(targetFailure.counts),
+      posting_rejection_count: sumFailureReasonCounts(postingRejection),
+      unknown_count: sumFailureReasonCounts(unknown)
+    },
+    adjustments: {
+      target_failure: targetFailure.adjustments
+    }
+  };
 }
 
 function buildWorkerBacklogQuery(options = {}) {
@@ -2312,6 +2369,14 @@ function attachBacklogDiagnostics(report, options = {}) {
   const recentRunTrend = summarizeRecentRunTrendRows(options.recentRunTrendRows || [], options);
   const recentRunTrendBySource = summarizeRecentRunTrendBySourceRows(options.recentRunTrendBySourceRows || [], options);
   const parserDriftRecheck = summarizeParserDriftRecheck(options.parserDriftRecheckRows || [], options);
+  const adjustedFailureReasonCounts = adjustFailureReasonCountsForParserDriftRecheck(
+    failureReasonCounts,
+    parserDriftRecheck
+  );
+  const adjustedFailureReasonCountsByScope = adjustFailureReasonCountsByScopeForParserDriftRecheck(
+    failureReasonCountsByScope,
+    parserDriftRecheck
+  );
   const targetFailurePressure = summarizeTargetFailurePressureRows(options.targetFailurePressureRows || [], options);
   const gateLatestRun = selectGateLatestRun(latestRun, recentRunTrendBySource, targetAtsKeys);
   const gateRecentRunTrend = selectGateRecentRunTrend(recentRunTrend, recentRunTrendBySource, targetAtsKeys);
@@ -2336,6 +2401,9 @@ function attachBacklogDiagnostics(report, options = {}) {
       source_policy_block_count: sourcePolicyBlockCount,
       failure_reason_counts: failureReasonCounts,
       failure_reason_counts_by_scope: failureReasonCountsByScope,
+      current_policy_adjusted_failure_reason_counts: adjustedFailureReasonCounts.counts,
+      parser_drift_recheck_adjustments: adjustedFailureReasonCounts.adjustments,
+      current_policy_adjusted_failure_reason_counts_by_scope: adjustedFailureReasonCountsByScope,
       latest_run: latestRun,
       recent_run_trend: recentRunTrend,
       recent_run_trend_by_source: recentRunTrendBySource,

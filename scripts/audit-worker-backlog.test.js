@@ -1664,6 +1664,99 @@ test("attachBacklogDiagnostics maps raw worker errors into operator failure buck
   ]);
 });
 
+test("attachBacklogDiagnostics exposes current-policy adjusted failure taxonomy", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "applytojob",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 10,
+      due_count: 8,
+      runnable_due_count: 8
+    }
+  ]);
+
+  const withDiagnostics = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      errorWindowHours: 24,
+      recentErrorRows: [
+        { ats_key: "applytojob", error_type: "parser_drift", error_message: "parser drift detected", count: 5 },
+        { ats_key: "applytojob", error_type: "portal_search_empty", count: 4 }
+      ],
+      scopedRecentErrorRows: [
+        { ats_key: "applytojob", error_scope: "target_failure", error_type: "parser_drift", error_message: "parser drift detected", count: 5 },
+        { ats_key: "applytojob", error_scope: "target_failure", error_type: "portal_search_empty", count: 4 }
+      ],
+      parserDriftRecheckRows: [
+        {
+          ats_key: "applytojob",
+          baseline_shape_paths: [
+            "html:string",
+            "__detailHtmlByUrl.first:string",
+            "__detailStatusByUrl.first:number"
+          ],
+          observed_shape_paths: [
+            "html:string",
+            "__detailHtmlByUrl.second:string",
+            "__detailStatusByUrl.second:number"
+          ]
+        },
+        {
+          ats_key: "bamboohr",
+          baseline_shape_paths: [
+            "meta.totalCount:number",
+            "result:array",
+            "result[]:object",
+            "result[].id:string"
+          ],
+          observed_shape_paths: [
+            "meta.totalCount:number",
+            "result:array",
+            "result[]:empty"
+          ]
+        }
+      ]
+    }
+  );
+
+  assert.deepEqual(withDiagnostics.diagnostics.failure_reason_counts, {
+    parser_bug: 5,
+    source_quality: 0,
+    rate_limit: 0,
+    network: 0,
+    empty_no_jobs: 4,
+    auth: 0,
+    unknown: 0
+  });
+  assert.deepEqual(withDiagnostics.diagnostics.current_policy_adjusted_failure_reason_counts, {
+    parser_bug: 3,
+    source_quality: 0,
+    rate_limit: 0,
+    network: 0,
+    empty_no_jobs: 5,
+    auth: 0,
+    unknown: 0
+  });
+  assert.deepEqual(withDiagnostics.diagnostics.parser_drift_recheck_adjustments, {
+    parser_bug_to_current_policy_pass: 1,
+    parser_bug_to_empty_no_jobs: 1,
+    parser_bug_resolved_total: 2
+  });
+  assert.equal(
+    withDiagnostics.diagnostics.current_policy_adjusted_failure_reason_counts_by_scope.target_failure.parser_bug,
+    3
+  );
+  assert.equal(
+    withDiagnostics.diagnostics.current_policy_adjusted_failure_reason_counts_by_scope.target_failure.empty_no_jobs,
+    5
+  );
+});
+
 test("attachBacklogDiagnostics keeps source policy blocks out of parser attention count", () => {
   const base = summarizeBacklogRows([
     {
