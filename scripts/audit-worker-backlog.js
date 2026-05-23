@@ -1680,6 +1680,7 @@ function createEmptyNoJobsCleanupCandidates(staleDays = 7, sampleLimit = 5) {
     recent_error_count: 0,
     sample_limit: boundedSampleLimit,
     sample_targets: [],
+    review_groups: [],
     next_action: "review stale never-success empty targets for quarantine or removal only after explicit approval"
   };
 }
@@ -1728,6 +1729,56 @@ function createEmptyNoJobsClassificationSample(row = {}) {
   };
 }
 
+function cleanupErrorSignature(row = {}) {
+  const signature = String(row.last_error || "empty/no jobs")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+  return signature || "empty/no jobs";
+}
+
+function addEmptyNoJobsCleanupReviewGroup(cleanup, row = {}, sample = {}) {
+  if (!cleanup) return;
+  const sampleLimit = Math.max(1, Math.min(25, Math.floor(Number(cleanup.sample_limit || 5))));
+  const atsKey = String(row.ats_key || sample.ats_key || "").trim().toLowerCase();
+  const protectionStatus = String(row.protection_status || sample.protection_status || "normal") || "normal";
+  const errorSignature = cleanupErrorSignature(row);
+  const groupKey = `${atsKey}|${protectionStatus}|${errorSignature}`;
+  let group = cleanup.review_groups.find((item) => item.group_key === groupKey);
+  if (!group) {
+    group = {
+      group_key: groupKey,
+      ats_key: atsKey,
+      protection_status: protectionStatus,
+      error_signature: errorSignature,
+      candidate_count: 0,
+      worker_slot_pressure: 0,
+      recent_error_count: 0,
+      sample_targets: []
+    };
+    cleanup.review_groups.push(group);
+  }
+  group.candidate_count += 1;
+  group.worker_slot_pressure += Number(row.consecutive_failures || 0);
+  group.recent_error_count += Number(row.recent_error_count || 0);
+  if (group.sample_targets.length < sampleLimit) {
+    group.sample_targets.push(sample);
+  }
+}
+
+function finalizeEmptyNoJobsClassificationSummary(summary) {
+  const cleanup = summary?.cleanup_candidates;
+  if (!cleanup) return summary;
+  cleanup.group_count = cleanup.review_groups.length;
+  cleanup.review_groups.sort((left, right) => (
+    Number(right.worker_slot_pressure || 0) - Number(left.worker_slot_pressure || 0)
+    || Number(right.candidate_count || 0) - Number(left.candidate_count || 0)
+    || String(left.group_key || "").localeCompare(String(right.group_key || ""))
+  ));
+  return summary;
+}
+
 function addEmptyNoJobsClassification(summary, className, row = {}) {
   if (!summary || !className || !summary.by_class[className]) return;
   const consecutiveFailures = Number(row.consecutive_failures || 0);
@@ -1753,6 +1804,7 @@ function addEmptyNoJobsClassification(summary, className, row = {}) {
     if (cleanup.sample_targets.length < cleanupSampleLimit) {
       cleanup.sample_targets.push(sample);
     }
+    addEmptyNoJobsCleanupReviewGroup(cleanup, row, sample);
   }
 }
 
@@ -1849,8 +1901,10 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     });
   }
 
+  finalizeEmptyNoJobsClassificationSummary(emptyNoJobsClassification);
   for (const source of Object.values(bySource)) {
     source.dominant_failure_reason = dominantFailureReason({ by_reason: source.by_reason });
+    finalizeEmptyNoJobsClassificationSummary(source.empty_no_jobs_classification);
   }
 
   return {

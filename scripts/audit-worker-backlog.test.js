@@ -447,6 +447,65 @@ test("summarizeTargetFailurePressureRows classifies empty/no-jobs targets by pri
   assert.equal(summary.by_source.breezy.empty_no_jobs_classification.cleanup_candidates.candidate_count, 1);
 });
 
+test("summarizeTargetFailurePressureRows groups stale empty cleanup candidates for review", () => {
+  const nowEpoch = 1_800_000_000;
+  const oldCompanyEpoch = nowEpoch - 21 * 86400;
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "breezy",
+      company_url: "https://one.breezy.hr",
+      company_name: "One",
+      protection_status: "normal",
+      company_created_at_epoch: oldCompanyEpoch,
+      last_success_epoch: 0,
+      consecutive_failures: 2,
+      last_error: "Breezy public portal returned no parseable postings",
+      recent_error_groups: [
+        { error_type: "no_jobs", error_message: "no jobs", count: 2 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://two.breezy.hr",
+      company_name: "Two",
+      protection_status: "normal",
+      company_created_at_epoch: oldCompanyEpoch,
+      last_success_epoch: 0,
+      consecutive_failures: 1,
+      last_error: "Breezy public portal returned no parseable postings",
+      recent_error_groups: [
+        { error_type: "no_jobs", error_message: "no jobs", count: 1 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://three.breezy.hr",
+      company_name: "Three",
+      protection_status: "quarantine_only",
+      company_created_at_epoch: oldCompanyEpoch,
+      last_success_epoch: 0,
+      consecutive_failures: 4,
+      last_error: "No jobs found",
+      recent_error_groups: [
+        { error_type: "portal_search_empty", error_message: "No jobs found", count: 1 }
+      ]
+    }
+  ], { nowEpoch, emptyNoJobsStaleDays: 7, emptyNoJobsSampleLimit: 2 });
+
+  const cleanup = summary.empty_no_jobs_classification.cleanup_candidates;
+  assert.equal(cleanup.candidate_count, 3);
+  assert.equal(cleanup.worker_slot_pressure, 7);
+  assert.equal(cleanup.review_groups.length, 2);
+  assert.equal(cleanup.review_groups[0].error_signature, "no jobs found");
+  assert.equal(cleanup.review_groups[0].protection_status, "quarantine_only");
+  assert.equal(cleanup.review_groups[0].candidate_count, 1);
+  assert.equal(cleanup.review_groups[0].worker_slot_pressure, 4);
+  assert.equal(cleanup.review_groups[1].error_signature, "breezy public portal returned no parseable postings");
+  assert.equal(cleanup.review_groups[1].candidate_count, 2);
+  assert.equal(cleanup.review_groups[1].worker_slot_pressure, 3);
+  assert.equal(cleanup.review_groups[1].sample_targets.length, 2);
+});
+
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {
   const report = summarizeBacklogRows(
     [
