@@ -1477,9 +1477,60 @@ test("attachBacklogDiagnostics ranks success-rate recovery priorities with curre
   assert.equal(breezy.current_policy_adjusted_failure_reason_counts.parser_bug, 3);
   assert.equal(breezy.current_policy_adjusted_failure_reason_counts.empty_no_jobs, 21);
   assert.equal(hrmdirect.priority_lane, "source_quality");
-  assert.ok(applytojob.reasons.includes("real_parser_bug"));
+  assert.equal(applytojob.priority_lane, "parser_bug_unrechecked");
+  assert.ok(applytojob.reasons.includes("parser_bug_unrechecked"));
   assert.ok(breezy.reasons.includes("empty_no_jobs_cleanup"));
   assert.ok(hrmdirect.reasons.includes("source_quality"));
+});
+
+test("attachBacklogDiagnostics separates unrechecked parser drift from real parser bugs in priorities", () => {
+  const base = summarizeBacklogRows([
+    {
+      ats_key: "applytojob",
+      enabled: true,
+      protection_status: "normal",
+      target_count: 100,
+      due_count: 90,
+      runnable_due_count: 90,
+      failure_pressure: 40,
+      failing_due_count: 40
+    }
+  ]);
+
+  const report = attachBacklogDiagnostics(
+    {
+      ok: true,
+      totals: base.totals,
+      items: base.items
+    },
+    {
+      recentErrorRows: [
+        { ats_key: "applytojob", error_type: "parser_drift", error_message: "parser drift detected", count: 5 }
+      ],
+      parserDriftRecheckRows: [
+        {
+          ats_key: "applytojob",
+          baseline_shape_paths: ["html:string", "__detailHtmlByUrl.first:string"],
+          observed_shape_paths: ["html:string", "__detailHtmlByUrl.second:string"]
+        },
+        {
+          ats_key: "applytojob",
+          baseline_shape_paths: ["html:string", "__detailHtmlByUrl.first:string"],
+          observed_shape_paths: ["html:string", "__detailHtmlByUrl.third:string"]
+        }
+      ]
+    }
+  );
+
+  const [applytojob] = report.diagnostics.worker_success_recovery_priorities.sources;
+  assert.equal(applytojob.ats_key, "applytojob");
+  assert.equal(applytojob.priority_lane, "parser_bug_unrechecked");
+  assert.equal(applytojob.current_policy_adjusted_failure_reason_counts.parser_bug, 3);
+  assert.equal(applytojob.parser_bug_evidence.raw_parser_drift_count, 5);
+  assert.equal(applytojob.parser_bug_evidence.parser_drift_unrechecked_count, 3);
+  assert.equal(applytojob.parser_bug_evidence.confirmed_parser_bug_count, 0);
+  assert.ok(applytojob.reasons.includes("parser_bug_unrechecked"));
+  assert.ok(!applytojob.reasons.includes("real_parser_bug"));
 });
 
 test("buildThroughputScalingGate allows only small increase after clean worker evidence", () => {

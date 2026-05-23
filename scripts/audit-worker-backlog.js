@@ -1409,8 +1409,63 @@ function failureReasonCountsFromRecentErrorSummary(summary = {}) {
   return counts;
 }
 
-function priorityLaneForFailureCounts(counts = {}) {
-  if (Number(counts.parser_bug || 0) > 0) return "parser_bug";
+function summarizeParserBugEvidenceForPriority(recentSummary = {}, parserDriftRecheck = {}, adjustedCounts = {}) {
+  const rawParserBugCount = Math.max(
+    0,
+    Number(recentSummary?.parser_bug_count || recentSummary?.by_reason?.parser_bug || 0)
+  );
+  const rawParserDriftCount = Math.max(
+    0,
+    Number(recentSummary?.parser_drift_count || recentSummary?.by_type?.parser_drift || 0)
+  );
+  const rawNonDriftParserBugCount = Math.max(0, rawParserBugCount - rawParserDriftCount);
+  const sampleCount = Math.max(0, Number(parserDriftRecheck?.sample_count || 0));
+  const stillDriftCount = Math.max(0, Number(parserDriftRecheck?.still_drift_count || 0));
+  const currentPolicyPassCount = Math.max(0, Number(parserDriftRecheck?.current_policy_pass_count || 0));
+  const currentPolicyEmptyNoJobsCount = Math.max(
+    0,
+    Number(parserDriftRecheck?.current_policy_empty_no_jobs_count || 0)
+  );
+  const currentPolicyResolvedCount = Math.max(
+    0,
+    Number(parserDriftRecheck?.current_policy_resolved_count || currentPolicyPassCount + currentPolicyEmptyNoJobsCount)
+  );
+  const skippedNoBaselineCount = Math.max(0, Number(parserDriftRecheck?.skipped_no_baseline_count || 0));
+  const parserDriftUnrecheckedCount = Math.max(0, rawParserDriftCount - sampleCount);
+  const parserDriftUnverifiedCount = parserDriftUnrecheckedCount + skippedNoBaselineCount;
+  const confirmedParserBugCount = rawNonDriftParserBugCount + stillDriftCount;
+  const adjustedParserBugCount = Math.max(0, Number(adjustedCounts?.parser_bug || 0));
+  const status = rawParserBugCount <= 0
+    ? "none"
+    : confirmedParserBugCount > 0
+      ? "confirmed_parser_bug"
+      : parserDriftUnverifiedCount > 0
+        ? "parser_bug_unrechecked"
+        : adjustedParserBugCount > 0
+          ? "parser_bug_unclassified"
+          : "current_policy_resolved";
+
+  return {
+    status,
+    raw_parser_bug_count: rawParserBugCount,
+    raw_parser_drift_count: rawParserDriftCount,
+    raw_non_drift_parser_bug_count: rawNonDriftParserBugCount,
+    parser_drift_recheck_sample_count: sampleCount,
+    parser_drift_still_drift_count: stillDriftCount,
+    parser_drift_current_policy_pass_count: currentPolicyPassCount,
+    parser_drift_current_policy_empty_no_jobs_count: currentPolicyEmptyNoJobsCount,
+    parser_drift_current_policy_resolved_count: currentPolicyResolvedCount,
+    parser_drift_skipped_no_baseline_count: skippedNoBaselineCount,
+    parser_drift_unrechecked_count: parserDriftUnrecheckedCount,
+    parser_drift_unverified_count: parserDriftUnverifiedCount,
+    confirmed_parser_bug_count: confirmedParserBugCount
+  };
+}
+
+function priorityLaneForFailureCounts(counts = {}, parserBugEvidence = {}) {
+  if (Number(counts.parser_bug || 0) > 0) {
+    return parserBugEvidence.status === "parser_bug_unrechecked" ? "parser_bug_unrechecked" : "parser_bug";
+  }
   if (Number(counts.source_quality || 0) > 0) return "source_quality";
   if (
     Number(counts.rate_limit || 0) > 0 ||
@@ -1426,14 +1481,16 @@ function priorityLaneRank(lane) {
   switch (lane) {
     case "parser_bug":
       return 0;
-    case "source_quality":
+    case "parser_bug_unrechecked":
       return 1;
-    case "stability":
+    case "source_quality":
       return 2;
-    case "empty_no_jobs_cleanup":
+    case "stability":
       return 3;
-    default:
+    case "empty_no_jobs_cleanup":
       return 4;
+    default:
+      return 5;
   }
 }
 
@@ -1454,9 +1511,16 @@ function buildWorkerSuccessRecoveryPriorities({
   for (const item of Array.isArray(items) ? items : []) {
     const atsKey = String(item?.ats_key || "").trim().toLowerCase();
     if (!atsKey) continue;
-    const rawFailureCounts = failureReasonCountsFromRecentErrorSummary(recentByAts.get(atsKey) || {});
-    const adjusted = adjustFailureReasonCountsForParserDriftRecheck(rawFailureCounts, parserDriftBySource[atsKey] || {});
+    const recentSummary = recentByAts.get(atsKey) || {};
+    const parserDriftSource = parserDriftBySource[atsKey] || {};
+    const rawFailureCounts = failureReasonCountsFromRecentErrorSummary(recentSummary);
+    const adjusted = adjustFailureReasonCountsForParserDriftRecheck(rawFailureCounts, parserDriftSource);
     const adjustedCounts = adjusted.counts;
+    const parserBugEvidence = summarizeParserBugEvidenceForPriority(
+      recentSummary,
+      parserDriftSource,
+      adjustedCounts
+    );
     const recentTrend = recentRunTrendBySource[atsKey] || null;
     const recentSuccessRate = recentTrend?.success_rate_pct ?? null;
     const runnableDueCount = Number(item.runnable_due_count || item.due_count || 0);
@@ -1468,9 +1532,17 @@ function buildWorkerSuccessRecoveryPriorities({
       Number(adjustedCounts.network || 0) +
       Number(adjustedCounts.auth || 0) +
       Number(adjustedCounts.unknown || 0);
-    const lane = priorityLaneForFailureCounts(adjustedCounts);
+    const lane = priorityLaneForFailureCounts(adjustedCounts, parserBugEvidence);
     const reasons = [];
-    if (Number(adjustedCounts.parser_bug || 0) > 0) reasons.push("real_parser_bug");
+    if (Number(adjustedCounts.parser_bug || 0) > 0) {
+      if (parserBugEvidence.status === "parser_bug_unrechecked") {
+        reasons.push("parser_bug_unrechecked");
+      } else if (parserBugEvidence.status === "parser_bug_unclassified") {
+        reasons.push("parser_bug_unclassified");
+      } else {
+        reasons.push("real_parser_bug");
+      }
+    }
     if (Number(adjustedCounts.source_quality || 0) > 0) reasons.push("source_quality");
     if (Number(adjustedCounts.rate_limit || 0) > 0) reasons.push("rate_limit");
     if (Number(adjustedCounts.network || 0) > 0) reasons.push("network");
@@ -1484,6 +1556,8 @@ function buildWorkerSuccessRecoveryPriorities({
 
     const nextAction = lane === "parser_bug"
       ? "Add or update raw fixtures and fix the parser before counting this source as scalable."
+      : lane === "parser_bug_unrechecked"
+        ? "Increase parser-drift recheck coverage or wait for a new worker run before treating this as a real parser bug."
       : lane === "source_quality"
         ? "Review source evidence and quality-gate rejects; do not relax thresholds or invent missing fields."
         : lane === "stability"
@@ -1502,6 +1576,7 @@ function buildWorkerSuccessRecoveryPriorities({
       recent_run_success_rate_pct: recentSuccessRate,
       current_policy_adjusted_failure_reason_counts: adjustedCounts,
       parser_drift_recheck_adjustments: adjusted.adjustments,
+      parser_bug_evidence: parserBugEvidence,
       actionable_failure_count: actionableFailureCount,
       empty_no_jobs_count: Number(adjustedCounts.empty_no_jobs || 0),
       reasons,
@@ -1523,7 +1598,7 @@ function buildWorkerSuccessRecoveryPriorities({
     read_only: true,
     minimum_success_rate_pct: minimumSuccessRatePct,
     source_count: sources.length,
-    prioritization: "parser_bug lane first, then source_quality, stability, and empty/no-jobs cleanup; ties use failure pressure, adjusted parser bugs, actionable failures, and runnable due.",
+    prioritization: "confirmed parser_bug lane first, then unrechecked parser drift, source_quality, stability, and empty/no-jobs cleanup; ties use failure pressure, adjusted parser bugs, actionable failures, and runnable due.",
     sources: sources.slice(0, limit)
   };
 }
