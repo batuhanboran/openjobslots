@@ -358,7 +358,7 @@ function buildLatestRunBySourceQuery(options = {}) {
         SELECT
           l.id AS latest_run_id,
           e.ats_key,
-          COUNT(*)::int AS failure_count
+          COUNT(DISTINCT COALESCE(NULLIF(e.company_url, ''), e.id::text))::int AS failure_count
         FROM ingestion_run_errors e
         JOIN latest l
           ON e.run_id = l.id

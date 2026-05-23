@@ -98,6 +98,7 @@ test("buildLatestRunBySourceQuery compares latest-run successes and failures by 
   assert.match(query.sql, /WITH latest AS/i);
   assert.match(query.sql, /FROM company_sync_state/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
+  assert.match(query.sql, /COUNT\(DISTINCT COALESCE\(NULLIF\(e\.company_url, ''\), e\.id::text\)\)::int AS failure_count/i);
   assert.match(query.sql, /last_success_epoch >= l\.started_at_epoch/i);
   assert.match(query.sql, /e\.run_id = l\.id/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
