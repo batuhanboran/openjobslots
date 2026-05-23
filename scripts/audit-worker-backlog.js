@@ -1651,8 +1651,22 @@ function mergeReasonCounts(target, source = {}) {
   }
 }
 
-function createEmptyNoJobsClassificationSummary(staleDays = 7) {
+function emptyNoJobsClassificationNextAction(className) {
+  if (className === "real_empty_after_prior_success") {
+    return "treat as likely real empty board; keep scheduled only if the source has recent useful output";
+  }
+  if (className === "stale_never_success_empty") {
+    return "review stale never-success empty targets; quarantine or remove only after explicit approval; no source apply/backfill/reindex in audit";
+  }
+  if (className === "new_never_success_empty") {
+    return "let new never-success empty targets age before cleanup decisions unless repeated failures continue";
+  }
+  return "review empty/no-jobs target classification before changing throughput";
+}
+
+function createEmptyNoJobsClassificationSummary(staleDays = 7, sampleLimit = 5) {
   const byClass = {};
+  const boundedSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(sampleLimit || 5))));
   for (const name of [
     "real_empty_after_prior_success",
     "stale_never_success_empty",
@@ -1661,12 +1675,15 @@ function createEmptyNoJobsClassificationSummary(staleDays = 7) {
     byClass[name] = {
       target_count: 0,
       failure_pressure: 0,
-      recent_error_count: 0
+      recent_error_count: 0,
+      sample_targets: [],
+      next_action: emptyNoJobsClassificationNextAction(name)
     };
   }
   return {
     read_only: true,
     stale_never_success_after_days: staleDays,
+    sample_limit: boundedSampleLimit,
     total_targets: 0,
     failure_pressure: 0,
     recent_error_count: 0,
@@ -1674,16 +1691,37 @@ function createEmptyNoJobsClassificationSummary(staleDays = 7) {
   };
 }
 
+function createEmptyNoJobsClassificationSample(row = {}) {
+  return {
+    ats_key: String(row.ats_key || "").trim().toLowerCase(),
+    company_url: String(row.company_url || "").trim(),
+    company_name: String(row.company_name || ""),
+    protection_status: String(row.protection_status || "normal") || "normal",
+    company_created_at: epochToIso(row.company_created_at_epoch),
+    last_success_at: epochToIso(row.last_success_epoch),
+    last_failure_at: epochToIso(row.last_failure_epoch),
+    consecutive_failures: Number(row.consecutive_failures || 0),
+    recent_error_count: Number(row.recent_error_count || 0),
+    last_http_status: normalizeHttpStatus(row.last_http_status),
+    last_error: String(row.last_error || "").slice(0, 240)
+  };
+}
+
 function addEmptyNoJobsClassification(summary, className, row = {}) {
   if (!summary || !className || !summary.by_class[className]) return;
   const consecutiveFailures = Number(row.consecutive_failures || 0);
   const recentErrorCount = Number(row.recent_error_count || 0);
+  const classSummary = summary.by_class[className];
   summary.total_targets += 1;
   summary.failure_pressure += consecutiveFailures;
   summary.recent_error_count += recentErrorCount;
-  summary.by_class[className].target_count += 1;
-  summary.by_class[className].failure_pressure += consecutiveFailures;
-  summary.by_class[className].recent_error_count += recentErrorCount;
+  classSummary.target_count += 1;
+  classSummary.failure_pressure += consecutiveFailures;
+  classSummary.recent_error_count += recentErrorCount;
+  const sampleLimit = Math.max(1, Math.min(25, Math.floor(Number(summary.sample_limit || 5))));
+  if (classSummary.sample_targets.length < sampleLimit) {
+    classSummary.sample_targets.push(createEmptyNoJobsClassificationSample(row));
+  }
 }
 
 function classifyEmptyNoJobsTarget(row = {}, recentErrors = {}, reason = "", options = {}) {
@@ -1703,9 +1741,10 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.targetPressureLimit || options.limit || 25))));
   const staleDays = Math.max(1, Math.min(365, Math.floor(Number(options.emptyNoJobsStaleDays || 7))));
+  const emptyNoJobsSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(options.emptyNoJobsSampleLimit || 5))));
   const bySource = {};
   const topTargets = [];
-  const emptyNoJobsClassification = createEmptyNoJobsClassificationSummary(staleDays);
+  const emptyNoJobsClassification = createEmptyNoJobsClassificationSummary(staleDays, emptyNoJobsSampleLimit);
   let failurePressure = 0;
   let recentErrorCount = 0;
 
@@ -1726,7 +1765,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
         target_count: 0,
         failure_pressure: 0,
         recent_error_count: 0,
-        empty_no_jobs_classification: createEmptyNoJobsClassificationSummary(staleDays),
+        empty_no_jobs_classification: createEmptyNoJobsClassificationSummary(staleDays, emptyNoJobsSampleLimit),
         by_reason: {}
       };
     }
@@ -1740,8 +1779,17 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     const emptyNoJobsClass = classifyEmptyNoJobsTarget(row, recentErrors, reason, options);
     if (emptyNoJobsClass) {
       const classificationRow = {
+        ats_key: atsKey,
+        company_url: companyUrl,
+        company_name: String(row?.company_name || ""),
+        protection_status: String(row?.protection_status || "normal") || "normal",
+        company_created_at_epoch: Number(row?.company_created_at_epoch || 0),
+        last_success_epoch: Number(row?.last_success_epoch || 0),
+        last_failure_epoch: Number(row?.last_failure_epoch || 0),
         consecutive_failures: consecutiveFailures,
-        recent_error_count: rowRecentErrorCount
+        recent_error_count: rowRecentErrorCount,
+        last_http_status: row?.last_http_status,
+        last_error: String(row?.last_error || "")
       };
       addEmptyNoJobsClassification(emptyNoJobsClassification, emptyNoJobsClass, classificationRow);
       addEmptyNoJobsClassification(bySource[atsKey].empty_no_jobs_classification, emptyNoJobsClass, classificationRow);

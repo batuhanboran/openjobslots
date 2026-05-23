@@ -412,7 +412,7 @@ test("summarizeTargetFailurePressureRows classifies empty/no-jobs targets by pri
         { error_type: "parser_drift", error_message: "shape drift", count: 1 }
       ]
     }
-  ], { nowEpoch, emptyNoJobsStaleDays: 7 });
+  ], { nowEpoch, emptyNoJobsStaleDays: 7, emptyNoJobsSampleLimit: 1 });
 
   assert.equal(summary.empty_no_jobs_classification.total_targets, 3);
   assert.equal(summary.empty_no_jobs_classification.by_class.real_empty_after_prior_success.target_count, 1);
@@ -423,6 +423,18 @@ test("summarizeTargetFailurePressureRows classifies empty/no-jobs targets by pri
   assert.equal(summary.by_source.breezy.empty_no_jobs_classification.by_class.new_never_success_empty.target_count, 1);
   assert.equal(summary.top_targets[0].empty_no_jobs_class, "real_empty_after_prior_success");
   assert.equal(summary.top_targets[1].empty_no_jobs_class, "stale_never_success_empty");
+
+  const staleClass = summary.empty_no_jobs_classification.by_class.stale_never_success_empty;
+  assert.equal(staleClass.sample_targets.length, 1);
+  assert.equal(staleClass.sample_targets[0].ats_key, "breezy");
+  assert.equal(staleClass.sample_targets[0].company_url, "https://stale-empty.breezy.hr");
+  assert.equal(staleClass.sample_targets[0].company_name, "Stale Empty");
+  assert.equal(staleClass.sample_targets[0].last_success_at, "");
+  assert.ok(staleClass.next_action.includes("explicit approval"));
+
+  const breezyStaleClass = summary.by_source.breezy.empty_no_jobs_classification.by_class.stale_never_success_empty;
+  assert.equal(breezyStaleClass.sample_targets.length, 1);
+  assert.equal(breezyStaleClass.sample_targets[0].company_url, "https://stale-empty.breezy.hr");
 });
 
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {
