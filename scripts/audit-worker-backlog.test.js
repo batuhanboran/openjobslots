@@ -58,7 +58,8 @@ test("buildRecentErrorsQuery groups http status for failure taxonomy", () => {
 
   assert.deepEqual(query.values, [48, ["applytojob", "breezy"]]);
   assert.match(query.sql, /http_status/i);
-  assert.match(query.sql, /GROUP BY ats_key, error_type, http_status/i);
+  assert.match(query.sql, /error_message/i);
+  assert.match(query.sql, /GROUP BY ats_key, error_type, http_status, error_message/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -108,7 +109,8 @@ test("buildLatestRunFailureReasonsQuery groups only the latest run by source", (
   assert.match(query.sql, /WITH latest AS/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
   assert.match(query.sql, /e\.run_id = l\.id/i);
-  assert.match(query.sql, /GROUP BY e\.ats_key, e\.error_type, COALESCE\(e\.http_status, 0\)/i);
+  assert.match(query.sql, /error_message/i);
+  assert.match(query.sql, /GROUP BY e\.ats_key, e\.error_type, COALESCE\(e\.http_status, 0\), e\.error_message/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -555,6 +557,8 @@ test("attachBacklogDiagnostics maps raw worker errors into operator failure buck
       errorWindowHours: 24,
       recentErrorRows: [
         { ats_key: "applytojob", error_type: "parser_drift", count: 7 },
+        { ats_key: "applytojob", error_type: "parser_validation", error_message: "ambiguous_location", count: 5 },
+        { ats_key: "applytojob", error_type: "parser_validation", error_message: "no_geo_no_remote", count: 3 },
         { ats_key: "applytojob", error_type: "portal_search_empty", count: 2 },
         { ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 },
         { ats_key: "applytojob", error_type: "fetch", http_status: 0, count: 4 },
@@ -567,11 +571,13 @@ test("attachBacklogDiagnostics maps raw worker errors into operator failure buck
 
   const applytojob = withDiagnostics.items.find((item) => item.ats_key === "applytojob");
   assert.equal(applytojob.recent_errors.parser_bug_count, 7);
+  assert.equal(applytojob.recent_errors.source_quality_count, 8);
   assert.equal(applytojob.recent_errors.rate_limit_count, 3);
   assert.equal(applytojob.recent_errors.network_count, 4);
   assert.equal(applytojob.recent_errors.empty_no_jobs_count, 2);
   assert.deepEqual(applytojob.recent_errors.by_reason, {
     parser_bug: 7,
+    source_quality: 8,
     empty_no_jobs: 2,
     rate_limit: 3,
     network: 4
@@ -582,7 +588,7 @@ test("attachBacklogDiagnostics maps raw worker errors into operator failure buck
   assert.equal(breezy.recent_errors.empty_no_jobs_count, 5);
 
   assert.equal(withDiagnostics.diagnostics.failure_reason_counts.parser_bug, 7);
-  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.source_quality, 8);
+  assert.equal(withDiagnostics.diagnostics.failure_reason_counts.source_quality, 16);
   assert.equal(withDiagnostics.diagnostics.failure_reason_counts.rate_limit, 4);
   assert.equal(withDiagnostics.diagnostics.failure_reason_counts.network, 4);
   assert.equal(withDiagnostics.diagnostics.failure_reason_counts.empty_no_jobs, 7);

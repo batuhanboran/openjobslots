@@ -199,10 +199,19 @@ function normalizeHttpStatus(value) {
   return Math.floor(status);
 }
 
-function classifyFailureReason(errorType, httpStatus = 0) {
+function isSourceQualityValidationMessage(message) {
+  const text = String(message || "").trim().toLowerCase();
+  return text.includes("no_geo_no_remote") ||
+    text.includes("ambiguous_location") ||
+    text.includes("weak_remote_evidence") ||
+    text.includes("no_normalized_geo_or_explicit_remote");
+}
+
+function classifyFailureReason(errorType, httpStatus = 0, errorMessage = "") {
   const type = String(errorType || "unknown").trim().toLowerCase() || "unknown";
   const status = normalizeHttpStatus(httpStatus);
   if (status === 429 || RATE_LIMIT_ERROR_TYPES.includes(type)) return "rate_limit";
+  if (type === "parser_validation" && isSourceQualityValidationMessage(errorMessage)) return "source_quality";
   if (isParserAttentionErrorType(type) || type.startsWith("parser_")) return "parser_bug";
   if (SOURCE_QUALITY_ERROR_TYPES.includes(type)) return "source_quality";
   if (EMPTY_NO_JOBS_ERROR_TYPES.includes(type)) return "empty_no_jobs";
@@ -283,6 +292,7 @@ function buildRecentErrorsQuery(options = {}) {
         ats_key,
         error_type,
         COALESCE(http_status, 0)::int AS http_status,
+        COALESCE(error_message, '') AS error_message,
         COUNT(*)::int AS count
       FROM ingestion_run_errors
       WHERE created_at >= now() - ($1::int * interval '1 hour')
@@ -290,8 +300,8 @@ function buildRecentErrorsQuery(options = {}) {
           cardinality($2::text[]) = 0
           OR ats_key = ANY($2::text[])
         )
-      GROUP BY ats_key, error_type, http_status
-      ORDER BY count DESC, ats_key ASC, error_type ASC, http_status ASC;
+      GROUP BY ats_key, error_type, http_status, error_message
+      ORDER BY count DESC, ats_key ASC, error_type ASC, http_status ASC, error_message ASC;
     `
   };
 }
@@ -387,6 +397,7 @@ function buildLatestRunFailureReasonsQuery(options = {}) {
         e.ats_key,
         e.error_type,
         COALESCE(e.http_status, 0)::int AS http_status,
+        COALESCE(e.error_message, '') AS error_message,
         COUNT(*)::int AS count
       FROM ingestion_run_errors e
       JOIN latest l
@@ -395,8 +406,8 @@ function buildLatestRunFailureReasonsQuery(options = {}) {
         cardinality($1::text[]) = 0
         OR e.ats_key = ANY($1::text[])
       )
-      GROUP BY e.ats_key, e.error_type, COALESCE(e.http_status, 0)
-      ORDER BY count DESC, e.ats_key ASC, e.error_type ASC, http_status ASC;
+      GROUP BY e.ats_key, e.error_type, COALESCE(e.http_status, 0), e.error_message
+      ORDER BY count DESC, e.ats_key ASC, e.error_type ASC, http_status ASC, error_message ASC;
     `
   };
 }
@@ -612,6 +623,7 @@ function summarizeRecentErrors(rows = []) {
   for (const row of Array.isArray(rows) ? rows : []) {
     const atsKey = String(row.ats_key || "").trim().toLowerCase();
     const errorType = String(row.error_type || "unknown").trim() || "unknown";
+    const errorMessage = String(row.error_message || "");
     const httpStatus = normalizeHttpStatus(row.http_status);
     const count = Number(row.count || 0);
     if (!atsKey || count <= 0) continue;
@@ -633,7 +645,7 @@ function summarizeRecentErrors(rows = []) {
       });
     }
     const current = byAts.get(atsKey);
-    const failureReason = classifyFailureReason(errorType, httpStatus);
+    const failureReason = classifyFailureReason(errorType, httpStatus, errorMessage);
     current.total_count += count;
     current.by_type[errorType] = (current.by_type[errorType] || 0) + count;
     current.by_reason[failureReason] = (current.by_reason[failureReason] || 0) + count;
