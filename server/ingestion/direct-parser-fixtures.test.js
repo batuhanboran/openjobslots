@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { adapters } = require("./adapters");
 const { normalizeCountryFromAtsCodeLocation, validatePosting } = require("./posting");
+const { evaluatePublicPosting } = require("./publicPostingGate");
 const {
   buildApplitrackDetailUrl,
   extractApplitrackDetailFields,
@@ -700,6 +701,49 @@ test("careerplug raw fixture parses valid jobs and rejects placeholder or missin
   const missingCompany = adapter.normalize(missingCompanyParsed, { company_name: "" });
   assert.equal(validatePosting(missingCompany).ok, false);
   assert.equal(validatePosting(missingCompany).error, "missing company_name");
+});
+
+test("careerplug parser reads sibling location cells from public jobs rows", () => {
+  const adapter = adapters.get("careerplug");
+  const parsed = parseCareerplugPostingsFromHtml(
+    "Fixture CareerPlug",
+    { baseOrigin: "https://fixture.careerplug.com" },
+    `
+      <div id="job_table">
+        <div class="row header-row column-titles">
+          <div class="job-title col-md-7">Job Title</div>
+          <div class="job-location col-md-3">Location</div>
+          <div class="job-type col-md-2">Full / Part Time</div>
+        </div>
+        <div>
+          <div class="row">
+            <div class="job-title col-md-7">
+              <a aria-label="Full Time Home Infusion RN in Brooklyn, NY" href="/jobs/746847">
+                <span class="name">Full Time Home Infusion RN</span>
+              </a>
+            </div>
+            <div class="job-location col-md-3">NY-Brooklyn-11226</div>
+            <div class="job-type col-md-2">Full Time</div>
+          </div>
+        </div>
+      </div>
+    `
+  );
+
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].position_name, "Full Time Home Infusion RN");
+  assert.equal(parsed[0].location, "NY-Brooklyn-11226");
+  assert.equal(parsed[0].employment_type, "Full Time");
+
+  const normalized = adapter.normalize(parsed[0], {
+    company_name: "Fixture CareerPlug",
+    ATS_name: "careerplug",
+    url_string: "https://fixture.careerplug.com/jobs"
+  });
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.region, "North America");
+  assert.equal(normalized.location_text, "NY-Brooklyn-11226");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: adapter.parserVersion }).status, "accepted");
 });
 
 test("implemented HTML/API parsers preserve source ids from source payloads and URLs", () => {

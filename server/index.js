@@ -5225,6 +5225,46 @@ function normalizeCareerplugAriaTitle(value) {
   return /^(view|open|apply|job|jobs|position|role|details)$/i.test(cleaned) ? "" : cleaned;
 }
 
+function extractCareerplugDivBlock(source, startIndex) {
+  const html = String(source || "");
+  const start = Number(startIndex || 0);
+  const opening = html.slice(start).match(/^<div\b[^>]*>/i);
+  if (!opening) return "";
+  const tagPattern = /<\/?div\b[^>]*>/gi;
+  tagPattern.lastIndex = start;
+  let depth = 0;
+  let tagMatch = tagPattern.exec(html);
+  while (tagMatch) {
+    if (/^<div\b/i.test(tagMatch[0])) depth += 1;
+    else depth -= 1;
+    if (depth === 0) return html.slice(start, tagPattern.lastIndex);
+    tagMatch = tagPattern.exec(html);
+  }
+  return html.slice(start);
+}
+
+function extractCareerplugRowHtml(source, anchorIndex) {
+  const html = String(source || "");
+  const beforeAnchor = html.slice(0, Math.max(0, Number(anchorIndex || 0)));
+  const rowPattern = /<div\b[^>]*class=["'][^"']*\brow\b[^"']*["'][^>]*>/gi;
+  let rowMatch = rowPattern.exec(beforeAnchor);
+  let latest = null;
+  while (rowMatch) {
+    latest = rowMatch;
+    rowMatch = rowPattern.exec(beforeAnchor);
+  }
+  if (!latest) return "";
+  const rowHtml = extractCareerplugDivBlock(html, latest.index);
+  return rowHtml && rowHtml.includes("/jobs/") ? rowHtml : "";
+}
+
+function extractCareerplugTitleFromHtml(titleHtml, anchorAttrs) {
+  const source = String(titleHtml || "");
+  const nameMatch = source.match(/<span[^>]*class=["'][^"']*\bname\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
+  return cleanCareerplugText(nameMatch?.[1] || source)
+    || normalizeCareerplugAriaTitle(String(anchorAttrs || "").match(/\baria-label=["']([^"']*)["']/i)?.[1] || "");
+}
+
 function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
@@ -5232,7 +5272,6 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
 
   const rowPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
   const hrefPattern = /\bhref=["'](\/jobs\/\d+[^"']*)["']/i;
-  const ariaPattern = /\baria-label=["']([^"']*)["']/i;
   const titlePattern = /<div[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
   const locationPattern = /<div[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
   const typePattern = /<div[^>]*class=["'][^"']*\bjob-type\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
@@ -5242,7 +5281,8 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
     const attrs = String(rowMatch[1] || "");
     const href = String(attrs.match(hrefPattern)?.[1] || "").trim();
     const rowBody = String(rowMatch[2] || "");
-    if (!href && !titlePattern.test(rowBody)) {
+    const rowHtml = extractCareerplugRowHtml(source, rowMatch.index) || rowMatch[0] || rowBody;
+    if (!href && !titlePattern.test(rowHtml)) {
       rowMatch = rowPattern.exec(source);
       continue;
     }
@@ -5252,10 +5292,9 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
       continue;
     }
 
-    const title = cleanCareerplugText(rowBody.match(titlePattern)?.[1] || "")
-      || normalizeCareerplugAriaTitle(attrs.match(ariaPattern)?.[1] || "");
-    const location = normalizeCareerplugMeta(rowBody.match(locationPattern)?.[1] || "");
-    const jobType = normalizeCareerplugMeta(rowBody.match(typePattern)?.[1] || "");
+    const title = extractCareerplugTitleFromHtml(rowHtml.match(titlePattern)?.[1] || "", attrs);
+    const location = normalizeCareerplugMeta(rowHtml.match(locationPattern)?.[1] || "");
+    const jobType = normalizeCareerplugMeta(rowHtml.match(typePattern)?.[1] || "");
 
     postings.push({
       company_name: companyNameForPostings,
