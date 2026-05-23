@@ -154,6 +154,76 @@ const {
   parseWorkdayPostingsFromApi
 } = require("./ingestion/sources/workday/parse");
 const { parseZohoPostingsFromHtml } = require("./ingestion/sources/zoho/parse");
+const { parseTeamtailorPostingsFromHtml } = require("./ingestion/sources/teamtailor/parse");
+const { parseFreshteamPostingsFromHtml } = require("./ingestion/sources/freshteam/parse");
+const {
+  extractSagehrCompanyNameFromHtml,
+  parseSagehrPostingsFromHtml
+} = require("./ingestion/sources/sagehr/parse");
+const { parsePeopleforcePostingsFromHtml } = require("./ingestion/sources/peopleforce/parse");
+const { parseSimplicantPostingsFromHtml } = require("./ingestion/sources/simplicant/parse");
+const { parseLoxoPostingsFromHtml } = require("./ingestion/sources/loxo/parse");
+const { parseCareerspagePostingsFromHtml } = require("./ingestion/sources/careerspage/parse");
+const {
+  extractApplicantProDomainId,
+  parseApplicantProPostingsFromApi
+} = require("./ingestion/sources/applicantpro/parse");
+const {
+  buildEightfoldApiUrl,
+  extractEightfoldDomainFromHtml,
+  parseEightfoldPostingsFromApi
+} = require("./ingestion/sources/eightfold/parse");
+const { parseCareerpuckPostingsFromApi } = require("./ingestion/sources/careerpuck/parse");
+const { parseRipplingPostingsFromApi } = require("./ingestion/sources/rippling/parse");
+const { parseTalexioPostingsFromApi } = require("./ingestion/sources/talexio/parse");
+const { parseGemPostingsFromBatchResponse } = require("./ingestion/sources/gem/parse");
+const { parseJobApsPostingsFromHtml } = require("./ingestion/sources/jobaps/parse");
+const {
+  extractJoinNextDataJsonFromHtml,
+  parseJoinPostingsFromNextData
+} = require("./ingestion/sources/join/parse");
+const { parseGetroPostingsFromHtml } = require("./ingestion/sources/getro/parse");
+const {
+  extractTalentlyftInitialConfig,
+  extractTalentlyftTotalPages,
+  parseTalentlyftPostingsFromFragment
+} = require("./ingestion/sources/talentlyft/parse");
+const { parseTheApplicantManagerPostingsFromHtml } = require("./ingestion/sources/theapplicantmanager/parse");
+const { parseApplicantAiPostingsFromHtml } = require("./ingestion/sources/applicantai/parse");
+const { parseHibobPostingsFromApi } = require("./ingestion/sources/hibob/parse");
+const {
+  extractIsolvisolvedhireDomainId,
+  parseIsolvisolvedhirePostingsFromApi
+} = require("./ingestion/sources/isolvisolvedhire/parse");
+const {
+  extractGovernmentJobsLastPage,
+  extractGovernmentJobsViewHtmlFromResponse,
+  parseGovernmentJobsPostingsFromViewHtml
+} = require("./ingestion/sources/governmentjobs/parse");
+const {
+  normalizePoliceappJobUrl,
+  parsePoliceappPostingsFromHtml
+} = require("./ingestion/sources/policeapp/parse");
+const {
+  parseUsajobsOfficialSearchPayload,
+  parseUsajobsPostingsFromPayload
+} = require("./ingestion/sources/usajobs/parse");
+const { parseK12jobspotPostingsFromPayload } = require("./ingestion/sources/k12jobspot/parse");
+const { parseSchoolspringPostingsFromPayload } = require("./ingestion/sources/schoolspring/parse");
+const {
+  buildCalcareersPostPayload,
+  extractCalcareersHiddenInputs,
+  extractCalcareersPagerTargets,
+  parseCalcareersPostingsFromHtml
+} = require("./ingestion/sources/calcareers/parse");
+const {
+  extractCaloppsNextPageUrl,
+  parseCaloppsPostingsFromHtml
+} = require("./ingestion/sources/calopps/parse");
+const {
+  buildStatejobsnyWindowUrl,
+  parseStatejobsnyPostingsFromHtml
+} = require("./ingestion/sources/statejobsny/parse");
 
 const PORT = Number(process.env.PORT || 8787);
 const NODE_ENV = String(process.env.NODE_ENV || "development").trim().toLowerCase();
@@ -4672,28 +4742,6 @@ function extractTaleoRestConfig(pageHtml) {
 
   return { portal, tokenName, tokenValue };
 }
-
-function extractApplicantProDomainId(pageHtml) {
-  const source = String(pageHtml || "");
-  const patterns = [
-    /["']domain_id["']\s*:\s*["']?(\d{2,})["']?/i,
-    /["']domainId["']\s*:\s*["']?(\d{2,})["']?/i,
-    /data-domain-id=["'](\d{2,})["']/i,
-    /name=["']domain_id["'][^>]*value=["'](\d{2,})["']/i,
-    /name=["']domainId["'][^>]*value=["'](\d{2,})["']/i,
-    /domain_id\s*=\s*["']?(\d{2,})["']?/i,
-    /domainId\s*=\s*["']?(\d{2,})["']?/i
-  ];
-
-  for (const pattern of patterns) {
-    const match = source.match(pattern);
-    const value = String(match?.[1] || "").trim();
-    if (value) return value;
-  }
-
-  return "";
-}
-
 function buildTaleoRestPayload(pageNo = 1) {
   return {
     multilineEnabled: true,
@@ -4754,1239 +4802,6 @@ function buildTaleoAjaxPayload(lang = "en", csrfToken = "") {
   }
 
   return payload;
-}
-
-function cleanTeamtailorText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractTeamtailorMetaParts(value) {
-  const source = String(value || "");
-  const parts = [];
-  const seen = new Set();
-  const spanPattern = /<span[^>]*>([\s\S]*?)<\/span>/gi;
-  let spanMatch = spanPattern.exec(source);
-
-  while (spanMatch) {
-    const cleaned = cleanTeamtailorText(spanMatch[1] || "");
-    const normalized = cleaned.toLowerCase();
-    if (cleaned && cleaned !== "·" && cleaned !== "&middot;" && !seen.has(normalized)) {
-      parts.push(cleaned);
-      seen.add(normalized);
-    }
-    spanMatch = spanPattern.exec(source);
-  }
-
-  return parts;
-}
-
-function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-  const itemPattern =
-    /<li[^>]*class=["'][^"']*\bblock-grid-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
-  const hrefPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>/i;
-  const titleAttrPattern =
-    /<span[^>]*class=["'][^"']*\btext-block-base-link\b[^"']*["'][^>]*\btitle=["']([^"']+)["'][^>]*>/i;
-  const titleBodyPattern =
-    /<span[^>]*class=["'][^"']*\btext-block-base-link\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i;
-  const metaPattern =
-    /<div[^>]*class=["'][^"']*\bmt-1\b[^"']*\btext-md\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-
-  let itemMatch = itemPattern.exec(source);
-  while (itemMatch) {
-    const itemHtml = String(itemMatch[1] || "");
-    const hrefMatch = itemHtml.match(hrefPattern);
-    const href = String(hrefMatch?.[1] || "").trim();
-    const jobUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
-    if (!jobUrl || seenUrls.has(jobUrl)) {
-      itemMatch = itemPattern.exec(source);
-      continue;
-    }
-
-    const titleFromAttr = cleanTeamtailorText(itemHtml.match(titleAttrPattern)?.[1] || "");
-    const titleFromBody = cleanTeamtailorText(itemHtml.match(titleBodyPattern)?.[1] || "");
-    const title = titleFromAttr || titleFromBody || "Untitled Position";
-
-    const metaRaw = String(itemHtml.match(metaPattern)?.[1] || "");
-    const metaParts = extractTeamtailorMetaParts(metaRaw);
-    const department = metaParts.length > 1 ? metaParts[0] : null;
-    const location = metaParts.length > 1 ? metaParts.slice(1).join(" / ") : metaParts[0] || null;
-
-    postings.push({
-      company_name: companyNameForPostings,
-      source_job_id: extractSourceIdFromPostingUrl(jobUrl, "teamtailor"),
-      position_name: title,
-      job_posting_url: jobUrl,
-      posting_date: null,
-      location,
-      department
-    });
-    seenUrls.add(jobUrl);
-    itemMatch = itemPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanFreshteamText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const cardPattern =
-    /<a[^>]*href=["'](\/jobs\/[^"'#?]+(?:\/[^"'#?]+)?)["'][^>]*class=["'][^"']*\bheading\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
-  const titlePattern = /<div[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-  const locationInfoPattern = /<div[^>]*class=["'][^"']*\blocation-info\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-  const locationAttrPattern = /\bdata-portal-location=["']([^"']*)["']/i;
-  const remoteAttrPattern = /\bdata-portal-remote-location=(true|false)\b/i;
-
-  let cardMatch = cardPattern.exec(source);
-  while (cardMatch) {
-    const href = String(cardMatch[1] || "").trim();
-    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      cardMatch = cardPattern.exec(source);
-      continue;
-    }
-
-    const cardHtml = String(cardMatch[0] || "");
-    const bodyHtml = String(cardMatch[2] || "");
-    const title = cleanFreshteamText(bodyHtml.match(titlePattern)?.[1] || "") || "Untitled Position";
-    const location = cleanFreshteamText(cardHtml.match(locationAttrPattern)?.[1] || "");
-    const locationInfo = cleanFreshteamText(bodyHtml.match(locationInfoPattern)?.[1] || "");
-    const isRemoteRaw = String(cardHtml.match(remoteAttrPattern)?.[1] || "").trim().toLowerCase();
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: location || locationInfo || null,
-      location_info: locationInfo || null,
-      is_remote: isRemoteRaw === "true" ? 1 : 0
-    });
-
-    seenUrls.add(absoluteUrl);
-    cardMatch = cardPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanSagehrText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractSagehrCompanyNameFromHtml(pageHtml) {
-  const source = String(pageHtml || "");
-  const companyMatch = source.match(
-    /<div[^>]*class=['"][^'"]*\btitle-wrap\b[^'"]*['"][^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i
-  );
-  const fromTitleWrap = cleanSagehrText(companyMatch?.[1] || "");
-  if (fromTitleWrap) return fromTitleWrap;
-
-  const fallbackMatch = source.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const fallback = cleanSagehrText(fallbackMatch?.[1] || "");
-  return fallback || "Unknown Company";
-}
-
-function parseSagehrPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const jobPattern = /<div[^>]*class=['"][^'"]*\bjob\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/gi;
-  const linkPattern =
-    /<a[^>]*class=['"][^'"]*\btitle\b[^'"]*['"][^>]*href=['"]([^"']+)['"][^>]*>([\s\S]*?)<\/a>/i;
-  const locationPattern = /<div[^>]*class=['"][^'"]*\blocation\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/i;
-
-  let jobMatch = jobPattern.exec(source);
-  while (jobMatch) {
-    const jobHtml = String(jobMatch[1] || "");
-    const linkMatch = jobHtml.match(linkPattern);
-    const hrefRaw = cleanSagehrText(linkMatch?.[1] || "");
-    const href = decodeHtmlEntities(hrefRaw).replace(/\s+/g, "");
-    if (!href || !href.toLowerCase().includes("/jobs/")) {
-      jobMatch = jobPattern.exec(source);
-      continue;
-    }
-
-    let absoluteUrl = "";
-    try {
-      absoluteUrl = new URL(href, `${config.baseOrigin || ""}/`).toString();
-    } catch {
-      jobMatch = jobPattern.exec(source);
-      continue;
-    }
-
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      jobMatch = jobPattern.exec(source);
-      continue;
-    }
-
-    const title = cleanSagehrText(linkMatch?.[2] || "") || "Untitled Position";
-    const location = cleanSagehrText(jobHtml.match(locationPattern)?.[1] || "");
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: location || null
-    });
-    seenUrls.add(absoluteUrl);
-    jobMatch = jobPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanPeopleforceText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parsePeopleforcePostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const postingPattern =
-    /<a[^>]*class=["'][^"']*\bstretched-link\b[^"']*["'][^>]*href=["'](\/careers\/v\/[^"'#?]+)["'][^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class=["'][^"']*\bstretched-link\b|$)/gi;
-  const locationPattern =
-    /<div[^>]*class=["'][^"']*\btw-text-neutral-dark-80\b[^"']*\bsmall\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-
-  let postingMatch = postingPattern.exec(source);
-  while (postingMatch) {
-    const href = String(postingMatch[1] || "").trim();
-    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      postingMatch = postingPattern.exec(source);
-      continue;
-    }
-
-    const title = cleanPeopleforceText(postingMatch[2] || "") || "Untitled Position";
-    const locationRaw = String(postingMatch[3] || "");
-    const location = cleanPeopleforceText(locationRaw.match(locationPattern)?.[1] || "");
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: location || null
-    });
-
-    seenUrls.add(absoluteUrl);
-    postingMatch = postingPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanSimplicantText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseSimplicantPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const cardPattern =
-    /<a[^>]*class=["'][^"']*\blist-group-item\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  const titlePattern = /<h3[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h3>/i;
-  const locationPattern = /<div[^>]*class=["'][^"']*\bjob-subtitle\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-
-  let match = cardPattern.exec(source);
-  while (match) {
-    const href = cleanSimplicantText(match[1] || "");
-    if (!href || !href.includes("/jobs/") || !href.replace(/\/+$/, "").toLowerCase().endsWith("/detail")) {
-      match = cardPattern.exec(source);
-      continue;
-    }
-
-    const absoluteUrl = new URL(href, `${config.baseOrigin || ""}/`).toString();
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      match = cardPattern.exec(source);
-      continue;
-    }
-
-    const bodyHtml = String(match[2] || "");
-    const title = cleanSimplicantText(bodyHtml.match(titlePattern)?.[1] || "") || "Untitled Position";
-    const location = cleanSimplicantText(bodyHtml.match(locationPattern)?.[1] || "");
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: location || null
-    });
-
-    seenUrls.add(absoluteUrl);
-    match = cardPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanLoxoText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseLoxoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const cardPattern =
-    /<div[^>]*class=['"][^'"]*\bjobs-listing-card\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<div[^>]*class=['"][^'"]*\bdata-cell\b[^'"]*['"][^>]*>[\s\S]*?<div[^>]*class=['"][^'"]*\bjob-location\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/gi;
-  const hrefPattern = /<a[^>]*class=['"][^'"]*\bjob-title\b[^'"]*['"][^>]*href=['"]([^"']+)['"][^>]*>([\s\S]*?)<\/a>/i;
-  const datePattern = /<div[^>]*class=['"][^'"]*\bjob-date\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>/i;
-
-  let match = cardPattern.exec(source);
-  while (match) {
-    const cardHtml = String(match[1] || "");
-    const locationHtml = String(match[2] || "");
-    const hrefMatch = cardHtml.match(hrefPattern);
-    const href = String(hrefMatch?.[1] || "").trim();
-    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      match = cardPattern.exec(source);
-      continue;
-    }
-
-    const title = cleanLoxoText(hrefMatch?.[2] || "") || "Untitled Position";
-    const postingDate = cleanLoxoText(cardHtml.match(datePattern)?.[1] || "");
-    const location = cleanLoxoText(locationHtml).replace(/\blocation_on\b/gi, "").trim();
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: postingDate || null,
-      location: location || null
-    });
-
-    seenUrls.add(absoluteUrl);
-    match = cardPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanCareerspageText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseCareerspagePostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const jobItemPattern = /<div[^>]*class=['"][^'"]*\bjob-item\b[^'"]*['"][^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
-  let itemMatch = jobItemPattern.exec(source);
-
-  while (itemMatch) {
-    const itemHtml = String(itemMatch[1] || "");
-    const hrefRaw = String(
-      itemHtml.match(/href=['"](https?:\/\/careerspage\.io\/[^'"?#]+\/[^'"?#]+)['"]/i)?.[1] || ""
-    ).trim();
-    if (!hrefRaw) {
-      itemMatch = jobItemPattern.exec(source);
-      continue;
-    }
-
-    const title = cleanCareerspageText(itemHtml.match(/<h3[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/h3>/i)?.[1] || "");
-    if (!title) {
-      itemMatch = jobItemPattern.exec(source);
-      continue;
-    }
-
-    let jobUrl = "";
-    try {
-      jobUrl = new URL(hrefRaw, `${String(config?.boardUrl || "").replace(/\/+$/, "")}/`).toString();
-    } catch {
-      itemMatch = jobItemPattern.exec(source);
-      continue;
-    }
-    if (!jobUrl || seenUrls.has(jobUrl)) {
-      itemMatch = jobItemPattern.exec(source);
-      continue;
-    }
-
-    const location = cleanCareerspageText(
-      itemHtml.match(/fa-location-arrow[^<]*<\/i>\s*<\/span>\s*<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] || ""
-    );
-    const employmentType = cleanCareerspageText(
-      itemHtml.match(/fa-business-time[^<]*<\/i>\s*<\/span>\s*<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] || ""
-    );
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title || "Untitled Position",
-      job_posting_url: jobUrl,
-      posting_date: null,
-      location: location || null,
-      employment_type: employmentType || null
-    });
-    seenUrls.add(jobUrl);
-    itemMatch = jobItemPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanEightfoldText(value) {
-  return decodeHtmlEntities(String(value || ""))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractEightfoldDomainFromHtml(pageHtml) {
-  const source = String(pageHtml || "");
-  const match = source.match(/window\._EF_GROUP_ID\s*=\s*["']([^"']+)["']/i);
-  const value = cleanEightfoldText(match?.[1] || "");
-  return value || "";
-}
-
-function buildEightfoldApiUrl(config, domainValue) {
-  const siteBaseUrl = String(config?.siteBaseUrl || "").replace(/\/+$/, "");
-  const domain = cleanEightfoldText(domainValue || "");
-  if (!siteBaseUrl || !domain) return "";
-  return `${siteBaseUrl}/api/pcsx/search?domain=${encodeURIComponent(domain)}&query=&location=&start=0&`;
-}
-
-function parseEightfoldPostingsFromApi(companyNameForPostings, config, responseJson) {
-  const data = responseJson?.data && typeof responseJson.data === "object" ? responseJson.data : {};
-  const positions = Array.isArray(data?.positions) ? data.positions : [];
-  const postings = [];
-  const seenIds = new Set();
-  const seenUrls = new Set();
-
-  const fallbackCompanyKey =
-    String(config?.host || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "board";
-  const effectiveCompanyName = cleanEightfoldText(companyNameForPostings) || `eightfold_${fallbackCompanyKey}`;
-
-  for (const position of positions) {
-    if (!position || typeof position !== "object") continue;
-
-    const positionId = cleanEightfoldText(position?.id || "");
-    const normalizedPositionId = positionId.toLowerCase();
-    if (!positionId || seenIds.has(normalizedPositionId)) continue;
-
-    const rawPositionUrl = cleanEightfoldText(position?.positionUrl || "");
-    let postingUrl = "";
-    if (rawPositionUrl) {
-      try {
-        postingUrl = new URL(rawPositionUrl, `${String(config?.siteBaseUrl || "").replace(/\/+$/, "")}/`).toString();
-      } catch {
-        postingUrl = "";
-      }
-    }
-    if (!postingUrl || seenUrls.has(postingUrl)) continue;
-
-    const locations = Array.isArray(position?.locations)
-      ? position.locations.map((item) => cleanEightfoldText(item || "")).filter(Boolean)
-      : [];
-    const fallbackLocation = cleanEightfoldText(position?.locations || "");
-    const workLocationOption = cleanEightfoldText(position?.workLocationOption || "");
-    let location = locations.length > 0 ? locations.join(", ") : fallbackLocation;
-    if (!location && /remote/i.test(workLocationOption)) {
-      location = "Remote";
-    }
-
-    const rawPostedTs = position?.postedTs;
-    let postingDate = "";
-    if (Number.isFinite(Number(rawPostedTs)) && Number(rawPostedTs) > 0) {
-      postingDate = String(Math.floor(Number(rawPostedTs)));
-    } else {
-      postingDate = cleanEightfoldText(rawPostedTs || "");
-    }
-
-    const department = Array.isArray(position?.department)
-      ? position.department.map((item) => cleanEightfoldText(item || "")).filter(Boolean).join(" / ")
-      : cleanEightfoldText(position?.department || "");
-    const externalId = cleanEightfoldText(position?.atsJobId || "");
-
-    postings.push({
-      company_name: effectiveCompanyName,
-      position_name: cleanEightfoldText(position?.name || "") || "Untitled Position",
-      job_posting_url: postingUrl,
-      posting_date: postingDate || null,
-      location: location || null,
-      department: department || null,
-      employment_type: workLocationOption || null,
-      external_id: externalId || null
-    });
-    seenIds.add(normalizedPositionId);
-    seenUrls.add(postingUrl);
-  }
-
-  return postings;
-}
-
-function parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson) {
-  const jobs = Array.isArray(responseJson?.jobs) ? responseJson.jobs : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const job of jobs) {
-    const status = String(job?.status || "").trim().toLowerCase();
-    if (status && status !== "public") continue;
-
-    const publicUrl = String(job?.publicUrl || "").trim();
-    const applyUrl = String(job?.applyUrl || "").trim();
-    const jobUrl = publicUrl || applyUrl;
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-    const title = String(job?.title || "").trim() || "Untitled Position";
-    const location = String(job?.location || "").trim() || null;
-    const postingDate = String(job?.postedAt || "").trim() || null;
-    const departmentNames = Array.isArray(job?.departments)
-      ? job.departments
-          .map((item) => String(item?.name || "").trim())
-          .filter(Boolean)
-      : [];
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: jobUrl,
-      posting_date: postingDate,
-      location,
-      department: departmentNames.length > 0 ? departmentNames.join(" / ") : null
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return postings;
-}
-
-function formatRipplingLocation(locationsValue) {
-  const locations = Array.isArray(locationsValue) ? locationsValue : [];
-  const values = [];
-  const seen = new Set();
-
-  for (const location of locations) {
-    const item = location && typeof location === "object" ? location : {};
-    const name = String(item?.name || "").trim();
-    const city = String(item?.city || "").trim();
-    const state = String(item?.state || item?.stateCode || "").trim();
-    const country = String(item?.country || "").trim();
-    const fallback = [city, state, country].filter(Boolean).join(", ");
-    const label = name || fallback;
-    const normalized = label.toLowerCase();
-    if (!label || seen.has(normalized)) continue;
-    seen.add(normalized);
-    values.push(label);
-  }
-
-  return values.length > 0 ? values.join(" / ") : null;
-}
-
-function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJson) {
-  const items = Array.isArray(responseJson?.items) ? responseJson.items : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const row of items) {
-    const item = row && typeof row === "object" ? row : {};
-    const postingId = String(item?.id || "").trim();
-    const itemUrlRaw = String(item?.url || "").trim();
-    const jobUrl = itemUrlRaw || (postingId ? `${config.boardUrl}/${postingId}` : "");
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-    const postingDate =
-      String(item?.postedAt || item?.createdAt || item?.updatedAt || item?.publishedAt || "").trim() || null;
-    const department = String(item?.department?.name || "").trim() || null;
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: String(item?.name || "").trim() || "Untitled Position",
-      job_posting_url: jobUrl,
-      posting_date: postingDate,
-      location: formatRipplingLocation(item?.locations),
-      department,
-      employment_type: String(item?.employmentType || item?.employment_type || "").trim() || null,
-      workplace_type: String(item?.workplaceType || item?.workplace_type || "").trim() || null,
-      language: String(item?.language || "").trim() || null
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return postings;
-}
-
-function parseTalexioPostingsFromApi(companyNameForPostings, config, responseJson) {
-  const vacancies = Array.isArray(responseJson?.vacancies) ? responseJson.vacancies : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const vacancy of vacancies) {
-    const item = vacancy && typeof vacancy === "object" ? vacancy : {};
-    const vacancyId = String(item?.id || "").trim();
-    const itemUrlRaw = String(item?.url || item?.jobUrl || item?.vacancyUrl || item?.applyUrl || "").trim();
-    const itemUrl = itemUrlRaw
-      ? new URL(itemUrlRaw, `${config.baseOrigin || config.jobsUrl || ""}/`).toString()
-      : vacancyId
-        ? `${config.jobsUrl}?vacancyId=${encodeURIComponent(vacancyId)}`
-        : "";
-    if (!itemUrl || seenUrls.has(itemUrl)) continue;
-
-    const workLocation = String(item?.workLocation || "").trim();
-    const country = String(item?.country || "").trim();
-    const location = [workLocation, country].filter(Boolean).join(", ");
-    const postingDate = String(item?.publishDate || "").trim() || null;
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: String(item?.title || "").trim() || "Untitled Position",
-      job_posting_url: itemUrl,
-      posting_date: postingDate,
-      location: location || null,
-      reference: String(item?.reference || "").trim() || null,
-      department: String(item?.department || "").trim() || null,
-      employment_type: String(item?.jobType || "").trim() || null
-    });
-    seenUrls.add(itemUrl);
-  }
-
-  return postings;
-}
-
-function decodeBase64Utf8(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  try {
-    return Buffer.from(raw, "base64").toString("utf8");
-  } catch {
-    return "";
-  }
-}
-
-function extractGemNumericJobId(rawId) {
-  const direct = String(rawId || "").trim();
-  if (/^\d+$/.test(direct)) return direct;
-
-  const decoded = decodeBase64Utf8(direct);
-  const match = decoded.match(/:(\d{2,})$/);
-  return String(match?.[1] || "").trim();
-}
-
-function buildGemJobPostingUrl(config, posting) {
-  const boardUrl = String(config?.boardUrl || "").replace(/\/+$/, "");
-  const item = posting && typeof posting === "object" ? posting : {};
-  const numericId = extractGemNumericJobId(item?.id);
-  const extId = String(item?.extId || "").trim();
-  const fallbackId = String(item?.id || "").trim();
-  const identifier = numericId || extId || fallbackId;
-  if (!boardUrl || !identifier) return boardUrl || "";
-  return `${boardUrl}/${encodeURIComponent(identifier)}`;
-}
-
-function extractGemLocationLabel(posting) {
-  const item = posting && typeof posting === "object" ? posting : {};
-  const locations = Array.isArray(item?.locations) ? item.locations : [];
-  const values = [];
-  const seen = new Set();
-
-  for (const location of locations) {
-    const source = location && typeof location === "object" ? location : {};
-    const name = String(source?.name || "").trim();
-    const city = String(source?.city || "").trim();
-    const country = String(source?.isoCountry || "").trim();
-    const label = name || [city, country].filter(Boolean).join(", ");
-    const normalized = label.toLowerCase();
-    if (!label || seen.has(normalized)) continue;
-    seen.add(normalized);
-    values.push(label);
-  }
-
-  if (values.length > 0) return values.join(" / ");
-
-  const locationType = String(item?.job?.locationType || "").trim().toUpperCase();
-  if (locationType.includes("REMOTE")) return "Remote";
-  return null;
-}
-
-function parseGemPostingsFromBatchResponse(companyNameForPostings, config, responseJson) {
-  const payload = Array.isArray(responseJson) ? responseJson : [];
-  let jobPostings = [];
-  for (const item of payload) {
-    const data = item && typeof item === "object" ? item.data : null;
-    const external = data && typeof data === "object" ? data.oatsExternalJobPostings : null;
-    const postings = external && typeof external === "object" ? external.jobPostings : null;
-    if (!Array.isArray(postings)) continue;
-    jobPostings = postings;
-    break;
-  }
-
-  const collected = [];
-  const seenUrls = new Set();
-
-  for (const posting of jobPostings) {
-    const item = posting && typeof posting === "object" ? posting : {};
-    const postingUrl = buildGemJobPostingUrl(config, item);
-    if (!postingUrl || seenUrls.has(postingUrl)) continue;
-
-    const department = String(item?.job?.department?.name || "").trim();
-    collected.push({
-      company_name: companyNameForPostings,
-      position_name: String(item?.title || "").trim() || "Untitled Position",
-      job_posting_url: postingUrl,
-      posting_date: null,
-      location: extractGemLocationLabel(item),
-      department: department || null
-    });
-    seenUrls.add(postingUrl);
-  }
-
-  return collected;
-}
-
-function cleanJobApsText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .replace(/\s*,\s*/g, ", ")
-    .trim();
-}
-
-function parseJobApsPostingsFromHtml(companyNameForPostings, _config, pageHtml, baseUrl) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-  const ignoredTitles = new Set(["application-on-file", "application on-file", "application on file", "applicant profile"]);
-
-  const rowPattern = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
-  const titleLinkPattern =
-    /<a[^>]*href=['"]([^'"]+)['"][^>]*class=['"][^'"]*\bJobTitle\b[^'"]*['"][^>]*>([\s\S]*?)<\/a>/i;
-  const jobNumPattern =
-    /<a[^>]*href=['"]([^'"]+)['"][^>]*class=['"][^'"]*\bJobNum\b[^'"]*['"][^>]*>([\s\S]*?)<\/a>/i;
-  const locationPattern = /<td[^>]*class=['"][^'"]*\bLocs\b[^'"]*['"][^>]*>([\s\S]*?)<\/td>/i;
-  const departmentPattern = /<td[^>]*class=['"][^'"]*\bDept\b[^'"]*['"][^>]*>([\s\S]*?)<\/td>/i;
-  const salaryPattern = /<td[^>]*class=['"][^'"]*\bSalary\b[^'"]*['"][^>]*>([\s\S]*?)<\/td>/i;
-
-  let rowMatch = rowPattern.exec(source);
-  while (rowMatch) {
-    const rowHtml = String(rowMatch[1] || "");
-    const titleMatch = rowHtml.match(titleLinkPattern);
-    if (!titleMatch?.[1]) {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-
-    const href = decodeHtmlEntities(String(titleMatch[1] || "").trim());
-    const title = cleanJobApsText(titleMatch[2] || "") || "Untitled Position";
-    if (!href) {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-    if (href.toLowerCase().includes("r1=af")) {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-    if (ignoredTitles.has(title.toLowerCase())) {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-
-    const jobNumValue = cleanJobApsText(rowHtml.match(jobNumPattern)?.[2] || "");
-    if (!jobNumValue || jobNumValue.toLowerCase() === "update at any time") {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-
-    let absoluteUrl = "";
-    try {
-      absoluteUrl = new URL(href, String(baseUrl || "")).toString();
-    } catch {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      rowMatch = rowPattern.exec(source);
-      continue;
-    }
-
-    const location = cleanJobApsText(rowHtml.match(locationPattern)?.[1] || "");
-    const department = cleanJobApsText(rowHtml.match(departmentPattern)?.[1] || "");
-    const salary = cleanJobApsText(rowHtml.match(salaryPattern)?.[1] || "");
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: location || null,
-      department: department || null,
-      salary: salary || null,
-      external_id: jobNumValue || null
-    });
-    seenUrls.add(absoluteUrl);
-    rowMatch = rowPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function extractJoinNextDataJsonFromHtml(pageHtml) {
-  const source = String(pageHtml || "");
-  const match = source.match(
-    /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>\s*(\{[\s\S]*?\})\s*<\/script>/i
-  );
-  if (!match?.[1]) return {};
-  try {
-    return JSON.parse(String(match[1] || "").trim());
-  } catch {
-    return {};
-  }
-}
-
-function cleanJoinText(value) {
-  return decodeHtmlEntities(String(value || ""))
-    .replace(/\s+/g, " ")
-    .replace(/\s*,\s*/g, ", ")
-    .trim();
-}
-
-function buildJoinJobUrl(companySlug, idParam) {
-  const slug = cleanJoinText(companySlug);
-  const jobIdParam = cleanJoinText(idParam);
-  if (!slug || !jobIdParam) return "";
-  return `https://join.com/companies/${encodeURIComponent(slug)}/${encodeURIComponent(jobIdParam)}`;
-}
-
-function parseJoinPostingsFromNextData(companyNameForPostings, companySlug, nextData) {
-  const props = nextData && typeof nextData === "object" ? nextData.props : {};
-  const pageProps = props && typeof props === "object" ? props.pageProps : {};
-  const initialState = pageProps && typeof pageProps === "object" ? pageProps.initialState : {};
-  const jobsState = initialState && typeof initialState === "object" ? initialState.jobs : {};
-  const items = Array.isArray(jobsState?.items) ? jobsState.items : [];
-
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const job of items) {
-    const item = job && typeof job === "object" ? job : {};
-    const idParam = cleanJoinText(item?.idParam || "");
-    const postingUrl = buildJoinJobUrl(companySlug, idParam);
-    if (!postingUrl || seenUrls.has(postingUrl)) continue;
-
-    const city = item?.city && typeof item.city === "object" ? item.city : {};
-    const cityName = cleanJoinText(city?.cityName || "");
-    const countryName = cleanJoinText(city?.countryName || "");
-    const locationParts = [cityName, countryName].filter(Boolean);
-    let location = locationParts.join(", ");
-
-    const workplaceType = cleanJoinText(item?.workplaceType || "");
-    const remoteType = cleanJoinText(item?.remoteType || "");
-    if (!location && workplaceType.toUpperCase() === "REMOTE") {
-      location = "Remote";
-    } else if (!location && remoteType) {
-      location = remoteType;
-    }
-
-    const category = item?.category && typeof item.category === "object" ? item.category : {};
-    const employmentType = item?.employmentType && typeof item.employmentType === "object" ? item.employmentType : {};
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: cleanJoinText(item?.title || "") || "Untitled Position",
-      job_posting_url: postingUrl,
-      posting_date: cleanJoinText(item?.createdAt || "") || null,
-      location: location || null,
-      department: cleanJoinText(category?.name || "") || null,
-      employment_type: cleanJoinText(employmentType?.name || "") || null
-    });
-    seenUrls.add(postingUrl);
-  }
-
-  return postings;
-}
-
-function extractGetroNextDataJsonFromHtml(pageHtml) {
-  const source = String(pageHtml || "");
-  const match = source.match(
-    /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>\s*(\{[\s\S]*?\})\s*<\/script>/i
-  );
-  if (!match?.[1]) return {};
-  try {
-    return JSON.parse(String(match[1] || "").trim());
-  } catch {
-    return {};
-  }
-}
-
-function parseGetroPostingsFromHtml(companyNameForPostings, _config, pageHtml) {
-  const nextData = extractGetroNextDataJsonFromHtml(pageHtml);
-  const pageProps = nextData?.props?.pageProps && typeof nextData.props.pageProps === "object"
-    ? nextData.props.pageProps
-    : {};
-  const initialState = pageProps?.initialState && typeof pageProps.initialState === "object"
-    ? pageProps.initialState
-    : {};
-  const jobsState = initialState?.jobs && typeof initialState.jobs === "object"
-    ? initialState.jobs
-    : {};
-  const foundJobs = Array.isArray(jobsState?.found) ? jobsState.found : [];
-
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const job of foundJobs) {
-    const item = job && typeof job === "object" ? job : {};
-    const jobUrl = String(item?.url || "").trim();
-    if (!jobUrl || seenUrls.has(jobUrl)) continue;
-
-    const searchableLocations = Array.isArray(item?.searchableLocations) ? item.searchableLocations : [];
-    const locations = Array.isArray(item?.locations) ? item.locations : [];
-    const locationValue = String(searchableLocations[0] || locations[0] || "").trim();
-
-    const createdAtRaw = item?.createdAt;
-    let postingDate = null;
-    if (Number.isFinite(Number(createdAtRaw)) && Number(createdAtRaw) > 0) {
-      postingDate = String(Math.floor(Number(createdAtRaw)));
-    } else if (typeof createdAtRaw === "string" && createdAtRaw.trim()) {
-      postingDate = createdAtRaw.trim();
-    }
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: String(item?.title || "").trim() || "Untitled Position",
-      job_posting_url: jobUrl,
-      posting_date: postingDate,
-      location: locationValue || null
-    });
-    seenUrls.add(jobUrl);
-  }
-
-  return postings;
-}
-
-function cleanTalentlyftText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractTalentlyftInitialConfig(pageHtml, fallbackUrl) {
-  const source = String(pageHtml || "");
-  const parsed = parseUrl(fallbackUrl);
-  const websiteUrlDefault = parsed ? `${parsed.protocol}//${parsed.host}` : "";
-  const subdomainDefault = parsed ? String(parsed.hostname || "").split(".")[0] : "";
-
-  const pickFirst = (patterns) => {
-    for (const pattern of patterns) {
-      const match = source.match(pattern);
-      if (match?.[1]) return String(match[1]).trim();
-    }
-    return "";
-  };
-
-  const layoutId = pickFirst([/layoutId\s*:\s*['"]([^'"]+)['"]/i, /layoutId\s*=\s*['"]([^'"]+)['"]/i]) || "Jobs-1";
-  const themeId = pickFirst([/themeId\s*:\s*['"]([^'"]+)['"]/i, /themeId\s*=\s*['"]([^'"]+)['"]/i]) || "2";
-  const language = pickFirst([/language\s*:\s*['"]([^'"]+)['"]/i, /language\s*=\s*['"]([^'"]+)['"]/i]) || "en";
-  const subdomain =
-    pickFirst([/subdomain\s*:\s*['"]([^'"]+)['"]/i, /subdomain\s*=\s*['"]([^'"]+)['"]/i]) || subdomainDefault;
-  const websiteUrl =
-    pickFirst([/websiteUrl\s*:\s*['"]([^'"]+)['"]/i, /websiteUrl\s*=\s*['"]([^'"]+)['"]/i]) || websiteUrlDefault;
-
-  return {
-    layoutId,
-    themeId,
-    language,
-    subdomain,
-    websiteUrl,
-    apiUrl: websiteUrl ? `${websiteUrl}/JobList/` : ""
-  };
-}
-
-function extractTalentlyftTotalPages(fragmentHtml) {
-  const source = String(fragmentHtml || "");
-  const matches = Array.from(source.matchAll(/data-page=['"](\d+)['"]/gi));
-  const pages = matches
-    .map((match) => Number(match?.[1] || 0))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  return pages.length > 0 ? Math.max(...pages) : 1;
-}
-
-function parseTalentlyftPostingsFromFragment(companyNameForPostings, config, fragmentHtml) {
-  const source = String(fragmentHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-  const itemPattern =
-    /<a[^>]*class=['"][^'"]*\bjobs__box\b[^'"]*['"][^>]*>([\s\S]*?)<\/a>/gi;
-
-  let itemMatch = itemPattern.exec(source);
-  while (itemMatch) {
-    const blockHtml = String(itemMatch[0] || "");
-    const bodyHtml = String(itemMatch[1] || "");
-
-    const href = String(blockHtml.match(/\bhref=['"]([^'"]+)['"]/i)?.[1] || "").trim();
-    const absoluteUrl = href ? new URL(href, `${config.baseOrigin || ""}/`).toString() : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      itemMatch = itemPattern.exec(source);
-      continue;
-    }
-
-    const id =
-      String(blockHtml.match(/\bdata-job-id=['"](\d+)['"]/i)?.[1] || "").trim() ||
-      String(blockHtml.match(/\bid=['"](\d+)['"]/i)?.[1] || "").trim() ||
-      absoluteUrl;
-    const title = cleanTalentlyftText(bodyHtml.match(/<h3[^>]*class=['"][^'"]*\bjobs__box__heading\b[^'"]*['"][^>]*>([\s\S]*?)<\/h3>/i)?.[1] || "");
-    const location = cleanTalentlyftText(bodyHtml.match(/<p[^>]*class=['"][^'"]*\bjobs__box__text\b[^'"]*['"][^>]*>([\s\S]*?)<\/p>/i)?.[1] || "");
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title || "Untitled Position",
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: location || null
-    });
-    seenUrls.add(absoluteUrl);
-    itemMatch = itemPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanTheApplicantManagerText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseTheApplicantManagerPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-  let currentDepartment = "";
-
-  const paragraphPattern =
-    /<p[^>]*class=["']([^"']*\bpos_title_list\b[^"']*)["'][^>]*>([\s\S]*?)<\/p>/gi;
-  const linkPattern =
-    /<a[^>]*class=["'][^"']*\bpos_title_list\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
-
-  let paragraphMatch = paragraphPattern.exec(source);
-  while (paragraphMatch) {
-    const classNames = String(paragraphMatch[1] || "").toLowerCase();
-    const bodyHtml = String(paragraphMatch[2] || "");
-
-    if (classNames.includes("bold_font")) {
-      currentDepartment = cleanTheApplicantManagerText(bodyHtml);
-      paragraphMatch = paragraphPattern.exec(source);
-      continue;
-    }
-
-    const linkMatch = bodyHtml.match(linkPattern);
-    if (!linkMatch?.[1]) {
-      paragraphMatch = paragraphPattern.exec(source);
-      continue;
-    }
-
-    const href = String(linkMatch[1] || "").trim();
-    const absoluteUrl = href ? new URL(href, `${config.baseOrigin}/`).toString() : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      paragraphMatch = paragraphPattern.exec(source);
-      continue;
-    }
-
-    const title = cleanTheApplicantManagerText(linkMatch[2] || "");
-    if (!title || title.toLowerCase() === "resume") {
-      paragraphMatch = paragraphPattern.exec(source);
-      continue;
-    }
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title || "Untitled Position",
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: null,
-      department: currentDepartment || null
-    });
-    seenUrls.add(absoluteUrl);
-    paragraphMatch = paragraphPattern.exec(source);
-  }
-
-  if (postings.length > 0) return postings;
-
-  const fallbackLinkPattern =
-    /<a[^>]*class=["'][^"']*\bpos_title_list\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let fallbackMatch = fallbackLinkPattern.exec(source);
-  while (fallbackMatch) {
-    const href = String(fallbackMatch[1] || "").trim();
-    const absoluteUrl = href ? new URL(href, `${config.baseOrigin}/`).toString() : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      fallbackMatch = fallbackLinkPattern.exec(source);
-      continue;
-    }
-
-    const title = cleanTheApplicantManagerText(fallbackMatch[2] || "");
-    if (!title || title.toLowerCase() === "resume") {
-      fallbackMatch = fallbackLinkPattern.exec(source);
-      continue;
-    }
-
-    const contextBefore = source.slice(Math.max(0, Number(fallbackMatch.index || 0) - 1200), Number(fallbackMatch.index || 0));
-    const departmentMatches = Array.from(
-      contextBefore.matchAll(
-        /<p[^>]*class=["'][^"']*\bpos_title_list\b[^"']*\bbold_font\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi
-      )
-    );
-    const department =
-      departmentMatches.length > 0 ? cleanTheApplicantManagerText(departmentMatches[departmentMatches.length - 1][1] || "") : "";
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title || "Untitled Position",
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: null,
-      department: department || null
-    });
-    seenUrls.add(absoluteUrl);
-    fallbackMatch = fallbackLinkPattern.exec(source);
-  }
-
-  return postings;
-}
-
-function cleanApplicantAiText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isApplicantAiJobHref(href) {
-  const candidate = String(href || "").trim();
-  if (!candidate || candidate.startsWith("#") || candidate.toLowerCase().startsWith("mailto:")) {
-    return false;
-  }
-
-  const parsed = parseUrl(candidate);
-  if (parsed?.host) {
-    const host = String(parsed.host || "").split(":")[0].toLowerCase();
-    if (host !== "applicantai.com" && host !== "www.applicantai.com") {
-      return false;
-    }
-  }
-
-  const path = parsed ? String(parsed.pathname || "") : candidate;
-  const pathParts = path
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length < 3) return false;
-
-  return /^\d+$/.test(String(pathParts[pathParts.length - 1] || ""));
-}
-
-function parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHtml) {
-  const source = String(pageHtml || "");
-  const postings = [];
-  const seenUrls = new Set();
-
-  const blockPattern = /<div[^>]*class=["'][^"']*\bmy-4\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
-  const headingLinkPattern = /<h4[^>]*>\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h4>/i;
-  const locationPattern = /<small[^>]*class=["'][^"']*\btext-muted\b[^"']*["'][^>]*>([\s\S]*?)<\/small>/i;
-
-  let blockMatch = blockPattern.exec(source);
-  while (blockMatch) {
-    const blockHtml = String(blockMatch[1] || "");
-    const headingMatch = blockHtml.match(headingLinkPattern);
-    if (!headingMatch?.[1]) {
-      blockMatch = blockPattern.exec(source);
-      continue;
-    }
-
-    const href = String(headingMatch[1] || "").trim();
-    if (!isApplicantAiJobHref(href)) {
-      blockMatch = blockPattern.exec(source);
-      continue;
-    }
-
-    const absoluteUrl = new URL(href, `${config.baseOrigin}/`).toString();
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      blockMatch = blockPattern.exec(source);
-      continue;
-    }
-
-    const locationMatch = blockHtml.match(locationPattern);
-    const title = cleanApplicantAiText(headingMatch[2] || "") || "Untitled Position";
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: cleanApplicantAiText(locationMatch?.[1] || "") || null
-    });
-    seenUrls.add(absoluteUrl);
-    blockMatch = blockPattern.exec(source);
-  }
-
-  if (postings.length > 0) return postings;
-
-  const fallbackPattern = /<h4[^>]*>\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h4>/gi;
-  let fallbackMatch = fallbackPattern.exec(source);
-  while (fallbackMatch) {
-    const href = String(fallbackMatch[1] || "").trim();
-    if (!isApplicantAiJobHref(href)) {
-      fallbackMatch = fallbackPattern.exec(source);
-      continue;
-    }
-
-    const absoluteUrl = new URL(href, `${config.baseOrigin}/`).toString();
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
-      fallbackMatch = fallbackPattern.exec(source);
-      continue;
-    }
-
-    const contextHtml = source.slice(
-      Number(fallbackMatch.index || 0),
-      Math.min(source.length, Number(fallbackMatch.index || 0) + 700)
-    );
-    const locationMatch = contextHtml.match(locationPattern);
-    const title = cleanApplicantAiText(fallbackMatch[2] || "") || "Untitled Position";
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: cleanApplicantAiText(locationMatch?.[1] || "") || null
-    });
-    seenUrls.add(absoluteUrl);
-    fallbackMatch = fallbackPattern.exec(source);
-  }
-
-  return postings;
 }
 
 function ensureIcimsIframeUrl(urlString) {
@@ -7846,62 +6661,7 @@ async function collectPostingsForJobviteCompany(company) {
 
   const pageHtml = await fetchJobviteJobsPage(config.jobsUrl);
   return parseJobvitePostingsFromHtml(companyNameForPostings, config, pageHtml);
-}
-
-function extractApplicantProLocationLabel(job) {
-  const location = String(job?.jobLocation || job?.location || job?.locationName || "").trim();
-  if (location) return location;
-
-  const city = String(job?.city || "").trim();
-  const state = String(job?.abbreviation || job?.stateName || "").trim();
-  const country = String(job?.country || job?.countryName || job?.iso3 || "").trim();
-  const values = [city, state, country].filter(Boolean);
-  return values.length > 0 ? values.join(", ") : null;
-}
-
-function parseApplicantProPostingsFromApi(companyNameForPostings, config, response) {
-  const jobs = Array.isArray(response?.data?.jobs)
-    ? response.data.jobs
-    : Array.isArray(response?.jobs)
-      ? response.jobs
-      : Array.isArray(response?.data)
-        ? response.data
-        : [];
-  const origin = String(config?.origin || "").trim();
-  const companyName = String(companyNameForPostings || config?.subdomainLower || "").trim();
-  const collected = [];
-  const seenUrls = new Set();
-
-  for (const job of jobs) {
-    const rawJobUrl = String(job?.jobUrl || job?.url || job?.applyUrl || job?.applicationUrl || "").trim();
-    const fallbackJobId = String(job?.id ?? job?.job_id ?? job?.jobId ?? job?.jobID ?? "").trim();
-    const absoluteUrl = rawJobUrl
-      ? new URL(rawJobUrl, origin ? `${origin}/` : "https://example.invalid/").toString()
-      : fallbackJobId && origin
-        ? `${origin}/jobs/${encodeURIComponent(fallbackJobId)}`
-        : "";
-    if (!absoluteUrl || seenUrls.has(absoluteUrl)) continue;
-
-    collected.push({
-      company_name: companyName,
-      source_job_id: fallbackJobId || extractSourceIdFromPostingUrl(absoluteUrl, "applicantpro"),
-      id: fallbackJobId || undefined,
-      position_name: String(job?.title || job?.jobTitle || job?.name || "").trim() || "Untitled Position",
-      job_posting_url: absoluteUrl,
-      posting_date: String(job?.startDateRef || job?.postedDate || job?.datePosted || job?.published_at || job?.created_at || "").trim() || null,
-      location: extractApplicantProLocationLabel(job),
-      city: String(job?.city || "").trim() || null,
-      country: String(job?.country || job?.countryName || job?.iso3 || "").trim() || null,
-      department: String(job?.department?.name || job?.department || job?.jobCategory || job?.category || "").trim() || null,
-      employment_type: String(job?.employmentType || job?.jobType || job?.employment_type || "").trim() || null
-    });
-    seenUrls.add(absoluteUrl);
-  }
-
-  return collected;
-}
-
-async function collectPostingsForApplicantProCompany(company) {
+}async function collectPostingsForApplicantProCompany(company) {
   const config = parseApplicantProCompany(company.url_string);
   if (!config) return [];
 
@@ -8366,39 +7126,6 @@ async function fetchHibobJobBoard(config, boardUrl) {
   }
   return apiResponse.json();
 }
-
-function parseHibobPostingsFromApi(companyName, config, responseJson) {
-  if (!responseJson || typeof responseJson !== "object") return [];
-  const postings = [];
-  const seenUrls = new Set();
-  const jobAds = Array.isArray(responseJson.jobAdDetails) ? responseJson.jobAdDetails : [];
-
-  for (const item of jobAds) {
-    if (!item || typeof item !== "object") continue;
-    const jobId = cleanText(item.id);
-    if (!jobId) continue;
-
-    const postingUrl = cleanText(item.jobUrl) || cleanText(item.absoluteUrl) || cleanText(item.url);
-    const urlValue = postingUrl || `${config.baseOrigin}/job/${jobId}`;
-    if (!urlValue || seenUrls.has(urlValue)) continue;
-
-    const title = cleanText(item.title) || "Untitled Position";
-    const location = cleanText(item.site) || cleanText(item.country) || null;
-    const postingDate = cleanText(item.publishedAt) || null;
-
-    postings.push({
-      company_name: companyName,
-      position_name: title,
-      job_posting_url: urlValue,
-      posting_date: postingDate,
-      location
-    });
-    seenUrls.add(urlValue);
-  }
-
-  return postings;
-}
-
 async function collectPostingsForHibobCompany(company) {
   const config = parseHibobCompany(company?.url_string);
   if (!config) return [];
@@ -8424,23 +7151,6 @@ function parseIsolvisolvedhireCompany(url) {
     host
   };
 }
-
-function extractIsolvisolvedhireDomainId(pageHtml) {
-  const page = String(pageHtml || "");
-  const routeDataMatch = page.match(/courierCurrentRouteData\s*=\s*(\{[\s\S]*?\});/i);
-  if (routeDataMatch) {
-    try {
-      const parsed = JSON.parse(routeDataMatch[1]);
-      const domainId = cleanText(parsed?.domain_id);
-      if (domainId) return domainId;
-    } catch {}
-  }
-
-  const directMatch = page.match(/"domain_id"\s*:\s*"?(?<id>\d+)"?/i);
-  if (directMatch?.groups?.id) return cleanText(directMatch.groups.id);
-  return "";
-}
-
 async function fetchIsolvisolvedhireJobBoard(config) {
   const boardResponse = await fetchWithAtsRateLimit(
     "isolvisolvedhire",
@@ -8485,36 +7195,6 @@ async function fetchIsolvisolvedhireJobBoard(config) {
   }
   return apiResponse.json();
 }
-
-function parseIsolvisolvedhirePostingsFromApi(companyName, responseJson) {
-  if (!responseJson || typeof responseJson !== "object") return [];
-  const jobs = Array.isArray(responseJson?.data?.jobs) ? responseJson.data.jobs : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const job of jobs) {
-    if (!job || typeof job !== "object") continue;
-    const postingUrl = cleanText(job.jobUrl) || "";
-    if (!postingUrl || seenUrls.has(postingUrl)) continue;
-    const sourceJobId =
-      cleanText(job.id) ||
-      cleanText(job.jobId) ||
-      extractSourceIdFromPostingUrl(postingUrl, "isolvisolvedhire");
-
-    postings.push({
-      company_name: companyName,
-      source_job_id: sourceJobId,
-      id: sourceJobId || undefined,
-      position_name: cleanText(job.title) || "Untitled Position",
-      job_posting_url: postingUrl,
-      posting_date: cleanText(job.startDateRef) || null,
-      location: cleanText(job.jobLocation) || null
-    });
-    seenUrls.add(postingUrl);
-  }
-  return postings;
-}
-
 async function collectPostingsForIsolvisolvedhireCompany(company) {
   const config = parseIsolvisolvedhireCompany(company?.url_string);
   if (!config) return [];
@@ -9082,94 +7762,7 @@ async function collectPostingsForTaleoCompany(company) {
   }
 
   return postings;
-}
-
-function cleanGovernmentJobsText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractGovernmentJobsLastPage(viewHtml) {
-  const source = String(viewHtml || "");
-  const pageValues = [];
-  const pageRegex = /[?&]page=(\d+)/gi;
-  let match = pageRegex.exec(source);
-  while (match) {
-    const pageNumber = Number.parseInt(String(match[1] || "").trim(), 10);
-    if (Number.isFinite(pageNumber) && pageNumber > 0) {
-      pageValues.push(pageNumber);
-    }
-    match = pageRegex.exec(source);
-  }
-  return pageValues.length > 0 ? Math.max(...pageValues) : 1;
-}
-
-function extractGovernmentJobsViewHtmlFromResponse(response, bodyText) {
-  const contentType = String(response?.headers?.get("content-type") || "").toLowerCase();
-  const rawBody = String(bodyText || "");
-  if (!contentType.includes("application/json")) {
-    return rawBody;
-  }
-  try {
-    const parsed = JSON.parse(rawBody);
-    if (parsed && typeof parsed === "object") {
-      return String(parsed.view1 || "");
-    }
-  } catch {
-    return "";
-  }
-  return "";
-}
-
-function parseGovernmentJobsPostingsFromViewHtml(viewHtml) {
-  const source = String(viewHtml || "");
-  if (!source) return [];
-
-  const postings = [];
-  const seenUrls = new Set();
-  const itemRegex = /<li[^>]*class=["'][^"']*\bjob-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
-  const linkRegex =
-    /<a[^>]*class=["'][^"']*\bjob-details-link\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
-  const orgRegex = /<div[^>]*class=["'][^"']*\bjob-organization\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-  const locationRegex = /<span[^>]*class=["'][^"']*\bjob-location\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i;
-
-  let itemMatch = itemRegex.exec(source);
-  while (itemMatch) {
-    const itemHtml = String(itemMatch[1] || "");
-    const linkMatch = linkRegex.exec(itemHtml);
-    if (!linkMatch) {
-      itemMatch = itemRegex.exec(source);
-      continue;
-    }
-
-    const href = cleanGovernmentJobsText(linkMatch[1]).replace(/\s+/g, "");
-    const jobPostingUrl = href ? new URL(href, "https://www.governmentjobs.com/").toString() : "";
-    if (!jobPostingUrl || !jobPostingUrl.toLowerCase().includes("governmentjobs.com/jobs/") || seenUrls.has(jobPostingUrl)) {
-      itemMatch = itemRegex.exec(source);
-      continue;
-    }
-
-    const companyName = cleanGovernmentJobsText((orgRegex.exec(itemHtml) || [])[1]) || "Unknown Company";
-    const positionName = cleanGovernmentJobsText(linkMatch[2]) || "Untitled Position";
-    const location = cleanGovernmentJobsText((locationRegex.exec(itemHtml) || [])[1]) || null;
-
-    postings.push({
-      company_name: companyName,
-      position_name: positionName,
-      job_posting_url: jobPostingUrl,
-      posting_date: "Posted Today",
-      location
-    });
-    seenUrls.add(jobPostingUrl);
-    itemMatch = itemRegex.exec(source);
-  }
-
-  return postings;
-}
-
-async function fetchGovernmentJobsViewHtml(url, params) {
+}async function fetchGovernmentJobsViewHtml(url, params) {
   const requestUrl = new URL(url);
   for (const [key, value] of Object.entries(params || {})) {
     requestUrl.searchParams.set(key, String(value));
@@ -9260,80 +7853,7 @@ async function collectPostingsForSmartRecruitersDynamic(limit = 100) {
 
   const payload = await res.json();
   return parseSmartRecruitersPostingsFromApi("", {}, payload);
-}
-
-function cleanPoliceappText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizePoliceappJobUrl(rawUrl, baseOrigin = "https://www.policeapp.com") {
-  let value = String(rawUrl || "").trim();
-  if (!value) return "";
-  if (value.startsWith("/")) {
-    value = new URL(value, `${baseOrigin}/`).toString();
-  } else if (!/^https?:\/\//i.test(value)) {
-    value = new URL(value, `${baseOrigin}/`).toString();
-  }
-  value = value.replace(
-    /^(https?:\/\/www\.policeapp\.com\/)jobs\/urlrewrite_jobpostings\//i,
-    "$1"
-  );
-  return value;
-}
-
-function parsePoliceappPostingsFromHtml(responseHtml) {
-  const source = String(responseHtml || "");
-  if (!source) return [];
-
-  const postings = [];
-  const seenUrls = new Set();
-  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-
-  let linkMatch = linkRegex.exec(source);
-  while (linkMatch) {
-    const hrefRaw = cleanPoliceappText(linkMatch[1]);
-    const hrefLower = hrefRaw.toLowerCase();
-    if (!hrefLower || hrefLower.startsWith("javascript:") || hrefLower.startsWith("#")) {
-      linkMatch = linkRegex.exec(source);
-      continue;
-    }
-    if (!/\/\d+\/?$/.test(hrefLower)) {
-      linkMatch = linkRegex.exec(source);
-      continue;
-    }
-
-    const jobPostingUrl = normalizePoliceappJobUrl(hrefRaw);
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
-      linkMatch = linkRegex.exec(source);
-      continue;
-    }
-
-    const bodyText = cleanPoliceappText(linkMatch[2]);
-    const titlePart = bodyText.split(/deadline\s*:/i)[0].trim();
-    const positionName = titlePart || "Untitled Position";
-
-    const companyName = positionName.includes(" - ")
-      ? positionName.split(" - ", 1)[0].trim() || "Unknown Company"
-      : "Unknown Company";
-
-    postings.push({
-      company_name: companyName,
-      position_name: positionName,
-      job_posting_url: jobPostingUrl,
-      posting_date: "Posted Today",
-      location: null
-    });
-    seenUrls.add(jobPostingUrl);
-    linkMatch = linkRegex.exec(source);
-  }
-
-  return postings;
-}
-
-async function collectPostingsForPoliceappDynamic() {
+}async function collectPostingsForPoliceappDynamic() {
   const endpoint =
     "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0";
   const res = await fetchWithAtsRateLimit("policeapp", POLICEAPP_RATE_LIMIT_WAIT_MS, endpoint, {
@@ -9354,20 +7874,6 @@ async function collectPostingsForPoliceappDynamic() {
   return parsePoliceappPostingsFromHtml(html);
 }
 
-function cleanUsajobsText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractUsajobsOpenDate(dateDisplay) {
-  const raw = cleanUsajobsText(dateDisplay);
-  if (!raw) return null;
-  const match = raw.match(/open\s+(\d{2}\/\d{2}\/\d{4})\s+to/i);
-  return match?.[1] || null;
-}
-
 function getUsajobsApiConfig(env = process.env) {
   const authorizationKey = String(
     env.OPENJOBSLOTS_USAJOBS_AUTHORIZATION_KEY ||
@@ -9385,100 +7891,7 @@ function getUsajobsApiConfig(env = process.env) {
     "openjobslots.com"
   ).trim();
   return { authorizationKey, userAgent };
-}
-
-function normalizeUsajobsRemoteType(value) {
-  if (value === true) return "remote";
-  const normalized = cleanUsajobsText(value).toLowerCase();
-  if (["true", "yes", "y", "remote"].includes(normalized)) return "remote";
-  return "unknown";
-}
-
-function getUsajobsStructuredLocation(descriptor = {}) {
-  const locations = Array.isArray(descriptor.PositionLocation) ? descriptor.PositionLocation : [];
-  const first = locations.find((location) => location && typeof location === "object") || {};
-  const city = cleanUsajobsText(first.CityName);
-  const region = cleanUsajobsText(first.CountrySubDivisionCode || first.CountrySubDivision);
-  const countryCode = cleanUsajobsText(first.CountryCode);
-  const country = countryCode ? normalizeCountryName(countryCode) : cleanUsajobsText(first.CountryName);
-  const display = cleanUsajobsText(descriptor.PositionLocationDisplay);
-  const location = display || [city, region, country].filter(Boolean).join(", ");
-  return { city, region, country, location };
-}
-
-function parseUsajobsOfficialSearchPayload(payload) {
-  const items = Array.isArray(payload?.SearchResult?.SearchResultItems)
-    ? payload.SearchResult.SearchResultItems
-    : [];
-  const postings = [];
-  const seenUrls = new Set();
-  for (const item of items) {
-    const descriptor = item?.MatchedObjectDescriptor;
-    if (!descriptor || typeof descriptor !== "object") continue;
-    const sourceJobId = cleanUsajobsText(descriptor.PositionID || descriptor.DocumentID || descriptor.MatchedObjectId);
-    let jobPostingUrl = cleanUsajobsText(descriptor.PositionURI);
-    if (!jobPostingUrl && sourceJobId) jobPostingUrl = `https://www.usajobs.gov/job/${sourceJobId}`;
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) continue;
-
-    const details = descriptor.UserArea?.Details || {};
-    const location = getUsajobsStructuredLocation(descriptor);
-    postings.push({
-      company_name: cleanUsajobsText(descriptor.OrganizationName || descriptor.DepartmentName) || "Unknown Agency",
-      position_name: cleanUsajobsText(descriptor.PositionTitle) || "Untitled Position",
-      job_posting_url: jobPostingUrl,
-      source_job_id: sourceJobId,
-      posting_date: cleanUsajobsText(descriptor.PublicationStartDate),
-      location: location.location || null,
-      city: location.city || null,
-      region: location.region || null,
-      country: location.country || null,
-      remote_type: normalizeUsajobsRemoteType(details.RemoteIndicator),
-      description_plain: cleanUsajobsText(details.JobSummary || details.MajorDuties || details.Requirements || "")
-    });
-    seenUrls.add(jobPostingUrl);
-  }
-  return postings;
-}
-
-function parseUsajobsPostingsFromPayload(payload) {
-  if (!payload || typeof payload !== "object") return [];
-  const officialPostings = parseUsajobsOfficialSearchPayload(payload);
-  if (officialPostings.length > 0) return officialPostings;
-  const jobs = Array.isArray(payload.Jobs) ? payload.Jobs : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const job of jobs) {
-    if (!job || typeof job !== "object") continue;
-
-    let jobPostingUrl = cleanUsajobsText(job.PositionURI);
-    if (!jobPostingUrl) {
-      const documentId = cleanUsajobsText(job.DocumentID);
-      if (documentId) {
-        jobPostingUrl = `https://www.usajobs.gov/job/${documentId}`;
-      }
-    }
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) continue;
-
-    const positionName = cleanUsajobsText(job.Title) || "Untitled Position";
-    const companyName = cleanUsajobsText(job.Agency) || "Unknown Agency";
-    const location = cleanUsajobsText(job.LocationName || job.Location) || null;
-    const postingDate = extractUsajobsOpenDate(job.DateDisplay);
-
-    postings.push({
-      company_name: companyName,
-      position_name: positionName,
-      job_posting_url: jobPostingUrl,
-      posting_date: postingDate,
-      location
-    });
-    seenUrls.add(jobPostingUrl);
-  }
-
-  return postings;
-}
-
-async function collectPostingsForUsajobsDynamic(maxPages = 2, resultsPerPage = 25) {
+}async function collectPostingsForUsajobsDynamic(maxPages = 2, resultsPerPage = 25) {
   const { authorizationKey, userAgent } = getUsajobsApiConfig(process.env);
   const collected = [];
   const seenUrls = new Set();
@@ -9528,53 +7941,7 @@ async function collectPostingsForUsajobsDynamic(maxPages = 2, resultsPerPage = 2
   }
 
   return collected;
-}
-
-function cleanK12jobspotText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseK12jobspotPostingsFromPayload(payload) {
-  if (!payload || typeof payload !== "object") return [];
-  const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
-  const postings = [];
-  const seenUrls = new Set();
-
-  for (const job of jobs) {
-    if (!job || typeof job !== "object") continue;
-    const jobId = cleanK12jobspotText(job.id);
-    if (!jobId) continue;
-
-    const jobPostingUrl = `https://www.k12jobspot.com/Job/Detail/${jobId}`;
-    if (seenUrls.has(jobPostingUrl)) continue;
-
-    const companyName = cleanK12jobspotText(job.hiringOrganization) || "Unknown Organization";
-    const positionName = cleanK12jobspotText(job.title) || "Untitled Position";
-    const locationObj = job.location && typeof job.location === "object" ? job.location : {};
-    const city = cleanK12jobspotText(locationObj.city);
-    const region = cleanK12jobspotText(locationObj.regionCode);
-    const postal = cleanK12jobspotText(locationObj.postalCode);
-    const locationParts = [city, region, postal].filter(Boolean);
-    const location = locationParts.length > 0 ? locationParts.join(", ") : null;
-    const postingDate = cleanK12jobspotText(job.postedDate) || null;
-
-    postings.push({
-      company_name: companyName,
-      position_name: positionName,
-      job_posting_url: jobPostingUrl,
-      posting_date: postingDate,
-      location
-    });
-    seenUrls.add(jobPostingUrl);
-  }
-
-  return postings;
-}
-
-async function fetchK12jobspotSearchPayload(pageStartIndex, pageEndIndex) {
+}async function fetchK12jobspotSearchPayload(pageStartIndex, pageEndIndex) {
   const endpoint = "https://api.k12jobspot.com/api/Jobs/Search";
   const requestBody = {
     searchPhrase: "",
@@ -9635,31 +8002,6 @@ async function collectPostingsForK12jobspotDynamic(pageWindowSize = 25) {
 
   return postings;
 }
-
-function parseSchoolspringPostingsFromPayload(payload) {
-  const jobs = payload?.value?.jobsList;
-  if (!Array.isArray(jobs)) return [];
-
-  const postings = [];
-  const seenUrls = new Set();
-  for (const job of jobs) {
-    const jobId = Number(job?.jobId || 0);
-    if (!Number.isFinite(jobId) || jobId <= 0) continue;
-    const jobPostingUrl = `https://www.schoolspring.com/job.cfm?jid=${jobId}`;
-    if (seenUrls.has(jobPostingUrl)) continue;
-    seenUrls.add(jobPostingUrl);
-
-    postings.push({
-      company_name: String(job?.employer || "").trim() || "Unknown Employer",
-      position_name: String(job?.title || "").trim() || "Untitled Position",
-      job_posting_url: jobPostingUrl,
-      posting_date: String(job?.displayDate || "").trim() || null,
-      location: String(job?.location || "").trim() || null
-    });
-  }
-  return postings;
-}
-
 async function fetchSchoolspringSearchPayload(page, size = 25) {
   const endpoint = new URL("https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch");
   endpoint.searchParams.set("domainName", "");
@@ -9720,106 +8062,7 @@ async function collectPostingsForSchoolspringDynamic(pageSize = 25) {
   }
 
   return postings;
-}
-
-function cleanCalcareersText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractCalcareersHiddenInputs(htmlSource) {
-  const source = String(htmlSource || "");
-  const hidden = {};
-  const regex = /<input[^>]+type=["']hidden["'][^>]*>/gi;
-  let match = regex.exec(source);
-  while (match) {
-    const tag = String(match[0] || "");
-    const nameMatch = tag.match(/\bname=["']([^"']+)["']/i);
-    if (!nameMatch?.[1]) {
-      match = regex.exec(source);
-      continue;
-    }
-    const valueMatch = tag.match(/\bvalue=["']([^"']*)["']/i);
-    hidden[nameMatch[1]] = valueMatch?.[1] || "";
-    match = regex.exec(source);
-  }
-  return hidden;
-}
-
-function extractCalcareersPagerTargets(htmlSource) {
-  const source = String(htmlSource || "");
-  const targets = [];
-  const seen = new Set();
-  const regex = /__doPostBack\(&#39;([^']+btnPagerItem[^']*)&#39;,\s*&#39;[^']*&#39;\)/gi;
-  let match = regex.exec(source);
-  while (match) {
-    const target = String(match[1] || "").trim();
-    if (target && !seen.has(target)) {
-      seen.add(target);
-      targets.push(target);
-    }
-    match = regex.exec(source);
-  }
-  return targets;
-}
-
-function parseCalcareersPostingsFromHtml(htmlSource) {
-  const source = String(htmlSource || "");
-  if (!source) return [];
-
-  const postings = [];
-  const seenUrls = new Set();
-  const cardRegex = new RegExp(
-    String.raw`Working Title:\s*</div>\s*<div class="col-xs-6 job-details">\s*<span[^>]*>(.*?)</span>` +
-      String.raw`[\s\S]*?Job Control:\s*</div>\s*<div class="col-xs-6 job-details">\s*(\d+)\s*</div>` +
-      String.raw`[\s\S]*?Department:\s*</div>\s*<div class="col-xs-6 job-details">\s*(.*?)\s*</div>` +
-      String.raw`[\s\S]*?Location:\s*</div>\s*<div class="col-xs-6 job-details">\s*(.*?)\s*</div>` +
-      String.raw`[\s\S]*?Publish Date:\s*</div>\s*<div class="col-xs-6 job-details">\s*<time[^>]*>\s*([^<]+)\s*</time>` +
-      String.raw`[\s\S]*?href="(https:\/\/www\.calcareers\.ca\.gov\/CalHrPublic\/Jobs\/JobPosting\.aspx\?JobControlId=\d+)"`,
-    "gi"
-  );
-
-  let match = cardRegex.exec(source);
-  while (match) {
-    const positionName = cleanCalcareersText(match[1]) || "Untitled Position";
-    const companyName = cleanCalcareersText(match[3]) || "Unknown Department";
-    const location = cleanCalcareersText(match[4]) || null;
-    const postingDate = cleanCalcareersText(match[5]) || null;
-    const jobPostingUrl = cleanCalcareersText(match[6]);
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
-      match = cardRegex.exec(source);
-      continue;
-    }
-    postings.push({
-      company_name: companyName,
-      position_name: positionName,
-      job_posting_url: jobPostingUrl,
-      posting_date: postingDate,
-      location
-    });
-    seenUrls.add(jobPostingUrl);
-    match = cardRegex.exec(source);
-  }
-
-  return postings;
-}
-
-function buildCalcareersPostPayload(hiddenFields, eventTarget) {
-  const payload = { ...(hiddenFields || {}) };
-  payload.__EVENTTARGET = eventTarget;
-  payload.__EVENTARGUMENT = "";
-  payload["ctl00$cphMainContent$txtKeyword"] = "";
-  payload["ctl00$cphMainContent$chkExactWordMatch"] = "on";
-  payload["ctl00$cphMainContent$hdnInit"] = "true";
-  payload["ctl00$ucUtilityHeader1$txtGoogleSiteSearch"] = payload["ctl00$ucUtilityHeader1$txtGoogleSiteSearch"] || "";
-  payload["ctl00$hdnShowHeaderPadding"] = payload["ctl00$hdnShowHeaderPadding"] || "1";
-  payload["ctl00$ucSessionTimeoutDialog$tmrCountdown"] = payload["ctl00$ucSessionTimeoutDialog$tmrCountdown"] || "1200";
-  return payload;
-}
-
-async function collectPostingsForCalcareersDynamic() {
+}async function collectPostingsForCalcareersDynamic() {
   const endpoint = "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx";
   const headers = {
     Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -9900,102 +8143,7 @@ async function collectPostingsForCalcareersDynamic() {
   }
 
   return postings;
-}
-
-function cleanCaloppsText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function inferCaloppsCompanyFromPath(pathValue) {
-  const path = String(pathValue || "").trim().replace(/^\/+|\/+$/g, "");
-  if (!path) return "Unknown Agency";
-  const firstSegment = path.split("/", 1)[0];
-  const company = firstSegment.replace(/-/g, " ").trim();
-  return company ? toTitleCase(company) : "Unknown Agency";
-}
-
-function parseCaloppsPostingsFromHtml(pageHtml, pageUrl) {
-  const source = String(pageHtml || "");
-  if (!source) return [];
-
-  const postings = [];
-  const seenUrls = new Set();
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
-
-  let rowMatch = rowRegex.exec(source);
-  while (rowMatch) {
-    const rowHtml = String(rowMatch[1] || "");
-    if (!rowHtml.toLowerCase().includes("views-field-label")) {
-      rowMatch = rowRegex.exec(source);
-      continue;
-    }
-
-    const cells = [];
-    let cellMatch = cellRegex.exec(rowHtml);
-    while (cellMatch) {
-      cells.push(String(cellMatch[1] || ""));
-      cellMatch = cellRegex.exec(rowHtml);
-    }
-    if (cells.length < 5) {
-      rowMatch = rowRegex.exec(source);
-      continue;
-    }
-
-    const linkMatch = linkRegex.exec(cells[0]);
-    if (!linkMatch) {
-      rowMatch = rowRegex.exec(source);
-      continue;
-    }
-
-    const href = cleanCaloppsText(linkMatch[1]);
-    const jobPostingUrl = urljoin(pageUrl, href);
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
-      rowMatch = rowRegex.exec(source);
-      continue;
-    }
-
-    const title = cleanCaloppsText(linkMatch[2]) || "Untitled Position";
-    const region = cleanCaloppsText(cells[1]) || null;
-    const category = cleanCaloppsText(cells[2]) || null;
-    const jobType = cleanCaloppsText(cells[3]) || null;
-    const closeDate = cleanCaloppsText(cells[4]) || null;
-    const postingIdMatch = href.match(/\/job-(\d+)/i);
-    const postingId = postingIdMatch?.[1] || jobPostingUrl;
-
-    postings.push({
-      id: postingId,
-      company_name: inferCaloppsCompanyFromPath(href),
-      position_name: title,
-      job_posting_url: jobPostingUrl,
-      posting_date: new Date().toISOString(),
-      location: region,
-      category,
-      work_type: jobType,
-      close_date: closeDate
-    });
-    seenUrls.add(jobPostingUrl);
-
-    rowMatch = rowRegex.exec(source);
-  }
-
-  return postings;
-}
-
-function extractCaloppsNextPageUrl(pageHtml, pageUrl) {
-  const source = String(pageHtml || "");
-  const match = source.match(
-    /<li[^>]*class=["'][^"']*\bnext\b[^"']*["'][^>]*>\s*<a[^>]*href=["']([^"']+)["']/i
-  );
-  if (!match?.[1]) return null;
-  return urljoin(pageUrl, cleanCaloppsText(match[1]));
-}
-
-async function collectPostingsForCaloppsDynamic(maxPages = 25) {
+}async function collectPostingsForCaloppsDynamic(maxPages = 25) {
   let nextPageUrl = "https://www.calopps.org/job-search-list";
   let pagesFetched = 0;
   const pageLimit = Math.max(1, Math.min(100, Number(maxPages) || 25));
@@ -10028,94 +8176,7 @@ async function collectPostingsForCaloppsDynamic(maxPages = 25) {
   }
 
   return postings;
-}
-
-function formatStatejobsnyDate(dateValue) {
-  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const year = String(date.getUTCFullYear()).slice(-2);
-  return `${month}/${day}/${year}`;
-}
-
-function buildStatejobsnyWindowUrl() {
-  const baseUrl = new URL("https://www.statejobsny.com/public/vacancyTable.cfm");
-  const now = new Date();
-  const startUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
-  const endUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-  baseUrl.searchParams.set("searchResults", "yes");
-  baseUrl.searchParams.set("minDate", formatStatejobsnyDate(startUtc));
-  baseUrl.searchParams.set("maxDate", formatStatejobsnyDate(endUtc));
-  return baseUrl.toString();
-}
-
-function cleanStatejobsnyText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseStatejobsnyPostingsFromHtml(pageHtml, pageUrl) {
-  const source = String(pageHtml || "");
-  if (!source) return [];
-
-  const postings = [];
-  const seenUrls = new Set();
-  const tbodyMatch = source.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
-  const tbodyHtml = tbodyMatch?.[1] || source;
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i;
-
-  let rowMatch = rowRegex.exec(tbodyHtml);
-  while (rowMatch) {
-    const rowHtml = String(rowMatch[1] || "");
-    const cells = [];
-    let cellMatch = cellRegex.exec(rowHtml);
-    while (cellMatch) {
-      cells.push(String(cellMatch[1] || ""));
-      cellMatch = cellRegex.exec(rowHtml);
-    }
-
-    if (cells.length < 7) {
-      rowMatch = rowRegex.exec(tbodyHtml);
-      continue;
-    }
-
-    const titleLink = linkRegex.exec(cells[1]);
-    if (!titleLink) {
-      rowMatch = rowRegex.exec(tbodyHtml);
-      continue;
-    }
-
-    const href = cleanStatejobsnyText(titleLink[1]);
-    const jobPostingUrl = urljoin(pageUrl, href);
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
-      rowMatch = rowRegex.exec(tbodyHtml);
-      continue;
-    }
-
-    const positionName = cleanStatejobsnyText(titleLink[2]) || "Untitled Position";
-    const companyName = cleanStatejobsnyText(cells[5]) || "Unknown Agency";
-    const location = cleanStatejobsnyText(cells[6]) || null;
-    const postingDate = cleanStatejobsnyText(cells[3]) || null;
-
-    postings.push({
-      company_name: companyName,
-      position_name: positionName,
-      job_posting_url: jobPostingUrl,
-      posting_date: postingDate,
-      location
-    });
-    seenUrls.add(jobPostingUrl);
-    rowMatch = rowRegex.exec(tbodyHtml);
-  }
-
-  return postings;
-}
-
-async function collectPostingsForStatejobsnyDynamic() {
+}async function collectPostingsForStatejobsnyDynamic() {
   const endpoint = buildStatejobsnyWindowUrl();
   const res = await fetchWithAtsRateLimit("statejobsny", STATEJOBSNY_RATE_LIMIT_WAIT_MS, endpoint, {
     method: "GET",
@@ -13647,6 +11708,48 @@ module.exports = {
   parseUltiProPostingsFromApi,
   parseUsajobsPostingsFromPayload,
   parseWorkdayPostingsFromApi,
+  buildEightfoldApiUrl,
+  extractEightfoldDomainFromHtml,
+  extractJoinNextDataJsonFromHtml,
+  extractSagehrCompanyNameFromHtml,
+  extractTalentlyftInitialConfig,
+  extractTalentlyftTotalPages,
+  parseApplicantAiPostingsFromHtml,
+  parseCareerpuckPostingsFromApi,
+  parseCareerspagePostingsFromHtml,
+  parseEightfoldPostingsFromApi,
+  parseFreshteamPostingsFromHtml,
+  parseGemPostingsFromBatchResponse,
+  parseGetroPostingsFromHtml,
+  parseJobApsPostingsFromHtml,
+  parseJoinPostingsFromNextData,
+  parseLoxoPostingsFromHtml,
+  parsePeopleforcePostingsFromHtml,
+  parseRipplingPostingsFromApi,
+  parseSagehrPostingsFromHtml,
+  parseSimplicantPostingsFromHtml,
+  parseTalentlyftPostingsFromFragment,
+  parseTalexioPostingsFromApi,
+  parseTheApplicantManagerPostingsFromHtml,
+  buildCalcareersPostPayload,
+  buildStatejobsnyWindowUrl,
+  extractCalcareersHiddenInputs,
+  extractCalcareersPagerTargets,
+  extractCaloppsNextPageUrl,
+  extractGovernmentJobsLastPage,
+  extractGovernmentJobsViewHtmlFromResponse,
+  extractIsolvisolvedhireDomainId,
+  normalizePoliceappJobUrl,
+  parseCalcareersPostingsFromHtml,
+  parseCaloppsPostingsFromHtml,
+  parseGovernmentJobsPostingsFromViewHtml,
+  parseHibobPostingsFromApi,
+  parseIsolvisolvedhirePostingsFromApi,
+  parseK12jobspotPostingsFromPayload,
+  parsePoliceappPostingsFromHtml,
+  parseSchoolspringPostingsFromPayload,
+  parseStatejobsnyPostingsFromHtml,
+  parseUsajobsOfficialSearchPayload,
   parseZohoPostingsFromHtml,
   resolveAdpWorkforcenowCompanyName,
   runWorkdaySync,
