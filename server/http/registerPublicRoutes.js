@@ -176,9 +176,10 @@ function registerPublicRoutes(app, context) {
 
   app.get("/sync/status", async (req, res) => {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      const includeAdminDiagnostics = hasAdminAccess(req);
       if (DB_BACKEND === "postgres") {
         const [status, parserAttentionByAts] = await Promise.all([
-          getPostgresSyncStatus(postgresPool),
+          getPostgresSyncStatus(postgresPool, { includeWorkerDiagnostics: includeAdminDiagnostics }),
           getPostgresParserAttentionByAts(postgresPool)
         ]);
         return sanitizeFrontendValue({
@@ -210,7 +211,8 @@ function registerPublicRoutes(app, context) {
             search_reindex: readMeiliReindexStatus(),
             queue_backend: status.queue_backend || QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
-            parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+            parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+            include_worker_diagnostics: includeAdminDiagnostics
           })
         });
       }
@@ -238,7 +240,8 @@ function registerPublicRoutes(app, context) {
           search_reindex: readMeiliReindexStatus(),
           queue_backend: QUEUE_BACKEND,
           write_pressure: getWritePressure(ingestionWorker),
-          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0)
+          parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+          include_worker_diagnostics: includeAdminDiagnostics
         })
       });
     });
@@ -249,7 +252,7 @@ function registerPublicRoutes(app, context) {
       const includeAdminDiagnostics = hasAdminAccess(req);
       if (DB_BACKEND === "postgres") {
         const [status, parserAttentionByAts, growth24h] = await Promise.all([
-          getPostgresSyncStatus(postgresPool),
+          getPostgresSyncStatus(postgresPool, { includeWorkerDiagnostics: includeAdminDiagnostics }),
           getPostgresParserAttentionByAts(postgresPool),
           includeAdminDiagnostics ? getPostgresGrowthSummary(postgresPool, { hours: 24 }) : Promise.resolve(null)
         ]);
@@ -262,6 +265,7 @@ function registerPublicRoutes(app, context) {
             queue_backend: QUEUE_BACKEND,
             write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
             parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+            include_worker_diagnostics: includeAdminDiagnostics,
             ...(includeAdminDiagnostics ? { growth_24h: growth24h } : {})
           })
         });
@@ -280,6 +284,7 @@ function registerPublicRoutes(app, context) {
           queue_backend: QUEUE_BACKEND,
           write_pressure: getWritePressure(status),
           parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),
+          include_worker_diagnostics: includeAdminDiagnostics,
           ...(includeAdminDiagnostics ? { growth_24h: createEmptyGrowthSummary({ hours: 24 }) } : {})
         })
       });

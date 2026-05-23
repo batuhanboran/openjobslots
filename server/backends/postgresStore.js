@@ -19,6 +19,13 @@ const {
   classifySourceProtection,
   summarizeSourceMetrics
 } = require("../ingestion/sourceQualityPolicy");
+const { readWorkerBudgetConfig } = require("../ingestion/workerConfig");
+const {
+  addFailureReasonCount,
+  classifyFailureReason,
+  createFailureReasonCounts,
+  normalizeHttpStatus
+} = require("../ingestion/workerFailureTaxonomy");
 const {
   normalizeCountryFromLocation,
   normalizeRegionFromCountry,
@@ -62,6 +69,62 @@ function getRetentionCutoffs(referenceEpoch = Math.floor(Date.now() / 1000), con
     runArchiveEpoch: nowEpoch - config.runSummaryDays * DAY_SECONDS,
     errorArchiveEpoch: nowEpoch - config.detailedErrorDays * DAY_SECONDS,
     outboxProcessedEpoch: nowEpoch - config.outboxProcessedDays * DAY_SECONDS
+  };
+}
+
+function startOfUtcDayEpoch(epoch) {
+  const value = Math.max(0, Math.floor(Number(epoch || 0)));
+  return Math.floor(value / DAY_SECONDS) * DAY_SECONDS;
+}
+
+function pct(numerator, denominator) {
+  const top = Number(numerator || 0);
+  const bottom = Number(denominator || 0);
+  if (bottom <= 0) return null;
+  return Number(((top / bottom) * 100).toFixed(2));
+}
+
+function summarizeAutoSyncBudgetUsage(rows = [], options = {}) {
+  const workerBudgetConfig = readWorkerBudgetConfig(options.env || process.env, options);
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
+  const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  const row = Array.isArray(rows) ? (rows[0] || {}) : {};
+  const dailyBudget = Number(workerBudgetConfig.autoSyncDailyTargetBudget || 0);
+  const targetsStartedToday = Number(row.targets_started_today || row.count || 0);
+  return {
+    read_only: true,
+    utc_day_start_epoch: dayStartEpoch,
+    utc_day_reset_epoch: dayStartEpoch + DAY_SECONDS,
+    daily_budget: dailyBudget,
+    targets_per_run: Number(workerBudgetConfig.autoSyncTargetsPerRun || 0),
+    targets_started_today: targetsStartedToday,
+    remaining_daily_budget: dailyBudget > 0 ? Math.max(0, dailyBudget - targetsStartedToday) : null,
+    daily_budget_exhausted: dailyBudget > 0 && targetsStartedToday >= dailyBudget
+  };
+}
+
+function summarizeWorkerHealth24h(runRows = [], failureRows = []) {
+  const runRow = Array.isArray(runRows) ? (runRows[0] || {}) : {};
+  const targetCount = Number(runRow.target_count_24h || 0);
+  const successCount = Number(runRow.success_count_24h || 0);
+  const failureCount = Number(runRow.failure_count_24h || 0);
+  const failureReasonCounts = createFailureReasonCounts();
+  for (const row of Array.isArray(failureRows) ? failureRows : []) {
+    const reason = classifyFailureReason(
+      row?.error_type,
+      normalizeHttpStatus(row?.http_status),
+      row?.error_message
+    );
+    addFailureReasonCount(failureReasonCounts, reason, row?.count);
+  }
+  return {
+    read_only: true,
+    window_hours: 24,
+    target_count: targetCount,
+    success_count: successCount,
+    failure_count: failureCount,
+    success_rate_pct: pct(successCount, targetCount),
+    failure_reason_counts: failureReasonCounts
   };
 }
 
@@ -2199,8 +2262,22 @@ async function requestSyncStop(pool) {
   return getSyncControl(pool);
 }
 
-async function getPostgresSyncStatus(pool) {
-  const [control, counts, latestRun, latestFailedRun, due, parserErrors] = await Promise.all([
+async function getPostgresSyncStatus(pool, options = {}) {
+  const includeWorkerDiagnostics = options.includeWorkerDiagnostics !== false;
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  const utcDayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  const healthWindowStartEpoch = nowEpoch - DAY_SECONDS;
+  const [
+    control,
+    counts,
+    latestRun,
+    latestFailedRun,
+    due,
+    parserErrors,
+    budgetUsage,
+    workerHealth,
+    workerFailureReasons
+  ] = await Promise.all([
     getSyncControl(pool),
     getPostgresCounts(pool),
     pool.query("SELECT * FROM ingestion_runs ORDER BY id DESC LIMIT 1;"),
@@ -2225,9 +2302,47 @@ async function getPostgresSyncStatus(pool) {
         WHERE s.enabled = true
           AND COALESCE(st.next_sync_epoch, 0) <= $1;
       `,
-      [Math.floor(Date.now() / 1000)]
+      [nowEpoch]
     ),
-    pool.query(`SELECT COUNT(*)::int AS count FROM ingestion_run_errors WHERE created_at >= now() - interval '24 hours' AND ${parserAttentionPredicate()};`)
+    pool.query(`SELECT COUNT(*)::int AS count FROM ingestion_run_errors WHERE created_at >= now() - interval '24 hours' AND ${parserAttentionPredicate()};`),
+    includeWorkerDiagnostics
+      ? pool.query(
+          `
+            SELECT COALESCE(SUM(total_targets), 0)::int AS targets_started_today
+            FROM ingestion_runs
+            WHERE started_at_epoch >= $1;
+          `,
+          [utcDayStartEpoch]
+        )
+      : Promise.resolve({ rows: [] }),
+    includeWorkerDiagnostics
+      ? pool.query(
+          `
+            SELECT
+              COALESCE(SUM(total_targets), 0)::int AS target_count_24h,
+              COALESCE(SUM(success_count), 0)::int AS success_count_24h,
+              COALESCE(SUM(failure_count), 0)::int AS failure_count_24h
+            FROM ingestion_runs
+            WHERE started_at_epoch >= $1;
+          `,
+          [healthWindowStartEpoch]
+        )
+      : Promise.resolve({ rows: [] }),
+    includeWorkerDiagnostics
+      ? pool.query(
+          `
+            SELECT
+              error_type,
+              COALESCE(http_status, 0)::int AS http_status,
+              COALESCE(error_message, '') AS error_message,
+              COUNT(*)::int AS count
+            FROM ingestion_run_errors
+            WHERE created_at >= now() - interval '24 hours'
+            GROUP BY error_type, COALESCE(http_status, 0), error_message
+            ORDER BY count DESC, error_type ASC, http_status ASC, error_message ASC;
+          `
+        )
+      : Promise.resolve({ rows: [] })
   ]);
   const run = latestRun.rows[0] || {};
   const failedRun = latestFailedRun.rows[0] || {};
@@ -2240,6 +2355,37 @@ async function getPostgresSyncStatus(pool) {
       : status === "stopping"
         ? "stopping"
         : String(run.status || status);
+  const ingestionWorker = {
+    latest_run_id: Number(run.id || 0),
+    latest_status: latestStatus,
+    started_at_epoch: Number(run.started_at_epoch || 0),
+    finished_at_epoch: Number(run.finished_at_epoch || 0),
+    last_run_duration_seconds:
+      run?.finished_at_epoch && run?.started_at_epoch
+        ? Math.max(0, Number(run.finished_at_epoch) - Number(run.started_at_epoch))
+        : 0,
+    total_targets: Number(run.total_targets || 0),
+    success_count: Number(run.success_count || 0),
+    failure_count: Number(run.failure_count || 0),
+    cache_hit_count: Number(run.cache_hit_count || 0),
+    cache_write_count: Number(run.cache_write_count || 0),
+    posting_upsert_count: Number(run.posting_upsert_count || 0),
+    rejected_count: Number(run.rejected_count || 0),
+    duplicate_count: Number(run.duplicate_count || 0),
+    db_busy_count: Number(run.db_busy_count || 0),
+    queue_due_count: Number(due.rows[0]?.count || 0),
+    parser_error_count_24h: Number(parserErrors.rows[0]?.count || 0),
+    current_ats: String(run.current_ats || ""),
+    current_company_url: String(run.current_company_url || ""),
+    current_company_name: String(run.current_company_name || ""),
+    http_status_counts: run.http_status_counts && typeof run.http_status_counts === "object" ? run.http_status_counts : {},
+    active_ats: Array.isArray(run.active_ats) ? run.active_ats : [],
+    last_error: String(run.last_error || "")
+  };
+  if (includeWorkerDiagnostics) {
+    ingestionWorker.auto_sync_budget_usage = summarizeAutoSyncBudgetUsage(budgetUsage.rows, { nowEpoch });
+    ingestionWorker.worker_health_24h = summarizeWorkerHealth24h(workerHealth.rows, workerFailureReasons.rows);
+  }
   return {
     running,
     queued,
@@ -2267,33 +2413,7 @@ async function getPostgresSyncStatus(pool) {
     configured_enabled_ats_count: counts.configured_enabled_ats_count,
     excluded_ats_count: 0,
     active_ats: Array.isArray(run.active_ats) ? run.active_ats : [],
-    ingestion_worker: {
-      latest_run_id: Number(run.id || 0),
-      latest_status: latestStatus,
-      started_at_epoch: Number(run.started_at_epoch || 0),
-      finished_at_epoch: Number(run.finished_at_epoch || 0),
-      last_run_duration_seconds:
-        run?.finished_at_epoch && run?.started_at_epoch
-          ? Math.max(0, Number(run.finished_at_epoch) - Number(run.started_at_epoch))
-          : 0,
-      total_targets: Number(run.total_targets || 0),
-      success_count: Number(run.success_count || 0),
-      failure_count: Number(run.failure_count || 0),
-      cache_hit_count: Number(run.cache_hit_count || 0),
-      cache_write_count: Number(run.cache_write_count || 0),
-      posting_upsert_count: Number(run.posting_upsert_count || 0),
-      rejected_count: Number(run.rejected_count || 0),
-      duplicate_count: Number(run.duplicate_count || 0),
-      db_busy_count: Number(run.db_busy_count || 0),
-      queue_due_count: Number(due.rows[0]?.count || 0),
-      parser_error_count_24h: Number(parserErrors.rows[0]?.count || 0),
-      current_ats: String(run.current_ats || ""),
-      current_company_url: String(run.current_company_url || ""),
-      current_company_name: String(run.current_company_name || ""),
-      http_status_counts: run.http_status_counts && typeof run.http_status_counts === "object" ? run.http_status_counts : {},
-      active_ats: Array.isArray(run.active_ats) ? run.active_ats : [],
-      last_error: String(run.last_error || "")
-    },
+    ingestion_worker: ingestionWorker,
     ...counts
   };
 }

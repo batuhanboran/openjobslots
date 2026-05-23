@@ -18527,6 +18527,10 @@ function buildPublicIngestionStatusItem(ingestionWorker = {}, options = {}) {
   if (Object.prototype.hasOwnProperty.call(options, "growth_24h")) {
     item.growth_24h = options.growth_24h || createEmptyGrowthSummary({ hours: 24 });
   }
+  if (options.include_worker_diagnostics) {
+    item.auto_sync_budget_usage = ingestionWorker?.auto_sync_budget_usage || null;
+    item.worker_health_24h = ingestionWorker?.worker_health_24h || null;
+  }
   return item;
 }
 

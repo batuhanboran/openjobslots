@@ -54,7 +54,7 @@ function createMockPool(status = "idle") {
   };
 }
 
-function createStatusMockPool(controlStatus = "requested") {
+function createStatusMockPool(controlStatus = "requested", options = {}) {
   return {
     async query(sql) {
       if (/SELECT \* FROM sync_control/i.test(sql)) {
@@ -88,6 +88,35 @@ function createStatusMockPool(controlStatus = "requested") {
             active_ats: ["greenhouse"],
             last_error: ""
           }]
+        };
+      }
+      if (/SUM\(total_targets\).*targets_started_today/is.test(sql)) {
+        if (options.failWorkerDiagnosticsQueries) throw new Error("unexpected worker budget query");
+        return {
+          rows: [{
+            targets_started_today: options.targetsStartedToday ?? 1300
+          }]
+        };
+      }
+      if (/SUM\(total_targets\).*target_count_24h/is.test(sql)) {
+        if (options.failWorkerDiagnosticsQueries) throw new Error("unexpected worker health query");
+        return {
+          rows: [{
+            target_count_24h: options.targetCount24h ?? 100,
+            success_count_24h: options.successCount24h ?? 75,
+            failure_count_24h: options.failureCount24h ?? 25
+          }]
+        };
+      }
+      if (/SELECT\s+error_type[\s\S]+FROM ingestion_run_errors/i.test(sql)) {
+        if (options.failWorkerDiagnosticsQueries) throw new Error("unexpected worker failure taxonomy query");
+        return {
+          rows: options.failureReasonRows || [
+            { error_type: "parser_validation", http_status: 0, error_message: "no_geo_no_remote", count: 5 },
+            { error_type: "fetch", http_status: 500, error_message: "upstream failed", count: 2 },
+            { error_type: "no_jobs", http_status: 0, error_message: "no jobs", count: 3 },
+            { error_type: "rate_limit", http_status: 429, error_message: "too many requests", count: 4 }
+          ]
         };
       }
       if (/FROM ingestion_run_errors/i.test(sql)) {
@@ -177,6 +206,64 @@ async function testSyncStatusDefaultsToPostgresSyncControlQueue() {
       process.env.OPENJOBSLOTS_QUEUE_BACKEND = previousQueueBackend;
     }
   }
+}
+
+async function testSyncStatusIncludesWorkerBudgetAndFailureTaxonomy() {
+  const previousDailyBudget = process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET;
+  const previousTargetsPerRun = process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN;
+  process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET = "2000";
+  process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN = "50";
+  try {
+    const status = await getPostgresSyncStatus(createStatusMockPool("idle"));
+    const budgetUsage = status.ingestion_worker.auto_sync_budget_usage;
+    const workerHealth = status.ingestion_worker.worker_health_24h;
+
+    assert.equal(budgetUsage.read_only, true);
+    assert.equal(budgetUsage.daily_budget, 2000);
+    assert.equal(budgetUsage.targets_per_run, 50);
+    assert.equal(budgetUsage.targets_started_today, 1300);
+    assert.equal(budgetUsage.remaining_daily_budget, 700);
+    assert.equal(budgetUsage.daily_budget_exhausted, false);
+    assert.equal(budgetUsage.utc_day_reset_epoch - budgetUsage.utc_day_start_epoch, 86400);
+    assert.deepEqual(workerHealth, {
+      read_only: true,
+      window_hours: 24,
+      target_count: 100,
+      success_count: 75,
+      failure_count: 25,
+      success_rate_pct: 75,
+      failure_reason_counts: {
+        parser_bug: 0,
+        source_quality: 5,
+        rate_limit: 4,
+        network: 2,
+        empty_no_jobs: 3,
+        auth: 0,
+        unknown: 0
+      }
+    });
+  } finally {
+    if (previousDailyBudget === undefined) {
+      delete process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET;
+    } else {
+      process.env.INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET = previousDailyBudget;
+    }
+    if (previousTargetsPerRun === undefined) {
+      delete process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN;
+    } else {
+      process.env.INGESTION_AUTO_SYNC_TARGETS_PER_RUN = previousTargetsPerRun;
+    }
+  }
+}
+
+async function testSyncStatusCanSkipWorkerDiagnosticsForPublicStatus() {
+  const status = await getPostgresSyncStatus(
+    createStatusMockPool("idle", { failWorkerDiagnosticsQueries: true }),
+    { includeWorkerDiagnostics: false }
+  );
+
+  assert.equal(status.ingestion_worker.auto_sync_budget_usage, undefined);
+  assert.equal(status.ingestion_worker.worker_health_24h, undefined);
 }
 
 async function testParserAttentionGroupsCareerplugRejectionReasons() {
@@ -1406,6 +1493,8 @@ async function main() {
   await testSyncStatusReportsQueuedSeparatelyFromRunning();
   await testSyncStatusReportsRunningForActiveWorkerOnly();
   await testSyncStatusDefaultsToPostgresSyncControlQueue();
+  await testSyncStatusIncludesWorkerBudgetAndFailureTaxonomy();
+  await testSyncStatusCanSkipWorkerDiagnosticsForPublicStatus();
   await testParserAttentionGroupsCareerplugRejectionReasons();
   await testAtsFieldQualityReportsFieldGapsByAts();
   await testIngestionErrorsEndpointQueryIsBounded();
