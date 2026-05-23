@@ -1359,10 +1359,12 @@ function summarizeTargetAtsPatchEffect({
   targetAtsKeys = [],
   latestRun = {},
   latestRunBySource = {},
-  recentRunTrendBySource = {}
+  recentRunTrendBySource = {},
+  autoSyncBudgetUsage = {}
 } = {}) {
   const targets = normalizeTargetAtsKeys(targetAtsKeys);
   const latestRunId = Number(latestRun.latest_run_id || 0);
+  const autoSyncBudgetExhausted = Boolean(autoSyncBudgetUsage?.daily_budget_exhausted);
   const sources = targets.map((atsKey) => {
     const latestSourceRun = latestRunBySource[atsKey] || emptyLatestRunBySourceSummary(latestRunId);
     const recentTrend = recentRunTrendBySource[atsKey] || null;
@@ -1383,12 +1385,30 @@ function summarizeTargetAtsPatchEffect({
       recent_run_success_rate_pct: recentTrend?.success_rate_pct ?? null,
       measured_in_latest_run: measuredInLatestRun,
       status: measuredInLatestRun ? "measured_in_latest_run" : "pending_new_worker_run",
+      measurement_blocker_code: !measuredInLatestRun && autoSyncBudgetExhausted
+        ? "daily_budget_exhausted"
+        : "",
       next_action: measuredInLatestRun
         ? "Use latest-run source success and failure taxonomy before changing throughput."
-        : "Wait for a new worker run that includes this ATS before judging the patch effect."
+        : autoSyncBudgetExhausted
+          ? "Automatic worker daily budget is exhausted; wait for the UTC reset or an approved manual run before judging this ATS patch effect."
+          : "Wait for a new worker run that includes this ATS before judging the patch effect."
     };
   });
   const allTargetsMeasured = sources.length > 0 && sources.every((source) => source.measured_in_latest_run);
+  const needsNewMeasurement = targets.length > 0 && !allTargetsMeasured;
+  const measurementBlocker = needsNewMeasurement && autoSyncBudgetExhausted
+    ? {
+        code: "daily_budget_exhausted",
+        message: "Automatic worker daily budget is exhausted; wait for the UTC reset or an approved manual run before judging target ATS patch effect.",
+        daily_budget: Number(autoSyncBudgetUsage.daily_budget || 0),
+        targets_per_run: Number(autoSyncBudgetUsage.targets_per_run || 0),
+        targets_started_today: Number(autoSyncBudgetUsage.targets_started_today || 0),
+        remaining_daily_budget: autoSyncBudgetUsage.remaining_daily_budget ?? null,
+        utc_day_reset_epoch: Number(autoSyncBudgetUsage.utc_day_reset_epoch || 0),
+        utc_day_reset_at: epochToIso(autoSyncBudgetUsage.utc_day_reset_epoch)
+      }
+    : null;
   return {
     read_only: true,
     latest_run_id: latestRunId,
@@ -1404,7 +1424,10 @@ function summarizeTargetAtsPatchEffect({
       ? "Run diagnostics with --targets=<ats_key,...> to measure a specific parser or source patch."
       : allTargetsMeasured
         ? "Compare latest-run source success, failures, and quality-gate output before any throughput change."
-        : "Hold throughput until the target ATS appears in a completed worker run.",
+        : measurementBlocker
+          ? "Hold throughput; wait for the UTC daily budget reset or an approved manual run, then measure the target ATS in a completed worker run."
+          : "Hold throughput until the target ATS appears in a completed worker run.",
+    ...(measurementBlocker ? { measurement_blocker: measurementBlocker } : {}),
     sources
   };
 }
@@ -2760,7 +2783,8 @@ function attachBacklogDiagnostics(report, options = {}) {
     targetAtsKeys,
     latestRun,
     latestRunBySource,
-    recentRunTrendBySource
+    recentRunTrendBySource,
+    autoSyncBudgetUsage
   });
   const workerSuccessRecoveryPriorities = buildWorkerSuccessRecoveryPriorities({
     items: report.items || [],

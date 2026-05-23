@@ -1419,18 +1419,37 @@ test("attachBacklogDiagnostics marks target patch effect pending until the lates
       recentRunTrendBySourceRows: [
         { run_id: 299, status: "completed_with_errors", ats_key: "applytojob", total_targets: 10, success_count: 7, failure_count: 3 },
         { run_id: 298, status: "completed_with_errors", ats_key: "breezy", total_targets: 10, success_count: 5, failure_count: 5 }
-      ]
+      ],
+      autoSyncBudgetUsageRows: [
+        { targets_started_today: 2000 }
+      ],
+      env: {
+        INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET: "2000",
+        INGESTION_AUTO_SYNC_TARGETS_PER_RUN: "50"
+      },
+      nowEpoch: 1779548500
     }
   );
 
   assert.equal(report.diagnostics.target_ats_patch_effect.status, "pending_new_worker_run");
   assert.equal(report.diagnostics.target_ats_patch_effect.latest_run_id, 300);
   assert.equal(report.diagnostics.target_ats_patch_effect.all_targets_measured_in_latest_run, false);
+  assert.deepEqual(report.diagnostics.target_ats_patch_effect.measurement_blocker, {
+    code: "daily_budget_exhausted",
+    message: "Automatic worker daily budget is exhausted; wait for the UTC reset or an approved manual run before judging target ATS patch effect.",
+    daily_budget: 2000,
+    targets_per_run: 50,
+    targets_started_today: 2000,
+    remaining_daily_budget: 0,
+    utc_day_reset_epoch: 1779580800,
+    utc_day_reset_at: "2026-05-24T00:00:00.000Z"
+  });
   assert.deepEqual(
     report.diagnostics.target_ats_patch_effect.sources.map((source) => ({
       ats_key: source.ats_key,
       measured_in_latest_run: source.measured_in_latest_run,
       status: source.status,
+      measurement_blocker_code: source.measurement_blocker_code,
       recent_run_success_rate_pct: source.recent_run_success_rate_pct
     })),
     [
@@ -1438,12 +1457,14 @@ test("attachBacklogDiagnostics marks target patch effect pending until the lates
         ats_key: "applytojob",
         measured_in_latest_run: false,
         status: "pending_new_worker_run",
+        measurement_blocker_code: "daily_budget_exhausted",
         recent_run_success_rate_pct: 70
       },
       {
         ats_key: "breezy",
         measured_in_latest_run: false,
         status: "pending_new_worker_run",
+        measurement_blocker_code: "daily_budget_exhausted",
         recent_run_success_rate_pct: 50
       }
     ]
