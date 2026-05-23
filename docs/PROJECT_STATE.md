@@ -2,6 +2,17 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Architecture Update - May 24, 2026
+
+This update records the ATS parser modularization decision. It is architecture-only: no source apply, backfill, cleanup, public-row delete/hide, worker budget change, threshold change, or Meili replace reindex is part of this update.
+
+- Posting parser implementations now live under `server/ingestion/sources/<ats>/parse.js`; this branch has `59` source parser modules.
+- Shared parser helpers live under `server/ingestion/parsers/shared/`, currently covering HTML decoding, location/remote classification, and source-id extraction.
+- `server/index.js` is no longer the owner of parser implementations. It remains the API/bootstrap surface plus legacy collector/discovery/fetch orchestration. At this checkpoint it is `10,437` lines and should not regain ATS parser bodies.
+- `server/ingestion/sources/common.js`, `server/ingestion/direct-parser-fixtures.test.js`, and detail-refetch planning now import parser modules directly where possible.
+- The only intentional remaining source-layer dependency on `server/index.js` is the legacy `collectPostingsForCompany` fallback. The next architecture phase is to move collector/discovery/fetch orchestration into ATS source modules, then shrink `server/index.js` again.
+- Future parser/source fixes must target the relevant source module plus raw/expected fixtures. Do not fix ATS parser behavior by adding new parser code to `server/index.js`.
+
 ## Verified Current State - May 23, 2026
 
 This update supersedes the May 18 worker-gate numbers below for current reliability work.
@@ -121,6 +132,7 @@ Expected OpenJobSlots services:
 - Active search backend: Meilisearch in production.
 - Queue/control model: Postgres-backed sync/control state; pg-boss code exists but is not the primary production queue path unless deployment config says otherwise.
 - Source-job control model: source-specific dry-run/canary/apply work must use the global heavy-job advisory lock and the `ats_source_runs` audit tables.
+- ATS parser module model: parser code belongs in `server/ingestion/sources/<ats>/parse.js`; shared parser helpers belong in `server/ingestion/parsers/shared/`; `server/index.js` may call parser modules only from legacy collectors until collector extraction is complete.
 - SQLite role: local fallback, import source, isolated tests, and legacy compatibility.
 - Meilisearch role: derived public search index. Postgres remains source of truth.
 

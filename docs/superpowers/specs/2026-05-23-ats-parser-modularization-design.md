@@ -1,5 +1,13 @@
 # ATS Parser Modularization Design
 
+## Status - May 24, 2026
+
+This design has been implemented and expanded beyond the original ApplyToJob/Breezy first phase. Pure ATS posting parsers now live in `server/ingestion/sources/<ats>/parse.js` across `59` source modules, with shared parser helpers in `server/ingestion/parsers/shared/`.
+
+`server/index.js` no longer owns ATS parser implementations; it remains API/bootstrap plus legacy collector/discovery/fetch orchestration. At the May 24 checkpoint it is `10,437` lines. The next architecture phase is collector extraction from `server/index.js`, not more parser-body work inside that file.
+
+The historical line references below describe the pre-extraction checkout and should be used only as context. Current parser fixes should start from the relevant `server/ingestion/sources/<ats>/parse.js` file and add raw/expected fixture coverage.
+
 ## Goal
 
 Reduce the OpenJobSlots god-file risk by moving ATS parser logic out of `server/index.js` into focused source modules, starting with ApplyToJob and Breezy. The first implementation phase must preserve behavior exactly; parser quality fixes come only after extraction tests prove parity.

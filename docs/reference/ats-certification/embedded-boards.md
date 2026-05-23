@@ -4,6 +4,8 @@ This lane covers the embedded or semi-structured ATS tier from `server/ingestion
 
 Certification standard: each ATS needs a source endpoint record, saved raw source fixture, parser regression, normalized fixture, and proof for `location_text`, `country`, `region`, `remote_type`, `posting_date`, `source_job_id`, and `last_seen_epoch`. Inline parser tests are useful evidence, but they do not replace saved raw source fixtures.
 
+As of May 24, 2026, pure parsers belong under `server/ingestion/sources/<ats>/parse.js`. Rows that still mention `server/index.js` are pointing at legacy collector/discovery/fetch orchestration and should be updated to the source module path when that ATS is next touched.
+
 ## Current Records
 
 | ATS | Source endpoint | Parser path | Raw fixture status | Field decisions | Tests needed |

@@ -2,7 +2,9 @@
 
 This lane covers `governmentjobs`, `usajobs`, `k12jobspot`, `schoolspring`, `calcareers`, `calopps`, `statejobsny`, `policeapp`, `jobaps`, and `applitrack`.
 
-Scope for this pass is documentation only. Do not change `server/index.js` while executing this lane; use this file to drive later parser extraction, raw fixture capture, and read-only production audits.
+Scope for this pass is documentation only. Do not add new parser behavior to `server/index.js` while executing this lane; pure parser changes belong in `server/ingestion/sources/<ats>/parse.js`, and this file should drive raw fixture capture plus read-only production audits.
+
+As of May 24, 2026, rows that still mention `server/index.js` are collector/discovery/fetch orchestration notes and should be updated to the source module path when that ATS is next touched.
 
 ## Current Implementation Map
 

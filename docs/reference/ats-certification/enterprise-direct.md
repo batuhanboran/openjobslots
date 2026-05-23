@@ -4,6 +4,8 @@ Scope: enterprise/direct ATS keys from `server/ingestion/adapter-metadata.js`. T
 
 Certification remains blocked unless the source response is saved as a raw fixture and the normalized output proves `location_text`, `country`, `region`, `remote_type`, `posting_date`/`posted_at`, `source_job_id`, and `last_seen_epoch` behavior. Nullable geo/date/remote fields need raw evidence that the source omitted them.
 
+As of May 24, 2026, pure parsers belong under `server/ingestion/sources/<ats>/parse.js`. Rows that still mention `server/index.js` are collector/discovery/fetch orchestration notes and should be updated to the source module path when that ATS is next touched.
+
 ## Coverage Snapshot
 
 | ATS | Source endpoint | Parser path | Raw fixture status | Field decisions | Tests needed |

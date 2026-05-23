@@ -1,5 +1,7 @@
 # ATS Parser Modularization Implementation Plan
 
+> **Status - May 24, 2026:** Completed and superseded by the implemented architecture. The original checklist below is historical execution context. Current canonical state: ATS posting parsers live in `server/ingestion/sources/<ats>/parse.js`, shared parser helpers live in `server/ingestion/parsers/shared/`, and `server/index.js` remains API/bootstrap plus legacy collector/discovery/fetch orchestration. Future work should move collectors out of `server/index.js` and keep parser fixes inside the relevant source module with fixtures.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move ApplyToJob and Breezy parser logic out of `server/index.js` into focused ATS source modules without changing runtime behavior, then prepare a clean lane for fixture-backed parser quality fixes.

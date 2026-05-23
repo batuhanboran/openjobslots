@@ -1,6 +1,6 @@
 # Vendor-Specific ATS Certification Worksheet
 
-This lane covers the vendor-specific ATS tier from `server/ingestion/adapter-metadata.js`. All entries are implemented through the legacy collector in `server/index.js`, then normalized by `server/ingestion/posting.js`. Do not certify any row below until a saved raw source fixture and normalized expectation prove the field decisions.
+This lane covers the vendor-specific ATS tier from `server/ingestion/adapter-metadata.js`. Legacy collector/discovery/fetch orchestration may still live in `server/index.js`, but pure parser implementations now belong under `server/ingestion/sources/<ats>/parse.js`, then normalize through `server/ingestion/posting.js`. Do not certify any row below until a saved raw source fixture and normalized expectation prove the field decisions.
 
 Current raw fixture status for every ATS in this file: pending. There are no saved `server/ingestion/fixtures/{ats}-direct.json` or `{ats}-postings.json` fixtures for this tier yet. `manatal` has inline parser smoke coverage in `server/ingestion/direct-parser-fixtures.test.js`, but that is not a saved raw fixture.
 
@@ -129,7 +129,7 @@ Current raw fixture status for every ATS in this file: pending. There are no sav
 ## Required Fixture/Test Work
 
 - Add saved raw fixtures under `server/ingestion/fixtures/` for each ATS, preferring `*-direct.json` when the source is JSON/API and `*-postings.json` or a new raw HTML fixture schema when the source is HTML.
-- Export or extract pure parser functions for vendor parsers that are currently private to `server/index.js`; keep fetch/network behavior out of parser fixture tests.
+- Add or update pure parser functions in `server/ingestion/sources/<ats>/parse.js`; keep fetch/network behavior out of parser fixture tests.
 - Extend `server/ingestion/direct-parser-fixtures.test.js` or add a vendor-specific parser fixture test file that asserts normalized `source_job_id`, `canonical_url`, `apply_url`, `location_text`, `country`, `region`, `remote_type`, `posted_at`, `last_seen_epoch`, `parser_version`, and `raw_hash`.
 - Add negative parser tests for missing title, missing company, missing canonical URL, malformed cards, template links, duplicate URLs, and source responses that omit optional geo/date/remote fields.
 - Run adapter normalization plus search parity tests after field behavior changes so Postgres and Meilisearch filters keep matching the certified fields.
