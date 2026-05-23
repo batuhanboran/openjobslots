@@ -206,6 +206,7 @@ test("buildTargetFailurePressureQuery is read-only and returns full due failure 
   assert.match(query.sql, /WITH due_targets AS/i);
   assert.match(query.sql, /JOIN company_sync_state/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
+  assert.match(query.sql, /company_created_at_epoch/i);
   assert.match(query.sql, /LEFT JOIN ingestion_runs r\s+ON r\.id = e\.run_id/i);
   assert.match(query.sql, /LEFT JOIN company_sync_state error_state/i);
   assert.match(query.sql, /error_state\.last_success_epoch < r\.started_at_epoch/i);
@@ -289,6 +290,30 @@ test("summarizeTargetFailurePressureRows falls back to last error when recent gr
   assert.equal(summary.top_targets[0].next_action, "add fixture and fix parser before counting this source as scalable");
 });
 
+test("summarizeTargetFailurePressureRows classifies no-parseable last errors as empty/no-jobs", () => {
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "breezy",
+      company_url: "https://empty.breezy.hr",
+      company_name: "Empty",
+      protection_status: "normal",
+      next_sync_epoch: 1_800_000_000,
+      last_success_epoch: 0,
+      last_failure_epoch: 1_799_900_000,
+      consecutive_failures: 3,
+      last_http_status: 0,
+      last_error: "Breezy public portal returned no parseable postings",
+      recent_error_count: 0,
+      recent_error_groups: []
+    }
+  ], { nowEpoch: 1_800_000_000 });
+
+  assert.equal(summary.by_source.breezy.by_reason.empty_no_jobs, 1);
+  assert.equal(summary.by_source.breezy.dominant_failure_reason, "empty_no_jobs");
+  assert.equal(summary.top_targets[0].dominant_failure_reason, "empty_no_jobs");
+  assert.equal(summary.top_targets[0].empty_no_jobs_class, "stale_never_success_empty");
+});
+
 test("summarizeTargetFailurePressureRows keeps full source totals while bounding top targets", () => {
   const rows = [
     {
@@ -333,6 +358,71 @@ test("summarizeTargetFailurePressureRows keeps full source totals while bounding
   assert.equal(summary.by_source.applytojob.by_reason.parser_bug, 1);
   assert.equal(summary.top_targets.length, 1);
   assert.equal(summary.top_targets[0].company_url, "https://one.breezy.hr");
+});
+
+test("summarizeTargetFailurePressureRows classifies empty/no-jobs targets by prior success", () => {
+  const nowEpoch = 1_800_000_000;
+  const oldCompanyEpoch = nowEpoch - 14 * 86400;
+  const newCompanyEpoch = nowEpoch - 2 * 86400;
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "breezy",
+      company_url: "https://real-empty.breezy.hr",
+      company_name: "Real Empty",
+      protection_status: "normal",
+      company_created_at_epoch: oldCompanyEpoch,
+      last_success_epoch: nowEpoch - 3600,
+      consecutive_failures: 1,
+      recent_error_groups: [
+        { error_type: "portal_search_empty", error_message: "no jobs", count: 2 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://stale-empty.breezy.hr",
+      company_name: "Stale Empty",
+      protection_status: "normal",
+      company_created_at_epoch: oldCompanyEpoch,
+      last_success_epoch: 0,
+      consecutive_failures: 1,
+      recent_error_groups: [
+        { error_type: "no_jobs", error_message: "no jobs", count: 1 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://new-empty.breezy.hr",
+      company_name: "New Empty",
+      protection_status: "normal",
+      company_created_at_epoch: newCompanyEpoch,
+      last_success_epoch: 0,
+      consecutive_failures: 1,
+      recent_error_groups: [
+        { error_type: "no_jobs", error_message: "no jobs", count: 1 }
+      ]
+    },
+    {
+      ats_key: "applytojob",
+      company_url: "https://jobs.example.com",
+      company_name: "Apply",
+      protection_status: "normal",
+      company_created_at_epoch: oldCompanyEpoch,
+      consecutive_failures: 1,
+      recent_error_groups: [
+        { error_type: "parser_drift", error_message: "shape drift", count: 1 }
+      ]
+    }
+  ], { nowEpoch, emptyNoJobsStaleDays: 7 });
+
+  assert.equal(summary.empty_no_jobs_classification.total_targets, 3);
+  assert.equal(summary.empty_no_jobs_classification.by_class.real_empty_after_prior_success.target_count, 1);
+  assert.equal(summary.empty_no_jobs_classification.by_class.stale_never_success_empty.target_count, 1);
+  assert.equal(summary.empty_no_jobs_classification.by_class.new_never_success_empty.target_count, 1);
+  assert.equal(summary.by_source.breezy.empty_no_jobs_classification.by_class.real_empty_after_prior_success.target_count, 1);
+  assert.equal(summary.by_source.breezy.empty_no_jobs_classification.by_class.stale_never_success_empty.target_count, 1);
+  assert.equal(summary.by_source.breezy.empty_no_jobs_classification.by_class.new_never_success_empty.target_count, 1);
+  assert.equal(summary.top_targets[0].empty_no_jobs_class, "real_empty_after_prior_success");
+  assert.equal(summary.top_targets[1].empty_no_jobs_class, "stale_never_success_empty");
 });
 
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {

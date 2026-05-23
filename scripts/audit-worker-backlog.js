@@ -232,6 +232,9 @@ function classifyFailureReason(errorType, httpStatus = 0, errorMessage = "") {
   if (status === 429 || RATE_LIMIT_ERROR_TYPES.includes(type)) return "rate_limit";
   if (isSourceQualityParserValidation(type, errorMessage)) return "source_quality";
   if (type === "unknown" && isSourceQualityValidationMessage(errorMessage)) return "source_quality";
+  if (message.includes("no parseable postings") || message.includes("no parseable jobs") || message.includes("no jobs")) {
+    return "empty_no_jobs";
+  }
   if (message.includes("parser drift") || message.includes("payload shape similarity")) return "parser_bug";
   if (isParserAttentionErrorType(type) || type.startsWith("parser_")) return "parser_bug";
   if (SOURCE_QUALITY_ERROR_TYPES.includes(type)) return "source_quality";
@@ -627,6 +630,7 @@ function buildTargetFailurePressureQuery(options = {}) {
           c.ats_key,
           c.url_string AS company_url,
           c.company_name,
+          COALESCE(EXTRACT(EPOCH FROM c.created_at)::bigint, 0)::bigint AS company_created_at_epoch,
           COALESCE(NULLIF(s.protection_status, ''), 'normal') AS protection_status,
           COALESCE(st.next_sync_epoch, 0)::bigint AS next_sync_epoch,
           COALESCE(st.last_success_epoch, 0)::bigint AS last_success_epoch,
@@ -697,6 +701,7 @@ function buildTargetFailurePressureQuery(options = {}) {
         d.ats_key,
         d.company_url,
         d.company_name,
+        d.company_created_at_epoch,
         d.protection_status,
         d.next_sync_epoch,
         d.last_success_epoch,
@@ -1646,11 +1651,61 @@ function mergeReasonCounts(target, source = {}) {
   }
 }
 
+function createEmptyNoJobsClassificationSummary(staleDays = 7) {
+  const byClass = {};
+  for (const name of [
+    "real_empty_after_prior_success",
+    "stale_never_success_empty",
+    "new_never_success_empty"
+  ]) {
+    byClass[name] = {
+      target_count: 0,
+      failure_pressure: 0,
+      recent_error_count: 0
+    };
+  }
+  return {
+    read_only: true,
+    stale_never_success_after_days: staleDays,
+    total_targets: 0,
+    failure_pressure: 0,
+    recent_error_count: 0,
+    by_class: byClass
+  };
+}
+
+function addEmptyNoJobsClassification(summary, className, row = {}) {
+  if (!summary || !className || !summary.by_class[className]) return;
+  const consecutiveFailures = Number(row.consecutive_failures || 0);
+  const recentErrorCount = Number(row.recent_error_count || 0);
+  summary.total_targets += 1;
+  summary.failure_pressure += consecutiveFailures;
+  summary.recent_error_count += recentErrorCount;
+  summary.by_class[className].target_count += 1;
+  summary.by_class[className].failure_pressure += consecutiveFailures;
+  summary.by_class[className].recent_error_count += recentErrorCount;
+}
+
+function classifyEmptyNoJobsTarget(row = {}, recentErrors = {}, reason = "", options = {}) {
+  const emptyCount = Number(recentErrors?.empty_no_jobs_count || recentErrors?.by_reason?.empty_no_jobs || 0);
+  if (reason !== "empty_no_jobs" && emptyCount <= 0) return "";
+  if (Number(row.last_success_epoch || 0) > 0) return "real_empty_after_prior_success";
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
+  const staleDays = Math.max(1, Math.min(365, Math.floor(Number(options.emptyNoJobsStaleDays || 7))));
+  const companyCreatedAtEpoch = Number(row.company_created_at_epoch || 0);
+  if (companyCreatedAtEpoch > 0 && nowEpoch - companyCreatedAtEpoch < staleDays * 86400) {
+    return "new_never_success_empty";
+  }
+  return "stale_never_success_empty";
+}
+
 function summarizeTargetFailurePressureRows(rows = [], options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.targetPressureLimit || options.limit || 25))));
+  const staleDays = Math.max(1, Math.min(365, Math.floor(Number(options.emptyNoJobsStaleDays || 7))));
   const bySource = {};
   const topTargets = [];
+  const emptyNoJobsClassification = createEmptyNoJobsClassificationSummary(staleDays);
   let failurePressure = 0;
   let recentErrorCount = 0;
 
@@ -1671,6 +1726,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
         target_count: 0,
         failure_pressure: 0,
         recent_error_count: 0,
+        empty_no_jobs_classification: createEmptyNoJobsClassificationSummary(staleDays),
         by_reason: {}
       };
     }
@@ -1680,6 +1736,15 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     mergeReasonCounts(bySource[atsKey].by_reason, recentErrors.by_reason);
     if (reason && recentErrors.total_count <= 0) {
       bySource[atsKey].by_reason[reason] = Number(bySource[atsKey].by_reason[reason] || 0) + 1;
+    }
+    const emptyNoJobsClass = classifyEmptyNoJobsTarget(row, recentErrors, reason, options);
+    if (emptyNoJobsClass) {
+      const classificationRow = {
+        consecutive_failures: consecutiveFailures,
+        recent_error_count: rowRecentErrorCount
+      };
+      addEmptyNoJobsClassification(emptyNoJobsClassification, emptyNoJobsClass, classificationRow);
+      addEmptyNoJobsClassification(bySource[atsKey].empty_no_jobs_classification, emptyNoJobsClass, classificationRow);
     }
 
     topTargets.push({
@@ -1699,6 +1764,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
       recent_error_count: rowRecentErrorCount,
       recent_errors: recentErrors,
       dominant_failure_reason: reason,
+      empty_no_jobs_class: emptyNoJobsClass || null,
       next_action: targetPressureNextAction(reason)
     });
   }
@@ -1714,6 +1780,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     target_count: topTargets.length,
     failure_pressure: failurePressure,
     recent_error_count: recentErrorCount,
+    empty_no_jobs_classification: emptyNoJobsClassification,
     by_source: bySource,
     top_targets: topTargets.slice(0, limit)
   };
