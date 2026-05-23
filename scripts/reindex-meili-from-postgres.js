@@ -44,6 +44,8 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     replaceMode: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPLACE_MODE),
     json: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_JSON),
     output: String(env.OPENJOBSLOTS_REINDEX_OUTPUT || "").trim(),
+    repairExtraDocuments: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPAIR_EXTRA_DOCUMENTS) ||
+      parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_DELETE_EXTRA_DOCUMENTS),
     sampleLimit: parseNumberOption(env.OPENJOBSLOTS_REINDEX_SAMPLE_LIMIT || 25, 25, 0, 200),
     taskTimeoutMs: parseNumberOption(env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000, 120000, 30000, 300000),
     tempIndexSuffix: String(env.OPENJOBSLOTS_REINDEX_TEMP_SUFFIX || "").trim(),
@@ -59,6 +61,10 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     if (arg === "--dry-run") {
       options.check = true;
       options.dryRun = true;
+    }
+    if (arg === "--repair-extra-documents" || arg === "--repair-extra-docs" || arg === "--delete-extra-documents") {
+      options.check = true;
+      options.repairExtraDocuments = true;
     }
     if (arg === "--replace" || arg === "--replace-mode") {
       options.replaceMode = true;
@@ -83,6 +89,7 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
       options.output = String(arg.slice("--output=".length) || "").trim();
     }
   }
+  if (options.repairExtraDocuments) options.check = true;
   return options;
 }
 
@@ -812,6 +819,61 @@ function getReplaceSafetyGate(options) {
   };
 }
 
+function getExtraDocumentRepairSafetyGate(options) {
+  const missing = [];
+  if (!options.apply) missing.push("--apply");
+  if (!options.confirmProduction) missing.push("--confirm-production");
+  if (options.dryRun) missing.push("remove --dry-run");
+  return {
+    repair_requested: Boolean(options.repairExtraDocuments),
+    apply_requested: Boolean(options.apply),
+    confirm_production: Boolean(options.confirmProduction),
+    dry_run: Boolean(options.dryRun),
+    authorized: missing.length === 0,
+    missing
+  };
+}
+
+function compactRepairDocument(document) {
+  return {
+    id: String(document?.id || "").trim(),
+    canonical_url: String(document?.canonical_url || "").trim(),
+    title: String(document?.title || "").trim(),
+    company: String(document?.company || "").trim(),
+    remote_type: String(document?.remote_type || "").trim(),
+    hidden: Boolean(document?.hidden),
+    postgres_index_status: String(document?.postgres_index_status || "unknown").trim() || "unknown",
+    postgres_exclusion_reasons: Array.isArray(document?.postgres_exclusion_reasons)
+      ? document.postgres_exclusion_reasons.map((reason) => String(reason || "").trim()).filter(Boolean)
+      : []
+  };
+}
+
+function isExtraDocumentDeleteCandidate(document) {
+  const id = String(document?.id || "").trim();
+  const status = String(document?.postgres_index_status || "").trim();
+  return Boolean(id) && ["excluded_visible", "hidden", "not_found"].includes(status);
+}
+
+function buildExtraDocumentRepairPlan(checkResult = {}) {
+  const extraDocuments = (Array.isArray(checkResult.extra_meili_documents) ? checkResult.extra_meili_documents : [])
+    .map(compactRepairDocument)
+    .filter((document) => document.id);
+  const deleteCandidates = extraDocuments.filter(isExtraDocumentDeleteCandidate);
+  const skippedDocuments = extraDocuments.filter((document) => !isExtraDocumentDeleteCandidate(document));
+  const diagnosis = checkResult.drift_diagnosis || {};
+  const totalExtraDocumentCount = Number(checkResult.extra_meili_document_count || extraDocuments.length || 0);
+  return {
+    total_extra_document_count: totalExtraDocumentCount,
+    sampled_extra_document_count: extraDocuments.length,
+    sample_complete: Boolean(diagnosis.sample_complete),
+    delete_candidate_count: deleteCandidates.length,
+    delete_candidates: deleteCandidates,
+    skipped_count: skippedDocuments.length,
+    skipped_documents: skippedDocuments
+  };
+}
+
 function latestFacetDeltaSummary(delta) {
   const entries = Object.entries(delta || {});
   if (entries.length === 0) return null;
@@ -974,6 +1036,90 @@ async function runReplaceReindex(pool, config, options) {
   }
 }
 
+async function runExtraDocumentRepair(pool, config, options, env = process.env) {
+  const gate = getExtraDocumentRepairSafetyGate(options);
+  const checkResult = await checkMeiliParity(pool, config, options);
+  const repairPlan = buildExtraDocumentRepairPlan(checkResult);
+
+  writeStatusSafe({
+    ok: checkResult.ok,
+    current_index_uid: config.indexName,
+    last_count_delta: checkResult.count_delta,
+    last_facet_delta: latestFacetDeltaSummary(checkResult.remote_facet_delta),
+    last_task_error: checkResult.ok ? "" : "Meili/Postgres validation mismatch."
+  }, options, env);
+
+  if (!gate.authorized) {
+    return {
+      ok: checkResult.ok,
+      check: true,
+      repair_extra_documents: true,
+      dry_run: true,
+      approval_required: true,
+      safety_gate: gate,
+      validation: checkResult,
+      repair_plan: repairPlan,
+      deleted_count: 0,
+      deleted_documents: [],
+      message: "Extra Meili document repair not executed; required safety flags are missing."
+    };
+  }
+
+  if (!config.enabled) {
+    throw new Error("OPENJOBSLOTS_SEARCH_BACKEND=meili is required for extra document repair.");
+  }
+
+  if (!repairPlan.sample_complete) {
+    return {
+      ok: false,
+      check: true,
+      repair_extra_documents: true,
+      dry_run: false,
+      approval_required: true,
+      safety_gate: gate,
+      validation: checkResult,
+      repair_plan: repairPlan,
+      deleted_count: 0,
+      deleted_documents: [],
+      error: "Refusing to apply extra document repair because the drift sample is incomplete."
+    };
+  }
+
+  const deletedDocuments = [];
+  for (const document of repairPlan.delete_candidates) {
+    const deleteTask = await meiliRequest(
+      config,
+      `/indexes/${encodeIndex(config.indexName)}/documents/${encodeURIComponent(document.id)}`,
+      { method: "DELETE" }
+    );
+    await waitForMeiliTask(config, deleteTask, options.taskTimeoutMs);
+    deletedDocuments.push(document);
+  }
+
+  const postRepairCheck = await checkMeiliParity(pool, config, options);
+  writeStatusSafe({
+    ok: postRepairCheck.ok,
+    current_index_uid: config.indexName,
+    last_count_delta: postRepairCheck.count_delta,
+    last_facet_delta: latestFacetDeltaSummary(postRepairCheck.remote_facet_delta),
+    last_task_error: postRepairCheck.ok ? "" : "Post-repair Meili/Postgres validation mismatch."
+  }, options, env);
+
+  return {
+    ok: postRepairCheck.ok,
+    check: true,
+    repair_extra_documents: true,
+    dry_run: false,
+    approval_required: false,
+    safety_gate: gate,
+    validation: checkResult,
+    repair_plan: repairPlan,
+    deleted_count: deletedDocuments.length,
+    deleted_documents: deletedDocuments,
+    post_repair_check: postRepairCheck
+  };
+}
+
 async function runIncrementalReindex(pool, config, options) {
   await ensurePostgresSchema(pool);
   await ensureMeiliIndex(config, config.indexName, options.taskTimeoutMs);
@@ -991,6 +1137,15 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
         reason: "OPENJOBSLOTS_DB_BACKEND is not postgres; Meili reindex checks require the Postgres source of truth."
       };
       return writeResultOutput(skipped, options);
+    }
+
+    if (options.repairExtraDocuments) {
+      const result = await withHeavyJobLock(
+        pool,
+        "meili-extra-document-repair",
+        () => runExtraDocumentRepair(pool, config, options, env)
+      );
+      return writeResultOutput(result, options);
     }
 
     if ((options.replaceMode || options.replaceIndex) && !options.validateOnly) {
@@ -1045,6 +1200,7 @@ module.exports = {
   compareMeiliDocument,
   compareSettingList,
   ensureMeiliIndex,
+  getExtraDocumentRepairSafetyGate,
   getMeiliRemoteFacet,
   getPostgresRemoteFacet,
   getReplaceSafetyGate,

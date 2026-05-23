@@ -6,6 +6,7 @@ const path = require("node:path");
 const { toMeiliPostingDocument, upsertMeiliPostings } = require("../server/search/meili");
 const {
   ensureMeiliIndex,
+  getExtraDocumentRepairSafetyGate,
   getReplaceSafetyGate,
   compareSettingList,
   compareMeiliDocument,
@@ -57,8 +58,13 @@ test("reindex check mode is explicit and non-mutating", () => {
   assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).output, "reports/meili.json");
   assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).apply, true);
   assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).confirmProduction, true);
+  assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).repairExtraDocuments, true);
+  assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).check, true);
+  assert.equal(parseReindexArgs(["--delete-extra-documents"], {}).repairExtraDocuments, true);
   assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
   assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
+  assert.equal(getExtraDocumentRepairSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
+  assert.equal(getExtraDocumentRepairSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
 });
 
 test("reindex check can write JSON output without mutating", async () => {
@@ -528,6 +534,212 @@ test("replace validation catches count mismatch", async () => {
       approval_required: true,
       suggested_next_action: "delete_extra_meili_documents_or_replace_reindex_after_explicit_approval"
     });
+  } finally {
+    mock.restore();
+  }
+});
+
+test("extra Meili document repair defaults to dry-run without deleting", async () => {
+  const staleDocument = {
+    id: "stale-id",
+    canonical_url: "https://example.com/jobs/stale-open-position",
+    title: "Open Position",
+    company: "Demo Co",
+    remote_type: "onsite",
+    hidden: false
+  };
+  const mock = installFetchMock((url, options) => {
+    if (url.endsWith("/indexes/postings")) return createResponse(200, { uid: "postings", primaryKey: "id" });
+    if (url.endsWith("/indexes/postings/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings/stats")) return createResponse(200, { numberOfDocuments: 2 });
+    if (url.endsWith("/indexes/postings/search")) {
+      const body = JSON.parse(options.body || "{}");
+      if (Array.isArray(body.facets)) {
+        return createResponse(200, { facetDistribution: { remote_type: { remote: 1, onsite: 1 } }, hits: [], estimatedTotalHits: 0 });
+      }
+      return createResponse(200, { hits: [], estimatedTotalHits: 0 });
+    }
+    if (url.includes("/indexes/postings/documents?")) {
+      return createResponse(200, {
+        results: [
+          {
+            id: toMeiliPostingDocument(posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })).id,
+            canonical_url: "https://example.com/jobs/remote-00000000",
+            title: "Software Engineer",
+            company: "Example Co",
+            remote_type: "remote",
+            hidden: false
+          },
+          staleDocument
+        ]
+      });
+    }
+    if (options.method === "DELETE") throw new Error("dry-run must not delete documents");
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await withSilencedConsole(() =>
+      runReindex(
+        makePool({
+          count: 1,
+          facet: { remote: 1 },
+          rows: [posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })],
+          driftRows: [posting({
+            canonical_url: "https://example.com/jobs/stale-open-position",
+            company_name: "Demo Co",
+            position_name: "Open Position",
+            remote_type: "onsite"
+          })]
+        }),
+        {
+          repairExtraDocuments: true,
+          check: true,
+          apply: false,
+          confirmProduction: false,
+          dryRun: false,
+          batchSize: 100,
+          sampleLimit: 0,
+          taskTimeoutMs: 1000,
+          writeStatus: false
+        },
+        { OPENJOBSLOTS_SEARCH_BACKEND: "meili", MEILI_HOST: "http://meili.test" }
+      )
+    );
+
+    assert.equal(result.repair_extra_documents, true);
+    assert.equal(result.dry_run, true);
+    assert.equal(result.safety_gate.authorized, false);
+    assert.equal(result.deleted_count, 0);
+    assert.equal(result.repair_plan.delete_candidate_count, 1);
+    assert.deepEqual(result.repair_plan.delete_candidates.map((document) => document.id), ["stale-id"]);
+    assert.equal(mock.calls.some((call) => call.options.method === "DELETE"), false);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("extra Meili document repair only deletes non-indexable extras when approved", async () => {
+  const indexableDuplicate = {
+    id: "legacy-indexable-id",
+    canonical_url: "https://example.com/jobs/current-indexable",
+    title: "Software Engineer",
+    company: "Example Co",
+    remote_type: "remote",
+    hidden: false
+  };
+  const staleDocument = {
+    id: "stale-id",
+    canonical_url: "https://example.com/jobs/stale-open-position",
+    title: "Open Position",
+    company: "Demo Co",
+    remote_type: "onsite",
+    hidden: false
+  };
+  let statsCallCount = 0;
+  let documentsCallCount = 0;
+  const mock = installFetchMock((url, options) => {
+    if (url.endsWith("/indexes/postings")) return createResponse(200, { uid: "postings", primaryKey: "id" });
+    if (url.endsWith("/indexes/postings/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings/stats")) {
+      statsCallCount += 1;
+      return createResponse(200, { numberOfDocuments: statsCallCount === 1 ? 3 : 2 });
+    }
+    if (url.endsWith("/indexes/postings/search")) {
+      const body = JSON.parse(options.body || "{}");
+      if (Array.isArray(body.facets)) {
+        return createResponse(200, {
+          facetDistribution: {
+            remote_type: statsCallCount === 1 ? { remote: 2, onsite: 1 } : { remote: 2 }
+          },
+          hits: [],
+          estimatedTotalHits: 0
+        });
+      }
+      return createResponse(200, { hits: [], estimatedTotalHits: 0 });
+    }
+    if (url.includes("/indexes/postings/documents?")) {
+      documentsCallCount += 1;
+      return createResponse(200, {
+        results: documentsCallCount === 1
+          ? [
+            {
+              id: toMeiliPostingDocument(posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })).id,
+              canonical_url: "https://example.com/jobs/remote-00000000",
+              title: "Software Engineer",
+              company: "Example Co",
+              remote_type: "remote",
+              hidden: false
+            },
+            indexableDuplicate,
+            staleDocument
+          ]
+          : [
+            {
+              id: toMeiliPostingDocument(posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })).id,
+              canonical_url: "https://example.com/jobs/remote-00000000",
+              title: "Software Engineer",
+              company: "Example Co",
+              remote_type: "remote",
+              hidden: false
+            },
+            {
+              id: toMeiliPostingDocument(posting({ canonical_url: "https://example.com/jobs/current-indexable", remote_type: "remote" })).id,
+              canonical_url: "https://example.com/jobs/current-indexable",
+              title: "Software Engineer",
+              company: "Example Co",
+              remote_type: "remote",
+              hidden: false
+            }
+          ]
+      });
+    }
+    if (url.endsWith("/indexes/postings/documents/stale-id") && options.method === "DELETE") {
+      return createResponse(202, { taskUid: 30 });
+    }
+    if (url.endsWith("/tasks/30")) return createResponse(200, { uid: 30, status: "succeeded" });
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await withSilencedConsole(() =>
+      runReindex(
+        makePool({
+          count: 2,
+          facet: { remote: 2 },
+          rows: [
+            posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" }),
+            posting({ canonical_url: "https://example.com/jobs/current-indexable", remote_type: "remote" })
+          ],
+          driftRows: [
+            posting({ canonical_url: "https://example.com/jobs/current-indexable", remote_type: "remote" }),
+            posting({
+              canonical_url: "https://example.com/jobs/stale-open-position",
+              company_name: "Demo Co",
+              position_name: "Open Position",
+              remote_type: "onsite"
+            })
+          ]
+        }),
+        {
+          repairExtraDocuments: true,
+          check: true,
+          apply: true,
+          confirmProduction: true,
+          dryRun: false,
+          batchSize: 100,
+          sampleLimit: 0,
+          taskTimeoutMs: 1000,
+          writeStatus: false
+        },
+        { OPENJOBSLOTS_SEARCH_BACKEND: "meili", MEILI_HOST: "http://meili.test" }
+      )
+    );
+
+    assert.equal(result.dry_run, false);
+    assert.equal(result.deleted_count, 1);
+    assert.deepEqual(result.deleted_documents.map((document) => document.id), ["stale-id"]);
+    assert.deepEqual(result.repair_plan.skipped_documents.map((document) => document.id), ["legacy-indexable-id"]);
+    assert.equal(mock.calls.some((call) => call.url.endsWith("/indexes/postings/documents/legacy-indexable-id") && call.options.method === "DELETE"), false);
+    assert.equal(result.post_repair_check.count_delta, 0);
   } finally {
     mock.restore();
   }
