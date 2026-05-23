@@ -172,6 +172,84 @@ test("applytojob source module enriches list rows from JSON-LD and labeled detai
   assert.equal(evaluatePublicPosting(byId["ATJ2004"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("applytojob source fetch spends limited detail budget on rows missing geo evidence", async () => {
+  const source = getSourceModule("applytojob");
+  const company = {
+    company_name: "Fixture ApplyToJob",
+    ATS_name: "applytojob",
+    url_string: "https://fixture.applytojob.com/apply"
+  };
+  const previousLimit = process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY;
+  process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY = "1";
+  const fetchedUrls = [];
+  try {
+    const raw = await source.fetchList(company, {
+      fetcher: async (url) => {
+        const value = String(url || "");
+        fetchedUrls.push(value);
+        if (value.endsWith("/apply")) {
+          return {
+            status: 200,
+            url: value,
+            html: `
+              <ul>
+                <li class="list-group-item">
+                  <h3 class="list-group-item-heading"><a href="/apply/ATJ-CLEAN/Operations-Lead">Operations Lead</a></h3>
+                  <i class="fa fa-map-marker"></i>Austin, TX, United States
+                  <i class="fa fa-calendar"></i>2026-05-12
+                </li>
+                <li class="list-group-item">
+                  <h3 class="list-group-item-heading"><a href="/apply/ATJ-NEEDS/Training-Manager">Training Manager</a></h3>
+                </li>
+              </ul>
+            `
+          };
+        }
+        if (value.includes("/ATJ-NEEDS/")) {
+          return {
+            status: 200,
+            url: value,
+            html: `
+              <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "JobPosting",
+                  "title": "Training Manager",
+                  "datePosted": "2026-05-13",
+                  "jobLocation": {
+                    "@type": "Place",
+                    "address": {
+                      "@type": "PostalAddress",
+                      "addressLocality": "Iloilo City",
+                      "addressRegion": "Iloilo",
+                      "addressCountry": "PH"
+                    }
+                  }
+                }
+              </script>
+            `
+          };
+        }
+        return { status: 200, url: value, html: "<html></html>" };
+      }
+    });
+    const parsed = source.parse(raw, company);
+    const normalized = parsed.map((posting) => source.normalize(posting, company));
+    const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+    assert.ok(fetchedUrls.some((url) => url.includes("/ATJ-NEEDS/")));
+    assert.equal(byId["ATJ-NEEDS"].country, "Philippines");
+    assert.equal(byId["ATJ-NEEDS"].city, "Iloilo City");
+    assert.equal(evaluatePublicPosting(byId["ATJ-NEEDS"], { parserVersion: source.parserVersion }).status, "accepted");
+  } finally {
+    if (previousLimit === undefined) {
+      delete process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY;
+    } else {
+      process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY = previousLimit;
+    }
+  }
+});
+
 test("applytojob source module parses generic card links with labeled fields", () => {
   const source = getSourceModule("applytojob");
   const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));

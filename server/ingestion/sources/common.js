@@ -789,6 +789,56 @@ function applyToJobDetailKey(urlValue) {
   }
 }
 
+function hasExplicitSourceRemote(posting = {}) {
+  return ["remote", "hybrid", "onsite"].includes(clean(posting.remote_type).toLowerCase());
+}
+
+function sourceFailureReasonSet(posting = {}) {
+  return new Set(
+    (Array.isArray(posting.source_failure_reasons) ? posting.source_failure_reasons : [])
+      .map((reason) => clean(reason).toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function applyToJobPostingNeedsDetail(posting = {}) {
+  const reasons = sourceFailureReasonSet(posting);
+  if (
+    reasons.has("no_structured_location") ||
+    reasons.has("detail_no_structured_location") ||
+    reasons.has("no_explicit_remote_evidence") ||
+    reasons.has("detail_no_explicit_remote") ||
+    reasons.has("ambiguous_location") ||
+    reasons.has("no_normalized_geo_or_explicit_remote")
+  ) {
+    return true;
+  }
+  if (!hasUsefulGeoEvidence(posting) && !hasExplicitSourceRemote(posting)) return true;
+  return !clean(posting.posting_date);
+}
+
+function detailPriorityScore(posting = {}, needsDetail) {
+  const reasons = sourceFailureReasonSet(posting);
+  let score = needsDetail(posting) ? 100 : 0;
+  if (!hasUsefulGeoEvidence(posting) && !hasExplicitSourceRemote(posting)) score += 40;
+  if (reasons.has("no_structured_location") || reasons.has("detail_no_structured_location")) score += 30;
+  if (reasons.has("ambiguous_location")) score += 25;
+  if (reasons.has("no_explicit_remote_evidence") || reasons.has("detail_no_explicit_remote")) score += 15;
+  if (!clean(posting.posting_date)) score += 5;
+  return score;
+}
+
+function prioritizeDetailCandidates(postings = [], needsDetail) {
+  return (Array.isArray(postings) ? postings : [])
+    .map((posting, index) => ({
+      posting,
+      index,
+      score: detailPriorityScore(posting, needsDetail)
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((item) => item.posting);
+}
+
 async function fetchApplyToJobSourceList(company = {}, target = {}, options = {}) {
   const context = buildCompanyContext(company);
   const discovered = target && target.list_url ? target : SOURCE_SPECS.applytojob.discover(context);
@@ -820,14 +870,15 @@ async function fetchApplyToJobSourceList(company = {}, target = {}, options = {}
     });
   }
 
-  const detailLimit = Math.max(0, Math.min(50, Number(process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY || 5)));
+  const detailLimit = Math.max(0, Math.min(50, Number(process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY || 15)));
   let detailFetches = 0;
   const detailHtmlByUrl = {};
   const detailStatusByUrl = {};
   const detailFailureByUrl = {};
 
-  for (const posting of parsed) {
+  for (const posting of prioritizeDetailCandidates(parsed, applyToJobPostingNeedsDetail)) {
     if (detailFetches >= detailLimit) break;
+    if (!applyToJobPostingNeedsDetail(posting)) continue;
     const detailUrl = clean(posting.job_posting_url);
     if (!detailUrl) continue;
     try {
@@ -913,13 +964,13 @@ async function fetchBreezySourceList(company = {}, target = {}, options = {}) {
     });
   }
 
-  const detailLimit = Math.max(0, Math.min(75, Number(process.env.OPENJOBSLOTS_BREEZY_DETAIL_FETCH_LIMIT_PER_COMPANY || 8)));
+  const detailLimit = Math.max(0, Math.min(75, Number(process.env.OPENJOBSLOTS_BREEZY_DETAIL_FETCH_LIMIT_PER_COMPANY || 20)));
   let detailFetches = 0;
   const detailHtmlByUrl = {};
   const detailStatusByUrl = {};
   const detailFailureByUrl = {};
 
-  for (const posting of parsed) {
+  for (const posting of prioritizeDetailCandidates(parsed, breezyPostingNeedsDetail)) {
     if (detailFetches >= detailLimit) break;
     if (!breezyPostingNeedsDetail(posting)) continue;
     const detailUrl = clean(posting.job_posting_url);

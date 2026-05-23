@@ -132,6 +132,40 @@ test("applicantpro parser returns no postings for empty raw payloads", () => {
   );
 });
 
+test("greenhouse parser derives country from the selected posting location", () => {
+  const adapter = adapters.get("greenhouse");
+  const parsed = parseGreenhousePostingsFromApi("Fixture Greenhouse", {
+    boardTokenLower: "fixturegreenhouse"
+  }, {
+    jobs: [
+      {
+        id: 7620323003,
+        absolute_url: "https://job-boards.greenhouse.io/fixturegreenhouse/jobs/7620323003",
+        title: "Lead Data Analyst, Marketing Analytics",
+        first_published: "2026-05-23T00:00:00.000Z",
+        location: { name: "Toronto, Ontario, Canada" },
+        offices: [
+          { location: "Lisbon, Portugal" }
+        ],
+        departments: [
+          { name: "Marketing" }
+        ]
+      }
+    ]
+  });
+
+  assert.equal(parsed.length, 1);
+  const normalized = adapter.normalize(parsed[0], {
+    company_name: "Fixture Greenhouse",
+    ATS_name: "greenhouse",
+    url_string: "https://job-boards.greenhouse.io/fixturegreenhouse"
+  });
+  assert.equal(normalized.location_text, "Toronto, Ontario, Canada");
+  assert.equal(normalized.country, "Canada");
+  assert.equal(normalized.city, "Toronto");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: adapter.parserVersion }).status, "accepted");
+});
+
 const newlyCertifiedFailureFixtures = [
   "applicantpro-failures.json",
   "ashby-failures.json",
@@ -743,6 +777,60 @@ test("careerplug parser reads sibling location cells from public jobs rows", () 
   assert.equal(normalized.country, "United States");
   assert.equal(normalized.region, "North America");
   assert.equal(normalized.location_text, "NY-Brooklyn-11226");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: adapter.parserVersion }).status, "accepted");
+});
+
+test("careerplug parser reads detail JSON-LD and skips localized apply links", () => {
+  const adapter = adapters.get("careerplug");
+  const parsed = parseCareerplugPostingsFromHtml(
+    "FASTSIGNS #175201",
+    { baseOrigin: "https://fastsigns-175201.careerplug.com" },
+    `
+      <script type="application/ld+json">
+        {
+          "@context": "http://schema.org/",
+          "@type": "JobPosting",
+          "title": "Sales Specialist Signage Graphics Industry",
+          "description": "&lt;div class=&quot;benefits&quot;&gt;Training&lt;/div&gt;",
+          "datePosted": "2020-11-10T15:47:35+00:00",
+          "employmentType": "FULL_TIME",
+          "hiringOrganization": {
+            "@type": "Organization",
+            "name": "FASTSIGNS #175201"
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Davie",
+              "addressRegion": "FL",
+              "postalCode": "33317",
+              "addressCountry": "US"
+            }
+          }
+        }
+      </script>
+      <link rel="alternate" href="https://app.careerplug.com/jobs/1182630/apps/new">
+      <div class="language-select">
+        <a href="/jobs/1182630/apps/new?loc=es" class="btn btn-default">Espanol</a>
+      </div>
+    `
+  );
+
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].source_job_id, "1182630");
+  assert.equal(parsed[0].job_posting_url, "https://fastsigns-175201.careerplug.com/jobs/1182630");
+  assert.equal(parsed[0].position_name, "Sales Specialist Signage Graphics Industry");
+  assert.equal(parsed[0].location, "Davie, FL, United States");
+  assert.equal(parsed[0].employment_type, "FULL_TIME");
+
+  const normalized = adapter.normalize(parsed[0], {
+    company_name: "FASTSIGNS #175201",
+    ATS_name: "careerplug",
+    url_string: "https://fastsigns-175201.careerplug.com/jobs"
+  });
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Davie");
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: adapter.parserVersion }).status, "accepted");
 });
 
