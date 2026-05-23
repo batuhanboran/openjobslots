@@ -506,6 +506,67 @@ test("summarizeTargetFailurePressureRows groups stale empty cleanup candidates f
   assert.equal(cleanup.review_groups[1].sample_targets.length, 2);
 });
 
+test("summarizeTargetFailurePressureRows groups failure reasons for parser review", () => {
+  const summary = summarizeTargetFailurePressureRows([
+    {
+      ats_key: "applytojob",
+      company_url: "https://one.applytojob.com",
+      company_name: "One",
+      protection_status: "normal",
+      consecutive_failures: 3,
+      last_error: "Parser drift detected: job cards missing title",
+      recent_error_groups: [
+        { error_type: "parser_drift", error_message: "job cards missing title", count: 2 }
+      ]
+    },
+    {
+      ats_key: "applytojob",
+      company_url: "https://two.applytojob.com",
+      company_name: "Two",
+      protection_status: "normal",
+      consecutive_failures: 2,
+      last_error: "Parser drift detected: job cards missing title",
+      recent_error_groups: [
+        { error_type: "parser_drift", error_message: "job cards missing title", count: 1 }
+      ]
+    },
+    {
+      ats_key: "bamboohr",
+      company_url: "https://example.bamboohr.com/careers",
+      company_name: "Bamboo",
+      protection_status: "normal",
+      consecutive_failures: 4,
+      last_error: "Parser validation failed: missing source id",
+      recent_error_groups: [
+        { error_type: "parser_validation", error_message: "missing source id", count: 1 }
+      ]
+    },
+    {
+      ats_key: "breezy",
+      company_url: "https://empty.breezy.hr",
+      company_name: "Empty",
+      protection_status: "normal",
+      consecutive_failures: 1,
+      last_error: "Breezy public portal returned no parseable postings",
+      recent_error_groups: [
+        { error_type: "no_jobs", error_message: "no jobs", count: 1 }
+      ]
+    }
+  ], { emptyNoJobsSampleLimit: 2 });
+
+  assert.equal(summary.failure_reason_review_groups.length, 3);
+  assert.equal(summary.failure_reason_review_groups[0].failure_reason, "parser_bug");
+  assert.equal(summary.failure_reason_review_groups[0].ats_key, "applytojob");
+  assert.equal(summary.failure_reason_review_groups[0].error_signature, "parser drift detected: job cards missing title");
+  assert.equal(summary.failure_reason_review_groups[0].target_count, 2);
+  assert.equal(summary.failure_reason_review_groups[0].failure_pressure, 5);
+  assert.equal(summary.failure_reason_review_groups[0].sample_targets.length, 2);
+  assert.equal(summary.failure_reason_review_groups[1].ats_key, "bamboohr");
+  assert.equal(summary.failure_reason_review_groups[1].failure_pressure, 4);
+  assert.equal(summary.by_source.applytojob.failure_reason_review_groups[0].target_count, 2);
+  assert.equal(summary.by_source.applytojob.failure_reason_review_groups[0].sample_targets[0].company_url, "https://one.applytojob.com");
+});
+
 test("summarizeBacklogRows explains protection-state impact and budget projection", () => {
   const report = summarizeBacklogRows(
     [

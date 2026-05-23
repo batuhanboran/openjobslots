@@ -1738,6 +1738,47 @@ function cleanupErrorSignature(row = {}) {
   return signature || "empty/no jobs";
 }
 
+function addFailureReasonReviewGroup(groups = [], row = {}, reason = "", sample = {}, sampleLimit = 5) {
+  const failureReason = String(reason || "unknown").trim() || "unknown";
+  const atsKey = String(row.ats_key || sample.ats_key || "").trim().toLowerCase();
+  const protectionStatus = String(row.protection_status || sample.protection_status || "normal") || "normal";
+  const errorSignature = cleanupErrorSignature(row);
+  const groupKey = `${failureReason}|${atsKey}|${protectionStatus}|${errorSignature}`;
+  const boundedSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(sampleLimit || 5))));
+  let group = groups.find((item) => item.group_key === groupKey);
+  if (!group) {
+    group = {
+      group_key: groupKey,
+      failure_reason: failureReason,
+      ats_key: atsKey,
+      protection_status: protectionStatus,
+      error_signature: errorSignature,
+      target_count: 0,
+      failure_pressure: 0,
+      recent_error_count: 0,
+      sample_targets: []
+    };
+    groups.push(group);
+  }
+  group.target_count += 1;
+  group.failure_pressure += Number(row.consecutive_failures || 0);
+  group.recent_error_count += Number(row.recent_error_count || 0);
+  if (group.sample_targets.length < boundedSampleLimit) {
+    group.sample_targets.push(sample);
+  }
+}
+
+function finalizeFailureReasonReviewGroups(groups = [], limit = 25) {
+  const boundedLimit = Math.max(1, Math.min(100, Math.floor(Number(limit || 25))));
+  return groups
+    .sort((left, right) => (
+      Number(right.failure_pressure || 0) - Number(left.failure_pressure || 0)
+      || Number(right.target_count || 0) - Number(left.target_count || 0)
+      || String(left.group_key || "").localeCompare(String(right.group_key || ""))
+    ))
+    .slice(0, boundedLimit);
+}
+
 function addEmptyNoJobsCleanupReviewGroup(cleanup, row = {}, sample = {}) {
   if (!cleanup) return;
   const sampleLimit = Math.max(1, Math.min(25, Math.floor(Number(cleanup.sample_limit || 5))));
@@ -1828,6 +1869,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
   const emptyNoJobsSampleLimit = Math.max(1, Math.min(25, Math.floor(Number(options.emptyNoJobsSampleLimit || 5))));
   const bySource = {};
   const topTargets = [];
+  const failureReasonReviewGroups = [];
   const emptyNoJobsClassification = createEmptyNoJobsClassificationSummary(staleDays, emptyNoJobsSampleLimit);
   let failurePressure = 0;
   let recentErrorCount = 0;
@@ -1850,6 +1892,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
         failure_pressure: 0,
         recent_error_count: 0,
         empty_no_jobs_classification: createEmptyNoJobsClassificationSummary(staleDays, emptyNoJobsSampleLimit),
+        failure_reason_review_groups: [],
         by_reason: {}
       };
     }
@@ -1878,6 +1921,28 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
       addEmptyNoJobsClassification(emptyNoJobsClassification, emptyNoJobsClass, classificationRow);
       addEmptyNoJobsClassification(bySource[atsKey].empty_no_jobs_classification, emptyNoJobsClass, classificationRow);
     }
+    const reviewSample = createEmptyNoJobsClassificationSample({
+      ats_key: atsKey,
+      company_url: companyUrl,
+      company_name: String(row?.company_name || ""),
+      protection_status: String(row?.protection_status || "normal") || "normal",
+      company_created_at_epoch: Number(row?.company_created_at_epoch || 0),
+      last_success_epoch: Number(row?.last_success_epoch || 0),
+      last_failure_epoch: Number(row?.last_failure_epoch || 0),
+      consecutive_failures: consecutiveFailures,
+      recent_error_count: rowRecentErrorCount,
+      last_http_status: row?.last_http_status,
+      last_error: String(row?.last_error || "")
+    });
+    const reviewRow = {
+      ats_key: atsKey,
+      protection_status: String(row?.protection_status || "normal") || "normal",
+      consecutive_failures: consecutiveFailures,
+      recent_error_count: rowRecentErrorCount,
+      last_error: String(row?.last_error || "")
+    };
+    addFailureReasonReviewGroup(failureReasonReviewGroups, reviewRow, reason || "unknown", reviewSample, emptyNoJobsSampleLimit);
+    addFailureReasonReviewGroup(bySource[atsKey].failure_reason_review_groups, reviewRow, reason || "unknown", reviewSample, emptyNoJobsSampleLimit);
 
     topTargets.push({
       ats_key: atsKey,
@@ -1905,6 +1970,8 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
   for (const source of Object.values(bySource)) {
     source.dominant_failure_reason = dominantFailureReason({ by_reason: source.by_reason });
     finalizeEmptyNoJobsClassificationSummary(source.empty_no_jobs_classification);
+    source.failure_reason_review_group_count = source.failure_reason_review_groups.length;
+    source.failure_reason_review_groups = finalizeFailureReasonReviewGroups(source.failure_reason_review_groups, limit);
   }
 
   return {
@@ -1915,6 +1982,8 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
     failure_pressure: failurePressure,
     recent_error_count: recentErrorCount,
     empty_no_jobs_classification: emptyNoJobsClassification,
+    failure_reason_review_group_count: failureReasonReviewGroups.length,
+    failure_reason_review_groups: finalizeFailureReasonReviewGroups(failureReasonReviewGroups, limit),
     by_source: bySource,
     top_targets: topTargets.slice(0, limit)
   };
