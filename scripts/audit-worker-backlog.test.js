@@ -9,6 +9,7 @@ const {
   buildParserDriftRecheckQuery,
   buildRecentErrorsQuery,
   buildRecentRunTrendQuery,
+  buildRecentRunTrendBySourceQuery,
   buildSourceBudgetUsageQuery,
   buildTargetFailurePressureQuery,
   buildThroughputScalingGate,
@@ -18,6 +19,7 @@ const {
   summarizeAutoSyncBudgetUsage,
   summarizeLatestRunBySourceRows,
   summarizeRecentRunTrendRows,
+  summarizeRecentRunTrendBySourceRows,
   summarizeSourceBudgetUsageRows,
   summarizeTargetFailurePressureRows,
   summarizeParserDriftRecheck,
@@ -113,7 +115,7 @@ test("buildLatestRunBySourceQuery compares latest-run successes and failures by 
 
   assert.deepEqual(query.values, [["applytojob", "breezy"]]);
   assert.match(query.sql, /WITH latest AS/i);
-  assert.match(query.sql, /FROM company_sync_state/i);
+  assert.match(query.sql, /company_sync_state/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
   assert.match(query.sql, /COUNT\(DISTINCT COALESCE\(NULLIF\(e\.company_url, ''\), e\.id::text\)\)::int AS failure_count/i);
   assert.match(query.sql, /last_success_epoch >= l\.started_at_epoch/i);
@@ -144,6 +146,22 @@ test("buildRecentRunTrendQuery is read-only and bounded", () => {
   assert.deepEqual(query.values, [20, ["applytojob", "breezy"]]);
   assert.match(query.sql, /WITH recent_runs AS/i);
   assert.match(query.sql, /active_ats \?\| \$2::text\[\]/i);
+  assert.match(query.sql, /LIMIT \$1/i);
+  assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
+});
+
+test("buildRecentRunTrendBySourceQuery is read-only and groups recent runs by ATS", () => {
+  const query = buildRecentRunTrendBySourceQuery({
+    recentRunLimit: 20,
+    targetAtsKeys: ["applytojob", "breezy"]
+  });
+
+  assert.deepEqual(query.values, [20, ["applytojob", "breezy"]]);
+  assert.match(query.sql, /WITH recent_runs AS/i);
+  assert.match(query.sql, /company_sync_state/i);
+  assert.match(query.sql, /ingestion_run_errors/i);
+  assert.match(query.sql, /GROUP BY r\.id, st\.ats_key/i);
+  assert.match(query.sql, /GROUP BY r\.id, e\.ats_key/i);
   assert.match(query.sql, /LIMIT \$1/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
@@ -429,27 +447,43 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
           ]
         };
       }
-      if (/FROM ingestion_run_errors/i.test(sql)) {
-        if (/e\.run_id = l\.id/i.test(sql)) {
-          if (/GROUP BY e\.ats_key, e\.error_type/i.test(sql)) {
-            return {
-              rows: [
-                { ats_key: "applytojob", error_type: "parser_validation", http_status: 0, count: 3 },
-                { ats_key: "breezy", error_type: "blocked_or_rate_limited", http_status: 403, count: 1 },
-                { ats_key: "breezy", error_type: "portal_search_empty", http_status: 0, count: 2 }
-              ]
-            };
-          }
+      if (/WITH recent_runs AS/i.test(sql)) {
+        if (/company_sync_state/i.test(sql) && /ingestion_run_errors/i.test(sql)) {
           return {
             rows: [
-              { latest_run_id: 211, ats_key: "applytojob", success_count: 1, failure_count: 3 },
-              { latest_run_id: 211, ats_key: "breezy", success_count: 1, failure_count: 2 }
+              {
+                run_id: 211,
+                ats_key: "applytojob",
+                status: "completed_with_errors",
+                started_at_epoch: 1_800_000_000,
+                finished_at_epoch: 1_800_000_060,
+                success_count: 1,
+                failure_count: 3,
+                total_targets: 4
+              },
+              {
+                run_id: 210,
+                ats_key: "applytojob",
+                status: "completed_with_errors",
+                started_at_epoch: 1_799_999_000,
+                finished_at_epoch: 1_799_999_050,
+                success_count: 2,
+                failure_count: 8,
+                total_targets: 10
+              },
+              {
+                run_id: 211,
+                ats_key: "breezy",
+                status: "completed_with_errors",
+                started_at_epoch: 1_800_000_000,
+                finished_at_epoch: 1_800_000_060,
+                success_count: 1,
+                failure_count: 2,
+                total_targets: 3
+              }
             ]
           };
         }
-        return { rows: [{ ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 }] };
-      }
-      if (/WITH recent_runs AS/i.test(sql)) {
         return {
           rows: [
             {
@@ -474,6 +508,26 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
             }
           ]
         };
+      }
+      if (/FROM ingestion_run_errors/i.test(sql)) {
+        if (/e\.run_id = l\.id/i.test(sql)) {
+          if (/GROUP BY e\.ats_key, e\.error_type/i.test(sql)) {
+            return {
+              rows: [
+                { ats_key: "applytojob", error_type: "parser_validation", http_status: 0, count: 3 },
+                { ats_key: "breezy", error_type: "blocked_or_rate_limited", http_status: 403, count: 1 },
+                { ats_key: "breezy", error_type: "portal_search_empty", http_status: 0, count: 2 }
+              ]
+            };
+          }
+          return {
+            rows: [
+              { latest_run_id: 211, ats_key: "applytojob", success_count: 1, failure_count: 3 },
+              { latest_run_id: 211, ats_key: "breezy", success_count: 1, failure_count: 2 }
+            ]
+          };
+        }
+        return { rows: [{ ats_key: "applytojob", error_type: "fetch", http_status: 429, count: 3 }] };
       }
       if (/FROM ingestion_runs/i.test(sql)) {
         if (/SUM\(total_targets\)/i.test(sql)) {
@@ -515,12 +569,15 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
     errorWindowHours: 24
   });
 
-  assert.equal(calls.length, 10);
+  assert.equal(calls.length, 11);
   assert.equal(report.diagnostics.latest_run.latest_run_id, 211);
   assert.equal(report.diagnostics.latest_run.success_rate_pct, 80);
   assert.equal(report.diagnostics.latest_run.failure_rate_pct, 20);
   assert.equal(report.diagnostics.recent_run_trend.run_count, 2);
   assert.equal(report.diagnostics.recent_run_trend.success_rate_pct, 70);
+  assert.equal(report.diagnostics.recent_run_trend_by_source.applytojob.run_count, 2);
+  assert.equal(report.diagnostics.recent_run_trend_by_source.applytojob.success_rate_pct, 21.43);
+  assert.equal(report.diagnostics.recent_run_trend_by_source.breezy.success_rate_pct, 33.33);
   assert.equal(report.diagnostics.throughput_scaling_gate.recent_run_success_rate_pct, 70);
   assert.equal(report.diagnostics.throughput_scaling_gate.allowed, false);
   assert.equal(report.diagnostics.throughput_scaling_gate.decision, "hold");
@@ -545,6 +602,7 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   assert.equal(report.diagnostics.auto_sync_budget_usage.daily_budget_exhausted, true);
 
   const applytojob = report.items.find((item) => item.ats_key === "applytojob");
+  assert.equal(applytojob.recent_run_trend.success_rate_pct, 21.43);
   assert.equal(applytojob.source_daily_budget_usage.successful_targets_today, 200);
   assert.equal(applytojob.source_daily_budget_usage.remaining_daily_budget, 0);
   assert.equal(applytojob.source_daily_budget_usage.daily_budget_exhausted, true);
@@ -596,6 +654,48 @@ test("summarizeRecentRunTrendRows exposes multi-run worker success rate", () => 
   assert.deepEqual(summary.target_ats_keys, ["breezy"]);
   assert.equal(summary.runs[0].success_rate_pct, 100);
   assert.equal(summary.runs[1].success_rate_pct, 50);
+});
+
+test("summarizeRecentRunTrendBySourceRows exposes patch effect by ATS", () => {
+  const summary = summarizeRecentRunTrendBySourceRows([
+    {
+      run_id: 254,
+      ats_key: "applytojob",
+      status: "completed_with_errors",
+      started_at_epoch: 1_800_000_000,
+      finished_at_epoch: 1_800_000_030,
+      success_count: 7,
+      failure_count: 3
+    },
+    {
+      run_id: 253,
+      ats_key: "applytojob",
+      status: "completed_with_errors",
+      started_at_epoch: 1_799_999_000,
+      finished_at_epoch: 1_799_999_030,
+      success_count: 2,
+      failure_count: 8
+    },
+    {
+      run_id: 252,
+      ats_key: "breezy",
+      status: "completed_with_errors",
+      started_at_epoch: 1_799_998_000,
+      finished_at_epoch: 1_799_998_030,
+      success_count: 5,
+      failure_count: 5
+    }
+  ], { recentRunLimit: 20, targetAtsKeys: ["applytojob", "breezy"] });
+
+  assert.equal(summary.applytojob.run_count, 2);
+  assert.equal(summary.applytojob.total_targets, 20);
+  assert.equal(summary.applytojob.success_count, 9);
+  assert.equal(summary.applytojob.failure_count, 11);
+  assert.equal(summary.applytojob.success_rate_pct, 45);
+  assert.equal(summary.applytojob.runs[0].run_id, 254);
+  assert.equal(summary.applytojob.runs[0].success_rate_pct, 70);
+  assert.equal(summary.breezy.run_count, 1);
+  assert.equal(summary.breezy.success_rate_pct, 50);
 });
 
 test("summarizeLatestRunBySourceRows exposes per-source run success rates", () => {
