@@ -1,12 +1,13 @@
 const {
-  collectPostingsForCompany,
-  buildApplitrackDetailUrl,
-  extractApplitrackDetailFields,
-  parseApplitrackPostings,
-  parseTalentreefPostingsFromSearchResponse
+  collectPostingsForCompany
 } = require("../../index");
 const { parseAdpMyjobsPostingsFromApi } = require("./adp_myjobs/parse");
 const { parseAdpWorkforcenowPostingsFromApi } = require("./adp_workforcenow/parse");
+const {
+  buildApplitrackDetailUrl,
+  extractApplitrackDetailFields,
+  parseApplitrackPostings
+} = require("./applitrack/parse");
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
@@ -38,6 +39,7 @@ const {
   extractTaleoPostingsFromAjax,
   extractTaleoPostingsFromRest
 } = require("./taleo/parse");
+const { parseTalentreefPostingsFromSearchResponse } = require("./talentreef/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { parseWorkdayPostingsFromApi } = require("./workday/parse");
 const { parseZohoPostingsFromHtml } = require("./zoho/parse");
