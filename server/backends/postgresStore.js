@@ -2001,6 +2001,42 @@ function emptyArrayPathStem(path) {
   return match ? match[1] : "";
 }
 
+function isJobListArrayStem(stem) {
+  const leaf = String(stem || "").split(".").pop().toLowerCase();
+  return /^(jobs?|postings?|positions?|openings?|offers?|result|items|records)$/.test(leaf);
+}
+
+function hasPopulatedArrayItemShape(paths = [], stem = "") {
+  return (Array.isArray(paths) ? paths : []).some((path) =>
+    String(path || "").startsWith(`${stem}[]:`) && String(path || "") !== `${stem}[]:empty`
+  );
+}
+
+function hasPositiveTotalCount(value, depth = 0) {
+  if (!value || typeof value !== "object" || depth > 5) return false;
+  if (Array.isArray(value)) {
+    return value.some((item) => hasPositiveTotalCount(item, depth + 1));
+  }
+  for (const [key, raw] of Object.entries(value)) {
+    const normalizedKey = String(key || "").toLowerCase();
+    if (/^(totalcount|total_count|jobcount|job_count|count)$/.test(normalizedKey)) {
+      const count = Number(raw);
+      if (Number.isFinite(count) && count > 0) return true;
+    }
+    if (raw && typeof raw === "object" && hasPositiveTotalCount(raw, depth + 1)) return true;
+  }
+  return false;
+}
+
+function isExplicitEmptyJobListPayload(raw, observedPaths = []) {
+  if (hasPositiveTotalCount(raw)) return false;
+  const paths = Array.isArray(observedPaths) ? observedPaths : [];
+  const emptyJobListStems = paths
+    .map(emptyArrayPathStem)
+    .filter((stem) => stem && isJobListArrayStem(stem));
+  return emptyJobListStems.some((stem) => !hasPopulatedArrayItemShape(paths, stem));
+}
+
 function shouldReplaceEmptyArrayBaseline(baselinePaths = [], observedPaths = []) {
   const baseline = Array.isArray(baselinePaths) ? baselinePaths : [];
   const observed = Array.isArray(observedPaths) ? observedPaths : [];
@@ -2030,6 +2066,9 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
   const observedPaths = Array.isArray(observed.shape_paths) ? observed.shape_paths : [];
   if (observedPaths.length === 0) {
     return { drift: false, skipped_empty_shape: true, observed };
+  }
+  if (isExplicitEmptyJobListPayload(raw, observedPaths)) {
+    return { drift: false, empty_no_jobs: true, observed };
   }
   const existing = await pool.query(
     `

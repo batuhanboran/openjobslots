@@ -1502,6 +1502,11 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
       raw,
       target.adapter.parserVersion
     );
+    if (drift?.empty_no_jobs) {
+      const error = new Error(`${target.atsKey} public list returned no jobs`);
+      error.ingestionErrorType = "no_jobs";
+      throw error;
+    }
     if (drift?.drift) {
       const error = new Error(`parser drift detected: ${drift.reason}`);
       error.ingestionErrorType = "parser_drift";

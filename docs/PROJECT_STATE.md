@@ -12,6 +12,7 @@ This update supersedes the May 18 worker-gate numbers below for current reliabil
 - Freshness is above the 1k/day target by volume (`29,912` rows seen in 24h and `19,012` new rows), but quality gates still block throughput increase.
 - New 24h `no_geo_no_remote` public rows were `40`: `39` ApplyToJob and `1` Breezy.
 - Current patch direction: keep throughput fixed, quarantine future ambiguous parenthesized/multi-state ApplyToJob rows, and reject Breezy narrative description text as location evidence instead of public geo.
+- Worker failure taxonomy is being tightened before throughput increases: explicit empty job-list payloads are now `empty_no_jobs` instead of parser drift for sources such as BambooHR/Ashby.
 - `audit:source-freshness` `quality_gate_sources_24h` should be used after the next worker run to measure ApplyToJob/Breezy post-patch impact before any throughput increase.
 - Remaining search-index drift is a single extra Meili document for a Lever demo placeholder title (`count_delta=-1`). Do not repair with delete/reindex without explicit approval.
 

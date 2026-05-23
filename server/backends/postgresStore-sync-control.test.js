@@ -1184,6 +1184,53 @@ async function testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape() {
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "populated-bamboo",
+            shape_paths: [
+              "__sourceConfig.baseOrigin:string",
+              "__sourceConfig.boardUrl:string",
+              "__sourceConfig:object",
+              "meta.totalCount:number",
+              "meta:object",
+              "result:array",
+              "result[].id:string",
+              "result[].jobOpeningName:string"
+            ],
+            observed_count: 42
+          }]
+        };
+      }
+      throw new Error(`Empty job list should not write drift or replace baseline: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    { atsKey: "bamboohr", companyUrl: "https://empty.bamboohr.com/careers", company: { company_name: "Empty Bamboo" } },
+    {
+      meta: { totalCount: 0 },
+      result: [],
+      __sourceConfig: {
+        baseOrigin: "https://empty.bamboohr.com",
+        boardUrl: "https://empty.bamboohr.com/careers"
+      }
+    },
+    "source-bamboohr-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.empty_no_jobs, true);
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
+}
+
 async function testPublicSearchEventInsertIsPrivacyBounded() {
   const calls = [];
   const pool = {
@@ -1385,6 +1432,7 @@ async function main() {
   await testPayloadDriftDoesNotBootstrapEmptyShapes();
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
+  await testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs();
   await testPublicSearchEventInsertIsPrivacyBounded();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
   await testPublicSearchReportResolvesTodayInRequestedTimezone();
