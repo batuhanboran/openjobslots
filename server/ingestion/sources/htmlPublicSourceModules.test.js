@@ -413,3 +413,47 @@ test("hrmdirect source module enriches title-only rows from deterministic detail
   assert.ok(byId.HRM3002.source_failure_reasons.includes(fixture.expected.HRM3002.reason));
   assert.equal(evaluatePublicPosting(byId.HRM3002, { parserVersion: source.parserVersion }).status, "quarantined");
 });
+
+test("hrmdirect source module uses labeled remote column without publishing comma-only locations", () => {
+  const source = getSourceModule("hrmdirect");
+  const company = readJson(path.join(__dirname, "hrmdirect", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <table>
+        <tr class="reqitem" data-req-id="HRM4001">
+          <td class="leftBorder">&nbsp;</td>
+          <td id="custSort10" class="custSort1 reqitem ReqRowClick">Remote&nbsp;</td>
+          <td id="departments0" class="departments reqitem ReqRowClick">Colleague</td>
+          <td id="posTitle0" class="posTitle reqitem ReqRowClick">
+            <a href="job-opening.php?req=HRM4001&req_loc=1326820&&amp;#job">Colleague SaaS Technical Consultant</a>
+          </td>
+          <td id="cities0" class="cities reqitem ReqRowClick"></td>
+          <td id="state0" class="state reqitem ReqRowClick"></td>
+        </tr>
+      </table>
+    `,
+    __listUrl: company.url_string,
+    __detailHtmlByUrl: {
+      "https://fixture.hrmdirect.com/employment/job-opening.php?req=HRM4001&req_loc=1326820": `
+        <html>
+          <body>
+            <table class="viewFields">
+              <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Colleague</td></tr>
+              <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue"><br />, <br></td></tr>
+            </table>
+          </body>
+        </html>
+      `
+    }
+  }, company);
+
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.location_text || "", "");
+  assert.equal(normalized.city || "", "");
+  assert.equal(normalized.country || "", "");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.source_evidence.remote_source, "labeled_html");
+  assert.equal(normalized.source_evidence.remote_path, "td.custSort1");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});

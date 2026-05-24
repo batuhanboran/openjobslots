@@ -23,6 +23,17 @@ function cleanHrmDirectText(value) {
     .trim();
 }
 
+function cleanHrmDirectLocationText(value) {
+  const text = cleanHrmDirectText(value)
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/\s+/g, " ")
+    .replace(/^,\s*/g, "")
+    .replace(/\s*,$/g, "")
+    .trim();
+  if (!text || /^[,;:|/\s-]+$/.test(text)) return "";
+  return text;
+}
+
 function normalizeHrmDirectHref(value) {
   return decodeHtmlEntities(String(value || ""))
     .replace(/&#job/gi, "")
@@ -100,7 +111,7 @@ function extractHrmDirectViewField(detailHtml, labels) {
 }
 
 function extractHrmDirectDetailFields(detailHtml) {
-  const location = extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]);
+  const location = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
   const department = extractHrmDirectViewField(detailHtml, ["Department", "Team", "Category"]);
   const employmentType = extractHrmDirectViewField(detailHtml, ["Employment Type", "Job Type", "Type"]);
   return {
@@ -120,7 +131,7 @@ function extractHrmDirectDetailFields(detailHtml) {
 
 function hrmDirectSourceFailureReasons(posting) {
   const reasons = [];
-  const location = cleanHrmDirectText(posting.location || posting.location_text);
+  const location = cleanHrmDirectLocationText(posting.location || posting.location_text);
   const remoteType = cleanHrmDirectText(posting.remote_type).toLowerCase();
   const locationRemoteType = normalizeRemoteType(location);
   if (!location && !["remote", "hybrid", "onsite"].includes(remoteType) && locationRemoteType === "unknown") {
@@ -204,9 +215,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     }
 
     const title = cleanHrmDirectText(titleLinkMatch?.[2] || titleCell || "");
-    const city = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "cities"));
-    const state = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "state"));
+    const city = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "cities"));
+    const state = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "state"));
     const department = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "departments"));
+    const workMode = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "custSort1"));
+    const remoteType = normalizeRemoteType(workMode);
     const postingDate =
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "date")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "dates")) ||
@@ -229,6 +242,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       location: location || null,
       city: isRemoteOnlyLocationValue(city) ? null : city || null,
       country: country || null,
+      remote_type: remoteType,
       department: department || null,
       employment_type: employmentType,
       source_requires_normalized_geo_or_remote: true,
@@ -243,6 +257,9 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
         source_job_id_path: "req query param",
         location_source: location ? "labeled_html" : "",
         location_path: location ? "td.cities + td.state" : "",
+        remote_source: remoteType !== "unknown" ? "labeled_html" : "",
+        remote_path: remoteType !== "unknown" ? "td.custSort1" : "",
+        remote_rule_name: remoteType !== "unknown" ? "hrmdirect_work_mode_column" : "",
         posting_date_source: postingDate ? "labeled_html" : "",
         posting_date_path: postingDate ? "td.date/td.dates" : ""
       }
