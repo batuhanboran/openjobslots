@@ -24,6 +24,36 @@
       "employmentType": "FullTime",
       "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1001?utm_source=openjobslots#job",
       "applyUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1001/application"
+    },
+    {
+      "id": "ash-1002",
+      "title": "NYC Platform Engineer",
+      "location": "NYC",
+      "department": "Engineering",
+      "isRemote": false,
+      "publishedAt": "2026-05-14T08:00:00+03:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1002"
+    },
+    {
+      "id": "ash-1003",
+      "title": "Remote US Support Lead",
+      "location": "Remote / US",
+      "department": "Support",
+      "isRemote": true,
+      "publishedAt": "2026-05-14T09:00:00+03:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1003"
+    },
+    {
+      "id": "ash-1004",
+      "title": "SF Data Engineer",
+      "location": "SF",
+      "department": "Data",
+      "isRemote": false,
+      "publishedAt": "2026-05-14T10:00:00+03:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1004"
     }
   ]
 }

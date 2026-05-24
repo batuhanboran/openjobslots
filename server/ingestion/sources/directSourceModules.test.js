@@ -95,6 +95,74 @@ test("target direct ATS modules return no postings for empty raw payloads", () =
   }
 });
 
+test("ashby source module normalizes source-provided location shorthand without shared ATS logic", () => {
+  const source = getSourceModule("ashby");
+  const company = readJson(path.join(__dirname, "ashby", "fixtures", "company.json"));
+  const parsed = source.parse({
+    jobs: [
+      {
+        id: "ash-nyc",
+        title: "NYC Platform Engineer",
+        location: "NYC",
+        isRemote: false,
+        publishedAt: "2026-05-14T08:00:00+03:00",
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-nyc"
+      },
+      {
+        id: "ash-remote-us",
+        title: "Remote US Support Lead",
+        location: "Remote / US",
+        isRemote: true,
+        publishedAt: "2026-05-14T09:00:00+03:00",
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-remote-us"
+      },
+      {
+        id: "ash-sf",
+        title: "SF Data Engineer",
+        location: "SF",
+        isRemote: false,
+        publishedAt: "2026-05-14T10:00:00+03:00",
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-sf"
+      }
+    ]
+  }, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const nyc = byId.get("ash-nyc");
+  assert.equal(nyc.location_text, "New York, NY, United States");
+  assert.equal(nyc.country, "United States");
+  assert.equal(nyc.region, "North America");
+  assert.equal(nyc.city, "New York");
+  assert.equal(nyc.remote_type, "onsite");
+  assert.equal(nyc.source_evidence.location_source, "list_api");
+  assert.equal(nyc.source_evidence.location_path, "jobs[].location");
+  assert.equal(nyc.source_evidence.location_rule_name, "ashby_city_shorthand");
+  assert.equal(source.validatePublic(nyc).status, "accepted");
+
+  const remoteUs = byId.get("ash-remote-us");
+  assert.equal(remoteUs.location_text, "Remote / US");
+  assert.equal(remoteUs.country, "United States");
+  assert.equal(remoteUs.region, "North America");
+  assert.equal(remoteUs.city || "", "");
+  assert.equal(remoteUs.remote_type, "remote");
+  assert.equal(remoteUs.source_evidence.location_source, "list_api");
+  assert.equal(remoteUs.source_evidence.location_path, "jobs[].location");
+  assert.equal(remoteUs.source_evidence.location_rule_name, "ashby_remote_country_hint");
+  assert.equal(source.validatePublic(remoteUs).status, "accepted");
+
+  const sf = byId.get("ash-sf");
+  assert.equal(sf.location_text, "San Francisco, CA, United States");
+  assert.equal(sf.country, "United States");
+  assert.equal(sf.region, "North America");
+  assert.equal(sf.city, "San Francisco");
+  assert.equal(sf.remote_type, "onsite");
+  assert.equal(sf.source_evidence.location_source, "list_api");
+  assert.equal(sf.source_evidence.location_path, "jobs[].location");
+  assert.equal(sf.source_evidence.location_rule_name, "ashby_city_shorthand");
+  assert.equal(source.validatePublic(sf).status, "accepted");
+});
+
 function zohoFixtureContext() {
   return {
     source: getSourceModule("zoho"),
