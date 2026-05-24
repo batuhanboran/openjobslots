@@ -101,7 +101,7 @@ function main() {
     failures.push(`server/index.js has ${serverIndexLines} lines, above cap ${SERVER_INDEX_CAP}`);
   }
 
-  const publicFiles = listTrackedFiles(["App.js", "src", "server/http", "docs-site", "README.md"]);
+  const publicFiles = listTrackedFiles(["App.js", "src", "server/http", "README.md"]);
   const leakHits = scanFiles(publicFiles, [
     { name: "windows_private_user_path", regex: /C:\\Users\\BaronPC/i },
     { name: "production_checkout_path", regex: /\/root\/OpenJobSlots/i },

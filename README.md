@@ -28,8 +28,6 @@ Detailed references:
 - ATS source certification: [docs/reference/ats-source-certification.md](docs/reference/ats-source-certification.md)
 - Data quality: [docs/reference/data-quality-runbook.md](docs/reference/data-quality-runbook.md)
 - Retention: [docs/reference/data-retention.md](docs/reference/data-retention.md)
-- Historical plans: [docs/archive/](docs/archive/)
-- End-user docs site: [docs-site/](docs-site/)
 
 ## Features
 
@@ -134,6 +132,6 @@ Do not commit runtime data:
 
 Production data belongs on the server and in Docker volumes. Repository fixtures should be small, non-sensitive samples used for tests.
 
-## Legacy Client And Docs Site
+## Legacy Client
 
-This repository still contains legacy Windows/Android/MCP/apply-agent surfaces and a `docs-site/` tree. They are preserved, but the active public product direction is the hosted search engine described above.
+This repository still contains legacy Windows/Android/MCP/apply-agent surfaces. They are preserved, but the active public product direction is the hosted search engine described above.

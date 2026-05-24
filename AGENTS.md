@@ -36,14 +36,12 @@ Load `README.md` or `docs/reference/` only when the task needs architecture, dep
 - Data quality diagnostics: `docs/reference/data-quality-runbook.md`.
 - Retention rules: `docs/reference/data-retention.md`.
 - QA and Playwright/API testing: `docs/reference/QA_RUNBOOK.md`.
-- End-user docs site content: `docs-site/`.
-- Obsolete historical notes: `docs/archive-obsolete/`. Do not read these for current state.
 
 ## Codex Context Hygiene
 
 Keep Codex context focused on current source and state. Do not read dependency trees, generated artifacts, runtime data, stale reports, or obsolete docs unless the user explicitly asks for that path or the task is to clean those artifacts.
 
-Noisy paths are listed in `.codexignore` and include `node_modules/`, `docs-site/node_modules/`, `docs-site/.docusaurus/`, `docs-site/build/`, `.tmp/`, `reports/`, `backups/`, `test-results/`, `playwright-report/`, `coverage/`, `build/`, `dist/`, `.expo/`, `.cache/`, runtime database files, dumps, and `docs/archive-obsolete/`.
+Noisy paths are listed in `.codexignore` and include `node_modules/`, `.tmp/`, `reports/`, `backups/`, `test-results/`, `playwright-report/`, `coverage/`, `build/`, `dist/`, `.expo/`, `.cache/`, runtime database files, and dumps.
 
 Current production state lives in `handoff.md`, `docs/PROJECT_STATE.md`, and the latest relevant production report. If local `reports/` content is stale or noisy, regenerate the requested report or read the explicitly named latest live report instead of scanning the whole tree. Historical docs may explain old decisions, but they must not override current handoff or project state.
 

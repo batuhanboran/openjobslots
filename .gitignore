@@ -75,8 +75,3 @@ reports/
 backups/
 *.dump
 *.sql.gz
-
-# Docs site generated artifacts
-docs-site/node_modules/
-docs-site/.docusaurus/
-docs-site/build/

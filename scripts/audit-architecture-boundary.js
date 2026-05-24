@@ -80,7 +80,7 @@ function main() {
     warnings.push(`known debt: server/index.js still contains legacy ATS bootstrap/alias patterns (${knownServerIndexDebt.join(", ")})`);
   }
 
-  const publicFiles = listTrackedFiles(["App.js", "src", "server/http", "docs-site", "README.md"]);
+  const publicFiles = listTrackedFiles(["App.js", "src", "server/http", "README.md"]);
   const leakHits = scanFiles(publicFiles, [
     { name: "windows_private_user_path", regex: /C:\\Users\\BaronPC/i },
     { name: "production_checkout_path", regex: /\/root\/OpenJobSlots/i },
