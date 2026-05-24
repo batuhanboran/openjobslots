@@ -159,10 +159,12 @@ test("every configured ATS has a certified adapter contract", () => {
 });
 
 test("legacy fetch dispatcher is explicit for every configured ATS", () => {
-  const indexSource = fs.readFileSync(path.join(__dirname, "..", "index.js"), "utf8");
-  const body = indexSource.slice(
-    indexSource.indexOf("async function collectPostingsForCompany"),
-    indexSource.indexOf("async function ensureCompaniesTableSchema")
+  const collectorsSource = fs.readFileSync(path.join(__dirname, "sourceCollectors.js"), "utf8");
+  const dispatcherStart = collectorsSource.indexOf("async function collectPostingsForCompany");
+  const dispatcherEnd = collectorsSource.indexOf("\n\n  return {", dispatcherStart);
+  const body = collectorsSource.slice(
+    dispatcherStart,
+    dispatcherEnd
   );
   const missing = [];
   for (const item of ATS_FILTER_OPTION_ITEMS) {

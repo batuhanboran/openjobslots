@@ -1294,6 +1294,7 @@ module.exports = {
   parseManatalCompany,
   parseOracleCompany,
   parsePageupCompany,
+  extractPageupRouteConfigFromUrl,
   parsePaylocityCompany,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
