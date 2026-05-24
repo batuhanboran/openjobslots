@@ -26,6 +26,35 @@
       "isRemote": false,
       "postingDate": "2026-05-07",
       "department": "Operations"
+    },
+    {
+      "id": "1003",
+      "jobOpeningName": "Brussels Support Specialist",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1003",
+      "location": {
+        "city": "Bruxelles",
+        "state": "Brussels"
+      },
+      "isRemote": false,
+      "postingDate": "2026-05-08",
+      "department": "Support"
+    },
+    {
+      "id": "1004",
+      "jobOpeningName": "Valletta Operations Analyst",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1004",
+      "location": {
+        "city": null,
+        "state": null
+      },
+      "atsLocation": {
+        "city": "Valletta",
+        "province": "Malta",
+        "country": "Malta"
+      },
+      "isRemote": false,
+      "postingDate": "2026-05-09",
+      "department": "Operations"
     }
   ]
 }

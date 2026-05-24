@@ -163,6 +163,79 @@ test("ashby source module normalizes source-provided location shorthand without 
   assert.equal(source.validatePublic(sf).status, "accepted");
 });
 
+test("bamboohr source module completes sparse structured EU locations without accepting ambiguous bases", () => {
+  const source = getSourceModule("bamboohr");
+  const company = readJson(path.join(__dirname, "bamboohr", "fixtures", "company.json"));
+  const parsed = source.parse({
+    result: [
+      {
+        id: "bhr-brussels",
+        jobOpeningName: "Brussels Support Specialist",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-brussels",
+        location: {
+          city: "Bruxelles",
+          state: "Brussels"
+        },
+        isRemote: false
+      },
+      {
+        id: "bhr-valletta",
+        jobOpeningName: "Valletta Operations Analyst",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-valletta",
+        location: {},
+        atsLocation: {
+          city: "Valletta",
+          province: "Malta",
+          country: "Malta"
+        },
+        isRemote: false
+      },
+      {
+        id: "bhr-multibase",
+        jobOpeningName: "Clinical Specialist",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-multibase",
+        location: {
+          city: "Multiple Bases (Phoenix, Denver, or Grand Junction)",
+          state: "Arizona"
+        },
+        isRemote: false
+      }
+    ]
+  }, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const brussels = byId.get("bhr-brussels");
+  assert.equal(brussels.location_text, "Bruxelles, Brussels, Belgium");
+  assert.equal(brussels.country, "Belgium");
+  assert.equal(brussels.region, "EMEA");
+  assert.equal(brussels.city, "Bruxelles");
+  assert.equal(brussels.remote_type, "onsite");
+  assert.equal(brussels.source_evidence.location_source, "list_api");
+  assert.equal(brussels.source_evidence.location_path, "result[].location");
+  assert.equal(brussels.source_evidence.location_rule_name, "bamboohr_sparse_structured_location");
+  assert.equal(source.validatePublic(brussels).status, "accepted");
+
+  const valletta = byId.get("bhr-valletta");
+  assert.equal(valletta.location_text, "Valletta, Malta");
+  assert.equal(valletta.country, "Malta");
+  assert.equal(valletta.region, "EMEA");
+  assert.equal(valletta.city, "Valletta");
+  assert.equal(valletta.remote_type, "onsite");
+  assert.equal(valletta.source_evidence.location_source, "list_api");
+  assert.equal(valletta.source_evidence.location_path, "result[].atsLocation");
+  assert.equal(valletta.source_evidence.location_rule_name, "bamboohr_sparse_structured_location");
+  assert.equal(source.validatePublic(valletta).status, "accepted");
+
+  const multibase = byId.get("bhr-multibase");
+  const gate = source.validatePublic(multibase);
+  assert.equal(multibase.location_text, "Multiple Bases (Phoenix, Denver, or Grand Junction), Arizona, United States");
+  assert.equal(multibase.country, "United States");
+  assert.equal(multibase.city || "", "");
+  assert.equal(gate.status, "quarantined");
+  assert.ok(gate.reason_codes.includes("ambiguous_location"));
+});
+
 function zohoFixtureContext() {
   return {
     source: getSourceModule("zoho"),
