@@ -98,6 +98,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Saudi Arabia", ["sa", "sau", "saudi arabia"]],
   ["Guam", ["gu", "gum", "guam"]],
   ["Luxembourg", ["lu", "lux", "luxembourg"]],
+  ["Malta", ["mt", "mlt", "malta"]],
   ["Lebanon", ["lb", "lbn", "lebanon"]],
   ["Jordan", ["jo", "jor", "jordan"]],
   ["Iraq", ["iq", "irq", "iraq"]],
@@ -336,6 +337,7 @@ function normalizeRegionFromCountry(country) {
     "armenia",
     "cyprus",
     "luxembourg",
+    "malta",
     "lebanon",
     "jordan",
     "iraq",
@@ -519,7 +521,8 @@ function extractCityText(posting, location, country) {
   if (/^(remote|hybrid|onsite|on[- ]?site|work from home|wfh|worldwide|anywhere)$/i.test(firstSegment)) return "";
   if (/\b(?:work from home|home based|remote|hybrid)\b/i.test(firstSegment)) return "";
   if (/^[A-Z]{2}\s+[A-Z0-9]{2,}\s+.*\bwork from home\b/i.test(firstSegment)) return "";
-  if (/^\(?\s*(multiple|various|several|all)\s+(locations|states|sites|schools|campuses)\s*\)?$/i.test(firstSegment)) return "";
+  if (/^\(?\s*(multiple|various|several|all)\s*$/i.test(firstSegment)) return "";
+  if (/^\(?\s*(multiple|various|several|all)\s+(locations|states|sites|schools|campuses|bases|offices)\b/i.test(firstSegment)) return "";
   if (/^(district[- ]?wide|statewide|nationwide|tbd|n\/?a|unknown)$/i.test(firstSegment)) return "";
   if (locationLooksNarrativeText(firstSegment)) return "";
   const normalizedFirst = normalizeSearchText(firstSegment);

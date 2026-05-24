@@ -25,5 +25,33 @@
     "posting_date": "2026-05-07",
     "industry": "Operations",
     "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1003",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Brussels Support Specialist",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1003",
+    "country": "Belgium",
+    "region": "EMEA",
+    "city": "Bruxelles",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-08",
+    "industry": "Support",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1004",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Valletta Operations Analyst",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1004",
+    "country": "Malta",
+    "region": "EMEA",
+    "city": "Valletta",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-09",
+    "industry": "Operations",
+    "parser_confidence": 0.75
   }
 ]
