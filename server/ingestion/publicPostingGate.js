@@ -228,7 +228,7 @@ function evaluatePublicPosting(posting = {}, options = {}) {
 
   const remoteType = evidence.remote_type.normalized || "unknown";
   const usefulGeo = hasUsefulGeoEvidence(posting);
-  const explicitRemote = remoteType !== "unknown" && evidence.remote_type.explicit;
+  const explicitRemote = (remoteType === "remote" || remoteType === "hybrid") && evidence.remote_type.explicit;
   const missingSourceJobId = !evidence.source_job_id.present;
   const missingParserKey = !evidence.parser_key.present;
   const missingParserVersion = !evidence.parser_version.present;
@@ -245,7 +245,7 @@ function evaluatePublicPosting(posting = {}, options = {}) {
     reasonCodes.push("ambiguous_location");
   }
 
-  if (!usefulGeo && remoteType === "unknown") {
+  if (!usefulGeo && !explicitRemote) {
     reasonCodes.push("no_geo_no_remote");
   }
   if ((remoteType === "remote" || remoteType === "hybrid") && !explicitRemote) {

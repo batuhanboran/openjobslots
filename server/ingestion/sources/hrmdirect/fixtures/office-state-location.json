@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Office",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://office.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://office.hrmdirect.com/employment/job-openings.php?search=true",
+  "detail_url": "https://office.hrmdirect.com/employment/job-opening.php?req=HRM8001",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM8001\"><td class=\"departments reqitem ReqRowClick\">Corporate</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM8001&req_loc=321\">Program Analyst</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Corporate</td></tr><tr><td class=\"viewFieldName\"><b>Office:</b></td><td class=\"viewFieldValue\">Maryland</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr></table>",
+  "expected": {
+    "source_job_id": "HRM8001",
+    "location_text": "Maryland",
+    "country": "United States",
+    "city": "",
+    "remote_type": "onsite",
+    "location_source": "labeled_detail_html",
+    "location_path": "table.viewFields Office",
+    "location_rule_name": "hrmdirect_detail_office_state"
+  }
+}

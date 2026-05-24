@@ -1,0 +1,87 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://fixture.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://fixture.hrmdirect.com/employment/job-openings.php?search=true",
+  "empty_list_html": "<html><body><p>Current job opportunities are posted here as they become available.</p></body></html>",
+  "list_html": "<table><tr class=\"reqitem ReqRowClick\" data-req-id=\"HRM5001\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort10\" class=\"custSort1 reqitem ReqRowClick\">Hybrid - Silver Spring, MD, United States&nbsp;</td><td id=\"departments0\" class=\"departments reqitem ReqRowClick\">Advocacy & Public Policy</td><td id=\"posTitle0\" class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM5001&req_loc=1326036&&amp;#job\">Director, Policy & Advocacy</a></td></tr><tr class=\"reqitem1 ReqRowClick\" data-req-id=\"HRM5002\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort11\" class=\"custSort1 reqitem1 ReqRowClick\">Remote&nbsp;</td><td id=\"departments1\" class=\"departments reqitem1 ReqRowClick\">Finance</td><td id=\"posTitle1\" class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM5002&req_loc=834092&&amp;#job\">Affiliate Fiscal Monitoring Consultant</a></td></tr><tr class=\"reqitem ReqRowClick\" data-req-id=\"HRM5003\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort12\" class=\"custSort1 reqitem ReqRowClick\">Hybrid - or Remote - Silver Spring, MD or New York, NY or United States&nbsp;</td><td id=\"departments2\" class=\"departments reqitem ReqRowClick\">Development</td><td id=\"posTitle2\" class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM5003&req_loc=834093&&amp;#job\">Mid-Level Giving Manager</a></td></tr><tr class=\"reqitem1 ReqRowClick\" data-req-id=\"HRM5004\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort13\" class=\"custSort1 reqitem1 ReqRowClick\">N'djamena, Chad&nbsp;</td><td id=\"departments3\" class=\"departments reqitem1 ReqRowClick\">Protection</td><td id=\"posTitle3\" class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM5004&req_loc=834094&&amp;#job\">Officier de Protection</a></td></tr><tr class=\"reqitem ReqRowClick\" data-req-id=\"HRM5005\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort14\" class=\"custSort1 reqitem ReqRowClick\">Onsite&nbsp;</td><td id=\"departments4\" class=\"departments reqitem ReqRowClick\">Production</td><td id=\"posTitle4\" class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM5005&req_loc=834095&&amp;#job\">Lighting Technician</a></td><td id=\"cities4\" class=\"cities reqitem ReqRowClick\">Colorado Springs</td><td id=\"state4\" class=\"state reqitem ReqRowClick\">CO</td></tr><tr class=\"reqitem1 ReqRowClick\" data-req-id=\"HRM5006\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort15\" class=\"custSort1 reqitem1 ReqRowClick\"></td><td id=\"departments5\" class=\"departments reqitem1 ReqRowClick\">Sales</td><td id=\"posTitle5\" class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM5006&req_loc=834096&&amp;#job\">Remote Sales Representative</a></td></tr><tr class=\"reqitem ReqRowClick\" data-req-id=\"HRM5007\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort16\" class=\"custSort1 reqitem ReqRowClick\"></td><td id=\"departments6\" class=\"departments reqitem ReqRowClick\">Federal Civilian</td><td id=\"posTitle6\" class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM5007&req_loc=1288972&cust_sort1=245588&&amp;#job\">Software Engineer III - Back End (Remote)</a></td></tr><tr class=\"reqitem1 ReqRowClick\" data-req-id=\"HRM5008\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort17\" class=\"custSort1 reqitem1 ReqRowClick\"></td><td id=\"departments7\" class=\"departments reqitem1 ReqRowClick\">Field Adjusters</td><td id=\"posTitle7\" class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM5008&req_loc=1323691&&amp;#job\">Field Adjuster - Panhandle</a></td></tr></table>",
+  "detail_url_without_filter": "https://fixture.hrmdirect.com/employment/job-opening.php?req=HRM5007",
+  "details": {
+    "https://fixture.hrmdirect.com/employment/job-opening.php?req=HRM5007": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Federal Civilian</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Mc Lean, VA</td></tr></table></body></html>",
+    "https://fixture.hrmdirect.com/employment/job-opening.php?req=HRM5008": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Field Adjusters</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr><tr><td class=\"viewFieldName\"><b>Workplace Type:</b></td><td class=\"viewFieldValue\">Remote</td></tr></table></body></html>"
+  },
+  "expected": {
+    "HRM5001": {
+      "location_text": "Silver Spring, MD, United States",
+      "country": "United States",
+      "city": "Silver Spring",
+      "remote_type": "hybrid",
+      "department": "Advocacy & Public Policy",
+      "posting_date": null
+    },
+    "HRM5002": {
+      "location_text": "",
+      "country": "",
+      "city": "",
+      "remote_type": "remote",
+      "department": "Finance",
+      "posting_date": null
+    },
+    "HRM5003": {
+      "location_text": "Silver Spring, MD or New York, NY or United States",
+      "country": "United States",
+      "remote_type": "hybrid",
+      "department": "Development",
+      "posting_date": null
+    },
+    "HRM5004": {
+      "location_text": "N'djamena, Chad",
+      "country": "Chad",
+      "city": "N'djamena",
+      "remote_type": "onsite",
+      "department": "Protection",
+      "posting_date": null
+    },
+    "HRM5005": {
+      "location_text": "Colorado Springs, CO",
+      "country": "United States",
+      "city": "Colorado Springs",
+      "remote_type": "onsite",
+      "department": "Production",
+      "posting_date": null
+    },
+    "HRM5006": {
+      "location_text": "",
+      "country": "",
+      "city": "",
+      "remote_type": "unknown",
+      "department": "Sales",
+      "posting_date": null,
+      "source_failure_reasons": [
+        "no_geo_no_remote",
+        "detail_no_structured_location",
+        "detail_no_explicit_remote"
+      ]
+    },
+    "HRM5007": {
+      "location_text": "Mc Lean, VA",
+      "country": "United States",
+      "city": "Mc Lean",
+      "remote_type": "onsite",
+      "department": "Federal Civilian",
+      "posting_date": null
+    },
+    "HRM5008": {
+      "location_text": "",
+      "country": "",
+      "city": "",
+      "remote_type": "remote",
+      "department": "Field Adjusters",
+      "posting_date": null,
+      "remote_source": "labeled_detail_html",
+      "remote_path": "table.viewFields Workplace Type"
+    }
+  }
+}

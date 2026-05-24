@@ -5,6 +5,60 @@ const { isRemoteOnlyLocationValue } = require("../../parsers/shared/location");
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 const { normalizeCountryFromLocation, normalizeCountryName, normalizeRemoteType } = require("../../posting");
 
+const HRMDIRECT_US_STATE_NAMES = new Set([
+  "alabama",
+  "alaska",
+  "arizona",
+  "arkansas",
+  "california",
+  "colorado",
+  "connecticut",
+  "delaware",
+  "district of columbia",
+  "florida",
+  "georgia",
+  "hawaii",
+  "idaho",
+  "illinois",
+  "indiana",
+  "iowa",
+  "kansas",
+  "kentucky",
+  "louisiana",
+  "maine",
+  "maryland",
+  "massachusetts",
+  "michigan",
+  "minnesota",
+  "mississippi",
+  "missouri",
+  "montana",
+  "nebraska",
+  "nevada",
+  "new hampshire",
+  "new jersey",
+  "new mexico",
+  "new york",
+  "north carolina",
+  "north dakota",
+  "ohio",
+  "oklahoma",
+  "oregon",
+  "pennsylvania",
+  "rhode island",
+  "south carolina",
+  "south dakota",
+  "tennessee",
+  "texas",
+  "utah",
+  "vermont",
+  "virginia",
+  "washington",
+  "west virginia",
+  "wisconsin",
+  "wyoming"
+]);
+
 function parseUrl(urlString) {
   try {
     return new URL(String(urlString || ""));
@@ -18,7 +72,8 @@ function escapeRegExp(value) {
 }
 
 function cleanHrmDirectText(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+  return decodeHtmlEntities(String(value || "").replace(/&nbsp;/gi, " ").replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -34,6 +89,53 @@ function cleanHrmDirectLocationText(value) {
   return text;
 }
 
+function extractHrmDirectWorkModeLocationText(value) {
+  const text = cleanHrmDirectLocationText(value);
+  if (!text) return "";
+  let withoutMode = text.replace(/^job\s+location\s*:\s*/i, "").trim();
+  for (let index = 0; index < 3; index += 1) {
+    const next = withoutMode
+      .replace(/^(?:or\s+)?(?:remote|hybrid|on[-\s]?site|onsite)\s*(?:[-:|/]\s*)?/i, "")
+      .trim();
+    if (next === withoutMode) break;
+    withoutMode = next;
+  }
+  const candidate = withoutMode === text && normalizeRemoteType(text) !== "unknown" ? "" : withoutMode;
+  if (!candidate || isRemoteOnlyLocationValue(candidate)) return "";
+  return cleanHrmDirectLocationText(candidate);
+}
+
+function extractHrmDirectOfficeLocationText(value) {
+  const text = cleanHrmDirectLocationText(value);
+  if (!text || isRemoteOnlyLocationValue(text)) return "";
+  return HRMDIRECT_US_STATE_NAMES.has(text.toLowerCase()) ? text : "";
+}
+
+function extractHrmDirectRssValue(itemXml, tagName) {
+  const escapedTagName = escapeRegExp(tagName);
+  const match = String(itemXml || "").match(new RegExp(`<${escapedTagName}\\b[^>]*>([\\s\\S]*?)<\\/${escapedTagName}>`, "i"));
+  return cleanHrmDirectText(String(match?.[1] || "").replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, ""));
+}
+
+function extractHrmDirectRssPostingDateByReq(rssXml) {
+  const source = String(rssXml || "");
+  if (!source) return {};
+  const postingDateByReq = {};
+  const itemPattern = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let itemMatch = itemPattern.exec(source);
+  while (itemMatch) {
+    const itemXml = String(itemMatch[1] || "");
+    const link = extractHrmDirectRssValue(itemXml, "link");
+    const sourceJobId = extractSourceIdFromPostingUrl(link, "hrmdirect");
+    const pubDate = extractHrmDirectRssValue(itemXml, "pubDate");
+    if (sourceJobId && pubDate && !postingDateByReq[sourceJobId]) {
+      postingDateByReq[sourceJobId] = pubDate;
+    }
+    itemMatch = itemPattern.exec(source);
+  }
+  return postingDateByReq;
+}
+
 function normalizeHrmDirectHref(value) {
   return decodeHtmlEntities(String(value || ""))
     .replace(/&#job/gi, "")
@@ -41,6 +143,30 @@ function normalizeHrmDirectHref(value) {
     .replace(/&{2,}/g, "&")
     .replace(/[&\s]+$/g, "")
     .trim();
+}
+
+function normalizeHrmDirectJobPostingUrl(value) {
+  const parsed = parseUrl(value);
+  if (!parsed) return String(value || "").trim();
+  parsed.hash = "";
+  if (/\/employment\/job-opening\.php$/i.test(parsed.pathname)) {
+    for (const key of Array.from(parsed.searchParams.keys())) {
+      if (/^cust_sort/i.test(key) || key === "search") parsed.searchParams.delete(key);
+    }
+  }
+  return parsed.toString();
+}
+
+function extractHrmDirectReqLocFromPostingUrl(value) {
+  const parsed = parseUrl(value);
+  return cleanHrmDirectText(parsed?.searchParams?.get("req_loc") || "");
+}
+
+function buildHrmDirectSourceJobId(baseReq, reqLoc, duplicateReqIds) {
+  const req = cleanHrmDirectText(baseReq);
+  const locationId = cleanHrmDirectText(reqLoc);
+  if (req && locationId && duplicateReqIds?.has(req)) return `${req}:${locationId}`;
+  return req;
 }
 
 function extractHrmDirectCellValue(rowHtml, className) {
@@ -111,20 +237,32 @@ function extractHrmDirectViewField(detailHtml, labels) {
 }
 
 function extractHrmDirectDetailFields(detailHtml) {
-  const location = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
+  const primaryLocation = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
+  const officeLocation = primaryLocation ? "" : extractHrmDirectOfficeLocationText(extractHrmDirectViewField(detailHtml, "Office"));
+  const location = primaryLocation || officeLocation;
   const department = extractHrmDirectViewField(detailHtml, ["Department", "Team", "Category"]);
   const employmentType = extractHrmDirectViewField(detailHtml, ["Employment Type", "Job Type", "Type"]);
+  const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
+  const detailRemoteType = normalizeRemoteType(workplaceType);
+  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : "";
+  const locationPath = primaryLocation ? "table.viewFields Location" : officeLocation ? "table.viewFields Office" : "";
+  const locationRuleName = officeLocation ? "hrmdirect_detail_office_state" : "";
   return {
     location,
     department,
     employment_type: employmentType,
+    remote_type: remoteType,
     evidence: {
       location_source: location ? "labeled_detail_html" : "",
-      location_path: location ? "table.viewFields Location" : "",
+      location_path: locationPath,
+      location_rule_name: locationRuleName,
       department_source: department ? "labeled_detail_html" : "",
       department_path: department ? "table.viewFields Department" : "",
       employment_type_source: employmentType ? "labeled_detail_html" : "",
-      employment_type_path: employmentType ? "table.viewFields Employment Type/Job Type" : ""
+      employment_type_path: employmentType ? "table.viewFields Employment Type/Job Type" : "",
+      remote_source: remoteType ? "labeled_detail_html" : "",
+      remote_path: remoteType ? "table.viewFields Workplace Type" : "",
+      remote_rule_name: remoteType ? "hrmdirect_detail_workplace_type" : ""
     }
   };
 }
@@ -134,11 +272,14 @@ function hrmDirectSourceFailureReasons(posting) {
   const location = cleanHrmDirectLocationText(posting.location || posting.location_text);
   const remoteType = cleanHrmDirectText(posting.remote_type).toLowerCase();
   const locationRemoteType = normalizeRemoteType(location);
-  if (!location && !["remote", "hybrid", "onsite"].includes(remoteType) && locationRemoteType === "unknown") {
+  const hasExplicitRemote = ["remote", "hybrid"].includes(remoteType);
+  const hasExplicitOnsite = remoteType === "onsite";
+  if (!location && !hasExplicitRemote && locationRemoteType === "unknown") {
     reasons.push("no_geo_no_remote");
   }
-  if (!location && locationRemoteType === "unknown") {
-    reasons.push("detail_no_structured_location", "detail_no_explicit_remote");
+  if (!location && !hasExplicitRemote && locationRemoteType === "unknown") {
+    reasons.push("detail_no_structured_location");
+    if (!hasExplicitOnsite) reasons.push("detail_no_explicit_remote");
   }
   return Array.from(new Set(reasons));
 }
@@ -157,16 +298,21 @@ function enrichHrmDirectPostingFromDetail(posting, detailHtml, detailStatus) {
     detail_fetch_status: detailStatus || 200,
     location_source: detailFields.evidence.location_source || posting.source_evidence?.location_source || "",
     location_path: detailFields.evidence.location_path || posting.source_evidence?.location_path || "",
+    location_rule_name: detailFields.evidence.location_rule_name || posting.source_evidence?.location_rule_name || "",
     department_source: detailFields.evidence.department_source || posting.source_evidence?.department_source || "",
     department_path: detailFields.evidence.department_path || posting.source_evidence?.department_path || "",
     employment_type_source: detailFields.evidence.employment_type_source || posting.source_evidence?.employment_type_source || "",
-    employment_type_path: detailFields.evidence.employment_type_path || posting.source_evidence?.employment_type_path || ""
+    employment_type_path: detailFields.evidence.employment_type_path || posting.source_evidence?.employment_type_path || "",
+    remote_source: posting.source_evidence?.remote_source || detailFields.evidence.remote_source || "",
+    remote_path: posting.source_evidence?.remote_path || detailFields.evidence.remote_path || "",
+    remote_rule_name: posting.source_evidence?.remote_rule_name || detailFields.evidence.remote_rule_name || ""
   };
   const enriched = {
     ...posting,
     location: detailFields.location || posting.location || null,
     department: posting.department || detailFields.department || null,
     employment_type: posting.employment_type || detailFields.employment_type || null,
+    remote_type: posting.remote_type && posting.remote_type !== "unknown" ? posting.remote_type : detailFields.remote_type || posting.remote_type,
     source_evidence: sourceEvidence
   };
   return {
@@ -181,8 +327,14 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
   const listUrl = String(payload.__listUrl || config.list_url || config.jobsUrl || config.baseOrigin || "").trim();
   const detailHtmlByUrl = payload.__detailHtmlByUrl || payload.detailHtmlByUrl || {};
   const detailStatusByUrl = payload.__detailStatusByUrl || payload.detailStatusByUrl || {};
+  const rssPostingDateByReq = {
+    ...extractHrmDirectRssPostingDateByReq(payload.__rssXml || payload.rssXml || ""),
+    ...(payload.__rssPostingDateByReq || payload.rssPostingDateByReq || {})
+  };
   const postings = [];
   const seenUrls = new Set();
+  const rowCandidates = [];
+  const sourceJobIdCounts = new Map();
   const rowPattern =
     /<tr[^>]*class=["'][^"']*\breqitem1?\b[^"']*["'][^>]*>([\s\S]*?)<\/tr>/gi;
 
@@ -199,7 +351,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
 
     let absoluteUrl = "";
     try {
-      absoluteUrl = new URL(href, `${config.baseOrigin}/employment/`).toString();
+      absoluteUrl = normalizeHrmDirectJobPostingUrl(new URL(href, `${config.baseOrigin}/employment/`).toString());
     } catch {
       rowMatch = rowPattern.exec(source);
       continue;
@@ -214,28 +366,61 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       continue;
     }
 
-    const title = cleanHrmDirectText(titleLinkMatch?.[2] || titleCell || "");
+    const baseSourceJobId = extractSourceIdFromPostingUrl(absoluteUrl, "hrmdirect");
+    const reqLoc = extractHrmDirectReqLocFromPostingUrl(absoluteUrl);
+    rowCandidates.push({
+      rowHtml,
+      titleCell,
+      titleLinkText: titleLinkMatch?.[2] || "",
+      absoluteUrl,
+      baseSourceJobId,
+      reqLoc
+    });
+    if (baseSourceJobId) {
+      sourceJobIdCounts.set(baseSourceJobId, (sourceJobIdCounts.get(baseSourceJobId) || 0) + 1);
+    }
+    seenUrls.add(absoluteUrl);
+    rowMatch = rowPattern.exec(source);
+  }
+
+  const duplicateReqIds = new Set(
+    Array.from(sourceJobIdCounts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([sourceJobId]) => sourceJobId)
+  );
+
+  for (const candidate of rowCandidates) {
+    const { rowHtml, titleCell, titleLinkText, absoluteUrl, baseSourceJobId, reqLoc } = candidate;
+    const title = cleanHrmDirectText(titleLinkText || titleCell || "");
+    const sourceJobId = buildHrmDirectSourceJobId(baseSourceJobId, reqLoc, duplicateReqIds);
+    const sourceJobIdPath = sourceJobId && sourceJobId !== baseSourceJobId
+      ? "req + req_loc query params"
+      : "req query param";
     const city = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "cities"));
     const state = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "state"));
     const department = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "departments"));
     const workMode = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "custSort1"));
+    const workModeLocation = extractHrmDirectWorkModeLocationText(workMode);
     const remoteType = normalizeRemoteType(workMode);
-    const postingDate =
+    const listPostingDate =
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "date")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "dates")) ||
-      null;
+      "";
+    const rssPostingDate = cleanHrmDirectText(rssPostingDateByReq[baseSourceJobId] || "");
+    const postingDate = listPostingDate || rssPostingDate || null;
     const employmentType =
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "jobtype")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "jobType")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "employmentType")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "type")) ||
       null;
-    const location = [city, state].filter(Boolean).join(", ");
-    const country = normalizeCountryName(state) || normalizeCountryFromLocation(location);
+    const listLocation = [city, state].filter(Boolean).join(", ");
+    const location = listLocation || workModeLocation;
+    const country = normalizeCountryFromLocation(location) || normalizeCountryName(state);
 
     const basePosting = {
       company_name: companyNameForPostings,
-      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "hrmdirect"),
+      source_job_id: sourceJobId,
       position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
@@ -254,14 +439,15 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
         canonical_url_source: "url",
         canonical_url_path: "td.posTitle a[href]",
         source_job_id_source: "url",
-        source_job_id_path: "req query param",
+        source_job_id_path: sourceJobIdPath,
         location_source: location ? "labeled_html" : "",
-        location_path: location ? "td.cities + td.state" : "",
+        location_path: location ? (listLocation ? "td.cities + td.state" : "td.custSort1") : "",
         remote_source: remoteType !== "unknown" ? "labeled_html" : "",
         remote_path: remoteType !== "unknown" ? "td.custSort1" : "",
         remote_rule_name: remoteType !== "unknown" ? "hrmdirect_work_mode_column" : "",
-        posting_date_source: postingDate ? "labeled_html" : "",
-        posting_date_path: postingDate ? "td.date/td.dates" : ""
+        posting_date_source: listPostingDate ? "labeled_html" : rssPostingDate ? "rss_xml" : "",
+        posting_date_path: listPostingDate ? "td.date/td.dates" : rssPostingDate ? "rss.channel.item pubDate" : "",
+        posting_date_rule_name: rssPostingDate && !listPostingDate ? "hrmdirect_rss_pubdate" : ""
       }
     };
     postings.push(enrichHrmDirectPostingFromDetail(
@@ -269,13 +455,12 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       lookupHrmDirectDetailHtml(detailHtmlByUrl, absoluteUrl),
       detailStatusByUrl[absoluteUrl] || detailStatusByUrl[canonicalHrmDirectDetailKey(absoluteUrl)]
     ));
-    seenUrls.add(absoluteUrl);
-    rowMatch = rowPattern.exec(source);
   }
 
   return postings;
 }
 
 module.exports = {
+  extractHrmDirectDetailFields,
   parseHrmDirectPostingsFromHtml
 };

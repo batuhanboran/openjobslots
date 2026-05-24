@@ -109,6 +109,20 @@ test("public posting gate accepts explicit remote and hybrid rows without geo", 
   assert.equal(hybrid.status, "accepted");
 });
 
+test("public posting gate does not accept onsite rows without geo", () => {
+  const result = evaluatePublicPosting(basePosting({
+    position_name: "Onsite Operations Specialist",
+    location_text: "",
+    country: "",
+    region: "",
+    city: "",
+    remote_type: "onsite"
+  }));
+
+  assert.equal(result.status, "quarantined");
+  assert.ok(result.reason_codes.includes("no_geo_no_remote"));
+});
+
 test("public posting gate does not accept vague remote marketing text as explicit remote", () => {
   const result = evaluatePublicPosting(basePosting({
     description_plain: "Our teams support flexible work arrangements.",

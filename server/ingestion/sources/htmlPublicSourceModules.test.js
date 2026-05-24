@@ -574,6 +574,480 @@ test("hrmdirect source module enriches title-only rows from deterministic detail
   assert.equal(evaluatePublicPosting(byId.HRM3002, { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("hrmdirect source module accepts labeled detail workplace remote evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Workplace",
+    ATS_name: "hrmdirect",
+    url_string: "https://workplace.hrmdirect.com/employment/job-openings.php"
+  };
+  const listUrl = "https://workplace.hrmdirect.com/employment/job-openings.php?search=true";
+  const detailUrl = "https://workplace.hrmdirect.com/employment/job-opening.php?req=HRM7001";
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      if (url === listUrl) {
+        return {
+          html: `<table>
+            <tr class="reqitem" data-req-id="HRM7001">
+              <td class="departments reqitem ReqRowClick">Field Adjusters</td>
+              <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=HRM7001&req_loc=1323691">Field Adjuster - Panhandle</a></td>
+              <td class="cities reqitem ReqRowClick"></td>
+              <td class="state reqitem ReqRowClick"></td>
+            </tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      if (url === detailUrl) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Field Adjusters</td></tr>
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue"></td></tr>
+            <tr><td class="viewFieldName"><b>Workplace Type:</b></td><td class="viewFieldValue">Remote</td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+
+  const [posting] = source.parse(raw, company);
+  const normalized = source.normalize(posting, company);
+
+  assert.equal(normalized.source_job_id, "HRM7001");
+  assert.equal(normalized.location_text || "", "");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.source_evidence.remote_source, "labeled_detail_html");
+  assert.equal(normalized.source_evidence.remote_path, "table.viewFields Workplace Type");
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module accepts labeled detail office state as geo evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "office-state-location.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) {
+        return {
+          html: fixture.list_html,
+          status: 200,
+          url
+        };
+      }
+      if (url === fixture.detail_url) {
+        return {
+          html: fixture.detail_html,
+          status: 200,
+          url
+        };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.location_text, fixture.expected.location_text);
+  assert.equal(normalized.country, fixture.expected.country);
+  assert.equal(normalized.city || "", fixture.expected.city);
+  assert.equal(normalized.remote_type, fixture.expected.remote_type);
+  assert.equal(normalized.source_evidence.location_source, fixture.expected.location_source);
+  assert.equal(normalized.source_evidence.location_path, fixture.expected.location_path);
+  assert.equal(normalized.source_evidence.location_rule_name, fixture.expected.location_rule_name);
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module uses RSS pubDate as posting date evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "rss-posting-date.json"));
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      requestedUrls.push(String(url));
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: fixture.rss_xml, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.ok(requestedUrls.includes(fixture.rss_url));
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.posting_date, fixture.expected.posting_date);
+  assert.equal(normalized.posting_date_epoch, fixture.expected.posting_date_epoch);
+  assert.equal(normalized.source_evidence.posting_date_source, fixture.expected.posting_date_source);
+  assert.equal(normalized.source_evidence.posting_date_path, fixture.expected.posting_date_path);
+  assert.equal(normalized.source_evidence.posting_date_rule_name, fixture.expected.posting_date_rule_name);
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module uses search=true route and parses work-mode location cells", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "work-mode-location.json"));
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      requestedUrls.push(String(url));
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (fixture.details?.[url]) return { html: fixture.details[url], status: 200, url };
+      return { html: fixture.empty_list_html, status: 200, url };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, fixture.company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.equal(source.discover(fixture.company).list_url, fixture.search_list_url);
+  assert.equal(requestedUrls[0], fixture.search_list_url);
+  assert.ok(requestedUrls.includes(fixture.detail_url_without_filter));
+  assert.equal(normalized.HRM5001.location_text, fixture.expected.HRM5001.location_text);
+  assert.equal(normalized.HRM5001.country, fixture.expected.HRM5001.country);
+  assert.equal(normalized.HRM5001.city, fixture.expected.HRM5001.city);
+  assert.equal(normalized.HRM5001.remote_type, fixture.expected.HRM5001.remote_type);
+  assert.equal(normalized.HRM5001.department, fixture.expected.HRM5001.department);
+  assert.equal(normalized.HRM5001.posting_date, fixture.expected.HRM5001.posting_date);
+  assert.equal(normalized.HRM5001.source_evidence.location_path, "td.custSort1");
+  assert.deepEqual(normalized.HRM5001.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5001, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(normalized.HRM5002.location_text || "", fixture.expected.HRM5002.location_text);
+  assert.equal(normalized.HRM5002.remote_type, fixture.expected.HRM5002.remote_type);
+  assert.equal(normalized.HRM5002.posting_date, fixture.expected.HRM5002.posting_date);
+  assert.deepEqual(normalized.HRM5002.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5002, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(normalized.HRM5003.location_text, fixture.expected.HRM5003.location_text);
+  assert.equal(normalized.HRM5003.country, fixture.expected.HRM5003.country);
+  assert.equal(normalized.HRM5003.remote_type, fixture.expected.HRM5003.remote_type);
+  assert.equal(normalized.HRM5003.department, fixture.expected.HRM5003.department);
+  assert.equal(normalized.HRM5003.posting_date, fixture.expected.HRM5003.posting_date);
+  assert.deepEqual(normalized.HRM5003.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5003, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(normalized.HRM5004.location_text, fixture.expected.HRM5004.location_text);
+  assert.equal(normalized.HRM5004.country, fixture.expected.HRM5004.country);
+  assert.equal(normalized.HRM5004.city, fixture.expected.HRM5004.city);
+  assert.equal(normalized.HRM5004.remote_type, fixture.expected.HRM5004.remote_type);
+  assert.equal(normalized.HRM5004.department, fixture.expected.HRM5004.department);
+  assert.equal(normalized.HRM5004.posting_date, fixture.expected.HRM5004.posting_date);
+  assert.deepEqual(normalized.HRM5004.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5004, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(normalized.HRM5005.location_text, fixture.expected.HRM5005.location_text);
+  assert.equal(normalized.HRM5005.country, fixture.expected.HRM5005.country);
+  assert.equal(normalized.HRM5005.city, fixture.expected.HRM5005.city);
+  assert.equal(normalized.HRM5005.remote_type, fixture.expected.HRM5005.remote_type);
+  assert.equal(normalized.HRM5005.department, fixture.expected.HRM5005.department);
+  assert.equal(normalized.HRM5005.posting_date, fixture.expected.HRM5005.posting_date);
+  assert.deepEqual(normalized.HRM5005.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5005, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(normalized.HRM5006.location_text || "", fixture.expected.HRM5006.location_text);
+  assert.equal(normalized.HRM5006.country || "", fixture.expected.HRM5006.country);
+  assert.equal(normalized.HRM5006.city || "", fixture.expected.HRM5006.city);
+  assert.equal(normalized.HRM5006.remote_type, fixture.expected.HRM5006.remote_type);
+  assert.equal(normalized.HRM5006.department, fixture.expected.HRM5006.department);
+  assert.equal(normalized.HRM5006.posting_date, fixture.expected.HRM5006.posting_date);
+  assert.deepEqual(normalized.HRM5006.source_failure_reasons || [], fixture.expected.HRM5006.source_failure_reasons);
+  assert.equal(evaluatePublicPosting(normalized.HRM5006, { parserVersion: source.parserVersion }).status, "quarantined");
+
+  assert.equal(normalized.HRM5007.location_text, fixture.expected.HRM5007.location_text);
+  assert.equal(normalized.HRM5007.country, fixture.expected.HRM5007.country);
+  assert.equal(normalized.HRM5007.city, fixture.expected.HRM5007.city);
+  assert.equal(normalized.HRM5007.remote_type, fixture.expected.HRM5007.remote_type);
+  assert.equal(normalized.HRM5007.department, fixture.expected.HRM5007.department);
+  assert.equal(normalized.HRM5007.posting_date, fixture.expected.HRM5007.posting_date);
+  assert.deepEqual(normalized.HRM5007.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5007, { parserVersion: source.parserVersion }).status, "accepted");
+
+  assert.equal(normalized.HRM5008.location_text || "", fixture.expected.HRM5008.location_text);
+  assert.equal(normalized.HRM5008.country || "", fixture.expected.HRM5008.country);
+  assert.equal(normalized.HRM5008.city || "", fixture.expected.HRM5008.city);
+  assert.equal(normalized.HRM5008.remote_type, fixture.expected.HRM5008.remote_type);
+  assert.equal(normalized.HRM5008.department, fixture.expected.HRM5008.department);
+  assert.equal(normalized.HRM5008.posting_date, fixture.expected.HRM5008.posting_date);
+  assert.equal(normalized.HRM5008.source_evidence.remote_source, fixture.expected.HRM5008.remote_source);
+  assert.equal(normalized.HRM5008.source_evidence.remote_path, fixture.expected.HRM5008.remote_path);
+  assert.deepEqual(normalized.HRM5008.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM5008, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module adapts detail budget for sparse mid-sized boards", async () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Sparse",
+    ATS_name: "hrmdirect",
+    url_string: "https://sparse.hrmdirect.com/employment/job-openings.php"
+  };
+  const searchListUrl = "https://sparse.hrmdirect.com/employment/job-openings.php?search=true";
+  const rows = Array.from({ length: 12 }, (_, index) => {
+    const id = `HRM6${String(index + 1).padStart(3, "0")}`;
+    return `<tr class="reqitem" data-req-id="${id}">
+      <td class="departments reqitem ReqRowClick">Engineering</td>
+      <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=${id}&req_loc=${9000 + index}&cust_sort1=245588&&amp;#job">Sparse Role ${index + 1}</a></td>
+      <td class="cities reqitem ReqRowClick"></td>
+      <td class="state reqitem ReqRowClick"></td>
+    </tr>`;
+  }).join("");
+  const lastDetailUrl = "https://sparse.hrmdirect.com/employment/job-opening.php?req=HRM6012";
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      requestedUrls.push(String(url));
+      if (url === searchListUrl) return { html: `<table>${rows}</table>`, status: 200, url };
+      if (url === lastDetailUrl) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Engineering</td></tr>
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue">Mc Lean, VA</td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      return {
+        html: `<table class="viewFields">
+          <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Engineering</td></tr>
+          <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue"></td></tr>
+        </table>`,
+        status: 200,
+        url
+      };
+    }
+  });
+
+  const parsed = source.parse(raw, company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.ok(requestedUrls.includes(lastDetailUrl));
+  assert.equal(raw.__sourceConfig.detail_fetch_count, 12);
+  assert.equal(normalized.HRM6012.location_text, "Mc Lean, VA");
+  assert.equal(normalized.HRM6012.country, "United States");
+  assert.equal(normalized.HRM6012.city, "Mc Lean");
+  assert.equal(normalized.HRM6012.remote_type, "onsite");
+  assert.deepEqual(normalized.HRM6012.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized.HRM6012, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module expands detail budget for large sparse boards", async () => {
+  const source = getSourceModule("hrmdirect");
+  const previousLimit = process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY;
+  delete process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY;
+  const company = {
+    company_name: "Fixture HRMDirect Large Sparse",
+    ATS_name: "hrmdirect",
+    url_string: "https://largesparse.hrmdirect.com/employment/job-openings.php"
+  };
+  const searchListUrl = "https://largesparse.hrmdirect.com/employment/job-openings.php?search=true";
+  const rowCount = 90;
+  const rows = Array.from({ length: rowCount }, (_, index) => {
+    const id = `HRM9${String(index + 1).padStart(3, "0")}`;
+    return `<tr class="reqitem" data-req-id="${id}">
+      <td class="departments reqitem ReqRowClick">Operations</td>
+      <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=${id}&req_loc=${9100 + index}&cust_sort1=245588&&amp;#job">Large Sparse Role ${index + 1}</a></td>
+      <td class="cities reqitem ReqRowClick"></td>
+      <td class="state reqitem ReqRowClick"></td>
+    </tr>`;
+  }).join("");
+  const lastId = `HRM9${String(rowCount).padStart(3, "0")}`;
+  const lastDetailUrl = `https://largesparse.hrmdirect.com/employment/job-opening.php?req=${lastId}`;
+  const requestedUrls = [];
+
+  try {
+    const raw = await source.fetchList(company, {
+      fetcher: async (url) => {
+        requestedUrls.push(String(url));
+        if (url === searchListUrl) return { html: `<table>${rows}</table>`, status: 200, url };
+        if (url === lastDetailUrl) {
+          return {
+            html: `<table class="viewFields">
+              <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Operations</td></tr>
+              <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue">Jacksonville, FL</td></tr>
+            </table>`,
+            status: 200,
+            url
+          };
+        }
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Operations</td></tr>
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue"></td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+    });
+
+    const parsed = source.parse(raw, company);
+    const normalized = Object.fromEntries(parsed.map((posting) => {
+      const row = source.normalize(posting, company);
+      return [row.source_job_id, row];
+    }));
+
+    assert.ok(requestedUrls.includes(lastDetailUrl));
+    assert.equal(raw.__sourceConfig.detail_fetch_count, rowCount);
+    assert.equal(normalized[lastId].location_text, "Jacksonville, FL");
+    assert.equal(normalized[lastId].country, "United States");
+    assert.equal(normalized[lastId].city, "Jacksonville");
+    assert.deepEqual(normalized[lastId].source_failure_reasons || [], []);
+    assert.equal(evaluatePublicPosting(normalized[lastId], { parserVersion: source.parserVersion }).status, "accepted");
+  } finally {
+    if (previousLimit === undefined) {
+      delete process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY;
+    } else {
+      process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY = previousLimit;
+    }
+  }
+});
+
+test("hrmdirect source module uses req_loc detail when it exposes labeled location", async () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect ReqLoc",
+    ATS_name: "hrmdirect",
+    url_string: "https://reqloc.hrmdirect.com/employment/job-openings.php"
+  };
+  const searchListUrl = "https://reqloc.hrmdirect.com/employment/job-openings.php?search=true";
+  const reqOnlyDetailUrl = "https://reqloc.hrmdirect.com/employment/job-opening.php?req=HRM9201";
+  const reqLocDetailUrl = "https://reqloc.hrmdirect.com/employment/job-opening.php?req=HRM9201&req_loc=12001";
+  const secondReqLocDetailUrl = "https://reqloc.hrmdirect.com/employment/job-opening.php?req=HRM9201&req_loc=12002";
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      requestedUrls.push(String(url));
+      if (url === searchListUrl) {
+        return {
+          html: `<table><tr class="reqitem" data-req-id="HRM9201">
+            <td class="departments reqitem ReqRowClick">Clinical</td>
+            <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=HRM9201&req_loc=12001&cust_sort1=245588&&amp;#job">Clinic Role</a></td>
+            <td class="cities reqitem ReqRowClick"></td>
+            <td class="state reqitem ReqRowClick"></td>
+          </tr><tr class="reqitem1" data-req-id="HRM9201">
+            <td class="departments reqitem1 ReqRowClick">Clinical</td>
+            <td class="posTitle reqitem1 ReqRowClick"><a href="job-opening.php?req=HRM9201&req_loc=12002&cust_sort1=245588&&amp;#job">Clinic Role</a></td>
+            <td class="cities reqitem1 ReqRowClick"></td>
+            <td class="state reqitem1 ReqRowClick"></td>
+          </tr></table>`,
+          status: 200,
+          url
+        };
+      }
+      if (url === reqOnlyDetailUrl) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Clinical</td></tr>
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue"></td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      if (url === reqLocDetailUrl) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Clinical</td></tr>
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue">Orlando</td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      if (url === secondReqLocDetailUrl) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Clinical</td></tr>
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue">Vero Beach</td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+
+  const parsed = source.parse(raw, company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.canonical_url, row];
+  }));
+  const row = normalized[reqLocDetailUrl];
+
+  assert.equal(new Set(Object.values(normalized).map((posting) => posting.source_job_id)).size, 2);
+  assert.ok(requestedUrls.includes(reqLocDetailUrl));
+  assert.equal(row.source_job_id, "HRM9201:12001");
+  assert.equal(row.source_evidence.source_job_id_path, "req + req_loc query params");
+  assert.equal(row.location_text, "Orlando");
+  assert.equal(row.city, "Orlando");
+  assert.deepEqual(row.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module quarantines onsite rows when geo evidence is absent", () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Onsite Missing Geo",
+    ATS_name: "hrmdirect",
+    url_string: "https://onsitemissinggeo.hrmdirect.com/employment/job-openings.php"
+  };
+  const detailUrl = "https://onsitemissinggeo.hrmdirect.com/employment/job-opening.php?req=HRM9301&req_loc=13001";
+  const parsed = source.parse({
+    html: `
+      <table>
+        <tr class="reqitem" data-req-id="HRM9301">
+          <td class="custSort1 reqitem ReqRowClick">Onsite</td>
+          <td class="departments reqitem ReqRowClick">Operations</td>
+          <td class="posTitle reqitem ReqRowClick">
+            <a href="job-opening.php?req=HRM9301&req_loc=13001">Operations Specialist</a>
+          </td>
+          <td class="cities reqitem ReqRowClick"></td>
+          <td class="state reqitem ReqRowClick"></td>
+        </tr>
+      </table>
+    `,
+    __listUrl: company.url_string,
+    __detailHtmlByUrl: {
+      [detailUrl]: `
+        <table class="viewFields">
+          <tr><td class="viewFieldName"><b>Department:</b></td><td class="viewFieldValue">Operations</td></tr>
+          <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue"></td></tr>
+        </table>
+      `
+    }
+  }, company);
+
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.remote_type, "onsite");
+  assert.ok(normalized.source_failure_reasons.includes("no_geo_no_remote"));
+  assert.ok(normalized.source_failure_reasons.includes("detail_no_structured_location"));
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "quarantined");
+});
+
 test("hrmdirect source module uses labeled remote column without publishing comma-only locations", () => {
   const source = getSourceModule("hrmdirect");
   const company = readJson(path.join(__dirname, "hrmdirect", "fixtures", "company.json"));

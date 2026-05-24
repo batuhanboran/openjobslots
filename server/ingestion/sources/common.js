@@ -14,7 +14,7 @@ const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseFountainPostingsFromApi } = require("./fountain/parse");
 const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
 const { parseHirebridgePostingsFromHtml } = require("./hirebridge/parse");
-const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
+const { extractHrmDirectDetailFields, parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsPostingDateFromHtml,
@@ -43,7 +43,7 @@ const { parseZohoPostingsFromHtml } = require("./zoho/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting, hasUsefulGeoEvidence } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
-const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../posting");
+const { canonicalizePostingUrl, normalizePosting, normalizeRemoteType, validatePosting } = require("../posting");
 const { readLimitedResponseText, safeFetch } = require("../safeFetch");
 
 const DEFAULT_PARSER_CONFIDENCE = 0.75;
@@ -1036,6 +1036,54 @@ function hrmDirectDetailKey(urlValue) {
   }
 }
 
+function hrmDirectDetailFetchUrl(urlValue) {
+  const parsed = asUrl(urlValue);
+  if (!parsed) return clean(urlValue);
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (host.endsWith(".hrmdirect.com") && /\/employment\/job-opening\.php$/i.test(parsed.pathname)) {
+    const req = clean(parsed.searchParams.get("req"));
+    if (req) {
+      const reqOnly = new URL(`${parsed.origin}${parsed.pathname}`);
+      reqOnly.searchParams.set("req", req);
+      return reqOnly.toString();
+    }
+  }
+  return parsed.toString();
+}
+
+function hrmDirectReqIdFromPostingUrl(urlValue) {
+  const parsed = asUrl(urlValue);
+  if (!parsed) return "";
+  return clean(parsed.searchParams.get("req"));
+}
+
+function hrmDirectDetailHasUsefulEvidence(detailHtml) {
+  const fields = extractHrmDirectDetailFields(detailHtml);
+  return Boolean(clean(fields.location) || ["remote", "hybrid"].includes(clean(fields.remote_type).toLowerCase()));
+}
+
+function normalizeHrmDirectListUrl(urlValue) {
+  const parsed = asUrl(urlValue);
+  if (!parsed) return clean(urlValue);
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".hrmdirect.com")) return parsed.toString();
+  if (/\/employment\/job-openings\.php$/i.test(parsed.pathname) && !parsed.searchParams.has("search")) {
+    parsed.searchParams.set("search", "true");
+  }
+  return parsed.toString();
+}
+
+function hrmDirectRssUrl(urlValue) {
+  const parsed = asUrl(urlValue);
+  if (!parsed) return "";
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".hrmdirect.com")) return "";
+  if (!/\/employment\/job-openings\.php$/i.test(parsed.pathname)) return "";
+  parsed.pathname = parsed.pathname.replace(/job-openings\.php$/i, "rss.php");
+  if (!parsed.searchParams.has("search")) parsed.searchParams.set("search", "true");
+  return parsed.toString();
+}
+
 function hrmDirectPostingNeedsDetail(posting = {}) {
   const location = clean(posting.location || posting.location_text);
   const remoteType = clean(posting.remote_type).toLowerCase();
@@ -1046,10 +1094,25 @@ function hrmDirectPostingNeedsDetail(posting = {}) {
   return !hasConcreteListLocation && !hasExplicitRemote;
 }
 
+function hrmDirectDetailLimit(parsedCount, needsDetailCount = parsedCount) {
+  const envValue = process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY;
+  if (envValue !== undefined) {
+    const configured = Number(envValue);
+    return Math.max(0, Math.min(200, Number.isFinite(configured) ? configured : 10));
+  }
+  const count = Math.max(0, Number(parsedCount) || 0);
+  const needed = Math.max(0, Math.min(count, Number(needsDetailCount) || 0));
+  if (needed === 0) return 0;
+  const sparseRatio = count > 0 ? needed / count : 0;
+  if (count <= 250 && sparseRatio >= 0.5) return Math.min(200, needed);
+  if (count <= 120 && sparseRatio >= 0.25) return Math.min(120, needed);
+  return Math.min(35, Math.max(10, needed));
+}
+
 async function fetchHrmDirectSourceList(company = {}, target = {}, options = {}) {
   const context = buildCompanyContext(company);
   const discovered = target && target.list_url ? target : SOURCE_SPECS.hrmdirect.discover(context);
-  const listUrl = clean(discovered?.list_url || context.url_string);
+  const listUrl = normalizeHrmDirectListUrl(discovered?.list_url || context.url_string);
   if (!listUrl) {
     throw makeSourceFetchError("no_public_jobs_route", "HRMDirect source has no public job-openings route", {
       url: context.url_string
@@ -1077,41 +1140,131 @@ async function fetchHrmDirectSourceList(company = {}, target = {}, options = {})
     });
   }
 
-  const configuredDetailLimit = Number(process.env.OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY ?? 10);
-  const detailLimit = Math.max(0, Math.min(75, Number.isFinite(configuredDetailLimit) ? configuredDetailLimit : 10));
+  const detailCandidates = parsed.filter((posting) => hrmDirectPostingNeedsDetail(posting));
+  const detailLimit = hrmDirectDetailLimit(parsed.length, detailCandidates.length);
+  const reqIdCounts = new Map();
+  for (const posting of parsed) {
+    const reqId = hrmDirectReqIdFromPostingUrl(posting.job_posting_url);
+    if (!reqId) continue;
+    reqIdCounts.set(reqId, (reqIdCounts.get(reqId) || 0) + 1);
+  }
+  let detailCandidatesProcessed = 0;
   let detailFetches = 0;
   const detailHtmlByUrl = {};
   const detailStatusByUrl = {};
   const detailFailureByUrl = {};
+  const rssUrl = hrmDirectRssUrl(list.finalUrl || listUrl);
+  let rssXml = "";
+  let rssStatus = 0;
+  let rssFailure = "";
 
-  for (const posting of parsed) {
-    if (detailFetches >= detailLimit) break;
-    if (!hrmDirectPostingNeedsDetail(posting)) continue;
+  if (rssUrl) {
+    try {
+      const rss = await fetchText(rssUrl, {
+        ...options,
+        target: discovered,
+        sourceLabel: "HRMDirect RSS",
+        fetchOptions: {
+          ...(options.fetchOptions || {}),
+          headers: {
+            accept: "application/rss+xml,text/xml,application/xml;q=0.8,text/html;q=0.5,*/*;q=0.3",
+            ...(options.fetchOptions?.headers || {})
+          }
+        }
+      });
+      rssStatus = Number(rss.status || 0);
+      if (rssStatus >= 200 && rssStatus < 300) {
+        rssXml = rss.text;
+      } else {
+        rssFailure = classifyPublicRouteStatus(rssStatus, "rss_unavailable");
+      }
+    } catch (error) {
+      rssStatus = Number(error?.status || 0);
+      rssFailure = classifyPublicRouteStatus(rssStatus, "rss_unavailable");
+    }
+  }
+
+  for (const posting of detailCandidates) {
+    if (detailCandidatesProcessed >= detailLimit) break;
+    detailCandidatesProcessed += 1;
     const detailUrl = clean(posting.job_posting_url);
     if (!detailUrl) continue;
+    const reqOnlyFetchUrl = hrmDirectDetailFetchUrl(detailUrl);
+    const reqId = hrmDirectReqIdFromPostingUrl(detailUrl);
+    const hasDuplicateReq = reqId && (reqIdCounts.get(reqId) || 0) > 1;
+    const primaryFetchUrl = hasDuplicateReq ? detailUrl : reqOnlyFetchUrl;
+    const fallbackFetchUrl = hasDuplicateReq ? reqOnlyFetchUrl : "";
+    let selectedDetail = null;
+    let selectedFetchUrl = "";
+    let detailFailure = "";
     try {
-      const detail = await fetchText(detailUrl, {
+      const detail = await fetchText(primaryFetchUrl, {
         ...options,
         target: discovered,
         sourceLabel: "HRMDirect"
       });
       detailFetches += 1;
-      const key = hrmDirectDetailKey(detailUrl);
-      detailHtmlByUrl[detailUrl] = detail.text;
-      detailHtmlByUrl[key] = detail.text;
-      detailStatusByUrl[detailUrl] = detail.status;
-      detailStatusByUrl[key] = detail.status;
+      selectedDetail = detail;
+      selectedFetchUrl = primaryFetchUrl;
+      if (
+        fallbackFetchUrl &&
+        fallbackFetchUrl !== primaryFetchUrl &&
+        !hrmDirectDetailHasUsefulEvidence(detail.text)
+      ) {
+        const fallbackDetail = await fetchText(fallbackFetchUrl, {
+          ...options,
+          target: discovered,
+          sourceLabel: "HRMDirect"
+        });
+        detailFetches += 1;
+        if (hrmDirectDetailHasUsefulEvidence(fallbackDetail.text)) {
+          selectedDetail = fallbackDetail;
+          selectedFetchUrl = fallbackFetchUrl;
+        }
+      }
     } catch (error) {
       detailFetches += 1;
-      const key = hrmDirectDetailKey(detailUrl);
-      detailFailureByUrl[detailUrl] = classifyPublicRouteStatus(Number(error?.status || 0), "unsupported_html_shape");
-      detailFailureByUrl[key] = detailFailureByUrl[detailUrl];
+      detailFailure = classifyPublicRouteStatus(Number(error?.status || 0), "unsupported_html_shape");
+      if (fallbackFetchUrl && fallbackFetchUrl !== primaryFetchUrl) {
+        try {
+          const fallbackDetail = await fetchText(fallbackFetchUrl, {
+            ...options,
+            target: discovered,
+            sourceLabel: "HRMDirect"
+          });
+          detailFetches += 1;
+          selectedDetail = fallbackDetail;
+          selectedFetchUrl = fallbackFetchUrl;
+          detailFailure = "";
+        } catch (fallbackError) {
+          detailFetches += 1;
+          detailFailure = classifyPublicRouteStatus(Number(fallbackError?.status || error?.status || 0), "unsupported_html_shape");
+        }
+      }
+    }
+    const detailKey = hrmDirectDetailKey(detailUrl);
+    const reqOnlyKey = hrmDirectDetailKey(reqOnlyFetchUrl);
+    const selectedKey = hrmDirectDetailKey(selectedFetchUrl);
+    if (selectedDetail) {
+      for (const key of [detailUrl, detailKey, reqOnlyFetchUrl, reqOnlyKey, selectedFetchUrl, selectedKey].filter(Boolean)) {
+        detailHtmlByUrl[key] = selectedDetail.text;
+        detailStatusByUrl[key] = selectedDetail.status;
+      }
+    } else {
+      const failure = detailFailure || "unsupported_html_shape";
+      for (const key of [detailUrl, detailKey, reqOnlyFetchUrl, reqOnlyKey, primaryFetchUrl, fallbackFetchUrl].filter(Boolean)) {
+        detailFailureByUrl[key] = failure;
+      }
     }
   }
 
   return {
     html: list.text,
     __listUrl: list.finalUrl || listUrl,
+    __rssUrl: rssUrl,
+    __rssXml: rssXml,
+    __rssStatus: rssStatus,
+    __rssFailure: rssFailure,
     __detailHtmlByUrl: detailHtmlByUrl,
     __detailStatusByUrl: detailStatusByUrl,
     __detailFailureByUrl: detailFailureByUrl,
@@ -1654,7 +1807,43 @@ const SOURCE_SPECS = Object.freeze({
         config: {
           baseOrigin: parsed ? parsed.origin : ""
         },
-        listUrl: clean(company.url_string)
+        listUrl: normalizeHrmDirectListUrl(company.url_string)
+      };
+    },
+    postNormalize(normalized, posting) {
+      const sourceEvidence = {
+        ...(posting?.source_evidence || {}),
+        ...(normalized?.source_evidence || {})
+      };
+      const patch = {};
+      if (
+        clean(sourceEvidence.location_rule_name) === "hrmdirect_detail_office_state" &&
+        clean(normalized?.country).toLowerCase() === "united states" &&
+        clean(normalized?.city).toLowerCase() === clean(normalized?.location_text || normalized?.location).toLowerCase()
+      ) {
+        patch.city = "";
+      }
+      if (clean(sourceEvidence.remote_source || sourceEvidence.remote_path)) return patch;
+      if (
+        ["remote", "hybrid"].includes(normalizeRemoteType(normalized?.location_text)) &&
+        clean(sourceEvidence.location_source || sourceEvidence.location_path)
+      ) {
+        return patch;
+      }
+      if (hasUsefulGeoEvidence({ ...normalized, ...patch })) {
+        if (["remote", "hybrid"].includes(clean(normalized?.remote_type).toLowerCase())) {
+          return {
+            ...patch,
+            remote_type: "onsite",
+            is_remote: false
+          };
+        }
+        return patch;
+      }
+      return {
+        ...patch,
+        remote_type: "unknown",
+        is_remote: false
       };
     }
   },
