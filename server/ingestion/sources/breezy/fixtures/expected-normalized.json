@@ -36,6 +36,25 @@
     "parser_confidence": 0.75
   },
   {
+    "source_job_id": "brz1006-paraguay-engineer",
+    "company_name": "Fixture Breezy",
+    "position_name": "Paraguay Engineer",
+    "country": "Paraguay",
+    "city": "Asuncion",
+    "remote_type": "onsite",
+    "posting_date": "May 13, 2026",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "brz1007-uruguay-remote-coordinator",
+    "company_name": "Fixture Breezy",
+    "position_name": "Uruguay Remote Coordinator",
+    "country": "Uruguay",
+    "remote_type": "remote",
+    "posting_date": "May 14, 2026",
+    "parser_confidence": 0.75
+  },
+  {
     "source_job_id": "brz1004-remote-revenue-analyst",
     "company_name": "Fixture Breezy",
     "position_name": "Remote Revenue Analyst",

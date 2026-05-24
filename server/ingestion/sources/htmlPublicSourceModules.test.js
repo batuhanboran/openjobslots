@@ -478,6 +478,71 @@ test("breezy source module treats worldwide position labels as explicit remote e
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("breezy source module does not publish state codes or placeholders as cities", () => {
+  const source = getSourceModule("breezy");
+  const company = readJson(path.join(__dirname, "breezy", "fixtures", "company.json"));
+  const stateOnlyUrl = "https://fixture.breezy.hr/p/BRZ6001-state-only-locality";
+  const placeholderUrl = "https://fixture.breezy.hr/p/BRZ6002-placeholder-locality";
+  const parsed = source.parse({
+    html: `
+      <a href="/p/BRZ6001-state-only-locality"><h2>State Only Locality</h2></a>
+      <a href="/p/BRZ6002-placeholder-locality"><h2>Placeholder Locality</h2></a>
+    `,
+    __listUrl: company.url_string,
+    __detailHtmlByUrl: {
+      [stateOnlyUrl]: `
+        <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            "title": "State Only Locality",
+            "datePosted": "2026-05-15",
+            "jobLocation": {
+              "@type": "Place",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "NC",
+                "addressCountry": "US"
+              }
+            }
+          }
+        </script>
+      `,
+      [placeholderUrl]: `
+        <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            "title": "Placeholder Locality",
+            "datePosted": "2026-05-15",
+            "jobLocation": {
+              "@type": "Place",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "None",
+                "addressCountry": "US"
+              }
+            }
+          }
+        </script>
+      `
+    }
+  }, company);
+
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.equal(normalized["BRZ6001-state-only-locality"].country, "United States");
+  assert.equal(normalized["BRZ6001-state-only-locality"].city, "");
+  assert.equal(normalized["BRZ6001-state-only-locality"].source_evidence.city_source || "", "");
+
+  assert.equal(normalized["BRZ6002-placeholder-locality"].country, "United States");
+  assert.equal(normalized["BRZ6002-placeholder-locality"].city, "");
+  assert.equal(normalized["BRZ6002-placeholder-locality"].source_evidence.city_source || "", "");
+});
+
 test("hrmdirect source module enriches title-only rows from deterministic detail pages", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");

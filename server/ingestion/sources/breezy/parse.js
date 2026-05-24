@@ -124,6 +124,15 @@ const BREEZY_LABELS = [
   "Date"
 ];
 
+const BREEZY_US_STATE_CODES = new Set([
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "IA", "ID", "IL", "IN",
+  "KS", "KY", "LA", "MA", "MD", "ME", "MI", "MN", "MO", "MS", "MT", "NC", "ND", "NE", "NH", "NJ",
+  "NM", "NV", "NY", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VA", "VT", "WA",
+  "WI", "WV", "WY"
+]);
+
+const BREEZY_CANADA_PROVINCE_CODES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
+
 function escapeBreezyRegex(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -208,6 +217,28 @@ function firstBreezyStructuredCountry(value) {
   return cleanBreezyStructuredValue(value);
 }
 
+function normalizeBreezyComparableText(value) {
+  return cleanBreezyText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function breezyLocalityLooksNonCity(value, country) {
+  const text = cleanBreezyStructuredValue(value);
+  if (!text) return false;
+  if (/^(none|null|n\/?a|not applicable|not specified|to be determined|tbd|unknown|unavailable)$/i.test(text)) return true;
+  const normalized = normalizeBreezyComparableText(text);
+  const normalizedCountry = normalizeBreezyComparableText(country);
+  if (normalizedCountry && normalized === normalizedCountry) return true;
+  const countryFromLocality = normalizeCountryName(text);
+  if (countryFromLocality && (!country || countryFromLocality === country)) return true;
+  const upper = text.toUpperCase();
+  if (country === "United States" && BREEZY_US_STATE_CODES.has(upper)) return true;
+  if (country === "Canada" && BREEZY_CANADA_PROVINCE_CODES.has(upper)) return true;
+  return false;
+}
+
 function extractBreezyJsonLdFieldsFromObject(jobPosting) {
   if (!jobPosting) return {};
   const locations = Array.isArray(jobPosting.jobLocation)
@@ -222,13 +253,14 @@ function extractBreezyJsonLdFieldsFromObject(jobPosting) {
       break;
     }
   }
-  const city = cleanBreezyStructuredValue(address.addressLocality);
+  const rawCity = cleanBreezyStructuredValue(address.addressLocality);
   const state = cleanBreezyStructuredValue(address.addressRegion);
   const countryRaw =
     cleanBreezyStructuredValue(address.addressCountry) ||
     firstBreezyStructuredCountry(jobPosting.applicantLocationRequirements);
   const country = normalizeCountryName(countryRaw) || countryRaw;
-  const locationParts = [city, state, country].filter(Boolean);
+  const city = breezyLocalityLooksNonCity(rawCity, country) ? "" : rawCity;
+  const locationParts = [city, city ? state : "", country].filter(Boolean);
   const jobLocationType = Array.isArray(jobPosting.jobLocationType)
     ? jobPosting.jobLocationType.join(" ")
     : cleanBreezyStructuredValue(jobPosting.jobLocationType);
@@ -474,7 +506,7 @@ function extractBreezyListSegment(linkBody, className) {
   if (!match) return "";
   const start = Number(match.index || 0) + String(match[0] || "").length;
   const tail = source.slice(start);
-  const next = tail.search(/<li[^>]*class=["'][^"']*\b(?:location|type|department|salary|remote)\b/i);
+  const next = tail.search(/<li[^>]*class=["'][^"']*\b(?:location|type|department|salary|remote|posted|created|date)\b/i);
   const end = next >= 0 ? next : tail.search(/<\/ul>|<\/a>/i);
   return tail.slice(0, end >= 0 ? end : Math.min(tail.length, 600));
 }
