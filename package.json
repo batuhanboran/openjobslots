@@ -17,6 +17,7 @@
     "audit:data-quality": "node scripts/audit-data-quality.js",
     "audit:source-freshness": "node scripts/audit-source-freshness.js",
     "audit:growth": "node scripts/audit-growth.js",
+    "audit:architecture-boundary": "node scripts/audit-architecture-boundary.js",
     "audit:worker-backlog": "node scripts/audit-worker-backlog.js",
     "analytics:daily": "node scripts/report-public-analytics.js",
     "analytics:daily:email": "node scripts/email-daily-analytics.js",
