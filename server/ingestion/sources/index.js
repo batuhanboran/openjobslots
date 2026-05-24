@@ -1,4 +1,9 @@
-const { SOURCE_SPECS, createSourceModule, getSourceSpec } = require("./common");
+const {
+  SOURCE_SPECS,
+  createSourceModule,
+  getSourceSpec,
+  setLegacyCollectPostingsForCompany
+} = require("./common");
 
 const modules = new Map(
   Object.keys(SOURCE_SPECS).map((atsKey) => [atsKey, createSourceModule(atsKey)])
@@ -12,5 +17,6 @@ module.exports = {
   DIRECT_SOURCE_ATS_KEYS: Object.freeze(Array.from(modules.keys())),
   getSourceModule,
   getSourceSpec,
+  setLegacyCollectPostingsForCompany,
   sourceModules: modules
 };

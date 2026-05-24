@@ -1,6 +1,3 @@
-const {
-  collectPostingsForCompany
-} = require("../../index");
 const { parseAdpMyjobsPostingsFromApi } = require("./adp_myjobs/parse");
 const { parseAdpWorkforcenowPostingsFromApi } = require("./adp_workforcenow/parse");
 const {
@@ -58,6 +55,21 @@ const ENTERPRISE_RATE_LIMIT = Object.freeze({
   requestsPerMinute: 8,
   strategy: "enterprise-brittle-per-host-serialized"
 });
+let legacyCollectPostingsForCompany = null;
+
+function setLegacyCollectPostingsForCompany(collector) {
+  legacyCollectPostingsForCompany = typeof collector === "function" ? collector : null;
+}
+
+async function collectPostingsForCompany(company) {
+  if (typeof legacyCollectPostingsForCompany === "function") {
+    return legacyCollectPostingsForCompany(company);
+  }
+  throw makeSourceFetchError(
+    "legacy_collector_unavailable",
+    "Legacy source collector fallback is not configured for this source module."
+  );
+}
 
 function clean(value) {
   return String(value || "").trim();
@@ -1849,5 +1861,6 @@ function createSourceModule(atsKey) {
 module.exports = {
   SOURCE_SPECS,
   createSourceModule,
-  getSourceSpec
+  getSourceSpec,
+  setLegacyCollectPostingsForCompany
 };
