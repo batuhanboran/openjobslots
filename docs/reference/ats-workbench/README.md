@@ -4,6 +4,8 @@ This directory is the evidence scoreboard for ATS parser certification. It is ge
 
 - `scoreboard.json`: machine-readable ATS scoreboard for all configured ATS keys.
 - `scoreboard.md`: human-readable ATS scoreboard with wave priority, blockers, exact parser action, and public-enabled recommendation.
+- `target-table.json`: machine-readable live ATS target table with posting volume, geo/location/remote/date coverage, worker signals, and parser threshold profile.
+- `target-table.md`: human-readable live ATS target table used to pick the next high-impact ATS/parser family.
 - `index.json`: canonical ATS-specific workbench index generated from scoreboard, adapter metadata, certification records, and fixture inventory.
 - `sources/<ats>.json`: one structured work packet per ATS with fetch method, parser method, fixture state, quality threshold, public/quarantine decision, and failure log.
 - `../../../server/ingestion/sources/<ats>/`: dedicated source modules for direct JSON/API and enterprise/brittle repair waves. Each module exposes `discover`, `fetchList`, `fetchDetail`, `parse`, `normalize`, and `validate`, with local `fixtures/list.json`, `fixtures/expected-normalized.json`, and `fixtures/invalid-shapes.json`.
@@ -32,6 +34,15 @@ Run directly against the configured Postgres database:
 ```bash
 npm run audit:ats-quality -- --json --output=reports/ats-quality-scoreboard.json --markdown-output=reports/ats-quality-scoreboard.md
 ```
+
+Generate the live ATS target table and threshold snapshot:
+
+```bash
+npm run ats:target-table -- --json --output=docs/reference/ats-workbench/target-table.json --markdown-output=docs/reference/ats-workbench/target-table.md
+npm run test:ats-target-table
+```
+
+This command is read-only. It only selects from Postgres and writes local report files.
 
 Generate the ATS-specific workbench files from the latest scoreboard snapshot:
 
