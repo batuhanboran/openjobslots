@@ -30,6 +30,7 @@ const {
 } = require("./ingestion/growthSummary");
 const { createAtsRateLimitStateStore } = require("./ingestion/atsRateLimitStore");
 const { safeFetch } = require("./ingestion/safeFetch");
+const { createSourceFetchRuntime } = require("./ingestion/sourceFetch");
 const {
   createPostgresPool,
   ensurePostgresSchema,
@@ -460,6 +461,13 @@ const atsRateLimitStore = createAtsRateLimitStateStore({
   getPool: () => (DB_BACKEND === "postgres" ? postgresPool : null)
 });
 let atsRequestQueueConcurrency = ATS_REQUEST_QUEUE_CONCURRENCY_DEFAULT;
+const {
+  fetchWithAtsRateLimit
+} = createSourceFetchRuntime({
+  atsRateLimitStore,
+  fetchTimeoutMs: FETCH_TIMEOUT_MS,
+  getAtsRequestQueueConcurrency: () => atsRequestQueueConcurrency
+});
 let syncEnabledAts = new Set();
 const syncStatus = {
   running: false,
@@ -3871,91 +3879,6 @@ function extractIcimsNextPageUrlFromHtml(pageHtml, currentUrl) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getAtsRateLimitState(rateLimitKey) {
-  return atsRateLimitStore.getState(rateLimitKey);
-}
-
-function parseRetryAfterMilliseconds(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return null;
-
-  const seconds = Number(raw);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.max(0, Math.ceil(seconds * 1000));
-  }
-
-  const parsedEpochMs = Date.parse(raw);
-  if (!Number.isFinite(parsedEpochMs)) return null;
-  return Math.max(0, parsedEpochMs - Date.now());
-}
-
-function resolveAtsRateLimitWaitMs(res, fallbackWaitMs) {
-  const minimumWaitMs = Math.max(0, Number(fallbackWaitMs || 0));
-  const retryAfterMs = parseRetryAfterMilliseconds(res?.headers?.get("retry-after"));
-  if (!Number.isFinite(retryAfterMs)) return minimumWaitMs;
-  return Math.max(minimumWaitMs, retryAfterMs);
-}
-
-async function acquireAtsRequestSlot(rateLimitKey) {
-  const state = getAtsRateLimitState(rateLimitKey);
-  if (state.active < atsRequestQueueConcurrency) {
-    state.active += 1;
-    return;
-  }
-  await new Promise((resolve) => {
-    state.queue.push(resolve);
-  });
-}
-
-function releaseAtsRequestSlot(rateLimitKey) {
-  const state = getAtsRateLimitState(rateLimitKey);
-  const next = state.queue.shift();
-  if (typeof next === "function") {
-    next();
-    return;
-  }
-  state.active = Math.max(0, state.active - 1);
-}
-
-async function markAtsRateLimited(rateLimitKey, waitMs) {
-  await atsRateLimitStore.markRateLimited(rateLimitKey, waitMs);
-}
-
-async function waitForAtsCooldown(rateLimitKey) {
-  await atsRateLimitStore.hydrateCooldown(rateLimitKey);
-  const state = getAtsRateLimitState(rateLimitKey);
-  while (true) {
-    const waitMs = Number(state.blockedUntilEpochMs || 0) - Date.now();
-    if (waitMs <= 0) return;
-    await sleep(waitMs);
-  }
-}
-
-async function fetchWithAtsRateLimit(rateLimitKey, fallbackWaitMs, url, init = {}) {
-  while (true) {
-    await acquireAtsRequestSlot(rateLimitKey);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      await waitForAtsCooldown(rateLimitKey);
-      const res = await safeFetch(url, {
-        ...init,
-        signal: controller.signal
-      });
-
-      if (res.status === 429) {
-        await markAtsRateLimited(rateLimitKey, resolveAtsRateLimitWaitMs(res, fallbackWaitMs));
-        continue;
-      }
-
-      return res;
-    } finally {
-      clearTimeout(timeout);
-      releaseAtsRequestSlot(rateLimitKey);
-    }
-  }
 }
 
 async function fetchWorkdayPage(cxsUrl, limit, offset) {
