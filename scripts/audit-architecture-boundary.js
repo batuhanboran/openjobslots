@@ -4,6 +4,21 @@ const { execFileSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const SERVER_INDEX_CAP = Number(process.env.OPENJOBSLOTS_SERVER_INDEX_LINE_CAP || 3000);
+const SERVER_INDEX_FORBIDDEN_ATS_PATTERNS = Object.freeze([
+  { name: "source_module_import", regex: /require\(["']\.\/ingestion\/sources\// },
+  { name: "greenhouse_api_endpoint", regex: /boards-api\.greenhouse\.io/i },
+  { name: "icims_public_portal_endpoint", regex: /\.icims\.com\/jobs\/search/i },
+  { name: "greenhouse_rate_limit_constant", regex: /GREENHOUSE_RATE_LIMIT_WAIT_MS/ },
+  { name: "icims_rate_limit_constant", regex: /ICIMS_RATE_LIMIT_WAIT_MS/ }
+]);
+const SERVER_INDEX_KNOWN_ATS_DEBT_PATTERNS = Object.freeze([
+  { name: "legacy_dynamic_target_url", regex: /url_string:\s*["']https?:\/\/(?:www\.policeapp\.com|api\.k12jobspot\.com|api\.schoolspring\.com|calcareers\.ca\.gov|calopps\.org|statejobsny\.com)/i },
+  { name: "legacy_usajobs_endpoint_constant", regex: /USAJOBS_SEARCH_API_URL/ },
+  { name: "legacy_ats_alias_pattern", regex: /greenhouse\.io|icims\.com|ats\.rippling\.com/i }
+]);
+const SOURCE_MODULE_FORBIDDEN_IMPORT_PATTERNS = Object.freeze([
+  { name: "server_index_import", regex: /require\(["'](?:\.\.\/){2,3}index["']\)/ }
+]);
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -53,6 +68,17 @@ function main() {
   if (serverIndexLines > SERVER_INDEX_CAP) {
     failures.push(`server/index.js has ${serverIndexLines} lines, above cap ${SERVER_INDEX_CAP}`);
   }
+  const serverIndexText = readText("server/index.js");
+  const serverIndexAtsHits = scanFiles(["server/index.js"], SERVER_INDEX_FORBIDDEN_ATS_PATTERNS);
+  if (serverIndexAtsHits.length) {
+    failures.push(`server/index.js contains ATS source implementation patterns: ${JSON.stringify(serverIndexAtsHits)}`);
+  }
+  const knownServerIndexDebt = SERVER_INDEX_KNOWN_ATS_DEBT_PATTERNS
+    .filter((pattern) => pattern.regex.test(serverIndexText))
+    .map((pattern) => pattern.name);
+  if (knownServerIndexDebt.length) {
+    warnings.push(`known debt: server/index.js still contains legacy ATS bootstrap/alias patterns (${knownServerIndexDebt.join(", ")})`);
+  }
 
   const publicFiles = listTrackedFiles(["App.js", "src", "server/http", "docs-site", "README.md"]);
   const leakHits = scanFiles(publicFiles, [
@@ -69,11 +95,18 @@ function main() {
   if (/require\(["']\.\.\/\.\.\/index["']\)/.test(sourceCommon)) {
     warnings.push("known debt: server/ingestion/sources/common.js still imports ../../index for legacy collector fallback");
   }
+  const sourceFiles = listTrackedFiles(["server/ingestion/sources"]);
+  const sourceImportHits = scanFiles(sourceFiles, SOURCE_MODULE_FORBIDDEN_IMPORT_PATTERNS);
+  if (sourceImportHits.length) {
+    failures.push(`source modules must not import server/index.js: ${JSON.stringify(sourceImportHits)}`);
+  }
 
   const result = {
     ok: failures.length === 0,
     server_index_lines: serverIndexLines,
     server_index_cap: SERVER_INDEX_CAP,
+    server_index_ats_boundary_hits: serverIndexAtsHits,
+    source_module_boundary_hits: sourceImportHits,
     failures,
     warnings
   };

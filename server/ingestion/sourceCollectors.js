@@ -198,6 +198,8 @@ const {
   buildStatejobsnyWindowUrl,
   parseStatejobsnyPostingsFromHtml
 } = require("./sources/statejobsny/parse");
+const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
+const { validateSourceContract } = require("./sourceContracts");
 
 const WORKDAY_PAGE_SIZE = 20;
 const ULTIPRO_PAGE_SIZE = 50;
@@ -272,6 +274,10 @@ const HIBOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
+const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
+  greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
+  icims: ICIMS_RATE_LIMIT_WAIT_MS
+});
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
 const ORACLE_EXPAND_VALUE = [
   "requisitionList.workLocation",
@@ -329,6 +335,12 @@ function createSourceCollectorRuntime(dependencies = {}) {
   if (typeof fetchWithAtsRateLimit !== "function") {
     throw new Error("createSourceCollectorRuntime requires fetchWithAtsRateLimit");
   }
+  const getRegistrySourceModuleForRuntime = typeof dependencies.getRegistrySourceModule === "function"
+    ? dependencies.getRegistrySourceModule
+    : getRegistrySourceModule;
+  const isRegistryPilotSourceForRuntime = typeof dependencies.isRegistryPilotSource === "function"
+    ? dependencies.isRegistryPilotSource
+    : isRegistryPilotSource;
 
   const getPostingLocationByJobUrl = typeof dependencies.getPostingLocationByJobUrl === "function"
     ? dependencies.getPostingLocationByJobUrl
@@ -1051,7 +1063,55 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     return res.text();
   }
-  
+
+  async function fetchRegistryPilotPayload(atsKey, urlString, target = {}) {
+    const headers = String(target.source_family || "").includes("html")
+      ? { Accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5" }
+      : { Accept: "application/json,text/html;q=0.8,*/*;q=0.5" };
+    const res = await fetchWithAtsRateLimit(
+      atsKey,
+      REGISTRY_PILOT_RATE_LIMIT_WAIT_MS[atsKey] || 60 * 1000,
+      urlString,
+      {
+        method: "GET",
+        headers
+      }
+    );
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`${atsKey} registry source request failed (${res.status}): ${body.slice(0, 180)}`);
+    }
+
+    const body = await res.text();
+    const contentType = String(res.headers?.get?.("content-type") || "").toLowerCase();
+    if (contentType.includes("json") || /^[\s\r\n]*[\[{]/.test(body)) {
+      try {
+        return JSON.parse(body);
+      } catch {
+        return body;
+      }
+    }
+    return {
+      body,
+      url: res.url || urlString,
+      status: Number(res.status || 200)
+    };
+  }
+
+  async function collectPostingsForRegistryPilotCompany(company, atsKey) {
+    const sourceModule = getRegistrySourceModuleForRuntime(atsKey);
+    const contract = validateSourceContract(sourceModule);
+    if (!contract.ok) {
+      throw new Error(`${atsKey} registry source contract failed: ${contract.failures.join(", ")}`);
+    }
+
+    const rawPayload = await sourceModule.fetchList(company, {
+      fetcher: (urlString, target) => fetchRegistryPilotPayload(atsKey, urlString, target)
+    });
+    return sourceModule.parse(rawPayload, company);
+  }
+
   async function fetchZohoCareersPage(urlString) {
     const res = await fetchWithAtsRateLimit("zoho", ZOHO_RATE_LIMIT_WAIT_MS, urlString, {
       method: "GET",
@@ -4039,6 +4099,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForAshbyCompany(company);
     }
     if (atsName === "greenhouseio" || atsName === "greenhouse.io" || atsName === "greenhouse") {
+      if (isRegistryPilotSourceForRuntime("greenhouse")) return collectPostingsForRegistryPilotCompany(company, "greenhouse");
       return collectPostingsForGreenhouseCompany(company);
     }
     if (atsName === "leverco" || atsName === "lever.co" || atsName === "lever") {
@@ -4064,6 +4125,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForBreezyCompany(company);
     }
     if (atsName === "icims" || atsName === "icims.com" || atsName === "icimscom") {
+      if (isRegistryPilotSourceForRuntime("icims")) return collectPostingsForRegistryPilotCompany(company, "icims");
       return collectPostingsForIcimsCompany(company);
     }
     if (atsName === "zoho" || atsName === "zohorecruit" || atsName === "zohorecruit.com" || atsName === "zohorecruitcom") {
