@@ -7,6 +7,8 @@ This directory is the evidence scoreboard for ATS parser certification. It is ge
 - `index.json`: canonical ATS-specific workbench index generated from scoreboard, adapter metadata, certification records, and fixture inventory.
 - `sources/<ats>.json`: one structured work packet per ATS with fetch method, parser method, fixture state, quality threshold, public/quarantine decision, and failure log.
 - `../../../server/ingestion/sources/<ats>/`: dedicated source modules for direct JSON/API and enterprise/brittle repair waves. Each module exposes `discover`, `fetchList`, `fetchDetail`, `parse`, `normalize`, and `validate`, with local `fixtures/list.json`, `fixtures/expected-normalized.json`, and `fixtures/invalid-shapes.json`.
+- `../ats-registry-targets/index.json`: registry migration target index for every configured ATS plus research-only future candidates.
+- `../ats-registry-targets/index.md`: human-readable family execution order, per-ATS registry status, source-module path, next action, and script entrypoints.
 
 ## Work Packet Coverage
 
@@ -40,5 +42,15 @@ npm run ats:workbench -- --json
 ```
 
 The command is read-only. It does not backfill, refetch detail pages, or reindex Meilisearch.
+
+Generate the registry migration target index:
+
+```bash
+npm run ats:registry-index
+npm run ats:registry-index -- --family=direct-json-stable --json
+npm run test:ats-registry-index
+```
+
+This command is read-only. It turns the workbench, adapter metadata, source-module inventory, and future candidate list into the concrete ATS family targets used to plan registry expansion.
 
 The current direct JSON/API source-module wave covers `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `manatal`, `recruitcrm`, `pinpointhq`, `fountain`, and `zoho`. The enterprise/brittle source-module wave covers `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring`. Runtime adapters prefer these modules for those ATS keys, so future source canaries use source-specific raw fetch and parser logic instead of the legacy identity parser path.

@@ -1,0 +1,3249 @@
+{
+  "ok": true,
+  "generated_at": "2026-05-24T12:47:59.226Z",
+  "summary": {
+    "configured_ats_count": 60,
+    "future_candidate_count": 30,
+    "registry_status_counts": {
+      "research-only": 30,
+      "module-ready": 57,
+      "unsupported": 1,
+      "pilot-enabled": 2
+    },
+    "family_counts": {
+      "future-candidate": 30,
+      "enterprise-direct": 10,
+      "vendor-specific": 14,
+      "embedded-or-semi-structured": 12,
+      "public-sector-education": 10,
+      "direct-json-stable": 12,
+      "brittle-high-risk": 2
+    },
+    "next_execution_order": [
+      "greenhouse and icims stay as pilot references",
+      "direct-json-stable module-ready sources",
+      "enterprise-direct fixture-backed sources",
+      "embedded-or-semi-structured high-volume debt sources",
+      "public-sector-education dynamic sources",
+      "brittle-high-risk canary-only sources",
+      "future-candidate research packets"
+    ]
+  },
+  "families": [
+    {
+      "family": "direct-json-stable",
+      "title": "Direct JSON Stable",
+      "objective": "Move stable public JSON ATS modules onto registry-backed discover/fetch/parse/normalize contracts first.",
+      "test_script": "node server/ingestion/sources/directSourceModules.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=direct-json-stable --json",
+      "targets": [
+        {
+          "ats_key": "greenhouse",
+          "registry_status": "pilot-enabled",
+          "source_module": "server/ingestion/sources/greenhouse/index.js",
+          "next_action": "Keep registry dispatch enabled; use this ATS as the contract reference while expanding the family."
+        },
+        {
+          "ats_key": "ashby",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/ashby/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "bamboohr",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/bamboohr/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "fountain",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/fountain/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "freshteam",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/freshteam/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "getro",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/getro/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "lever",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/lever/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "pinpointhq",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/pinpointhq/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "recruitcrm",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/recruitcrm/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "recruitee",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/recruitee/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "smartrecruiters",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/smartrecruiters/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "teamtailor",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/teamtailor/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        }
+      ]
+    },
+    {
+      "family": "enterprise-direct",
+      "title": "Enterprise Direct",
+      "objective": "Keep tenant/API discovery source-specific, add registry metadata, then canary only fixture-backed enterprise modules.",
+      "test_script": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=enterprise-direct --json",
+      "targets": [
+        {
+          "ats_key": "adp_myjobs",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/adp_myjobs/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "adp_workforcenow",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/adp_workforcenow/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "eightfold",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/eightfold/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "oracle",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/oracle/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "pageup",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/pageup/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "paylocity",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/paylocity/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "saphrcloud",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/saphrcloud/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "ultipro",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/ultipro/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "workday",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/workday/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "dayforcehcm",
+          "registry_status": "unsupported",
+          "source_module": "",
+          "next_action": "Do not run live sync; add raw fixtures, parser certification, and source module before registry enablement."
+        }
+      ]
+    },
+    {
+      "family": "embedded-or-semi-structured",
+      "title": "Embedded Or Semi-Structured",
+      "objective": "Split HTML/embed discovery from parsing and keep detail enrichment fixture-backed before registry enablement.",
+      "test_script": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=embedded-or-semi-structured --json",
+      "targets": [
+        {
+          "ats_key": "icims",
+          "registry_status": "pilot-enabled",
+          "source_module": "server/ingestion/sources/icims/index.js",
+          "next_action": "Keep registry dispatch enabled; use this ATS as the contract reference while expanding the family."
+        },
+        {
+          "ats_key": "applicantpro",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/applicantpro/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "applytojob",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/applytojob/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "breezy",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/breezy/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "careerplug",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/careerplug/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "hirebridge",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/hirebridge/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "hrmdirect",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/hrmdirect/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "isolvisolvedhire",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/isolvisolvedhire/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "jobvite",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/jobvite/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "talentreef",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/talentreef/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "theapplicantmanager",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/theapplicantmanager/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "zoho",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/zoho/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        }
+      ]
+    },
+    {
+      "family": "vendor-specific",
+      "title": "Vendor Specific",
+      "objective": "Stabilize one vendor at a time with source-local fixtures before broad registry dispatch.",
+      "test_script": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=vendor-specific --json",
+      "targets": [
+        {
+          "ats_key": "applicantai",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/applicantai/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "careerpuck",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/careerpuck/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "careerspage",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/careerspage/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "gem",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/gem/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "hibob",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/hibob/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "join",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/join/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "loxo",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/loxo/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "manatal",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/manatal/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "peopleforce",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/peopleforce/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "rippling",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/rippling/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "sagehr",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/sagehr/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "simplicant",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/simplicant/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "talentlyft",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/talentlyft/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "talexio",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/talexio/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        }
+      ]
+    },
+    {
+      "family": "public-sector-education",
+      "title": "Public Sector And Education",
+      "objective": "Move aggregate public-board URLs out of bootstrap into source modules with polite pagination and virtual target tests.",
+      "test_script": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=public-sector-education --json",
+      "targets": [
+        {
+          "ats_key": "applitrack",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/applitrack/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "calcareers",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/calcareers/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "calopps",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/calopps/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "governmentjobs",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/governmentjobs/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "jobaps",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/jobaps/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "k12jobspot",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/k12jobspot/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "policeapp",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/policeapp/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "schoolspring",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/schoolspring/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "statejobsny",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/statejobsny/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "usajobs",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/usajobs/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        }
+      ]
+    },
+    {
+      "family": "brittle-high-risk",
+      "title": "Brittle High Risk",
+      "objective": "Keep brittle ATS canary-only until fixtures prove stable list/detail parsing and source IDs.",
+      "test_script": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=brittle-high-risk --json",
+      "targets": [
+        {
+          "ats_key": "brassring",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/brassring/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        },
+        {
+          "ats_key": "taleo",
+          "registry_status": "module-ready",
+          "source_module": "server/ingestion/sources/taleo/index.js",
+          "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary."
+        }
+      ]
+    },
+    {
+      "family": "future-candidate",
+      "title": "Future Candidate",
+      "objective": "Track research-only ATS candidates separately so unsupported systems cannot leak into live sync or server/index.js.",
+      "test_script": "node scripts/ats-registry-index.test.js",
+      "next_family_script": "npm.cmd run ats:registry-index -- --family=future-candidate --json",
+      "targets": [
+        {
+          "ats_key": "academicjobsonline",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "agilehr",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "avature",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "bullhorn",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "comeet",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "crelate",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "edjoin",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "factorialhr",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "hireology",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "hiringplatform",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "homerun",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "jibeapply",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "jobs2web",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "jobscore",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "occupop",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "paycomonline",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "paycor",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "peopleadmin",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "personio",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "prismhr",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "recruiterbox",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "recruiterflow",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "silkroad",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "softgarden",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "trakstar",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "ukg",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "webcruiter",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "workable",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "ycombinator",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        },
+        {
+          "ats_key": "yello",
+          "registry_status": "research-only",
+          "source_module": "",
+          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
+        }
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "ats_key": "academicjobsonline",
+      "display_name": "AcademicJobsOnline",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "adp_myjobs",
+      "display_name": "ADP MyJobs",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/adp_myjobs/index.js",
+        "fixtures_dir": "server/ingestion/sources/adp_myjobs/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=adp_myjobs --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=adp_myjobs --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/adp_myjobs.json"
+    },
+    {
+      "ats_key": "adp_workforcenow",
+      "display_name": "ADP Workforce Now",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/adp_workforcenow/index.js",
+        "fixtures_dir": "server/ingestion/sources/adp_workforcenow/fixtures"
+      },
+      "quality": {
+        "rows": 272,
+        "missing_country_pct": 4.41,
+        "missing_city_pct": 19.85,
+        "missing_any_geo_pct": 19.85,
+        "weak_remote_pct": 7.35,
+        "risk_score": 44.8,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=adp_workforcenow --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=adp_workforcenow --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/adp_workforcenow.json"
+    },
+    {
+      "ats_key": "agilehr",
+      "display_name": "AgileHR",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "applicantai",
+      "display_name": "ApplicantAI",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/applicantai/index.js",
+        "fixtures_dir": "server/ingestion/sources/applicantai/fixtures"
+      },
+      "quality": {
+        "rows": 146,
+        "missing_country_pct": 93.15,
+        "missing_city_pct": 97.26,
+        "missing_any_geo_pct": 98.63,
+        "weak_remote_pct": 4.79,
+        "risk_score": 178.83,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=applicantai --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=applicantai --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/applicantai.json"
+    },
+    {
+      "ats_key": "applicantpro",
+      "display_name": "ApplicantPro",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/applicantpro/index.js",
+        "fixtures_dir": "server/ingestion/sources/applicantpro/fixtures"
+      },
+      "quality": {
+        "rows": 898,
+        "missing_country_pct": 0,
+        "missing_city_pct": 1.56,
+        "missing_any_geo_pct": 1.56,
+        "weak_remote_pct": 1.11,
+        "risk_score": 31.17,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=applicantpro --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=applicantpro --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/applicantpro.json"
+    },
+    {
+      "ats_key": "applitrack",
+      "display_name": "Applitrack",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/applitrack/index.js",
+        "fixtures_dir": "server/ingestion/sources/applitrack/fixtures"
+      },
+      "quality": {
+        "rows": 70598,
+        "missing_country_pct": 100,
+        "missing_city_pct": 99.54,
+        "missing_any_geo_pct": 100,
+        "weak_remote_pct": 99.98,
+        "risk_score": 208.37,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=applitrack --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=applitrack --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/applitrack.json"
+    },
+    {
+      "ats_key": "applytojob",
+      "display_name": "ApplyToJob",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/applytojob/index.js",
+        "fixtures_dir": "server/ingestion/sources/applytojob/fixtures"
+      },
+      "quality": {
+        "rows": 65917,
+        "missing_country_pct": 18.51,
+        "missing_city_pct": 69.99,
+        "missing_any_geo_pct": 70.33,
+        "weak_remote_pct": 3.11,
+        "risk_score": 113.79,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=applytojob --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=applytojob --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/applytojob.json"
+    },
+    {
+      "ats_key": "ashby",
+      "display_name": "Ashby",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/ashby/index.js",
+        "fixtures_dir": "server/ingestion/sources/ashby/fixtures"
+      },
+      "quality": {
+        "rows": 26620,
+        "missing_country_pct": 16.8,
+        "missing_city_pct": 60.88,
+        "missing_any_geo_pct": 60.95,
+        "weak_remote_pct": 16.42,
+        "risk_score": 106.3,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=ashby --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=ashby --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/ashby.json"
+    },
+    {
+      "ats_key": "avature",
+      "display_name": "Avature",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "bamboohr",
+      "display_name": "BambooHR",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/bamboohr/index.js",
+        "fixtures_dir": "server/ingestion/sources/bamboohr/fixtures"
+      },
+      "quality": {
+        "rows": 28501,
+        "missing_country_pct": 17.53,
+        "missing_city_pct": 89.84,
+        "missing_any_geo_pct": 89.84,
+        "weak_remote_pct": 8.04,
+        "risk_score": 127.12,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=bamboohr --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=bamboohr --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/bamboohr.json"
+    },
+    {
+      "ats_key": "brassring",
+      "display_name": "BrassRing",
+      "family": "brittle-high-risk",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/brassring/index.js",
+        "fixtures_dir": "server/ingestion/sources/brassring/fixtures"
+      },
+      "quality": {
+        "rows": 1531,
+        "missing_country_pct": 97.65,
+        "missing_city_pct": 73.74,
+        "missing_any_geo_pct": 100,
+        "weak_remote_pct": 98.04,
+        "risk_score": 218.54,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=brassring --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=brassring --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/brassring.json"
+    },
+    {
+      "ats_key": "breezy",
+      "display_name": "BreezyHR",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/breezy/index.js",
+        "fixtures_dir": "server/ingestion/sources/breezy/fixtures"
+      },
+      "quality": {
+        "rows": 35337,
+        "missing_country_pct": 22.34,
+        "missing_city_pct": 77.64,
+        "missing_any_geo_pct": 77.66,
+        "weak_remote_pct": 15.19,
+        "risk_score": 122.97,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=breezy --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=breezy --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/breezy.json"
+    },
+    {
+      "ats_key": "bullhorn",
+      "display_name": "Bullhorn",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "https://bullhorn.github.io/Public-API/",
+      "endpoint_pattern": "Requires customer cls and corpToken discovery/config.",
+      "notes": "Useful for staffing/recruiting boards; needs tenant config certification."
+    },
+    {
+      "ats_key": "calcareers",
+      "display_name": "CalCareers",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/calcareers/index.js",
+        "fixtures_dir": "server/ingestion/sources/calcareers/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=calcareers --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=calcareers --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/calcareers.json"
+    },
+    {
+      "ats_key": "calopps",
+      "display_name": "CalOpps",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/calopps/index.js",
+        "fixtures_dir": "server/ingestion/sources/calopps/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=calopps --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=calopps --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/calopps.json"
+    },
+    {
+      "ats_key": "careerplug",
+      "display_name": "CareerPlug",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/careerplug/index.js",
+        "fixtures_dir": "server/ingestion/sources/careerplug/fixtures"
+      },
+      "quality": {
+        "rows": 4426,
+        "missing_country_pct": 10.37,
+        "missing_city_pct": 95.48,
+        "missing_any_geo_pct": 95.77,
+        "weak_remote_pct": 10.33,
+        "risk_score": 146.29,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=careerplug --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=careerplug --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/careerplug.json"
+    },
+    {
+      "ats_key": "careerpuck",
+      "display_name": "CareerPuck",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/careerpuck/index.js",
+        "fixtures_dir": "server/ingestion/sources/careerpuck/fixtures"
+      },
+      "quality": {
+        "rows": 1066,
+        "missing_country_pct": 9.76,
+        "missing_city_pct": 38.09,
+        "missing_any_geo_pct": 41.46,
+        "weak_remote_pct": 6.38,
+        "risk_score": 104.23,
+        "wave_priority": "wave-3-certification",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=careerpuck --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=careerpuck --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/careerpuck.json"
+    },
+    {
+      "ats_key": "careerspage",
+      "display_name": "CareersPage",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/careerspage/index.js",
+        "fixtures_dir": "server/ingestion/sources/careerspage/fixtures"
+      },
+      "quality": {
+        "rows": 1875,
+        "missing_country_pct": 74.83,
+        "missing_city_pct": 73.71,
+        "missing_any_geo_pct": 94.03,
+        "weak_remote_pct": 32.37,
+        "risk_score": 182.88,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=careerspage --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=careerspage --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/careerspage.json"
+    },
+    {
+      "ats_key": "comeet",
+      "display_name": "Comeet",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "crelate",
+      "display_name": "Crelate",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "dayforcehcm",
+      "display_name": "Dayforce",
+      "family": "enterprise-direct",
+      "registry_status": "unsupported",
+      "current_status": "unsupported",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": -65,
+        "wave_priority": "disabled",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=dayforcehcm --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=dayforcehcm --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Do not run live sync; add raw fixtures, parser certification, and source module before registry enablement.",
+      "work_packet": "docs/reference/ats-workbench/sources/dayforcehcm.json"
+    },
+    {
+      "ats_key": "edjoin",
+      "display_name": "EdJoin",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "eightfold",
+      "display_name": "Eightfold",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/eightfold/index.js",
+        "fixtures_dir": "server/ingestion/sources/eightfold/fixtures"
+      },
+      "quality": {
+        "rows": 691,
+        "missing_country_pct": 2.89,
+        "missing_city_pct": 45.59,
+        "missing_any_geo_pct": 45.59,
+        "weak_remote_pct": 4.49,
+        "risk_score": 102.75,
+        "wave_priority": "wave-3-certification",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=eightfold --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=eightfold --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/eightfold.json"
+    },
+    {
+      "ats_key": "factorialhr",
+      "display_name": "FactorialHR",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "fountain",
+      "display_name": "Fountain",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/fountain/index.js",
+        "fixtures_dir": "server/ingestion/sources/fountain/fixtures"
+      },
+      "quality": {
+        "rows": 374,
+        "missing_country_pct": 38.5,
+        "missing_city_pct": 19.25,
+        "missing_any_geo_pct": 48.66,
+        "weak_remote_pct": 36.9,
+        "risk_score": 87.56,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=fountain --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=fountain --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/fountain.json"
+    },
+    {
+      "ats_key": "freshteam",
+      "display_name": "Freshteam",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/freshteam/index.js",
+        "fixtures_dir": "server/ingestion/sources/freshteam/fixtures"
+      },
+      "quality": {
+        "rows": 8228,
+        "missing_country_pct": 3.1,
+        "missing_city_pct": 83.59,
+        "missing_any_geo_pct": 83.59,
+        "weak_remote_pct": 1.22,
+        "risk_score": 142.85,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=freshteam --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=freshteam --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/freshteam.json"
+    },
+    {
+      "ats_key": "gem",
+      "display_name": "Gem",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/gem/index.js",
+        "fixtures_dir": "server/ingestion/sources/gem/fixtures"
+      },
+      "quality": {
+        "rows": 3493,
+        "missing_country_pct": 25.16,
+        "missing_city_pct": 96.36,
+        "missing_any_geo_pct": 96.54,
+        "weak_remote_pct": 19.24,
+        "risk_score": 165.68,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=gem --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=gem --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/gem.json"
+    },
+    {
+      "ats_key": "getro",
+      "display_name": "Getro",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/getro/index.js",
+        "fixtures_dir": "server/ingestion/sources/getro/fixtures"
+      },
+      "quality": {
+        "rows": 1136,
+        "missing_country_pct": 14.79,
+        "missing_city_pct": 30.72,
+        "missing_any_geo_pct": 31.25,
+        "weak_remote_pct": 22.71,
+        "risk_score": 105.03,
+        "wave_priority": "wave-3-certification",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=getro --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=getro --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/getro.json"
+    },
+    {
+      "ats_key": "governmentjobs",
+      "display_name": "GovernmentJobs",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/governmentjobs/index.js",
+        "fixtures_dir": "server/ingestion/sources/governmentjobs/fixtures"
+      },
+      "quality": {
+        "rows": 1281,
+        "missing_country_pct": 14.13,
+        "missing_city_pct": 100,
+        "missing_any_geo_pct": 100,
+        "weak_remote_pct": 14.05,
+        "risk_score": 157.35,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=governmentjobs --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=governmentjobs --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/governmentjobs.json"
+    },
+    {
+      "ats_key": "greenhouse",
+      "display_name": "Greenhouse",
+      "family": "direct-json-stable",
+      "registry_status": "pilot-enabled",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/greenhouse/index.js",
+        "fixtures_dir": "server/ingestion/sources/greenhouse/fixtures"
+      },
+      "quality": {
+        "rows": 4891,
+        "missing_country_pct": 6.42,
+        "missing_city_pct": 61.91,
+        "missing_any_geo_pct": 63.77,
+        "weak_remote_pct": 11.33,
+        "risk_score": 94.3,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=greenhouse --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Keep registry dispatch enabled; use this ATS as the contract reference while expanding the family.",
+      "work_packet": "docs/reference/ats-workbench/sources/greenhouse.json"
+    },
+    {
+      "ats_key": "hibob",
+      "display_name": "HiBob",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/hibob/index.js",
+        "fixtures_dir": "server/ingestion/sources/hibob/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=hibob --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=hibob --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/hibob.json"
+    },
+    {
+      "ats_key": "hirebridge",
+      "display_name": "Hirebridge",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/hirebridge/index.js",
+        "fixtures_dir": "server/ingestion/sources/hirebridge/fixtures"
+      },
+      "quality": {
+        "rows": 3284,
+        "missing_country_pct": 80.39,
+        "missing_city_pct": 66.63,
+        "missing_any_geo_pct": 95.43,
+        "weak_remote_pct": 77.5,
+        "risk_score": 202.61,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=hirebridge --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=hirebridge --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/hirebridge.json"
+    },
+    {
+      "ats_key": "hireology",
+      "display_name": "Hireology",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "hiringplatform",
+      "display_name": "HiringPlatform",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "homerun",
+      "display_name": "Homerun",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "hrmdirect",
+      "display_name": "HRMDirect",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/hrmdirect/index.js",
+        "fixtures_dir": "server/ingestion/sources/hrmdirect/fixtures"
+      },
+      "quality": {
+        "rows": 43182,
+        "missing_country_pct": 8.55,
+        "missing_city_pct": 75.64,
+        "missing_any_geo_pct": 75.92,
+        "weak_remote_pct": 8.14,
+        "risk_score": 131.72,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=hrmdirect --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=hrmdirect --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/hrmdirect.json"
+    },
+    {
+      "ats_key": "icims",
+      "display_name": "iCIMS",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "pilot-enabled",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/icims/index.js",
+        "fixtures_dir": "server/ingestion/sources/icims/fixtures"
+      },
+      "quality": {
+        "rows": 183222,
+        "missing_country_pct": 78.46,
+        "missing_city_pct": 95.43,
+        "missing_any_geo_pct": 95.7,
+        "weak_remote_pct": 78.24,
+        "risk_score": 191.81,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=icims --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=icims --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Keep registry dispatch enabled; use this ATS as the contract reference while expanding the family.",
+      "work_packet": "docs/reference/ats-workbench/sources/icims.json"
+    },
+    {
+      "ats_key": "isolvisolvedhire",
+      "display_name": "isolvedhire",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/isolvisolvedhire/index.js",
+        "fixtures_dir": "server/ingestion/sources/isolvisolvedhire/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=isolvisolvedhire --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=isolvisolvedhire --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/isolvisolvedhire.json"
+    },
+    {
+      "ats_key": "jibeapply",
+      "display_name": "JibeApply",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "jobaps",
+      "display_name": "JobAps",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/jobaps/index.js",
+        "fixtures_dir": "server/ingestion/sources/jobaps/fixtures"
+      },
+      "quality": {
+        "rows": 1256,
+        "missing_country_pct": 60.83,
+        "missing_city_pct": 37.82,
+        "missing_any_geo_pct": 67.12,
+        "weak_remote_pct": 60.83,
+        "risk_score": 161.03,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=jobaps --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=jobaps --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/jobaps.json"
+    },
+    {
+      "ats_key": "jobs2web",
+      "display_name": "Jobs2Web",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "jobscore",
+      "display_name": "JobScore",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "https://support.jobscore.com/hc/en-us/articles/202001320-Developers-Guide-to-Job-Feed-APIs",
+      "endpoint_pattern": "https://careers.jobscore.com/jobs/{company}/feed.json",
+      "notes": "Official JSON/XML job feed with clear polling guidance."
+    },
+    {
+      "ats_key": "jobvite",
+      "display_name": "Jobvite",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/jobvite/index.js",
+        "fixtures_dir": "server/ingestion/sources/jobvite/fixtures"
+      },
+      "quality": {
+        "rows": 10090,
+        "missing_country_pct": 14.19,
+        "missing_city_pct": 95.41,
+        "missing_any_geo_pct": 95.64,
+        "weak_remote_pct": 12.71,
+        "risk_score": 162.33,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=jobvite --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=jobvite --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/jobvite.json"
+    },
+    {
+      "ats_key": "join",
+      "display_name": "JOIN",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/join/index.js",
+        "fixtures_dir": "server/ingestion/sources/join/fixtures"
+      },
+      "quality": {
+        "rows": 139,
+        "missing_country_pct": 0.72,
+        "missing_city_pct": 28.78,
+        "missing_any_geo_pct": 28.78,
+        "weak_remote_pct": 0.72,
+        "risk_score": 80.06,
+        "wave_priority": "wave-3-certification",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=join --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=join --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/join.json"
+    },
+    {
+      "ats_key": "k12jobspot",
+      "display_name": "K12JobSpot",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/k12jobspot/index.js",
+        "fixtures_dir": "server/ingestion/sources/k12jobspot/fixtures"
+      },
+      "quality": {
+        "rows": 169,
+        "missing_country_pct": 0,
+        "missing_city_pct": 100,
+        "missing_any_geo_pct": 100,
+        "weak_remote_pct": 0,
+        "risk_score": 137.3,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=k12jobspot --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=k12jobspot --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/k12jobspot.json"
+    },
+    {
+      "ats_key": "lever",
+      "display_name": "Lever",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/lever/index.js",
+        "fixtures_dir": "server/ingestion/sources/lever/fixtures"
+      },
+      "quality": {
+        "rows": 2769,
+        "missing_country_pct": 14.19,
+        "missing_city_pct": 53.27,
+        "missing_any_geo_pct": 53.3,
+        "weak_remote_pct": 18.2,
+        "risk_score": 89.81,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=lever --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=lever --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/lever.json"
+    },
+    {
+      "ats_key": "loxo",
+      "display_name": "Loxo",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/loxo/index.js",
+        "fixtures_dir": "server/ingestion/sources/loxo/fixtures"
+      },
+      "quality": {
+        "rows": 5999,
+        "missing_country_pct": 14.29,
+        "missing_city_pct": 68.51,
+        "missing_any_geo_pct": 68.93,
+        "weak_remote_pct": 9.75,
+        "risk_score": 137.66,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=loxo --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=loxo --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/loxo.json"
+    },
+    {
+      "ats_key": "manatal",
+      "display_name": "Manatal",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/manatal/index.js",
+        "fixtures_dir": "server/ingestion/sources/manatal/fixtures"
+      },
+      "quality": {
+        "rows": 74896,
+        "missing_country_pct": 18.72,
+        "missing_city_pct": 24.11,
+        "missing_any_geo_pct": 24.11,
+        "weak_remote_pct": 13.58,
+        "risk_score": 81.21,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=manatal --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=manatal --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/manatal.json"
+    },
+    {
+      "ats_key": "occupop",
+      "display_name": "Occupop",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "oracle",
+      "display_name": "Oracle",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/oracle/index.js",
+        "fixtures_dir": "server/ingestion/sources/oracle/fixtures"
+      },
+      "quality": {
+        "rows": 1641,
+        "missing_country_pct": 3.41,
+        "missing_city_pct": 28.64,
+        "missing_any_geo_pct": 28.76,
+        "weak_remote_pct": 13.41,
+        "risk_score": 61.36,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=oracle --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=oracle --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/oracle.json"
+    },
+    {
+      "ats_key": "pageup",
+      "display_name": "PageUp",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/pageup/index.js",
+        "fixtures_dir": "server/ingestion/sources/pageup/fixtures"
+      },
+      "quality": {
+        "rows": 462,
+        "missing_country_pct": 72.08,
+        "missing_city_pct": 80.09,
+        "missing_any_geo_pct": 93.94,
+        "weak_remote_pct": 71.43,
+        "risk_score": 190.78,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=pageup --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=pageup --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/pageup.json"
+    },
+    {
+      "ats_key": "paycomonline",
+      "display_name": "PaycomOnline",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "paycor",
+      "display_name": "Paycor",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "paylocity",
+      "display_name": "Paylocity",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/paylocity/index.js",
+        "fixtures_dir": "server/ingestion/sources/paylocity/fixtures"
+      },
+      "quality": {
+        "rows": 1346,
+        "missing_country_pct": 4.53,
+        "missing_city_pct": 65.68,
+        "missing_any_geo_pct": 65.97,
+        "weak_remote_pct": 1.71,
+        "risk_score": 86.63,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=paylocity --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=paylocity --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/paylocity.json"
+    },
+    {
+      "ats_key": "peopleadmin",
+      "display_name": "PeopleAdmin",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "peopleforce",
+      "display_name": "PeopleForce",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/peopleforce/index.js",
+        "fixtures_dir": "server/ingestion/sources/peopleforce/fixtures"
+      },
+      "quality": {
+        "rows": 461,
+        "missing_country_pct": 78.74,
+        "missing_city_pct": 84.82,
+        "missing_any_geo_pct": 92.19,
+        "weak_remote_pct": 65.94,
+        "risk_score": 192.07,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=peopleforce --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=peopleforce --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/peopleforce.json"
+    },
+    {
+      "ats_key": "personio",
+      "display_name": "Personio",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "pinpointhq",
+      "display_name": "PinpointHQ",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/pinpointhq/index.js",
+        "fixtures_dir": "server/ingestion/sources/pinpointhq/fixtures"
+      },
+      "quality": {
+        "rows": 11204,
+        "missing_country_pct": 12.08,
+        "missing_city_pct": 66.99,
+        "missing_any_geo_pct": 67.11,
+        "weak_remote_pct": 3.39,
+        "risk_score": 100.77,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=pinpointhq --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=pinpointhq --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/pinpointhq.json"
+    },
+    {
+      "ats_key": "policeapp",
+      "display_name": "PoliceApp",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/policeapp/index.js",
+        "fixtures_dir": "server/ingestion/sources/policeapp/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=policeapp --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=policeapp --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/policeapp.json"
+    },
+    {
+      "ats_key": "prismhr",
+      "display_name": "PrismHR",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "recruitcrm",
+      "display_name": "RecruitCRM",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/recruitcrm/index.js",
+        "fixtures_dir": "server/ingestion/sources/recruitcrm/fixtures"
+      },
+      "quality": {
+        "rows": 2795,
+        "missing_country_pct": 92.88,
+        "missing_city_pct": 89.73,
+        "missing_any_geo_pct": 93.49,
+        "weak_remote_pct": 23.94,
+        "risk_score": 158.49,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=recruitcrm --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=recruitcrm --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/recruitcrm.json"
+    },
+    {
+      "ats_key": "recruitee",
+      "display_name": "Recruitee",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/recruitee/index.js",
+        "fixtures_dir": "server/ingestion/sources/recruitee/fixtures"
+      },
+      "quality": {
+        "rows": 37468,
+        "missing_country_pct": 3.28,
+        "missing_city_pct": 17.91,
+        "missing_any_geo_pct": 17.91,
+        "weak_remote_pct": 6.7,
+        "risk_score": 63.89,
+        "wave_priority": "monitor",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=recruitee --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=recruitee --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/recruitee.json"
+    },
+    {
+      "ats_key": "recruiterbox",
+      "display_name": "Trakstar Hire / Recruiterbox",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "https://apiv1.recruiterbox.com/frontend_api.html",
+      "endpoint_pattern": "https://jsapi.recruiterbox.com/v1/openings?client_name={client}",
+      "notes": "Official frontend openings API; public opening data does not require auth."
+    },
+    {
+      "ats_key": "recruiterflow",
+      "display_name": "Recruiterflow",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "rippling",
+      "display_name": "Rippling",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/rippling/index.js",
+        "fixtures_dir": "server/ingestion/sources/rippling/fixtures"
+      },
+      "quality": {
+        "rows": 8474,
+        "missing_country_pct": 2.53,
+        "missing_city_pct": 94.12,
+        "missing_any_geo_pct": 94.12,
+        "weak_remote_pct": 2.32,
+        "risk_score": 151.53,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=rippling --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=rippling --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/rippling.json"
+    },
+    {
+      "ats_key": "sagehr",
+      "display_name": "SageHR",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/sagehr/index.js",
+        "fixtures_dir": "server/ingestion/sources/sagehr/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=sagehr --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=sagehr --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/sagehr.json"
+    },
+    {
+      "ats_key": "saphrcloud",
+      "display_name": "SAP HR Cloud",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/saphrcloud/index.js",
+        "fixtures_dir": "server/ingestion/sources/saphrcloud/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=saphrcloud --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=saphrcloud --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/saphrcloud.json"
+    },
+    {
+      "ats_key": "schoolspring",
+      "display_name": "SchoolSpring",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/schoolspring/index.js",
+        "fixtures_dir": "server/ingestion/sources/schoolspring/fixtures"
+      },
+      "quality": {
+        "rows": 496,
+        "missing_country_pct": 0.6,
+        "missing_city_pct": 100,
+        "missing_any_geo_pct": 100,
+        "weak_remote_pct": 0.6,
+        "risk_score": 142.44,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=schoolspring --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=schoolspring --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/schoolspring.json"
+    },
+    {
+      "ats_key": "silkroad",
+      "display_name": "SilkRoad",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "simplicant",
+      "display_name": "Simplicant",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/simplicant/index.js",
+        "fixtures_dir": "server/ingestion/sources/simplicant/fixtures"
+      },
+      "quality": {
+        "rows": 427,
+        "missing_country_pct": 7.26,
+        "missing_city_pct": 6.56,
+        "missing_any_geo_pct": 13.35,
+        "weak_remote_pct": 3.98,
+        "risk_score": 74.96,
+        "wave_priority": "wave-3-certification",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=simplicant --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=simplicant --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/simplicant.json"
+    },
+    {
+      "ats_key": "smartrecruiters",
+      "display_name": "SmartRecruiters",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/smartrecruiters/index.js",
+        "fixtures_dir": "server/ingestion/sources/smartrecruiters/fixtures"
+      },
+      "quality": {
+        "rows": 5033,
+        "missing_country_pct": 45.62,
+        "missing_city_pct": 100,
+        "missing_any_geo_pct": 100,
+        "weak_remote_pct": 41.31,
+        "risk_score": 152.01,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=smartrecruiters --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=smartrecruiters --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/smartrecruiters.json"
+    },
+    {
+      "ats_key": "softgarden",
+      "display_name": "Softgarden",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "statejobsny",
+      "display_name": "StateJobsNY",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/statejobsny/index.js",
+        "fixtures_dir": "server/ingestion/sources/statejobsny/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=statejobsny --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=statejobsny --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/statejobsny.json"
+    },
+    {
+      "ats_key": "talentlyft",
+      "display_name": "Talentlyft",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/talentlyft/index.js",
+        "fixtures_dir": "server/ingestion/sources/talentlyft/fixtures"
+      },
+      "quality": {
+        "rows": 2041,
+        "missing_country_pct": 50.61,
+        "missing_city_pct": 92.75,
+        "missing_any_geo_pct": 94.12,
+        "weak_remote_pct": 3.04,
+        "risk_score": 166.89,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=talentlyft --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=talentlyft --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/talentlyft.json"
+    },
+    {
+      "ats_key": "talentreef",
+      "display_name": "TalentReef",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/talentreef/index.js",
+        "fixtures_dir": "server/ingestion/sources/talentreef/fixtures"
+      },
+      "quality": {
+        "rows": 19973,
+        "missing_country_pct": 0,
+        "missing_city_pct": 83.51,
+        "missing_any_geo_pct": 83.51,
+        "weak_remote_pct": 0,
+        "risk_score": 144.81,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=talentreef --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=talentreef --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/talentreef.json"
+    },
+    {
+      "ats_key": "taleo",
+      "display_name": "Taleo",
+      "family": "brittle-high-risk",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/taleo/index.js",
+        "fixtures_dir": "server/ingestion/sources/taleo/fixtures"
+      },
+      "quality": {
+        "rows": 24976,
+        "missing_country_pct": 40.07,
+        "missing_city_pct": 92.3,
+        "missing_any_geo_pct": 92.31,
+        "weak_remote_pct": 46.19,
+        "risk_score": 152.02,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=taleo --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=taleo --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/taleo.json"
+    },
+    {
+      "ats_key": "talexio",
+      "display_name": "Talexio",
+      "family": "vendor-specific",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/talexio/index.js",
+        "fixtures_dir": "server/ingestion/sources/talexio/fixtures"
+      },
+      "quality": {
+        "rows": 262,
+        "missing_country_pct": 51.15,
+        "missing_city_pct": 78.63,
+        "missing_any_geo_pct": 85.88,
+        "weak_remote_pct": 27.86,
+        "risk_score": 158.86,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=talexio --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js && node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=talexio --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/talexio.json"
+    },
+    {
+      "ats_key": "teamtailor",
+      "display_name": "Teamtailor",
+      "family": "direct-json-stable",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/teamtailor/index.js",
+        "fixtures_dir": "server/ingestion/sources/teamtailor/fixtures"
+      },
+      "quality": {
+        "rows": 2839,
+        "missing_country_pct": 79.54,
+        "missing_city_pct": 98.87,
+        "missing_any_geo_pct": 99.33,
+        "weak_remote_pct": 66.11,
+        "risk_score": 209.81,
+        "wave_priority": "wave-1-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=teamtailor --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=teamtailor --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/teamtailor.json"
+    },
+    {
+      "ats_key": "theapplicantmanager",
+      "display_name": "The Applicant Manager",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/theapplicantmanager/index.js",
+        "fixtures_dir": "server/ingestion/sources/theapplicantmanager/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=theapplicantmanager --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=theapplicantmanager --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/theapplicantmanager.json"
+    },
+    {
+      "ats_key": "trakstar",
+      "display_name": "Trakstar",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "ukg",
+      "display_name": "UKG",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "ultipro",
+      "display_name": "UltiPro",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/ultipro/index.js",
+        "fixtures_dir": "server/ingestion/sources/ultipro/fixtures"
+      },
+      "quality": {
+        "rows": 3619,
+        "missing_country_pct": 0.83,
+        "missing_city_pct": 50.57,
+        "missing_any_geo_pct": 50.93,
+        "weak_remote_pct": 0.03,
+        "risk_score": 111.63,
+        "wave_priority": "wave-3-certification",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=ultipro --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=ultipro --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/ultipro.json"
+    },
+    {
+      "ats_key": "usajobs",
+      "display_name": "USAJobs",
+      "family": "public-sector-education",
+      "registry_status": "module-ready",
+      "current_status": "fallback",
+      "public_enabled": false,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/usajobs/index.js",
+        "fixtures_dir": "server/ingestion/sources/usajobs/fixtures"
+      },
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": 35,
+        "wave_priority": "wave-4-fixture",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=usajobs --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=usajobs --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/usajobs.json"
+    },
+    {
+      "ats_key": "webcruiter",
+      "display_name": "Webcruiter",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "workable",
+      "display_name": "Workable",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "https://help.workable.com/hc/en-us/articles/115012771647-Using-the-Workable-API-to-create-a-careers-page",
+      "endpoint_pattern": "Requires reviewed public widget config or r_jobs token.",
+      "notes": "High-value source; enable only after token/config handling is reviewed."
+    },
+    {
+      "ats_key": "workday",
+      "display_name": "Workday",
+      "family": "enterprise-direct",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/workday/index.js",
+        "fixtures_dir": "server/ingestion/sources/workday/fixtures"
+      },
+      "quality": {
+        "rows": 20356,
+        "missing_country_pct": 39.2,
+        "missing_city_pct": 77.59,
+        "missing_any_geo_pct": 83.85,
+        "weak_remote_pct": 46.96,
+        "risk_score": 142.68,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": false
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=workday --json",
+        "source_test": "node server/ingestion/sources/enterpriseSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=workday --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/workday.json"
+    },
+    {
+      "ats_key": "ycombinator",
+      "display_name": "YCombinator",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "yello",
+      "display_name": "Yello",
+      "family": "future-candidate",
+      "registry_status": "research-only",
+      "current_status": "future-candidate",
+      "public_enabled": false,
+      "source_module": {
+        "present": false,
+        "path": "",
+        "fixtures_dir": ""
+      },
+      "quality": {},
+      "scripts": {
+        "workbench": "not available until configured as an ATS adapter",
+        "source_test": "not available until source module exists",
+        "dry_run": "not available until adapter and source target exist",
+        "registry_check": "node scripts/ats-registry-index.test.js"
+      },
+      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
+      "work_packet": "",
+      "docs_url": "",
+      "endpoint_pattern": "",
+      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+    },
+    {
+      "ats_key": "zoho",
+      "display_name": "Zoho Recruit",
+      "family": "embedded-or-semi-structured",
+      "registry_status": "module-ready",
+      "current_status": "certified",
+      "public_enabled": true,
+      "source_module": {
+        "present": true,
+        "path": "server/ingestion/sources/zoho/index.js",
+        "fixtures_dir": "server/ingestion/sources/zoho/fixtures"
+      },
+      "quality": {
+        "rows": 9114,
+        "missing_country_pct": 33.3,
+        "missing_city_pct": 87.16,
+        "missing_any_geo_pct": 87.16,
+        "weak_remote_pct": 22.02,
+        "risk_score": 132.02,
+        "wave_priority": "wave-2-live-gap",
+        "detail_refetch_needed": true
+      },
+      "scripts": {
+        "workbench": "npm.cmd run ats:workbench -- --source=zoho --json",
+        "source_test": "node server/ingestion/sources/htmlPublicSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=zoho --limit=10 --json",
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
+      },
+      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "work_packet": "docs/reference/ats-workbench/sources/zoho.json"
+    }
+  ]
+}
