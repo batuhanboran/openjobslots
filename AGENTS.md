@@ -13,6 +13,8 @@ For routine Codex runs, start from only the current operating context needed for
 5. The relevant tests for the requested work.
 6. The relevant latest production report when the task depends on live state.
 
+For non-trivial OpenJobSlots work, also use the project-specific Obsidian vault at `C:\Users\BaronPC\Documents\OpenJobSlots Codex Memory`. Start with `README.md` and `Thread Start.md` after the three repo-local files above. Do not read or update the Povly vault for OpenJobSlots work; Povly is a separate project.
+
 Load `README.md` or `docs/reference/` only when the task needs architecture, deployment, runbook, ATS matrix, certification, quality, or search details. Do not use archived or obsolete docs as current production state.
 
 ## Product Context
