@@ -36,6 +36,7 @@ const BREEZY_POLYGOT_LABELS = Object.freeze({
   "%LABEL_POSITION_TYPE_REMOTE_ANY%": "Remote",
   "%LABEL_POSITION_TYPE_REMOTE_WITHIN%": "Remote",
   "%LABEL_POSITION_TYPE_REMOTE%": "Remote",
+  "%LABEL_POSITION_TYPE_WORLDWIDE%": "Worldwide",
   "%LABEL_POSITION_TYPE_HYBRID%": "Hybrid",
   "%LABEL_POSITION_TYPE_ON_SITE%": "On-site",
   "%LABEL_POSITION_TYPE_ONSITE%": "On-site",
@@ -179,7 +180,7 @@ function extractBreezyRemoteTypeFromValue(value) {
   const text = cleanBreezyText(value).toLowerCase();
   if (!text) return "";
   if (/%label_position_type_hybrid%|\b(hybrid|partially remote)\b/i.test(text)) return "hybrid";
-  if (/%label_position_type_remote|%label_position_type_remote_any%|%label_position_type_remote_within%|\b(remote|telecommute|telework|work from home|wfh|virtual)\b/i.test(text)) return "remote";
+  if (/%label_position_type_remote|%label_position_type_remote_any%|%label_position_type_remote_within%|%label_position_type_worldwide%|\b(remote|telecommute|telework|work from home|wfh|virtual|worldwide)\b/i.test(text)) return "remote";
   if (/%label_position_type_on[-_]?site%|\b(on[-\s]?site|onsite|in[-\s]?person|office[-\s]?based|work from office)\b/i.test(text)) return "onsite";
   return "";
 }
@@ -330,6 +331,9 @@ function extractBreezyLabeledRemoteType(sourceHtml) {
   const translated = translateBreezyPolygotLabels(source);
   if (/%LABEL_POSITION_TYPE_REMOTE_ANY%|%LABEL_POSITION_TYPE_REMOTE_WITHIN%|%LABEL_POSITION_TYPE_REMOTE%/i.test(source)) {
     return { value: "remote", raw: "Remote", path: "Breezy remote position label" };
+  }
+  if (/%LABEL_POSITION_TYPE_WORLDWIDE%/i.test(source)) {
+    return { value: "remote", raw: "Worldwide", path: "Breezy worldwide position label" };
   }
   if (/%LABEL_POSITION_TYPE_HYBRID%/i.test(source)) {
     return { value: "hybrid", raw: "Hybrid", path: "Breezy hybrid position label" };

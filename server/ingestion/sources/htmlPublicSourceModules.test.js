@@ -383,6 +383,46 @@ test("breezy source module quarantines narrative detail text captured as locatio
   assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
 });
 
+test("breezy source module treats worldwide position labels as explicit remote evidence", () => {
+  const source = getSourceModule("breezy");
+  const company = readJson(path.join(__dirname, "breezy", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <h2 class="group-header"><i class="fa fa-map-marker"></i><span>Worldwide</span></h2>
+      <ul class="positions location">
+        <li class="position transition">
+          <ul class="position-wrap">
+            <li class="position-details">
+              <a href="/p/BRZ5001-link-building-specialist" title="Apply">
+                <h2>Link Building Specialist</h2>
+                <ul class="meta">
+                  <li class="location">
+                    <i class="fa fa-wifi"></i>
+                    <span class="polygot">%LABEL_POSITION_TYPE_WORLDWIDE%</span>
+                  </li>
+                  <li class="type"><span class="polygot">%LABEL_POSITION_TYPE_OTHER%</span></li>
+                </ul>
+              </a>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    `,
+    __listUrl: company.url_string
+  }, company);
+
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "BRZ5001-link-building-specialist");
+  assert.equal(normalized.location_text, "Worldwide");
+  assert.equal(normalized.city || "", "");
+  assert.equal(normalized.country || "", "");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.source_evidence.remote_source, "labeled_html");
+  assert.equal(normalized.source_evidence.remote_path, "Breezy worldwide position label");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("hrmdirect source module enriches title-only rows from deterministic detail pages", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");
