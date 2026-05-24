@@ -278,6 +278,61 @@ test("applytojob source module parses generic card links with labeled fields", (
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("applytojob source module normalizes source-provided country tokens", () => {
+  const source = getSourceModule("applytojob");
+  const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <section class="jobs">
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4001/Store-Lead">Store Lead</a>
+          <div><span>Location:</span><span>Nassau, Bahamas</span></div>
+        </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4002/Project-Engineer">Project Engineer</a>
+          <div><span>Location:</span><span>Juncos, PR, Puerto Rico</span></div>
+        </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4003/Beach-Attendant">Beach Attendant</a>
+          <div><span>Location:</span><span>Aruba</span></div>
+        </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4004/Salesforce-Consultant">Salesforce Consultant</a>
+          <div><span>Location:</span><span>Casablanca, Morocco</span></div>
+        </article>
+      </section>
+    `,
+    __listUrl: company.url_string
+  }, company);
+  assert.equal(parsed.length, 4);
+  const normalized = Object.fromEntries(
+    parsed.map((posting) => {
+      const row = source.normalize(posting, company);
+      return [row.source_job_id, row];
+    })
+  );
+
+  assert.equal(normalized.ATJ4001.country, "Bahamas");
+  assert.equal(normalized.ATJ4001.region, "North America");
+  assert.equal(normalized.ATJ4001.city, "Nassau");
+  assert.equal(normalized.ATJ4001.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4002.country, "Puerto Rico");
+  assert.equal(normalized.ATJ4002.region, "North America");
+  assert.equal(normalized.ATJ4002.city, "Juncos");
+  assert.equal(normalized.ATJ4002.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4003.country, "Aruba");
+  assert.equal(normalized.ATJ4003.region, "North America");
+  assert.equal(normalized.ATJ4003.city, "");
+  assert.equal(normalized.ATJ4003.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4004.country, "Morocco");
+  assert.equal(normalized.ATJ4004.region, "EMEA");
+  assert.equal(normalized.ATJ4004.city, "Casablanca");
+  assert.equal(normalized.ATJ4004.source_evidence.location_rule_name, "applytojob_country_token_hint");
+});
+
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {
   const source = getSourceModule("breezy");
   const sourceDir = path.join(__dirname, "breezy");

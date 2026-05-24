@@ -18,6 +18,41 @@
     "parser_confidence": 0.75
   },
   {
+    "source_job_id": "ATJ1004",
+    "company_name": "Fixture ApplyToJob",
+    "position_name": "Store Lead",
+    "country": "Bahamas",
+    "city": "Nassau",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "ATJ1005",
+    "company_name": "Fixture ApplyToJob",
+    "position_name": "Project Engineer",
+    "country": "Puerto Rico",
+    "city": "Juncos",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "ATJ1006",
+    "company_name": "Fixture ApplyToJob",
+    "position_name": "Beach Attendant",
+    "country": "Aruba",
+    "remote_type": "unknown",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "ATJ1007",
+    "company_name": "Fixture ApplyToJob",
+    "position_name": "Salesforce Consultant",
+    "country": "Morocco",
+    "city": "Casablanca",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
     "source_job_id": "ATJ1003",
     "company_name": "Fixture ApplyToJob",
     "position_name": "Hybrid Implementation Consultant",

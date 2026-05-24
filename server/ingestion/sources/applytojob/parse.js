@@ -199,6 +199,60 @@ function extractApplyToJobRemoteTypeFromValue(value) {
   return "";
 }
 
+const APPLYTOJOB_COUNTRY_TOKEN_HINTS = Object.freeze({
+  aruba: { country: "Aruba", region: "North America" },
+  bahamas: { country: "Bahamas", region: "North America" },
+  "the bahamas": { country: "Bahamas", region: "North America" },
+  malta: { country: "Malta", region: "EMEA" },
+  morocco: { country: "Morocco", region: "EMEA" },
+  pr: { country: "Puerto Rico", region: "North America" },
+  "puerto rico": { country: "Puerto Rico", region: "North America" }
+});
+
+function normalizeApplyToJobToken(value) {
+  return cleanApplyToJobText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractApplyToJobCountryTokenHint(locationValue) {
+  const location = cleanApplyToJobText(locationValue);
+  if (!location || /^(remote|hybrid|onsite|on[-\s]?site)$/i.test(location)) return null;
+  const tokens = location.split(",").map((part) => cleanApplyToJobText(part)).filter(Boolean);
+  if (tokens.length === 0) return null;
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const token = tokens[index];
+    const hint = APPLYTOJOB_COUNTRY_TOKEN_HINTS[normalizeApplyToJobToken(token)];
+    if (!hint) continue;
+    const cityToken = tokens.length === 1 ? "" : cleanApplyToJobText(tokens[0]);
+    const normalizedCity = normalizeApplyToJobToken(cityToken);
+    const normalizedCountry = normalizeApplyToJobToken(hint.country);
+    return {
+      ...hint,
+      city: normalizedCity && normalizedCity !== normalizedCountry ? cityToken : "",
+      raw: location,
+      token,
+      ruleName: "applytojob_country_token_hint"
+    };
+  }
+  return null;
+}
+
+function buildApplyToJobLocationHintEvidence(locationValue) {
+  const hint = extractApplyToJobCountryTokenHint(locationValue);
+  if (!hint) return {};
+  return {
+    location_rule_name: hint.ruleName,
+    location_raw: hint.raw,
+    country_source: "labeled_html",
+    country_path: "Location country token",
+    country_rule_name: hint.ruleName
+  };
+}
+
 function extractApplyToJobJsonLdFieldsFromObject(jobPosting) {
   if (!jobPosting) return {};
   const locations = Array.isArray(jobPosting.jobLocation)
@@ -379,6 +433,7 @@ function extractApplyToJobDetailFields(detailHtml) {
       ...(jsonLd.evidence || {}),
       location_source: jsonLd.evidence?.location_source || (labeledLocation ? "labeled_html" : ""),
       location_path: jsonLd.evidence?.location_path || (labeledLocation ? "Location label" : ""),
+      ...(!jsonLd.evidence?.location_source ? buildApplyToJobLocationHintEvidence(labeledLocation) : {}),
       remote_source: jsonLd.evidence?.remote_source || (labeledRemote ? "labeled_html" : ""),
       remote_path: jsonLd.evidence?.remote_path || (labeledRemote ? labeledRemote.path : ""),
       posting_date_source: jsonLd.evidence?.posting_date_source || (labeledPostingDate ? "labeled_html" : ""),
@@ -532,6 +587,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
         source_job_id_path: "/apply/:id",
         location_source: location ? "labeled_html" : "",
         location_path: location ? "list location label/icon" : "",
+        ...buildApplyToJobLocationHintEvidence(location),
         remote_source: labeledRemote ? "labeled_html" : "",
         remote_path: labeledRemote?.path || "",
         posting_date_source: postingDate ? "labeled_html" : "",
@@ -611,6 +667,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
         source_job_id_path: "/apply/:id",
         location_source: location ? "labeled_html" : "",
         location_path: location ? "legacy location label/icon" : "",
+        ...buildApplyToJobLocationHintEvidence(location),
         remote_source: labeledRemote ? "labeled_html" : "",
         remote_path: labeledRemote?.path || "",
         posting_date_source: postingDate ? "labeled_html" : "",
@@ -638,7 +695,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     if (!title) continue;
 
     const nextStart = index + 1 < genericMatches.length ? Number(genericMatches[index + 1].index || 0) : source.length;
-    const contextStart = Math.max(0, Number(match.index || 0) - 600);
+    const contextStart = Number(match.index || 0);
     const contextEnd = Math.min(nextStart, Number(match.index || 0) + String(match[0] || "").length + 2200);
     const contextHtml = source.slice(contextStart, contextEnd);
     const location =
@@ -682,6 +739,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
         source_job_id_path: "/apply/:id",
         location_source: location ? "labeled_html" : "",
         location_path: location ? "generic card location label/icon" : "",
+        ...buildApplyToJobLocationHintEvidence(location),
         remote_source: labeledRemote ? "labeled_html" : "",
         remote_path: labeledRemote?.path || "",
         posting_date_source: postingDate ? "labeled_html" : "",
@@ -702,5 +760,6 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
 }
 
 module.exports = {
+  extractApplyToJobCountryTokenHint,
   parseApplyToJobPostingsFromHtml
 };
