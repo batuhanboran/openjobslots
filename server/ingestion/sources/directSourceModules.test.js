@@ -95,6 +95,40 @@ test("target direct ATS modules return no postings for empty raw payloads", () =
   }
 });
 
+test("lever source module filters employment categories that are misfiled as locations", () => {
+  const source = getSourceModule("lever");
+  const company = {
+    company_name: "Peak Games",
+    company_url: "https://jobs.lever.co/peakgames",
+    ATS_name: "Lever"
+  };
+  const rawList = readJson(path.join(__dirname, "lever", "fixtures", "employment-location.json"));
+  const expectedRows = readJson(path.join(__dirname, "lever", "fixtures", "employment-location-expected.json"));
+
+  const parsed = source.parse(rawList, company);
+  assert.equal(parsed.length, expectedRows.length);
+  assert.equal(parsed[0].location, null);
+  assert.equal(parsed[0].workplaceType, null);
+  assert.equal(parsed[0].employment_type, "Full-time");
+
+  const normalized = source.normalize(parsed[0], company);
+  const expected = expectedRows[0];
+  assert.equal(normalized.source_job_id, expected.source_job_id);
+  assert.equal(normalized.company_name, expected.company_name);
+  assert.equal(normalized.position_name, expected.position_name);
+  assert.equal(normalized.canonical_url, expected.job_posting_url);
+  assert.equal(normalized.location_text || "", expected.location_text);
+  assert.equal(normalized.country || "", expected.country);
+  assert.equal(normalized.region || "", expected.region);
+  assert.equal(normalized.city || "", expected.city);
+  assert.equal(normalized.remote_type, expected.remote_type);
+  assert.equal(normalized.employment_type, expected.employment_type);
+
+  const gate = source.validatePublic(normalized);
+  assert.equal(gate.status, "quarantined");
+  assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
+});
+
 test("ashby source module normalizes source-provided location shorthand without shared ATS logic", () => {
   const source = getSourceModule("ashby");
   const company = readJson(path.join(__dirname, "ashby", "fixtures", "company.json"));

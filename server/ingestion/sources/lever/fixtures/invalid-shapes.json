@@ -80,6 +80,20 @@
         "description_plain": "Our culture supports remote collaboration when needed.",
         "remote_type": "unknown"
       }
+    },
+    {
+      "name": "filtered employment category without geo",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture Lever",
+        "source_job_id": "lever-filtered-employment-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://jobs.lever.co/fixtureco/lever-filtered-employment-location",
+        "location": "",
+        "remote_type": "unknown",
+        "employment_type": "Full-time"
+      }
     }
   ]
 }
