@@ -55,13 +55,7 @@ function createSqliteSchemaRuntime(dependencies = {}) {
         nextPostingLocationByJobUrl.set(url, location);
       }
     }
-    postingLocationVersion += 1;
-    postingLocationGeoFilterOptionsCache = {
-      mapRef: null,
-      version: -1,
-      countries: [],
-      regions: []
-    };
+    setPostingLocationState(nextPostingLocationByJobUrl);
   }
   
   async function ensureJobIndustryTables() {
