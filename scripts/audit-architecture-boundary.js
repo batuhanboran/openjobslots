@@ -3,7 +3,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const SERVER_INDEX_CAP = Number(process.env.OPENJOBSLOTS_SERVER_INDEX_LINE_CAP || 5000);
+const SERVER_INDEX_CAP = Number(process.env.OPENJOBSLOTS_SERVER_INDEX_LINE_CAP || 3000);
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
