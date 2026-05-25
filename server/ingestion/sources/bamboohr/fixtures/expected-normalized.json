@@ -53,5 +53,61 @@
     "posting_date": "2026-05-09",
     "industry": "Operations",
     "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1005",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Iceland General Application",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1005",
+    "country": "Iceland",
+    "region": "EMEA",
+    "city": "Reykjavik",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "General",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1006",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Remote Sales Manager - Europe",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1006",
+    "country": "Italy",
+    "region": "EMEA",
+    "city": "Milano",
+    "remote_type": "remote",
+    "posting_date": null,
+    "industry": "Sales",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1007",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Hybrid BI Analyst",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1007",
+    "country": "El Salvador",
+    "region": "LATAM",
+    "city": "San Salvador",
+    "remote_type": "hybrid",
+    "posting_date": null,
+    "industry": "Analytics",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1008",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Warehouse Coordinator",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1008",
+    "country": "Netherlands",
+    "region": "EMEA",
+    "city": "Raamsdonksveer",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "Operations",
+    "parser_confidence": 0.75
   }
 ]

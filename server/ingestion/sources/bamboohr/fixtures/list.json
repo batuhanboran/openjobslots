@@ -55,6 +55,64 @@
       "isRemote": false,
       "postingDate": "2026-05-09",
       "department": "Operations"
+    },
+    {
+      "id": "1005",
+      "jobOpeningName": "Iceland General Application",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1005",
+      "location": {
+        "city": "Reykjavik",
+        "state": "Iceland"
+      },
+      "atsLocation": {
+        "country": null,
+        "province": null,
+        "city": null
+      },
+      "isRemote": null,
+      "locationType": "0",
+      "department": "General"
+    },
+    {
+      "id": "1006",
+      "jobOpeningName": "Remote Sales Manager - Europe",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1006",
+      "location": {
+        "city": null,
+        "state": null
+      },
+      "atsLocation": {
+        "country": "Italy",
+        "province": "Lombardy",
+        "city": "Milano"
+      },
+      "isRemote": null,
+      "locationType": "1",
+      "department": "Sales"
+    },
+    {
+      "id": "1007",
+      "jobOpeningName": "Hybrid BI Analyst",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1007",
+      "location": {
+        "city": "El salvador",
+        "state": "San Salvador"
+      },
+      "isRemote": null,
+      "locationType": "2",
+      "department": "Analytics"
+    },
+    {
+      "id": "1008",
+      "jobOpeningName": "Warehouse Coordinator",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1008",
+      "location": {
+        "city": "Netherlands",
+        "state": "Raamsdonksveer"
+      },
+      "isRemote": null,
+      "locationType": "0",
+      "department": "Operations"
     }
   ]
 }

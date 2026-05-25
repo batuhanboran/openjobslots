@@ -270,6 +270,112 @@ test("bamboohr source module completes sparse structured EU locations without ac
   assert.ok(gate.reason_codes.includes("ambiguous_location"));
 });
 
+test("bamboohr source module maps locationType and country-token structured locations", () => {
+  const source = getSourceModule("bamboohr");
+  const company = readJson(path.join(__dirname, "bamboohr", "fixtures", "company.json"));
+  const parsed = source.parse({
+    result: [
+      {
+        id: "bhr-reykjavik",
+        jobOpeningName: "Iceland General Application",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-reykjavik",
+        location: {
+          city: "Reykjavik",
+          state: "Iceland"
+        },
+        atsLocation: {
+          country: null,
+          province: null,
+          city: null
+        },
+        isRemote: null,
+        locationType: "0"
+      },
+      {
+        id: "bhr-remote-milano",
+        jobOpeningName: "Remote Sales Manager - Europe",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-remote-milano",
+        location: {
+          city: null,
+          state: null
+        },
+        atsLocation: {
+          country: "Italy",
+          province: "Lombardy",
+          city: "Milano"
+        },
+        isRemote: null,
+        locationType: "1"
+      },
+      {
+        id: "bhr-hybrid-sansalvador",
+        jobOpeningName: "Hybrid BI Analyst",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-hybrid-sansalvador",
+        location: {
+          city: "El salvador",
+          state: "San Salvador"
+        },
+        isRemote: null,
+        locationType: "2"
+      },
+      {
+        id: "bhr-netherlands",
+        jobOpeningName: "Warehouse Coordinator",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-netherlands",
+        location: {
+          city: "Netherlands",
+          state: "Raamsdonksveer"
+        },
+        isRemote: null,
+        locationType: "0"
+      }
+    ]
+  }, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const reykjavik = byId.get("bhr-reykjavik");
+  assert.equal(reykjavik.location_text, "Reykjavik, Iceland");
+  assert.equal(reykjavik.country, "Iceland");
+  assert.equal(reykjavik.region, "EMEA");
+  assert.equal(reykjavik.city, "Reykjavik");
+  assert.equal(reykjavik.remote_type, "onsite");
+  assert.equal(reykjavik.posting_date, null);
+  assert.equal(reykjavik.source_evidence.location_source, "list_api");
+  assert.equal(reykjavik.source_evidence.location_path, "result[].location");
+  assert.equal(reykjavik.source_evidence.location_rule_name, "bamboohr_country_token_location");
+  assert.equal(reykjavik.source_evidence.remote_source, "list_api");
+  assert.equal(reykjavik.source_evidence.remote_path, "result[].locationType");
+  assert.equal(reykjavik.source_evidence.remote_rule_name, "bamboohr_location_type");
+  assert.equal(source.validatePublic(reykjavik).status, "accepted");
+
+  const milano = byId.get("bhr-remote-milano");
+  assert.equal(milano.location_text, "Milano, Lombardy, Italy");
+  assert.equal(milano.country, "Italy");
+  assert.equal(milano.city, "Milano");
+  assert.equal(milano.remote_type, "remote");
+  assert.equal(milano.source_evidence.location_path, "result[].atsLocation");
+  assert.equal(milano.source_evidence.remote_path, "result[].locationType");
+  assert.equal(source.validatePublic(milano).status, "accepted");
+
+  const sanSalvador = byId.get("bhr-hybrid-sansalvador");
+  assert.equal(sanSalvador.location_text, "San Salvador, El Salvador");
+  assert.equal(sanSalvador.country, "El Salvador");
+  assert.equal(sanSalvador.region, "LATAM");
+  assert.equal(sanSalvador.city, "San Salvador");
+  assert.equal(sanSalvador.remote_type, "hybrid");
+  assert.equal(sanSalvador.source_evidence.location_rule_name, "bamboohr_country_token_location");
+  assert.equal(source.validatePublic(sanSalvador).status, "accepted");
+
+  const netherlands = byId.get("bhr-netherlands");
+  assert.equal(netherlands.location_text, "Raamsdonksveer, Netherlands");
+  assert.equal(netherlands.country, "Netherlands");
+  assert.equal(netherlands.city, "Raamsdonksveer");
+  assert.equal(netherlands.remote_type, "onsite");
+  assert.equal(netherlands.source_evidence.location_rule_name, "bamboohr_country_token_location");
+  assert.equal(source.validatePublic(netherlands).status, "accepted");
+});
+
 function zohoFixtureContext() {
   return {
     source: getSourceModule("zoho"),

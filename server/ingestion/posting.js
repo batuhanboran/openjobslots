@@ -52,6 +52,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Spain", ["es", "esp", "spain", "españa", "espana"]],
   ["Italy", ["it", "ita", "italy", "italia"]],
   ["Ireland", ["ie", "irl", "ireland"]],
+  ["Iceland", ["is", "isl", "iceland"]],
   ["India", ["in", "ind", "india"]],
   ["Australia", ["au", "aus", "australia"]],
   ["New Zealand", ["nz", "nzl", "new zealand"]],
@@ -68,9 +69,15 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Brazil", ["br", "bra", "brazil", "brasil"]],
   ["Mexico", ["mx", "mex", "mexico", "méxico"]],
   ["Argentina", ["ar", "arg", "argentina"]],
+  ["Bolivia", ["bo", "bol", "bolivia"]],
   ["Chile", ["cl", "chl", "chile"]],
   ["Colombia", ["co", "col", "colombia"]],
   ["Guyana", ["gy", "guy", "guyana"]],
+  ["El Salvador", ["sv", "slv", "el salvador"]],
+  ["Guatemala", ["gt", "gtm", "guatemala"]],
+  ["Honduras", ["hn", "hnd", "honduras"]],
+  ["Nicaragua", ["ni", "nic", "nicaragua"]],
+  ["Panama", ["pa", "pan", "panama", "panamá"]],
   ["Peru", ["pe", "per", "peru"]],
   ["Paraguay", ["py", "pry", "paraguay"]],
   ["Uruguay", ["uy", "ury", "uruguay"]],
@@ -107,6 +114,9 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Iraq", ["iq", "irq", "iraq"]],
   ["Cambodia", ["kh", "khm", "cambodia"]],
   ["Kenya", ["ke", "ken", "kenya"]],
+  ["Tanzania", ["tz", "tza", "tanzania"]],
+  ["Mozambique", ["mz", "moz", "mozambique"]],
+  ["Zambia", ["zm", "zmb", "zambia"]],
   ["Myanmar", ["mm", "mmr", "myanmar", "burma"]],
   ["North Macedonia", ["mk", "mkd", "macedonia", "north macedonia"]],
   ["Solomon Islands", ["sb", "slb", "solomon islands"]],
@@ -119,6 +129,11 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Ecuador", ["ec", "ecu", "ecuador"]],
   ["Bahamas", ["bs", "bhs", "bahamas", "the bahamas"]],
   ["Puerto Rico", ["pr", "pri", "puerto rico"]],
+  ["Dominican Republic", ["do", "dom", "dominican republic", "rep dom", "rep.dom"]],
+  ["Jamaica", ["jm", "jam", "jamaica"]],
+  ["Barbados", ["bb", "brb", "barbados"]],
+  ["Guyana", ["gy", "guy", "guyana"]],
+  ["Trinidad and Tobago", ["tt", "tto", "trinidad and tobago"]],
   ["Aruba", ["aw", "abw", "aruba"]],
   ["Morocco", ["mar", "morocco"]],
   ["Malta", ["mlt", "malta"]],
@@ -393,6 +408,7 @@ function normalizeRegionFromCountry(country) {
     "spain",
     "italy",
     "ireland",
+    "iceland",
     "portugal",
     "poland",
     "romania",
@@ -426,6 +442,9 @@ function normalizeRegionFromCountry(country) {
     "jordan",
     "iraq",
     "kenya",
+    "tanzania",
+    "mozambique",
+    "zambia",
     "north macedonia",
     "morocco",
     "malta",
@@ -467,10 +486,36 @@ function normalizeRegionFromCountry(country) {
   ].includes(normalized)) {
     return "APAC";
   }
-  if (["brazil", "mexico", "argentina", "chile", "colombia", "guyana", "peru", "paraguay", "uruguay", "ecuador"].includes(normalized)) {
+  if ([
+    "brazil",
+    "mexico",
+    "argentina",
+    "bolivia",
+    "chile",
+    "colombia",
+    "el salvador",
+    "guatemala",
+    "guyana",
+    "honduras",
+    "nicaragua",
+    "panama",
+    "peru",
+    "paraguay",
+    "uruguay",
+    "ecuador"
+  ].includes(normalized)) {
     return "LATAM";
   }
-  if (["aruba", "bahamas", "cayman islands", "puerto rico"].includes(normalized)) {
+  if ([
+    "aruba",
+    "bahamas",
+    "barbados",
+    "cayman islands",
+    "dominican republic",
+    "jamaica",
+    "puerto rico",
+    "trinidad and tobago"
+  ].includes(normalized)) {
     return "North America";
   }
   return "";
