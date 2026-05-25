@@ -12,7 +12,8 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+  assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -40,6 +41,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
   assert.deepEqual(pilotKeys, [
+    "adp_myjobs",
     "applicantpro",
     "applitrack",
     "applytojob",
@@ -68,6 +70,17 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
 });
 
 test("registry returns contract-valid pilot source modules", () => {
+  const adpMyjobs = getRegistrySourceModule("adp_myjobs");
+  assert.equal(adpMyjobs.atsKey, "adp_myjobs");
+  assert.equal(adpMyjobs.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(adpMyjobs.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof adpMyjobs.discover, "function");
+  assert.equal(typeof adpMyjobs.fetchList, "function");
+  assert.equal(typeof adpMyjobs.parse, "function");
+  assert.equal(typeof adpMyjobs.normalize, "function");
+  assert.equal(typeof adpMyjobs.validate, "function");
+  assert.deepEqual(validateSourceContract(adpMyjobs), { ok: true, failures: [] });
+
   const applicantPro = getRegistrySourceModule("applicantpro");
   assert.equal(applicantPro.atsKey, "applicantpro");
   assert.equal(applicantPro.family, SOURCE_FAMILIES.embeddedOrSemiStructured);

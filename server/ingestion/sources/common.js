@@ -1,4 +1,3 @@
-const { parseAdpMyjobsPostingsFromApi } = require("./adp_myjobs/parse");
 const { parseAdpWorkforcenowPostingsFromApi } = require("./adp_workforcenow/parse");
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
@@ -755,15 +754,11 @@ const SOURCE_SPECS = Object.freeze({
   adp_myjobs: {
     sourceFamily: "enterprise_api",
     confidence: 0.6,
-    parser: parseAdpMyjobsPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed ADP MyJobs public requisitions endpoint",
     discover(company) {
-      const companyName = firstPathSegment(company.url_string) || hostSlug(company.url_string);
       return {
-        config: {
-          companyName,
-          boardUrl: clean(company.url_string)
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

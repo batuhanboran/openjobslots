@@ -151,6 +151,56 @@ test("workday source module fetches CXS list with POST pagination body", async (
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("adp_myjobs source module fetches career-site token before requisitions API", async () => {
+  const source = getSourceModule("adp_myjobs");
+  const company = readJson(path.join(__dirname, "adp_myjobs", "fixtures", "company.json"));
+  const fixtureList = readJson(path.join(__dirname, "adp_myjobs", "fixtures", "list.json"));
+  const requests = [];
+  const raw = await source.fetchList(company, {
+    pageSize: 100,
+    maxPages: 3,
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      if (url === "https://myjobs.adp.com/public/staffing/v1/career-site/acme") {
+        assert.equal(target.method, "GET");
+        assert.equal(target.source_family, "enterprise_api");
+        assert.equal(target.headers.Accept, "application/json, text/plain, */*");
+        return {
+          myJobsToken: "fixture-token",
+          properties: {
+            myadpUrl: "https://fixture.adp.example"
+          }
+        };
+      }
+      if (url.startsWith("https://fixture.adp.example/myadp_prefix/mycareer/public/staffing/v1/job-requisitions/apply-custom-filters?")) {
+        const parsedUrl = new URL(url);
+        assert.equal(target.method, "GET");
+        assert.equal(target.source_family, "enterprise_api");
+        assert.equal(target.headers.Accept, "application/json, text/plain, */*");
+        assert.equal(target.headers.myjobstoken, "fixture-token");
+        assert.equal(target.headers.rolecode, "manager");
+        assert.equal(target.headers.Origin, "https://myjobs.adp.com");
+        assert.equal(target.headers.Referer, "https://myjobs.adp.com/acme/cx/job-listing");
+        assert.equal(parsedUrl.searchParams.get("$top"), "100");
+        assert.equal(parsedUrl.searchParams.get("$skip"), "0");
+        return fixtureList;
+      }
+      throw new Error(`unexpected ADP MyJobs fixture fetch ${url}`);
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => request.target.method), ["GET", "GET"]);
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "REQ-5001");
+  assert.equal(normalized.country, "Canada");
+  assert.equal(normalized.city, "Toronto");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.posting_date, "2026-05-08");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("ultipro source module fetches LoadSearchResults with source-local POST metadata", async () => {
   const source = getSourceModule("ultipro");
   const company = readJson(path.join(__dirname, "ultipro", "fixtures", "company.json"));

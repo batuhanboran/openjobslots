@@ -6,6 +6,10 @@ const {
 } = require("./sourceContracts");
 
 const PILOT_SOURCE_METADATA = Object.freeze({
+  adp_myjobs: Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled
+  }),
   applicantpro: Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
     status: SOURCE_STATUSES.enabled

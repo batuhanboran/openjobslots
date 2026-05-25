@@ -1,7 +1,6 @@
 const { safeFetch } = require("./safeFetch");
 const { decodeHtmlEntities } = require("./parsers/shared/html");
 const {
-  parseAdpMyjobsCompany,
   parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
   parseBrassringCompany,
@@ -29,7 +28,6 @@ const {
   parseTalexioCompany,
   parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
-const { parseAdpMyjobsPostingsFromApi } = require("./sources/adp_myjobs/parse");
 const {
   extractAdpWorkforcenowCompanyName,
   parseAdpWorkforcenowPostingsFromApi,
@@ -207,6 +205,7 @@ const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
+  adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
   applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
   applitrack: APPLITRACK_RATE_LIMIT_WAIT_MS,
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
@@ -1320,22 +1319,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchAdpMyjobsCareerSite(config) {
-    const res = await fetchWithAtsRateLimit("adp_myjobs", ADP_MYJOBS_RATE_LIMIT_WAIT_MS, config.careerSiteUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ADP MyJobs career-site request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchAdpWorkforcenowContentLinks(config) {
     const url =
       `${config.contentLinksBaseUrl}?cid=${encodeURIComponent(config.cid)}` +
@@ -1461,44 +1444,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     const responseJson = await res.json();
     return { responseJson, companyName };
-  }
-  
-  async function fetchAdpMyjobsJobsPage(config, careerSiteJson, top = 100, skip = 0) {
-    const myJobsToken = String(careerSiteJson?.myJobsToken || "").trim();
-    const myadpUrl = String(careerSiteJson?.properties?.myadpUrl || "").trim().replace(/\/+$/, "");
-    if (!myJobsToken || !myadpUrl) {
-      return { count: 0, jobRequisitions: [] };
-    }
-  
-    const params = new URLSearchParams({
-      $select:
-        "reqId,jobTitle,publishedJobTitle,type,jobDescription,jobQualifications,workLocations,workLevelCode,clientRequisitionID,postingDate,requisitionLocations,postingLocations,organizationalUnits",
-      $top: String(Math.max(1, Number(top || 100))),
-      $skip: String(Math.max(0, Number(skip || 0))),
-      $filter: "",
-      radius: "25",
-      tz: "America/Los_Angeles"
-    }).toString();
-    const apiUrl = `${myadpUrl}/myadp_prefix/mycareer/public/staffing/v1/job-requisitions/apply-custom-filters?${params}`;
-  
-    const res = await fetchWithAtsRateLimit("adp_myjobs", ADP_MYJOBS_RATE_LIMIT_WAIT_MS, apiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        myjobstoken: myJobsToken,
-        rolecode: "manager",
-        Origin: "https://myjobs.adp.com",
-        Referer: config.boardUrl
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ADP MyJobs jobs request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
   }
   
   async function fetchCareerpuckJobBoard(config) {
@@ -1847,37 +1792,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       }
       if (batch.length < pageSize) break;
       if (Number.isFinite(totalHits) && from + pageSize >= Number(totalHits)) break;
-    }
-  
-    return collected;
-  }
-  
-  async function collectPostingsForAdpMyjobsCompany(company) {
-    const config = parseAdpMyjobsCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companyNameLower;
-    const careerSiteJson = await fetchAdpMyjobsCareerSite(config);
-    const pageSize = 100;
-    const seenUrls = new Set();
-    const collected = [];
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const skip = page * pageSize;
-      const responseJson = await fetchAdpMyjobsJobsPage(config, careerSiteJson, pageSize, skip);
-      const batch = parseAdpMyjobsPostingsFromApi(companyNameForPostings, config, responseJson);
-  
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      const totalCount = Number(responseJson?.count);
-      if (batch.length < pageSize) break;
-      if (Number.isFinite(totalCount) && totalCount >= 0 && skip + pageSize >= totalCount) break;
     }
   
     return collected;
@@ -2906,7 +2820,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "bamboohr");
     }
     if (atsName === "adp_myjobs" || atsName === "adpmyjobs") {
-      return collectPostingsForAdpMyjobsCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "adp_myjobs");
     }
     if (
       atsName === "adp_workforcenow" ||

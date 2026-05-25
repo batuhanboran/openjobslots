@@ -147,6 +147,56 @@ test("Workday dispatches through registry source module instead of legacy collec
   }]);
 });
 
+test("ADP MyJobs dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "adp_myjobs",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "adp_myjobs",
+      source_family: "enterprise_api",
+      list_url: "https://myjobs.adp.com/public/staffing/v1/career-site/fixture"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { jobRequisitions: [{ reqId: "REQ-9001" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.jobRequisitions) ? "ADP MyJobs Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("ADP MyJobs registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "adp_myjobs",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "adpmyjobs",
+    company_name: "ADP Registry Co",
+    url_string: "https://myjobs.adp.com/fixture/cx"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "adp_myjobs"],
+    ["fetchList", "adpmyjobs", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "ADP Registry Co",
+    position_name: "ADP MyJobs Registry Posting"
+  }]);
+});
+
 test("HRMDirect dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {
