@@ -7,7 +7,6 @@ const {
   parseApplicantProCompany,
   parseAshbyCompany,
   parseBrassringCompany,
-  parseBreezyCompany,
   parseCareerplugCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
@@ -59,7 +58,6 @@ const {
   parseApplitrackPostings
 } = require("./sources/applitrack/parse");
 const { parseAshbyPostingsFromApi } = require("./sources/ashby/parse");
-const { parseBreezyPostingsFromHtml } = require("./sources/breezy/parse");
 const {
   extractBrassringCompanyName,
   extractBrassringHiddenInput,
@@ -271,6 +269,7 @@ const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
+  breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS
@@ -1005,28 +1004,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchBreezyPortalPage(urlString) {
-    const res = await fetchWithAtsRateLimit("breezy", BREEZY_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Breezy page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost === "breezy.hr" || finalHost === "www.breezy.hr") {
-      throw new Error(`Breezy URL redirected to main page: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
   }
   
   async function fetchIcimsPage(urlString) {
@@ -2527,20 +2504,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseTheApplicantManagerPostingsFromHtml(companyNameForPostings, config, pageHtml);
   }
   
-  async function collectPostingsForBreezyCompany(company) {
-    const config = parseBreezyCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml, finalUrl } = await fetchBreezyPortalPage(config.portalUrl);
-    const parseConfig = {
-      ...config,
-      origin: `${parseUrl(finalUrl)?.protocol || "https:"}//${parseUrl(finalUrl)?.host || config.host}`
-    };
-    return parseBreezyPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
   async function collectPostingsForIcimsCompany(company) {
     const config = parseIcimsCompany(company.url_string);
     if (!config) return [];
@@ -4033,7 +3996,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForTheApplicantManagerCompany(company);
     }
     if (atsName === "breezy" || atsName === "breezyhr" || atsName === "breezy.hr" || atsName === "breezyhrcom") {
-      return collectPostingsForBreezyCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "breezy");
     }
     if (atsName === "icims" || atsName === "icims.com" || atsName === "icimscom") {
       if (isRegistryPilotSourceForRuntime("icims")) return collectPostingsForRegistryPilotCompany(company, "icims");

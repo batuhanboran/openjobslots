@@ -12,16 +12,17 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplyToJob, BambooHR, Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
+test("registry exposes ApplyToJob, BambooHR, Breezy, Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applytojob"), true);
   assert.equal(isRegistryPilotSource("bamboohr"), true);
+  assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("lever"), false);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
-  assert.deepEqual(pilotKeys, ["applytojob", "bamboohr", "greenhouse", "hrmdirect", "icims"]);
+  assert.deepEqual(pilotKeys, ["applytojob", "bamboohr", "breezy", "greenhouse", "hrmdirect", "icims"]);
 });
 
 test("registry returns contract-valid pilot source modules", () => {
@@ -46,6 +47,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof bamboohr.normalize, "function");
   assert.equal(typeof bamboohr.validate, "function");
   assert.deepEqual(validateSourceContract(bamboohr), { ok: true, failures: [] });
+
+  const breezy = getRegistrySourceModule("breezy");
+  assert.equal(breezy.atsKey, "breezy");
+  assert.equal(breezy.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(breezy.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof breezy.discover, "function");
+  assert.equal(typeof breezy.fetchList, "function");
+  assert.equal(typeof breezy.parse, "function");
+  assert.equal(typeof breezy.normalize, "function");
+  assert.equal(typeof breezy.validate, "function");
+  assert.deepEqual(validateSourceContract(breezy), { ok: true, failures: [] });
 
   const greenhouse = getRegistrySourceModule("greenhouse");
   assert.equal(greenhouse.atsKey, "greenhouse");
