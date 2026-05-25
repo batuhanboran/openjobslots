@@ -1163,7 +1163,7 @@ test("hrmdirect source module accepts exact Office Remote as remote evidence", a
   }
 });
 
-test("hrmdirect source module skips exact Apply Today placeholder titles", async () => {
+test("hrmdirect source module skips exact placeholder titles", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");
   const fixture = readJson(path.join(sourceDir, "fixtures", "placeholder-title.json"));

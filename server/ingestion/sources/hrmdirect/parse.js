@@ -129,7 +129,7 @@ function isHrmDirectPlaceholderTitle(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-  return normalized === "apply today";
+  return normalized === "apply today" || normalized === "here";
 }
 
 function extractHrmDirectWorkModeLocationText(value) {
