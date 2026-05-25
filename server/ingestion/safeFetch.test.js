@@ -65,6 +65,50 @@ test("safeFetch pins the transport request to the validated DNS answer", async (
   assert.equal(await response.text(), "ok");
 });
 
+test("safeFetch retries transient DNS lookup failures before requesting", async () => {
+  let lookupCount = 0;
+  let requestCount = 0;
+  const response = await safeFetch("https://example.com/jobs", {}, {
+    lookup: async () => {
+      lookupCount += 1;
+      if (lookupCount === 1) {
+        const error = new Error("temporary resolver failure");
+        error.code = "EAI_AGAIN";
+        throw error;
+      }
+      return [{ address: "93.184.216.34", family: 4 }];
+    },
+    requester: async () => {
+      requestCount += 1;
+      return new Response("ok", { status: 200 });
+    },
+    dnsLookupRetryDelayMs: 1
+  });
+
+  assert.equal(lookupCount, 2);
+  assert.equal(requestCount, 1);
+  assert.equal(await response.text(), "ok");
+});
+
+test("safeFetch bounds stalled DNS lookups", async () => {
+  await assert.rejects(
+    () => safeFetch("https://example.com/jobs", {}, {
+      lookup: async () => new Promise(() => {}),
+      requester: async () => {
+        throw new Error("request should not start");
+      },
+      dnsLookupTimeoutMs: 5,
+      dnsLookupRetries: 0
+    }),
+    (error) => {
+      assert.equal(error.code, "ETIMEDOUT");
+      assert.equal(error.ingestionErrorType, "timeout");
+      assert.match(error.message, /DNS lookup timed out/);
+      return true;
+    }
+  );
+});
+
 test("private address classifier covers loopback, private, link-local, and documentation ranges", () => {
   assert.equal(isPrivateAddress("127.0.0.1"), true);
   assert.equal(isPrivateAddress("10.1.2.3"), true);

@@ -15,6 +15,18 @@ const DEFAULT_MAX_RESPONSE_BYTES = Math.max(
 );
 const DEFAULT_MAX_REDIRECTS = 5;
 const BLOCKED_HOSTNAMES = new Set(["localhost", "localhost.localdomain"]);
+const DEFAULT_DNS_LOOKUP_TIMEOUT_MS = Math.max(
+  250,
+  Math.min(30_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_TIMEOUT_MS || 2500))
+);
+const DEFAULT_DNS_LOOKUP_RETRIES = Math.max(
+  0,
+  Math.min(5, Math.floor(Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_RETRIES || 1)))
+);
+const DEFAULT_DNS_LOOKUP_RETRY_DELAY_MS = Math.max(
+  0,
+  Math.min(5_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_RETRY_DELAY_MS || 150))
+);
 
 function makeSafeFetchError(code, message, detail = {}) {
   const error = new Error(`[${code}] ${message || code}`);
@@ -76,9 +88,33 @@ function isPrivateAddress(address) {
 
 async function resolveHostAddresses(hostname, options = {}) {
   const lookup = options.lookup || dns.lookup;
-  const result = await lookup(hostname, { all: true, verbatim: true });
-  if (Array.isArray(result)) return result;
-  if (result && typeof result === "object") return [result];
+  const timeoutMs = Math.max(0, Number(options.dnsLookupTimeoutMs || DEFAULT_DNS_LOOKUP_TIMEOUT_MS));
+  const maxRetries = Math.max(0, Math.floor(Number(options.dnsLookupRetries ?? DEFAULT_DNS_LOOKUP_RETRIES)));
+  const retryDelayMs = Math.max(0, Number(options.dnsLookupRetryDelayMs || DEFAULT_DNS_LOOKUP_RETRY_DELAY_MS));
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    throwIfAborted(options.signal);
+    try {
+      const result = await withTimeout(
+        lookup(hostname, { all: true, verbatim: true }),
+        timeoutMs,
+        () => makeDnsLookupTimeoutError(hostname, timeoutMs),
+        options.signal
+      );
+      if (Array.isArray(result)) return result;
+      if (result && typeof result === "object") return [result];
+      return [];
+    } catch (error) {
+      lastError = error;
+      if (isAbortSignalError(error) || !isTransientDnsLookupError(error) || attempt >= maxRetries) {
+        throw error;
+      }
+      await sleep(retryDelayMs * (attempt + 1), options.signal);
+    }
+  }
+
+  if (lastError) throw lastError;
   return [];
 }
 
@@ -202,6 +238,86 @@ function makeAbortError() {
   const error = new Error("The operation was aborted");
   error.name = "AbortError";
   return error;
+}
+
+function isAbortSignalError(error) {
+  return error?.name === "AbortError";
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw makeAbortError();
+}
+
+function isTransientDnsLookupError(error) {
+  const code = String(error?.code || "").toUpperCase();
+  return ["EAI_AGAIN", "ETIMEOUT", "ESERVFAIL"].includes(code);
+}
+
+function makeDnsLookupTimeoutError(hostname, timeoutMs) {
+  const error = makeSafeFetchError("timeout", `DNS lookup timed out for ${hostname} after ${timeoutMs}ms`);
+  error.code = "ETIMEDOUT";
+  return error;
+}
+
+function sleep(ms, signal) {
+  const waitMs = Math.max(0, Number(ms || 0));
+  if (waitMs <= 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let timeout;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener?.("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(makeAbortError());
+    };
+    if (signal?.aborted) {
+      reject(makeAbortError());
+      return;
+    }
+    timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, waitMs);
+    signal?.addEventListener?.("abort", onAbort, { once: true });
+  });
+}
+
+function withTimeout(promise, timeoutMs, onTimeout, signal) {
+  const waitMs = Math.max(0, Number(timeoutMs || 0));
+  if (waitMs <= 0 && !signal) return promise;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeout;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener?.("abort", onAbort);
+    };
+    const done = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const onAbort = () => done(reject, makeAbortError());
+
+    if (signal?.aborted) {
+      reject(makeAbortError());
+      return;
+    }
+
+    if (waitMs > 0) {
+      timeout = setTimeout(() => done(reject, onTimeout()), waitMs);
+    }
+    signal?.addEventListener?.("abort", onAbort, { once: true });
+
+    Promise.resolve(promise).then(
+      (value) => done(resolve, value),
+      (error) => done(reject, error)
+    );
+  });
 }
 
 function requestBodyToBuffer(body) {
@@ -396,7 +512,7 @@ async function safeFetch(url, init = {}, options = {}) {
   let currentUrl = String(url || "");
 
   for (let redirects = 0; redirects <= maxRedirects; redirects += 1) {
-    const target = await resolveSafeFetchTarget(currentUrl, options);
+    const target = await resolveSafeFetchTarget(currentUrl, { ...options, signal: init.signal });
     const requestInit = {
       ...init,
       redirect: "manual"
