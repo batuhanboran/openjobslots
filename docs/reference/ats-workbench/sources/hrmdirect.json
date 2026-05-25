@@ -25,7 +25,8 @@
       "server/ingestion/sources/hrmdirect/fixtures/company.json",
       "server/ingestion/sources/hrmdirect/fixtures/expected-normalized.json",
       "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/hrmdirect/fixtures/list.json"
+      "server/ingestion/sources/hrmdirect/fixtures/list.json",
+      "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json"
     ],
     "present": [
       "server/ingestion/fixtures/hrmdirect-direct.json",
@@ -34,7 +35,8 @@
       "server/ingestion/sources/hrmdirect/fixtures/company.json",
       "server/ingestion/sources/hrmdirect/fixtures/expected-normalized.json",
       "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/hrmdirect/fixtures/list.json"
+      "server/ingestion/sources/hrmdirect/fixtures/list.json",
+      "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json"
     ],
     "missing": []
   },

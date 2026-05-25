@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Office Country",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://officecountry.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://officecountry.hrmdirect.com/employment/job-openings.php?search=true",
+  "detail_url": "https://officecountry.hrmdirect.com/employment/job-opening.php?req=HRM8101",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM8101\"><td class=\"departments reqitem ReqRowClick\">Customer Success</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM8101&req_loc=654\">Implementation Manager</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Customer Success</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr><tr><td class=\"viewFieldName\"><b>Office:</b></td><td class=\"viewFieldValue\">Canada</td></tr></table>",
+  "expected": {
+    "source_job_id": "HRM8101",
+    "location_text": "Canada",
+    "country": "Canada",
+    "city": "",
+    "remote_type": "unknown",
+    "location_source": "labeled_detail_html",
+    "location_path": "table.viewFields Office",
+    "location_rule_name": "hrmdirect_detail_office_country"
+  }
+}

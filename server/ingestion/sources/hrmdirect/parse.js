@@ -105,10 +105,18 @@ function extractHrmDirectWorkModeLocationText(value) {
   return cleanHrmDirectLocationText(candidate);
 }
 
-function extractHrmDirectOfficeLocationText(value) {
+function extractHrmDirectOfficeLocation(value) {
   const text = cleanHrmDirectLocationText(value);
-  if (!text || isRemoteOnlyLocationValue(text)) return "";
-  return HRMDIRECT_US_STATE_NAMES.has(text.toLowerCase()) ? text : "";
+  if (!text || isRemoteOnlyLocationValue(text)) return { location: "", ruleName: "" };
+  if (HRMDIRECT_US_STATE_NAMES.has(text.toLowerCase())) {
+    return { location: text, ruleName: "hrmdirect_detail_office_state" };
+  }
+  const compactText = text.replace(/[^A-Za-z0-9]+/g, "");
+  const country = compactText.length > 2 ? normalizeCountryName(text) : "";
+  if (country) {
+    return { location: country, ruleName: "hrmdirect_detail_office_country" };
+  }
+  return { location: "", ruleName: "" };
 }
 
 function extractHrmDirectRssValue(itemXml, tagName) {
@@ -238,15 +246,17 @@ function extractHrmDirectViewField(detailHtml, labels) {
 
 function extractHrmDirectDetailFields(detailHtml) {
   const primaryLocation = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
-  const officeLocation = primaryLocation ? "" : extractHrmDirectOfficeLocationText(extractHrmDirectViewField(detailHtml, "Office"));
-  const location = primaryLocation || officeLocation;
+  const officeLocation = primaryLocation
+    ? { location: "", ruleName: "" }
+    : extractHrmDirectOfficeLocation(extractHrmDirectViewField(detailHtml, "Office"));
+  const location = primaryLocation || officeLocation.location;
   const department = extractHrmDirectViewField(detailHtml, ["Department", "Team", "Category"]);
   const employmentType = extractHrmDirectViewField(detailHtml, ["Employment Type", "Job Type", "Type"]);
   const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
   const detailRemoteType = normalizeRemoteType(workplaceType);
   const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : "";
-  const locationPath = primaryLocation ? "table.viewFields Location" : officeLocation ? "table.viewFields Office" : "";
-  const locationRuleName = officeLocation ? "hrmdirect_detail_office_state" : "";
+  const locationPath = primaryLocation ? "table.viewFields Location" : officeLocation.location ? "table.viewFields Office" : "";
+  const locationRuleName = officeLocation.ruleName;
   return {
     location,
     department,
