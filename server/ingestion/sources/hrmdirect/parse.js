@@ -234,6 +234,21 @@ function lookupHrmDirectDetailHtml(detailHtmlByUrl, urlValue) {
   return "";
 }
 
+function lookupHrmDirectDetailMapValue(mapValue, urlValue) {
+  const map = mapValue && typeof mapValue === "object" ? mapValue : {};
+  const key = canonicalHrmDirectDetailKey(urlValue);
+  const candidates = [
+    String(urlValue || ""),
+    String(urlValue || "").replace(/#.*$/, ""),
+    key,
+    `${key}/`
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (Object.prototype.hasOwnProperty.call(map, candidate)) return map[candidate];
+  }
+  return "";
+}
+
 function extractHrmDirectViewFieldsTable(detailHtml) {
   const source = String(detailHtml || "");
   const matches = Array.from(source.matchAll(
@@ -316,11 +331,29 @@ function hrmDirectSourceFailureReasons(posting) {
   return Array.from(new Set(reasons));
 }
 
-function enrichHrmDirectPostingFromDetail(posting, detailHtml, detailStatus) {
+function hrmDirectDetailFailureReason(detailStatus, detailFailure) {
+  const status = Number(detailStatus || 0);
+  if (status === 404 || status === 410) return "detail_404_or_410";
+  if (status === 401 || status === 403 || status === 429) return "blocked_or_rate_limited";
+  return cleanHrmDirectText(detailFailure);
+}
+
+function enrichHrmDirectPostingFromDetail(posting, detailHtml, detailStatus, detailFailure) {
   if (!detailHtml) {
+    const failureReason = hrmDirectDetailFailureReason(detailStatus, detailFailure);
+    const sourceEvidence = {
+      ...(posting.source_evidence || {}),
+      detail_url: posting.job_posting_url,
+      detail_fetch_status: detailStatus || "",
+      detail_failure_reason: failureReason
+    };
     return {
       ...posting,
-      source_failure_reasons: hrmDirectSourceFailureReasons(posting)
+      source_evidence: sourceEvidence,
+      source_failure_reasons: Array.from(new Set([
+        ...hrmDirectSourceFailureReasons(posting),
+        failureReason
+      ].filter(Boolean)))
     };
   }
   const detailFields = extractHrmDirectDetailFields(detailHtml);
@@ -359,6 +392,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
   const listUrl = String(payload.__listUrl || config.list_url || config.jobsUrl || config.baseOrigin || "").trim();
   const detailHtmlByUrl = payload.__detailHtmlByUrl || payload.detailHtmlByUrl || {};
   const detailStatusByUrl = payload.__detailStatusByUrl || payload.detailStatusByUrl || {};
+  const detailFailureByUrl = payload.__detailFailureByUrl || payload.detailFailureByUrl || {};
   const rssPostingDateByReq = {
     ...extractHrmDirectRssPostingDateByReq(payload.__rssXml || payload.rssXml || ""),
     ...(payload.__rssPostingDateByReq || payload.rssPostingDateByReq || {})
@@ -485,7 +519,8 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     postings.push(enrichHrmDirectPostingFromDetail(
       basePosting,
       lookupHrmDirectDetailHtml(detailHtmlByUrl, absoluteUrl),
-      detailStatusByUrl[absoluteUrl] || detailStatusByUrl[canonicalHrmDirectDetailKey(absoluteUrl)]
+      detailStatusByUrl[absoluteUrl] || detailStatusByUrl[canonicalHrmDirectDetailKey(absoluteUrl)],
+      lookupHrmDirectDetailMapValue(detailFailureByUrl, absoluteUrl)
     ));
   }
 

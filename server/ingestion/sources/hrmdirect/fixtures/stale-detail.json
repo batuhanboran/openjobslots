@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Stale Detail",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://staledetail.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://staledetail.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://staledetail.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://staledetail.hrmdirect.com/employment/job-opening.php?req=HRM9401",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9401\"><td class=\"departments reqitem ReqRowClick\">Operations</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9401&req_loc=14001\">Operations Specialist</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "expected": {
+    "source_job_id": "HRM9401",
+    "detail_fetch_count": 1,
+    "source_failure_reasons": [
+      "no_geo_no_remote",
+      "detail_no_structured_location",
+      "detail_no_explicit_remote",
+      "detail_404_or_410"
+    ]
+  }
+}

@@ -1091,6 +1091,34 @@ test("hrmdirect source module uses req_loc detail when it exposes labeled locati
   assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module reports stale detail failures as quarantine reasons", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "stale-detail.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      if (url === fixture.detail_url) {
+        const error = new Error("detail removed");
+        error.status = 404;
+        throw error;
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.equal(raw.__sourceConfig.detail_fetch_count, fixture.expected.detail_fetch_count);
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  for (const reason of fixture.expected.source_failure_reasons) {
+    assert.ok(normalized.source_failure_reasons.includes(reason), `missing ${reason}`);
+  }
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "quarantined");
+});
+
 test("hrmdirect source module quarantines onsite rows when geo evidence is absent", () => {
   const source = getSourceModule("hrmdirect");
   const company = {

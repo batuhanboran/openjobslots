@@ -6,7 +6,7 @@
   "official_public_docs_or_observed_endpoint": "Observed HRMDirect employment table HTML.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
   "list_fetch_method": "bounded HTML list fetch through source runner",
-  "detail_fetch_method": "detail page required when list cards omit location/remote; use only fixture-backed extractors. Use req-only detail for normal rows, but preserve req_loc first when the same base req appears on multiple canonical URLs and req_loc exposes labeled Location. Optional RSS feed fetch supplies posting dates when item link or guid values expose matching base req ids.",
+  "detail_fetch_method": "detail page required when list cards omit location/remote; use only fixture-backed extractors. Use req-only detail for normal rows, but preserve req_loc first when the same base req appears on multiple canonical URLs and req_loc exposes labeled Location. Optional RSS feed fetch supplies posting dates when item link or guid values expose matching base req ids. Stale or removed detail pages stay quarantined with detail_404_or_410 instead of inventing geo/remote evidence.",
   "pagination_method": "only follow known next-page/list links with max-page and max-row limits",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
   "source_job_id_rule": "HRMDirect URL identity: use req for normal rows; use req:req_loc when the same req appears on multiple canonical URLs so each posting remains indexable. RSS date matching stays keyed by base req.",
@@ -28,7 +28,8 @@
       "server/ingestion/sources/hrmdirect/fixtures/list.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-province-location.json",
-      "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json"
+      "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json",
+      "server/ingestion/sources/hrmdirect/fixtures/stale-detail.json"
     ],
     "present": [
       "server/ingestion/fixtures/hrmdirect-direct.json",
@@ -40,7 +41,8 @@
       "server/ingestion/sources/hrmdirect/fixtures/list.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-province-location.json",
-      "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json"
+      "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json",
+      "server/ingestion/sources/hrmdirect/fixtures/stale-detail.json"
     ],
     "missing": []
   },
