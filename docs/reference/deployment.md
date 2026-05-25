@@ -60,7 +60,7 @@ To roll back this throughput stage without code changes, override `INGESTION_WOR
 
 ## Container DNS
 
-The app and worker containers use explicit external DNS resolvers through Compose (`OPENJOBSLOTS_DNS_PRIMARY`, `OPENJOBSLOTS_DNS_SECONDARY`; defaults `1.1.1.1` and `1.0.0.1`) so high-volume ATS fetches are not dependent only on the host/router resolver. If production shows recurrent `getaddrinfo EAI_AGAIN` errors, verify the container `/etc/resolv.conf` and run lookup probes from `openjobslots-worker` before increasing throughput further.
+The app and worker containers use explicit external DNS resolvers through Compose (`OPENJOBSLOTS_DNS_PRIMARY`, `OPENJOBSLOTS_DNS_SECONDARY`; defaults `8.8.4.4` and `149.112.112.112`) so high-volume ATS fetches are not dependent only on the host/router resolver. If production shows recurrent `getaddrinfo EAI_AGAIN` errors, verify the container `/etc/resolv.conf` and run lookup probes from `openjobslots-worker` before increasing throughput further.
 
 ## Postgres Observability
 

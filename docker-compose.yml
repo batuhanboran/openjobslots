@@ -46,8 +46,8 @@ services:
     container_name: openjobslots-app
     restart: unless-stopped
     dns:
-      - ${OPENJOBSLOTS_DNS_PRIMARY:-1.1.1.1}
-      - ${OPENJOBSLOTS_DNS_SECONDARY:-1.0.0.1}
+      - ${OPENJOBSLOTS_DNS_PRIMARY:-8.8.4.4}
+      - ${OPENJOBSLOTS_DNS_SECONDARY:-149.112.112.112}
     depends_on:
       openjobslots-postgres:
         condition: service_healthy
@@ -84,8 +84,8 @@ services:
     container_name: openjobslots-worker
     restart: unless-stopped
     dns:
-      - ${OPENJOBSLOTS_DNS_PRIMARY:-1.1.1.1}
-      - ${OPENJOBSLOTS_DNS_SECONDARY:-1.0.0.1}
+      - ${OPENJOBSLOTS_DNS_PRIMARY:-8.8.4.4}
+      - ${OPENJOBSLOTS_DNS_SECONDARY:-149.112.112.112}
     depends_on:
       openjobslots-postgres:
         condition: service_healthy
