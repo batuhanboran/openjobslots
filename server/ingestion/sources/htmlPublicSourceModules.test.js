@@ -207,6 +207,60 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
   );
 });
 
+test("jobvite source module fetches jobs HTML with source-local discovery and host guard", async () => {
+  const source = getSourceModule("jobvite");
+  assert.ok(source, "expected Jobvite source module");
+  const company = readJson(path.join(__dirname, "jobvite", "fixtures", "company.json"));
+  const rawList = readJson(path.join(__dirname, "jobvite", "fixtures", "list.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        body: rawList.html,
+        status: 200,
+        url
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://jobs.jobvite.com/fixture/jobs",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }]);
+  assert.equal(payload.__sourceConfig.companySlugLower, "fixture");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId.get("oABCxfw9").country, "Turkey");
+  assert.equal(byId.get("oABCxfw9").city, "Istanbul");
+  assert.equal(byId.get("oABCxfw9").remote_type, "onsite");
+  assert.equal(source.validatePublic(byId.get("oABCxfw9")).status, "accepted");
+  assert.equal(byId.get("oDEFxfw8").remote_type, "remote");
+  assert.equal(source.validatePublic(byId.get("oDEFxfw8")).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        body: rawList.html,
+        status: 200,
+        url: "https://example.com/fixture/jobs"
+      })
+    }),
+    /unexpected host/
+  );
+});
+
 test("join source module fetches Next.js company page with source-local host guard", async () => {
   const source = getSourceModule("join");
   const company = readJson(path.join(__dirname, "join", "fixtures", "company.json"));

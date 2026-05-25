@@ -14,7 +14,6 @@ const {
   extractIcimsRemoteTypeFromHtml,
   parseIcimsPostingsFromHtml
 } = require("./icims/parse");
-const { parseJobvitePostingsFromHtml } = require("./jobvite/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parseOraclePostingsFromApi } = require("./oracle/parse");
@@ -878,14 +877,11 @@ const SOURCE_SPECS = Object.freeze({
   jobvite: {
     sourceFamily: "html_detail",
     confidence: 0.55,
-    parser: (companyName, config, payload) => parseJobvitePostingsFromHtml(companyName, config, payload?.html || payload),
+    parser: () => [],
     officialDocs: "observed Jobvite public job-list HTML",
     discover(company) {
-      const parsed = asUrl(company.url_string);
       return {
-        config: {
-          baseOrigin: parsed ? parsed.origin : ""
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

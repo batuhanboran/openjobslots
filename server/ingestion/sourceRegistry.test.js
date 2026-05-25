@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -27,6 +27,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("isolvisolvedhire"), true);
+  assert.equal(isRegistryPilotSource("jobvite"), true);
   assert.equal(isRegistryPilotSource("join"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
   assert.equal(isRegistryPilotSource("manatal"), true);
@@ -56,6 +57,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "hrmdirect",
     "icims",
     "isolvisolvedhire",
+    "jobvite",
     "join",
     "lever",
     "manatal",
@@ -225,6 +227,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof isolvIsolvedHire.normalize, "function");
   assert.equal(typeof isolvIsolvedHire.validate, "function");
   assert.deepEqual(validateSourceContract(isolvIsolvedHire), { ok: true, failures: [] });
+
+  const jobvite = getRegistrySourceModule("jobvite");
+  assert.equal(jobvite.atsKey, "jobvite");
+  assert.equal(jobvite.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(jobvite.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof jobvite.discover, "function");
+  assert.equal(typeof jobvite.fetchList, "function");
+  assert.equal(typeof jobvite.parse, "function");
+  assert.equal(typeof jobvite.normalize, "function");
+  assert.equal(typeof jobvite.validate, "function");
+  assert.deepEqual(validateSourceContract(jobvite), { ok: true, failures: [] });
 
   const lever = getRegistrySourceModule("lever");
   assert.equal(lever.atsKey, "lever");

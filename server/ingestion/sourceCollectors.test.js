@@ -1294,6 +1294,56 @@ test("isolvisolvedhire dispatches through registry source module instead of lega
   }]);
 });
 
+test("Jobvite dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "jobvite",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "jobvite",
+      source_family: "html_detail",
+      list_url: "https://jobs.jobvite.com/fixture/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { html: "<table class=\"jv-job-list\"></table>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.html ? "Jobvite Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Jobvite registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "jobvite",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "jobvite.com",
+    company_name: "Jobvite Registry Co",
+    url_string: "https://jobs.jobvite.com/fixture/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "jobvite"],
+    ["fetchList", "jobvite.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Jobvite Registry Co",
+    position_name: "Jobvite Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

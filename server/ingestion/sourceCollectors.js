@@ -13,7 +13,6 @@ const {
   parseHirebridgeCompany,
   parseIcimsCompany,
   parseJobApsCompany,
-  parseJobviteCompany,
   parseLoxoCompany,
   parseOracleCompany,
   parsePageupCompany,
@@ -49,7 +48,6 @@ const {
   extractHirebridgeDatePostedFromDetailHtml,
   parseHirebridgePostingsFromHtml
 } = require("./sources/hirebridge/parse");
-const { parseJobvitePostingsFromHtml } = require("./sources/jobvite/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
 const {
   extractPageupCompanyNameFromTitle,
@@ -215,6 +213,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
   isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
+  jobvite: JOBVITE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
@@ -615,22 +614,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.json();
-  }
-  
-  async function fetchJobviteJobsPage(jobsUrl) {
-    const res = await fetchWithAtsRateLimit("jobvite", JOBVITE_RATE_LIMIT_WAIT_MS, jobsUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Jobvite request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
   }
   
   async function fetchTheApplicantManagerPage(careersUrl) {
@@ -1632,22 +1615,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     const response = await fetchGreenhouseJobBoard(config.boardToken);
     return parseGreenhousePostingsFromApi(company.company_name, config, response);
-  }
-  
-  async function collectPostingsForJobviteCompany(company) {
-    const config = parseJobviteCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings =
-      normalizedCompanyName &&
-      normalizedCompanyName.toLowerCase() !== "jobs" &&
-      normalizedCompanyName.toLowerCase() !== "careers"
-        ? normalizedCompanyName
-        : config.companySlugLower;
-  
-    const pageHtml = await fetchJobviteJobsPage(config.jobsUrl);
-    return parseJobvitePostingsFromHtml(companyNameForPostings, config, pageHtml);
   }
   
   async function collectPostingsForTheApplicantManagerCompany(company) {
@@ -2695,7 +2662,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "lever");
     }
     if (atsName === "jobvite" || atsName === "jobvite.com" || atsName === "jobvitecom") {
-      return collectPostingsForJobviteCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "jobvite");
     }
     if (atsName === "applicantpro" || atsName === "applicantpro.com" || atsName === "applicantprocom") {
       return collectPostingsForRegistryPilotCompany(company, "applicantpro");
