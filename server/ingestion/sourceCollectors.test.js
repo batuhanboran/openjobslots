@@ -97,6 +97,56 @@ test("pilot ATS dispatches through registry modules before legacy collectors", a
   }]);
 });
 
+test("HRMDirect dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "hrmdirect",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "hrmdirect",
+      source_family: "html_detail",
+      list_url: "https://fixture.hrmdirect.com/employment/job-openings.php?search=true"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { html: "<table></table>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.html ? "HRMDirect Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("HRMDirect registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "hrmdirect",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "hrmdirect",
+    company_name: "HRM Registry Co",
+    url_string: "https://fixture.hrmdirect.com/employment/job-openings.php"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "hrmdirect"],
+    ["fetchList", "hrmdirect", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "HRM Registry Co",
+    position_name: "HRMDirect Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

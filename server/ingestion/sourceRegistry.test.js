@@ -12,13 +12,14 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes Greenhouse and iCIMS as pilot sources", () => {
+test("registry exposes Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
   assert.equal(isRegistryPilotSource("greenhouse"), true);
+  assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("lever"), false);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
-  assert.deepEqual(pilotKeys, ["greenhouse", "icims"]);
+  assert.deepEqual(pilotKeys, ["greenhouse", "hrmdirect", "icims"]);
 });
 
 test("registry returns contract-valid pilot source modules", () => {
@@ -43,6 +44,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof icims.normalize, "function");
   assert.equal(typeof icims.validate, "function");
   assert.deepEqual(validateSourceContract(icims), { ok: true, failures: [] });
+
+  const hrmDirect = getRegistrySourceModule("hrmdirect");
+  assert.equal(hrmDirect.atsKey, "hrmdirect");
+  assert.equal(hrmDirect.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(hrmDirect.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof hrmDirect.discover, "function");
+  assert.equal(typeof hrmDirect.fetchList, "function");
+  assert.equal(typeof hrmDirect.parse, "function");
+  assert.equal(typeof hrmDirect.normalize, "function");
+  assert.equal(typeof hrmDirect.validate, "function");
+  assert.deepEqual(validateSourceContract(hrmDirect), { ok: true, failures: [] });
 });
 
 test("registry returns typed unsupported module for unknown sources", async () => {

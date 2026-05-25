@@ -20,7 +20,6 @@ const {
   parseGetroCompany,
   parseGreenhouseCompany,
   parseHirebridgeCompany,
-  parseHrmDirectCompany,
   parseIcimsCompany,
   parseJobApsCompany,
   parseJobviteCompany,
@@ -84,7 +83,6 @@ const {
   extractHirebridgeDatePostedFromDetailHtml,
   parseHirebridgePostingsFromHtml
 } = require("./sources/hirebridge/parse");
-const { parseHrmDirectPostingsFromHtml } = require("./sources/hrmdirect/parse");
 const { parseJobvitePostingsFromHtml } = require("./sources/jobvite/parse");
 const { parseLeverPostingsFromApi } = require("./sources/lever/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
@@ -276,6 +274,7 @@ const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
+  hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -1080,7 +1079,10 @@ function createSourceCollectorRuntime(dependencies = {}) {
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`${atsKey} registry source request failed (${res.status}): ${body.slice(0, 180)}`);
+      const error = new Error(`${atsKey} registry source request failed (${res.status}): ${body.slice(0, 180)}`);
+      error.status = res.status;
+      error.url = res.url || urlString;
+      throw error;
     }
 
     const body = await res.text();
@@ -2195,28 +2197,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchHrmDirectJobsPage(urlString) {
-    const res = await fetchWithAtsRateLimit("hrmdirect", HRMDIRECT_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`HRMDirect page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".hrmdirect.com")) {
-      throw new Error(`HRMDirect URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
   }
   
   async function fetchTalentlyftLandingPage(urlString) {
@@ -3462,22 +3442,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseGetroPostingsFromHtml(companyNameForPostings, config, pageHtml);
   }
   
-  async function collectPostingsForHrmDirectCompany(company) {
-    const config = parseHrmDirectCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml, finalUrl } = await fetchHrmDirectJobsPage(config.jobsUrl);
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      jobsUrl: finalUrl || config.jobsUrl
-    };
-    return parseHrmDirectPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
   async function collectPostingsForTalentlyftCompany(company) {
     const config = parseTalentlyftCompany(company.url_string);
     if (!config) return [];
@@ -4336,7 +4300,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForStatejobsnyDynamic();
     }
     if (atsName === "hrmdirect" || atsName === "hrmdirect.com" || atsName === "hrmdirectcom") {
-      return collectPostingsForHrmDirectCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "hrmdirect");
     }
     if (atsName === "talentlyft" || atsName === "talentlyft.com" || atsName === "talentlyftcom") {
       return collectPostingsForTalentlyftCompany(company);
