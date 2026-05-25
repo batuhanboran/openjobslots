@@ -148,6 +148,55 @@ test("workday source module fetches CXS list with POST pagination body", async (
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("ultipro source module fetches LoadSearchResults with source-local POST metadata", async () => {
+  const source = getSourceModule("ultipro");
+  const company = readJson(path.join(__dirname, "ultipro", "fixtures", "company.json"));
+  const requests = [];
+  const raw = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      assert.equal(url, "https://recruiting.ultipro.com/ACME1000/JobBoard/11111111-1111-1111-1111-111111111111/JobBoardView/LoadSearchResults");
+      assert.equal(target.method, "POST");
+      assert.equal(target.headers.Accept, "application/json");
+      assert.equal(target.headers["Content-Type"], "application/json");
+      const body = JSON.parse(target.body);
+      assert.equal(body.opportunitySearch.Top, 50);
+      assert.equal(body.opportunitySearch.Skip, 0);
+      assert.equal(body.opportunitySearch.OrderBy[0].PropertyName, "PostedDate");
+      return {
+        opportunities: [
+          {
+            Id: "OPP-5001",
+            Title: "Onsite Warehouse Supervisor",
+            PostedDate: "2026-05-08",
+            Locations: [
+              {
+                Address: {
+                  City: "Dallas",
+                  State: { Code: "TX" },
+                  Country: { Name: "United States" }
+                }
+              }
+            ]
+          }
+        ],
+        totalCount: 1
+      };
+    }
+  });
+
+  assert.equal(requests.length, 1);
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "OPP-5001");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Dallas");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.posting_date, "2026-05-08");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("icims source module follows wrapper iframe and enriches from public detail", async () => {
   const source = getSourceModule("icims");
   const sourceDir = path.join(__dirname, "icims");

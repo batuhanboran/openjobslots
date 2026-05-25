@@ -27,8 +27,7 @@ const {
   parseTalentreefCompany,
   parseTalentlyftCompany,
   parseTalexioCompany,
-  parseTheApplicantManagerCompany,
-  parseUltiProCompany
+  parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
 const { parseAdpMyjobsPostingsFromApi } = require("./sources/adp_myjobs/parse");
 const {
@@ -75,7 +74,6 @@ const {
   parseSapHrCloudPostingsFromHtml
 } = require("./sources/saphrcloud/parse");
 const { parseSmartRecruitersPostingsFromApi } = require("./sources/smartrecruiters/parse");
-const { parseUltiProPostingsFromApi } = require("./sources/ultipro/parse");
 const {
   extractWorkdayLocationLabel,
   extractWorkdaySourceJobId,
@@ -145,7 +143,6 @@ const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegi
 const { validateSourceContract } = require("./sourceContracts");
 
 const WORKDAY_PAGE_SIZE = 20;
-const ULTIPRO_PAGE_SIZE = 50;
 const MAX_PAGES_PER_COMPANY = 25;
 const LOCALE_SEGMENT_REGEX = /^[a-z]{2}(?:-[a-z]{2})?$/i;
 const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 30));
@@ -236,6 +233,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
+  ultipro: ULTIPRO_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -1747,60 +1745,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     };
   }
   
-  function buildUltiProSearchPayload(top, skip) {
-    return {
-      opportunitySearch: {
-        Top: Number(top || ULTIPRO_PAGE_SIZE),
-        Skip: Number(skip || 0),
-        QueryString: "",
-        OrderBy: [
-          {
-            Value: "postedDateDesc",
-            PropertyName: "PostedDate",
-            Ascending: false
-          }
-        ],
-        Filters: [
-          { t: "TermsSearchFilterDto", fieldName: 4, extra: null, values: [] },
-          { t: "TermsSearchFilterDto", fieldName: 5, extra: null, values: [] },
-          { t: "TermsSearchFilterDto", fieldName: 6, extra: null, values: [] },
-          { t: "TermsSearchFilterDto", fieldName: 37, extra: null, values: [] }
-        ]
-      },
-      matchCriteria: {
-        PreferredJobs: [],
-        Educations: [],
-        LicenseAndCertifications: [],
-        Skills: [],
-        hasNoLicenses: false,
-        SkippedSkills: []
-      }
-    };
-  }
-  
-  async function fetchUltiProSearchResults(config, top, skip) {
-    const tenantEncoded = encodeURIComponent(String(config?.tenant || "").trim());
-    const boardIdEncoded = encodeURIComponent(String(config?.boardId || "").trim());
-    const apiUrl = `https://recruiting.ultipro.com/${tenantEncoded}/JobBoard/${boardIdEncoded}/JobBoardView/LoadSearchResults`;
-    const payload = buildUltiProSearchPayload(top, skip);
-  
-    const res = await fetchWithAtsRateLimit("ultipro", ULTIPRO_RATE_LIMIT_WAIT_MS, apiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`UltiPro request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
   async function collectTodayPostingsForWorkdayCompany(company) {
     const config = parseWorkdayCompany(company.url_string);
     if (!config) return [];
@@ -2545,37 +2489,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl);
   }
   
-  async function collectPostingsForUltiProCompany(company) {
-    const config = parseUltiProCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.tenantLower;
-    const postings = [];
-    const seenIds = new Set();
-    let skip = 0;
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const response = await fetchUltiProSearchResults(config, ULTIPRO_PAGE_SIZE, skip);
-      const opportunities = Array.isArray(response?.opportunities) ? response.opportunities : [];
-      if (opportunities.length === 0) break;
-  
-      for (const posting of parseUltiProPostingsFromApi(companyNameForPostings, config, response)) {
-        const opportunityId = String(posting?.source_job_id || "").trim();
-        if (!opportunityId || seenIds.has(opportunityId)) continue;
-        postings.push(posting);
-        seenIds.add(opportunityId);
-      }
-  
-      const totalCount = Number(response?.totalCount);
-      if (opportunities.length < ULTIPRO_PAGE_SIZE) break;
-      if (Number.isFinite(totalCount) && skip + ULTIPRO_PAGE_SIZE >= totalCount) break;
-      skip += ULTIPRO_PAGE_SIZE;
-    }
-  
-    return postings;
-  }
-  
   async function fetchGovernmentJobsViewHtml(url, params) {
     const requestUrl = new URL(url);
     for (const [key, value] of Object.entries(params || {})) {
@@ -3278,7 +3191,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "recruitee");
     }
     if (atsName === "ultipro" || atsName === "ukg") {
-      return collectPostingsForUltiProCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "ultipro");
     }
     if (atsName === "taleo" || atsName === "taleo.net" || atsName === "taleonet") {
       return collectPostingsForRegistryPilotCompany(company, "taleo");
