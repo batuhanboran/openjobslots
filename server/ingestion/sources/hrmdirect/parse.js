@@ -192,6 +192,14 @@ function stripHrmDirectOfficeDescriptor(value) {
   return cleanHrmDirectLocationText(candidate);
 }
 
+function titleCaseHrmDirectRegionName(value) {
+  return cleanHrmDirectLocationText(value)
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) => part === "of" ? part : part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function extractHrmDirectOfficeRemoteScopeType(value) {
   const text = cleanHrmDirectLocationText(value);
   if (!text) return "";
@@ -205,6 +213,37 @@ function extractHrmDirectOfficeRemoteScopeType(value) {
     .match(/^(?:US|U\.S\.|USA|U\.S\.A\.|United States|UK|U\.K\.|United Kingdom)\s*[-/]?\s*(remote|hybrid)$/i);
   if (countryRemoteMatch?.[1]) return countryRemoteMatch[1].toLowerCase() === "hybrid" ? "hybrid" : "remote";
   return "";
+}
+
+function extractHrmDirectOfficeRemoteRegionScope(value) {
+  const text = cleanHrmDirectLocationText(value);
+  if (!text) return null;
+  const prefixMatch = text.match(/^(remote|hybrid)\s*[-/]\s*(.+)$/i);
+  const suffixMatch = text.match(/^(.+?)\s*[-/]\s*(remote|hybrid)$/i);
+  const remoteValue = prefixMatch?.[1] || suffixMatch?.[2] || "";
+  const regionValue = cleanHrmDirectLocationText(prefixMatch?.[2] || suffixMatch?.[1] || "");
+  const remoteType = normalizeRemoteType(remoteValue);
+  const normalizedRegion = regionValue.toLowerCase();
+  if (!regionValue || !["remote", "hybrid"].includes(remoteType)) return null;
+  if (HRMDIRECT_US_STATE_NAMES.has(normalizedRegion)) {
+    return {
+      location: titleCaseHrmDirectRegionName(regionValue),
+      country: "United States",
+      remoteType,
+      ruleName: "hrmdirect_detail_office_remote_region_scope",
+      remoteRuleName: "hrmdirect_detail_office_remote_scope"
+    };
+  }
+  if (HRMDIRECT_CANADA_PROVINCE_NAMES.has(normalizedRegion)) {
+    return {
+      location: titleCaseHrmDirectRegionName(regionValue),
+      country: "Canada",
+      remoteType,
+      ruleName: "hrmdirect_detail_office_remote_region_scope",
+      remoteRuleName: "hrmdirect_detail_office_remote_scope"
+    };
+  }
+  return null;
 }
 
 function extractHrmDirectOfficeLocation(value) {
@@ -222,6 +261,8 @@ function extractHrmDirectOfficeLocation(value) {
       remoteRuleName: "hrmdirect_detail_office_remote_only"
     };
   }
+  const officeRemoteRegionScope = extractHrmDirectOfficeRemoteRegionScope(text);
+  if (officeRemoteRegionScope) return officeRemoteRegionScope;
   if (isRemoteOnlyLocationValue(text)) {
     return { location: "", country: "", remoteType: "unknown", ruleName: "", remoteRuleName: "" };
   }

@@ -1,0 +1,40 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Office Remote Scope",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://officeremotescope.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://officeremotescope.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://officeremotescope.hrmdirect.com/employment/rss.php?search=true",
+  "detail_urls": {
+    "HRM9602": "https://officeremotescope.hrmdirect.com/employment/job-opening.php?req=HRM9602"
+  },
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9601\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9601\">Franchise Development Specialist</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\">Remote - Texas</td></tr><tr class=\"reqitem\" data-req-id=\"HRM9602\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9602\">Senior Product Manager</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": {
+    "HRM9602": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Office:</b></td><td class=\"viewFieldValue\">Remote - North Carolina</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table></body></html>"
+  },
+  "expected": {
+    "HRM9601": {
+      "location_text": "Texas",
+      "country": "United States",
+      "remote_type": "remote",
+      "location_source": "labeled_html",
+      "location_path": "td.offices",
+      "location_rule_name": "hrmdirect_list_office_remote_region_scope",
+      "remote_source": "labeled_html",
+      "remote_path": "td.offices",
+      "remote_rule_name": "hrmdirect_list_office_remote_scope"
+    },
+    "HRM9602": {
+      "location_text": "North Carolina",
+      "country": "United States",
+      "remote_type": "remote",
+      "location_source": "labeled_detail_html",
+      "location_path": "table.viewFields Office",
+      "location_rule_name": "hrmdirect_detail_office_remote_region_scope",
+      "remote_source": "labeled_detail_html",
+      "remote_path": "table.viewFields Office",
+      "remote_rule_name": "hrmdirect_detail_office_remote_scope"
+    }
+  }
+}
