@@ -497,6 +497,56 @@ test("Lever dispatches through registry source module instead of legacy collecto
   }]);
 });
 
+test("Zoho dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "zoho",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.canary,
+    discover: () => ({
+      ats_key: "zoho",
+      source_family: "embedded_json",
+      list_url: "https://fixtureco.zohorecruit.com/jobs/Careers"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { body: "<input id=\"jobs\" value='[]'>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.body ? "Zoho Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Zoho registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "zoho",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "zohorecruit",
+    company_name: "Zoho Registry Co",
+    url_string: "https://fixtureco.zohorecruit.com/jobs/Careers"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "zoho"],
+    ["fetchList", "zohorecruit", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Zoho Registry Co",
+    position_name: "Zoho Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

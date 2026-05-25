@@ -38,8 +38,7 @@ const {
   parseTalexioCompany,
   parseTeamtailorCompany,
   parseTheApplicantManagerCompany,
-  parseUltiProCompany,
-  parseZohoCompany
+  parseUltiProCompany
 } = require("./sourceDiscovery");
 const { parseAdpMyjobsPostingsFromApi } = require("./sources/adp_myjobs/parse");
 const {
@@ -112,7 +111,6 @@ const {
   inferWorkdayLocationFromJobUrl,
   parseWorkdayPostingsFromApi
 } = require("./sources/workday/parse");
-const { parseZohoPostingsFromHtml } = require("./sources/zoho/parse");
 const { parseTeamtailorPostingsFromHtml } = require("./sources/teamtailor/parse");
 const { parseFreshteamPostingsFromHtml } = require("./sources/freshteam/parse");
 const {
@@ -263,7 +261,8 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
-  lever: LEVER_RATE_LIMIT_WAIT_MS
+  lever: LEVER_RATE_LIMIT_WAIT_MS,
+  zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
 const ORACLE_EXPAND_VALUE = [
@@ -941,22 +940,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return sourceModule.parse(rawPayload, company);
   }
 
-  async function fetchZohoCareersPage(urlString) {
-    const res = await fetchWithAtsRateLimit("zoho", ZOHO_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Zoho Recruit page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
   async function fetchApplicantAiCareersPage(urlString) {
     const res = await fetchWithAtsRateLimit("applicantai", APPLICANTAI_RATE_LIMIT_WAIT_MS, urlString, {
       method: "GET",
@@ -2379,16 +2362,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return collected;
   }
   
-  async function collectPostingsForZohoCompany(company) {
-    const config = parseZohoCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const pageHtml = await fetchZohoCareersPage(config.careersUrl);
-    return parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
   async function collectPostingsForApplicantAiCompany(company) {
     const config = parseApplicantAiCompany(company.url_string);
     if (!config) return [];
@@ -3808,7 +3781,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForIcimsCompany(company);
     }
     if (atsName === "zoho" || atsName === "zohorecruit" || atsName === "zohorecruit.com" || atsName === "zohorecruitcom") {
-      return collectPostingsForZohoCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "zoho");
     }
     if (atsName === "applicantai" || atsName === "applicantai.com" || atsName === "applicantaicom") {
       return collectPostingsForApplicantAiCompany(company);

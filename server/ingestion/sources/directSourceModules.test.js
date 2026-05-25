@@ -421,6 +421,23 @@ test("zoho source module parses hidden JSON variants for localized geo and remot
   assert.equal(source.validatePublic(sparseDate).status, "accepted");
 });
 
+test("zoho source module parses registry HTML payload wrappers", () => {
+  const { source, company } = zohoFixtureContext();
+  const rawList = readJson(path.join(__dirname, "zoho", "fixtures", "list.json"));
+  const parsed = source.parse({
+    body: rawList,
+    url: "https://fixtureco.zohorecruit.com/jobs/Careers",
+    status: 200,
+    __sourceConfig: {
+      careersUrl: "https://fixtureco.zohorecruit.com/jobs/Careers"
+    }
+  }, company);
+
+  assert.equal(parsed.length, 5);
+  assert.equal(parsed[0].source_job_id, "476000000001001");
+  assert.equal(parsed[0].company_name, "Fixture Zoho");
+});
+
 test("zoho source module ignores malformed hidden JSON and rows without source ids", () => {
   const { source, company } = zohoFixtureContext();
 
