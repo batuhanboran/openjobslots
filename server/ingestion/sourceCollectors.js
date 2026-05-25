@@ -26,7 +26,6 @@ const {
   parsePaylocityCompany,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
-  parseRecruitCrmCompany,
   parseRecruiteeCompany,
   parseRipplingCompany,
   parseSagehrCompany,
@@ -87,7 +86,6 @@ const {
   parsePaylocityPostingsFromPageData
 } = require("./sources/paylocity/parse");
 const { parsePinpointHqPostingsFromApi } = require("./sources/pinpointhq/parse");
-const { parseRecruitCrmPostingsFromApi } = require("./sources/recruitcrm/parse");
 const {
   extractRecruiteePropsFromHtml,
   parseRecruiteePostingsFromPublicApp
@@ -262,6 +260,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
+  recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -886,13 +885,20 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const headers = String(target.source_family || "").includes("html")
       ? { Accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5" }
       : { Accept: "application/json,text/html;q=0.8,*/*;q=0.5" };
+    if (target.body && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
     const res = await fetchWithAtsRateLimit(
       atsKey,
       REGISTRY_PILOT_RATE_LIMIT_WAIT_MS[atsKey] || 60 * 1000,
       urlString,
       {
-        method: "GET",
-        headers
+        method: target.method || "GET",
+        headers: {
+          ...headers,
+          ...(target.headers || {})
+        },
+        body: target.body
       }
     );
 
@@ -1667,34 +1673,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
     if (!finalHost.endsWith(".pinpointhq.com") || finalHost === "pinpointhq.com" || finalHost === "www.pinpointhq.com") {
       throw new Error(`PinpointHQ URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return res.json();
-  }
-  
-  async function fetchRecruitCrmJobsPage(config, limit = 100, offset = 0) {
-    const payload = {
-      limit,
-      offset,
-      search_data: "",
-      onlyJobs: true
-    };
-    const res = await fetchWithAtsRateLimit("recruitcrm", RECRUITCRM_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Content-Type": "application/json",
-        Origin: "https://recruitcrm.io",
-        Referer: config.publicJobsUrl,
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      },
-      body: JSON.stringify(payload)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`RecruitCRM API request failed (${res.status}): ${body.slice(0, 180)}`);
     }
   
     return res.json();
@@ -3042,34 +3020,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parsePinpointHqPostingsFromApi(companyNameForPostings, config, responseJson);
   }
   
-  async function collectPostingsForRecruitCrmCompany(company) {
-    const config = parseRecruitCrmCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.account;
-    const limit = 100;
-    const seenUrls = new Set();
-    const collected = [];
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const offset = page * limit;
-      const responseJson = await fetchRecruitCrmJobsPage(config, limit, offset);
-      const batch = parseRecruitCrmPostingsFromApi(companyNameForPostings, config, responseJson);
-  
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      if (batch.length < limit) break;
-    }
-  
-    return collected;
-  }
-  
   async function collectPostingsForRipplingCompany(company) {
     const config = parseRipplingCompany(company.url_string);
     if (!config) return [];
@@ -3922,7 +3872,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForPinpointHqCompany(company);
     }
     if (atsName === "recruitcrm" || atsName === "recruitcrm.io" || atsName === "recruitcrmiocom" || atsName === "recruitcrmio") {
-      return collectPostingsForRecruitCrmCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "recruitcrm");
     }
     if (atsName === "rippling" || atsName === "rippling.com" || atsName === "ripplingcom" || atsName === "ats.rippling.com" || atsName === "atsripplingcom") {
       return collectPostingsForRipplingCompany(company);

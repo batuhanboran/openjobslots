@@ -469,6 +469,53 @@ test("recruitcrm source module discovers the public jobs API route", () => {
   assert.equal(discovered.config.publicJobsUrl, "https://recruitcrm.io/jobs/fixtureco");
 });
 
+test("recruitcrm source module fetches paginated public API batches with POST metadata", async () => {
+  const { source, company } = recruitCrmFixtureContext();
+  const calls = [];
+  const firstPage = Array.from({ length: 100 }, (_, index) => ({
+    id: `rc-${index}`,
+    name: `RecruitCRM Role ${index}`,
+    slug: `recruitcrm-role-${index}`,
+    remote: "1"
+  }));
+  const secondPage = [
+    firstPage[0],
+    {
+      id: "rc-101",
+      name: "RecruitCRM Final Role",
+      slug: "recruitcrm-final-role",
+      remote: "1"
+    }
+  ];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({
+        url,
+        method: target.method,
+        headers: target.headers,
+        body: JSON.parse(target.body)
+      });
+      return {
+        data: {
+          jobs: calls.length === 1 ? firstPage : secondPage
+        }
+      };
+    }
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url, "https://albatross.recruitcrm.io/v1/external-pages/jobs-by-account/get?account=fixtureco&batch=true");
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].headers["Content-Type"], "application/json");
+  assert.equal(calls[0].body.limit, 100);
+  assert.equal(calls[0].body.offset, 0);
+  assert.equal(calls[0].body.onlyJobs, true);
+  assert.equal(calls[1].body.offset, 100);
+  assert.equal(payload.__sourceConfig.account, "fixtureco");
+  assert.equal(payload.data.jobs.length, 101);
+});
+
 test("recruitcrm source module keeps remote evidence source-specific", () => {
   const { source, company } = recruitCrmFixtureContext();
   const rawList = readJson(path.join(__dirname, "recruitcrm", "fixtures", "list.json"));
