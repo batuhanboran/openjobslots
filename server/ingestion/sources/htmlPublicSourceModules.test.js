@@ -97,6 +97,64 @@ test("target html/public ATS modules return no postings for empty raw payloads",
   }
 });
 
+test("applicantpro source module discovers domain id and fetches core jobs JSON", async () => {
+  const source = getSourceModule("applicantpro");
+  assert.ok(source, "expected ApplicantPro source module");
+  const company = {
+    company_name: "Fixture ApplicantPro",
+    ATS_name: "applicantpro",
+    url_string: "https://fixtureco.applicantpro.com/jobs/"
+  };
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      requestedUrls.push(url);
+      if (url === "https://fixtureco.applicantpro.com/jobs/") {
+        return {
+          html: `<html><script>window.courierCurrentRouteData={"domain_id":"12345"}</script></html>`,
+          status: 200,
+          url
+        };
+      }
+      if (url === "https://fixtureco.applicantpro.com/core/jobs/12345?getParams=%7B%7D") {
+        return {
+          data: {
+            jobs: [{
+              id: 445566,
+              title: "Remote Support Specialist",
+              jobUrl: "/jobs/445566",
+              jobLocation: "Remote - United States",
+              startDateRef: "2026-05-24",
+              department: "Operations",
+              employmentType: "Full-time"
+            }]
+          },
+          success: true
+        };
+      }
+      return { status: 404, html: "", url };
+    }
+  });
+
+  assert.deepEqual(requestedUrls, [
+    "https://fixtureco.applicantpro.com/jobs/",
+    "https://fixtureco.applicantpro.com/core/jobs/12345?getParams=%7B%7D"
+  ]);
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "445566");
+  assert.equal(normalized.company_name, "Fixture ApplicantPro");
+  assert.equal(normalized.position_name, "Remote Support Specialist");
+  assert.equal(normalized.canonical_url, "https://fixtureco.applicantpro.com/jobs/445566");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.posting_date, "2026-05-24");
+  assert.equal(source.validate(normalized).ok, true);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("careerplug source module enriches list rows from deterministic detail JSON-LD", async () => {
   const source = getSourceModule("careerplug");
   const fixture = readJson(path.join(__dirname, "careerplug", "fixtures", "route-detection.json"));

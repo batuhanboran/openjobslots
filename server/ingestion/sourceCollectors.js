@@ -4,7 +4,6 @@ const {
   parseAdpMyjobsCompany,
   parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
-  parseApplicantProCompany,
   parseAshbyCompany,
   parseBrassringCompany,
   parseCareerpuckCompany,
@@ -128,10 +127,6 @@ const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/pars
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
 const { parseLoxoPostingsFromHtml } = require("./sources/loxo/parse");
 const { parseCareerspagePostingsFromHtml } = require("./sources/careerspage/parse");
-const {
-  extractApplicantProDomainId,
-  parseApplicantProPostingsFromApi
-} = require("./sources/applicantpro/parse");
 const {
   buildEightfoldApiUrl,
   extractEightfoldDomainFromHtml,
@@ -265,6 +260,7 @@ const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
+  applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
@@ -942,46 +938,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchApplicantProJobsPage(jobsUrl) {
-    const res = await fetchWithAtsRateLimit("applicantpro", APPLICANTPRO_RATE_LIMIT_WAIT_MS, jobsUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ApplicantPro page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
-  async function fetchApplicantProJobsList(config, domainId) {
-    const apiUrl = new URL(`${String(config?.origin || "").replace(/\/+$/, "")}/core/jobs/${encodeURIComponent(domainId)}`);
-    apiUrl.searchParams.set("getParams", "{}");
-  
-    const res = await fetchWithAtsRateLimit("applicantpro", APPLICANTPRO_RATE_LIMIT_WAIT_MS, apiUrl.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ApplicantPro jobs request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const payload = await res.json();
-    if (payload && typeof payload === "object" && payload.success === false) {
-      const message = String(payload?.message || "Unknown ApplicantPro API error");
-      throw new Error(`ApplicantPro jobs API returned success=false: ${message}`);
-    }
-    return payload;
   }
   
   async function fetchTheApplicantManagerPage(careersUrl) {
@@ -2461,20 +2417,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     const pageHtml = await fetchJobviteJobsPage(config.jobsUrl);
     return parseJobvitePostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }async function collectPostingsForApplicantProCompany(company) {
-    const config = parseApplicantProCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const jobsPageHtml = await fetchApplicantProJobsPage(config.jobsUrl);
-    const domainId = extractApplicantProDomainId(jobsPageHtml);
-    if (!domainId) {
-      throw new Error("ApplicantPro domain_id was not found on the jobs page");
-    }
-  
-    const response = await fetchApplicantProJobsList(config, domainId);
-    return parseApplicantProPostingsFromApi(companyNameForPostings, config, response);
   }
   
   async function collectPostingsForTheApplicantManagerCompany(company) {
@@ -3956,7 +3898,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForJobviteCompany(company);
     }
     if (atsName === "applicantpro" || atsName === "applicantpro.com" || atsName === "applicantprocom") {
-      return collectPostingsForApplicantProCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "applicantpro");
     }
     if (atsName === "applytojob" || atsName === "applytojob.com" || atsName === "applytojobcom") {
       return collectPostingsForRegistryPilotCompany(company, "applytojob");

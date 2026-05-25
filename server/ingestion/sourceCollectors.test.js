@@ -347,6 +347,56 @@ test("CareerPlug dispatches through registry source module instead of legacy col
   }]);
 });
 
+test("ApplicantPro dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "applicantpro",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "applicantpro",
+      source_family: "embedded_json",
+      list_url: "https://fixture.applicantpro.com/jobs/"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { data: { jobs: [{ id: 445566 }] } };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload?.data?.jobs?.length ? "ApplicantPro Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("ApplicantPro registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "applicantpro",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "applicantpro",
+    company_name: "ApplicantPro Registry Co",
+    url_string: "https://fixture.applicantpro.com/jobs/"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "applicantpro"],
+    ["fetchList", "applicantpro", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "ApplicantPro Registry Co",
+    position_name: "ApplicantPro Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({
