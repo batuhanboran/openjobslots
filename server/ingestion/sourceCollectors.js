@@ -102,10 +102,6 @@ const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theappli
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
 const { parseHibobPostingsFromApi } = require("./sources/hibob/parse");
 const {
-  extractIsolvisolvedhireDomainId,
-  parseIsolvisolvedhirePostingsFromApi
-} = require("./sources/isolvisolvedhire/parse");
-const {
   extractGovernmentJobsLastPage,
   extractGovernmentJobsViewHtmlFromResponse,
   parseGovernmentJobsPostingsFromViewHtml
@@ -218,6 +214,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
+  isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
@@ -1965,75 +1962,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseHibobPostingsFromApi(companyNameForPostings, config, responseJson);
   }
   
-  function parseIsolvisolvedhireCompany(url) {
-    const normalizedUrl = String(url || "").trim();
-    if (!normalizedUrl) return null;
-  
-    const parsed = parseUrl(normalizedUrl);
-    if (!parsed || !parsed.protocol || !parsed.host) return null;
-    const host = String(parsed.hostname || "").toLowerCase();
-    if (!host.endsWith(".isolvedhire.com")) return null;
-  
-    return {
-      baseOrigin: `${parsed.protocol}//${parsed.host}`,
-      boardUrl: normalizedUrl,
-      host
-    };
-  }
-  async function fetchIsolvisolvedhireJobBoard(config) {
-    const boardResponse = await fetchWithAtsRateLimit(
-      "isolvisolvedhire",
-      ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
-      config.boardUrl,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent": DEFAULT_BROWSER_USER_AGENT,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9"
-        }
-      }
-    );
-    if (!boardResponse.ok) {
-      const body = await boardResponse.text();
-      throw new Error(`isolvedhire board request failed (${boardResponse.status}): ${body.slice(0, 180)}`);
-    }
-    const boardHtml = await boardResponse.text();
-    const domainId = extractIsolvisolvedhireDomainId(boardHtml);
-    if (!domainId) throw new Error("isolvedhire domain_id not found in board HTML");
-  
-    const apiUrl = `${config.baseOrigin}/core/jobs/${encodeURIComponent(domainId)}?getParams=%7B%7D`;
-    const apiResponse = await fetchWithAtsRateLimit(
-      "isolvisolvedhire",
-      ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
-      apiUrl,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent": DEFAULT_BROWSER_USER_AGENT,
-          Accept: "application/json, text/plain, */*",
-          "Accept-Language": "en-US,en;q=0.9",
-          Referer: config.boardUrl,
-          Origin: config.baseOrigin
-        }
-      }
-    );
-    if (!apiResponse.ok) {
-      const body = await apiResponse.text();
-      throw new Error(`isolvedhire API request failed (${apiResponse.status}): ${body.slice(0, 180)}`);
-    }
-    return apiResponse.json();
-  }
-  async function collectPostingsForIsolvisolvedhireCompany(company) {
-    const config = parseIsolvisolvedhireCompany(company?.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.host.split(".")[0];
-    const responseJson = await fetchIsolvisolvedhireJobBoard(config);
-    return parseIsolvisolvedhirePostingsFromApi(companyNameForPostings, responseJson);
-  }
-  
   async function collectPostingsForCareerspageCompany(company) {
     const config = parseCareerspageCompany(company.url_string);
     if (!config) return [];
@@ -2871,7 +2799,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "isolvedhire.com" ||
       atsName === "isolvedhirecom"
     ) {
-      return collectPostingsForIsolvisolvedhireCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "isolvisolvedhire");
     }
     if (
       atsName === "manatal" ||

@@ -1,0 +1,71 @@
+{
+  "ats_key": "isolvisolvedhire",
+  "description": "Invalid source-shape fixtures for source-level validation and public gate quarantine.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture isolvisolvedhire",
+        "source_job_id": "iso-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://fixture.isolvedhire.com/jobs/missing-title",
+        "location": "Austin, TX, United States",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing canonical URL",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Fixture isolvisolvedhire",
+        "source_job_id": "iso-missing-url",
+        "position_name": "Valid Title",
+        "job_posting_url": "",
+        "location": "Austin, TX, United States",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture isolvisolvedhire",
+        "source_job_id": "",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://fixture.isolvedhire.com/jobs/missing-source-id",
+        "location": "Austin, TX, United States",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing location with unknown remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture isolvisolvedhire",
+        "source_job_id": "iso-missing-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://fixture.isolvedhire.com/jobs/missing-location",
+        "location": "",
+        "remote_type": "unknown"
+      }
+    },
+    {
+      "name": "ambiguous location",
+      "expected": "quarantined",
+      "reason": "ambiguous_location",
+      "posting": {
+        "company_name": "Fixture isolvisolvedhire",
+        "source_job_id": "iso-ambiguous-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://fixture.isolvedhire.com/jobs/ambiguous-location",
+        "location": "Multiple Locations",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}

@@ -1244,6 +1244,56 @@ test("Applitrack dispatches through registry source module instead of legacy col
   }]);
 });
 
+test("isolvisolvedhire dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "isolvisolvedhire",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "isolvisolvedhire",
+      source_family: "direct_json",
+      list_url: "https://fixture.isolvedhire.com/core/jobs/12345?getParams=%7B%7D"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { data: { jobs: [{ id: "iso-9001" }] } };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.data?.jobs) ? "isolvisolvedhire Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("isolvisolvedhire registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "isolvisolvedhire",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "isolvedhire.com",
+    company_name: "Isolved Registry Co",
+    url_string: "https://fixture.isolvedhire.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "isolvisolvedhire"],
+    ["fetchList", "isolvedhire.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Isolved Registry Co",
+    position_name: "isolvisolvedhire Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

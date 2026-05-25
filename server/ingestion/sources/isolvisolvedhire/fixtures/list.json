@@ -1,0 +1,13 @@
+{
+  "data": {
+    "jobs": [
+      {
+        "id": "iso-1001",
+        "title": "Remote Support Coordinator",
+        "jobUrl": "https://fixture.isolvedhire.com/jobs/remote-support-coordinator-iso-1001",
+        "startDateRef": "2026-05-21",
+        "jobLocation": "Remote - United States"
+      }
+    ]
+  }
+}

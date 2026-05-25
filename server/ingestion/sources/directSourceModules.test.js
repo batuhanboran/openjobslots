@@ -16,6 +16,7 @@ const PRIMARY_DIRECT_SOURCES = Object.freeze([
   "recruitcrm",
   "pinpointhq",
   "fountain",
+  "isolvisolvedhire",
   "zoho"
 ]);
 
@@ -346,6 +347,81 @@ test("manatal source module fetches landing runtime config and paginated jobs AP
         status: 200,
         __sourceFetchFinalUrl: "https://example.com/fixture-manatal",
         body: landingHtml
+      })
+    }),
+    /unexpected host/
+  );
+});
+
+test("isolvisolvedhire source module fetches board HTML before jobs API", async () => {
+  const source = getSourceModule("isolvisolvedhire");
+  assert.ok(source, "expected isolvisolvedhire source module");
+  const company = readJson(path.join(__dirname, "isolvisolvedhire", "fixtures", "company.json"));
+  const listFixture = readJson(path.join(__dirname, "isolvisolvedhire", "fixtures", "list.json"));
+  const calls = [];
+  const boardUrl = "https://fixture.isolvedhire.com/jobs";
+  const apiUrl = "https://fixture.isolvedhire.com/core/jobs/12345?getParams=%7B%7D";
+  const boardHtml = `<html><script>window.courierCurrentRouteData = {"domain_id":"12345"};</script></html>`;
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({
+        url,
+        method: target.method,
+        accept: target.headers?.Accept || "",
+        referer: target.headers?.Referer || ""
+      });
+      if (url === boardUrl) {
+        return {
+          status: 200,
+          url,
+          body: boardHtml
+        };
+      }
+      if (url === apiUrl) {
+        return {
+          status: 200,
+          url,
+          ...listFixture
+        };
+      }
+      throw new Error(`unexpected isolvisolvedhire fetch URL ${url}`);
+    }
+  });
+
+  assert.deepEqual(calls, [
+    {
+      url: boardUrl,
+      method: "GET",
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      referer: ""
+    },
+    {
+      url: apiUrl,
+      method: "GET",
+      accept: "application/json, text/plain, */*",
+      referer: boardUrl
+    }
+  ]);
+  assert.equal(payload.__sourceConfig.domainId, "12345");
+  assert.equal(payload.__sourceConfig.apiUrl, apiUrl);
+  assert.equal(payload.data.jobs.length, 1);
+
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "iso-1001");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.posting_date, "2026-05-21");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        __sourceFetchFinalUrl: "https://example.com/jobs",
+        body: boardHtml
       })
     }),
     /unexpected host/

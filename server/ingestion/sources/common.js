@@ -622,6 +622,18 @@ const SOURCE_SPECS = Object.freeze({
       };
     }
   },
+  isolvisolvedhire: {
+    sourceFamily: "direct_json",
+    confidence: 0.65,
+    parser: () => [],
+    officialDocs: "observed isolvedhire public jobs endpoint",
+    discover(company) {
+      return {
+        config: {},
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
   zoho: {
     sourceFamily: "embedded_json",
     confidence: 0.75,
