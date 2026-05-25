@@ -1163,6 +1163,27 @@ test("hrmdirect source module accepts exact Office Remote as remote evidence", a
   }
 });
 
+test("hrmdirect source module skips exact Apply Today placeholder titles", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "placeholder-title.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const rows = source.parse(raw, fixture.company).map((posting) => source.normalize(posting, fixture.company));
+  const sourceJobIds = rows.map((row) => row.source_job_id).sort();
+
+  assert.deepEqual(sourceJobIds, fixture.expected_source_job_ids.slice().sort());
+  for (const sourceJobId of fixture.rejected_source_job_ids) {
+    assert.equal(sourceJobIds.includes(sourceJobId), false, `${sourceJobId} should not parse as a real posting`);
+  }
+});
+
 test("hrmdirect source module parses labeled detail office prefixes as geo evidence", async () => {
   const source = getSourceModule("hrmdirect");
   const company = {

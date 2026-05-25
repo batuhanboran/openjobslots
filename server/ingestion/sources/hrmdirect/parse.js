@@ -124,6 +124,14 @@ function cleanHrmDirectLocationText(value) {
   return text;
 }
 
+function isHrmDirectPlaceholderTitle(value) {
+  const normalized = cleanHrmDirectText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return normalized === "apply today";
+}
+
 function extractHrmDirectWorkModeLocationText(value) {
   const text = cleanHrmDirectLocationText(value);
   if (!text) return "";
@@ -789,6 +797,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
   for (const candidate of rowCandidates) {
     const { rowHtml, titleCell, titleLinkText, absoluteUrl, baseSourceJobId, reqLoc } = candidate;
     const title = cleanHrmDirectText(titleLinkText || titleCell || "");
+    if (isHrmDirectPlaceholderTitle(title)) continue;
     const sourceJobId = buildHrmDirectSourceJobId(baseSourceJobId, reqLoc, duplicateReqIds);
     const sourceJobIdPath = sourceJobId && sourceJobId !== baseSourceJobId
       ? "req + req_loc query params"
