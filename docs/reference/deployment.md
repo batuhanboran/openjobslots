@@ -61,6 +61,7 @@ To roll back this throughput stage without code changes, override `INGESTION_WOR
 ## Container DNS
 
 The app and worker containers use explicit external DNS resolvers through Compose (`OPENJOBSLOTS_DNS_PRIMARY`, `OPENJOBSLOTS_DNS_SECONDARY`; defaults `8.8.4.4` and `149.112.112.112`) so high-volume ATS fetches are not dependent only on the host/router resolver. If production shows recurrent `getaddrinfo EAI_AGAIN` errors, verify the container `/etc/resolv.conf` and run lookup probes from `openjobslots-worker` before increasing throughput further.
+DNS lookup retry behavior is also bounded in-process: `OPENJOBSLOTS_DNS_LOOKUP_TIMEOUT_MS` defaults to `8000`, `OPENJOBSLOTS_DNS_LOOKUP_RETRIES` defaults to `1`, and `OPENJOBSLOTS_DNS_LOOKUP_RETRY_DELAY_MS` defaults to `250`. Keep these values high enough for Docker's embedded resolver to answer under load; too-low timeouts can convert recoverable DNS lookups into worker-wide timeout failures.
 
 ## Postgres Observability
 

@@ -17,7 +17,7 @@ const DEFAULT_MAX_REDIRECTS = 5;
 const BLOCKED_HOSTNAMES = new Set(["localhost", "localhost.localdomain"]);
 const DEFAULT_DNS_LOOKUP_TIMEOUT_MS = Math.max(
   250,
-  Math.min(30_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_TIMEOUT_MS || 2500))
+  Math.min(30_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_TIMEOUT_MS || 8000))
 );
 const DEFAULT_DNS_LOOKUP_RETRIES = Math.max(
   0,
@@ -25,7 +25,7 @@ const DEFAULT_DNS_LOOKUP_RETRIES = Math.max(
 );
 const DEFAULT_DNS_LOOKUP_RETRY_DELAY_MS = Math.max(
   0,
-  Math.min(5_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_RETRY_DELAY_MS || 150))
+  Math.min(5_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_RETRY_DELAY_MS || 250))
 );
 
 function makeSafeFetchError(code, message, detail = {}) {
