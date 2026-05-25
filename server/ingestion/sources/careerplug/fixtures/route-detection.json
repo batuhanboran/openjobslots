@@ -1,0 +1,22 @@
+{
+  "company": {
+    "company_name": "Fixture CareerPlug",
+    "ATS_name": "careerplug",
+    "url_string": "https://fixture.careerplug.com/jobs"
+  },
+  "list_html": "<div id=\"job_table\"><div class=\"row\"><div class=\"job-title\"><a aria-label=\"Experienced Plumber\" href=\"/jobs/3301618\"><span class=\"name\">Experienced Plumber</span></a></div><div class=\"job-location\">FL-St. Petersburg-33713</div><div class=\"job-type\">Full Time</div></div></div>",
+  "details": {
+    "3301618": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org/\",\"@type\":\"JobPosting\",\"title\":\"Experienced Plumber\",\"datePosted\":\"2026-03-06T14:53:25+00:00\",\"employmentType\":\"FULL_TIME\",\"url\":\"https://fixture.careerplug.com/jobs/3301618\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"St. Petersburg\",\"addressRegion\":\"FL\",\"postalCode\":\"33713\",\"addressCountry\":\"US\"}}}</script>"
+  },
+  "expected": {
+    "3301618": {
+      "location_text": "St. Petersburg, FL, United States",
+      "country": "United States",
+      "city": "St. Petersburg",
+      "remote_type": "onsite",
+      "posting_date": "2026-03-06T14:53:25+00:00",
+      "location_source": "json_ld",
+      "posting_date_source": "json_ld"
+    }
+  }
+}

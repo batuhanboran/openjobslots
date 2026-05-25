@@ -97,6 +97,38 @@ test("target html/public ATS modules return no postings for empty raw payloads",
   }
 });
 
+test("careerplug source module enriches list rows from deterministic detail JSON-LD", async () => {
+  const source = getSourceModule("careerplug");
+  const fixture = readJson(path.join(__dirname, "careerplug", "fixtures", "route-detection.json"));
+  const requestedUrls = [];
+  const raw = await source.fetchList(fixture.company, {
+    maxCareerplugDetailFetches: 5,
+    fetcher: async (url) => {
+      requestedUrls.push(url);
+      if (url === "https://fixture.careerplug.com/jobs") return { html: fixture.list_html, status: 200, url };
+      const jobId = new URL(url).pathname.split("/").filter(Boolean).pop();
+      if (fixture.details[jobId]) return { html: fixture.details[jobId], status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+
+  assert.ok(requestedUrls.includes("https://fixture.careerplug.com/jobs/3301618"));
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], fixture.company);
+  const expected = fixture.expected["3301618"];
+
+  assert.equal(normalized.source_job_id, "3301618");
+  assert.equal(normalized.location_text, expected.location_text);
+  assert.equal(normalized.country, expected.country);
+  assert.equal(normalized.city, expected.city);
+  assert.equal(normalized.remote_type, expected.remote_type);
+  assert.equal(normalized.posting_date, expected.posting_date);
+  assert.equal(normalized.source_evidence.location_source, expected.location_source);
+  assert.equal(normalized.source_evidence.posting_date_source, expected.posting_date_source);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("applitrack source module enriches Output.asp rows from deterministic detail pages", async () => {
   const source = getSourceModule("applitrack");
   const sourceDir = path.join(__dirname, "applitrack");

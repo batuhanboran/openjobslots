@@ -3,6 +3,18 @@
 const { decodeHtmlEntities, extractJsonLdObjectsFromHtml } = require("../../parsers/shared/html");
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 const { normalizeCountryFromLocation, normalizeCountryName } = require("../../posting");
+const { readLimitedResponseText, safeFetch } = require("../../safeFetch");
+
+const CAREERPLUG_DEFAULT_DETAIL_LIMIT = 30;
+const CAREERPLUG_DEFAULT_DETAIL_DELAY_MS = 150;
+const CAREERPLUG_US_STATE_CODES = new Set([
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL",
+  "GA", "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA", "MA",
+  "MD", "ME", "MI", "MN", "MO", "MS", "MT", "NC", "ND", "NE",
+  "NH", "NJ", "NM", "NV", "NY", "OH", "OK", "OR", "PA", "RI",
+  "SC", "SD", "TN", "TX", "UT", "VA", "VT", "WA", "WI", "WV",
+  "WY"
+]);
 
 function cleanCareerplugText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
@@ -16,6 +28,50 @@ function normalizeCareerplugMeta(value) {
     .replace(/^\s*Location:\s*/i, "")
     .replace(/^\s*Full\s*\/\s*Part\s*Time:\s*/i, "")
     .trim();
+}
+
+function normalizeCareerplugStateCityZipLocation(value) {
+  const raw = normalizeCareerplugMeta(value);
+  const match = raw.match(/^([A-Z]{2})-(.+?)(?:-(\d{5}(?:-\d{4})?))?$/i);
+  const state = String(match?.[1] || "").toUpperCase();
+  const city = cleanCareerplugText(match?.[2] || "").replace(/\s*-\s*/g, "-").trim();
+  if (!state || !city || !CAREERPLUG_US_STATE_CODES.has(state)) return null;
+  if (/^\d+$/.test(city)) return null;
+  return {
+    location: `${city}, ${state}, United States`,
+    city,
+    state,
+    country: "United States",
+    evidence: {
+      location_source: "labeled_html",
+      location_path: ".job-location",
+      location_rule_name: "careerplug_state_city_zip_location",
+      city_source: "labeled_html",
+      city_path: ".job-location",
+      city_rule_name: "careerplug_state_city_zip_location",
+      country_source: "labeled_html",
+      country_path: ".job-location",
+      country_rule_name: "careerplug_state_city_zip_location"
+    }
+  };
+}
+
+function careerplugListLocationFields(value) {
+  const normalized = normalizeCareerplugMeta(value);
+  if (!normalized) return {
+    location: "",
+    evidence: {}
+  };
+  const structured = normalizeCareerplugStateCityZipLocation(normalized);
+  if (structured) return structured;
+  return {
+    location: normalized,
+    evidence: {
+      location_source: "labeled_html",
+      location_path: ".job-location",
+      location_rule_name: "careerplug_job_location"
+    }
+  };
 }
 
 function normalizeCareerplugAriaTitle(value) {
@@ -219,7 +275,7 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
     }
 
     const title = extractCareerplugTitleFromHtml(rowHtml.match(titlePattern)?.[1] || "", attrs);
-    const location = normalizeCareerplugMeta(rowHtml.match(locationPattern)?.[1] || "");
+    const locationFields = careerplugListLocationFields(rowHtml.match(locationPattern)?.[1] || "");
     const jobType = normalizeCareerplugMeta(rowHtml.match(typePattern)?.[1] || "");
 
     postings.push({
@@ -228,8 +284,23 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
       position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: null,
-      location: location || null,
-      employment_type: jobType || null
+      location: locationFields.location || null,
+      city: locationFields.city || null,
+      state: locationFields.state || null,
+      country: locationFields.country || null,
+      employment_type: jobType || null,
+      source_evidence: {
+        route_kind: "careerplug_jobs_html",
+        title_source: "labeled_html",
+        title_path: ".job-title|aria-label",
+        canonical_url_source: "labeled_html",
+        canonical_url_path: "a[href*='/jobs/']",
+        source_job_id_source: "url",
+        source_job_id_path: "/jobs/:id",
+        ...(locationFields.evidence || {}),
+        employment_type_source: jobType ? "labeled_html" : "",
+        employment_type_path: jobType ? ".job-type" : ""
+      }
     });
     seenUrls.add(absoluteUrl);
     rowMatch = rowPattern.exec(source);
@@ -238,7 +309,172 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
   return postings;
 }
 
+function shouldFetchCareerplugDetail(posting) {
+  if (!posting) return false;
+  if (!cleanCareerplugText(posting.posting_date)) return true;
+  if (!cleanCareerplugText(posting.location) || !cleanCareerplugText(posting.country) || !cleanCareerplugText(posting.city)) return true;
+  return false;
+}
+
+function careerplugDetailLimit(options = {}) {
+  const value = Number(
+    options.maxCareerplugDetailFetches ??
+    process.env.OPENJOBSLOTS_CAREERPLUG_DETAIL_LIMIT ??
+    CAREERPLUG_DEFAULT_DETAIL_LIMIT
+  );
+  if (!Number.isFinite(value)) return CAREERPLUG_DEFAULT_DETAIL_LIMIT;
+  return Math.max(0, Math.min(250, Math.floor(value)));
+}
+
+function careerplugDetailDelayMs(options = {}) {
+  const value = Number(
+    options.careerplugDetailDelayMs ??
+    process.env.OPENJOBSLOTS_CAREERPLUG_DETAIL_DELAY_MS ??
+    CAREERPLUG_DEFAULT_DETAIL_DELAY_MS
+  );
+  if (!Number.isFinite(value)) return CAREERPLUG_DEFAULT_DETAIL_DELAY_MS;
+  return Math.max(0, Math.min(5000, Math.floor(value)));
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchCareerplugText(url, options = {}) {
+  if (typeof options.fetcher === "function") {
+    const response = await options.fetcher(url, options.target || {});
+    if (typeof response === "string") return { text: response, status: 200, finalUrl: url };
+    if (response && typeof response === "object") {
+      if (typeof response.text === "function") {
+        return {
+          text: await response.text(),
+          status: Number(response.status || 200),
+          finalUrl: response.url || url
+        };
+      }
+      return {
+        text: String(response.html || response.body || response.text || ""),
+        status: Number(response.status || 200),
+        finalUrl: response.url || url
+      };
+    }
+    return { text: String(response || ""), status: 200, finalUrl: url };
+  }
+
+  const response = await safeFetch(url, {
+    ...(options.fetchOptions || {}),
+    headers: {
+      accept: "text/html,application/xhtml+xml,application/ld+json;q=0.8,*/*;q=0.5",
+      "user-agent": "OpenJobSlotsBot/1.0 (+https://openjobslots.com)",
+      ...(options.fetchOptions?.headers || {})
+    }
+  });
+  return {
+    text: await readLimitedResponseText(response, { sourceUrl: response.url || url }),
+    status: Number(response.status || 200),
+    finalUrl: response.url || url
+  };
+}
+
+function mergeCareerplugDetailPosting(listPosting, detailPosting, detailUrl) {
+  if (!detailPosting) return listPosting;
+  const listEvidence = listPosting.source_evidence || {};
+  const detailEvidence = detailPosting.source_evidence || {};
+  return {
+    ...listPosting,
+    position_name: listPosting.position_name || detailPosting.position_name,
+    job_posting_url: listPosting.job_posting_url || detailPosting.job_posting_url,
+    source_job_id: listPosting.source_job_id || detailPosting.source_job_id,
+    posting_date: detailPosting.posting_date || listPosting.posting_date || null,
+    location: detailPosting.location || listPosting.location || null,
+    city: detailPosting.city || listPosting.city || null,
+    state: detailPosting.state || listPosting.state || null,
+    country: detailPosting.country || listPosting.country || null,
+    employment_type: listPosting.employment_type || detailPosting.employment_type || null,
+    source_evidence: {
+      ...listEvidence,
+      ...detailEvidence,
+      route_kind: "careerplug_jobs_html_with_json_ld_detail",
+      detail_url: detailUrl || detailEvidence.detail_url || "",
+      list_location_source: listEvidence.location_source || "",
+      list_location_path: listEvidence.location_path || "",
+      list_location_rule_name: listEvidence.location_rule_name || ""
+    }
+  };
+}
+
+async function fetchList(company = {}, options = {}) {
+  const companyName = cleanCareerplugText(company.company_name || company.companyName || company.name);
+  const boardUrl = cleanCareerplugText(company.url_string || company.company_url || company.url).replace(/\/$/, "");
+  if (!boardUrl) {
+    return {
+      __legacyParsed: [],
+      html: "",
+      detail_fetch_count: 0,
+      __sourceConfig: { baseOrigin: "" }
+    };
+  }
+  const parsedBoard = new URL(boardUrl);
+  const config = {
+    baseOrigin: parsedBoard ? parsedBoard.origin : ""
+  };
+  const list = await fetchCareerplugText(boardUrl, options);
+  if (list.status >= 400) {
+    const error = new Error(`careerplug public jobs route failed with HTTP ${list.status}`);
+    error.status = list.status;
+    error.url = list.finalUrl || boardUrl;
+    throw error;
+  }
+  const listPostings = parseCareerplugPostingsFromHtml(companyName, config, list.text);
+  const maxDetails = careerplugDetailLimit(options);
+  const detailDelayMs = typeof options.fetcher === "function" ? 0 : careerplugDetailDelayMs(options);
+  let detailFetches = 0;
+  const enriched = [];
+
+  for (const posting of listPostings) {
+    if (!shouldFetchCareerplugDetail(posting) || detailFetches >= maxDetails) {
+      enriched.push(posting);
+      continue;
+    }
+    detailFetches += 1;
+    try {
+      if (detailFetches > 1 && detailDelayMs > 0) await delay(detailDelayMs);
+      const detailUrl = normalizeCareerplugCanonicalJobUrl(posting.job_posting_url, config);
+      const detail = await fetchCareerplugText(detailUrl, options);
+      if (detail.status >= 400) {
+        enriched.push({
+          ...posting,
+          source_failure_reasons: [
+            ...(posting.source_failure_reasons || []),
+            detail.status === 404 || detail.status === 410 ? "detail_404_or_410" : "detail_fetch_failed"
+          ]
+        });
+        continue;
+      }
+      const detailParsed = parseCareerplugPostingsFromHtml(companyName, config, detail.text)
+        .find((item) => item.source_job_id === posting.source_job_id) || null;
+      enriched.push(mergeCareerplugDetailPosting(posting, detailParsed, detail.finalUrl || detailUrl));
+    } catch (error) {
+      enriched.push({
+        ...posting,
+        source_failure_reasons: [
+          ...(posting.source_failure_reasons || []),
+          error.status === 404 || error.status === 410 ? "detail_404_or_410" : "detail_fetch_failed"
+        ]
+      });
+    }
+  }
+
+  return {
+    __legacyParsed: enriched,
+    html: list.text,
+    detail_fetch_count: detailFetches,
+    __sourceConfig: config
+  };
+}
+
 
 module.exports = {
+  fetchList,
   parseCareerplugPostingsFromHtml
 };

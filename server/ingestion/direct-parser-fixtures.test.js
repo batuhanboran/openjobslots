@@ -762,7 +762,9 @@ test("careerplug parser reads sibling location cells from public jobs rows", () 
 
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0].position_name, "Full Time Home Infusion RN");
-  assert.equal(parsed[0].location, "NY-Brooklyn-11226");
+  assert.equal(parsed[0].location, "Brooklyn, NY, United States");
+  assert.equal(parsed[0].city, "Brooklyn");
+  assert.equal(parsed[0].country, "United States");
   assert.equal(parsed[0].employment_type, "Full Time");
 
   const normalized = adapter.normalize(parsed[0], {
@@ -772,7 +774,8 @@ test("careerplug parser reads sibling location cells from public jobs rows", () 
   });
   assert.equal(normalized.country, "United States");
   assert.equal(normalized.region, "North America");
-  assert.equal(normalized.location_text, "NY-Brooklyn-11226");
+  assert.equal(normalized.location_text, "Brooklyn, NY, United States");
+  assert.equal(normalized.city, "Brooklyn");
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: adapter.parserVersion }).status, "accepted");
 });
 
