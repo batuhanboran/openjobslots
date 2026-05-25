@@ -352,7 +352,11 @@ function extractHrmDirectViewField(detailHtml, labels) {
 }
 
 function extractHrmDirectDetailFields(detailHtml) {
-  const primaryLocation = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
+  const primaryLocationValue = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
+  const primaryLocationRemoteType = isRemoteOnlyLocationValue(primaryLocationValue)
+    ? normalizeRemoteType(primaryLocationValue)
+    : "unknown";
+  const primaryLocation = primaryLocationRemoteType === "unknown" ? primaryLocationValue : "";
   const officeLocation = primaryLocation
     ? { location: "", ruleName: "" }
     : extractHrmDirectOfficeLocation(extractHrmDirectViewField(detailHtml, "Office"));
@@ -365,11 +369,12 @@ function extractHrmDirectDetailFields(detailHtml) {
   const postingDate = extractHrmDirectViewField(detailHtml, ["Date Posted", "Posted Date", "Posting Date", "Open Date"]);
   const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
   const detailRemoteType = normalizeRemoteType(workplaceType);
-  const detailRemoteTag = ["remote", "hybrid"].includes(detailRemoteType) ? "" : extractHrmDirectDetailRemoteTag(detailHtml);
-  const detailBodyRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailRemoteTag
+  const detailLocationRemoteType = ["remote", "hybrid"].includes(primaryLocationRemoteType) ? primaryLocationRemoteType : "";
+  const detailRemoteTag = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType ? "" : extractHrmDirectDetailRemoteTag(detailHtml);
+  const detailBodyRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag
     ? ""
     : extractHrmDirectDetailBodyLocationRemoteType(detailHtml);
-  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailRemoteTag || detailBodyRemoteType;
+  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType;
   const locationPath = primaryLocation
     ? "table.viewFields Location"
     : officeLocation.location
@@ -383,10 +388,10 @@ function extractHrmDirectDetailFields(detailHtml) {
     ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType ? "labeled_detail_body" : "labeled_detail_html"
     : "";
   const remotePath = remoteType
-    ? detailRemoteTag ? "detail text #LI-Remote/#LI-Hybrid" : detailBodyRemoteType ? "detail body Location" : "table.viewFields Workplace Type"
+    ? detailRemoteTag ? "detail text #LI-Remote/#LI-Hybrid" : detailBodyRemoteType ? "detail body Location" : detailLocationRemoteType ? "table.viewFields Location" : "table.viewFields Workplace Type"
     : "";
   const remoteRuleName = remoteType
-    ? detailRemoteTag ? "hrmdirect_detail_li_remote_tag" : detailBodyRemoteType ? "hrmdirect_detail_body_location_remote" : "hrmdirect_detail_workplace_type"
+    ? detailRemoteTag ? "hrmdirect_detail_li_remote_tag" : detailBodyRemoteType ? "hrmdirect_detail_body_location_remote" : detailLocationRemoteType ? "hrmdirect_detail_location_remote" : "hrmdirect_detail_workplace_type"
     : "";
   return {
     location,

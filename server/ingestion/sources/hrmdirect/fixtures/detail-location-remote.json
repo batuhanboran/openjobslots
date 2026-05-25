@@ -1,0 +1,24 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Detail Location Remote",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://detaillocationremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://detaillocationremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://detaillocationremote.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://detaillocationremote.hrmdirect.com/employment/job-opening.php?req=HRM9903",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9903\"><td class=\"departments reqitem ReqRowClick\">Engineering</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9903\">Senior Design Manager</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Engineering</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Remote</td></tr></table><p>Remote applicants must reside in one of our registered states.</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9903",
+    "location": null,
+    "city": "",
+    "country": "",
+    "remote_type": "remote",
+    "location_source": "",
+    "location_path": "",
+    "remote_source": "labeled_detail_html",
+    "remote_path": "table.viewFields Location",
+    "remote_rule_name": "hrmdirect_detail_location_remote"
+  }
+}
