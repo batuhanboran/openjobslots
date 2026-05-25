@@ -39,6 +39,7 @@ function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJs
     const department = String(item?.department?.name || "").trim() || null;
 
     postings.push({
+      source_job_id: postingId || null,
       company_name: companyNameForPostings,
       position_name: String(item?.name || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
@@ -46,6 +47,7 @@ function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJs
       location: formatRipplingLocation(item?.locations),
       department,
       employment_type: String(item?.employmentType || item?.employment_type || "").trim() || null,
+      remote_type: String(item?.remoteType || item?.remote_type || item?.workplaceType || item?.workplace_type || "").trim() || null,
       workplace_type: String(item?.workplaceType || item?.workplace_type || "").trim() || null,
       language: String(item?.language || "").trim() || null
     });

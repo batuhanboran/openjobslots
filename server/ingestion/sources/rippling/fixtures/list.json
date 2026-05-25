@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": "rip-remote-1",
+      "name": "Remote Platform Engineer",
+      "url": "https://ats.rippling.com/fixtureco/jobs/rip-remote-1",
+      "postedAt": "2026-05-20T10:00:00Z",
+      "locations": [
+        {
+          "name": "Remote, United States",
+          "country": "United States"
+        }
+      ],
+      "department": {
+        "name": "Engineering"
+      },
+      "employmentType": "Full-time",
+      "workplaceType": "Remote",
+      "language": "en"
+    },
+    {
+      "id": "rip-hybrid-2",
+      "name": "Hybrid Revenue Lead",
+      "postedAt": "2026-05-21T10:00:00Z",
+      "locations": [
+        {
+          "city": "London",
+          "country": "United Kingdom"
+        }
+      ],
+      "department": {
+        "name": "Sales"
+      },
+      "employmentType": "Full-time",
+      "workplaceType": "Hybrid",
+      "language": "en"
+    }
+  ],
+  "totalPages": 1
+}

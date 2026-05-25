@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture Rippling Co",
+        "position_name": "Role Without ID",
+        "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/no-id",
+        "location": "Remote, United States",
+        "remote_type": "remote"
+      }
+    },
+    {
+      "name": "missing geo and remote evidence",
+      "expected": "quarantined",
+      "reason": "missing_location_or_remote",
+      "posting": {
+        "source_job_id": "rip-missing-geo",
+        "company_name": "Fixture Rippling Co",
+        "position_name": "Ambiguous Role",
+        "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-missing-geo"
+      }
+    }
+  ]
+}

@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, PinpointHQ, RecruitCRM, Recruitee, Taleo, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -29,6 +29,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
+  assert.equal(isRegistryPilotSource("rippling"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
   assert.equal(isRegistryPilotSource("zoho"), true);
 
@@ -50,6 +51,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
     "pinpointhq",
     "recruitcrm",
     "recruitee",
+    "rippling",
     "taleo",
     "zoho"
   ]);
@@ -231,6 +233,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof recruitee.normalize, "function");
   assert.equal(typeof recruitee.validate, "function");
   assert.deepEqual(validateSourceContract(recruitee), { ok: true, failures: [] });
+
+  const rippling = getRegistrySourceModule("rippling");
+  assert.equal(rippling.atsKey, "rippling");
+  assert.equal(rippling.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(rippling.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof rippling.discover, "function");
+  assert.equal(typeof rippling.fetchList, "function");
+  assert.equal(typeof rippling.parse, "function");
+  assert.equal(typeof rippling.normalize, "function");
+  assert.equal(typeof rippling.validate, "function");
+  assert.deepEqual(validateSourceContract(rippling), { ok: true, failures: [] });
 
   const taleo = getRegistrySourceModule("taleo");
   assert.equal(taleo.atsKey, "taleo");

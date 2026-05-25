@@ -23,7 +23,6 @@ const {
   extractPageupRouteConfigFromUrl,
   parsePaylocityCompany,
   parsePeopleforceCompany,
-  parseRipplingCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
   parseSimplicantCompany,
@@ -107,7 +106,6 @@ const {
   parseEightfoldPostingsFromApi
 } = require("./sources/eightfold/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
-const { parseRipplingPostingsFromApi } = require("./sources/rippling/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseGemPostingsFromBatchResponse } = require("./sources/gem/parse");
 const { parseJobApsPostingsFromHtml } = require("./sources/jobaps/parse");
@@ -243,6 +241,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
+  rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
@@ -1490,43 +1489,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchRipplingJobsPage(config, page = 0, pageSize = 100) {
-    const res = await fetchWithAtsRateLimit("rippling", RIPPLING_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Rippling API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    // Primary board API currently returns the first page without requiring params,
-    // but we still keep page/pageSize inputs for future compatibility.
-    const responseJson = await res.json();
-    if (page > 0 || pageSize !== 100) {
-      const pagedRes = await fetchWithAtsRateLimit(
-        "rippling",
-        RIPPLING_RATE_LIMIT_WAIT_MS,
-        `${config.apiUrl}?page=${encodeURIComponent(page)}&pageSize=${encodeURIComponent(pageSize)}`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json, text/plain, */*"
-          }
-        }
-      );
-      if (!pagedRes.ok) {
-        return responseJson;
-      }
-      return pagedRes.json();
-    }
-  
-    return responseJson;
-  }
-  
   async function fetchAdpMyjobsCareerSite(config) {
     const res = await fetchWithAtsRateLimit("adp_myjobs", ADP_MYJOBS_RATE_LIMIT_WAIT_MS, config.careerSiteUrl, {
       method: "GET",
@@ -2673,36 +2635,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseLoxoPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
   }
   
-  async function collectPostingsForRipplingCompany(company) {
-    const config = parseRipplingCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySlug;
-    const pageSize = 100;
-    const seenUrls = new Set();
-    const collected = [];
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const responseJson = await fetchRipplingJobsPage(config, page, pageSize);
-      const batch = parseRipplingPostingsFromApi(companyNameForPostings, config, responseJson);
-  
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      const totalPagesRaw = Number(responseJson?.totalPages);
-      const totalPages = Number.isFinite(totalPagesRaw) && totalPagesRaw > 0 ? totalPagesRaw : 1;
-      if (page + 1 >= totalPages) break;
-      if (batch.length < pageSize) break;
-    }
-  
-    return collected;
-  }
-  
   async function collectPostingsForCareerpuckCompany(company) {
     const config = parseCareerpuckCompany(company.url_string);
     if (!config) return [];
@@ -3458,7 +3390,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "recruitcrm");
     }
     if (atsName === "rippling" || atsName === "rippling.com" || atsName === "ripplingcom" || atsName === "ats.rippling.com" || atsName === "atsripplingcom") {
-      return collectPostingsForRipplingCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "rippling");
     }
     if (atsName === "careerpuck" || atsName === "careerpuck.com" || atsName === "careerpuckcom") {
       return collectPostingsForCareerpuckCompany(company);

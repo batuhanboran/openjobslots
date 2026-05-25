@@ -747,6 +747,56 @@ test("RecruitCRM dispatches through registry source module instead of legacy col
   }]);
 });
 
+test("Rippling dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "rippling",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "rippling",
+      source_family: "direct_json",
+      list_url: "https://ats.rippling.com/api/v2/board/fixtureco/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { items: [{ name: "Fixture Rippling Role" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.items) ? "Rippling Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Rippling registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "rippling",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "rippling",
+    company_name: "Rippling Registry Co",
+    url_string: "https://ats.rippling.com/fixtureco/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "rippling"],
+    ["fetchList", "rippling", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Rippling Registry Co",
+    position_name: "Rippling Registry Posting"
+  }]);
+});
+
 test("Recruitee dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

@@ -1,0 +1,18 @@
+[
+  {
+    "source_job_id": "rip-remote-1",
+    "company_name": "Fixture Rippling Co",
+    "position_name": "Remote Platform Engineer",
+    "country": "United States",
+    "remote_type": "remote",
+    "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-remote-1"
+  },
+  {
+    "source_job_id": "rip-hybrid-2",
+    "company_name": "Fixture Rippling Co",
+    "position_name": "Hybrid Revenue Lead",
+    "country": "United Kingdom",
+    "remote_type": "hybrid",
+    "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-hybrid-2"
+  }
+]

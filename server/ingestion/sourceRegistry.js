@@ -70,6 +70,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.quarantine
   }),
+  rippling: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
   taleo: Object.freeze({
     family: SOURCE_FAMILIES.brittleHighRisk,
     status: SOURCE_STATUSES.disabled

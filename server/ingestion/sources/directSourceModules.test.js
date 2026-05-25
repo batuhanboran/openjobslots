@@ -177,6 +177,72 @@ test("pinpointhq source module fetches postings JSON with source-local cache-bus
   );
 });
 
+test("rippling source module fetches paginated board API with source-local discovery", async () => {
+  const source = getSourceModule("rippling");
+  assert.ok(source, "expected rippling source module");
+  const company = readJson(path.join(__dirname, "rippling", "fixtures", "company.json"));
+  const listFixture = readJson(path.join(__dirname, "rippling", "fixtures", "list.json"));
+  const calls = [];
+  const firstPageUrl = "https://ats.rippling.com/api/v2/board/fixtureco/jobs";
+  const secondPageUrl = "https://ats.rippling.com/api/v2/board/fixtureco/jobs?page=1&pageSize=100";
+  const payloadsByUrl = new Map([
+    [firstPageUrl, { items: [listFixture.items[0]], totalPages: 2 }],
+    [secondPageUrl, { items: [listFixture.items[1]], totalPages: 2 }]
+  ]);
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        status: 200,
+        url,
+        ...(payloadsByUrl.get(url) || { items: [], totalPages: 2 })
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [
+    {
+      url: firstPageUrl,
+      method: "GET",
+      headers: { Accept: "application/json, text/plain, */*" }
+    },
+    {
+      url: secondPageUrl,
+      method: "GET",
+      headers: { Accept: "application/json, text/plain, */*" }
+    }
+  ]);
+  assert.equal(payload.__sourceConfig.apiUrl, firstPageUrl);
+  assert.equal(payload.items.length, 2);
+
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const remote = byId.get("rip-remote-1");
+  assert.equal(remote.country, "United States");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const hybrid = byId.get("rip-hybrid-2");
+  assert.equal(hybrid.country, "United Kingdom");
+  assert.equal(hybrid.remote_type, "hybrid");
+  assert.equal(source.validatePublic(hybrid).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        __sourceFetchFinalUrl: "https://example.com/api/v2/board/fixtureco/jobs",
+        items: []
+      })
+    }),
+    /unexpected host/
+  );
+});
+
 test("lever source module filters employment categories that are misfiled as locations", () => {
   const source = getSourceModule("lever");
   const company = {
