@@ -547,6 +547,56 @@ test("Lever dispatches through registry source module instead of legacy collecto
   }]);
 });
 
+test("PinpointHQ dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "pinpointhq",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "pinpointhq",
+      source_family: "direct_json",
+      list_url: "https://fixtureco.pinpointhq.com/postings.json"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { data: [{ id: "pin-1" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.data) ? "PinpointHQ Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("PinpointHQ registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "pinpointhq",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "pinpointhq",
+    company_name: "Pinpoint Registry Co",
+    url_string: "https://fixtureco.pinpointhq.com/"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "pinpointhq"],
+    ["fetchList", "pinpointhq", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Pinpoint Registry Co",
+    position_name: "PinpointHQ Registry Posting"
+  }]);
+});
+
 test("Zoho dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

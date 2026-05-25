@@ -24,7 +24,6 @@ const {
   extractPageupRouteConfigFromUrl,
   parsePaylocityCompany,
   parsePeopleforceCompany,
-  parsePinpointHqCompany,
   parseRipplingCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -74,7 +73,6 @@ const {
   extractPaylocityPageDataJson,
   parsePaylocityPostingsFromPageData
 } = require("./sources/paylocity/parse");
-const { parsePinpointHqPostingsFromApi } = require("./sources/pinpointhq/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsLocationFromTitleOrUrl,
@@ -246,6 +244,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
+  pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
@@ -1522,31 +1521,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchPinpointHqJobBoard(config) {
-    const timestamp = Date.now().toString();
-    const queryGlue = String(config.apiUrl || "").includes("?") ? "&" : "?";
-    const requestUrl = `${config.apiUrl}${queryGlue}_=${encodeURIComponent(timestamp)}`;
-    const res = await fetchWithAtsRateLimit("pinpointhq", PINPOINTHQ_RATE_LIMIT_WAIT_MS, requestUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`PinpointHQ API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || requestUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".pinpointhq.com") || finalHost === "pinpointhq.com" || finalHost === "www.pinpointhq.com") {
-      throw new Error(`PinpointHQ URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchRipplingJobsPage(config, page = 0, pageSize = 100) {
     const res = await fetchWithAtsRateLimit("rippling", RIPPLING_RATE_LIMIT_WAIT_MS, config.apiUrl, {
       method: "GET",
@@ -2742,16 +2716,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseLoxoPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
   }
   
-  async function collectPostingsForPinpointHqCompany(company) {
-    const config = parsePinpointHqCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const responseJson = await fetchPinpointHqJobBoard(config);
-    return parsePinpointHqPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
   async function collectPostingsForRipplingCompany(company) {
     const config = parseRipplingCompany(company.url_string);
     if (!config) return [];
@@ -3531,7 +3495,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForSimplicantCompany(company);
     }
     if (atsName === "pinpointhq" || atsName === "pinpointhq.com" || atsName === "pinpointhqcom") {
-      return collectPostingsForPinpointHqCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "pinpointhq");
     }
     if (atsName === "recruitcrm" || atsName === "recruitcrm.io" || atsName === "recruitcrmiocom" || atsName === "recruitcrmio") {
       return collectPostingsForRegistryPilotCompany(company, "recruitcrm");

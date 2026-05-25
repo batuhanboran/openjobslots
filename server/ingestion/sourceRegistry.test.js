@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, Recruitee, Taleo, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Lever, PinpointHQ, RecruitCRM, Recruitee, Taleo, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -25,6 +25,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
+  assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
@@ -44,6 +45,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
     "hrmdirect",
     "icims",
     "lever",
+    "pinpointhq",
     "recruitcrm",
     "recruitee",
     "taleo",
@@ -183,6 +185,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof lever.normalize, "function");
   assert.equal(typeof lever.validate, "function");
   assert.deepEqual(validateSourceContract(lever), { ok: true, failures: [] });
+
+  const pinpointHq = getRegistrySourceModule("pinpointhq");
+  assert.equal(pinpointHq.atsKey, "pinpointhq");
+  assert.equal(pinpointHq.family, SOURCE_FAMILIES.directJsonStable);
+  assert.equal(pinpointHq.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof pinpointHq.discover, "function");
+  assert.equal(typeof pinpointHq.fetchList, "function");
+  assert.equal(typeof pinpointHq.parse, "function");
+  assert.equal(typeof pinpointHq.normalize, "function");
+  assert.equal(typeof pinpointHq.validate, "function");
+  assert.deepEqual(validateSourceContract(pinpointHq), { ok: true, failures: [] });
 
   const recruitCrm = getRegistrySourceModule("recruitcrm");
   assert.equal(recruitCrm.atsKey, "recruitcrm");

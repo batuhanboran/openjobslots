@@ -21,7 +21,6 @@ const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parseOraclePostingsFromApi } = require("./oracle/parse");
 const { parsePageupPostingsFromResults } = require("./pageup/parse");
 const { parsePaylocityPostingsFromPageData } = require("./paylocity/parse");
-const { parsePinpointHqPostingsFromApi } = require("./pinpointhq/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
@@ -604,15 +603,12 @@ const SOURCE_SPECS = Object.freeze({
   pinpointhq: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parsePinpointHqPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed Pinpoint public postings JSON endpoint",
     discover(company) {
-      const parsed = asUrl(company.url_string);
-      const baseOrigin = parsed ? parsed.origin : "";
-      const boardUrl = clean(company.url_string).replace(/\/$/, "");
       return {
-        config: { boardUrl, baseOrigin },
-        listUrl: boardUrl ? `${boardUrl}.json` : ""
+        config: {},
+        listUrl: clean(company.url_string)
       };
     }
   },

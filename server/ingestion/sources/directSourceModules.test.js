@@ -126,6 +126,57 @@ test("fountain source module fetches the board JSON endpoint with source-local d
   assert.equal(payload.openings.length, 1);
 });
 
+test("pinpointhq source module fetches postings JSON with source-local cache-busting metadata", async () => {
+  const source = getSourceModule("pinpointhq");
+  const company = readJson(path.join(__dirname, "pinpointhq", "fixtures", "company.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    now: () => 1779726000000,
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        data: [{
+          id: "pin-9001",
+          title: "Remote Pinpoint Fixture",
+          path: "/postings/remote-pinpoint-fixture",
+          posted_at: "2026-05-25T10:00:00Z",
+          location: {
+            city: "Remote",
+            name: "United States"
+          },
+          workplace_type_text: "Remote"
+        }]
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://fixtureco.pinpointhq.com/postings.json?_=1779726000000",
+    method: "GET",
+    headers: { Accept: "application/json, text/plain, */*" }
+  }]);
+  assert.equal(payload.__sourceConfig.apiUrl, "https://fixtureco.pinpointhq.com/postings.json");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "pin-9001");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      now: () => 1779726000000,
+      fetcher: async () => ({
+        __sourceFetchFinalUrl: "https://example.com/postings.json",
+        data: []
+      })
+    }),
+    /unexpected host/
+  );
+});
+
 test("lever source module filters employment categories that are misfiled as locations", () => {
   const source = getSourceModule("lever");
   const company = {
