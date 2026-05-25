@@ -285,8 +285,10 @@ function extractHrmDirectDetailBodyWorkArrangementRemoteType(detailHtml) {
 function extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
   const match = text.match(/\b(?:full[-\s]?time|part[-\s]?time|contract)\s*\/\s*(remote|hybrid)\b/i);
-  if (!match?.[1]) return "";
-  return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+  if (match?.[1]) return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+  const workFromHomeMatch = text.match(/\b(?:100%\s*)?remote\s*(?:[-\u2013\u2014\uFFFD]\s*)?(?:work\s+from\s+home|wfh)\b/i);
+  if (workFromHomeMatch) return "remote";
+  return "";
 }
 
 function extractHrmDirectDetailBodyAddressLocation(detailHtml) {
