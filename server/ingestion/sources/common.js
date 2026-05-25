@@ -1161,10 +1161,10 @@ const SOURCE_SPECS = Object.freeze({
     discover(company) {
       const parsed = asUrl(company.url_string);
       const baseOrigin = parsed ? parsed.origin : "";
-      const boardUrl = clean(company.url_string).replace(/\/$/, "");
+      const boardUrl = clean(company.url_string).replace(/\/+$/, "");
       return {
         config: { boardUrl, baseOrigin },
-        listUrl: boardUrl ? `${boardUrl}/list` : ""
+        listUrl: clean(company.url_string)
       };
     }
   },

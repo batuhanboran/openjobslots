@@ -147,6 +147,56 @@ test("HRMDirect dispatches through registry source module instead of legacy coll
   }]);
 });
 
+test("BambooHR dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "bamboohr",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "bamboohr",
+      source_family: "direct_json",
+      list_url: "https://fixture.bamboohr.com/careers/list"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { result: [{ id: 1001 }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.result) ? "BambooHR Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("BambooHR registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "bamboohr",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "bamboohr",
+    company_name: "Bamboo Registry Co",
+    url_string: "https://fixture.bamboohr.com/careers"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "bamboohr"],
+    ["fetchList", "bamboohr", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Bamboo Registry Co",
+    position_name: "BambooHR Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

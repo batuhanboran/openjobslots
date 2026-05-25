@@ -12,17 +12,29 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
+test("registry exposes BambooHR, Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
+  assert.equal(isRegistryPilotSource("bamboohr"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("lever"), false);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
-  assert.deepEqual(pilotKeys, ["greenhouse", "hrmdirect", "icims"]);
+  assert.deepEqual(pilotKeys, ["bamboohr", "greenhouse", "hrmdirect", "icims"]);
 });
 
 test("registry returns contract-valid pilot source modules", () => {
+  const bamboohr = getRegistrySourceModule("bamboohr");
+  assert.equal(bamboohr.atsKey, "bamboohr");
+  assert.equal(bamboohr.family, SOURCE_FAMILIES.directJsonStable);
+  assert.equal(bamboohr.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof bamboohr.discover, "function");
+  assert.equal(typeof bamboohr.fetchList, "function");
+  assert.equal(typeof bamboohr.parse, "function");
+  assert.equal(typeof bamboohr.normalize, "function");
+  assert.equal(typeof bamboohr.validate, "function");
+  assert.deepEqual(validateSourceContract(bamboohr), { ok: true, failures: [] });
+
   const greenhouse = getRegistrySourceModule("greenhouse");
   assert.equal(greenhouse.atsKey, "greenhouse");
   assert.equal(greenhouse.family, SOURCE_FAMILIES.directJsonStable);

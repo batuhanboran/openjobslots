@@ -7,7 +7,6 @@ const {
   parseApplicantProCompany,
   parseApplyToJobCompany,
   parseAshbyCompany,
-  parseBambooHrCompany,
   parseBrassringCompany,
   parseBreezyCompany,
   parseCareerplugCompany,
@@ -62,7 +61,6 @@ const {
 } = require("./sources/applitrack/parse");
 const { parseApplyToJobPostingsFromHtml } = require("./sources/applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./sources/ashby/parse");
-const { parseBambooHrPostingsFromApi } = require("./sources/bamboohr/parse");
 const { parseBreezyPostingsFromHtml } = require("./sources/breezy/parse");
 const {
   extractBrassringCompanyName,
@@ -273,6 +271,7 @@ const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
+  bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS
@@ -1089,7 +1088,14 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const contentType = String(res.headers?.get?.("content-type") || "").toLowerCase();
     if (contentType.includes("json") || /^[\s\r\n]*[\[{]/.test(body)) {
       try {
-        return JSON.parse(body);
+        const parsedJson = JSON.parse(body);
+        if (parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)) {
+          return {
+            ...parsedJson,
+            __sourceFetchFinalUrl: res.url || urlString
+          };
+        }
+        return parsedJson;
       } catch {
         return body;
       }
@@ -1943,28 +1949,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return responseJson;
   }
   
-  async function fetchBambooHrJobBoard(config) {
-    const res = await fetchWithAtsRateLimit("bamboohr", BAMBOOHR_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`BambooHR API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.apiUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".bamboohr.com") || finalHost === "bamboohr.com" || finalHost === "www.bamboohr.com") {
-      throw new Error(`BambooHR URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchAdpMyjobsCareerSite(config) {
     const res = await fetchWithAtsRateLimit("adp_myjobs", ADP_MYJOBS_RATE_LIMIT_WAIT_MS, config.careerSiteUrl, {
       method: "GET",
@@ -2748,16 +2732,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
     const pageHtml = await fetchCareerplugJobsPage(config.jobsUrl);
     return parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
-  async function collectPostingsForBambooHrCompany(company) {
-    const config = parseBambooHrCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySubdomainLower;
-    const responseJson = await fetchBambooHrJobBoard(config);
-    return parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJson);
   }
   
   async function collectPostingsForAdpMyjobsCompany(company) {
@@ -4120,7 +4094,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForCareerplugCompany(company);
     }
     if (atsName === "bamboohr" || atsName === "bamboohr.com" || atsName === "bamboohrcom") {
-      return collectPostingsForBambooHrCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "bamboohr");
     }
     if (atsName === "adp_myjobs" || atsName === "adpmyjobs") {
       return collectPostingsForAdpMyjobsCompany(company);
