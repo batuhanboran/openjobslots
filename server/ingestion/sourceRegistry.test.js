@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -26,6 +26,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("join"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
+  assert.equal(isRegistryPilotSource("manatal"), true);
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
@@ -48,6 +49,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
     "icims",
     "join",
     "lever",
+    "manatal",
     "pinpointhq",
     "recruitcrm",
     "recruitee",
@@ -200,6 +202,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof join.normalize, "function");
   assert.equal(typeof join.validate, "function");
   assert.deepEqual(validateSourceContract(join), { ok: true, failures: [] });
+
+  const manatal = getRegistrySourceModule("manatal");
+  assert.equal(manatal.atsKey, "manatal");
+  assert.equal(manatal.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(manatal.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof manatal.discover, "function");
+  assert.equal(typeof manatal.fetchList, "function");
+  assert.equal(typeof manatal.parse, "function");
+  assert.equal(typeof manatal.normalize, "function");
+  assert.equal(typeof manatal.validate, "function");
+  assert.deepEqual(validateSourceContract(manatal), { ok: true, failures: [] });
 
   const pinpointHq = getRegistrySourceModule("pinpointhq");
   assert.equal(pinpointHq.atsKey, "pinpointhq");

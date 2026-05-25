@@ -58,6 +58,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
+  manatal: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
   pinpointhq: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.disabled

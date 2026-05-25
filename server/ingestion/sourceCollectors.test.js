@@ -797,6 +797,56 @@ test("Rippling dispatches through registry source module instead of legacy colle
   }]);
 });
 
+test("Manatal dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "manatal",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "manatal",
+      source_family: "direct_json",
+      list_url: "https://www.careers-page.com/api/v1.0/c/fixtureco/jobs/"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { results: [{ position_name: "Fixture Manatal Role" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.results) ? "Manatal Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Manatal registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "manatal",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "manatal",
+    company_name: "Manatal Registry Co",
+    url_string: "https://www.careers-page.com/fixtureco"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "manatal"],
+    ["fetchList", "manatal", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Manatal Registry Co",
+    position_name: "Manatal Registry Posting"
+  }]);
+});
+
 test("Recruitee dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

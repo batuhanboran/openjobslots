@@ -243,6 +243,115 @@ test("rippling source module fetches paginated board API with source-local disco
   );
 });
 
+test("manatal source module fetches landing runtime config and paginated jobs API", async () => {
+  const source = getSourceModule("manatal");
+  assert.ok(source, "expected manatal source module");
+  const company = readJson(path.join(__dirname, "manatal", "fixtures", "company.json"));
+  const listFixture = readJson(path.join(__dirname, "manatal", "fixtures", "list.json"));
+  const calls = [];
+  const landingUrl = "https://www.careers-page.com/fixture-manatal/";
+  const pageQuery = (page) => new URLSearchParams({
+    page: String(page),
+    page_size: "50",
+    ordering: "-is_pinned_in_career_page,-last_published_at"
+  }).toString();
+  const firstPageUrl = `https://www.careers-page.com/api/v1.0/c/fixture-manatal/jobs/?${pageQuery(1)}`;
+  const secondPageUrl = `https://www.careers-page.com/api/v1.0/c/fixture-manatal/jobs/?${pageQuery(2)}`;
+  const landingHtml = `
+    <html>
+      <script>
+        const baseUrl = "https://www.careers-page.com";
+        const clientSlug = "fixture-manatal";
+      </script>
+    </html>`;
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({
+        url,
+        method: target.method,
+        accept: target.headers?.Accept || "",
+        referer: target.headers?.Referer || ""
+      });
+      if (url === landingUrl) {
+        return {
+          status: 200,
+          url,
+          body: landingHtml
+        };
+      }
+      if (url === firstPageUrl) {
+        return {
+          status: 200,
+          url,
+          count: 2,
+          next: secondPageUrl,
+          results: [listFixture.results[0]]
+        };
+      }
+      if (url === secondPageUrl) {
+        return {
+          status: 200,
+          url,
+          count: 2,
+          next: null,
+          results: [listFixture.results[1]]
+        };
+      }
+      throw new Error(`unexpected Manatal fetch URL ${url}`);
+    }
+  });
+
+  assert.deepEqual(calls, [
+    {
+      url: landingUrl,
+      method: "GET",
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      referer: ""
+    },
+    {
+      url: firstPageUrl,
+      method: "GET",
+      accept: "application/json, text/plain, */*",
+      referer: landingUrl
+    },
+    {
+      url: secondPageUrl,
+      method: "GET",
+      accept: "application/json, text/plain, */*",
+      referer: landingUrl
+    }
+  ]);
+  assert.equal(payload.__sourceConfig.jobsApiUrl, "https://www.careers-page.com/api/v1.0/c/fixture-manatal/jobs/");
+  assert.equal(payload.results.length, 2);
+
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const remote = byId.get("4R846955");
+  assert.equal(remote.country, "Canada");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const hybrid = byId.get("DATEHASH");
+  assert.equal(hybrid.country, "Cambodia");
+  assert.equal(hybrid.remote_type, "hybrid");
+  assert.equal(source.validatePublic(hybrid).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        __sourceFetchFinalUrl: "https://example.com/fixture-manatal",
+        body: landingHtml
+      })
+    }),
+    /unexpected host/
+  );
+});
+
 test("lever source module filters employment categories that are misfiled as locations", () => {
   const source = getSourceModule("lever");
   const company = {

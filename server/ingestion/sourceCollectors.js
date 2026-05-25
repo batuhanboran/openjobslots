@@ -17,7 +17,6 @@ const {
   parseJobApsCompany,
   parseJobviteCompany,
   parseLoxoCompany,
-  parseManatalCompany,
   parseOracleCompany,
   parsePageupCompany,
   extractPageupRouteConfigFromUrl,
@@ -57,11 +56,6 @@ const {
 } = require("./sources/hirebridge/parse");
 const { parseJobvitePostingsFromHtml } = require("./sources/jobvite/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
-const {
-  extractManatalPageRuntimeConfig,
-  parseManatalPostingsFromApi,
-  parseManatalPostingsFromHtml
-} = require("./sources/manatal/parse");
 const {
   extractPageupCompanyNameFromTitle,
   extractPageupPostingDateFromDetailHtml,
@@ -238,6 +232,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
+  manatal: MANATAL_RATE_LIMIT_WAIT_MS,
   pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
@@ -924,28 +919,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.json();
   }
   
-  async function fetchManatalCareersPage(urlString) {
-    const res = await fetchWithAtsRateLimit("manatal", MANATAL_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const pageHtml = await res.text();
-    return {
-      status: Number(res.status || 0),
-      finalUrl,
-      pageHtml
-    };
-  }
-  
   async function fetchCareerspageBoardPage(urlString) {
     const res = await fetchWithAtsRateLimit("careerspage", CAREERSPAGE_RATE_LIMIT_WAIT_MS, urlString, {
       method: "GET",
@@ -1267,39 +1240,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchManatalJobsApiPage(config, page = 1, pageSize = 50) {
-    const jobsApiUrl = String(config?.jobsApiUrl || "").trim();
-    if (!jobsApiUrl) {
-      throw new Error("Manatal API URL is missing");
-    }
-  
-    const query = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-      ordering: "-is_pinned_in_career_page,-last_published_at"
-    }).toString();
-    const url = `${jobsApiUrl}${jobsApiUrl.includes("?") ? "&" : "?"}${query}`;
-  
-    const res = await fetchWithAtsRateLimit("manatal", MANATAL_RATE_LIMIT_WAIT_MS, url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        Referer: String(config?.boardUrl || ""),
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      const error = new Error(`Manatal API request failed (${res.status}): ${body.slice(0, 180)}`);
-      error.status = Number(res.status || 0);
-      throw error;
-    }
-  
-    return res.json();
   }
   
   async function fetchTeamtailorJobsPage(config) {
@@ -2369,64 +2309,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseIsolvisolvedhirePostingsFromApi(companyNameForPostings, responseJson);
   }
   
-  async function collectPostingsForManatalCompany(company) {
-    const config = parseManatalCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.domainSlugLower;
-  
-    const landing = await fetchManatalCareersPage(config.careersUrl || company.url_string);
-    const pageHtml = String(landing?.pageHtml || "");
-    const runtimeConfig = extractManatalPageRuntimeConfig(pageHtml, config, landing?.finalUrl || config.careersUrl);
-  
-    const collected = [];
-    const seenUrls = new Set();
-  
-    for (let page = 1; page <= MAX_PAGES_PER_COMPANY; page += 1) {
-      let responseJson = {};
-      try {
-        responseJson = await fetchManatalJobsApiPage(runtimeConfig, page, 50);
-      } catch (error) {
-        const status = Number(error?.status || 0);
-        if (status === 404) {
-          break;
-        }
-        if (page > 1) break;
-        throw error;
-      }
-  
-      const batch = parseManatalPostingsFromApi(companyNameForPostings, runtimeConfig, responseJson);
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      const results = Array.isArray(responseJson?.results) ? responseJson.results : [];
-      const totalCount = Number(responseJson?.count);
-      const nextUrl = String(responseJson?.next || "").trim();
-      if (results.length === 0) break;
-      if (!nextUrl) break;
-      if (Number.isFinite(totalCount) && totalCount >= 0 && collected.length >= totalCount) break;
-    }
-  
-    if (collected.length > 0) return collected;
-  
-    if (pageHtml) {
-      const fallbackPostings = parseManatalPostingsFromHtml(companyNameForPostings, runtimeConfig, pageHtml);
-      for (const posting of fallbackPostings) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-    }
-  
-    return collected;
-  }
-  
   async function collectPostingsForCareerspageCompany(company) {
     const config = parseCareerspageCompany(company.url_string);
     if (!config) return [];
@@ -3336,7 +3218,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "careers-page.com" ||
       atsName === "careerspagecom"
     ) {
-      return collectPostingsForManatalCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "manatal");
     }
     if (atsName === "careerspage" || atsName === "careerspage.io" || atsName === "careerspageio") {
       return collectPostingsForCareerspageCompany(company);
