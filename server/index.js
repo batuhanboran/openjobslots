@@ -121,7 +121,7 @@ const PUBLIC_READ_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENJOBSLO
 const PUBLIC_SITE_URL = String(process.env.OPENJOBSLOTS_PUBLIC_SITE_URL || "").trim();
 const SEO_SITE_TITLE = "OpenJobSlots | Fresh Job Openings";
 const SEO_SITE_DESCRIPTION =
-  "Search fresh job openings across ATS platforms, filter by role, company, location, industry, and remote work, and track applications in one place.";
+  "Find fresh job openings from public employer ATS boards. Search by role, company, location, remote mode, source, and posting freshness with no sign-up.";
 const PUBLIC_SUPPORTED_LANGUAGES = Object.freeze([
   { code: "en", label: "English", native_label: "English", country_code: "US" },
   { code: "tr", label: "Turkish", native_label: "Türkçe", country_code: "TR" },

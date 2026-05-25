@@ -44,6 +44,45 @@ function testRenderSeoIndexHtmlReplacesMetadata() {
   assert.ok(!html.includes("old analytics"));
 }
 
+function parseJsonLdById(html, id) {
+  const pattern = new RegExp(
+    `<script[^>]+id=["']${id}["'][^>]*>([\\s\\S]*?)<\\/script>`,
+    "i"
+  );
+  const match = pattern.exec(html);
+  assert.ok(match, `expected JSON-LD script ${id}`);
+  return JSON.parse(match[1]);
+}
+
+function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title><script type=\"application/ld+json\" id=\"openjobslots-website-jsonld\">{\"stale\":true}</script></head><body></body></html>",
+    createRequest()
+  );
+
+  const organization = parseJsonLdById(html, "openjobslots-organization-jsonld");
+  assert.equal(organization["@context"], "https://schema.org");
+  assert.equal(organization["@type"], "Organization");
+  assert.equal(organization["@id"], "https://openjobslots.com/#organization");
+  assert.equal(organization.name, "OpenJobSlots");
+  assert.equal(organization.url, "https://openjobslots.com/");
+  assert.equal(organization.logo, "https://openjobslots.com/favicon.ico");
+
+  const website = parseJsonLdById(html, "openjobslots-website-jsonld");
+  assert.equal(website["@context"], "https://schema.org");
+  assert.equal(website["@type"], "WebSite");
+  assert.equal(website["@id"], "https://openjobslots.com/#website");
+  assert.equal(website.name, "OpenJobSlots");
+  assert.equal(website.url, "https://openjobslots.com/");
+  assert.equal(website.description, "Find fresh job openings from public employer ATS boards.");
+  assert.deepEqual(website.publisher, { "@id": "https://openjobslots.com/#organization" });
+  assert.ok(!html.includes("\"stale\":true"));
+}
+
 function testRobotsAndSitemapUseConfiguredPublicOrigin() {
   const { buildRobotsTxt, buildSitemapXml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
@@ -54,7 +93,32 @@ function testRobotsAndSitemapUseConfiguredPublicOrigin() {
   assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/</loc>"));
 }
 
+function testRobotsAndSitemapStayCrawlSafe() {
+  const { buildRobotsTxt, buildSitemapXml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com"
+  });
+  const req = createRequest();
+  const robots = buildRobotsTxt(req);
+  const sitemap = buildSitemapXml(req);
+
+  assert.match(robots, /^User-agent: \*/m);
+  assert.match(robots, /^Allow: \/$/m);
+  assert.match(robots, /^Disallow: \/applications$/m);
+  assert.match(robots, /^Disallow: \/settings$/m);
+  assert.match(robots, /^Disallow: \/ingestion$/m);
+  assert.match(robots, /^Disallow: \/postings$/m);
+  assert.doesNotMatch(robots, /^Disallow: \/$/m);
+  assert.doesNotMatch(robots, /noindex/i);
+  assert.match(robots, /^Sitemap: https:\/\/openjobslots\.com\/sitemap\.xml$/m);
+
+  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
+  assert.doesNotMatch(sitemap, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
+}
+
 testRenderSeoIndexHtmlReplacesMetadata();
+testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
+testRobotsAndSitemapStayCrawlSafe();
 
 console.log("public SEO tests passed");

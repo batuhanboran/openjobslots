@@ -21,7 +21,17 @@ function removeExistingSeoTags(html) {
   return String(html || "")
     .replace(/\s*<meta[^>]+name=["'](?:description|robots|twitter:card|twitter:title|twitter:description)["'][^>]*>/gi, "")
     .replace(/\s*<meta[^>]+property=["'](?:og:title|og:description|og:type|og:url|og:site_name)["'][^>]*>/gi, "")
-    .replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/gi, "");
+    .replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/gi, "")
+    .replace(/\s*<script[^>]+id=["']openjobslots-(?:organization|website)-jsonld["'][^>]*>[\s\S]*?<\/script>/gi, "");
+}
+
+function stringifyJsonLd(value) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 function createPublicSeoHelpers(dependencies = {}) {
@@ -52,6 +62,37 @@ function createPublicSeoHelpers(dependencies = {}) {
     return `${getPublicSiteOrigin(req)}/`;
   }
 
+  function buildStructuredDataTags(req) {
+    const siteOrigin = getPublicSiteOrigin(req);
+    const siteUrl = `${siteOrigin}/`;
+    const description = String(seoDescription || "").trim();
+    const organization = {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": `${siteOrigin}/#organization`,
+      name: "OpenJobSlots",
+      url: siteUrl,
+      logo: `${siteOrigin}/favicon.ico`
+    };
+    const website = {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": `${siteOrigin}/#website`,
+      name: "OpenJobSlots",
+      url: siteUrl,
+      description,
+      inLanguage: "en",
+      publisher: {
+        "@id": organization["@id"]
+      }
+    };
+
+    return [
+      '<script type="application/ld+json" id="openjobslots-organization-jsonld">' + stringifyJsonLd(organization) + "</script>",
+      '<script type="application/ld+json" id="openjobslots-website-jsonld">' + stringifyJsonLd(website) + "</script>"
+    ].join("\n    ");
+  }
+
   function renderSeoIndexHtml(indexHtml, req) {
     const canonicalUrl = getPublicSiteCanonicalUrl(req);
     const title = escapeHtmlAttribute(seoTitle);
@@ -71,6 +112,7 @@ function createPublicSeoHelpers(dependencies = {}) {
       '<meta name="twitter:title" content="' + title + '" />',
       '<meta name="twitter:description" content="' + description + '" />'
     ].join("\n    ");
+    const structuredDataTags = buildStructuredDataTags(req);
     const managedAnalyticsTags = analyticsTags
       ? [
         "<!-- OpenJobSlots public analytics start -->",
@@ -87,7 +129,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     const analyticsBlock = managedAnalyticsTags ? `\n    ${managedAnalyticsTags}` : "";
     return html.replace(
       /<\/head>/i,
-      `    <!-- OpenJobSlots SEO metadata -->\n    ${tags}${analyticsBlock}\n</head>`
+      `    <!-- OpenJobSlots SEO metadata -->\n    ${tags}\n    ${structuredDataTags}${analyticsBlock}\n</head>`
     );
   }
 
@@ -123,6 +165,7 @@ function createPublicSeoHelpers(dependencies = {}) {
   return {
     buildRobotsTxt,
     buildSitemapXml,
+    buildStructuredDataTags,
     getPublicSiteCanonicalUrl,
     getPublicSiteOrigin,
     renderSeoIndexHtml
@@ -133,5 +176,6 @@ module.exports = {
   createPublicSeoHelpers,
   escapeHtmlAttribute,
   normalizeOrigin,
-  removeExistingSeoTags
+  removeExistingSeoTags,
+  stringifyJsonLd
 };
