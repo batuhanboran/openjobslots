@@ -1,0 +1,58 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Grouped Div List",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://groupeddiv.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://groupeddiv.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://groupeddiv.hrmdirect.com/employment/rss.php?search=true",
+  "detail_urls": {
+    "HRM9903:111": "https://groupeddiv.hrmdirect.com/employment/job-opening.php?req=HRM9903&req_loc=111",
+    "HRM9903:222": "https://groupeddiv.hrmdirect.com/employment/job-opening.php?req=HRM9903&req_loc=222",
+    "HRM9904": "https://groupeddiv.hrmdirect.com/employment/job-opening.php?req=HRM9904"
+  },
+  "list_html": "<div class=\"reqResult\"><h3 class=\"reqhead\" id=\"dept\">Information Technology</h3><div style=\"float:right\">Location:</div><div style=\"clear:both\"></div><div style=\"margin:0 0 3px 20px; border-bottom:1px solid #BBB;\"><div style=\"display:block; float:left;\"><a href=\"job-opening.php?req=HRM9903&req_loc=111&#job\">Financial Systems Administrator</a></div><div style=\"float:right;font-size:1.1em\">Multiple Office Locations</div><div style=\"clear:both;\"></div></div><div style=\"margin:0 0 3px 20px; border-bottom:1px solid #BBB;\"><div style=\"display:block; float:left;\"><a href=\"job-opening.php?req=HRM9903&req_loc=222&#job\">Financial Systems Administrator</a></div><div style=\"float:right;font-size:1.1em\">Multiple Office Locations</div><div style=\"clear:both;\"></div></div><h3 class=\"reqhead\" id=\"dept\">Legal</h3><div style=\"float:right\">Location:</div><div style=\"clear:both\"></div><div style=\"margin:0 0 3px 20px; border-bottom:1px solid #BBB;\"><div style=\"display:block; float:left;\"><a href=\"job-opening.php?req=HRM9904&req_loc=333&#job\">Legal Secretary</a></div><div style=\"float:right;font-size:1.1em\">Sacramento</div><div style=\"clear:both;\"></div></div></div>",
+  "detail_html": {
+    "HRM9903:111": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Information Technology</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Irvine, CA<br></td></tr></table></body></html>",
+    "HRM9903:222": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Information Technology</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Atlanta, GA<br></td></tr></table></body></html>",
+    "HRM9904": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Legal</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Sacramento, CA<br></td></tr></table></body></html>"
+  },
+  "expected": {
+    "HRM9903:111": {
+      "source_job_id": "HRM9903:111",
+      "location_text": "Irvine, CA",
+      "city": "Irvine",
+      "country": "United States",
+      "department": "Information Technology",
+      "remote_type": "onsite",
+      "source_job_id_path": "req + req_loc query params",
+      "location_source": "labeled_detail_html",
+      "location_path": "table.viewFields Location",
+      "location_rule_name": ""
+    },
+    "HRM9903:222": {
+      "source_job_id": "HRM9903:222",
+      "location_text": "Atlanta, GA",
+      "city": "Atlanta",
+      "country": "United States",
+      "department": "Information Technology",
+      "remote_type": "onsite",
+      "source_job_id_path": "req + req_loc query params",
+      "location_source": "labeled_detail_html",
+      "location_path": "table.viewFields Location",
+      "location_rule_name": ""
+    },
+    "HRM9904": {
+      "source_job_id": "HRM9904",
+      "location_text": "Sacramento, CA",
+      "city": "Sacramento",
+      "country": "United States",
+      "department": "Legal",
+      "remote_type": "onsite",
+      "source_job_id_path": "req query param",
+      "location_source": "labeled_detail_html",
+      "location_path": "table.viewFields Location",
+      "location_rule_name": ""
+    }
+  }
+}

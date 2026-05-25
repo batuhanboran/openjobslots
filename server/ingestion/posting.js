@@ -591,7 +591,23 @@ function extractCityText(posting, location, country) {
     posting?.primaryLocation?.city,
     posting?.workLocation?.city
   ]);
-  if (explicit) return explicit;
+  if (explicit) {
+    const normalizedExplicit = normalizeSearchText(explicit);
+    const normalizedCountry = normalizeSearchText(country);
+    if (/^(remote|hybrid|onsite|on[- ]?site|work from home|wfh|worldwide|anywhere)$/i.test(explicit)) return "";
+    if (/\b(?:work from home|home based|remote|hybrid)\b/i.test(explicit)) return "";
+    if (/^\(?\s*(multiple|various|several|all)\b/i.test(explicit)) return "";
+    if (locationLooksNarrativeText(explicit)) return "";
+    if (normalizedCountry && normalizedExplicit === normalizedCountry) return "";
+    if (COUNTRY_ALIASES[normalizedExplicit]) return "";
+    if (
+      (US_STATE_ABBREVIATION_EXACT_PATTERN.test(explicit) && (!normalizedCountry || normalizedCountry === "united states")) ||
+      (CANADA_PROVINCE_ABBREVIATION_EXACT_PATTERN.test(explicit) && (!normalizedCountry || normalizedCountry === "canada"))
+    ) {
+      return "";
+    }
+    return explicit;
+  }
 
   const locationText = normalizePostingValue(location);
   if (!locationText || /^(remote|worldwide|anywhere)$/i.test(locationText)) return "";
@@ -606,6 +622,7 @@ function extractCityText(posting, location, country) {
   if (/^(remote|hybrid|onsite|on[- ]?site|work from home|wfh|worldwide|anywhere)$/i.test(firstSegment)) return "";
   if (/\b(?:work from home|home based|remote|hybrid)\b/i.test(firstSegment)) return "";
   if (/^[A-Z]{2}\s+[A-Z0-9]{2,}\s+.*\bwork from home\b/i.test(firstSegment)) return "";
+  if (/^\(?\s*(multiple|various|several|all)\b/i.test(firstSegment)) return "";
   if (/^\(?\s*(multiple|various|several|all)\s*$/i.test(firstSegment)) return "";
   if (/^\(?\s*(multiple|various|several|all)\s+(locations|states|sites|schools|campuses|bases|offices)\b/i.test(firstSegment)) return "";
   if (/^(district[- ]?wide|statewide|nationwide|tbd|n\/?a|unknown)$/i.test(firstSegment)) return "";

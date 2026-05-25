@@ -1,0 +1,40 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Detail Body Work Arrangement",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://bodyworkarrangement.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://bodyworkarrangement.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://bodyworkarrangement.hrmdirect.com/employment/rss.php?search=true",
+  "detail_urls": {
+    "HRM9921": "https://bodyworkarrangement.hrmdirect.com/employment/job-opening.php?req=HRM9921",
+    "HRM9922": "https://bodyworkarrangement.hrmdirect.com/employment/job-opening.php?req=HRM9922"
+  },
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9921\"><td class=\"departments reqitem ReqRowClick\">Legal</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9921\">Docketing Specialist</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr><tr class=\"reqitem\" data-req-id=\"HRM9922\"><td class=\"departments reqitem ReqRowClick\">New Business Intake</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9922\">New Business Intake Analyst</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": {
+    "HRM9921": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Legal</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table><p><span>Full-time/Remote</span></p><p>This role supports a centralized docketing model.</p></body></html>",
+    "HRM9922": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">New Business Intake</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table><p><strong>Work Arrangement:</strong> This is a full-time, fully remote position. We are hiring two candidates.</p></body></html>"
+  },
+  "expected": {
+    "HRM9921": {
+      "source_job_id": "HRM9921",
+      "location_text": null,
+      "city": "",
+      "country": "",
+      "remote_type": "remote",
+      "remote_source": "labeled_detail_body",
+      "remote_path": "detail body work mode tag",
+      "remote_rule_name": "hrmdirect_detail_body_work_mode_tag"
+    },
+    "HRM9922": {
+      "source_job_id": "HRM9922",
+      "location_text": null,
+      "city": "",
+      "country": "",
+      "remote_type": "remote",
+      "remote_source": "labeled_detail_body",
+      "remote_path": "detail body Work Arrangement/Work Environment",
+      "remote_rule_name": "hrmdirect_detail_body_work_arrangement_remote"
+    }
+  }
+}

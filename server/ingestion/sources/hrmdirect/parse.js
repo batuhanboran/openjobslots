@@ -3,6 +3,7 @@
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
 const { isRemoteOnlyLocationValue } = require("../../parsers/shared/location");
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
+const { locationLooksAmbiguous } = require("../../parserEvidence");
 const { normalizeCountryFromLocation, normalizeCountryName, normalizeRemoteType } = require("../../posting");
 
 const HRMDIRECT_US_STATE_NAMES = new Set([
@@ -191,6 +192,22 @@ function extractHrmDirectDetailBodyLocationRemoteType(detailHtml) {
   return String(value).toLowerCase() === "hybrid" ? "hybrid" : "remote";
 }
 
+function extractHrmDirectDetailBodyWorkArrangementRemoteType(detailHtml) {
+  const text = cleanHrmDirectText(detailHtml);
+  const match = text.match(
+    /\bWork\s+(?:Arrangement|Environment)\s*:?\s*(?:This\s+is\s+a\s+)?(?:full[-\s]?time,?\s*)?(?:fully\s+)?(remote|hybrid)\s+(?:position|role|job)\b/i
+  );
+  if (!match?.[1]) return "";
+  return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+}
+
+function extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml) {
+  const text = cleanHrmDirectText(detailHtml);
+  const match = text.match(/\b(?:full[-\s]?time|part[-\s]?time|contract)\s*\/\s*(remote|hybrid)\b/i);
+  if (!match?.[1]) return "";
+  return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+}
+
 function extractHrmDirectDetailBodyAddressLocation(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
   const locationAddressPattern = /\bLocation\s*:\s*([^:]{0,220}?,\s*([A-Za-z][A-Za-z .'-]{1,60}),\s*(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\s+\d{5}(?:-\d{4})?)\b/gi;
@@ -285,6 +302,24 @@ function extractHrmDirectCellValue(rowHtml, className) {
     "i"
   );
   return String(rowHtml.match(cellRegex)?.[1] || "");
+}
+
+function extractLatestHrmDirectDepartmentBefore(source, index) {
+  const windowStart = Math.max(0, Number(index || 0) - 12000);
+  const prefix = String(source || "").slice(windowStart, Number(index || 0));
+  const departmentMatches = Array.from(prefix.matchAll(
+    /<h3[^>]*class=["'][^"']*\breqhead\b[^"']*["'][^>]*>([\s\S]*?)<\/h3>/gi
+  ));
+  const latest = departmentMatches[departmentMatches.length - 1];
+  return cleanHrmDirectText(latest?.[1] || "");
+}
+
+function extractHrmDirectGroupedDivLocationAfter(source, index) {
+  const segment = String(source || "").slice(Number(index || 0), Number(index || 0) + 1800);
+  const match = segment.match(/<div[^>]*style=["'][^"']*\bfloat\s*:\s*right\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+  const location = cleanHrmDirectLocationText(match?.[1] || "");
+  if (/^location:?$/i.test(location)) return "";
+  return location;
 }
 
 function canonicalHrmDirectDetailKey(urlValue) {
@@ -385,7 +420,15 @@ function extractHrmDirectDetailFields(detailHtml) {
   const detailBodyRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag
     ? ""
     : extractHrmDirectDetailBodyLocationRemoteType(detailHtml);
-  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType;
+  const detailBodyWorkArrangementRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType
+    ? ""
+    : extractHrmDirectDetailBodyWorkArrangementRemoteType(detailHtml);
+  const detailBodyWorkModeTagRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType
+    ? ""
+    : extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml);
+  const remoteType = ["remote", "hybrid"].includes(detailRemoteType)
+    ? detailRemoteType
+    : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType;
   const locationPath = primaryLocation
     ? "table.viewFields Location"
     : officeLocation.location
@@ -397,13 +440,33 @@ function extractHrmDirectDetailFields(detailHtml) {
   const locationRuleName = primaryLocationRuleName || officeLocation.ruleName || (bodyAddressLocation ? "hrmdirect_detail_body_location_address" : "");
   const country = primaryLocationRuleName === "hrmdirect_detail_location_state_abbreviation" ? "United States" : "";
   const remoteSource = remoteType
-    ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType ? "labeled_detail_body" : "labeled_detail_html"
+    ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType ? "labeled_detail_body" : "labeled_detail_html"
     : "";
   const remotePath = remoteType
-    ? detailRemoteTag ? "detail text #LI-Remote/#LI-Hybrid" : detailBodyRemoteType ? "detail body Location" : detailLocationRemoteType ? "table.viewFields Location" : "table.viewFields Workplace Type"
+    ? detailRemoteTag
+      ? "detail text #LI-Remote/#LI-Hybrid"
+      : detailBodyRemoteType
+        ? "detail body Location"
+        : detailBodyWorkArrangementRemoteType
+          ? "detail body Work Arrangement/Work Environment"
+          : detailBodyWorkModeTagRemoteType
+            ? "detail body work mode tag"
+            : detailLocationRemoteType
+              ? "table.viewFields Location"
+              : "table.viewFields Workplace Type"
     : "";
   const remoteRuleName = remoteType
-    ? detailRemoteTag ? "hrmdirect_detail_li_remote_tag" : detailBodyRemoteType ? "hrmdirect_detail_body_location_remote" : detailLocationRemoteType ? "hrmdirect_detail_location_remote" : "hrmdirect_detail_workplace_type"
+    ? detailRemoteTag
+      ? "hrmdirect_detail_li_remote_tag"
+      : detailBodyRemoteType
+        ? "hrmdirect_detail_body_location_remote"
+        : detailBodyWorkArrangementRemoteType
+          ? "hrmdirect_detail_body_work_arrangement_remote"
+          : detailBodyWorkModeTagRemoteType
+            ? "hrmdirect_detail_body_work_mode_tag"
+            : detailLocationRemoteType
+              ? "hrmdirect_detail_location_remote"
+              : "hrmdirect_detail_workplace_type"
     : "";
   return {
     location,
@@ -437,6 +500,9 @@ function hrmDirectSourceFailureReasons(posting) {
   const locationRemoteType = normalizeRemoteType(location);
   const hasExplicitRemote = ["remote", "hybrid"].includes(remoteType);
   const hasExplicitOnsite = remoteType === "onsite";
+  if (location && locationLooksAmbiguous(location, posting)) {
+    reasons.push("ambiguous_location");
+  }
   if (!location && !hasExplicitRemote && locationRemoteType === "unknown") {
     reasons.push("no_geo_no_remote");
   }
@@ -570,6 +636,48 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     rowMatch = rowPattern.exec(source);
   }
 
+  const groupedAnchorPattern =
+    /<a[^>]*href=["']([^"']*job-opening\.php\?[^"']*\breq=[^"']*)["'][^>]*>([\s\S]*?)(?:<\/a>|$)/gi;
+  let groupedAnchorMatch = groupedAnchorPattern.exec(source);
+  while (groupedAnchorMatch) {
+    const href = normalizeHrmDirectHref(groupedAnchorMatch?.[1] || "");
+    let absoluteUrl = "";
+    try {
+      absoluteUrl = normalizeHrmDirectJobPostingUrl(new URL(href, `${config.baseOrigin}/employment/`).toString());
+    } catch {
+      groupedAnchorMatch = groupedAnchorPattern.exec(source);
+      continue;
+    }
+    const parsedAbsoluteUrl = parseUrl(absoluteUrl);
+    if (!parsedAbsoluteUrl?.hostname?.endsWith(".hrmdirect.com")) {
+      groupedAnchorMatch = groupedAnchorPattern.exec(source);
+      continue;
+    }
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
+      groupedAnchorMatch = groupedAnchorPattern.exec(source);
+      continue;
+    }
+
+    const baseSourceJobId = extractSourceIdFromPostingUrl(absoluteUrl, "hrmdirect");
+    const reqLoc = extractHrmDirectReqLocFromPostingUrl(absoluteUrl);
+    rowCandidates.push({
+      rowHtml: "",
+      titleCell: "",
+      titleLinkText: groupedAnchorMatch?.[2] || "",
+      absoluteUrl,
+      baseSourceJobId,
+      reqLoc,
+      layout: "grouped_div",
+      listLocation: extractHrmDirectGroupedDivLocationAfter(source, groupedAnchorMatch.index + groupedAnchorMatch[0].length),
+      department: extractLatestHrmDirectDepartmentBefore(source, groupedAnchorMatch.index)
+    });
+    if (baseSourceJobId) {
+      sourceJobIdCounts.set(baseSourceJobId, (sourceJobIdCounts.get(baseSourceJobId) || 0) + 1);
+    }
+    seenUrls.add(absoluteUrl);
+    groupedAnchorMatch = groupedAnchorPattern.exec(source);
+  }
+
   const duplicateReqIds = new Set(
     Array.from(sourceJobIdCounts.entries())
       .filter(([, count]) => count > 1)
@@ -583,9 +691,12 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     const sourceJobIdPath = sourceJobId && sourceJobId !== baseSourceJobId
       ? "req + req_loc query params"
       : "req query param";
-    const cityCell = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "cities"));
-    const state = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "state"));
-    const department = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "departments"));
+    const isGroupedDivLayout = candidate.layout === "grouped_div";
+    const groupedLocation = isGroupedDivLayout ? cleanHrmDirectLocationText(candidate.listLocation) : "";
+    const groupedRemoteLocation = isGroupedDivLayout ? extractHrmDirectListRemoteLocation(groupedLocation) : { location: "", remoteType: "unknown" };
+    const cityCell = isGroupedDivLayout ? "" : cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "cities"));
+    const state = isGroupedDivLayout ? "" : cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "state"));
+    const department = cleanHrmDirectText(isGroupedDivLayout ? candidate.department : extractHrmDirectCellValue(rowHtml, "departments"));
     const workMode = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "custSort1"));
     const workModeLocation = extractHrmDirectWorkModeLocationText(workMode);
     const listRemoteLocation = extractHrmDirectListRemoteLocation(cityCell);
@@ -593,7 +704,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     const listState = listRemoteLocation.remoteType === "unknown" ? state : "";
     const listStateOnlyAbbreviation = !city && HRMDIRECT_US_STATE_ABBREVIATION_EXACT_PATTERN.test(listState);
     const workModeRemoteType = normalizeRemoteType(workMode);
-    const remoteType = workModeRemoteType !== "unknown" ? workModeRemoteType : listRemoteLocation.remoteType;
+    const remoteType = workModeRemoteType !== "unknown" ? workModeRemoteType : listRemoteLocation.remoteType !== "unknown" ? listRemoteLocation.remoteType : groupedRemoteLocation.remoteType;
     const listPostingDate =
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "date")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "dates")) ||
@@ -607,7 +718,7 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "type")) ||
       null;
     const listLocation = [city, listState].filter(Boolean).join(", ");
-    const location = listLocation || listRemoteLocation.location || workModeLocation;
+    const location = listLocation || listRemoteLocation.location || groupedRemoteLocation.location || workModeLocation;
     const country = listStateOnlyAbbreviation ? "United States" : normalizeCountryFromLocation(location) || normalizeCountryName(state);
 
     const basePosting = {
@@ -633,11 +744,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
         source_job_id_source: "url",
         source_job_id_path: sourceJobIdPath,
         location_source: location ? "labeled_html" : "",
-        location_path: location ? (listLocation ? (listStateOnlyAbbreviation ? "td.state" : "td.cities + td.state") : listRemoteLocation.location ? "td.cities" : "td.custSort1") : "",
-        location_rule_name: listRemoteLocation.location ? "hrmdirect_list_remote_city_location" : listStateOnlyAbbreviation ? "hrmdirect_list_state_abbreviation" : "",
+        location_path: location ? (listLocation ? (listStateOnlyAbbreviation ? "td.state" : "td.cities + td.state") : listRemoteLocation.location ? "td.cities" : groupedRemoteLocation.location ? "div.reqResult location" : "td.custSort1") : "",
+        location_rule_name: listRemoteLocation.location ? "hrmdirect_list_remote_city_location" : groupedRemoteLocation.location ? "hrmdirect_grouped_list_remote_location" : listStateOnlyAbbreviation ? "hrmdirect_list_state_abbreviation" : "",
         remote_source: remoteType !== "unknown" ? "labeled_html" : "",
-        remote_path: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "td.custSort1" : "td.cities") : "",
-        remote_rule_name: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "hrmdirect_work_mode_column" : "hrmdirect_list_remote_city") : "",
+        remote_path: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "td.custSort1" : listRemoteLocation.remoteType !== "unknown" ? "td.cities" : "div.reqResult location") : "",
+        remote_rule_name: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "hrmdirect_work_mode_column" : listRemoteLocation.remoteType !== "unknown" ? "hrmdirect_list_remote_city" : "hrmdirect_grouped_list_remote") : "",
         posting_date_source: listPostingDate ? "labeled_html" : rssPostingDate ? "rss_xml" : "",
         posting_date_path: listPostingDate ? "td.date/td.dates" : rssPostingDate ? "rss.channel.item pubDate" : "",
         posting_date_rule_name: rssPostingDate && !listPostingDate ? "hrmdirect_rss_pubdate" : ""

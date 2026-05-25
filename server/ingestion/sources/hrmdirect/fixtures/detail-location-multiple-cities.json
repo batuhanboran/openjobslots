@@ -1,0 +1,22 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Detail Multiple Cities",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://multiplecities.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://multiplecities.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://multiplecities.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://multiplecities.hrmdirect.com/employment/job-opening.php?req=HRM9915",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9915\"><td class=\"departments reqitem ReqRowClick\">Legal</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9915\">Attorney - Commercial Litigation</a></td><td class=\"cities reqitem ReqRowClick\">Multiple Cities</td><td class=\"state reqitem ReqRowClick\">SC</td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Legal</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Multiple Cities, SC</td></tr></table></body></html>",
+  "expected": {
+    "source_job_id": "HRM9915",
+    "location_text": "Multiple Cities, SC",
+    "city": "",
+    "country": "United States",
+    "remote_type": "onsite",
+    "location_source": "labeled_detail_html",
+    "location_path": "table.viewFields Location",
+    "source_failure_reason": "ambiguous_location"
+  }
+}

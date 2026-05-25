@@ -679,6 +679,43 @@ test("hrmdirect source module accepts labeled detail body location remote eviden
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module accepts exact detail body work arrangement remote evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "body-work-arrangement-remote.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      for (const [sourceJobId, detailUrl] of Object.entries(fixture.detail_urls)) {
+        if (url === detailUrl) return { html: fixture.detail_html[sourceJobId], status: 200, url };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, fixture.company);
+    return [row.source_job_id, row];
+  }));
+
+  for (const [sourceJobId, expected] of Object.entries(fixture.expected)) {
+    const row = normalized[sourceJobId];
+    assert.ok(row, `expected row ${sourceJobId}`);
+    assert.equal(row.source_job_id, expected.source_job_id);
+    assert.equal(row.location_text, expected.location_text);
+    assert.equal(row.city || "", expected.city);
+    assert.equal(row.country || "", expected.country);
+    assert.equal(row.remote_type, expected.remote_type);
+    assert.equal(row.source_evidence.remote_source, expected.remote_source);
+    assert.equal(row.source_evidence.remote_path, expected.remote_path);
+    assert.equal(row.source_evidence.remote_rule_name, expected.remote_rule_name);
+    assert.deepEqual(row.source_failure_reasons || [], []);
+    assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, "accepted");
+  }
+});
+
 test("hrmdirect source module accepts labeled detail body address location evidence", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");
@@ -823,6 +860,80 @@ test("hrmdirect source module strips detail remote prefix while preserving scope
   assert.equal(normalized.source_evidence.remote_rule_name, fixture.expected.remote_rule_name);
   assert.deepEqual(normalized.source_failure_reasons || [], []);
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module parses grouped div lists with detail location evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "grouped-div-list.json"));
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      requestedUrls.push(String(url));
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      for (const [sourceJobId, detailUrl] of Object.entries(fixture.detail_urls)) {
+        if (url === detailUrl) return { html: fixture.detail_html[sourceJobId], status: 200, url };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, fixture.company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.equal(parsed.length, Object.keys(fixture.expected).length);
+  for (const detailUrl of Object.values(fixture.detail_urls)) {
+    assert.ok(requestedUrls.includes(detailUrl), `expected detail fetch ${detailUrl}`);
+  }
+  for (const [sourceJobId, expected] of Object.entries(fixture.expected)) {
+    const row = normalized[sourceJobId];
+    assert.ok(row, `expected row ${sourceJobId}`);
+    assert.equal(row.source_job_id, expected.source_job_id);
+    assert.equal(row.location_text, expected.location_text);
+    assert.equal(row.city, expected.city);
+    assert.equal(row.country, expected.country);
+    assert.equal(row.department, expected.department);
+    assert.equal(row.remote_type, expected.remote_type);
+    assert.equal(row.source_evidence.source_job_id_path, expected.source_job_id_path);
+    assert.equal(row.source_evidence.location_source, expected.location_source);
+    assert.equal(row.source_evidence.location_path, expected.location_path);
+    assert.equal(row.source_evidence.location_rule_name, expected.location_rule_name);
+    assert.deepEqual(row.source_failure_reasons || [], []);
+    assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, "accepted");
+  }
+});
+
+test("hrmdirect source module does not publish ambiguous multiple-city labels as city", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "detail-location-multiple-cities.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      if (url === fixture.detail_url) return { html: fixture.detail_html, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+  const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
+
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.location_text, fixture.expected.location_text);
+  assert.equal(normalized.city || "", fixture.expected.city);
+  assert.equal(normalized.country, fixture.expected.country);
+  assert.equal(normalized.remote_type, fixture.expected.remote_type);
+  assert.equal(normalized.source_evidence.location_source, fixture.expected.location_source);
+  assert.equal(normalized.source_evidence.location_path, fixture.expected.location_path);
+  assert.ok(normalized.source_failure_reasons.includes(fixture.expected.source_failure_reason));
+  assert.equal(gate.status, "quarantined");
+  assert.ok(gate.reason_codes.includes(fixture.expected.source_failure_reason));
 });
 
 test("hrmdirect source module does not publish detail state abbreviation as city", async () => {
