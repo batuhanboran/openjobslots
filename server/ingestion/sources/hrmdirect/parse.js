@@ -75,6 +75,11 @@ const HRMDIRECT_CANADA_PROVINCE_NAMES = new Set([
   "yukon"
 ]);
 
+const HRMDIRECT_US_STATE_ABBREVIATION_PATTERN =
+  /\b(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\b/i;
+const HRMDIRECT_STREET_SUFFIX_PATTERN =
+  /\b(?:ave(?:nue)?|blvd|boulevard|cir(?:cle)?|ct|court|dr(?:ive)?|hwy|highway|ln|lane|pkwy|parkway|pl|place|rd|road|st|street|way)\b/i;
+
 function parseUrl(urlString) {
   try {
     return new URL(String(urlString || ""));
@@ -152,6 +157,31 @@ function extractHrmDirectDetailBodyLocationRemoteType(detailHtml) {
   const value = directMatch?.[1] || roleMatch?.[1] || "";
   if (!value) return "";
   return String(value).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+}
+
+function extractHrmDirectDetailBodyAddressLocation(detailHtml) {
+  const text = cleanHrmDirectText(detailHtml);
+  const locationAddressPattern = /\bLocation\s*:\s*([^:]{0,220}?,\s*([A-Za-z][A-Za-z .'-]{1,60}),\s*(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\s+\d{5}(?:-\d{4})?)\b/gi;
+  let match = locationAddressPattern.exec(text);
+  while (match) {
+    const address = cleanHrmDirectLocationText(match[1]);
+    const city = cleanHrmDirectLocationText(match[2]);
+    const state = cleanHrmDirectText(match[3]).toUpperCase();
+    const location = cleanHrmDirectLocationText(`${city}, ${state}`);
+    if (
+      address &&
+      /\d/.test(address) &&
+      HRMDIRECT_STREET_SUFFIX_PATTERN.test(address) &&
+      HRMDIRECT_US_STATE_ABBREVIATION_PATTERN.test(state) &&
+      city &&
+      !/\d/.test(city) &&
+      location
+    ) {
+      return location;
+    }
+    match = locationAddressPattern.exec(text);
+  }
+  return "";
 }
 
 function extractHrmDirectRssValue(itemXml, tagName) {
@@ -302,7 +332,10 @@ function extractHrmDirectDetailFields(detailHtml) {
   const officeLocation = primaryLocation
     ? { location: "", ruleName: "" }
     : extractHrmDirectOfficeLocation(extractHrmDirectViewField(detailHtml, "Office"));
-  const location = primaryLocation || officeLocation.location;
+  const bodyAddressLocation = primaryLocation || officeLocation.location
+    ? ""
+    : extractHrmDirectDetailBodyAddressLocation(detailHtml);
+  const location = primaryLocation || officeLocation.location || bodyAddressLocation;
   const department = extractHrmDirectViewField(detailHtml, ["Department", "Team", "Category"]);
   const employmentType = extractHrmDirectViewField(detailHtml, ["Employment Type", "Job Type", "Type"]);
   const postingDate = extractHrmDirectViewField(detailHtml, ["Date Posted", "Posted Date", "Posting Date", "Open Date"]);
@@ -313,8 +346,15 @@ function extractHrmDirectDetailFields(detailHtml) {
     ? ""
     : extractHrmDirectDetailBodyLocationRemoteType(detailHtml);
   const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailRemoteTag || detailBodyRemoteType;
-  const locationPath = primaryLocation ? "table.viewFields Location" : officeLocation.location ? "table.viewFields Office" : "";
-  const locationRuleName = officeLocation.ruleName;
+  const locationPath = primaryLocation
+    ? "table.viewFields Location"
+    : officeLocation.location
+      ? "table.viewFields Office"
+      : bodyAddressLocation
+        ? "detail body Location"
+        : "";
+  const locationSource = bodyAddressLocation ? "labeled_detail_body" : location ? "labeled_detail_html" : "";
+  const locationRuleName = officeLocation.ruleName || (bodyAddressLocation ? "hrmdirect_detail_body_location_address" : "");
   const remoteSource = remoteType
     ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType ? "labeled_detail_body" : "labeled_detail_html"
     : "";
@@ -331,7 +371,7 @@ function extractHrmDirectDetailFields(detailHtml) {
     posting_date: postingDate,
     remote_type: remoteType,
     evidence: {
-      location_source: location ? "labeled_detail_html" : "",
+      location_source: locationSource,
       location_path: locationPath,
       location_rule_name: locationRuleName,
       department_source: department ? "labeled_detail_html" : "",

@@ -1,0 +1,16 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Body Address Invalid",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://bodyaddressinvalid.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://bodyaddressinvalid.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://bodyaddressinvalid.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://bodyaddressinvalid.hrmdirect.com/employment/job-opening.php?req=HRM9802",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9802\"><td class=\"departments reqitem ReqRowClick\">Dir-Yard-Charleston,SC 2579-Depot</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9802\">Yard Driver</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Dir-Yard-Charleston,SC 2579-Depot</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr></table><p>Location: Dir-Yard-Charleston,SC 2579-Depot</p><p>Location: Charleston, SC</p><p>Function: START YOUR APPLICATION</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9802",
+    "reason": "no_geo_no_remote"
+  }
+}

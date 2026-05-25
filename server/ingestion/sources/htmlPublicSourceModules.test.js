@@ -679,6 +679,56 @@ test("hrmdirect source module accepts labeled detail body location remote eviden
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module accepts labeled detail body address location evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "body-location-address.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      if (url === fixture.detail_url) return { html: fixture.detail_html, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.location, fixture.expected.location);
+  assert.equal(normalized.city, fixture.expected.city);
+  assert.equal(normalized.country, fixture.expected.country);
+  assert.equal(normalized.source_evidence.location_source, fixture.expected.location_source);
+  assert.equal(normalized.source_evidence.location_path, fixture.expected.location_path);
+  assert.equal(normalized.source_evidence.location_rule_name, fixture.expected.location_rule_name);
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module quarantines body location labels without strict address evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "body-location-address-invalid.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      if (url === fixture.detail_url) return { html: fixture.detail_html, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.location, null);
+  assert.equal(normalized.source_evidence.location_source || "", "");
+  assert.ok(normalized.source_failure_reasons.includes(fixture.expected.reason));
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "quarantined");
+});
+
 test("hrmdirect source module accepts labeled detail office state as geo evidence", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");

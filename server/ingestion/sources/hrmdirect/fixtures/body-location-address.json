@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Body Address",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://bodyaddress.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://bodyaddress.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://bodyaddress.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://bodyaddress.hrmdirect.com/employment/job-opening.php?req=HRM9801",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9801\"><td class=\"departments reqitem ReqRowClick\">Dir-Shop-Houston, TX 2582-Depot</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9801\">Helper-Tank Welder</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Dir-Shop-Houston, TX 2582-Depot</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr></table><p>Starting Pay: $20.00 - $22.00 per hour</p><p>Location: 16230 De Zavalla Road, Channelview, TX 77530</p><p>Hours: Monday through Friday, 8:00 AM to 5:00 PM</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9801",
+    "location": "Channelview, TX",
+    "city": "Channelview",
+    "country": "United States",
+    "location_source": "labeled_detail_body",
+    "location_path": "detail body Location",
+    "location_rule_name": "hrmdirect_detail_body_location_address"
+  }
+}
