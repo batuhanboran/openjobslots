@@ -138,6 +138,13 @@ function extractHrmDirectOfficeLocation(value) {
   return { location: "", ruleName: "" };
 }
 
+function extractHrmDirectDetailRemoteTag(detailHtml) {
+  const text = cleanHrmDirectText(detailHtml);
+  const match = text.match(/(?:^|[\s.;,()[\]{}])#LI[-_\s]?(Remote|Hybrid)\b/i);
+  if (!match?.[1]) return "";
+  return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+}
+
 function extractHrmDirectRssValue(itemXml, tagName) {
   const escapedTagName = escapeRegExp(tagName);
   const match = String(itemXml || "").match(new RegExp(`<${escapedTagName}\\b[^>]*>([\\s\\S]*?)<\\/${escapedTagName}>`, "i"));
@@ -292,9 +299,13 @@ function extractHrmDirectDetailFields(detailHtml) {
   const postingDate = extractHrmDirectViewField(detailHtml, ["Date Posted", "Posted Date", "Posting Date", "Open Date"]);
   const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
   const detailRemoteType = normalizeRemoteType(workplaceType);
-  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : "";
+  const detailRemoteTag = ["remote", "hybrid"].includes(detailRemoteType) ? "" : extractHrmDirectDetailRemoteTag(detailHtml);
+  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailRemoteTag;
   const locationPath = primaryLocation ? "table.viewFields Location" : officeLocation.location ? "table.viewFields Office" : "";
   const locationRuleName = officeLocation.ruleName;
+  const remoteSource = remoteType ? detailRemoteTag ? "structured_detail_tag" : "labeled_detail_html" : "";
+  const remotePath = remoteType ? detailRemoteTag ? "detail text #LI-Remote/#LI-Hybrid" : "table.viewFields Workplace Type" : "";
+  const remoteRuleName = remoteType ? detailRemoteTag ? "hrmdirect_detail_li_remote_tag" : "hrmdirect_detail_workplace_type" : "";
   return {
     location,
     department,
@@ -312,9 +323,9 @@ function extractHrmDirectDetailFields(detailHtml) {
       posting_date_source: postingDate ? "labeled_detail_html" : "",
       posting_date_path: postingDate ? "table.viewFields Date Posted/Posted Date/Posting Date/Open Date" : "",
       posting_date_rule_name: postingDate ? "hrmdirect_detail_posting_date" : "",
-      remote_source: remoteType ? "labeled_detail_html" : "",
-      remote_path: remoteType ? "table.viewFields Workplace Type" : "",
-      remote_rule_name: remoteType ? "hrmdirect_detail_workplace_type" : ""
+      remote_source: remoteSource,
+      remote_path: remotePath,
+      remote_rule_name: remoteRuleName
     }
   };
 }

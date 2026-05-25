@@ -1,0 +1,19 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect LI Remote",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://liremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://liremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://liremote.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://liremote.hrmdirect.com/employment/job-opening.php?req=HRM9601",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9601\"><td class=\"departments reqitem ReqRowClick\">Professional Services</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9601\">Solutions Architect</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Professional Services</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr></table><p>Equal opportunity employer.</p><p>#LI-Remote</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9601",
+    "remote_type": "remote",
+    "remote_source": "structured_detail_tag",
+    "remote_path": "detail text #LI-Remote/#LI-Hybrid",
+    "remote_rule_name": "hrmdirect_detail_li_remote_tag"
+  }
+}
