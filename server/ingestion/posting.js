@@ -194,6 +194,76 @@ const COUNTRY_LOCATION_TERMS = Object.freeze([
   ["Iran", ["tehran"]]
 ]);
 
+const US_STATE_NAMES = Object.freeze(new Set([
+  "alabama",
+  "alaska",
+  "arizona",
+  "arkansas",
+  "california",
+  "colorado",
+  "connecticut",
+  "delaware",
+  "district of columbia",
+  "florida",
+  "georgia",
+  "hawaii",
+  "idaho",
+  "illinois",
+  "indiana",
+  "iowa",
+  "kansas",
+  "kentucky",
+  "louisiana",
+  "maine",
+  "maryland",
+  "massachusetts",
+  "michigan",
+  "minnesota",
+  "mississippi",
+  "missouri",
+  "montana",
+  "nebraska",
+  "nevada",
+  "new hampshire",
+  "new jersey",
+  "new mexico",
+  "new york",
+  "north carolina",
+  "north dakota",
+  "ohio",
+  "oklahoma",
+  "oregon",
+  "pennsylvania",
+  "rhode island",
+  "south carolina",
+  "south dakota",
+  "tennessee",
+  "texas",
+  "utah",
+  "vermont",
+  "virginia",
+  "washington",
+  "west virginia",
+  "wisconsin",
+  "wyoming"
+]));
+
+const CANADA_PROVINCE_NAMES = Object.freeze(new Set([
+  "alberta",
+  "british columbia",
+  "manitoba",
+  "new brunswick",
+  "newfoundland and labrador",
+  "nova scotia",
+  "northwest territories",
+  "nunavut",
+  "ontario",
+  "prince edward island",
+  "quebec",
+  "saskatchewan",
+  "yukon"
+]));
+
 const US_STATE_ABBREVIATION_PATTERN =
   /(?:^|,\s*|\s-\s)(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(?:\s|,|$)/i;
 const CANADA_PROVINCE_ABBREVIATION_PATTERN =
@@ -540,6 +610,12 @@ function extractCityText(posting, location, country) {
   const normalizedCountry = normalizeSearchText(country);
   if (normalizedCountry && normalizedFirst === normalizedCountry) return "";
   if (COUNTRY_ALIASES[normalizedFirst]) return "";
+  if (
+    (US_STATE_NAMES.has(normalizedFirst) && (!normalizedCountry || normalizedCountry === "united states")) ||
+    (CANADA_PROVINCE_NAMES.has(normalizedFirst) && (!normalizedCountry || normalizedCountry === "canada"))
+  ) {
+    return "";
+  }
   return firstSegment;
 }
 

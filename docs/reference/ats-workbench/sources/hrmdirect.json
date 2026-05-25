@@ -12,7 +12,7 @@
   "source_job_id_rule": "HRMDirect URL identity: use req for normal rows; use req:req_loc when the same req appears on multiple canonical URLs so each posting remains indexable. RSS date matching stays keyed by base req.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
   "location_text_rule": "detail-page: List cards may omit geo; detail fixture decides whether req-only or duplicate-req req_loc detail fetch is required.",
-  "country_region_city_rule": "detail-page: List cards may omit geo; detail fixture decides whether req-only or duplicate-req req_loc detail fetch is required.",
+  "country_region_city_rule": "detail-page: List cards may omit geo; detail fixture decides whether req-only or duplicate-req req_loc detail fetch is required. Exact full-state, Canadian province, and country Office values are accepted only from labeled detail HTML.",
   "remote_type_rule": "explicit-source-evidence: preserve source-backed onsite, remote, and hybrid values, but only explicit remote/hybrid can satisfy the no-geo public gate; title-only Remote/Virtual text stays quarantined.",
   "posting_date_rule": "rss-feed: HRMDirect rss.php?search=true item pubDate is accepted only when the item link or guid exposes a matching req id; list td.date/td.dates remains stronger if present.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
@@ -27,6 +27,7 @@
       "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hrmdirect/fixtures/list.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json",
+      "server/ingestion/sources/hrmdirect/fixtures/office-province-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json"
     ],
     "present": [
@@ -38,6 +39,7 @@
       "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hrmdirect/fixtures/list.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json",
+      "server/ingestion/sources/hrmdirect/fixtures/office-province-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json"
     ],
     "missing": []

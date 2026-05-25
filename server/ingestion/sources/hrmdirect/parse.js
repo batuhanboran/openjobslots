@@ -59,6 +59,22 @@ const HRMDIRECT_US_STATE_NAMES = new Set([
   "wyoming"
 ]);
 
+const HRMDIRECT_CANADA_PROVINCE_NAMES = new Set([
+  "alberta",
+  "british columbia",
+  "manitoba",
+  "new brunswick",
+  "newfoundland and labrador",
+  "nova scotia",
+  "northwest territories",
+  "nunavut",
+  "ontario",
+  "prince edward island",
+  "quebec",
+  "saskatchewan",
+  "yukon"
+]);
+
 function parseUrl(urlString) {
   try {
     return new URL(String(urlString || ""));
@@ -110,6 +126,9 @@ function extractHrmDirectOfficeLocation(value) {
   if (!text || isRemoteOnlyLocationValue(text)) return { location: "", ruleName: "" };
   if (HRMDIRECT_US_STATE_NAMES.has(text.toLowerCase())) {
     return { location: text, ruleName: "hrmdirect_detail_office_state" };
+  }
+  if (HRMDIRECT_CANADA_PROVINCE_NAMES.has(text.toLowerCase())) {
+    return { location: text, ruleName: "hrmdirect_detail_office_province" };
   }
   const compactText = text.replace(/[^A-Za-z0-9]+/g, "");
   const country = compactText.length > 2 ? normalizeCountryName(text) : "";

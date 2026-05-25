@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Office Province",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://officeprovince.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://officeprovince.hrmdirect.com/employment/job-openings.php?search=true",
+  "detail_url": "https://officeprovince.hrmdirect.com/employment/job-opening.php?req=HRM8201",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM8201\"><td class=\"departments reqitem ReqRowClick\">Field Operations</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM8201&req_loc=987\">Field Coordinator</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Field Operations</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr><tr><td class=\"viewFieldName\"><b>Office:</b></td><td class=\"viewFieldValue\">Ontario</td></tr></table>",
+  "expected": {
+    "source_job_id": "HRM8201",
+    "location_text": "Ontario",
+    "country": "Canada",
+    "city": "",
+    "remote_type": "onsite",
+    "location_source": "labeled_detail_html",
+    "location_path": "table.viewFields Office",
+    "location_rule_name": "hrmdirect_detail_office_province"
+  }
+}
