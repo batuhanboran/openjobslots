@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -35,6 +35,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
   assert.equal(isRegistryPilotSource("taleo"), true);
   assert.equal(isRegistryPilotSource("teamtailor"), true);
   assert.equal(isRegistryPilotSource("ultipro"), true);
+  assert.equal(isRegistryPilotSource("workday"), true);
   assert.equal(isRegistryPilotSource("zoho"), true);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
@@ -61,6 +62,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
     "taleo",
     "teamtailor",
     "ultipro",
+    "workday",
     "zoho"
   ]);
 });
@@ -307,6 +309,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof ultipro.normalize, "function");
   assert.equal(typeof ultipro.validate, "function");
   assert.deepEqual(validateSourceContract(ultipro), { ok: true, failures: [] });
+
+  const workday = getRegistrySourceModule("workday");
+  assert.equal(workday.atsKey, "workday");
+  assert.equal(workday.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(workday.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof workday.discover, "function");
+  assert.equal(typeof workday.fetchList, "function");
+  assert.equal(typeof workday.parse, "function");
+  assert.equal(typeof workday.normalize, "function");
+  assert.equal(typeof workday.validate, "function");
+  assert.deepEqual(validateSourceContract(workday), { ok: true, failures: [] });
 
   const zoho = getRegistrySourceModule("zoho");
   assert.equal(zoho.atsKey, "zoho");

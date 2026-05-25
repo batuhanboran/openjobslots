@@ -75,10 +75,7 @@ const {
 } = require("./sources/saphrcloud/parse");
 const { parseSmartRecruitersPostingsFromApi } = require("./sources/smartrecruiters/parse");
 const {
-  extractWorkdayLocationLabel,
-  extractWorkdaySourceJobId,
-  inferWorkdayLocationFromJobUrl,
-  parseWorkdayPostingsFromApi
+  inferWorkdayLocationFromJobUrl
 } = require("./sources/workday/parse");
 const {
   extractSagehrCompanyNameFromHtml,
@@ -142,9 +139,7 @@ const {
 const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
 const { validateSourceContract } = require("./sourceContracts");
 
-const WORKDAY_PAGE_SIZE = 20;
 const MAX_PAGES_PER_COMPANY = 25;
-const LOCALE_SEGMENT_REGEX = /^[a-z]{2}(?:-[a-z]{2})?$/i;
 const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 30));
 const DEFAULT_POSTING_TTL_SECONDS = Number(process.env.POSTING_TTL_SECONDS || POSTING_VISIBLE_RETENTION_DAYS * 24 * 60 * 60);
 const DEFAULT_BROWSER_USER_AGENT =
@@ -234,6 +229,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
   ultipro: ULTIPRO_RATE_LIMIT_WAIT_MS,
+  workday: WORKDAY_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -285,40 +281,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     } catch {
       return null;
     }
-  }
-  
-  function pickCompanyId(pathParts, subdomain) {
-    if (!Array.isArray(pathParts) || pathParts.length === 0) return subdomain;
-  
-    const [first = "", second = ""] = pathParts;
-    if (first && LOCALE_SEGMENT_REGEX.test(first) && second) {
-      return second;
-    }
-  
-    return first || subdomain;
-  }
-  
-  function parseWorkdayCompany(urlString) {
-    const parsed = parseUrl(urlString);
-    if (!parsed) return null;
-  
-    const [subdomain = ""] = parsed.hostname.split(".");
-    const pathParts = parsed.pathname
-      .split("/")
-      .map((part) => String(part || "").trim())
-      .filter(Boolean);
-    const companyIdRaw = pickCompanyId(pathParts, subdomain);
-    const companyIdApi = companyIdRaw.toLowerCase();
-  
-    if (!subdomain || !companyIdApi) return null;
-  
-    return {
-      subdomain: subdomain.toLowerCase(),
-      companyIdRaw,
-      companyIdApi,
-      companyBaseUrl: `${parsed.origin}/${companyIdRaw}`,
-      cxsUrl: `${parsed.origin}/wday/cxs/${subdomain.toLowerCase()}/${companyIdApi}/jobs`
-    };
   }
   
   function isPostedToday(postedOn) {
@@ -635,29 +597,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-  
-  async function fetchWorkdayPage(cxsUrl, limit, offset) {
-    const res = await fetchWithAtsRateLimit("workday", WORKDAY_RATE_LIMIT_WAIT_MS, cxsUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        appliedFacets: {},
-        limit,
-        offset,
-        searchText: ""
-      })
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Workday request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
   }
   
   async function fetchGreenhouseJobBoard(boardToken) {
@@ -1743,32 +1682,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       pageHtml: await res.text(),
       finalUrl: String(res.url || urlString || "").trim()
     };
-  }
-  
-  async function collectTodayPostingsForWorkdayCompany(company) {
-    const config = parseWorkdayCompany(company.url_string);
-    if (!config) return [];
-  
-    const collected = [];
-    const seenUrls = new Set();
-    let offset = 0;
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const response = await fetchWorkdayPage(config.cxsUrl, WORKDAY_PAGE_SIZE, offset);
-      const postings = Array.isArray(response?.jobPostings) ? response.jobPostings : [];
-      if (postings.length === 0) break;
-  
-      for (const parsedPosting of parseWorkdayPostingsFromApi(company.company_name, config, response)) {
-        if (!parsedPosting.job_posting_url || seenUrls.has(parsedPosting.job_posting_url)) continue;
-        collected.push(parsedPosting);
-        seenUrls.add(parsedPosting.job_posting_url);
-      }
-  
-      if (postings.length < WORKDAY_PAGE_SIZE) break;
-      offset += WORKDAY_PAGE_SIZE;
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForGreenhouseCompany(company) {
@@ -2927,7 +2840,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
   async function collectPostingsForCompany(company) {
     const atsName = String(company?.ATS_name || "").trim().toLowerCase();
     if (atsName === "workday") {
-      return collectTodayPostingsForWorkdayCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "workday");
     }
     if (atsName === "ashbyhq" || atsName === "ashby") {
       return collectPostingsForRegistryPilotCompany(company, "ashby");

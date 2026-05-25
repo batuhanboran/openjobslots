@@ -120,6 +120,9 @@ test("workday source module fetches CXS list with POST pagination body", async (
     fetcher: async (url, target) => {
       seenRequests.push({ url, target });
       assert.equal(target.method, "POST");
+      assert.equal(target.source_family, "enterprise_api");
+      assert.equal(target.headers.Accept, "application/json");
+      assert.equal(target.headers["Content-Type"], "application/json");
       const body = JSON.parse(target.body);
       assert.equal(body.limit, 20);
       assert.equal(body.offset, 0);

@@ -97,6 +97,56 @@ test("pilot ATS dispatches through registry modules before legacy collectors", a
   }]);
 });
 
+test("Workday dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "workday",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "workday",
+      source_family: "enterprise_api",
+      list_url: "https://fixture.wd1.myworkdayjobs.com/wday/cxs/fixture/Careers/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { jobPostings: [{ jobRequisitionId: "JR9001" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.jobPostings) ? "Workday Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Workday registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "workday",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "workday",
+    company_name: "Workday Registry Co",
+    url_string: "https://fixture.wd1.myworkdayjobs.com/Careers"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "workday"],
+    ["fetchList", "workday", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Workday Registry Co",
+    position_name: "Workday Registry Posting"
+  }]);
+});
+
 test("HRMDirect dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {
