@@ -1795,6 +1795,48 @@ test("hrmdirect source module quarantines onsite rows when geo evidence is absen
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("hrmdirect source module quarantines blank detail locations with department and body hints", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "blank-detail-location-quarantine.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      for (const [sourceJobId, detailUrl] of Object.entries(fixture.detail_urls)) {
+        if (url === detailUrl) return { html: fixture.detail_html[sourceJobId], status: 200, url };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+
+  const normalized = Object.fromEntries(source.parse(raw, fixture.company).map((posting) => {
+    const row = source.normalize(posting, fixture.company);
+    return [row.source_job_id, row];
+  }));
+
+  for (const [sourceJobId, expected] of Object.entries(fixture.expected)) {
+    const row = normalized[sourceJobId];
+    assert.ok(row, `expected row ${sourceJobId}`);
+    assert.equal(row.location_text || "", expected.location_text);
+    assert.equal(row.country || "", expected.country);
+    assert.equal(row.remote_type, expected.remote_type);
+    assert.equal(row.department, expected.department);
+    assert.equal(row.source_evidence.location_path || "", "");
+    assert.equal(row.source_evidence.location_rule_name || "", "");
+    assert.equal(row.source_evidence.remote_path || "", "");
+    assert.equal(row.source_evidence.remote_rule_name || "", "");
+    assert.equal(row.source_evidence.detail_fetch_status, 200);
+    for (const reason of expected.source_failure_reasons) {
+      assert.ok(row.source_failure_reasons.includes(reason), `missing ${reason} for ${sourceJobId}`);
+    }
+    const gate = evaluatePublicPosting(row, { parserVersion: source.parserVersion });
+    assert.equal(gate.status, "quarantined");
+    assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
+  }
+});
+
 test("hrmdirect source module uses labeled remote column without publishing comma-only locations", () => {
   const source = getSourceModule("hrmdirect");
   const company = readJson(path.join(__dirname, "hrmdirect", "fixtures", "company.json"));

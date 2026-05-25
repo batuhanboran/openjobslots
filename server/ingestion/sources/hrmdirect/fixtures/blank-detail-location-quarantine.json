@@ -1,0 +1,55 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Blank Detail Location",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://blankdetail.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://blankdetail.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://blankdetail.hrmdirect.com/employment/rss.php?search=true",
+  "detail_urls": {
+    "HRM9701": "https://blankdetail.hrmdirect.com/employment/job-opening.php?req=HRM9701",
+    "HRM9702": "https://blankdetail.hrmdirect.com/employment/job-opening.php?req=HRM9702",
+    "HRM9703": "https://blankdetail.hrmdirect.com/employment/job-opening.php?req=HRM9703"
+  },
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9701\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9701&req_loc=97001\">Clinical Services Manager</a></td><td class=\"departments reqitem ReqRowClick\">Dallas -Love Field, TX Retail</td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr><tr class=\"reqitem\" data-req-id=\"HRM9702\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9702&req_loc=97002\">Inside Sales Treatment Specialist- Remote</a></td><td class=\"departments reqitem ReqRowClick\">Sales</td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr><tr class=\"reqitem\" data-req-id=\"HRM9703\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9703&req_loc=97003\">HMG Family Support Specialist</a></td><td class=\"departments reqitem ReqRowClick\">HMG</td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": {
+    "HRM9701": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Dallas -Love Field, TX Retail</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table><p>Reports to: Brand Manager</p><p>Location: On-Site Store Location</p></body></html>",
+    "HRM9702": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Sales</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table><p>Must be located in a PST or MST state to apply to this position.</p><p>About the Role: Remote Aesthetic Sales Consultant.</p></body></html>",
+    "HRM9703": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">HMG</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table><p>We are seeking a Help Me Grow Family Support Specialist (Home Visitor) Fairfield/Pickaway County, OH.</p></body></html>"
+  },
+  "expected": {
+    "HRM9701": {
+      "location_text": "",
+      "country": "",
+      "remote_type": "unknown",
+      "department": "Dallas -Love Field, TX Retail",
+      "source_failure_reasons": [
+        "no_geo_no_remote",
+        "detail_no_structured_location",
+        "detail_no_explicit_remote"
+      ]
+    },
+    "HRM9702": {
+      "location_text": "",
+      "country": "",
+      "remote_type": "unknown",
+      "department": "Sales",
+      "source_failure_reasons": [
+        "no_geo_no_remote",
+        "detail_no_structured_location",
+        "detail_no_explicit_remote"
+      ]
+    },
+    "HRM9703": {
+      "location_text": "",
+      "country": "",
+      "remote_type": "unknown",
+      "department": "HMG",
+      "source_failure_reasons": [
+        "no_geo_no_remote",
+        "detail_no_structured_location",
+        "detail_no_explicit_remote"
+      ]
+    }
+  }
+}
