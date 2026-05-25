@@ -597,6 +597,56 @@ test("RecruitCRM dispatches through registry source module instead of legacy col
   }]);
 });
 
+test("Recruitee dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "recruitee",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.quarantine,
+    discover: () => ({
+      ats_key: "recruitee",
+      source_family: "direct_json",
+      list_url: "https://fixture.recruitee.com/api/offers/"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { offers: [{ id: 1001 }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.offers) ? "Recruitee Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Recruitee registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "recruitee",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "recruitee.com",
+    company_name: "Recruitee Registry Co",
+    url_string: "https://fixture.recruitee.com"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "recruitee"],
+    ["fetchList", "recruitee.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Recruitee Registry Co",
+    position_name: "Recruitee Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

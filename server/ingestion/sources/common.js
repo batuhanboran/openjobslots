@@ -838,12 +838,10 @@ const SOURCE_SPECS = Object.freeze({
     confidence: 0.75,
     parser: parseRecruiteePostingsFromPublicApp,
     officialDocs: "https://docs.recruitee.com/reference/intro-to-careers-site-api",
-    discover(company) {
-      const parsed = asUrl(company.url_string);
-      const baseUrl = parsed ? parsed.origin : "";
+    discover() {
       return {
-        config: { baseUrl },
-        listUrl: baseUrl ? `${baseUrl.replace(/\/$/, "")}/api/offers/` : ""
+        config: {},
+        listUrl: ""
       };
     }
   },

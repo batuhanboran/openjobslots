@@ -50,6 +50,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.quarantine
   }),
+  recruitee: Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.quarantine
+  }),
   zoho: Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
     status: SOURCE_STATUSES.canary

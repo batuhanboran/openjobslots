@@ -620,6 +620,35 @@ function recruiteeFixtureContext() {
   };
 }
 
+test("recruitee source module fetches public offers API with source-local discovery", async () => {
+  const { source, company } = recruiteeFixtureContext();
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        offers: [
+          {
+            id: 1001,
+            title: "Fixture Recruitee Role",
+            slug: "fixture-recruitee-role",
+            remote: true
+          }
+        ]
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://fixture.recruitee.com/api/offers/",
+    method: "GET",
+    headers: { Accept: "application/json, text/plain, */*" }
+  }]);
+  assert.equal(payload.__sourceConfig.baseUrl, "https://fixture.recruitee.com");
+  assert.equal(payload.offers.length, 1);
+});
+
 test("recruitee source module parses raw list variants for remote, hybrid, and onsite jobs", () => {
   const { source, company } = recruiteeFixtureContext();
   const rawList = readRecruiteeFixture("list.json");

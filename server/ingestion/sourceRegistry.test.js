@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, Recruitee, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
   assert.equal(isRegistryPilotSource("ashby"), true);
@@ -24,6 +24,7 @@ test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, Career
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
+  assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("zoho"), true);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
@@ -39,6 +40,7 @@ test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, Career
     "icims",
     "lever",
     "recruitcrm",
+    "recruitee",
     "zoho"
   ]);
 });
@@ -164,6 +166,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof recruitCrm.normalize, "function");
   assert.equal(typeof recruitCrm.validate, "function");
   assert.deepEqual(validateSourceContract(recruitCrm), { ok: true, failures: [] });
+
+  const recruitee = getRegistrySourceModule("recruitee");
+  assert.equal(recruitee.atsKey, "recruitee");
+  assert.equal(recruitee.family, SOURCE_FAMILIES.directJsonStable);
+  assert.equal(recruitee.status, SOURCE_STATUSES.quarantine);
+  assert.equal(typeof recruitee.discover, "function");
+  assert.equal(typeof recruitee.fetchList, "function");
+  assert.equal(typeof recruitee.parse, "function");
+  assert.equal(typeof recruitee.normalize, "function");
+  assert.equal(typeof recruitee.validate, "function");
+  assert.deepEqual(validateSourceContract(recruitee), { ok: true, failures: [] });
 
   const zoho = getRegistrySourceModule("zoho");
   assert.equal(zoho.atsKey, "zoho");

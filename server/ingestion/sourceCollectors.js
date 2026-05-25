@@ -26,7 +26,6 @@ const {
   parsePaylocityCompany,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
-  parseRecruiteeCompany,
   parseRipplingCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -86,10 +85,6 @@ const {
   parsePaylocityPostingsFromPageData
 } = require("./sources/paylocity/parse");
 const { parsePinpointHqPostingsFromApi } = require("./sources/pinpointhq/parse");
-const {
-  extractRecruiteePropsFromHtml,
-  parseRecruiteePostingsFromPublicApp
-} = require("./sources/recruitee/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsLocationFromTitleOrUrl,
@@ -261,6 +256,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
+  recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -805,27 +801,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.json();
-  }
-  
-  async function fetchRecruiteePublicApp(baseUrl) {
-    const res = await fetchWithAtsRateLimit("recruitee", RECRUITEE_RATE_LIMIT_WAIT_MS, baseUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Recruitee request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const pageHtml = await res.text();
-    const props = extractRecruiteePropsFromHtml(pageHtml);
-    if (!props) {
-      throw new Error("Recruitee payload not found in PublicApp data-props");
-    }
-    return props;
   }
   
   async function fetchJobviteJobsPage(jobsUrl) {
@@ -3166,20 +3141,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl);
   }
   
-  async function collectPostingsForRecruiteeCompany(company) {
-    const config = parseRecruiteeCompany(company.url_string);
-    if (!config) return [];
-  
-    const response = await fetchRecruiteePublicApp(config.baseUrl);
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings =
-      normalizedCompanyName && normalizedCompanyName.toLowerCase() !== "recruitee"
-        ? normalizedCompanyName
-        : config.subdomain;
-  
-    return parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, response);
-  }
-  
   async function collectPostingsForUltiProCompany(company) {
     const config = parseUltiProCompany(company.url_string);
     if (!config) return [];
@@ -3956,7 +3917,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForSapHrCloudCompany(company);
     }
     if (atsName === "recruiteecom" || atsName === "recruitee.com" || atsName === "recruitee") {
-      return collectPostingsForRecruiteeCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "recruitee");
     }
     if (atsName === "ultipro" || atsName === "ukg") {
       return collectPostingsForUltiProCompany(company);
