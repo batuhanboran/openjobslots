@@ -297,6 +297,56 @@ test("Breezy dispatches through registry source module instead of legacy collect
   }]);
 });
 
+test("CareerPlug dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "careerplug",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "careerplug",
+      source_family: "html_detail",
+      list_url: "https://fixture.careerplug.com/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { html: "<main></main>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.html ? "CareerPlug Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("CareerPlug registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "careerplug",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "careerplug",
+    company_name: "CareerPlug Registry Co",
+    url_string: "https://fixture.careerplug.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "careerplug"],
+    ["fetchList", "careerplug", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "CareerPlug Registry Co",
+    position_name: "CareerPlug Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

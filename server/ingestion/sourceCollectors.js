@@ -7,7 +7,6 @@ const {
   parseApplicantProCompany,
   parseAshbyCompany,
   parseBrassringCompany,
-  parseCareerplugCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseEightfoldCompany,
@@ -69,7 +68,6 @@ const {
   extractTalentreefAliasData,
   parseTalentreefPostingsFromSearchResponse
 } = require("./sources/talentreef/parse");
-const { parseCareerplugPostingsFromHtml } = require("./sources/careerplug/parse");
 const { parseFountainPostingsFromApi } = require("./sources/fountain/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
 const {
@@ -270,6 +268,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
+  careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS
@@ -1107,22 +1106,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`ApplicantAI page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
-  async function fetchCareerplugJobsPage(urlString) {
-    const res = await fetchWithAtsRateLimit("careerplug", CAREERPLUG_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`CareerPlug page request failed (${res.status}): ${body.slice(0, 180)}`);
     }
   
     return res.text();
@@ -2660,16 +2643,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return collected;
   }
   
-  async function collectPostingsForCareerplugCompany(company) {
-    const config = parseCareerplugCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const pageHtml = await fetchCareerplugJobsPage(config.jobsUrl);
-    return parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
   async function collectPostingsForAdpMyjobsCompany(company) {
     const config = parseAdpMyjobsCompany(company.url_string);
     if (!config) return [];
@@ -4027,7 +4000,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForTalentreefCompany(company);
     }
     if (atsName === "careerplug" || atsName === "careerplug.com" || atsName === "careerplugcom") {
-      return collectPostingsForCareerplugCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "careerplug");
     }
     if (atsName === "bamboohr" || atsName === "bamboohr.com" || atsName === "bamboohrcom") {
       return collectPostingsForRegistryPilotCompany(company, "bamboohr");
