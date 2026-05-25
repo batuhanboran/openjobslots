@@ -197,6 +197,56 @@ test("BambooHR dispatches through registry source module instead of legacy colle
   }]);
 });
 
+test("ApplyToJob dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "applytojob",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "applytojob",
+      source_family: "html_detail",
+      list_url: "https://fixture.applytojob.com/apply"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { html: "<ul></ul>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.html ? "ApplyToJob Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("ApplyToJob registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "applytojob",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "applytojob",
+    company_name: "Apply Registry Co",
+    url_string: "https://fixture.applytojob.com/apply"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "applytojob"],
+    ["fetchList", "applytojob", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Apply Registry Co",
+    position_name: "ApplyToJob Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

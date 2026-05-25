@@ -5,7 +5,6 @@ const {
   parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
   parseApplicantProCompany,
-  parseApplyToJobCompany,
   parseAshbyCompany,
   parseBrassringCompany,
   parseBreezyCompany,
@@ -59,7 +58,6 @@ const {
   normalizeApplitrackUrl,
   parseApplitrackPostings
 } = require("./sources/applitrack/parse");
-const { parseApplyToJobPostingsFromHtml } = require("./sources/applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./sources/ashby/parse");
 const { parseBreezyPostingsFromHtml } = require("./sources/breezy/parse");
 const {
@@ -271,6 +269,7 @@ const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
+  applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
@@ -985,22 +984,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       throw new Error(`ApplicantPro jobs API returned success=false: ${message}`);
     }
     return payload;
-  }
-  
-  async function fetchApplyToJobPage(applyUrl) {
-    const res = await fetchWithAtsRateLimit("applytojob", APPLYTOJOB_RATE_LIMIT_WAIT_MS, applyUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ApplyToJob page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
   }
   
   async function fetchTheApplicantManagerPage(careersUrl) {
@@ -2534,16 +2517,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseApplicantProPostingsFromApi(companyNameForPostings, config, response);
   }
   
-  async function collectPostingsForApplyToJobCompany(company) {
-    const config = parseApplyToJobCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const pageHtml = await fetchApplyToJobPage(config.applyUrl);
-    return parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
   async function collectPostingsForTheApplicantManagerCompany(company) {
     const config = parseTheApplicantManagerCompany(company.url_string);
     if (!config) return [];
@@ -4050,7 +4023,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForApplicantProCompany(company);
     }
     if (atsName === "applytojob" || atsName === "applytojob.com" || atsName === "applytojobcom") {
-      return collectPostingsForApplyToJobCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "applytojob");
     }
     if (
       atsName === "theapplicantmanager" ||

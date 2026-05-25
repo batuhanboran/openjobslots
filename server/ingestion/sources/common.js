@@ -797,16 +797,6 @@ async function fetchTaleoSourceList(company = {}, target = {}, options = {}) {
   };
 }
 
-function applyToJobDetailKey(urlValue) {
-  try {
-    const parsed = new URL(clean(urlValue));
-    parsed.hash = "";
-    return parsed.toString().replace(/\/+$/, "");
-  } catch {
-    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
-  }
-}
-
 function hasExplicitSourceRemote(posting = {}) {
   return ["remote", "hybrid", "onsite"].includes(clean(posting.remote_type).toLowerCase());
 }
@@ -817,22 +807,6 @@ function sourceFailureReasonSet(posting = {}) {
       .map((reason) => clean(reason).toLowerCase())
       .filter(Boolean)
   );
-}
-
-function applyToJobPostingNeedsDetail(posting = {}) {
-  const reasons = sourceFailureReasonSet(posting);
-  if (
-    reasons.has("no_structured_location") ||
-    reasons.has("detail_no_structured_location") ||
-    reasons.has("no_explicit_remote_evidence") ||
-    reasons.has("detail_no_explicit_remote") ||
-    reasons.has("ambiguous_location") ||
-    reasons.has("no_normalized_geo_or_explicit_remote")
-  ) {
-    return true;
-  }
-  if (!hasUsefulGeoEvidence(posting) && !hasExplicitSourceRemote(posting)) return true;
-  return !clean(posting.posting_date);
 }
 
 function detailPriorityScore(posting = {}, needsDetail) {
@@ -855,81 +829,6 @@ function prioritizeDetailCandidates(postings = [], needsDetail) {
     }))
     .sort((left, right) => right.score - left.score || left.index - right.index)
     .map((item) => item.posting);
-}
-
-async function fetchApplyToJobSourceList(company = {}, target = {}, options = {}) {
-  const context = buildCompanyContext(company);
-  const discovered = target && target.list_url ? target : SOURCE_SPECS.applytojob.discover(context);
-  const listUrl = clean(discovered?.list_url || context.url_string);
-  if (!listUrl) {
-    throw makeSourceFetchError("no_public_jobs_route", "ApplyToJob source has no public list route", {
-      url: context.url_string
-    });
-  }
-
-  const list = await fetchText(listUrl, {
-    ...options,
-    target: discovered,
-    sourceLabel: "ApplyToJob"
-  });
-  const config = {
-    ...(discovered.config || {}),
-    list_url: list.finalUrl || listUrl
-  };
-  const companyName = normalizeCompanyName(context, hostSlug(listUrl) || "ApplyToJob");
-  const parsed = parseApplyToJobPostingsFromHtml(companyName, config, {
-    html: list.text,
-    __listUrl: list.finalUrl || listUrl
-  });
-
-  if (parsed.length === 0) {
-    throw makeSourceFetchError("portal_search_empty", "ApplyToJob public list returned no parseable postings", {
-      url: listUrl
-    });
-  }
-
-  const detailLimit = Math.max(0, Math.min(50, Number(process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY || 15)));
-  let detailFetches = 0;
-  const detailHtmlByUrl = {};
-  const detailStatusByUrl = {};
-  const detailFailureByUrl = {};
-
-  for (const posting of prioritizeDetailCandidates(parsed, applyToJobPostingNeedsDetail)) {
-    if (detailFetches >= detailLimit) break;
-    if (!applyToJobPostingNeedsDetail(posting)) continue;
-    const detailUrl = clean(posting.job_posting_url);
-    if (!detailUrl) continue;
-    try {
-      const detail = await fetchText(detailUrl, {
-        ...options,
-        target: discovered,
-        sourceLabel: "ApplyToJob"
-      });
-      detailFetches += 1;
-      const key = applyToJobDetailKey(detailUrl);
-      detailHtmlByUrl[detailUrl] = detail.text;
-      detailHtmlByUrl[key] = detail.text;
-      detailStatusByUrl[detailUrl] = detail.status;
-      detailStatusByUrl[key] = detail.status;
-    } catch (error) {
-      detailFetches += 1;
-      const key = applyToJobDetailKey(detailUrl);
-      detailFailureByUrl[detailUrl] = classifyPublicRouteStatus(Number(error?.status || 0), "unsupported_html_shape");
-      detailFailureByUrl[key] = detailFailureByUrl[detailUrl];
-    }
-  }
-
-  return {
-    html: list.text,
-    __listUrl: list.finalUrl || listUrl,
-    __detailHtmlByUrl: detailHtmlByUrl,
-    __detailStatusByUrl: detailStatusByUrl,
-    __detailFailureByUrl: detailFailureByUrl,
-    __sourceConfig: {
-      ...config,
-      detail_fetch_count: detailFetches
-    }
-  };
 }
 
 function breezyDetailKey(urlValue) {
@@ -1599,7 +1498,6 @@ const SOURCE_SPECS = Object.freeze({
     sourceFamily: "html_detail",
     confidence: 0.75,
     parser: (companyName, config, payload) => parseApplyToJobPostingsFromHtml(companyName, config, payload),
-    fetchList: fetchApplyToJobSourceList,
     officialDocs: "observed ApplyToJob public list HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);

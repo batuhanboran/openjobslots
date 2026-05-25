@@ -6,6 +6,10 @@ const {
 } = require("./sourceContracts");
 
 const PILOT_SOURCE_METADATA = Object.freeze({
+  applytojob: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled
+  }),
   bamboohr: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
