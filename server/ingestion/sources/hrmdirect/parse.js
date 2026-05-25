@@ -289,6 +289,7 @@ function extractHrmDirectDetailFields(detailHtml) {
   const location = primaryLocation || officeLocation.location;
   const department = extractHrmDirectViewField(detailHtml, ["Department", "Team", "Category"]);
   const employmentType = extractHrmDirectViewField(detailHtml, ["Employment Type", "Job Type", "Type"]);
+  const postingDate = extractHrmDirectViewField(detailHtml, ["Date Posted", "Posted Date", "Posting Date", "Open Date"]);
   const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
   const detailRemoteType = normalizeRemoteType(workplaceType);
   const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : "";
@@ -298,6 +299,7 @@ function extractHrmDirectDetailFields(detailHtml) {
     location,
     department,
     employment_type: employmentType,
+    posting_date: postingDate,
     remote_type: remoteType,
     evidence: {
       location_source: location ? "labeled_detail_html" : "",
@@ -307,6 +309,9 @@ function extractHrmDirectDetailFields(detailHtml) {
       department_path: department ? "table.viewFields Department" : "",
       employment_type_source: employmentType ? "labeled_detail_html" : "",
       employment_type_path: employmentType ? "table.viewFields Employment Type/Job Type" : "",
+      posting_date_source: postingDate ? "labeled_detail_html" : "",
+      posting_date_path: postingDate ? "table.viewFields Date Posted/Posted Date/Posting Date/Open Date" : "",
+      posting_date_rule_name: postingDate ? "hrmdirect_detail_posting_date" : "",
       remote_source: remoteType ? "labeled_detail_html" : "",
       remote_path: remoteType ? "table.viewFields Workplace Type" : "",
       remote_rule_name: remoteType ? "hrmdirect_detail_workplace_type" : ""
@@ -368,6 +373,9 @@ function enrichHrmDirectPostingFromDetail(posting, detailHtml, detailStatus, det
     department_path: detailFields.evidence.department_path || posting.source_evidence?.department_path || "",
     employment_type_source: detailFields.evidence.employment_type_source || posting.source_evidence?.employment_type_source || "",
     employment_type_path: detailFields.evidence.employment_type_path || posting.source_evidence?.employment_type_path || "",
+    posting_date_source: posting.source_evidence?.posting_date_source || detailFields.evidence.posting_date_source || "",
+    posting_date_path: posting.source_evidence?.posting_date_path || detailFields.evidence.posting_date_path || "",
+    posting_date_rule_name: posting.source_evidence?.posting_date_rule_name || detailFields.evidence.posting_date_rule_name || "",
     remote_source: posting.source_evidence?.remote_source || detailFields.evidence.remote_source || "",
     remote_path: posting.source_evidence?.remote_path || detailFields.evidence.remote_path || "",
     remote_rule_name: posting.source_evidence?.remote_rule_name || detailFields.evidence.remote_rule_name || ""
@@ -377,6 +385,7 @@ function enrichHrmDirectPostingFromDetail(posting, detailHtml, detailStatus, det
     location: detailFields.location || posting.location || null,
     department: posting.department || detailFields.department || null,
     employment_type: posting.employment_type || detailFields.employment_type || null,
+    posting_date: posting.posting_date || detailFields.posting_date || null,
     remote_type: posting.remote_type && posting.remote_type !== "unknown" ? posting.remote_type : detailFields.remote_type || posting.remote_type,
     source_evidence: sourceEvidence
   };

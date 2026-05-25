@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Detail Date",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://detaildate.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://detaildate.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://detaildate.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://detaildate.hrmdirect.com/employment/job-opening.php?req=HRM9501",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9501\"><td class=\"departments reqitem ReqRowClick\">Operations</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9501\">Operations Specialist</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Operations</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Austin, Texas</td></tr><tr><td class=\"viewFieldName\"><b>Date Posted:</b></td><td class=\"viewFieldValue\">2026-05-21</td></tr></table>",
+  "expected": {
+    "source_job_id": "HRM9501",
+    "location": "Austin, Texas",
+    "posting_date": "2026-05-21",
+    "posting_date_epoch": 1779321600,
+    "posting_date_source": "labeled_detail_html",
+    "posting_date_path": "table.viewFields Date Posted/Posted Date/Posting Date/Open Date",
+    "posting_date_rule_name": "hrmdirect_detail_posting_date"
+  }
+}

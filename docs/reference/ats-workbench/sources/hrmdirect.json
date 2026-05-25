@@ -6,7 +6,7 @@
   "official_public_docs_or_observed_endpoint": "Observed HRMDirect employment table HTML.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
   "list_fetch_method": "bounded HTML list fetch through source runner",
-  "detail_fetch_method": "detail page required when list cards omit location/remote; use only fixture-backed extractors. Use req-only detail for normal rows, but preserve req_loc first when the same base req appears on multiple canonical URLs and req_loc exposes labeled Location. Optional RSS feed fetch supplies posting dates when item link or guid values expose matching base req ids. Stale or removed detail pages stay quarantined with detail_404_or_410 instead of inventing geo/remote evidence.",
+  "detail_fetch_method": "detail page required when list cards omit location/remote; use only fixture-backed extractors. Use req-only detail for normal rows, but preserve req_loc first when the same base req appears on multiple canonical URLs and req_loc exposes labeled Location. Optional RSS feed fetch supplies posting dates when item link or guid values expose matching base req ids. Labeled detail Date Posted/Posted Date/Posting Date/Open Date values supply posting dates only when list and RSS dates are absent. Stale or removed detail pages stay quarantined with detail_404_or_410 instead of inventing geo/remote evidence.",
   "pagination_method": "only follow known next-page/list links with max-page and max-row limits",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
   "source_job_id_rule": "HRMDirect URL identity: use req for normal rows; use req:req_loc when the same req appears on multiple canonical URLs so each posting remains indexable. RSS date matching stays keyed by base req.",
@@ -14,7 +14,7 @@
   "location_text_rule": "detail-page: List cards may omit geo; detail fixture decides whether req-only or duplicate-req req_loc detail fetch is required.",
   "country_region_city_rule": "detail-page: List cards may omit geo; detail fixture decides whether req-only or duplicate-req req_loc detail fetch is required. Exact full-state, Canadian province, and country Office values are accepted only from labeled detail HTML.",
   "remote_type_rule": "explicit-source-evidence: preserve source-backed onsite, remote, and hybrid values, but only explicit remote/hybrid can satisfy the no-geo public gate; title-only Remote/Virtual text stays quarantined.",
-  "posting_date_rule": "rss-feed: HRMDirect rss.php?search=true item pubDate is accepted only when the item link or guid exposes a matching req id; list td.date/td.dates remains stronger if present.",
+  "posting_date_rule": "list td.date/td.dates is strongest; HRMDirect rss.php?search=true item pubDate is accepted only when the item link or guid exposes a matching req id; labeled detail Date Posted/Posted Date/Posting Date/Open Date is accepted only when list and RSS dates are absent.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
     "status": "parser-fixture-backed",
@@ -26,6 +26,7 @@
       "server/ingestion/sources/hrmdirect/fixtures/expected-normalized.json",
       "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hrmdirect/fixtures/list.json",
+      "server/ingestion/sources/hrmdirect/fixtures/detail-posting-date.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-province-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json",
@@ -39,6 +40,7 @@
       "server/ingestion/sources/hrmdirect/fixtures/expected-normalized.json",
       "server/ingestion/sources/hrmdirect/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hrmdirect/fixtures/list.json",
+      "server/ingestion/sources/hrmdirect/fixtures/detail-posting-date.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-country-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/office-province-location.json",
       "server/ingestion/sources/hrmdirect/fixtures/rss-guid-posting-date.json",
@@ -92,6 +94,6 @@
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "run bounded source refresh after deployment to populate RSS-backed posting_date evidence, duplicate-req req:req_loc source ids, and req_loc detail location evidence, then inspect remaining no_geo_no_remote quarantines including source-backed onsite rows without useful geo",
+  "next_action": "run bounded source refresh after deployment to populate list/RSS/detail posting_date evidence, duplicate-req req:req_loc source ids, and req_loc detail location evidence, then inspect remaining no_geo_no_remote quarantines including source-backed onsite rows without useful geo",
   "certification_blockers": "production rows need refresh; remaining quarantines require source-labeled geo or explicit remote/hybrid evidence rather than title/body/onsite inference"
 }
