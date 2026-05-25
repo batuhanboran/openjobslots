@@ -38,6 +38,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
+  freshteam: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
   greenhouse: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled

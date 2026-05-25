@@ -1,6 +1,7 @@
 "use strict";
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
+const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 
 function cleanFreshteamText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
@@ -38,6 +39,7 @@ function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "freshteam"),
       position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: null,

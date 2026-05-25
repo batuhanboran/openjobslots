@@ -897,6 +897,56 @@ test("Teamtailor dispatches through registry source module instead of legacy col
   }]);
 });
 
+test("Freshteam dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "freshteam",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "freshteam",
+      source_family: "html_detail",
+      list_url: "https://fixture.freshteam.com/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { html: "<a class=\"heading\">Fixture</a>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.html ? "Freshteam Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Freshteam registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "freshteam",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "freshteam",
+    company_name: "Freshteam Registry Co",
+    url_string: "https://fixture.freshteam.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "freshteam"],
+    ["fetchList", "freshteam", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Freshteam Registry Co",
+    position_name: "Freshteam Registry Posting"
+  }]);
+});
+
 test("Recruitee dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

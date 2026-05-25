@@ -13,6 +13,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "talentreef",
   "join",
   "teamtailor",
+  "freshteam",
   "hrmdirect",
   "breezy",
   "applytojob"
@@ -92,11 +93,65 @@ for (const atsKey of HTML_PUBLIC_SOURCES) {
 }
 
 test("target html/public ATS modules return no postings for empty raw payloads", () => {
-  for (const atsKey of ["applitrack", "applytojob", "breezy", "teamtailor"]) {
+  for (const atsKey of ["applitrack", "applytojob", "breezy", "teamtailor", "freshteam"]) {
     const source = getSourceModule(atsKey);
     const company = readJson(path.join(__dirname, atsKey, "fixtures", "company.json"));
     assert.deepEqual(source.parse({ html: "" }, company), [], atsKey);
   }
+});
+
+test("freshteam source module fetches jobs HTML with source-local discovery and host guard", async () => {
+  const source = getSourceModule("freshteam");
+  assert.ok(source, "expected Freshteam source module");
+  const company = readJson(path.join(__dirname, "freshteam", "fixtures", "company.json"));
+  const rawList = readJson(path.join(__dirname, "freshteam", "fixtures", "list.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        body: rawList.html,
+        status: 200,
+        url
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://fixture.freshteam.com/jobs",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }]);
+  assert.equal(payload.__sourceConfig.subdomainLower, "fixture");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId.get("3421-product-engineer").country, "Turkey");
+  assert.equal(byId.get("3421-product-engineer").city, "Istanbul");
+  assert.equal(byId.get("3421-product-engineer").remote_type, "onsite");
+  assert.equal(source.validatePublic(byId.get("3421-product-engineer")).status, "accepted");
+  assert.equal(byId.get("3422-remote-support-specialist").remote_type, "remote");
+  assert.equal(source.validatePublic(byId.get("3422-remote-support-specialist")).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        body: rawList.html,
+        status: 200,
+        url: "https://example.com/jobs"
+      })
+    }),
+    /unexpected host/
+  );
 });
 
 test("teamtailor source module fetches jobs HTML with source-local discovery and host guard", async () => {

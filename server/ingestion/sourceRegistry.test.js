@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -21,6 +21,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
   assert.equal(isRegistryPilotSource("fountain"), true);
+  assert.equal(isRegistryPilotSource("freshteam"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
@@ -45,6 +46,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
     "breezy",
     "careerplug",
     "fountain",
+    "freshteam",
     "greenhouse",
     "hrmdirect",
     "icims",
@@ -160,6 +162,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof fountain.normalize, "function");
   assert.equal(typeof fountain.validate, "function");
   assert.deepEqual(validateSourceContract(fountain), { ok: true, failures: [] });
+
+  const freshteam = getRegistrySourceModule("freshteam");
+  assert.equal(freshteam.atsKey, "freshteam");
+  assert.equal(freshteam.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(freshteam.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof freshteam.discover, "function");
+  assert.equal(typeof freshteam.fetchList, "function");
+  assert.equal(typeof freshteam.parse, "function");
+  assert.equal(typeof freshteam.normalize, "function");
+  assert.equal(typeof freshteam.validate, "function");
+  assert.deepEqual(validateSourceContract(freshteam), { ok: true, failures: [] });
 
   const icims = getRegistrySourceModule("icims");
   assert.equal(icims.atsKey, "icims");

@@ -8,7 +8,6 @@ const {
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseEightfoldCompany,
-  parseFreshteamCompany,
   parseGemCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
@@ -83,7 +82,6 @@ const {
   inferWorkdayLocationFromJobUrl,
   parseWorkdayPostingsFromApi
 } = require("./sources/workday/parse");
-const { parseFreshteamPostingsFromHtml } = require("./sources/freshteam/parse");
 const {
   extractSagehrCompanyNameFromHtml,
   parseSagehrPostingsFromHtml
@@ -225,6 +223,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
   fountain: FOUNTAIN_RATE_LIMIT_WAIT_MS,
+  freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
@@ -1239,28 +1238,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchFreshteamJobsPage(config) {
-    const res = await fetchWithAtsRateLimit("freshteam", FRESHTEAM_RATE_LIMIT_WAIT_MS, config.jobsUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Freshteam page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.jobsUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".freshteam.com")) {
-      throw new Error(`Freshteam URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
   }
   
   async function fetchSagehrJobsPage(config) {
@@ -2389,22 +2366,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return collected;
   }
   
-  async function collectPostingsForFreshteamCompany(company) {
-    const config = parseFreshteamCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml, finalUrl } = await fetchFreshteamJobsPage(config);
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      jobsUrl: finalUrl || config.jobsUrl
-    };
-    return parseFreshteamPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
   async function collectPostingsForSagehrCompany(company) {
     const config = parseSagehrCompany(company.url_string);
     if (!config) return [];
@@ -3207,7 +3168,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "teamtailor");
     }
     if (atsName === "freshteam" || atsName === "freshteam.com" || atsName === "freshteamcom") {
-      return collectPostingsForFreshteamCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "freshteam");
     }
     if (
       atsName === "sagehr" ||
