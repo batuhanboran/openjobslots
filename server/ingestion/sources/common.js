@@ -11,7 +11,6 @@ const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseBrassringPostingsFromApi } = require("./brassring/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
-const { parseFountainPostingsFromApi } = require("./fountain/parse");
 const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
 const { parseHirebridgePostingsFromHtml } = require("./hirebridge/parse");
 const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
@@ -913,13 +912,11 @@ const SOURCE_SPECS = Object.freeze({
   fountain: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseFountainPostingsFromApi,
     officialDocs: "observed Fountain public openings JSON endpoint",
     discover(company) {
-      const boardUrl = clean(company.url_string).replace(/\/$/, "");
       return {
-        config: { boardUrl },
-        listUrl: boardUrl ? `${boardUrl}.json` : ""
+        config: {},
+        listUrl: ""
       };
     }
   },

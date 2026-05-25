@@ -8,7 +8,6 @@ const {
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseEightfoldCompany,
-  parseFountainCompany,
   parseFreshteamCompany,
   parseGemCompany,
   parseGetroCompany,
@@ -61,7 +60,6 @@ const {
   extractTalentreefAliasData,
   parseTalentreefPostingsFromSearchResponse
 } = require("./sources/talentreef/parse");
-const { parseFountainPostingsFromApi } = require("./sources/fountain/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
 const {
   buildHirebridgeDetailsUrl,
@@ -251,6 +249,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
+  fountain: FOUNTAIN_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
@@ -1887,22 +1886,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.json();
   }
   
-  async function fetchFountainJobBoard(config) {
-    const res = await fetchWithAtsRateLimit("fountain", FOUNTAIN_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Fountain API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchGetroJobsPage(urlString) {
     const res = await fetchWithAtsRateLimit("getro", GETRO_RATE_LIMIT_WAIT_MS, urlString, {
       method: "GET",
@@ -3035,16 +3018,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson);
   }
   
-  async function collectPostingsForFountainCompany(company) {
-    const config = parseFountainCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
-    const responseJson = await fetchFountainJobBoard(config);
-    return parseFountainPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
   async function collectPostingsForGetroCompany(company) {
     const config = parseGetroCompany(company.url_string);
     if (!config) return [];
@@ -3842,7 +3815,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForCareerpuckCompany(company);
     }
     if (atsName === "fountain" || atsName === "fountain.com" || atsName === "fountaincom") {
-      return collectPostingsForFountainCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "fountain");
     }
     if (atsName === "getro" || atsName === "getro.com" || atsName === "getrocom") {
       return collectPostingsForGetroCompany(company);

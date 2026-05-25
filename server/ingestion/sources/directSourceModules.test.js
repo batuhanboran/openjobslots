@@ -95,6 +95,37 @@ test("target direct ATS modules return no postings for empty raw payloads", () =
   }
 });
 
+test("fountain source module fetches the board JSON endpoint with source-local discovery", async () => {
+  const source = getSourceModule("fountain");
+  const company = readJson(path.join(__dirname, "fountain", "fixtures", "company.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        openings: [
+          {
+            id: 1001,
+            title: "Fixture Fountain Role",
+            to_param: "fixture-fountain-role",
+            location_name: "Austin, TX"
+          }
+        ]
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://web.fountain.com/c/fixtureco/jobs/board.json",
+    method: "GET",
+    headers: { Accept: "application/json, text/plain, */*" }
+  }]);
+  assert.equal(payload.__sourceConfig.boardUrl, "https://web.fountain.com/c/fixtureco/jobs/board");
+  assert.equal(payload.__sourceConfig.companySlugLower, "fixtureco");
+  assert.equal(payload.openings.length, 1);
+});
+
 test("lever source module filters employment categories that are misfiled as locations", () => {
   const source = getSourceModule("lever");
   const company = {

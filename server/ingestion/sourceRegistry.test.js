@@ -12,13 +12,14 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, Recruitee, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, Recruitee, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
   assert.equal(isRegistryPilotSource("ashby"), true);
   assert.equal(isRegistryPilotSource("bamboohr"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
+  assert.equal(isRegistryPilotSource("fountain"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
@@ -35,6 +36,7 @@ test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, Career
     "bamboohr",
     "breezy",
     "careerplug",
+    "fountain",
     "greenhouse",
     "hrmdirect",
     "icims",
@@ -122,6 +124,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof greenhouse.normalize, "function");
   assert.equal(typeof greenhouse.validate, "function");
   assert.deepEqual(validateSourceContract(greenhouse), { ok: true, failures: [] });
+
+  const fountain = getRegistrySourceModule("fountain");
+  assert.equal(fountain.atsKey, "fountain");
+  assert.equal(fountain.family, SOURCE_FAMILIES.directJsonStable);
+  assert.equal(fountain.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof fountain.discover, "function");
+  assert.equal(typeof fountain.fetchList, "function");
+  assert.equal(typeof fountain.parse, "function");
+  assert.equal(typeof fountain.normalize, "function");
+  assert.equal(typeof fountain.validate, "function");
+  assert.deepEqual(validateSourceContract(fountain), { ok: true, failures: [] });
 
   const icims = getRegistrySourceModule("icims");
   assert.equal(icims.atsKey, "icims");
