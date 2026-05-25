@@ -12,9 +12,10 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, ApplyToJob, BambooHR, Breezy, CareerPlug, Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
+test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Greenhouse, HRMDirect, and iCIMS as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
+  assert.equal(isRegistryPilotSource("ashby"), true);
   assert.equal(isRegistryPilotSource("bamboohr"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
@@ -27,6 +28,7 @@ test("registry exposes ApplicantPro, ApplyToJob, BambooHR, Breezy, CareerPlug, G
   assert.deepEqual(pilotKeys, [
     "applicantpro",
     "applytojob",
+    "ashby",
     "bamboohr",
     "breezy",
     "careerplug",
@@ -58,6 +60,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof applyToJob.normalize, "function");
   assert.equal(typeof applyToJob.validate, "function");
   assert.deepEqual(validateSourceContract(applyToJob), { ok: true, failures: [] });
+
+  const ashby = getRegistrySourceModule("ashby");
+  assert.equal(ashby.atsKey, "ashby");
+  assert.equal(ashby.family, SOURCE_FAMILIES.directJsonStable);
+  assert.equal(ashby.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof ashby.discover, "function");
+  assert.equal(typeof ashby.fetchList, "function");
+  assert.equal(typeof ashby.parse, "function");
+  assert.equal(typeof ashby.normalize, "function");
+  assert.equal(typeof ashby.validate, "function");
+  assert.deepEqual(validateSourceContract(ashby), { ok: true, failures: [] });
 
   const bamboohr = getRegistrySourceModule("bamboohr");
   assert.equal(bamboohr.atsKey, "bamboohr");

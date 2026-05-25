@@ -14,6 +14,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
+  ashby: Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
   bamboohr: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled

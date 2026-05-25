@@ -4,7 +4,6 @@ const {
   parseAdpMyjobsCompany,
   parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
-  parseAshbyCompany,
   parseBrassringCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
@@ -55,7 +54,6 @@ const {
   normalizeApplitrackUrl,
   parseApplitrackPostings
 } = require("./sources/applitrack/parse");
-const { parseAshbyPostingsFromApi } = require("./sources/ashby/parse");
 const {
   extractBrassringCompanyName,
   extractBrassringHiddenInput,
@@ -196,7 +194,6 @@ const DEFAULT_BROWSER_USER_AGENT =
   process.env.OPENJOBSLOTS_BROWSER_USER_AGENT ||
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const WORKDAY_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const ASHBY_API_URL = "https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobBoardWithTeams";
 const ASHBY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GREENHOUSE_API_URL_BASE = "https://boards-api.greenhouse.io/v1/boards";
 const GREENHOUSE_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -262,6 +259,7 @@ const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
+  ashby: ASHBY_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
@@ -279,44 +277,6 @@ const ORACLE_EXPAND_VALUE = [
 ].join(",");
 const ORACLE_FACETS_VALUE =
   "LOCATIONS;WORK_LOCATIONS;WORKPLACE_TYPES;TITLES;CATEGORIES;ORGANIZATIONS;POSTING_DATES;FLEX_FIELDS";
-const ASHBY_QUERY = `
-  query ApiJobBoardWithTeams($organizationHostedJobsPageName: String!) {
-    jobBoard: jobBoardWithTeams(
-      organizationHostedJobsPageName: $organizationHostedJobsPageName
-    ) {
-      teams {
-        id
-        name
-        externalName
-        parentTeamId
-        __typename
-      }
-      jobPostings {
-        id
-        title
-        teamId
-        locationId
-        locationName
-        workplaceType
-        employmentType
-        secondaryLocations {
-          ...JobPostingSecondaryLocationParts
-          __typename
-        }
-        compensationTierSummary
-        __typename
-      }
-      __typename
-    }
-  }
-
-  fragment JobPostingSecondaryLocationParts on JobPostingSecondaryLocation {
-    locationId
-    locationName
-    __typename
-  }
-`;
-
 function defaultNowEpochSeconds() {
   return Math.floor(Date.now() / 1000);
 }
@@ -827,36 +787,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.json();
-  }
-  
-  async function fetchAshbyJobBoard(organizationHostedJobsPageName) {
-    const res = await fetchWithAtsRateLimit("ashby", ASHBY_RATE_LIMIT_WAIT_MS, ASHBY_API_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        operationName: "ApiJobBoardWithTeams",
-        variables: {
-          organizationHostedJobsPageName
-        },
-        query: ASHBY_QUERY
-      })
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Ashby request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const data = await res.json();
-    if (Array.isArray(data?.errors) && data.errors.length > 0) {
-      const firstError = String(data.errors[0]?.message || "Unknown Ashby GraphQL error");
-      throw new Error(`Ashby GraphQL error: ${firstError}`);
-    }
-  
-    return data;
   }
   
   async function fetchGreenhouseJobBoard(boardToken) {
@@ -2379,14 +2309,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return collected;
   }
   
-  async function collectPostingsForAshbyCompany(company) {
-    const config = parseAshbyCompany(company.url_string);
-    if (!config) return [];
-  
-    const response = await fetchAshbyJobBoard(config.organizationHostedJobsPageName);
-    return parseAshbyPostingsFromApi(company.company_name, config, response);
-  }
-  
   async function collectPostingsForGreenhouseCompany(company) {
     const config = parseGreenhouseCompany(company.url_string);
     if (!config) return [];
@@ -3884,8 +3806,8 @@ function createSourceCollectorRuntime(dependencies = {}) {
     if (atsName === "workday") {
       return collectTodayPostingsForWorkdayCompany(company);
     }
-    if (atsName === "ashbyhq") {
-      return collectPostingsForAshbyCompany(company);
+    if (atsName === "ashbyhq" || atsName === "ashby") {
+      return collectPostingsForRegistryPilotCompany(company, "ashby");
     }
     if (atsName === "greenhouseio" || atsName === "greenhouse.io" || atsName === "greenhouse") {
       if (isRegistryPilotSourceForRuntime("greenhouse")) return collectPostingsForRegistryPilotCompany(company, "greenhouse");

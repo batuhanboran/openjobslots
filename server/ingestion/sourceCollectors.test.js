@@ -397,6 +397,56 @@ test("ApplicantPro dispatches through registry source module instead of legacy c
   }]);
 });
 
+test("Ashby dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "ashby",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "ashby",
+      source_family: "direct_json",
+      list_url: "https://api.ashbyhq.com/posting-api/job-board/fixtureco"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { jobs: [{ id: "ashby-1001" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.jobs) ? "Ashby Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Ashby registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "ashby",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "ashbyhq",
+    company_name: "Ashby Registry Co",
+    url_string: "https://jobs.ashbyhq.com/fixtureco"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "ashby"],
+    ["fetchList", "ashbyhq", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Ashby Registry Co",
+    position_name: "Ashby Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({
