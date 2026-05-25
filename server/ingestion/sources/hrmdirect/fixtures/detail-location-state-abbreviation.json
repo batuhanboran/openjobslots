@@ -1,0 +1,22 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Detail Location State",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://detailstate.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://detailstate.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://detailstate.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://detailstate.hrmdirect.com/employment/job-opening.php?req=HRM9914",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9914\"><td class=\"departments reqitem ReqRowClick\">Recruiting</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9914\">Recruiter - Contract</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Recruiting</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">IL</td></tr></table><p>Supports central time zone hiring.</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9914",
+    "location_text": "IL",
+    "city": "",
+    "country": "United States",
+    "remote_type": "onsite",
+    "location_source": "labeled_detail_html",
+    "location_path": "table.viewFields Location",
+    "location_rule_name": "hrmdirect_detail_location_state_abbreviation"
+  }
+}

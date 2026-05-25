@@ -268,6 +268,10 @@ const US_STATE_ABBREVIATION_PATTERN =
   /(?:^|,\s*|\s-\s)(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)(?:\s|,|$)/i;
 const CANADA_PROVINCE_ABBREVIATION_PATTERN =
   /(?:^|,\s*|\s-\s)(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s|,|$)/i;
+const US_STATE_ABBREVIATION_EXACT_PATTERN =
+  /^(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)$/i;
+const CANADA_PROVINCE_ABBREVIATION_EXACT_PATTERN =
+  /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/i;
 const US_STATE_HYPHEN_PREFIX_PATTERN =
   /^(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)[-\s]/i;
 const CANADA_PROVINCE_HYPHEN_PREFIX_PATTERN =
@@ -611,8 +615,8 @@ function extractCityText(posting, location, country) {
   if (normalizedCountry && normalizedFirst === normalizedCountry) return "";
   if (COUNTRY_ALIASES[normalizedFirst]) return "";
   if (
-    (US_STATE_NAMES.has(normalizedFirst) && (!normalizedCountry || normalizedCountry === "united states")) ||
-    (CANADA_PROVINCE_NAMES.has(normalizedFirst) && (!normalizedCountry || normalizedCountry === "canada"))
+    ((US_STATE_ABBREVIATION_EXACT_PATTERN.test(firstSegment) || US_STATE_NAMES.has(normalizedFirst)) && (!normalizedCountry || normalizedCountry === "united states")) ||
+    ((CANADA_PROVINCE_ABBREVIATION_EXACT_PATTERN.test(firstSegment) || CANADA_PROVINCE_NAMES.has(normalizedFirst)) && (!normalizedCountry || normalizedCountry === "canada"))
   ) {
     return "";
   }

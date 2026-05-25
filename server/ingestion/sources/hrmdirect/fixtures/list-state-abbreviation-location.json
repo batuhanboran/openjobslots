@@ -1,0 +1,20 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect List State",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://liststate.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://liststate.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://liststate.hrmdirect.com/employment/rss.php?search=true",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9924\"><td class=\"departments reqitem ReqRowClick\">Recruiting</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9924&req_loc=1331036\">Recruiter - Contract</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\">CO</td></tr></table>",
+  "expected": {
+    "source_job_id": "HRM9924",
+    "location_text": "CO",
+    "city": "",
+    "country": "United States",
+    "remote_type": "onsite",
+    "location_source": "labeled_html",
+    "location_path": "td.state",
+    "location_rule_name": "hrmdirect_list_state_abbreviation"
+  }
+}
