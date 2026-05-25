@@ -126,6 +126,30 @@ function extractHrmDirectWorkModeLocationText(value) {
   return cleanHrmDirectLocationText(candidate);
 }
 
+function normalizeHrmDirectRemoteScopeLocation(value) {
+  const text = cleanHrmDirectLocationText(value);
+  if (!text) return "";
+  const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (
+    normalizeCountryFromLocation(text) === "United States" &&
+    /^(?:continental\s+u\s+s|u\s+s|u\s+s\s+a|united\s+states)$/.test(normalized)
+  ) {
+    return "United States";
+  }
+  return text;
+}
+
+function extractHrmDirectListRemoteLocation(value) {
+  const remoteType = normalizeRemoteType(value);
+  if (!["remote", "hybrid"].includes(remoteType)) {
+    return { location: "", remoteType: "unknown" };
+  }
+  return {
+    location: normalizeHrmDirectRemoteScopeLocation(extractHrmDirectWorkModeLocationText(value)),
+    remoteType
+  };
+}
+
 function extractHrmDirectOfficeLocation(value) {
   const text = cleanHrmDirectLocationText(value);
   if (!text || isRemoteOnlyLocationValue(text)) return { location: "", ruleName: "" };
@@ -540,12 +564,16 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     const sourceJobIdPath = sourceJobId && sourceJobId !== baseSourceJobId
       ? "req + req_loc query params"
       : "req query param";
-    const city = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "cities"));
+    const cityCell = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "cities"));
     const state = cleanHrmDirectLocationText(extractHrmDirectCellValue(rowHtml, "state"));
     const department = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "departments"));
     const workMode = cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "custSort1"));
     const workModeLocation = extractHrmDirectWorkModeLocationText(workMode);
-    const remoteType = normalizeRemoteType(workMode);
+    const listRemoteLocation = extractHrmDirectListRemoteLocation(cityCell);
+    const city = listRemoteLocation.remoteType === "unknown" ? cityCell : "";
+    const listState = listRemoteLocation.remoteType === "unknown" ? state : "";
+    const workModeRemoteType = normalizeRemoteType(workMode);
+    const remoteType = workModeRemoteType !== "unknown" ? workModeRemoteType : listRemoteLocation.remoteType;
     const listPostingDate =
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "date")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "dates")) ||
@@ -558,8 +586,8 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "employmentType")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "type")) ||
       null;
-    const listLocation = [city, state].filter(Boolean).join(", ");
-    const location = listLocation || workModeLocation;
+    const listLocation = [city, listState].filter(Boolean).join(", ");
+    const location = listLocation || listRemoteLocation.location || workModeLocation;
     const country = normalizeCountryFromLocation(location) || normalizeCountryName(state);
 
     const basePosting = {
@@ -585,10 +613,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
         source_job_id_source: "url",
         source_job_id_path: sourceJobIdPath,
         location_source: location ? "labeled_html" : "",
-        location_path: location ? (listLocation ? "td.cities + td.state" : "td.custSort1") : "",
+        location_path: location ? (listLocation ? "td.cities + td.state" : listRemoteLocation.location ? "td.cities" : "td.custSort1") : "",
+        location_rule_name: listRemoteLocation.location ? "hrmdirect_list_remote_city_location" : "",
         remote_source: remoteType !== "unknown" ? "labeled_html" : "",
-        remote_path: remoteType !== "unknown" ? "td.custSort1" : "",
-        remote_rule_name: remoteType !== "unknown" ? "hrmdirect_work_mode_column" : "",
+        remote_path: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "td.custSort1" : "td.cities") : "",
+        remote_rule_name: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "hrmdirect_work_mode_column" : "hrmdirect_list_remote_city") : "",
         posting_date_source: listPostingDate ? "labeled_html" : rssPostingDate ? "rss_xml" : "",
         posting_date_path: listPostingDate ? "td.date/td.dates" : rssPostingDate ? "rss.channel.item pubDate" : "",
         posting_date_rule_name: rssPostingDate && !listPostingDate ? "hrmdirect_rss_pubdate" : ""

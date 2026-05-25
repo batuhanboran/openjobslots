@@ -1,0 +1,36 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect List Remote Location",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://listremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://listremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://listremote.hrmdirect.com/employment/rss.php?search=true",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9901\"><td class=\"departments reqitem ReqRowClick\">Sales</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9901\">Account Executive</a></td><td class=\"cities reqitem ReqRowClick\">Remote - Colorado</td><td class=\"state reqitem ReqRowClick\">CO</td></tr><tr class=\"reqitem\" data-req-id=\"HRM9902\"><td class=\"departments reqitem ReqRowClick\">Client Services</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9902\">Account Coordinator</a></td><td class=\"cities reqitem ReqRowClick\">Remote, Continental U.S.</td><td class=\"state reqitem ReqRowClick\">VA</td></tr></table>",
+  "expected": {
+    "HRM9901": {
+      "source_job_id": "HRM9901",
+      "location": "Colorado",
+      "city": "",
+      "country": "United States",
+      "remote_type": "remote",
+      "location_path": "td.cities",
+      "location_rule_name": "hrmdirect_list_remote_city_location",
+      "remote_source": "labeled_html",
+      "remote_path": "td.cities",
+      "remote_rule_name": "hrmdirect_list_remote_city"
+    },
+    "HRM9902": {
+      "source_job_id": "HRM9902",
+      "location": "United States",
+      "city": "",
+      "country": "United States",
+      "remote_type": "remote",
+      "location_path": "td.cities",
+      "location_rule_name": "hrmdirect_list_remote_city_location",
+      "remote_source": "labeled_html",
+      "remote_path": "td.cities",
+      "remote_rule_name": "hrmdirect_list_remote_city"
+    }
+  }
+}

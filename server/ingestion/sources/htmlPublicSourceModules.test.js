@@ -729,6 +729,41 @@ test("hrmdirect source module quarantines body location labels without strict ad
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("hrmdirect source module treats list city remote scopes as remote evidence without fake city", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "list-remote-location.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, fixture.company);
+    return [row.source_job_id, row];
+  }));
+
+  for (const [sourceJobId, expected] of Object.entries(fixture.expected)) {
+    const row = normalized[sourceJobId];
+    assert.ok(row, `expected row ${sourceJobId}`);
+    assert.equal(row.location, expected.location);
+    assert.equal(row.city, expected.city);
+    assert.equal(row.country, expected.country);
+    assert.equal(row.remote_type, expected.remote_type);
+    assert.equal(row.source_evidence.location_path, expected.location_path);
+    assert.equal(row.source_evidence.location_rule_name, expected.location_rule_name);
+    assert.equal(row.source_evidence.remote_source, expected.remote_source);
+    assert.equal(row.source_evidence.remote_path, expected.remote_path);
+    assert.equal(row.source_evidence.remote_rule_name, expected.remote_rule_name);
+    assert.deepEqual(row.source_failure_reasons || [], []);
+    assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, "accepted");
+  }
+});
+
 test("hrmdirect source module accepts labeled detail office state as geo evidence", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");
