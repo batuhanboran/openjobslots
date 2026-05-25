@@ -224,3 +224,71 @@ test("taleo source module parses AJAX fallback fixture and rejects unsupported s
     assert.equal(source.parse(item.payload, company).length, item.expected_count, item.name);
   }
 });
+
+test("taleo source module fetches bootstrap page and REST results with source-local request metadata", async () => {
+  const source = getSourceModule("taleo");
+  const company = readJson(path.join(__dirname, "taleo", "fixtures", "company.json"));
+  const requests = [];
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      requests.push({
+        url,
+        method: target.method,
+        headers: target.headers,
+        body: target.body
+      });
+      if (url === "https://fixture.taleo.net/careersection/001/jobsearch.ftl?lang=en") {
+        return {
+          body: [
+            "<html><script>",
+            "window.TALEO = 'portal=123456';",
+            "sessionCSRFTokenName: 'csrfTokenName';",
+            "sessionCSRFToken: 'csrfTokenValue';",
+            "</script></html>"
+          ].join(""),
+          status: 200,
+          url
+        };
+      }
+      if (url === "https://fixture.taleo.net/careersection/rest/jobboard/searchjobs?lang=en&portal=123456") {
+        const body = JSON.parse(target.body);
+        assert.equal(body.pageNo, 1);
+        return {
+          requisitionList: [{
+            jobId: "9001",
+            contestNo: "TALEO-9001",
+            column: [
+              "Remote Taleo Registry Engineer",
+              "Remote - United States",
+              "Full-time",
+              "May 25, 2026"
+            ]
+          }],
+          pagingData: {
+            pageSize: 25,
+            totalCount: 1
+          }
+        };
+      }
+      throw new Error(`unexpected Taleo fixture fetch ${url}`);
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => [request.url, request.method]), [
+    ["https://fixture.taleo.net/careersection/001/jobsearch.ftl?lang=en", "GET"],
+    ["https://fixture.taleo.net/careersection/rest/jobboard/searchjobs?lang=en&portal=123456", "POST"]
+  ]);
+  assert.equal(requests[0].headers.Accept, "text/html,application/xhtml+xml");
+  assert.equal(requests[1].headers["Content-Type"], "application/json");
+  assert.equal(requests[1].headers.csrfTokenName, "csrfTokenValue");
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "TALEO-9001");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.posting_date, "May 25, 2026");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});

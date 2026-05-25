@@ -197,6 +197,56 @@ test("BambooHR dispatches through registry source module instead of legacy colle
   }]);
 });
 
+test("Taleo dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "taleo",
+    family: SOURCE_FAMILIES.brittleHighRisk,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "taleo",
+      source_family: "brittle",
+      list_url: "https://fixture.taleo.net/careersection/001/jobsearch.ftl?lang=en"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { requisitionList: [{ jobId: "7001" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.requisitionList) ? "Taleo Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Taleo registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "taleo",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "taleo",
+    company_name: "Taleo Registry Co",
+    url_string: "https://fixture.taleo.net/careersection/001/jobsearch.ftl?lang=en"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "taleo"],
+    ["fetchList", "taleo", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Taleo Registry Co",
+    position_name: "Taleo Registry Posting"
+  }]);
+});
+
 test("ApplyToJob dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

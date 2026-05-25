@@ -29,7 +29,6 @@ const {
   parseSagehrCompany,
   parseSapHrCloudCompany,
   parseSimplicantCompany,
-  parseTaleoCompany,
   parseTalentreefCompany,
   parseTalentlyftCompany,
   parseTalexioCompany,
@@ -48,7 +47,6 @@ const {
   extractBrassringHiddenInput,
   parseBrassringPostingsFromApi
 } = require("./sources/brassring/parse");
-const { extractTaleoPostingsFromAjax, extractTaleoPostingsFromRest } = require("./sources/taleo/parse");
 const {
   buildTalentreefSearchPayload,
   extractTalentreefAliasData,
@@ -250,6 +248,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
+  taleo: TALEO_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -571,104 +570,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   }
   
-  function extractTaleoRestConfig(pageHtml) {
-    const source = String(pageHtml || "");
-    const portalMatch = source.match(/portal=([0-9]{6,})/i);
-    const portal = String(portalMatch?.[1] || "").trim();
-  
-    const tokenNamePatterns = [
-      /sessionCSRFTokenName\s*:\s*'([^']+)'/i,
-      /sessionCSRFTokenName\s*:\s*"([^"]+)"/i,
-      /"sessionCSRFTokenName"\s*:\s*"([^"]+)"/i,
-      /name=['"](csrftoken)['"]/i
-    ];
-    const tokenValuePatterns = [
-      /sessionCSRFToken\s*:\s*'([^']+)'/i,
-      /sessionCSRFToken\s*:\s*"([^"]+)"/i,
-      /"sessionCSRFToken"\s*:\s*"([^"]+)"/i,
-      /name=["']csrftoken["'][^>]*value=["']([^"']+)["']/i
-    ];
-  
-    let tokenName = "";
-    let tokenValue = "";
-  
-    for (const pattern of tokenNamePatterns) {
-      const match = source.match(pattern);
-      if (!match?.[1]) continue;
-      tokenName = String(match[1] || "").trim();
-      if (tokenName) break;
-    }
-  
-    for (const pattern of tokenValuePatterns) {
-      const match = source.match(pattern);
-      if (!match?.[1]) continue;
-      tokenValue = String(match[1] || "").trim();
-      if (tokenValue) break;
-    }
-  
-    return { portal, tokenName, tokenValue };
-  }
-  function buildTaleoRestPayload(pageNo = 1) {
-    return {
-      multilineEnabled: true,
-      sortingSelection: {
-        sortBySelectionParam: "1",
-        ascendingSortingOrder: "false"
-      },
-      fieldData: {
-        fields: {
-          LOCATION: "",
-          CATEGORY: "",
-          KEYWORD: ""
-        },
-        valid: true
-      },
-      filterSelectionParam: {
-        searchFilterSelections: [
-          { id: "JOB_FIELD", selectedValues: [] },
-          { id: "LOCATION", selectedValues: [] },
-          { id: "ORGANIZATION", selectedValues: [] },
-          { id: "JOB_LEVEL", selectedValues: [] }
-        ]
-      },
-      advancedSearchFiltersSelectionParam: {
-        searchFilterSelections: [
-          { id: "ORGANIZATION", selectedValues: [] },
-          { id: "LOCATION", selectedValues: [] },
-          { id: "JOB_FIELD", selectedValues: [] },
-          { id: "JOB_NUMBER", selectedValues: [] },
-          { id: "URGENT_JOB", selectedValues: [] },
-          { id: "JOB_SHIFT", selectedValues: [] }
-        ]
-      },
-      pageNo: Number(pageNo || 1)
-    };
-  }
-  
-  function buildTaleoAjaxPayload(lang = "en", csrfToken = "") {
-    const payload = {
-      ftlpageid: "reqListBasicPage",
-      ftlinterfaceid: "requisitionListInterface",
-      ftlcompid: "validateTimeZoneId",
-      jsfCmdId: "validateTimeZoneId",
-      ftlcompclass: "InitTimeZoneAction",
-      ftlcallback: "requisition_restoreDatesValues",
-      ftlajaxid: "ftlx1",
-      tz: "GMT-07:00",
-      tzname: "America/Los_Angeles",
-      lang: String(lang || "en").trim() || "en",
-      isExternal: "true",
-      "rlPager.currentPage": "1",
-      "listRequisition.size": "25",
-      dropListSize: "25"
-    };
-  
-    if (csrfToken) {
-      payload.csrftoken = String(csrfToken || "").trim();
-    }
-  
-    return payload;
-  }
   
   function ensureIcimsIframeUrl(urlString) {
     const parsed = parseUrl(urlString);
@@ -2101,77 +2002,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.json();
   }
   
-  async function fetchTaleoJobSearchPage(urlString) {
-    const res = await fetchWithAtsRateLimit("taleo", TALEO_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Taleo page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
-  async function fetchTaleoRestSearchResults(config, portal, tokenName, tokenValue, pageNo) {
-    const apiUrl = `${config.baseOrigin}/careersection/rest/jobboard/searchjobs?lang=${encodeURIComponent(
-      config.lang
-    )}&portal=${encodeURIComponent(portal)}`;
-    const payload = buildTaleoRestPayload(pageNo);
-  
-    const headers = {
-      Accept: "application/json, text/javascript, */*; q=0.01",
-      "Content-Type": "application/json",
-      "x-requested-with": "XMLHttpRequest",
-      tz: "GMT-07:00",
-      tzname: "America/Los_Angeles"
-    };
-    if (tokenName && tokenValue) {
-      headers[tokenName] = tokenValue;
-    }
-  
-    const res = await fetchWithAtsRateLimit("taleo", TALEO_RATE_LIMIT_WAIT_MS, apiUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Taleo REST request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
-  async function fetchTaleoAjaxSearchResults(config, csrfToken = "") {
-    const apiUrl = `${config.baseSectionUrl}/jobsearch.ajax`;
-    const payload = new URLSearchParams(buildTaleoAjaxPayload(config.lang, csrfToken)).toString();
-  
-    const res = await fetchWithAtsRateLimit("taleo", TALEO_RATE_LIMIT_WAIT_MS, apiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "*/*",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "x-requested-with": "XMLHttpRequest",
-        tz: "GMT-07:00",
-        tzname: "America/Los_Angeles"
-      },
-      body: payload
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Taleo AJAX request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
   async function collectTodayPostingsForWorkdayCompany(company) {
     const config = parseWorkdayCompany(company.url_string);
     if (!config) return [];
@@ -3089,53 +2919,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return postings;
   }
   
-  async function collectPostingsForTaleoCompany(company) {
-    const config = parseTaleoCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.careerSectionLower;
-    const pageHtml = await fetchTaleoJobSearchPage(company.url_string);
-    const { portal, tokenName, tokenValue } = extractTaleoRestConfig(pageHtml);
-    const postings = [];
-    const seenUrls = new Set();
-  
-    if (portal) {
-      for (let pageNo = 1; pageNo <= MAX_PAGES_PER_COMPANY; pageNo += 1) {
-        const response = await fetchTaleoRestSearchResults(config, portal, tokenName, tokenValue, pageNo);
-        const requisitions = Array.isArray(response?.requisitionList) ? response.requisitionList : [];
-        if (requisitions.length === 0) break;
-  
-        const batch = extractTaleoPostingsFromRest(companyNameForPostings, config, requisitions);
-        for (const posting of batch) {
-          if (seenUrls.has(posting.job_posting_url)) continue;
-          seenUrls.add(posting.job_posting_url);
-          postings.push(posting);
-        }
-  
-        const pagingData = response?.pagingData && typeof response.pagingData === "object" ? response.pagingData : {};
-        const totalCount = Number(pagingData?.totalCount);
-        const pageSizeRaw = Number(pagingData?.pageSize);
-        const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : requisitions.length;
-        if (requisitions.length < pageSize) break;
-        if (Number.isFinite(totalCount) && pageNo * pageSize >= totalCount) break;
-      }
-    }
-  
-    if (postings.length > 0) {
-      return postings;
-    }
-  
-    const ajaxText = await fetchTaleoAjaxSearchResults(config, tokenValue);
-    const ajaxPostings = extractTaleoPostingsFromAjax(companyNameForPostings, config, ajaxText);
-    for (const posting of ajaxPostings) {
-      if (seenUrls.has(posting.job_posting_url)) continue;
-      seenUrls.add(posting.job_posting_url);
-      postings.push(posting);
-    }
-  
-    return postings;
-  }async function fetchGovernmentJobsViewHtml(url, params) {
+  async function fetchGovernmentJobsViewHtml(url, params) {
     const requestUrl = new URL(url);
     for (const [key, value] of Object.entries(params || {})) {
       requestUrl.searchParams.set(key, String(value));
@@ -3840,7 +3624,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForUltiProCompany(company);
     }
     if (atsName === "taleo" || atsName === "taleo.net" || atsName === "taleonet") {
-      return collectPostingsForTaleoCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "taleo");
     }
     return [];
   }
