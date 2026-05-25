@@ -51,12 +51,16 @@ The worker keeps manual sync controls available, but automatic Postgres syncs ar
 - `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `900000` ms.
 - `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `2000`; set to `0` for a reversible pause of automatic sync work.
 - `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `50`.
-- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `200`.
+- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `300`.
 - `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose keeps this at `500`; manual requested syncs may continue across runs until due targets drain.
 - `INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER`: over-select factor for due target candidates before source budget and protection filtering. Worker code defaults to `8`.
 
 The daily budget is conservative and restart-safe because the worker counts targets already recorded in `ingestion_runs` since UTC midnight before starting another automatic run. Manual requested syncs are not blocked by the budget, but their recorded targets count against later automatic work for the same day.
 To roll back this throughput stage without code changes, override `INGESTION_WORKER_INTERVAL_MS=1800000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=1000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=25`, and `INGESTION_SOURCE_DAILY_TARGET_BUDGET=100` in the production environment.
+
+## Container DNS
+
+The app and worker containers use explicit external DNS resolvers through Compose (`OPENJOBSLOTS_DNS_PRIMARY`, `OPENJOBSLOTS_DNS_SECONDARY`; defaults `1.1.1.1` and `1.0.0.1`) so high-volume ATS fetches are not dependent only on the host/router resolver. If production shows recurrent `getaddrinfo EAI_AGAIN` errors, verify the container `/etc/resolv.conf` and run lookup probes from `openjobslots-worker` before increasing throughput further.
 
 ## Postgres Observability
 

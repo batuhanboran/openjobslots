@@ -1,7 +1,7 @@
 const WORKER_BUDGET_DEFAULTS = Object.freeze({
   autoSyncDailyTargetBudget: 2000,
   autoSyncTargetsPerRun: 50,
-  sourceDailyTargetBudget: 200
+  sourceDailyTargetBudget: 300
 });
 
 function positiveInteger(value, fallback) {
