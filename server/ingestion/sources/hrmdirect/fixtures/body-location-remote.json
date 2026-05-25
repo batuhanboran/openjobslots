@@ -1,0 +1,19 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Body Remote",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://bodyremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://bodyremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://bodyremote.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://bodyremote.hrmdirect.com/employment/job-opening.php?req=HRM9701",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9701\"><td class=\"departments reqitem ReqRowClick\">Commercial Sales</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9701\">Director, Enterprise Business Development</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Commercial Sales</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr></table><p>Location : This is a remote role; candidates must be based within reasonable distance of a major airport.</p><p>Travel: 30% annually.</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9701",
+    "remote_type": "remote",
+    "remote_source": "labeled_detail_body",
+    "remote_path": "detail body Location",
+    "remote_rule_name": "hrmdirect_detail_body_location_remote"
+  }
+}

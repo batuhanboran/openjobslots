@@ -145,6 +145,15 @@ function extractHrmDirectDetailRemoteTag(detailHtml) {
   return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
 }
 
+function extractHrmDirectDetailBodyLocationRemoteType(detailHtml) {
+  const text = cleanHrmDirectText(detailHtml);
+  const directMatch = text.match(/\bLocation\s*:\s*(Remote|Hybrid)\b/i);
+  const roleMatch = text.match(/\bLocation\s*:\s*This\s+is\s+a\s+(remote|hybrid)\s+(?:role|position|job)\b/i);
+  const value = directMatch?.[1] || roleMatch?.[1] || "";
+  if (!value) return "";
+  return String(value).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+}
+
 function extractHrmDirectRssValue(itemXml, tagName) {
   const escapedTagName = escapeRegExp(tagName);
   const match = String(itemXml || "").match(new RegExp(`<${escapedTagName}\\b[^>]*>([\\s\\S]*?)<\\/${escapedTagName}>`, "i"));
@@ -300,12 +309,21 @@ function extractHrmDirectDetailFields(detailHtml) {
   const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
   const detailRemoteType = normalizeRemoteType(workplaceType);
   const detailRemoteTag = ["remote", "hybrid"].includes(detailRemoteType) ? "" : extractHrmDirectDetailRemoteTag(detailHtml);
-  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailRemoteTag;
+  const detailBodyRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailRemoteTag
+    ? ""
+    : extractHrmDirectDetailBodyLocationRemoteType(detailHtml);
+  const remoteType = ["remote", "hybrid"].includes(detailRemoteType) ? detailRemoteType : detailRemoteTag || detailBodyRemoteType;
   const locationPath = primaryLocation ? "table.viewFields Location" : officeLocation.location ? "table.viewFields Office" : "";
   const locationRuleName = officeLocation.ruleName;
-  const remoteSource = remoteType ? detailRemoteTag ? "structured_detail_tag" : "labeled_detail_html" : "";
-  const remotePath = remoteType ? detailRemoteTag ? "detail text #LI-Remote/#LI-Hybrid" : "table.viewFields Workplace Type" : "";
-  const remoteRuleName = remoteType ? detailRemoteTag ? "hrmdirect_detail_li_remote_tag" : "hrmdirect_detail_workplace_type" : "";
+  const remoteSource = remoteType
+    ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType ? "labeled_detail_body" : "labeled_detail_html"
+    : "";
+  const remotePath = remoteType
+    ? detailRemoteTag ? "detail text #LI-Remote/#LI-Hybrid" : detailBodyRemoteType ? "detail body Location" : "table.viewFields Workplace Type"
+    : "";
+  const remoteRuleName = remoteType
+    ? detailRemoteTag ? "hrmdirect_detail_li_remote_tag" : detailBodyRemoteType ? "hrmdirect_detail_body_location_remote" : "hrmdirect_detail_workplace_type"
+    : "";
   return {
     location,
     department,
