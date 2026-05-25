@@ -1,0 +1,12 @@
+{
+  "ats_key": "teamtailor",
+  "description": "Invalid Teamtailor source-shape fixtures for rejection and quarantine.",
+  "cases": [
+    { "name": "missing title", "expected": "rejected", "reason": "missing position_name|missing title", "posting": { "company_name": "Fixture Teamtailor", "source_job_id": "tt-missing-title", "position_name": "", "job_posting_url": "https://fixture.teamtailor.com/jobs/tt-missing-title", "location": "Heidelberg", "remote_type": "onsite" } },
+    { "name": "missing canonical URL", "expected": "rejected", "reason": "missing job_posting_url|missing canonical_url", "posting": { "company_name": "Fixture Teamtailor", "source_job_id": "tt-missing-url", "position_name": "Valid Title", "job_posting_url": "", "location": "Heidelberg", "remote_type": "onsite" } },
+    { "name": "missing source id", "expected": "rejected", "reason": "missing source_job_id", "posting": { "company_name": "Fixture Teamtailor", "source_job_id": "", "position_name": "Valid Title", "job_posting_url": "https://fixture.teamtailor.com/jobs/", "location": "Heidelberg", "remote_type": "onsite" } },
+    { "name": "missing location with unknown remote", "expected": "quarantined", "reason": "no_geo_no_remote", "posting": { "company_name": "Fixture Teamtailor", "source_job_id": "tt-no-location", "position_name": "Valid Title", "job_posting_url": "https://fixture.teamtailor.com/jobs/tt-no-location", "location": "", "remote_type": "unknown" } },
+    { "name": "multiple locations", "expected": "quarantined", "reason": "ambiguous_location", "posting": { "company_name": "Fixture Teamtailor", "source_job_id": "tt-multi", "position_name": "Valid Title", "job_posting_url": "https://fixture.teamtailor.com/jobs/tt-multi", "location": "Multiple Locations", "remote_type": "unknown" } },
+    { "name": "vague remote marketing text", "expected": "quarantined", "reason": "no_geo_no_remote", "posting": { "company_name": "Fixture Teamtailor", "source_job_id": "tt-vague-remote", "position_name": "Flexible Workplace Specialist", "job_posting_url": "https://fixture.teamtailor.com/jobs/tt-remote", "location": "", "description_plain": "Remote collaboration is supported.", "remote_type": "unknown" } }
+  ]
+}

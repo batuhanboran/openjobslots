@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -32,6 +32,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
+  assert.equal(isRegistryPilotSource("teamtailor"), true);
   assert.equal(isRegistryPilotSource("zoho"), true);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
@@ -55,6 +56,7 @@ test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Br
     "recruitee",
     "rippling",
     "taleo",
+    "teamtailor",
     "zoho"
   ]);
 });
@@ -213,6 +215,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof manatal.normalize, "function");
   assert.equal(typeof manatal.validate, "function");
   assert.deepEqual(validateSourceContract(manatal), { ok: true, failures: [] });
+
+  const teamtailor = getRegistrySourceModule("teamtailor");
+  assert.equal(teamtailor.atsKey, "teamtailor");
+  assert.equal(teamtailor.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(teamtailor.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof teamtailor.discover, "function");
+  assert.equal(typeof teamtailor.fetchList, "function");
+  assert.equal(typeof teamtailor.parse, "function");
+  assert.equal(typeof teamtailor.normalize, "function");
+  assert.equal(typeof teamtailor.validate, "function");
+  assert.deepEqual(validateSourceContract(teamtailor), { ok: true, failures: [] });
 
   const pinpointHq = getRegistrySourceModule("pinpointhq");
   assert.equal(pinpointHq.atsKey, "pinpointhq");

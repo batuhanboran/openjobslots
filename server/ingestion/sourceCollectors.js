@@ -28,7 +28,6 @@ const {
   parseTalentreefCompany,
   parseTalentlyftCompany,
   parseTalexioCompany,
-  parseTeamtailorCompany,
   parseTheApplicantManagerCompany,
   parseUltiProCompany
 } = require("./sourceDiscovery");
@@ -84,7 +83,6 @@ const {
   inferWorkdayLocationFromJobUrl,
   parseWorkdayPostingsFromApi
 } = require("./sources/workday/parse");
-const { parseTeamtailorPostingsFromHtml } = require("./sources/teamtailor/parse");
 const { parseFreshteamPostingsFromHtml } = require("./sources/freshteam/parse");
 const {
   extractSagehrCompanyNameFromHtml,
@@ -238,6 +236,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
+  teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
@@ -1240,28 +1239,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchTeamtailorJobsPage(config) {
-    const res = await fetchWithAtsRateLimit("teamtailor", TEAMTAILOR_RATE_LIMIT_WAIT_MS, config.jobsUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Teamtailor page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.jobsUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".teamtailor.com")) {
-      throw new Error(`Teamtailor URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
   }
   
   async function fetchFreshteamJobsPage(config) {
@@ -2412,22 +2389,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return collected;
   }
   
-  async function collectPostingsForTeamtailorCompany(company) {
-    const config = parseTeamtailorCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml, finalUrl } = await fetchTeamtailorJobsPage(config);
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      jobsUrl: finalUrl || config.jobsUrl
-    };
-    return parseTeamtailorPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
   async function collectPostingsForFreshteamCompany(company) {
     const config = parseFreshteamCompany(company.url_string);
     if (!config) return [];
@@ -3243,7 +3204,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForHirebridgeCompany(company);
     }
     if (atsName === "teamtailor" || atsName === "teamtailor.com" || atsName === "teamtailorcom") {
-      return collectPostingsForTeamtailorCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "teamtailor");
     }
     if (atsName === "freshteam" || atsName === "freshteam.com" || atsName === "freshteamcom") {
       return collectPostingsForFreshteamCompany(company);

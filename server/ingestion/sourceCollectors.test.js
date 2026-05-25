@@ -847,6 +847,56 @@ test("Manatal dispatches through registry source module instead of legacy collec
   }]);
 });
 
+test("Teamtailor dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "teamtailor",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "teamtailor",
+      source_family: "html_detail",
+      list_url: "https://fixture.teamtailor.com/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { html: "<li class=\"block-grid-item\">Fixture</li>" };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.html ? "Teamtailor Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Teamtailor registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "teamtailor",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "teamtailor",
+    company_name: "Teamtailor Registry Co",
+    url_string: "https://fixture.teamtailor.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "teamtailor"],
+    ["fetchList", "teamtailor", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Teamtailor Registry Co",
+    position_name: "Teamtailor Registry Posting"
+  }]);
+});
+
 test("Recruitee dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {
