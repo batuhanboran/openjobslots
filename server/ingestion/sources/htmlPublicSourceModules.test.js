@@ -1059,6 +1059,126 @@ test("hrmdirect source module accepts labeled detail office country as geo evide
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module parses labeled list office prefixes as geo evidence", () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "office-prefixed-location.json"));
+
+  const parsed = source.parse({
+    html: fixture.list_html,
+    __listUrl: fixture.search_list_url,
+    __rssXml: fixture.rss_xml
+  }, fixture.company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, fixture.company);
+    return [row.source_job_id, row];
+  }));
+
+  for (const [id, expected] of Object.entries(fixture.expected)) {
+    const row = normalized[id];
+    assert.ok(row, `expected ${id} to be parsed`);
+    assert.equal(row.location_text || "", expected.location_text);
+    assert.equal(row.country || "", expected.country);
+    assert.equal(row.city || "", expected.city);
+    assert.equal(row.remote_type, expected.remote_type);
+    assert.equal(row.posting_date, fixture.posting_date);
+    assert.equal(row.source_evidence.posting_date_source, "rss_xml");
+    if (expected.location_path) {
+      assert.equal(row.source_evidence.location_source, "labeled_html");
+      assert.equal(row.source_evidence.location_path, expected.location_path);
+      assert.equal(row.source_evidence.location_rule_name, expected.location_rule_name);
+    }
+    if (expected.remote_path) {
+      assert.equal(row.source_evidence.remote_source, "labeled_html");
+      assert.equal(row.source_evidence.remote_path, expected.remote_path);
+      assert.equal(row.source_evidence.remote_rule_name, expected.remote_rule_name);
+    }
+    if (expected.source_failure_reasons) {
+      assert.deepEqual(row.source_failure_reasons || [], expected.source_failure_reasons);
+    } else {
+      assert.deepEqual(row.source_failure_reasons || [], []);
+    }
+    assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, expected.public_gate_status);
+  }
+});
+
+test("hrmdirect source module keeps list city evidence when office supplies country", () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Office Country With City",
+    ATS_name: "hrmdirect",
+    url_string: "https://officecity.hrmdirect.com/employment/job-openings.php"
+  };
+  const [posting] = source.parse({
+    html: `<table><tr class="reqitem" data-req-id="HRM9201">
+      <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=HRM9201&req_loc=2001">Offshore Doctor Guyana</a></td>
+      <td class="cities reqitem ReqRowClick">Georgetown</td>
+      <td class="state reqitem ReqRowClick">Georgetown</td>
+      <td class="offices reqitem ReqRowClick">Corporate Guyana</td>
+    </tr></table>`,
+    __listUrl: "https://officecity.hrmdirect.com/employment/job-openings.php?search=true"
+  }, company);
+  const normalized = source.normalize(posting, company);
+
+  assert.equal(normalized.location_text, "Georgetown, Georgetown");
+  assert.equal(normalized.city, "Georgetown");
+  assert.equal(normalized.country, "Guyana");
+  assert.equal(normalized.source_evidence.location_path, "td.cities + td.state");
+  assert.equal(normalized.source_evidence.location_rule_name, "");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module parses labeled detail office prefixes as geo evidence", async () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Detail Office Prefix",
+    ATS_name: "hrmdirect",
+    url_string: "https://detailofficeprefix.hrmdirect.com/employment/job-openings.php"
+  };
+  const searchListUrl = "https://detailofficeprefix.hrmdirect.com/employment/job-openings.php?search=true";
+  const detailUrl = "https://detailofficeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9301";
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      if (url === searchListUrl) {
+        return {
+          html: `<table><tr class="reqitem" data-req-id="HRM9301">
+            <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=HRM9301&req_loc=3001">UK Offshore Medic</a></td>
+            <td class="cities reqitem ReqRowClick"></td>
+            <td class="state reqitem ReqRowClick"></td>
+          </tr></table>`,
+          status: 200,
+          url
+        };
+      }
+      if (url === "https://detailofficeprefix.hrmdirect.com/employment/rss.php?search=true") {
+        return { html: "", status: 404, url };
+      }
+      if (url === detailUrl) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Office:</b></td><td class="viewFieldValue">Field UK Onshore</td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, company);
+  const normalized = source.normalize(posting, company);
+
+  assert.equal(normalized.location_text, "United Kingdom");
+  assert.equal(normalized.country, "United Kingdom");
+  assert.equal(normalized.city || "", "");
+  assert.equal(normalized.remote_type, "unknown");
+  assert.equal(normalized.source_evidence.location_source, "labeled_detail_html");
+  assert.equal(normalized.source_evidence.location_path, "table.viewFields Office");
+  assert.equal(normalized.source_evidence.location_rule_name, "hrmdirect_detail_office_country_prefixed");
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("hrmdirect source module accepts labeled detail office province as geo evidence", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");

@@ -82,6 +82,17 @@ const HRMDIRECT_US_STATE_ABBREVIATION_EXACT_PATTERN =
   /^(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)$/i;
 const HRMDIRECT_STREET_SUFFIX_PATTERN =
   /\b(?:ave(?:nue)?|blvd|boulevard|cir(?:cle)?|ct|court|dr(?:ive)?|hwy|highway|ln|lane|pkwy|parkway|pl|place|rd|road|st|street|way)\b/i;
+const HRMDIRECT_OFFICE_COUNTRY_ALIASES = Object.freeze({
+  "u s": "United States",
+  "us": "United States",
+  "u s a": "United States",
+  "usa": "United States",
+  "united states": "United States",
+  "u k": "United Kingdom",
+  "uk": "United Kingdom",
+  "united kingdom": "United Kingdom",
+  "guyana": "Guyana"
+});
 
 function parseUrl(urlString) {
   try {
@@ -153,21 +164,91 @@ function extractHrmDirectListRemoteLocation(value) {
   };
 }
 
+function normalizeHrmDirectOfficeCountry(value) {
+  const text = cleanHrmDirectLocationText(value);
+  if (!text) return "";
+  const normalizedKey = text
+    .toLowerCase()
+    .replace(/[.]/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return HRMDIRECT_OFFICE_COUNTRY_ALIASES[normalizedKey] || normalizeCountryName(text);
+}
+
+function stripHrmDirectOfficeDescriptor(value) {
+  let candidate = cleanHrmDirectLocationText(value);
+  if (!candidate) return "";
+  candidate = candidate.replace(/^(?:corporate|field)\s+/i, "").trim();
+  candidate = candidate.replace(/\s+(?:remote\s+)?(?:onshore|offshore)$/i, "").trim();
+  candidate = candidate.replace(/\s+(?:remote|hybrid)$/i, "").trim();
+  return cleanHrmDirectLocationText(candidate);
+}
+
+function extractHrmDirectOfficeRemoteScopeType(value) {
+  const text = cleanHrmDirectLocationText(value);
+  if (!text) return "";
+  const stateRemoteMatch = text.match(
+    /^(?:AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\s*[-/]\s*(remote|hybrid)$/i
+  );
+  if (stateRemoteMatch?.[1]) return stateRemoteMatch[1].toLowerCase() === "hybrid" ? "hybrid" : "remote";
+  const countryRemoteMatch = text
+    .replace(/^corporate\s+/i, "")
+    .trim()
+    .match(/^(?:US|U\.S\.|USA|U\.S\.A\.|United States|UK|U\.K\.|United Kingdom)\s*[-/]?\s*(remote|hybrid)$/i);
+  if (countryRemoteMatch?.[1]) return countryRemoteMatch[1].toLowerCase() === "hybrid" ? "hybrid" : "remote";
+  return "";
+}
+
 function extractHrmDirectOfficeLocation(value) {
   const text = cleanHrmDirectLocationText(value);
-  if (!text || isRemoteOnlyLocationValue(text)) return { location: "", ruleName: "" };
+  if (!text || isRemoteOnlyLocationValue(text) || /^unassigned\s+office$/i.test(text)) {
+    return { location: "", country: "", remoteType: "unknown", ruleName: "", remoteRuleName: "" };
+  }
+  const remoteScopeType = extractHrmDirectOfficeRemoteScopeType(text);
+  const stateRemoteMatch = text.match(HRMDIRECT_US_STATE_ABBREVIATION_PATTERN);
+  if (remoteScopeType && stateRemoteMatch?.[0] && /^\s*[A-Z]{2}\s*[-/]\s*(?:remote|hybrid)\s*$/i.test(text)) {
+    return {
+      location: stateRemoteMatch[0].toUpperCase(),
+      country: "United States",
+      remoteType: remoteScopeType,
+      ruleName: "hrmdirect_detail_office_state_remote_scope",
+      remoteRuleName: "hrmdirect_detail_office_remote_scope"
+    };
+  }
   if (HRMDIRECT_US_STATE_NAMES.has(text.toLowerCase())) {
-    return { location: text, ruleName: "hrmdirect_detail_office_state" };
+    return { location: text, country: "United States", remoteType: "unknown", ruleName: "hrmdirect_detail_office_state", remoteRuleName: "" };
   }
   if (HRMDIRECT_CANADA_PROVINCE_NAMES.has(text.toLowerCase())) {
-    return { location: text, ruleName: "hrmdirect_detail_office_province" };
+    return { location: text, country: "Canada", remoteType: "unknown", ruleName: "hrmdirect_detail_office_province", remoteRuleName: "" };
   }
   const compactText = text.replace(/[^A-Za-z0-9]+/g, "");
   const country = compactText.length > 2 ? normalizeCountryName(text) : "";
   if (country) {
-    return { location: country, ruleName: "hrmdirect_detail_office_country" };
+    return { location: country, country, remoteType: "unknown", ruleName: "hrmdirect_detail_office_country", remoteRuleName: "" };
   }
-  return { location: "", ruleName: "" };
+  const officeCandidate = stripHrmDirectOfficeDescriptor(text);
+  const officeCountry = officeCandidate && officeCandidate !== text ? normalizeHrmDirectOfficeCountry(officeCandidate) : "";
+  if (officeCountry) {
+    return {
+      location: officeCountry,
+      country: officeCountry,
+      remoteType: remoteScopeType || "unknown",
+      ruleName: remoteScopeType ? "hrmdirect_detail_office_country_remote_scope" : "hrmdirect_detail_office_country_prefixed",
+      remoteRuleName: remoteScopeType ? "hrmdirect_detail_office_remote_scope" : ""
+    };
+  }
+  return { location: "", country: "", remoteType: "unknown", ruleName: "", remoteRuleName: "" };
+}
+
+function toHrmDirectListOfficeLocation(officeLocation) {
+  if (!officeLocation?.location) return officeLocation;
+  return {
+    ...officeLocation,
+    ruleName: String(officeLocation.ruleName || "")
+      .replace("hrmdirect_detail_", "hrmdirect_list_"),
+    remoteRuleName: String(officeLocation.remoteRuleName || "")
+      .replace("hrmdirect_detail_", "hrmdirect_list_")
+  };
 }
 
 function hrmDirectDetailLocationRuleName(value) {
@@ -426,9 +507,10 @@ function extractHrmDirectDetailFields(detailHtml) {
   const detailBodyWorkModeTagRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType
     ? ""
     : extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml);
+  const detailOfficeRemoteType = officeLocation.remoteType && officeLocation.remoteType !== "unknown" ? officeLocation.remoteType : "";
   const remoteType = ["remote", "hybrid"].includes(detailRemoteType)
     ? detailRemoteType
-    : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType;
+    : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType || detailOfficeRemoteType;
   const locationPath = primaryLocation
     ? "table.viewFields Location"
     : officeLocation.location
@@ -438,7 +520,7 @@ function extractHrmDirectDetailFields(detailHtml) {
         : "";
   const locationSource = bodyAddressLocation ? "labeled_detail_body" : location ? "labeled_detail_html" : "";
   const locationRuleName = primaryLocationRuleName || officeLocation.ruleName || (bodyAddressLocation ? "hrmdirect_detail_body_location_address" : "");
-  const country = primaryLocationRuleName === "hrmdirect_detail_location_state_abbreviation" ? "United States" : "";
+  const country = primaryLocationRuleName === "hrmdirect_detail_location_state_abbreviation" ? "United States" : officeLocation.country || "";
   const remoteSource = remoteType
     ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType ? "labeled_detail_body" : "labeled_detail_html"
     : "";
@@ -453,7 +535,9 @@ function extractHrmDirectDetailFields(detailHtml) {
             ? "detail body work mode tag"
             : detailLocationRemoteType
               ? "table.viewFields Location"
-              : "table.viewFields Workplace Type"
+              : detailOfficeRemoteType
+                ? "table.viewFields Office"
+                : "table.viewFields Workplace Type"
     : "";
   const remoteRuleName = remoteType
     ? detailRemoteTag
@@ -466,7 +550,9 @@ function extractHrmDirectDetailFields(detailHtml) {
             ? "hrmdirect_detail_body_work_mode_tag"
             : detailLocationRemoteType
               ? "hrmdirect_detail_location_remote"
-              : "hrmdirect_detail_workplace_type"
+              : detailOfficeRemoteType
+                ? officeLocation.remoteRuleName
+                : "hrmdirect_detail_workplace_type"
     : "";
   return {
     location,
@@ -703,8 +789,18 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     const city = listRemoteLocation.remoteType === "unknown" ? cityCell : "";
     const listState = listRemoteLocation.remoteType === "unknown" ? state : "";
     const listStateOnlyAbbreviation = !city && HRMDIRECT_US_STATE_ABBREVIATION_EXACT_PATTERN.test(listState);
+    const listOfficeLocation = toHrmDirectListOfficeLocation(extractHrmDirectOfficeLocation(
+      isGroupedDivLayout ? "" : extractHrmDirectCellValue(rowHtml, "offices")
+    ));
     const workModeRemoteType = normalizeRemoteType(workMode);
-    const remoteType = workModeRemoteType !== "unknown" ? workModeRemoteType : listRemoteLocation.remoteType !== "unknown" ? listRemoteLocation.remoteType : groupedRemoteLocation.remoteType;
+    const listOfficeRemoteType = listOfficeLocation.remoteType && listOfficeLocation.remoteType !== "unknown" ? listOfficeLocation.remoteType : "unknown";
+    const remoteType = workModeRemoteType !== "unknown"
+      ? workModeRemoteType
+      : listRemoteLocation.remoteType !== "unknown"
+        ? listRemoteLocation.remoteType
+        : groupedRemoteLocation.remoteType !== "unknown"
+          ? groupedRemoteLocation.remoteType
+          : listOfficeRemoteType;
     const listPostingDate =
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "date")) ||
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "dates")) ||
@@ -718,8 +814,57 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       cleanHrmDirectText(extractHrmDirectCellValue(rowHtml, "type")) ||
       null;
     const listLocation = [city, listState].filter(Boolean).join(", ");
-    const location = listLocation || listRemoteLocation.location || groupedRemoteLocation.location || workModeLocation;
-    const country = listStateOnlyAbbreviation ? "United States" : normalizeCountryFromLocation(location) || normalizeCountryName(state);
+    const location = listLocation || listRemoteLocation.location || groupedRemoteLocation.location || workModeLocation || listOfficeLocation.location;
+    const country = listStateOnlyAbbreviation ? "United States" : listOfficeLocation.country || normalizeCountryFromLocation(location) || normalizeCountryName(state);
+    const usesListOfficeLocation = Boolean(
+      listOfficeLocation.location &&
+      !listLocation &&
+      !listRemoteLocation.location &&
+      !groupedRemoteLocation.location &&
+      !workModeLocation
+    );
+    const locationPath = location
+      ? listLocation
+        ? (listStateOnlyAbbreviation ? "td.state" : "td.cities + td.state")
+        : listRemoteLocation.location
+          ? "td.cities"
+          : groupedRemoteLocation.location
+            ? "div.reqResult location"
+            : workModeLocation
+              ? "td.custSort1"
+              : listOfficeLocation.location
+                ? "td.offices"
+                : ""
+      : "";
+    const locationRuleName = listRemoteLocation.location
+      ? "hrmdirect_list_remote_city_location"
+      : groupedRemoteLocation.location
+        ? "hrmdirect_grouped_list_remote_location"
+        : listStateOnlyAbbreviation
+          ? "hrmdirect_list_state_abbreviation"
+          : usesListOfficeLocation
+            ? listOfficeLocation.ruleName
+            : "";
+    const remotePath = remoteType !== "unknown"
+      ? workModeRemoteType !== "unknown"
+        ? "td.custSort1"
+        : listRemoteLocation.remoteType !== "unknown"
+          ? "td.cities"
+          : groupedRemoteLocation.remoteType !== "unknown"
+            ? "div.reqResult location"
+            : listOfficeRemoteType !== "unknown"
+              ? "td.offices"
+              : ""
+      : "";
+    const remoteRuleName = remoteType !== "unknown"
+      ? workModeRemoteType !== "unknown"
+        ? "hrmdirect_work_mode_column"
+        : listRemoteLocation.remoteType !== "unknown"
+          ? "hrmdirect_list_remote_city"
+          : groupedRemoteLocation.remoteType !== "unknown"
+            ? "hrmdirect_grouped_list_remote"
+            : listOfficeLocation.remoteRuleName || ""
+      : "";
 
     const basePosting = {
       company_name: companyNameForPostings,
@@ -744,11 +889,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
         source_job_id_source: "url",
         source_job_id_path: sourceJobIdPath,
         location_source: location ? "labeled_html" : "",
-        location_path: location ? (listLocation ? (listStateOnlyAbbreviation ? "td.state" : "td.cities + td.state") : listRemoteLocation.location ? "td.cities" : groupedRemoteLocation.location ? "div.reqResult location" : "td.custSort1") : "",
-        location_rule_name: listRemoteLocation.location ? "hrmdirect_list_remote_city_location" : groupedRemoteLocation.location ? "hrmdirect_grouped_list_remote_location" : listStateOnlyAbbreviation ? "hrmdirect_list_state_abbreviation" : "",
+        location_path: locationPath,
+        location_rule_name: locationRuleName,
         remote_source: remoteType !== "unknown" ? "labeled_html" : "",
-        remote_path: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "td.custSort1" : listRemoteLocation.remoteType !== "unknown" ? "td.cities" : "div.reqResult location") : "",
-        remote_rule_name: remoteType !== "unknown" ? (workModeRemoteType !== "unknown" ? "hrmdirect_work_mode_column" : listRemoteLocation.remoteType !== "unknown" ? "hrmdirect_list_remote_city" : "hrmdirect_grouped_list_remote") : "",
+        remote_path: remotePath,
+        remote_rule_name: remoteRuleName,
         posting_date_source: listPostingDate ? "labeled_html" : rssPostingDate ? "rss_xml" : "",
         posting_date_path: listPostingDate ? "td.date/td.dates" : rssPostingDate ? "rss.channel.item pubDate" : "",
         posting_date_rule_name: rssPostingDate && !listPostingDate ? "hrmdirect_rss_pubdate" : ""

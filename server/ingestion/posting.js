@@ -70,6 +70,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Argentina", ["ar", "arg", "argentina"]],
   ["Chile", ["cl", "chl", "chile"]],
   ["Colombia", ["co", "col", "colombia"]],
+  ["Guyana", ["gy", "guy", "guyana"]],
   ["Peru", ["pe", "per", "peru"]],
   ["Paraguay", ["py", "pry", "paraguay"]],
   ["Uruguay", ["uy", "ury", "uruguay"]],
@@ -466,7 +467,7 @@ function normalizeRegionFromCountry(country) {
   ].includes(normalized)) {
     return "APAC";
   }
-  if (["brazil", "mexico", "argentina", "chile", "colombia", "peru", "paraguay", "uruguay", "ecuador"].includes(normalized)) {
+  if (["brazil", "mexico", "argentina", "chile", "colombia", "guyana", "peru", "paraguay", "uruguay", "ecuador"].includes(normalized)) {
     return "LATAM";
   }
   if (["aruba", "bahamas", "cayman islands", "puerto rico"].includes(normalized)) {

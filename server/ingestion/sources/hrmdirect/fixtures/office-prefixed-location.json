@@ -1,0 +1,74 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Office Prefix",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://officeprefix.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://officeprefix.hrmdirect.com/employment/job-openings.php?search=true",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9101\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9101&req_loc=1001\">Offshore Paramedic/Nurse - Poland</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\">Corporate Poland</td></tr><tr class=\"reqitem1\" data-req-id=\"HRM9102\"><td class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM9102&req_loc=1002\">UK Offshore Medic</a></td><td class=\"cities reqitem1 ReqRowClick\"></td><td class=\"state reqitem1 ReqRowClick\"></td><td class=\"offices reqitem1 ReqRowClick\">Field UK Onshore</td></tr><tr class=\"reqitem\" data-req-id=\"HRM9103\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9103&req_loc=1003\">Corporate Deployable Paramedic</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\">Corporate US Remote</td></tr><tr class=\"reqitem1\" data-req-id=\"HRM9104\"><td class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM9104&req_loc=1004\">General Consideration</a></td><td class=\"cities reqitem1 ReqRowClick\"></td><td class=\"state reqitem1 ReqRowClick\"></td><td class=\"offices reqitem1 ReqRowClick\">WA - Remote</td></tr><tr class=\"reqitem\" data-req-id=\"HRM9105\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9105&req_loc=1005\">Safety Paramedic</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\">Unassigned Office</td></tr><tr class=\"reqitem1\" data-req-id=\"HRM9106\"><td class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=HRM9106&req_loc=1006\">Field Provider</a></td><td class=\"cities reqitem1 ReqRowClick\"></td><td class=\"state reqitem1 ReqRowClick\"></td><td class=\"offices reqitem1 ReqRowClick\">Field US Remote Offshore</td></tr></table>",
+  "rss_xml": "<?xml version=\"1.0\"?><rss><channel><item><guid>https://officeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9101</guid><pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate></item><item><guid>https://officeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9102</guid><pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate></item><item><guid>https://officeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9103</guid><pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate></item><item><guid>https://officeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9104</guid><pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate></item><item><guid>https://officeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9105</guid><pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate></item><item><guid>https://officeprefix.hrmdirect.com/employment/job-opening.php?req=HRM9106</guid><pubDate>Mon, 25 May 2026 10:00:00 GMT</pubDate></item></channel></rss>",
+  "posting_date": "Mon, 25 May 2026 10:00:00 GMT",
+  "expected": {
+    "HRM9101": {
+      "location_text": "Poland",
+      "country": "Poland",
+      "city": "",
+      "remote_type": "unknown",
+      "location_path": "td.offices",
+      "location_rule_name": "hrmdirect_list_office_country_prefixed",
+      "public_gate_status": "accepted"
+    },
+    "HRM9102": {
+      "location_text": "United Kingdom",
+      "country": "United Kingdom",
+      "city": "",
+      "remote_type": "unknown",
+      "location_path": "td.offices",
+      "location_rule_name": "hrmdirect_list_office_country_prefixed",
+      "public_gate_status": "accepted"
+    },
+    "HRM9103": {
+      "location_text": "United States",
+      "country": "United States",
+      "city": "",
+      "remote_type": "remote",
+      "location_path": "td.offices",
+      "location_rule_name": "hrmdirect_list_office_country_remote_scope",
+      "remote_path": "td.offices",
+      "remote_rule_name": "hrmdirect_list_office_remote_scope",
+      "public_gate_status": "accepted"
+    },
+    "HRM9104": {
+      "location_text": "WA",
+      "country": "United States",
+      "city": "",
+      "remote_type": "remote",
+      "location_path": "td.offices",
+      "location_rule_name": "hrmdirect_list_office_state_remote_scope",
+      "remote_path": "td.offices",
+      "remote_rule_name": "hrmdirect_list_office_remote_scope",
+      "public_gate_status": "accepted"
+    },
+    "HRM9105": {
+      "location_text": "",
+      "country": "",
+      "city": "",
+      "remote_type": "unknown",
+      "source_failure_reasons": [
+        "no_geo_no_remote",
+        "detail_no_structured_location",
+        "detail_no_explicit_remote"
+      ],
+      "public_gate_status": "quarantined"
+    },
+    "HRM9106": {
+      "location_text": "United States",
+      "country": "United States",
+      "city": "",
+      "remote_type": "unknown",
+      "location_path": "td.offices",
+      "location_rule_name": "hrmdirect_list_office_country_prefixed",
+      "public_gate_status": "accepted"
+    }
+  }
+}
