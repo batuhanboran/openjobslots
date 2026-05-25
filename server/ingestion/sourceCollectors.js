@@ -44,12 +44,6 @@ const {
   resolveAdpWorkforcenowCompanyName
 } = require("./sources/adp_workforcenow/parse");
 const {
-  buildApplitrackDetailUrl,
-  extractApplitrackDetailFields,
-  normalizeApplitrackUrl,
-  parseApplitrackPostings
-} = require("./sources/applitrack/parse");
-const {
   extractBrassringCompanyName,
   extractBrassringHiddenInput,
   parseBrassringPostingsFromApi
@@ -229,7 +223,6 @@ const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
-const APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const USAJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const USAJOBS_SEARCH_API_URL = "https://data.usajobs.gov/api/Search";
@@ -244,6 +237,7 @@ const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
+  applitrack: APPLITRACK_RATE_LIMIT_WAIT_MS,
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
   ashby: ASHBY_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
@@ -2522,56 +2516,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson);
   }
   
-  async function fetchApplitrackDetailFields(jobUrl) {
-    const res = await fetchWithAtsRateLimit("applitrack", APPLITRACK_RATE_LIMIT_WAIT_MS, jobUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      }
-    });
-    if (!res.ok) return {};
-    return extractApplitrackDetailFields(await res.text());
-  }
-  
-  async function collectPostingsForApplitrackCompany(company) {
-    const siteRoot = normalizeApplitrackUrl(company?.url_string);
-    const outputUrl = new URL("jobpostings/Output.asp?all=1", siteRoot).toString();
-    const res = await fetchWithAtsRateLimit("applitrack", APPLITRACK_RATE_LIMIT_WAIT_MS, outputUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Applitrack request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const pageHtml = await res.text();
-    const companyName = String(company?.company_name || "").trim() || "Unknown Company";
-    const postings = parseApplitrackPostings(pageHtml, siteRoot, companyName);
-    let detailFetches = 0;
-    for (const posting of postings) {
-      if (detailFetches >= APPLITRACK_DETAIL_FETCH_LIMIT_PER_COMPANY) break;
-      if (String(posting?.location || "").trim() && String(posting?.posting_date || "").trim()) continue;
-      try {
-        const detailUrl = buildApplitrackDetailUrl(siteRoot, posting.source_job_id, posting.job_posting_url);
-        const detail = await fetchApplitrackDetailFields(detailUrl);
-        detailFetches += 1;
-        posting.location = posting.location || detail.location || null;
-        posting.posting_date = posting.posting_date || detail.posting_date || null;
-        posting.remote_type = posting.remote_type || detail.remote_type || null;
-        posting.department = posting.department || detail.department || null;
-      } catch {
-        detailFetches += 1;
-      }
-    }
-    return postings;
-  }
-  
   function parseHibobCompany(url) {
     const normalizedUrl = String(url || "").trim();
     if (!normalizedUrl) return null;
@@ -3735,7 +3679,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForBrassringCompany(company);
     }
     if (atsName === "applitrack" || atsName === "applitrack.com" || atsName === "applitrackcom") {
-      return collectPostingsForApplitrackCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "applitrack");
     }
     if (atsName === "hibob" || atsName === "hibob.com" || atsName === "hibobcom" || atsName === "careers.hibob.com" || atsName === "careershibobcom") {
       return collectPostingsForHibobCompany(company);

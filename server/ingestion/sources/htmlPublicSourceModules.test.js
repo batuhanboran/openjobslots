@@ -221,6 +221,46 @@ test("applitrack source module enriches Output.asp rows from deterministic detai
   assert.equal(evaluatePublicPosting(byId["7003"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("applitrack source module fetches Output.asp and details with source-local request metadata", async () => {
+  const source = getSourceModule("applitrack");
+  const sourceDir = path.join(__dirname, "applitrack");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+  const requests = [];
+
+  const raw = await source.fetchList(fixture.company, {
+    maxApplitrackDetailFetches: 2,
+    fetcher: async (url, target) => {
+      requests.push({ url, method: target.method, headers: target.headers });
+      const value = String(url || "");
+      if (/Output\.asp/i.test(value)) return { html: fixture.output_html, status: 200, url: value };
+      const parsed = new URL(value);
+      const jobId = parsed.searchParams.get("AppliTrackJobId");
+      if (fixture.details[jobId]) return { html: fixture.details[jobId], status: 200, url: value };
+      return { html: "", status: fixture.stale_detail_status, url: value };
+    }
+  });
+
+  assert.equal(raw.__sourceConfig.siteRoot, "https://www.applitrack.com/fixturedistrict/onlineapp/");
+  assert.deepEqual(requests.slice(0, 3), [
+    {
+      url: "https://www.applitrack.com/fixturedistrict/onlineapp/jobpostings/Output.asp?all=1",
+      method: "GET",
+      headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
+    },
+    {
+      url: "https://www.applitrack.com/fixturedistrict/onlineapp/JobPostings/view.asp?AppliTrackJobId=7001&AppliTrackLayoutMode=detail&AppliTrackViewPosting=1&all=1&embed=1",
+      method: "GET",
+      headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
+    },
+    {
+      url: "https://www.applitrack.com/fixturedistrict/onlineapp/JobPostings/view.asp?AppliTrackJobId=7003&AppliTrackLayoutMode=detail&AppliTrackViewPosting=1&all=1&embed=1",
+      method: "GET",
+      headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
+    }
+  ]);
+  assert.equal(raw.__sourceConfig.detail_fetch_count, 2);
+});
+
 test("applytojob source module enriches list rows from JSON-LD and labeled detail pages", async () => {
   const source = getSourceModule("applytojob");
   const sourceDir = path.join(__dirname, "applytojob");

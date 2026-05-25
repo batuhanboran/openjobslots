@@ -697,6 +697,53 @@ test("Fountain dispatches through registry source module instead of legacy colle
   }]);
 });
 
+test("Applitrack dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "applitrack",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.quarantine,
+    discover: () => ({
+      ats_key: "applitrack",
+      source_family: "public_sector",
+      list_url: "https://district.applitrack.com/onlineapp/jobpostings/Output.asp?all=1"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: company.company_name, position_name: "Applitrack Registry Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Applitrack registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "applitrack",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "applitrack.com",
+    company_name: "Applitrack Registry Co",
+    url_string: "https://district.applitrack.com/onlineapp/default.aspx"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "applitrack"],
+    ["fetchList", "applitrack.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Applitrack Registry Co",
+    position_name: "Applitrack Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

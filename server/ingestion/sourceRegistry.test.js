@@ -12,8 +12,9 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, Recruitee, and Zoho as pilot sources", () => {
+test("registry exposes ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Greenhouse, HRMDirect, iCIMS, Lever, RecruitCRM, Recruitee, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("applicantpro"), true);
+  assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
   assert.equal(isRegistryPilotSource("ashby"), true);
   assert.equal(isRegistryPilotSource("bamboohr"), true);
@@ -31,6 +32,7 @@ test("registry exposes ApplicantPro, ApplyToJob, Ashby, BambooHR, Breezy, Career
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
   assert.deepEqual(pilotKeys, [
     "applicantpro",
+    "applitrack",
     "applytojob",
     "ashby",
     "bamboohr",
@@ -58,6 +60,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof applicantPro.normalize, "function");
   assert.equal(typeof applicantPro.validate, "function");
   assert.deepEqual(validateSourceContract(applicantPro), { ok: true, failures: [] });
+
+  const applitrack = getRegistrySourceModule("applitrack");
+  assert.equal(applitrack.atsKey, "applitrack");
+  assert.equal(applitrack.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(applitrack.status, SOURCE_STATUSES.quarantine);
+  assert.equal(typeof applitrack.discover, "function");
+  assert.equal(typeof applitrack.fetchList, "function");
+  assert.equal(typeof applitrack.parse, "function");
+  assert.equal(typeof applitrack.normalize, "function");
+  assert.equal(typeof applitrack.validate, "function");
+  assert.deepEqual(validateSourceContract(applitrack), { ok: true, failures: [] });
 
   const applyToJob = getRegistrySourceModule("applytojob");
   assert.equal(applyToJob.atsKey, "applytojob");
