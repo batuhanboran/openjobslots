@@ -18,7 +18,6 @@ const {
   parseJobApsCompany,
   parseJobviteCompany,
   parseJoinCompany,
-  parseLeverCompany,
   parseLoxoCompany,
   parseManatalCompany,
   parseOracleCompany,
@@ -73,7 +72,6 @@ const {
   parseHirebridgePostingsFromHtml
 } = require("./sources/hirebridge/parse");
 const { parseJobvitePostingsFromHtml } = require("./sources/jobvite/parse");
-const { parseLeverPostingsFromApi } = require("./sources/lever/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
 const {
   extractManatalPageRuntimeConfig,
@@ -197,7 +195,6 @@ const WORKDAY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ASHBY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GREENHOUSE_API_URL_BASE = "https://boards-api.greenhouse.io/v1/boards";
 const GREENHOUSE_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const LEVER_API_URL_BASE = "https://api.lever.co/v0/postings";
 const LEVER_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const RECRUITEE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ULTIPRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -265,7 +262,8 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
-  icims: ICIMS_RATE_LIMIT_WAIT_MS
+  icims: ICIMS_RATE_LIMIT_WAIT_MS,
+  lever: LEVER_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
 const ORACLE_EXPAND_VALUE = [
@@ -806,28 +804,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Greenhouse request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
-  async function fetchLeverJobBoard(organization) {
-    const encodedOrganization = encodeURIComponent(organization);
-    const res = await fetchWithAtsRateLimit(
-      "lever",
-      LEVER_RATE_LIMIT_WAIT_MS,
-      `${LEVER_API_URL_BASE}/${encodedOrganization}?mode=json`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json"
-        }
-      }
-    );
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Lever request failed (${res.status}): ${body.slice(0, 180)}`);
     }
   
     return res.json();
@@ -2315,14 +2291,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     const response = await fetchGreenhouseJobBoard(config.boardToken);
     return parseGreenhousePostingsFromApi(company.company_name, config, response);
-  }
-  
-  async function collectPostingsForLeverCompany(company) {
-    const config = parseLeverCompany(company.url_string);
-    if (!config) return [];
-  
-    const response = await fetchLeverJobBoard(config.organization);
-    return parseLeverPostingsFromApi(company.company_name, config, response);
   }
   
   async function collectPostingsForJobviteCompany(company) {
@@ -3814,7 +3782,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForGreenhouseCompany(company);
     }
     if (atsName === "leverco" || atsName === "lever.co" || atsName === "lever") {
-      return collectPostingsForLeverCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "lever");
     }
     if (atsName === "jobvite" || atsName === "jobvite.com" || atsName === "jobvitecom") {
       return collectPostingsForJobviteCompany(company);
