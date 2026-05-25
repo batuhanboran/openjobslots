@@ -794,6 +794,37 @@ test("hrmdirect source module treats detail Location remote label as remote evid
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module strips detail remote prefix while preserving scope location", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "detail-location-remote-scope.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: "", status: 404, url };
+      if (url === fixture.detail_url) return { html: fixture.detail_html, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.location_text, fixture.expected.location_text);
+  assert.equal(normalized.city || "", fixture.expected.city);
+  assert.equal(normalized.country, fixture.expected.country);
+  assert.equal(normalized.remote_type, fixture.expected.remote_type);
+  assert.equal(normalized.source_evidence.location_source, fixture.expected.location_source);
+  assert.equal(normalized.source_evidence.location_path, fixture.expected.location_path);
+  assert.equal(normalized.source_evidence.location_rule_name, fixture.expected.location_rule_name);
+  assert.equal(normalized.source_evidence.remote_source, fixture.expected.remote_source);
+  assert.equal(normalized.source_evidence.remote_path, fixture.expected.remote_path);
+  assert.equal(normalized.source_evidence.remote_rule_name, fixture.expected.remote_rule_name);
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("hrmdirect source module does not publish detail state abbreviation as city", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");

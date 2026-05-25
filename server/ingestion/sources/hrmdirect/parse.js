@@ -361,11 +361,14 @@ function extractHrmDirectViewField(detailHtml, labels) {
 
 function extractHrmDirectDetailFields(detailHtml) {
   const primaryLocationValue = cleanHrmDirectLocationText(extractHrmDirectViewField(detailHtml, ["Location", "Job Location", "Work Location"]));
-  const primaryLocationRemoteType = isRemoteOnlyLocationValue(primaryLocationValue)
-    ? normalizeRemoteType(primaryLocationValue)
-    : "unknown";
-  const primaryLocation = primaryLocationRemoteType === "unknown" ? primaryLocationValue : "";
-  const primaryLocationRuleName = hrmDirectDetailLocationRuleName(primaryLocation);
+  const primaryLocationRemoteType = normalizeRemoteType(primaryLocationValue);
+  const detailLocationRemoteType = ["remote", "hybrid"].includes(primaryLocationRemoteType) ? primaryLocationRemoteType : "";
+  const primaryLocation = detailLocationRemoteType
+    ? extractHrmDirectWorkModeLocationText(primaryLocationValue)
+    : primaryLocationValue;
+  const primaryLocationRuleName =
+    hrmDirectDetailLocationRuleName(primaryLocation) ||
+    (detailLocationRemoteType && primaryLocation ? "hrmdirect_detail_remote_scope_location" : "");
   const officeLocation = primaryLocation
     ? { location: "", ruleName: "" }
     : extractHrmDirectOfficeLocation(extractHrmDirectViewField(detailHtml, "Office"));
@@ -378,7 +381,6 @@ function extractHrmDirectDetailFields(detailHtml) {
   const postingDate = extractHrmDirectViewField(detailHtml, ["Date Posted", "Posted Date", "Posting Date", "Open Date"]);
   const workplaceType = extractHrmDirectViewField(detailHtml, ["Workplace Type", "Work Type", "Work Arrangement", "Remote"]);
   const detailRemoteType = normalizeRemoteType(workplaceType);
-  const detailLocationRemoteType = ["remote", "hybrid"].includes(primaryLocationRemoteType) ? primaryLocationRemoteType : "";
   const detailRemoteTag = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType ? "" : extractHrmDirectDetailRemoteTag(detailHtml);
   const detailBodyRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag
     ? ""

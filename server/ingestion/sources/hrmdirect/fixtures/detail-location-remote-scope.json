@@ -1,0 +1,25 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Detail Remote Scope",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://detailremotescope.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://detailremotescope.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://detailremotescope.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://detailremotescope.hrmdirect.com/employment/job-opening.php?req=HRM9934",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9934\"><td class=\"departments reqitem ReqRowClick\">Sales</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9934\">Account Executive</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Sales</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\">Remote - Arizona, AZ</td></tr></table></body></html>",
+  "expected": {
+    "source_job_id": "HRM9934",
+    "location_text": "Arizona, AZ",
+    "city": "",
+    "country": "United States",
+    "remote_type": "remote",
+    "location_source": "labeled_detail_html",
+    "location_path": "table.viewFields Location",
+    "location_rule_name": "hrmdirect_detail_remote_scope_location",
+    "remote_source": "labeled_detail_html",
+    "remote_path": "table.viewFields Location",
+    "remote_rule_name": "hrmdirect_detail_location_remote"
+  }
+}
