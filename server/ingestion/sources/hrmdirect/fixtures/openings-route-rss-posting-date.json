@@ -1,0 +1,21 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Openings Route",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://openingsroute.hrmdirect.com/employment/openings.php"
+  },
+  "search_list_url": "https://openingsroute.hrmdirect.com/employment/openings.php?search=true",
+  "rss_url": "https://openingsroute.hrmdirect.com/employment/rss.php?search=true",
+  "list_html": "<table><tr class=\"reqitem ReqRowClick\" data-req-id=\"HRM9401\"><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9401&req_loc=4401\">Paid Media Intern</a></td><td class=\"cities reqitem ReqRowClick\">Austin</td><td class=\"state reqitem ReqRowClick\">TX</td></tr></table>",
+  "rss_xml": "<?xml version=\"1.0\"?><rss><channel><item><title>Paid Media Intern</title><link>http://openingsroute.hrmdirect.com/employment/view.php?req=HRM9401</link><pubDate>Thu, 21 May 2026 04:00:00 +0100</pubDate></item></channel></rss>",
+  "expected": {
+    "source_job_id": "HRM9401",
+    "location_text": "Austin, TX",
+    "country": "United States",
+    "city": "Austin",
+    "posting_date": "Thu, 21 May 2026 04:00:00 +0100",
+    "posting_date_source": "rss_xml",
+    "posting_date_path": "rss.channel.item pubDate",
+    "posting_date_rule_name": "hrmdirect_rss_pubdate"
+  }
+}

@@ -1067,7 +1067,7 @@ function normalizeHrmDirectListUrl(urlValue) {
   if (!parsed) return clean(urlValue);
   const host = String(parsed.hostname || "").toLowerCase();
   if (!host.endsWith(".hrmdirect.com")) return parsed.toString();
-  if (/\/employment\/job-openings\.php$/i.test(parsed.pathname) && !parsed.searchParams.has("search")) {
+  if (/\/employment\/(?:job-openings|openings)\.php$/i.test(parsed.pathname) && !parsed.searchParams.has("search")) {
     parsed.searchParams.set("search", "true");
   }
   return parsed.toString();
@@ -1078,8 +1078,8 @@ function hrmDirectRssUrl(urlValue) {
   if (!parsed) return "";
   const host = String(parsed.hostname || "").toLowerCase();
   if (!host.endsWith(".hrmdirect.com")) return "";
-  if (!/\/employment\/job-openings\.php$/i.test(parsed.pathname)) return "";
-  parsed.pathname = parsed.pathname.replace(/job-openings\.php$/i, "rss.php");
+  if (!/\/employment\/(?:job-openings|openings)\.php$/i.test(parsed.pathname)) return "";
+  parsed.pathname = parsed.pathname.replace(/(?:job-openings|openings)\.php$/i, "rss.php");
   if (!parsed.searchParams.has("search")) parsed.searchParams.set("search", "true");
   return parsed.toString();
 }
