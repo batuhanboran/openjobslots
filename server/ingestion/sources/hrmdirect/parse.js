@@ -201,7 +201,20 @@ function extractHrmDirectOfficeRemoteScopeType(value) {
 
 function extractHrmDirectOfficeLocation(value) {
   const text = cleanHrmDirectLocationText(value);
-  if (!text || isRemoteOnlyLocationValue(text) || /^unassigned\s+office$/i.test(text)) {
+  if (!text || /^unassigned\s+office$/i.test(text)) {
+    return { location: "", country: "", remoteType: "unknown", ruleName: "", remoteRuleName: "" };
+  }
+  const exactOfficeRemoteType = /^(?:remote|hybrid)$/i.test(text) ? normalizeRemoteType(text) : "unknown";
+  if (exactOfficeRemoteType !== "unknown") {
+    return {
+      location: "",
+      country: "",
+      remoteType: exactOfficeRemoteType,
+      ruleName: "",
+      remoteRuleName: "hrmdirect_detail_office_remote_only"
+    };
+  }
+  if (isRemoteOnlyLocationValue(text)) {
     return { location: "", country: "", remoteType: "unknown", ruleName: "", remoteRuleName: "" };
   }
   const remoteScopeType = extractHrmDirectOfficeRemoteScopeType(text);
@@ -241,11 +254,12 @@ function extractHrmDirectOfficeLocation(value) {
 }
 
 function toHrmDirectListOfficeLocation(officeLocation) {
-  if (!officeLocation?.location) return officeLocation;
+  if (!officeLocation?.location && !officeLocation?.remoteRuleName) return officeLocation;
   return {
     ...officeLocation,
-    ruleName: String(officeLocation.ruleName || "")
-      .replace("hrmdirect_detail_", "hrmdirect_list_"),
+    ruleName: officeLocation.location
+      ? String(officeLocation.ruleName || "").replace("hrmdirect_detail_", "hrmdirect_list_")
+      : String(officeLocation.ruleName || ""),
     remoteRuleName: String(officeLocation.remoteRuleName || "")
       .replace("hrmdirect_detail_", "hrmdirect_list_")
   };

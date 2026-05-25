@@ -1,0 +1,38 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Office Remote",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://officeremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://officeremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://officeremote.hrmdirect.com/employment/rss.php?search=true",
+  "detail_urls": {
+    "HRM9401": "https://officeremote.hrmdirect.com/employment/job-opening.php?req=HRM9401"
+  },
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9401\"><td class=\"departments reqitem ReqRowClick\">Administration</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9401\">Governance Administrator</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\"></td></tr><tr class=\"reqitem\" data-req-id=\"HRM9402\"><td class=\"departments reqitem ReqRowClick\">Customer Success</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9402\">Customer Success Specialist</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td><td class=\"offices reqitem ReqRowClick\">Remote</td></tr></table>",
+  "detail_html": {
+    "HRM9401": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Administration</td></tr><tr><td class=\"viewFieldName\"><b>Office:</b></td><td class=\"viewFieldValue\">Remote</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"><br></td></tr></table></body></html>"
+  },
+  "expected": {
+    "HRM9401": {
+      "source_job_id": "HRM9401",
+      "location_text": null,
+      "city": "",
+      "country": "",
+      "remote_type": "remote",
+      "remote_source": "labeled_detail_html",
+      "remote_path": "table.viewFields Office",
+      "remote_rule_name": "hrmdirect_detail_office_remote_only"
+    },
+    "HRM9402": {
+      "source_job_id": "HRM9402",
+      "location_text": null,
+      "city": "",
+      "country": "",
+      "remote_type": "remote",
+      "remote_source": "labeled_html",
+      "remote_path": "td.offices",
+      "remote_rule_name": "hrmdirect_list_office_remote_only"
+    }
+  }
+}
