@@ -134,7 +134,10 @@ function extractHrmDirectRssPostingDateByReq(rssXml) {
   while (itemMatch) {
     const itemXml = String(itemMatch[1] || "");
     const link = extractHrmDirectRssValue(itemXml, "link");
-    const sourceJobId = extractSourceIdFromPostingUrl(link, "hrmdirect");
+    const guid = extractHrmDirectRssValue(itemXml, "guid");
+    const sourceJobId = [link, guid]
+      .map((value) => extractSourceIdFromPostingUrl(value, "hrmdirect"))
+      .find(Boolean);
     const pubDate = extractHrmDirectRssValue(itemXml, "pubDate");
     if (sourceJobId && pubDate && !postingDateByReq[sourceJobId]) {
       postingDateByReq[sourceJobId] = pubDate;

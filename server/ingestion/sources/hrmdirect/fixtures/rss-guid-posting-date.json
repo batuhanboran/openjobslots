@@ -1,0 +1,19 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect RSS Guid",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://rssguid.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://rssguid.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://rssguid.hrmdirect.com/employment/rss.php?search=true",
+  "list_html": "<table><tr class=\"reqitem ReqRowClick\" data-req-id=\"HRM9101\"><td class=\"leftBorder\">&nbsp;</td><td id=\"custSort10\" class=\"custSort1 reqitem ReqRowClick\">Onsite&nbsp;</td><td id=\"departments0\" class=\"departments reqitem ReqRowClick\">Operations</td><td id=\"posTitle0\" class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9101&req_loc=222\">Operations Coordinator</a></td><td id=\"cities0\" class=\"cities reqitem ReqRowClick\">Denver</td><td id=\"state0\" class=\"state reqitem ReqRowClick\">CO</td></tr></table>",
+  "rss_xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><rss version=\"2.0\"><channel><title>Fixture HRMDirect RSS Guid</title><item><title>Operations Coordinator</title><link>https://rssguid.hrmdirect.com/employment/job-openings.php</link><guid>https://rssguid.hrmdirect.com/employment/job-opening.php?req=HRM9101</guid><pubDate>Wed, 20 May 2026 12:30:00 +0000</pubDate><description><![CDATA[Structured RSS item description.]]></description></item></channel></rss>",
+  "expected": {
+    "source_job_id": "HRM9101",
+    "posting_date": "Wed, 20 May 2026 12:30:00 +0000",
+    "posting_date_epoch": 1779280200,
+    "posting_date_source": "rss_xml",
+    "posting_date_path": "rss.channel.item pubDate",
+    "posting_date_rule_name": "hrmdirect_rss_pubdate"
+  }
+}

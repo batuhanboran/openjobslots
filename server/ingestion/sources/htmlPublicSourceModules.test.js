@@ -723,6 +723,34 @@ test("hrmdirect source module uses RSS pubDate as posting date evidence", async 
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module uses RSS guid when link does not expose req id", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "rss-guid-posting-date.json"));
+  const requestedUrls = [];
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      requestedUrls.push(String(url));
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      if (url === fixture.rss_url) return { html: fixture.rss_xml, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const [posting] = source.parse(raw, fixture.company);
+  const normalized = source.normalize(posting, fixture.company);
+
+  assert.ok(requestedUrls.includes(fixture.rss_url));
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.posting_date, fixture.expected.posting_date);
+  assert.equal(normalized.posting_date_epoch, fixture.expected.posting_date_epoch);
+  assert.equal(normalized.source_evidence.posting_date_source, fixture.expected.posting_date_source);
+  assert.equal(normalized.source_evidence.posting_date_path, fixture.expected.posting_date_path);
+  assert.equal(normalized.source_evidence.posting_date_rule_name, fixture.expected.posting_date_rule_name);
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("hrmdirect source module uses search=true route and parses work-mode location cells", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");
