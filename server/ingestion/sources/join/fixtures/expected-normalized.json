@@ -1,0 +1,13 @@
+[
+  {
+    "source_job_id": "fixture-remote-role",
+    "company_name": "Fixture Join",
+    "position_name": "Fixture Remote Role",
+    "job_posting_url": "https://join.com/companies/fixtureco/fixture-remote-role",
+    "country": "Germany",
+    "city": "Berlin",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-25T09:00:00.000Z",
+    "parser_confidence": 0.55
+  }
+]

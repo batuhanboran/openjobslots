@@ -16,7 +16,6 @@ const {
   parseIcimsCompany,
   parseJobApsCompany,
   parseJobviteCompany,
-  parseJoinCompany,
   parseLoxoCompany,
   parseManatalCompany,
   parseOracleCompany,
@@ -112,10 +111,6 @@ const { parseRipplingPostingsFromApi } = require("./sources/rippling/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseGemPostingsFromBatchResponse } = require("./sources/gem/parse");
 const { parseJobApsPostingsFromHtml } = require("./sources/jobaps/parse");
-const {
-  extractJoinNextDataJsonFromHtml,
-  parseJoinPostingsFromNextData
-} = require("./sources/join/parse");
 const { parseGetroPostingsFromHtml } = require("./sources/getro/parse");
 const {
   extractTalentlyftInitialConfig,
@@ -243,6 +238,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: ICIMS_RATE_LIMIT_WAIT_MS,
+  join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
@@ -889,33 +885,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
     if (!finalHost.endsWith(".jobapscloud.com")) {
       throw new Error(`JobAps URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
-  async function fetchJoinCompanyPage(urlString) {
-    const res = await fetchWithAtsRateLimit("join", JOIN_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`JOIN page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "join.com" && finalHost !== "www.join.com") {
-      throw new Error(`JOIN URL redirected to unexpected host: ${finalUrl}`);
     }
   
     return { pageHtml: await res.text(), finalUrl };
@@ -2125,18 +2094,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || String(hostPrefix || "").toLowerCase();
     const { pageHtml, finalUrl } = await fetchJobApsCareersPage(config.boardUrl);
     return parseJobApsPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl || config.boardUrl);
-  }
-  
-  async function collectPostingsForJoinCompany(company) {
-    const config = parseJoinCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
-    const { pageHtml, finalUrl } = await fetchJoinCompanyPage(config.boardUrl);
-    const finalConfig = parseJoinCompany(finalUrl || config.boardUrl) || config;
-    const nextData = extractJoinNextDataJsonFromHtml(pageHtml);
-    return parseJoinPostingsFromNextData(companyNameForPostings, finalConfig.companySlug || config.companySlug, nextData);
   }
   
   async function collectPostingsForTalentreefCompany(company) {
@@ -3369,7 +3326,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForJobApsCompany(company);
     }
     if (atsName === "join" || atsName === "join.com" || atsName === "joincom") {
-      return collectPostingsForJoinCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "join");
     }
     if (
       atsName === "talentreef" ||

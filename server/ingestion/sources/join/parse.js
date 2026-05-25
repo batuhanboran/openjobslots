@@ -66,8 +66,10 @@ function parseJoinPostingsFromNextData(companyNameForPostings, companySlug, next
       company_name: companyNameForPostings,
       position_name: cleanJoinText(item?.title || "") || "Untitled Position",
       job_posting_url: postingUrl,
+      source_job_id: idParam,
       posting_date: cleanJoinText(item?.createdAt || "") || null,
       location: location || null,
+      remote_type: remoteType || workplaceType || null,
       department: cleanJoinText(category?.name || "") || null,
       employment_type: cleanJoinText(employmentType?.name || "") || null
     });

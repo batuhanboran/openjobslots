@@ -11,6 +11,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "jobvite",
   "careerplug",
   "talentreef",
+  "join",
   "hrmdirect",
   "breezy",
   "applytojob"
@@ -32,7 +33,7 @@ for (const atsKey of HTML_PUBLIC_SOURCES) {
     const discovered = source.discover(company);
     assert.equal(discovered.ats_key, atsKey);
     assert.ok(source.parserVersion.startsWith(`source-${atsKey}-v`));
-    assert.ok(["html_detail", "public_sector"].includes(discovered.source_family));
+    assert.ok(["html_detail", "public_sector", "embedded_json"].includes(discovered.source_family));
     assert.ok(source.rateLimit().requestsPerMinute <= 8);
 
     const parsed = source.parse(rawList, company);
@@ -95,6 +96,55 @@ test("target html/public ATS modules return no postings for empty raw payloads",
     const company = readJson(path.join(__dirname, atsKey, "fixtures", "company.json"));
     assert.deepEqual(source.parse({ html: "" }, company), [], atsKey);
   }
+});
+
+test("join source module fetches Next.js company page with source-local host guard", async () => {
+  const source = getSourceModule("join");
+  const company = readJson(path.join(__dirname, "join", "fixtures", "company.json"));
+  const rawList = readJson(path.join(__dirname, "join", "fixtures", "list.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        body: rawList.html,
+        status: 200,
+        url
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://join.com/companies/fixtureco",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }]);
+  assert.equal(payload.__sourceConfig.companySlug, "fixtureco");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "fixture-remote-role");
+  assert.equal(normalized.country, "Germany");
+  assert.equal(normalized.remote_type, "hybrid");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        body: rawList.html,
+        status: 200,
+        url: "https://example.com/companies/fixtureco"
+      })
+    }),
+    /unexpected host/
+  );
 });
 
 test("applicantpro source module discovers domain id and fetches core jobs JSON", async () => {
