@@ -415,6 +415,56 @@ test("ADP MyJobs dispatches through registry source module instead of legacy col
   }]);
 });
 
+test("ADP WorkForceNow dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "adp_workforcenow",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "adp_workforcenow",
+      source_family: "enterprise_api",
+      list_url: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc&ccId=fixture"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { jobRequisitions: [{ itemID: "ADP-WFN-1" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.jobRequisitions) ? "ADP WFN Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("ADP WorkForceNow registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "adp_workforcenow",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "workforcenow.adp.com",
+    company_name: "ADP WFN Registry Co",
+    url_string: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc&ccId=fixture"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "adp_workforcenow"],
+    ["fetchList", "workforcenow.adp.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "ADP WFN Registry Co",
+    position_name: "ADP WFN Registry Posting"
+  }]);
+});
+
 test("HRMDirect dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

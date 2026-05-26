@@ -1,4 +1,3 @@
-const { parseAdpWorkforcenowPostingsFromApi } = require("./adp_workforcenow/parse");
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
@@ -726,15 +725,11 @@ const SOURCE_SPECS = Object.freeze({
   adp_workforcenow: {
     sourceFamily: "enterprise_api",
     confidence: 0.65,
-    parser: parseAdpWorkforcenowPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed ADP Workforce Now public recruitment endpoint",
     discover(company) {
       return {
-        config: {
-          cid: queryParam(company.url_string, "cid"),
-          ccId: queryParam(company.url_string, "ccId"),
-          boardUrl: clean(company.url_string)
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

@@ -10,6 +10,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.disabled
   }),
+  adp_workforcenow: Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled
+  }),
   applicantpro: Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
     status: SOURCE_STATUSES.enabled

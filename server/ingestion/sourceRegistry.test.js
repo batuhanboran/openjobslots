@@ -12,8 +12,9 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
+  assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
@@ -53,6 +54,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
   assert.deepEqual(pilotKeys, [
     "adp_myjobs",
+    "adp_workforcenow",
     "applicantpro",
     "applitrack",
     "applytojob",
@@ -102,6 +104,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof adpMyjobs.normalize, "function");
   assert.equal(typeof adpMyjobs.validate, "function");
   assert.deepEqual(validateSourceContract(adpMyjobs), { ok: true, failures: [] });
+
+  const adpWorkforcenow = getRegistrySourceModule("adp_workforcenow");
+  assert.equal(adpWorkforcenow.atsKey, "adp_workforcenow");
+  assert.equal(adpWorkforcenow.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(adpWorkforcenow.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof adpWorkforcenow.discover, "function");
+  assert.equal(typeof adpWorkforcenow.fetchList, "function");
+  assert.equal(typeof adpWorkforcenow.parse, "function");
+  assert.equal(typeof adpWorkforcenow.normalize, "function");
+  assert.equal(typeof adpWorkforcenow.validate, "function");
+  assert.deepEqual(validateSourceContract(adpWorkforcenow), { ok: true, failures: [] });
 
   const applicantPro = getRegistrySourceModule("applicantpro");
   assert.equal(applicantPro.atsKey, "applicantpro");

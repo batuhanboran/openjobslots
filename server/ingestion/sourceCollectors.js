@@ -1,7 +1,6 @@
 const { safeFetch } = require("./safeFetch");
 const { decodeHtmlEntities } = require("./parsers/shared/html");
 const {
-  parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
@@ -18,11 +17,6 @@ const {
   parseTalexioCompany,
   parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
-const {
-  extractAdpWorkforcenowCompanyName,
-  parseAdpWorkforcenowPostingsFromApi,
-  resolveAdpWorkforcenowCompanyName
-} = require("./sources/adp_workforcenow/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
 const {
   extractIcimsLocationFromHtml,
@@ -133,7 +127,6 @@ const JOBAPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
@@ -150,6 +143,7 @@ const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
+  adp_workforcenow: 60 * 1000,
   applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
   applitrack: APPLITRACK_RATE_LIMIT_WAIT_MS,
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
@@ -869,42 +863,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchAdpWorkforcenowContentLinks(config) {
-    const url =
-      `${config.contentLinksBaseUrl}?cid=${encodeURIComponent(config.cid)}` +
-      `&timeStamp=${Date.now()}&ccId=${encodeURIComponent(config.ccId)}&locale=en_US&lang=en_US`;
-    const res = await fetchWithAtsRateLimit("adp_workforcenow", ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS, url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*"
-      }
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ADP Workforce Now content-links request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-    return res.json();
-  }
-  
-  async function fetchAdpWorkforcenowJobsPage(config) {
-    const res = await fetchWithAtsRateLimit(
-      "adp_workforcenow",
-      ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS,
-      config.jobRequisitionsUrl,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json, text/plain, */*"
-        }
-      }
-    );
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ADP Workforce Now job-requisitions request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-    return res.json();
-  }
-  
   async function fetchCareerpuckJobBoard(config) {
     const res = await fetchWithAtsRateLimit("careerpuck", CAREERPUCK_RATE_LIMIT_WAIT_MS, config.apiUrl, {
       method: "GET",
@@ -1185,16 +1143,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || String(hostPrefix || "").toLowerCase();
     const { pageHtml, finalUrl } = await fetchJobApsCareersPage(config.boardUrl);
     return parseJobApsPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl || config.boardUrl);
-  }
-  
-  async function collectPostingsForAdpWorkforcenowCompany(company) {
-    const config = parseAdpWorkforcenowCompany(company.url_string);
-    if (!config) return [];
-  
-    const contentLinksJson = await fetchAdpWorkforcenowContentLinks(config);
-    const companyNameForPostings = resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson);
-    const responseJson = await fetchAdpWorkforcenowJobsPage(config);
-    return parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson);
   }
   
   function parseHibobCompany(url) {
@@ -1933,7 +1881,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "workforcenow.adp.com" ||
       atsName === "workforcenowadpcom"
     ) {
-      return collectPostingsForAdpWorkforcenowCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "adp_workforcenow");
     }
     if (
       atsName === "paylocity" ||

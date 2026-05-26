@@ -148,33 +148,6 @@ function parseAdpMyjobsCompany(urlString) {
   };
 }
 
-function parseAdpWorkforcenowCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "workforcenow.adp.com" && host !== "www.workforcenow.adp.com") return null;
-
-  const cid = String(parsed.searchParams?.get("cid") || "").trim();
-  const ccId = String(parsed.searchParams?.get("ccId") || "").trim();
-  if (!cid || !ccId) return null;
-
-  const baseOrigin = "https://workforcenow.adp.com";
-  const boardUrl =
-    `${baseOrigin}/mascsr/default/mdf/recruitment/recruitment.html?` +
-    `cid=${encodeURIComponent(cid)}&ccId=${encodeURIComponent(ccId)}`;
-  const apiBase = `${baseOrigin}/mascsr/default/careercenter/public/events/staffing/v1`;
-
-  return {
-    host,
-    cid,
-    ccId,
-    boardUrl,
-    jobRequisitionsUrl: `${apiBase}/job-requisitions?cid=${encodeURIComponent(cid)}&ccId=${encodeURIComponent(ccId)}`,
-    contentLinksBaseUrl: `${apiBase}/content-links/career-center`
-  };
-}
-
 function parseCareerspageCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -928,7 +901,6 @@ function parseTaleoCompany(urlString) {
 
 const COMPANY_SOURCE_PARSERS = Object.freeze({
   adp_myjobs: parseAdpMyjobsCompany,
-  adp_workforcenow: parseAdpWorkforcenowCompany,
   applicantai: parseApplicantAiCompany,
   applicantpro: parseApplicantProCompany,
   applytojob: parseApplyToJobCompany,
@@ -974,7 +946,6 @@ function parseCompanySourceConfig(atsKey, urlString) {
 
 module.exports = {
   parseAdpMyjobsCompany,
-  parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
   parseApplicantProCompany,
   parseApplyToJobCompany,
