@@ -133,31 +133,6 @@ function parseAdpMyjobsCompany(urlString) {
   };
 }
 
-function parseCareerpuckCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "app.careerpuck.com" && host !== "www.app.careerpuck.com") return null;
-
-  const pathParts = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length < 2 || pathParts[0].toLowerCase() !== "job-board") return null;
-
-  const boardSlug = String(pathParts[1] || "").trim();
-  if (!boardSlug) return null;
-
-  return {
-    host,
-    boardSlug,
-    boardSlugLower: boardSlug.toLowerCase(),
-    boardUrl: `${parsed.protocol}//${parsed.host}/job-board/${boardSlug}`,
-    apiUrl: `https://api.careerpuck.com/v1/public/job-boards/${encodeURIComponent(boardSlug)}`
-  };
-}
-
 function parseFountainCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -761,7 +736,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   bamboohr: parseBambooHrCompany,
   breezy: parseBreezyCompany,
   careerplug: parseCareerplugCompany,
-  careerpuck: parseCareerpuckCompany,
   fountain: parseFountainCompany,
   freshteam: parseFreshteamCompany,
   hrmdirect: parseHrmDirectCompany,
@@ -799,7 +773,6 @@ module.exports = {
   parseBambooHrCompany,
   parseBreezyCompany,
   parseCareerplugCompany,
-  parseCareerpuckCompany,
   parseCompanySourceConfig,
   parseFountainCompany,
   parseFreshteamCompany,

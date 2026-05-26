@@ -29,7 +29,8 @@ function parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson) {
       job_posting_url: jobUrl,
       posting_date: postingDate,
       location,
-      department: departmentNames.length > 0 ? departmentNames.join(" / ") : null
+      department: departmentNames.length > 0 ? departmentNames.join(" / ") : null,
+      source_job_id: String(job?.id || job?.jobId || job?.uuid || "").trim() || jobUrl
     });
     seenUrls.add(jobUrl);
   }

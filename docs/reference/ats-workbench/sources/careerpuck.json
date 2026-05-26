@@ -1,7 +1,7 @@
 {
   "ats_key": "careerpuck",
   "display_name": "CareerPuck",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "direct_json",
   "official_public_docs_or_observed_endpoint": "Observed CareerPuck public board JSON.",
   "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
@@ -9,33 +9,39 @@
   "detail_fetch_method": "not required for core fields unless the list payload omits description or normalized geo evidence",
   "pagination_method": "use source offset/limit/page cursor when documented; otherwise cap single-list fetches",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "pending-research: Prefer raw id; otherwise stable URL id.",
+  "source_job_id_rule": "list-payload: Prefer raw id/jobId/uuid; otherwise stable canonical URL.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "pending-research: Vendor-specific payload shape needs saved fixture proof.",
-  "country_region_city_rule": "pending-research: Vendor-specific payload shape needs saved fixture proof.",
-  "remote_type_rule": "pending-research: Use explicit remote/workplace fields or conservative text only.",
-  "posting_date_rule": "pending-research: Use source date only; leave null when source omits it.",
+  "location_text_rule": "list-payload: Saved raw fixture covers source location text, including concrete city/country and explicit Remote labels.",
+  "country_region_city_rule": "list-payload: Saved raw fixture covers source-provided city/country normalization without invented geo.",
+  "remote_type_rule": "list-payload: Use explicit Remote location labels or normal geo-backed onsite classification only.",
+  "posting_date_rule": "list-payload: Use source postedAt only; leave null when source omits it.",
   "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/careerpuck/fixtures/company.json",
+      "server/ingestion/sources/careerpuck/fixtures/expected-normalized.json",
+      "server/ingestion/sources/careerpuck/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/careerpuck/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/careerpuck/fixtures/company.json",
+      "server/ingestion/sources/careerpuck/fixtures/expected-normalized.json",
+      "server/ingestion/sources/careerpuck/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/careerpuck/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/careerpuck/index.js",
+    "fixtures_dir": "server/ingestion/sources/careerpuck/fixtures",
+    "parser_version": "source-careerpuck-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "public_enabled",
+    "minimum_confidence": 0.78,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url/source_job_id and row-level quality gate"
   },
   "public_enabled": true,
   "quarantine_reason": "",
@@ -57,21 +63,21 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseCareerpuckPostingsFromApi",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/careerpuck/parse.js",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
+    "discover": "server/ingestion/sources/careerpuck/discover.js",
+    "fetchList": "server/ingestion/sources/careerpuck/fetchList.js",
     "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseCareerpuckPostingsFromApi",
-    "parseDetail": "server/index.js parseCareerpuckPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "parseList": "server/ingestion/sources/careerpuck/parse.js",
+    "parseDetail": "server/ingestion/sources/careerpuck/parse.js",
+    "normalize": "server/ingestion/sources/careerpuck/index.js",
+    "validate": "server/ingestion/sources/careerpuck/index.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "run bounded read-only source estimate before any production apply",
+  "certification_blockers": "production impact not yet refreshed after local source-module extraction"
 }

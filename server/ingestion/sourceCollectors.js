@@ -1,7 +1,6 @@
 const { safeFetch } = require("./safeFetch");
 const {
   parseApplicantAiCompany,
-  parseCareerpuckCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -22,7 +21,6 @@ const {
 } = require("./sources/sagehr/parse");
 const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
-const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theapplicantmanager/parse");
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
@@ -80,7 +78,6 @@ const ZOHO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLICANTAI_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERPLUG_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BAMBOOHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const CAREERPUCK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FOUNTAIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HRMDIRECT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -636,22 +633,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchCareerpuckJobBoard(config) {
-    const res = await fetchWithAtsRateLimit("careerpuck", CAREERPUCK_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`CareerPuck API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchTalexioJobsPage(config, page = 1, limit = 10) {
     const apiUrl = String(config?.apiUrl || "").trim();
     if (!apiUrl) {
@@ -873,16 +854,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       jobsUrl: finalUrl || config.jobsUrl
     };
     return parseSimplicantPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
-  async function collectPostingsForCareerpuckCompany(company) {
-    const config = parseCareerpuckCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.boardSlugLower;
-    const responseJson = await fetchCareerpuckJobBoard(config);
-    return parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson);
   }
   
   async function collectPostingsForTalexioCompany(company) {
@@ -1523,7 +1494,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "rippling");
     }
     if (atsName === "careerpuck" || atsName === "careerpuck.com" || atsName === "careerpuckcom") {
-      return collectPostingsForCareerpuckCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "careerpuck");
     }
     if (atsName === "fountain" || atsName === "fountain.com" || atsName === "fountaincom") {
       return collectPostingsForRegistryPilotCompany(company, "fountain");

@@ -2510,3 +2510,53 @@ test("Getro dispatch is registry-owned even when runtime pilot predicate is fals
     position_name: "Registry Getro Posting"
   }]);
 });
+
+test("CareerPuck dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "careerpuck",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "careerpuck",
+      source_family: "direct_json",
+      list_url: "https://api.careerpuck.com/v1/public/job-boards/fixture"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { jobs: [{ id: "cp-1" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.jobs) ? "CareerPuck Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("CareerPuck registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "careerpuck.com",
+    company_name: "CareerPuck Registry Co",
+    url_string: "https://app.careerpuck.com/job-board/fixture"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "careerpuck"],
+    ["fetchList", "careerpuck.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "CareerPuck Registry Co",
+    position_name: "CareerPuck Registry Posting"
+  }]);
+});

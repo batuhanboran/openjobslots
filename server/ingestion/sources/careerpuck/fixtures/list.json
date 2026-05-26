@@ -1,0 +1,34 @@
+{
+  "jobs": [
+    {
+      "id": "cp-1001",
+      "status": "public",
+      "title": "Product Data Analyst",
+      "publicUrl": "https://app.careerpuck.com/job-board/fixtureco/jobs/cp-1001",
+      "location": "Istanbul, Turkey",
+      "postedAt": "2026-05-20",
+      "departments": [
+        {
+          "name": "Data"
+        }
+      ]
+    },
+    {
+      "id": "cp-1002",
+      "status": "public",
+      "title": "Remote Partnerships Lead",
+      "publicUrl": "https://app.careerpuck.com/job-board/fixtureco/jobs/cp-1002",
+      "location": "Remote",
+      "postedAt": "2026-05-21",
+      "departments": []
+    },
+    {
+      "id": "cp-draft",
+      "status": "draft",
+      "title": "Draft Role",
+      "publicUrl": "https://app.careerpuck.com/job-board/fixtureco/jobs/cp-draft",
+      "location": "Berlin, Germany",
+      "postedAt": "2026-05-22"
+    }
+  ]
+}
