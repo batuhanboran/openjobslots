@@ -2,6 +2,7 @@ const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
+const { parseCareerspagePostingsFromHtml } = require("./careerspage/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
@@ -610,6 +611,18 @@ const SOURCE_SPECS = Object.freeze({
     confidence: 0.55,
     parser: (companyName, config, payload) => parseLoxoPostingsFromHtml(companyName, config, payload?.html || payload),
     officialDocs: "observed Loxo public jobs HTML",
+    discover(company) {
+      return {
+        config: {},
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
+  careerspage: {
+    sourceFamily: "html_detail",
+    confidence: 0.55,
+    parser: (companyName, config, payload) => parseCareerspagePostingsFromHtml(companyName, config, payload?.html || payload),
+    officialDocs: "observed CareersPage public jobs HTML",
     discover(company) {
       return {
         config: {},

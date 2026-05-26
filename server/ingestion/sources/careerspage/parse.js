@@ -1,5 +1,6 @@
 "use strict";
 
+const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
 
 function cleanCareerspageText(value) {
@@ -54,6 +55,7 @@ function parseCareerspagePostingsFromHtml(companyNameForPostings, config, pageHt
     postings.push({
       company_name: companyNameForPostings,
       position_name: title || "Untitled Position",
+      source_job_id: extractSourceIdFromPostingUrl(jobUrl, "careerspage"),
       job_posting_url: jobUrl,
       posting_date: null,
       location: location || null,

@@ -47,6 +47,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
+  careerspage: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
   eightfold: Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.disabled,

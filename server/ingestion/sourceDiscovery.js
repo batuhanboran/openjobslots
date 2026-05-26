@@ -133,30 +133,6 @@ function parseAdpMyjobsCompany(urlString) {
   };
 }
 
-function parseCareerspageCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "careerspage.io" && host !== "www.careerspage.io") return null;
-
-  const pathParts = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length === 0) return null;
-
-  const companySlug = String(pathParts[0] || "").trim();
-  if (!companySlug) return null;
-
-  return {
-    host,
-    companySlug,
-    companySlugLower: companySlug.toLowerCase(),
-    boardUrl: `https://careerspage.io/${companySlug}`
-  };
-}
-
 function parseCareerpuckCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -838,7 +814,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   breezy: parseBreezyCompany,
   careerplug: parseCareerplugCompany,
   careerpuck: parseCareerpuckCompany,
-  careerspage: parseCareerspageCompany,
   fountain: parseFountainCompany,
   freshteam: parseFreshteamCompany,
   getro: parseGetroCompany,
@@ -880,7 +855,6 @@ module.exports = {
   parseBreezyCompany,
   parseCareerplugCompany,
   parseCareerpuckCompany,
-  parseCareerspageCompany,
   parseCompanySourceConfig,
   parseFountainCompany,
   parseFreshteamCompany,

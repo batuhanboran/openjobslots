@@ -10,6 +10,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "hirebridge",
   "jobvite",
   "careerplug",
+  "careerspage",
   "talentreef",
   "join",
   "teamtailor",

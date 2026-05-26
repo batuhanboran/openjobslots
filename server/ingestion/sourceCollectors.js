@@ -2,7 +2,6 @@ const { safeFetch } = require("./safeFetch");
 const {
   parseApplicantAiCompany,
   parseCareerpuckCompany,
-  parseCareerspageCompany,
   parseGetroCompany,
   parseJobApsCompany,
   parsePeopleforceCompany,
@@ -26,7 +25,6 @@ const {
 } = require("./sources/sagehr/parse");
 const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
-const { parseCareerspagePostingsFromHtml } = require("./sources/careerspage/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseJobApsPostingsFromHtml } = require("./sources/jobaps/parse");
@@ -133,6 +131,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
+  careerspage: CAREERSPAGE_RATE_LIMIT_WAIT_MS,
   eightfold: 60 * 1000,
   fountain: FOUNTAIN_RATE_LIMIT_WAIT_MS,
   freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
@@ -561,33 +560,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchCareerspageBoardPage(urlString) {
-    const res = await fetchWithAtsRateLimit("careerspage", CAREERSPAGE_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`CareersPage request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "careerspage.io" && finalHost !== "www.careerspage.io") {
-      throw new Error(`CareersPage URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
   async function fetchSagehrJobsPage(config) {
     const headers = {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -970,16 +942,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.companySubdomain;
     const responseJson = await fetchHibobJobBoard(config, company.url_string);
     return parseHibobPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
-  async function collectPostingsForCareerspageCompany(company) {
-    const config = parseCareerspageCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
-    const { pageHtml } = await fetchCareerspageBoardPage(config.boardUrl);
-    return parseCareerspagePostingsFromHtml(companyNameForPostings, config, pageHtml);
   }
   
   async function collectPostingsForSagehrCompany(company) {
@@ -1684,7 +1646,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "manatal");
     }
     if (atsName === "careerspage" || atsName === "careerspage.io" || atsName === "careerspageio") {
-      return collectPostingsForCareerspageCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "careerspage");
     }
     if (
       atsName === "pageup" ||

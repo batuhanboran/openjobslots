@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareersPage, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -23,6 +23,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("brassring"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
+  assert.equal(isRegistryPilotSource("careerspage"), true);
   assert.equal(isRegistryPilotSource("eightfold"), true);
   assert.equal(isRegistryPilotSource("gem"), true);
   assert.equal(isRegistryPilotSource("fountain"), true);
@@ -64,6 +65,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "brassring",
     "breezy",
     "careerplug",
+    "careerspage",
     "eightfold",
     "fountain",
     "freshteam",

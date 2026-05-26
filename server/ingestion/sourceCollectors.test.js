@@ -2322,3 +2322,50 @@ test("Loxo dispatch is registry-owned even when runtime pilot predicate is false
     position_name: "Registry Loxo Posting"
   }]);
 });
+
+test("CareersPage dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "careerspage",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "careerspage",
+      source_family: "html_detail",
+      list_url: "https://careerspage.io/fixtureco"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: company.company_name, position_name: "Registry CareersPage Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("CareersPage registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "careerspage.io",
+    company_name: "CareersPage Registry Co",
+    url_string: "https://careerspage.io/fixtureco"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "careerspage"],
+    ["fetchList", "careerspage.io", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "CareersPage Registry Co",
+    position_name: "Registry CareersPage Posting"
+  }]);
+});
