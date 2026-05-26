@@ -1,0 +1,26 @@
+{
+  "jobAdDetails": [
+    {
+      "id": "hb-1001",
+      "title": "Product Analyst",
+      "jobUrl": "https://fixture.careers.hibob.com/job/hb-1001",
+      "site": "Istanbul, Turkey",
+      "country": "Turkey",
+      "publishedAt": "2026-05-20"
+    },
+    {
+      "id": "hb-1002",
+      "title": "Country Operations Lead",
+      "absoluteUrl": "https://fixture.careers.hibob.com/job/hb-1002",
+      "site": "United Kingdom",
+      "country": "United Kingdom"
+    },
+    {
+      "id": "hb-1003",
+      "title": "Backend Engineer",
+      "site": "New York, NY, United States",
+      "country": "United States",
+      "publishedAt": "2026-05-21"
+    }
+  ]
+}

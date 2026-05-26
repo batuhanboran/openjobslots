@@ -25,6 +25,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "statejobsny",
   "calcareers",
   "calopps",
+  "hibob",
   "hrmdirect",
   "breezy",
   "applytojob"

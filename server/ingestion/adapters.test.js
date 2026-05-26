@@ -212,6 +212,7 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "fountain",
       "greenhouse",
       "hirebridge",
+      "hibob",
       "hrmdirect",
       "icims",
       "jobvite",

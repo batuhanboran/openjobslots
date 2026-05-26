@@ -65,7 +65,7 @@ This report is read-only. It ranks current ATS families by visible live postings
 | `gem` | 0 | 364 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `getro` | 0 | 61 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `governmentjobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `hibob` | 0 | 227 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
+| `hibob` | 0 | 227 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | source-local registry module; keep disabled until bounded live canary and source quality evidence are approved |
 | `hirebridge` | 0 | 169 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `isolvisolvedhire` | 0 | 494 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `jobaps` | 0 | 15 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |

@@ -1,0 +1,38 @@
+[
+  {
+    "source_job_id": "hb-1001",
+    "company_name": "Fixture HiBob",
+    "position_name": "Product Analyst",
+    "job_posting_url": "https://fixture.careers.hibob.com/job/hb-1001",
+    "location": "Istanbul, Turkey",
+    "posting_date": "2026-05-20",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.57
+  },
+  {
+    "source_job_id": "hb-1002",
+    "company_name": "Fixture HiBob",
+    "position_name": "Country Operations Lead",
+    "job_posting_url": "https://fixture.careers.hibob.com/job/hb-1002",
+    "location": "United Kingdom",
+    "posting_date": null,
+    "country": "United Kingdom",
+    "city": null,
+    "remote_type": "onsite",
+    "parser_confidence": 0.57
+  },
+  {
+    "source_job_id": "hb-1003",
+    "company_name": "Fixture HiBob",
+    "position_name": "Backend Engineer",
+    "job_posting_url": "https://fixture.careers.hibob.com/job/hb-1003",
+    "location": "New York, NY, United States",
+    "posting_date": "2026-05-21",
+    "country": "United States",
+    "city": "New York",
+    "remote_type": "onsite",
+    "parser_confidence": 0.57
+  }
+]

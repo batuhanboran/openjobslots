@@ -271,6 +271,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("url-or-title-inference", "Saved list fixture covers /job-{id} canonical URLs as stable source_job_id evidence.")
     }
   },
+  hibob: {
+    priority: "P2",
+    sourcePattern: "HiBob public careers board plus same-origin /api/job-ad JSON.",
+    parserPath: "server/ingestion/sources/hibob/parse.js parseHibobPostingsFromApi",
+    requiredFixtures: ["job-ad API response fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved job-ad API fixture covers jobAdDetails[].site and jobAdDetails[].country as source-backed geo evidence."),
+      date: decision("list-payload", "Saved job-ad API fixture preserves jobAdDetails[].publishedAt when present and leaves posting date null when absent."),
+      remote: decision("source-absent", "Saved job-ad API fixture exposes no explicit remote/hybrid field; geo-backed rows normalize as onsite through source-location evidence and missing-geo rows remain gated."),
+      sourceId: decision("list-payload", "Saved job-ad API fixture covers jobAdDetails[].id as stable source_job_id evidence.")
+    }
+  },
   statejobsny: {
     priority: "P2",
     sourcePattern: "StateJobsNY public vacancyTable HTML plus vacancyDetailsView detail HTML.",

@@ -5,9 +5,9 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 ## Current Coverage
 
 - Configured ATS keys: 60.
-- Fixture-backed ATS keys: 23.
-- Strict saved raw parser-fixture-backed ATS keys: 23 (`adp_workforcenow`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `careerplug`, `fountain`, `greenhouse`, `hrmdirect`, `icims`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `taleo`, `workday`, `zoho`).
-- Configured enabled ATS still pending strict raw parser fixtures: 36.
+- Fixture-backed ATS keys: 31.
+- Strict saved raw parser-fixture-backed ATS keys: 31 (`adp_workforcenow`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `calcareers`, `calopps`, `careerplug`, `fountain`, `greenhouse`, `hibob`, `hirebridge`, `hrmdirect`, `icims`, `jobvite`, `k12jobspot`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `statejobsny`, `talentreef`, `taleo`, `workday`, `zoho`).
+- Configured enabled ATS still pending strict raw parser fixtures: 28.
 - Disabled unsupported ATS: `dayforcehcm`.
 
 The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires the raw parser fixture.
@@ -80,12 +80,12 @@ npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreb
 
 The command is read-only and includes every configured ATS key, including sources with no visible rows. The generated fields now include wave priority, certification blockers, exact next parser action, public-enabled recommendation, source-id reliability, canonical URL reliability, and detail-refetch requirement.
 
-Current workbench counts: 60 configured ATS, 24 strict parser-fixture-backed, 0 partial, 35 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
+Current workbench counts: 60 configured ATS, 31 strict parser-fixture-backed, 0 partial, 28 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
 - Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
-- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `calcareers`, `calopps`, and `statejobsny` now have raw fixtures but remain disabled until live canary evidence proves source quality and field coverage.
+- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `calcareers`, `calopps`, `hibob`, and `statejobsny` now have raw fixtures but remain disabled until live canary evidence proves source quality and field coverage.
 - Keep disabled: `dayforcehcm`.
 
 Subagent/work-packet findings in this certification pass:
@@ -93,7 +93,7 @@ Subagent/work-packet findings in this certification pass:
 - Direct JSON/API: `teamtailor`, `freshteam`, and `getro` are the main certification gaps. `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
 - Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module fixtures and invalid-shape tests. `eightfold` still needs raw parser fixtures before public enablement can be called safe. `taleo` and `brassring` remain low-confidence; `pageup`, `saphrcloud`, and `ultipro` need live canaries before promotion.
 - Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `jobvite`, `theapplicantmanager`, `talentreef`, `hirebridge`, and `isolvisolvedhire` remain raw-fixture blockers.
-- Vendor/public-sector: `manatal` is certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs` and `policeapp` must stop fabricated recency before public confidence can be raised; CalOpps now keeps close dates separate and leaves posting dates null.
+- Vendor/public-sector: `manatal` and `hibob` are certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs` and `policeapp` must stop fabricated recency before public confidence can be raised; CalOpps now keeps close dates separate and leaves posting dates null.
 
 | ATS | Current source/parser path | Field gaps seen | Certification action |
 | --- | --- | --- | --- |
@@ -136,7 +136,7 @@ Subagent/work-packet findings in this certification pass:
 | `join` | JOIN Next.js embedded data. | State shape brittle; source id dropped. | Add `initialState.jobs.items` fixture with remote/hybrid cases. |
 | `careerspage` | CareersPage HTML. | Date absent; absolute URL regex brittle. | Add fixture for absolute/relative links and employment/location blocks. |
 | `manatal` | Careers-page runtime config plus jobs API/fallback HTML. | Some public API rows omit posting date; city/source-id gaps in existing rows need backfill/reindex after parser repair. | Wave A adds API date/workplace variants and HTML fallback source-id plus remote/hybrid evidence. Parser carries city/state/country, department/team, employment type, description text, source id, and posting date only when source fields expose them. |
-| `hibob` | HiBob board plus `api/job-ad`. | Location can be only site/country; source id dropped. | Add raw API fixture with country/site variants and source id. |
+| `hibob` | HiBob careers board plus same-origin `api/job-ad`. | Location can be only `site`/`country`; no explicit remote/hybrid field is proven in the saved fixture. | Source-local registry module preserves `jobAdDetails[].id`, canonical URLs, `site`/`country` geo, optional `publishedAt`, raw/expected/invalid fixtures, and keeps the source disabled until live canary evidence proves quality. |
 | `sagehr` | SageHR vacancies HTML. | Date absent; anti-bot/403 and classes brittle. | Add saved HTML fixtures for open and restricted responses. |
 | `loxo` | Loxo HTML board. | Direct fetch bypasses central rate limiter; source id dropped. | Move through rate-limit wrapper and add date/location fixture. |
 | `peopleforce` | PeopleForce careers HTML. | Date absent; classes brittle; direct fetch bypasses limiter. | Add open/closed site fixtures and rate-limit wrapper. |

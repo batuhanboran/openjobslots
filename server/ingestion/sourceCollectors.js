@@ -22,7 +22,6 @@ const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/pars
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theapplicantmanager/parse");
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
-const { parseHibobPostingsFromApi } = require("./sources/hibob/parse");
 const {
   normalizePoliceappJobUrl,
   parsePoliceappPostingsFromHtml
@@ -79,7 +78,6 @@ const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SCHOOLSPRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALOPPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const HIBOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
@@ -100,6 +98,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
   greenhouse: 60 * 1000,
   governmentjobs: GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS,
+  hibob: 60 * 1000,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: 60 * 1000,
   isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
@@ -694,67 +693,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHtml);
   }
   
-  function parseHibobCompany(url) {
-    const normalizedUrl = String(url || "").trim();
-    if (!normalizedUrl) return null;
-  
-    const parsed = parseUrl(normalizedUrl);
-    if (!parsed || !parsed.protocol || !parsed.host) return null;
-  
-    const host = String(parsed.hostname || "").toLowerCase();
-    if (!host.endsWith(".careers.hibob.com")) return null;
-  
-    const companySubdomain = host.replace(".careers.hibob.com", "").trim();
-    if (!companySubdomain) return null;
-  
-    return {
-      baseOrigin: `${parsed.protocol}//${parsed.host}`,
-      apiUrl: `${parsed.protocol}//${parsed.host}/api/job-ad`,
-      companySubdomain
-    };
-  }
-  
-  async function fetchHibobJobBoard(config, boardUrl) {
-    const boardResponse = await fetchWithAtsRateLimit("hibob", HIBOB_RATE_LIMIT_WAIT_MS, boardUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": DEFAULT_BROWSER_USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      }
-    });
-    if (!boardResponse.ok) {
-      const body = await boardResponse.text();
-      throw new Error(`HiBob board request failed (${boardResponse.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const apiResponse = await fetchWithAtsRateLimit("hibob", HIBOB_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": DEFAULT_BROWSER_USER_AGENT,
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        Referer: boardUrl,
-        Origin: config.baseOrigin
-      }
-    });
-  
-    if (!apiResponse.ok) {
-      const body = await apiResponse.text();
-      throw new Error(`HiBob API request failed (${apiResponse.status}): ${body.slice(0, 180)}`);
-    }
-    return apiResponse.json();
-  }
-  async function collectPostingsForHibobCompany(company) {
-    const config = parseHibobCompany(company?.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySubdomain;
-    const responseJson = await fetchHibobJobBoard(config, company.url_string);
-    return parseHibobPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
   async function collectPostingsForSagehrCompany(company) {
     const config = parseSagehrCompany(company.url_string);
     if (!config) return [];
@@ -1038,7 +976,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "applitrack");
     }
     if (atsName === "hibob" || atsName === "hibob.com" || atsName === "hibobcom" || atsName === "careers.hibob.com" || atsName === "careershibobcom") {
-      return collectPostingsForHibobCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "hibob");
     }
     if (
       atsName === "isolvisolvedhire" ||

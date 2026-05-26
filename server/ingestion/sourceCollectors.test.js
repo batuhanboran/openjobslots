@@ -2825,6 +2825,47 @@ test("CalOpps dispatch is registry-owned and stays disabled without hitting lega
   assert.deepEqual(postings, []);
 });
 
+test("HiBob dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "hibob",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "hibob",
+      source_family: "html_detail",
+      list_url: "https://fixture.careers.hibob.com/api/job-ad"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled HiBob registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("HiBob registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "careers.hibob.com",
+    company_name: "HiBob Registry Co",
+    url_string: "https://fixture.careers.hibob.com/jobs"
+  });
+
+  assert.deepEqual(calls, [["module", "hibob"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

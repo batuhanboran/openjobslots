@@ -1,0 +1,71 @@
+{
+  "ats_key": "hibob",
+  "description": "Invalid HiBob source-shape fixtures for rejection and quarantine.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture HiBob",
+        "source_job_id": "hb-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://fixture.careers.hibob.com/job/hb-missing-title",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing canonical URL",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Fixture HiBob",
+        "source_job_id": "hb-missing-url",
+        "position_name": "Valid Title",
+        "job_posting_url": "",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture HiBob",
+        "source_job_id": "",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://fixture.careers.hibob.com/job/missing-source-id",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing location with unknown remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture HiBob",
+        "source_job_id": "hb-no-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://fixture.careers.hibob.com/job/hb-no-location",
+        "location": "",
+        "remote_type": "unknown"
+      }
+    },
+    {
+      "name": "multiple locations",
+      "expected": "quarantined",
+      "reason": "ambiguous_location",
+      "posting": {
+        "company_name": "Fixture HiBob",
+        "source_job_id": "hb-multi",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://fixture.careers.hibob.com/job/hb-multi",
+        "location": "Multiple Locations",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}
