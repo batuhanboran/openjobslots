@@ -1,5 +1,6 @@
 "use strict";
 
+const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
 
 function cleanLoxoText(value) {
@@ -37,6 +38,7 @@ function parseLoxoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     postings.push({
       company_name: companyNameForPostings,
       position_name: title,
+      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "loxo"),
       job_posting_url: absoluteUrl,
       posting_date: postingDate || null,
       location: location || null

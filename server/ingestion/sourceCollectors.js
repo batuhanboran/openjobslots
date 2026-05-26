@@ -5,7 +5,6 @@ const {
   parseCareerspageCompany,
   parseGetroCompany,
   parseJobApsCompany,
-  parseLoxoCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -27,7 +26,6 @@ const {
 } = require("./sources/sagehr/parse");
 const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
-const { parseLoxoPostingsFromHtml } = require("./sources/loxo/parse");
 const { parseCareerspagePostingsFromHtml } = require("./sources/careerspage/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
@@ -103,7 +101,6 @@ const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TEAMTAILOR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FRESHTEAM_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SAGEHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const LOXO_RATE_LIMIT_WAIT_MS = 5 * 1000;
 const SIMPLICANT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const PINPOINTHQ_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const RECRUITCRM_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -146,6 +143,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   jobvite: JOBVITE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
+  loxo: 5 * 1000,
   smartrecruiters: 1000,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
   oracle: 60 * 1000,
@@ -699,40 +697,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchLoxoJobsPage(config) {
-    const headers = {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    };
-  
-    const doRequest = async () =>
-      safeFetch(config.boardUrl, {
-        method: "GET",
-        headers
-      });
-  
-    let res = await doRequest();
-    if (Number(res.status || 0) === 429) {
-      await sleep(LOXO_RATE_LIMIT_WAIT_MS);
-      res = await doRequest();
-    }
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Loxo page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.boardUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "app.loxo.co" && finalHost !== "www.app.loxo.co") {
-      throw new Error(`Loxo URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
   async function fetchCareerpuckJobBoard(config) {
     const res = await fetchWithAtsRateLimit("careerpuck", CAREERPUCK_RATE_LIMIT_WAIT_MS, config.apiUrl, {
       method: "GET",
@@ -1073,22 +1037,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       jobsUrl: finalUrl || config.jobsUrl
     };
     return parseSimplicantPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
-  async function collectPostingsForLoxoCompany(company) {
-    const config = parseLoxoCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
-    const { pageHtml, finalUrl } = await fetchLoxoJobsPage(config);
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      boardUrl: finalUrl || config.boardUrl
-    };
-    return parseLoxoPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
   }
   
   async function collectPostingsForCareerpuckCompany(company) {
@@ -1772,7 +1720,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForSagehrCompany(company);
     }
     if (atsName === "loxo" || atsName === "loxo.co" || atsName === "loxoco") {
-      return collectPostingsForLoxoCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "loxo");
     }
     if (atsName === "peopleforce" || atsName === "peopleforce.io" || atsName === "peopleforceio") {
       return collectPostingsForPeopleforceCompany(company);

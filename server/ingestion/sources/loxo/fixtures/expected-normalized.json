@@ -1,0 +1,18 @@
+[
+  {
+    "source_job_id": "1001",
+    "company_name": "Fixture Loxo",
+    "position_name": "Senior Backend Engineer",
+    "job_posting_url": "https://app.loxo.co/jobs/1001",
+    "posting_date": "2026-05-01",
+    "location": "Remote"
+  },
+  {
+    "source_job_id": "1002",
+    "company_name": "Fixture Loxo",
+    "position_name": "Product Analyst",
+    "job_posting_url": "https://app.loxo.co/jobs/1002",
+    "posting_date": null,
+    "location": "Istanbul, Turkey"
+  }
+]

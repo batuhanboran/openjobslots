@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "name": "empty payload",
+      "posting": {
+        "company_name": "Fixture Loxo",
+        "position_name": "",
+        "job_posting_url": "",
+        "location": ""
+      },
+      "expected": "rejected",
+      "reason": "missing source_job_id"
+    }
+  ]
+}

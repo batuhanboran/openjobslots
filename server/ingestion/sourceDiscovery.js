@@ -464,36 +464,6 @@ function parseSimplicantCompany(urlString) {
   };
 }
 
-function parseLoxoCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "app.loxo.co" && host !== "www.app.loxo.co") return null;
-
-  const pathParts = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length === 0) return null;
-  if (String(pathParts[0] || "").toLowerCase() === "job") return null;
-
-  const companySlug = String(pathParts[0] || "").trim();
-  if (!companySlug) return null;
-
-  const boardUrl = new URL(`${parsed.protocol}//${parsed.host}/${companySlug}`);
-  boardUrl.search = "";
-  boardUrl.hash = "";
-
-  return {
-    host,
-    companySlug,
-    companySlugLower: companySlug.toLowerCase(),
-    baseOrigin: `${parsed.protocol}//${parsed.host}`,
-    boardUrl: boardUrl.toString()
-  };
-}
-
 function parsePinpointHqCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -877,7 +847,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   jobvite: parseJobviteCompany,
   join: parseJoinCompany,
   lever: parseLeverCompany,
-  loxo: parseLoxoCompany,
   manatal: parseManatalCompany,
   peopleforce: parsePeopleforceCompany,
   pinpointhq: parsePinpointHqCompany,
@@ -921,7 +890,6 @@ module.exports = {
   parseJobviteCompany,
   parseJoinCompany,
   parseLeverCompany,
-  parseLoxoCompany,
   parseManatalCompany,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
