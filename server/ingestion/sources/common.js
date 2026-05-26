@@ -22,7 +22,6 @@ const { parsePaylocityPostingsFromPageData } = require("./paylocity/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
-const { parseSmartRecruitersPostingsFromApi } = require("./smartrecruiters/parse");
 const { parseTalentreefPostingsFromSearchResponse } = require("./talentreef/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { parseWorkdayPostingsFromApi } = require("./workday/parse");
@@ -526,13 +525,12 @@ const SOURCE_SPECS = Object.freeze({
   smartrecruiters: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseSmartRecruitersPostingsFromApi,
+    parser: () => [],
     officialDocs: "https://developers.smartrecruiters.com/docs/endpoints",
     discover(company) {
-      const companySlug = firstPathSegment(company.url_string) || hostSlug(company.url_string);
       return {
-        config: { companySlug },
-        listUrl: companySlug ? `https://jobs.smartrecruiters.com/sr-jobs/search?company=${encodeURIComponent(companySlug)}&limit=100` : ""
+        config: {},
+        listUrl: clean(company.url_string)
       };
     }
   },

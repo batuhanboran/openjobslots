@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -34,6 +34,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("manatal"), true);
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
+  assert.equal(isRegistryPilotSource("smartrecruiters"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
@@ -67,6 +68,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "recruitcrm",
     "recruitee",
     "rippling",
+    "smartrecruiters",
     "taleo",
     "teamtailor",
     "ultipro",
@@ -318,6 +320,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof recruitCrm.normalize, "function");
   assert.equal(typeof recruitCrm.validate, "function");
   assert.deepEqual(validateSourceContract(recruitCrm), { ok: true, failures: [] });
+
+  const smartRecruiters = getRegistrySourceModule("smartrecruiters");
+  assert.equal(smartRecruiters.atsKey, "smartrecruiters");
+  assert.equal(smartRecruiters.family, SOURCE_FAMILIES.directJsonStable);
+  assert.equal(smartRecruiters.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof smartRecruiters.discover, "function");
+  assert.equal(typeof smartRecruiters.fetchList, "function");
+  assert.equal(typeof smartRecruiters.parse, "function");
+  assert.equal(typeof smartRecruiters.normalize, "function");
+  assert.equal(typeof smartRecruiters.validate, "function");
+  assert.deepEqual(validateSourceContract(smartRecruiters), { ok: true, failures: [] });
 
   const recruitee = getRegistrySourceModule("recruitee");
   assert.equal(recruitee.atsKey, "recruitee");

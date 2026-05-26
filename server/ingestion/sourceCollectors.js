@@ -68,7 +68,6 @@ const {
   parseSapHrCloudPostingsFromApi,
   parseSapHrCloudPostingsFromHtml
 } = require("./sources/saphrcloud/parse");
-const { parseSmartRecruitersPostingsFromApi } = require("./sources/smartrecruiters/parse");
 const {
   inferWorkdayLocationFromJobUrl
 } = require("./sources/workday/parse");
@@ -194,7 +193,6 @@ const STATEJOBSNY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HIBOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const SMARTRECRUITERS_RATE_LIMIT_WAIT_MS = 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
   applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
@@ -213,6 +211,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   jobvite: JOBVITE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
+  smartrecruiters: 1000,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
   pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
@@ -2231,33 +2230,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return postings;
   }
   
-  async function collectPostingsForSmartRecruitersDynamic(limit = 100) {
-    const cappedLimit = Math.max(1, Math.min(100, Number(limit) || 100));
-    const endpoint = new URL("https://jobs.smartrecruiters.com/sr-jobs/search");
-    endpoint.searchParams.set("limit", String(cappedLimit));
-    endpoint.searchParams.set("_", String(Date.now()));
-  
-    const res = await fetchWithAtsRateLimit(
-      "smartrecruiters",
-      SMARTRECRUITERS_RATE_LIMIT_WAIT_MS,
-      endpoint.toString(),
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Accept-Language": "en-US,en;q=0.9"
-        }
-      }
-    );
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`SmartRecruiters request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const payload = await res.json();
-    return parseSmartRecruitersPostingsFromApi("", {}, payload);
-  }async function collectPostingsForPoliceappDynamic() {
+  async function collectPostingsForPoliceappDynamic() {
     const endpoint =
       "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0";
     const res = await fetchWithAtsRateLimit("policeapp", POLICEAPP_RATE_LIMIT_WAIT_MS, endpoint, {
@@ -2805,7 +2778,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "jobs.smartrecruiters.com" ||
       atsName === "jobssmartrecruiterscom"
     ) {
-      return collectPostingsForSmartRecruitersDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "smartrecruiters");
     }
     if (atsName === "policeapp" || atsName === "policeapp.com" || atsName === "policeappcom" || atsName === "www.policeapp.com" || atsName === "wwwpoliceappcom") {
       return collectPostingsForPoliceappDynamic();

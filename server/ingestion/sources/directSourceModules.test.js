@@ -215,6 +215,50 @@ test("gem source module rejects empty or invalid JSON API payloads", async () =>
   );
 });
 
+test("smartrecruiters source module fetches search API with source-local discovery and host guard", async () => {
+  const source = getSourceModule("smartrecruiters");
+  const company = readJson(path.join(__dirname, "smartrecruiters", "fixtures", "company.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, headers: target.headers });
+      return {
+        content: [
+          {
+            id: "743999999995",
+            name: "Runtime SmartRecruiters Role",
+            applyUrl: "https://jobs.smartrecruiters.com/FixtureCo/743999999995-runtime-role",
+            company: { name: "Fixture SmartRecruiters" },
+            location: { city: "Austin", region: "TX", country: "United States" },
+            releasedDate: "2026-05-08T08:00:00-05:00"
+          }
+        ],
+        __sourceFetchFinalUrl: "https://jobs.smartrecruiters.com/sr-jobs/search?company=fixtureco&limit=100"
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://jobs.smartrecruiters.com/sr-jobs/search?company=fixtureco&limit=100",
+    method: "GET",
+    headers: { Accept: "application/json, text/plain, */*" }
+  }]);
+  assert.equal(payload.__sourceConfig.companySlugLower, "fixtureco");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        content: [],
+        __sourceFetchFinalUrl: "https://unexpected.example/sr-jobs/search?company=fixtureco"
+      })
+    }),
+    /SmartRecruiters API URL redirected to unexpected host/
+  );
+});
+
 test("target direct ATS modules return no postings for empty raw payloads", () => {
   for (const atsKey of ["recruitcrm", "recruitee"]) {
     const source = getSourceModule(atsKey);

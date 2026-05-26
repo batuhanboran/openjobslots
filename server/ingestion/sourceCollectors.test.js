@@ -1467,6 +1467,56 @@ test("Jobvite dispatches through registry source module instead of legacy collec
   }]);
 });
 
+test("SmartRecruiters dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "smartrecruiters",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "smartrecruiters",
+      source_family: "direct_json",
+      list_url: "https://jobs.smartrecruiters.com/sr-jobs/search?company=fixture"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { content: [{ id: "sr-2001", name: "SmartRecruiters Registry Posting" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.content) ? "SmartRecruiters Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("SmartRecruiters registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "smartrecruiters",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "jobs.smartrecruiters.com",
+    company_name: "SmartRecruiters Registry Co",
+    url_string: "https://jobs.smartrecruiters.com/fixture/search?company=fixture"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "smartrecruiters"],
+    ["fetchList", "jobs.smartrecruiters.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "SmartRecruiters Registry Co",
+    position_name: "SmartRecruiters Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

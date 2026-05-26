@@ -91,6 +91,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.quarantine
   }),
+  smartrecruiters: Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
   recruitee: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.quarantine
