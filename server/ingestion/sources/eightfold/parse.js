@@ -78,6 +78,7 @@ function parseEightfoldPostingsFromApi(companyNameForPostings, config, responseJ
     const externalId = cleanEightfoldText(position?.atsJobId || "");
 
     postings.push({
+      source_job_id: externalId || positionId,
       company_name: effectiveCompanyName,
       position_name: cleanEightfoldText(position?.name || "") || "Untitled Position",
       job_posting_url: postingUrl,

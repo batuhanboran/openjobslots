@@ -259,27 +259,6 @@ function parseOracleCompany(urlString) {
   };
 }
 
-function parseEightfoldCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (!(host.endsWith(".eightfold.ai") || host === "eightfold.ai" || host === "www.eightfold.ai")) return null;
-
-  const pathParts = String(parsed.pathname || "")
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length === 0 || pathParts[0].toLowerCase() !== "careers") return null;
-
-  const siteBaseUrl = `${parsed.protocol}//${parsed.host}`;
-  return {
-    host,
-    siteBaseUrl,
-    boardUrl: `${siteBaseUrl}/careers`
-  };
-}
-
 function parseCareerpuckCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1046,7 +1025,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   careerplug: parseCareerplugCompany,
   careerpuck: parseCareerpuckCompany,
   careerspage: parseCareerspageCompany,
-  eightfold: parseEightfoldCompany,
   fountain: parseFountainCompany,
   freshteam: parseFreshteamCompany,
   getro: parseGetroCompany,
@@ -1096,7 +1074,6 @@ module.exports = {
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseCompanySourceConfig,
-  parseEightfoldCompany,
   parseFountainCompany,
   parseFreshteamCompany,
   parseGetroCompany,

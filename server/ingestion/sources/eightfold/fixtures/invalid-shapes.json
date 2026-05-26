@@ -1,0 +1,62 @@
+{
+  "ats_key": "eightfold",
+  "description": "Invalid source-shape fixtures for Eightfold parser validation and public gate behavior.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture Eightfold",
+        "source_job_id": "ef-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://fixture.eightfold.ai/careers/job/fail-missing-title",
+        "location": "Austin, TX, United States",
+        "remote_type": "onsite",
+        "posting_date": "2026-05-01"
+      }
+    },
+    {
+      "name": "missing canonical URL",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Fixture Eightfold",
+        "source_job_id": "ef-missing-url",
+        "position_name": "Valid Eightfold Role",
+        "job_posting_url": "",
+        "location": "Austin, TX, United States",
+        "remote_type": "onsite",
+        "posting_date": "2026-05-01"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture Eightfold",
+        "source_job_id": "",
+        "position_name": "Valid Eightfold Role",
+        "job_posting_url": "https://fixture.eightfold.ai/careers/job/fail-missing-source-id",
+        "location": "Austin, TX, United States",
+        "remote_type": "onsite",
+        "posting_date": "2026-05-01"
+      }
+    },
+    {
+      "name": "missing location with unknown remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture Eightfold",
+        "source_job_id": "ef-missing-location",
+        "position_name": "Valid Eightfold Role",
+        "job_posting_url": "https://fixture.eightfold.ai/careers/job/fail-missing-location",
+        "location": "",
+        "remote_type": "unknown",
+        "posting_date": "2026-05-01"
+      }
+    }
+  ]
+}

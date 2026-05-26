@@ -1,0 +1,29 @@
+{
+  "data": {
+    "positions": [
+      {
+        "id": "ef-1001",
+        "atsJobId": "ATS-1001",
+        "name": "Senior Platform Engineer",
+        "positionUrl": "/careers/job/ef-1001",
+        "locations": [
+          "Austin, TX, United States"
+        ],
+        "workLocationOption": "On-site",
+        "postedTs": "2026-05-01",
+        "department": [
+          "Engineering"
+        ]
+      },
+      {
+        "id": "ef-1002",
+        "name": "Remote Product Manager",
+        "positionUrl": "https://fixture.eightfold.ai/careers/job/ef-1002",
+        "locations": [],
+        "workLocationOption": "Remote",
+        "postedTs": "2026-05-02",
+        "department": "Product"
+      }
+    ]
+  }
+}

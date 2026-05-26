@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -22,6 +22,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("brassring"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
+  assert.equal(isRegistryPilotSource("eightfold"), true);
   assert.equal(isRegistryPilotSource("gem"), true);
   assert.equal(isRegistryPilotSource("fountain"), true);
   assert.equal(isRegistryPilotSource("freshteam"), true);
@@ -58,6 +59,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "brassring",
     "breezy",
     "careerplug",
+    "eightfold",
     "fountain",
     "freshteam",
     "gem",
@@ -185,6 +187,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof careerplug.normalize, "function");
   assert.equal(typeof careerplug.validate, "function");
   assert.deepEqual(validateSourceContract(careerplug), { ok: true, failures: [] });
+
+  const eightfold = getRegistrySourceModule("eightfold");
+  assert.equal(eightfold.atsKey, "eightfold");
+  assert.equal(eightfold.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(eightfold.status, SOURCE_STATUSES.disabled);
+  assert.equal(eightfold.collectWhenDisabled, false);
+  assert.equal(typeof eightfold.discover, "function");
+  assert.equal(typeof eightfold.fetchList, "function");
+  assert.equal(typeof eightfold.parse, "function");
+  assert.equal(typeof eightfold.normalize, "function");
+  assert.equal(typeof eightfold.validate, "function");
+  assert.deepEqual(validateSourceContract(eightfold), { ok: true, failures: [] });
 
   const gem = getRegistrySourceModule("gem");
   assert.equal(gem.atsKey, "gem");

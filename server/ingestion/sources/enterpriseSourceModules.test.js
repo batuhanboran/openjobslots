@@ -13,6 +13,7 @@ const ENTERPRISE_SOURCES = Object.freeze([
   "paylocity",
   "adp_workforcenow",
   "adp_myjobs",
+  "eightfold",
   "ultipro",
   "pageup",
   "saphrcloud",
@@ -423,6 +424,85 @@ test("pageup source fetchList rejects redirects to unexpected hosts", async () =
       }
     }),
     /PageUp details URL redirected to unexpected host:/
+  );
+});
+
+test("eightfold source module fetches careers page and API with source-local guards", async () => {
+  const source = getSourceModule("eightfold");
+  const sourceDir = path.join(__dirname, "eightfold");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const fixture = readJson(path.join(sourceDir, "fixtures", "fetch-list.json"));
+  const requests = [];
+
+  const discovered = source.discover(company);
+  assert.equal(discovered.ats_key, "eightfold");
+  assert.equal(discovered.source_family, "enterprise_api");
+  assert.equal(discovered.config.host, "fixture.eightfold.ai");
+  assert.equal(discovered.config.siteBaseUrl, "https://fixture.eightfold.ai");
+  assert.equal(discovered.config.boardUrl, "https://fixture.eightfold.ai/careers");
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      if (url === "https://fixture.eightfold.ai/careers") {
+        return {
+          status: 200,
+          url,
+          body: fixture.boardHtml
+        };
+      }
+      if (url === "https://fixture.eightfold.ai/api/pcsx/search?domain=fixture-domain&query=&location=&start=0&") {
+        return {
+          status: 200,
+          url,
+          body: JSON.stringify(fixture.api)
+        };
+      }
+      throw new Error(`unexpected Eightfold fixture fetch ${url}`);
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => request.target.method), ["GET", "GET"]);
+  assert.equal(raw.__sourceConfig.groupId, "fixture-domain");
+  assert.equal(raw.__sourceRequest.rateLimitMs, 60 * 1000);
+  assert.equal(raw.__sourceRequest.boardUrl, "https://fixture.eightfold.ai/careers");
+  assert.equal(raw.__sourceRequest.apiUrl, "https://fixture.eightfold.ai/api/pcsx/search?domain=fixture-domain&query=&location=&start=0&");
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "ef-2001");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.posting_date, "2026-05-03");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
+test("eightfold source fetchList rejects missing group ids and redirects to unexpected hosts", async () => {
+  const source = getSourceModule("eightfold");
+  const sourceDir = path.join(__dirname, "eightfold");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://fixture.eightfold.ai/careers",
+        body: "<html></html>"
+      })
+    }),
+    /Eightfold window\._EF_GROUP_ID value not found/
+  );
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://example.com/careers",
+        body: "window._EF_GROUP_ID = 'fixture-domain';"
+      })
+    }),
+    /Eightfold URL redirected to unexpected host/
   );
 });
 

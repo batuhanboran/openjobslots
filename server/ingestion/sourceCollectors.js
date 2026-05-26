@@ -5,7 +5,6 @@ const {
   parseApplicantAiCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
-  parseEightfoldCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
   parseIcimsCompany,
@@ -55,11 +54,6 @@ const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/pars
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
 const { parseLoxoPostingsFromHtml } = require("./sources/loxo/parse");
 const { parseCareerspagePostingsFromHtml } = require("./sources/careerspage/parse");
-const {
-  buildEightfoldApiUrl,
-  extractEightfoldDomainFromHtml,
-  parseEightfoldPostingsFromApi
-} = require("./sources/eightfold/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseJobApsPostingsFromHtml } = require("./sources/jobaps/parse");
@@ -151,7 +145,6 @@ const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -174,6 +167,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
+  eightfold: 60 * 1000,
   fountain: FOUNTAIN_RATE_LIMIT_WAIT_MS,
   freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
@@ -447,13 +441,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
       if (parsed.hostname === "recruiting.paylocity.com" || parsed.hostname === "www.recruiting.paylocity.com") {
-        return currentPostingLocationByJobUrl.get(url) || null;
-      }
-      if (
-        parsed.hostname === "eightfold.ai" ||
-        parsed.hostname === "www.eightfold.ai" ||
-        parsed.hostname.endsWith(".eightfold.ai")
-      ) {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
       if (parsed.hostname.endsWith(".oraclecloud.com") && parsed.pathname.toLowerCase().includes("/hcmui/candidateexperience/")) {
@@ -828,79 +815,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.json();
-  }
-  
-  async function fetchEightfoldCareersPage(config) {
-    const res = await fetchWithAtsRateLimit("eightfold", EIGHTFOLD_RATE_LIMIT_WAIT_MS, config.boardUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Eightfold careers page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.boardUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!(finalHost.endsWith(".eightfold.ai") || finalHost === "eightfold.ai" || finalHost === "www.eightfold.ai")) {
-      throw new Error(`Eightfold URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return {
-      pageHtml: await res.text(),
-      finalUrl
-    };
-  }
-  
-  async function fetchEightfoldJobsApi(config, domainValue) {
-    const apiUrl = buildEightfoldApiUrl(config, domainValue);
-    if (!apiUrl) {
-      throw new Error("Eightfold API URL could not be built from careers page metadata");
-    }
-  
-    const res = await fetchWithAtsRateLimit("eightfold", EIGHTFOLD_RATE_LIMIT_WAIT_MS, apiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Eightfold jobs API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || apiUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!(finalHost.endsWith(".eightfold.ai") || finalHost === "eightfold.ai" || finalHost === "www.eightfold.ai")) {
-      throw new Error(`Eightfold API URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    const bodyText = await res.text();
-    let responseJson = {};
-    try {
-      responseJson = JSON.parse(bodyText);
-    } catch {
-      throw new Error(`Eightfold jobs API response was not JSON: ${bodyText.slice(0, 180)}`);
-    }
-  
-    return {
-      responseJson,
-      finalUrl
-    };
   }
   
   async function fetchSagehrJobsPage(config) {
@@ -1415,36 +1329,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson);
     const responseJson = await fetchAdpWorkforcenowJobsPage(config);
     return parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
-  async function collectPostingsForEightfoldCompany(company) {
-    const config = parseEightfoldCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const { pageHtml, finalUrl } = await fetchEightfoldCareersPage(config);
-    const runtimeConfig = parseEightfoldCompany(finalUrl) || config;
-    const domainValue = extractEightfoldDomainFromHtml(pageHtml);
-    if (!domainValue) {
-      throw new Error("Eightfold window._EF_GROUP_ID value not found in careers page");
-    }
-  
-    const { responseJson } = await fetchEightfoldJobsApi(runtimeConfig, domainValue);
-    const fallbackCompanyName = `eightfold_${String(runtimeConfig.host || "").split(".")[0] || "board"}`;
-    const companyNameForPostings = normalizedCompanyName || fallbackCompanyName;
-    const rawPostings = parseEightfoldPostingsFromApi(companyNameForPostings, runtimeConfig, responseJson);
-    const collected = [];
-    const seenUrls = new Set();
-  
-    for (const posting of rawPostings) {
-      const postingUrl = String(posting?.job_posting_url || "").trim();
-      if (!postingUrl || seenUrls.has(postingUrl)) continue;
-      if (!String(posting?.posting_date || "").trim()) continue;
-      seenUrls.add(postingUrl);
-      collected.push(posting);
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForOracleCompany(company) {
@@ -2225,7 +2109,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "paylocity");
     }
     if (atsName === "eightfold" || atsName === "eightfold.ai" || atsName === "eightfoldai") {
-      return collectPostingsForEightfoldCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "eightfold");
     }
     if (
       atsName === "oracle" ||

@@ -1,0 +1,19 @@
+{
+  "boardHtml": "<html><script>window._EF_GROUP_ID = 'fixture-domain';</script></html>",
+  "api": {
+    "data": {
+      "positions": [
+        {
+          "id": "ef-2001",
+          "name": "Runtime Eightfold Role",
+          "positionUrl": "/careers/job/ef-2001",
+          "locations": [
+            "Austin, TX, United States"
+          ],
+          "workLocationOption": "On-site",
+          "postedTs": "2026-05-03"
+        }
+      ]
+    }
+  }
+}

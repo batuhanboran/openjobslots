@@ -43,6 +43,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
+  eightfold: Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   gem: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled,

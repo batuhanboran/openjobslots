@@ -765,6 +765,18 @@ const SOURCE_SPECS = Object.freeze({
       };
     }
   },
+  eightfold: {
+    sourceFamily: "enterprise_api",
+    confidence: 0.55,
+    parser: () => [],
+    officialDocs: "observed Eightfold careers HTML plus search API",
+    discover(company) {
+      return {
+        config: {},
+        listUrl: clean(company.url_string)
+      };
+    }
+  },
   ultipro: {
     sourceFamily: "enterprise_api",
     confidence: 0.55,

@@ -193,6 +193,101 @@ test("Gem registry source stays idle while registry metadata is disabled", async
   assert.deepEqual(postings, []);
 });
 
+test("Eightfold dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "eightfold",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "eightfold",
+      source_family: "enterprise_api",
+      list_url: "https://fixture.eightfold.ai/careers"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { data: { positions: [{ id: "ef-1" }] } };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.data?.positions) ? "Eightfold Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Eightfold registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "eightfold",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "eightfold.ai",
+    company_name: "Eightfold Registry Co",
+    url_string: "https://fixture.eightfold.ai/careers"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "eightfold"],
+    ["fetchList", "eightfold.ai", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Eightfold Registry Co",
+    position_name: "Eightfold Registry Posting"
+  }]);
+});
+
+test("Eightfold registry source stays idle while registry metadata is disabled", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "eightfold",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "eightfold",
+      source_family: "enterprise_api",
+      list_url: "https://fixture.eightfold.ai/careers"
+    }),
+    fetchList: async () => {
+      calls.push(["fetchList"]);
+      return { data: { positions: [{ id: "ef-1" }] } };
+    },
+    parse: () => [{
+      company_name: "Eightfold Registry Co",
+      position_name: "Unexpected Disabled Posting"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Eightfold disabled registry dispatch should not hit network");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "eightfold",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "eightfold",
+    company_name: "Eightfold Registry Co",
+    url_string: "https://fixture.eightfold.ai/careers"
+  });
+
+  assert.deepEqual(calls, [["module", "eightfold"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("Gem registry JSON arrays preserve final URL metadata for host validation", async () => {
   const gemSource = {
     ...getSourceModule("gem"),
