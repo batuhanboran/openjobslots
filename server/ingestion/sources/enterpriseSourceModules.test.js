@@ -92,6 +92,103 @@ for (const atsKey of ENTERPRISE_SOURCES) {
   });
 }
 
+test("paylocity discovery accepts both short and slugified board URLs", () => {
+  const source = getSourceModule("paylocity");
+  const sourceDir = path.join(__dirname, "paylocity");
+  const fixtureCompany = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const shortListingUrl = "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco";
+  const listedBySlugUrl = "https://www.recruiting.paylocity.com/recruiting/jobs/Engineering/fixtureco/engineering-ops";
+
+  const shortListing = source.discover({ ...fixtureCompany, url_string: shortListingUrl });
+  const withSlug = source.discover({ ...fixtureCompany, url_string: listedBySlugUrl });
+
+  assert.equal(shortListing.ats_key, "paylocity");
+  assert.equal(shortListing.config.siteBaseUrl, "https://recruiting.paylocity.com");
+  assert.equal(shortListing.config.listingSegment, "All");
+  assert.equal(shortListing.config.companyId, "fixtureco");
+  assert.equal(typeof shortListing.config.companySlug, "undefined");
+  assert.equal(shortListing.list_url, shortListingUrl);
+
+  assert.equal(withSlug.config.siteBaseUrl, "https://www.recruiting.paylocity.com");
+  assert.equal(withSlug.config.listingSegment, "Engineering");
+  assert.equal(withSlug.config.companyId, "fixtureco");
+  assert.equal(withSlug.config.companySlug, "engineering-ops");
+  assert.equal(withSlug.list_url, listedBySlugUrl);
+});
+
+test("paylocity fetchList extracts window.pageData and keeps source metadata", async () => {
+  const source = getSourceModule("paylocity");
+  const sourceDir = path.join(__dirname, "paylocity");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const boardUrl = "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco";
+  const requests = [];
+  const raw = await source.fetchList({ ...company, url_string: boardUrl }, {
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      return `
+        <html><body>
+          <script>
+            window.pageData = ${JSON.stringify({
+              Jobs: [
+                {
+                  JobId: "5001",
+                  JobTitle: "Paylocity Role 1",
+                  PublishedDate: "2026-05-08T08:00:00+03:00",
+                  JobLocation: { City: "Berlin", Country: "Germany" }
+                },
+                {
+                  JobId: "5001",
+                  JobTitle: "Duplicate Paylocity Role",
+                  PublishedDate: "2026-05-07T08:00:00+03:00",
+                  JobLocation: { City: "Berlin", Country: "Germany" }
+                },
+                {
+                  JobId: "5002",
+                  JobTitle: "Missing Date Role",
+                  PublishedDate: "",
+                  JobLocation: { City: "Austin", Country: "United States" }
+                }
+              ]
+            })}
+          </script>
+        </body></html>
+      `;
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => request.url), [boardUrl]);
+  assert.equal(requests[0].target.source_family, "enterprise_api");
+  assert.equal(raw.__sourceFetchFinalUrl, boardUrl);
+  assert.equal(raw.__sourceRequest.rateLimitMs, 60 * 1000);
+  assert.equal(raw.__sourceConfig.companyId, "fixtureco");
+  assert.equal(raw.__sourceConfig.siteBaseUrl, "https://recruiting.paylocity.com");
+  assert.equal(raw.__sourceConfig.listingSegment, "All");
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].source_job_id, "5001");
+  assert.equal(parsed[0].position_name, "Paylocity Role 1");
+  assert.equal(parsed[0].job_posting_url, "https://recruiting.paylocity.com/Recruiting/Jobs/Details/5001");
+});
+
+test("paylocity source fetchList rejects redirect to unexpected host", async () => {
+  const source = getSourceModule("paylocity");
+  const sourceDir = path.join(__dirname, "paylocity");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const boardUrl = "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco";
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://malicious.example.com/recruiting/jobs/All/fixtureco",
+        text: "window.pageData={\"Jobs\":[]};"
+      })
+    }),
+    /Paylocity URL redirected to unexpected host:/
+  );
+});
+
 test("target enterprise ATS modules return no postings for empty raw payloads", () => {
   for (const atsKey of ["workday", "icims"]) {
     const source = getSourceModule(atsKey);

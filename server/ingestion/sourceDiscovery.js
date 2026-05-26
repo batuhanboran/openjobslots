@@ -259,44 +259,6 @@ function parseOracleCompany(urlString) {
   };
 }
 
-function parsePaylocityCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "recruiting.paylocity.com" && host !== "www.recruiting.paylocity.com") return null;
-
-  const pathParts = String(parsed.pathname || "")
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-
-  if (pathParts.length < 5) return null;
-  if (pathParts[0].toLowerCase() !== "recruiting" || pathParts[1].toLowerCase() !== "jobs") return null;
-
-  const listingSegment = String(pathParts[2] || "All")
-    .trim()
-    .replace(/[^A-Za-z0-9_-]/g, "") || "All";
-  const companyId = String(pathParts[3] || "")
-    .trim()
-    .replace(/[^A-Za-z0-9-]/g, "");
-  const companySlug = String(pathParts[4] || "")
-    .trim()
-    .replace(/[^A-Za-z0-9-_.]/g, "");
-  if (!companyId || !companySlug) return null;
-
-  const siteBaseUrl = `${parsed.protocol}//${parsed.host}`;
-  return {
-    host,
-    siteBaseUrl,
-    companyId,
-    companySlug,
-    boardUrl:
-      `${siteBaseUrl}/recruiting/jobs/${encodeURIComponent(listingSegment)}` +
-      `/${encodeURIComponent(companyId)}/${encodeURIComponent(companySlug)}`
-  };
-}
-
 function parseEightfoldCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1213,7 +1175,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   manatal: parseManatalCompany,
   oracle: parseOracleCompany,
   pageup: parsePageupCompany,
-  paylocity: parsePaylocityCompany,
   peopleforce: parsePeopleforceCompany,
   pinpointhq: parsePinpointHqCompany,
   recruitcrm: parseRecruitCrmCompany,
@@ -1268,7 +1229,6 @@ module.exports = {
   parseOracleCompany,
   parsePageupCompany,
   extractPageupRouteConfigFromUrl,
-  parsePaylocityCompany,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
   parseRecruitCrmCompany,

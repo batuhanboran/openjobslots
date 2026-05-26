@@ -1517,6 +1517,60 @@ test("SmartRecruiters dispatches through registry source module instead of legac
   }]);
 });
 
+test("Paylocity dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "paylocity",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "paylocity",
+      source_family: "enterprise_api",
+      list_url: "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return {
+        Jobs: [{ JobId: "PL-9001", JobTitle: "Payroll Operations" }],
+        __sourceConfig: { companyId: "fixtureco" },
+        __sourceFetchFinalUrl: "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco"
+      };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload.Jobs) ? "Paylocity Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Paylocity registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "paylocity",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "paylocity",
+    company_name: "Paylocity Registry Co",
+    url_string: "https://recruiting.paylocity.com/recruiting/jobs/All/fixtureco"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "paylocity"],
+    ["fetchList", "paylocity", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Paylocity Registry Co",
+    position_name: "Paylocity Registry Posting"
+  }]);
+});
+
 test("Greenhouse pilot collector fetches and parses through the source registry", async () => {
   const calls = [];
   const runtime = createSourceCollectorRuntime({

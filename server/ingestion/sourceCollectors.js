@@ -16,7 +16,6 @@ const {
   parseOracleCompany,
   parsePageupCompany,
   extractPageupRouteConfigFromUrl,
-  parsePaylocityCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -53,10 +52,6 @@ const {
   extractPageupPostingDateFromDetailHtml,
   parsePageupPostingsFromResults
 } = require("./sources/pageup/parse");
-const {
-  extractPaylocityPageDataJson,
-  parsePaylocityPostingsFromPageData
-} = require("./sources/paylocity/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsLocationFromTitleOrUrl,
@@ -177,7 +172,6 @@ const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HIREBRIDGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const PAGEUP_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const PAYLOCITY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -861,36 +855,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.json();
-  }
-  
-  async function fetchPaylocityBoardPage(config) {
-    const res = await fetchWithAtsRateLimit("paylocity", PAYLOCITY_RATE_LIMIT_WAIT_MS, config.boardUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Paylocity board request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.boardUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "recruiting.paylocity.com" && finalHost !== "www.recruiting.paylocity.com") {
-      throw new Error(`Paylocity URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return {
-      pageHtml: await res.text(),
-      finalUrl
-    };
   }
   
   async function fetchEightfoldCareersPage(config) {
@@ -1723,30 +1687,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson);
     const responseJson = await fetchAdpWorkforcenowJobsPage(config);
     return parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
-  async function collectPostingsForPaylocityCompany(company) {
-    const config = parsePaylocityCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const { pageHtml, finalUrl } = await fetchPaylocityBoardPage(config);
-    const runtimeConfig = parsePaylocityCompany(finalUrl) || config;
-    const companyNameForPostings = normalizedCompanyName || `paylocity_${String(runtimeConfig.companyId || "").toLowerCase()}`;
-    const pageData = extractPaylocityPageDataJson(pageHtml);
-    const rawPostings = parsePaylocityPostingsFromPageData(companyNameForPostings, runtimeConfig, pageData);
-    const collected = [];
-    const seenUrls = new Set();
-  
-    for (const posting of rawPostings) {
-      const postingUrl = String(posting?.job_posting_url || "").trim();
-      if (!postingUrl || seenUrls.has(postingUrl)) continue;
-      if (!String(posting?.posting_date || "").trim()) continue;
-      seenUrls.add(postingUrl);
-      collected.push(posting);
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForEightfoldCompany(company) {
@@ -2660,7 +2600,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "recruiting.paylocity.com" ||
       atsName === "recruitingpaylocitycom"
     ) {
-      return collectPostingsForPaylocityCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "paylocity");
     }
     if (atsName === "eightfold" || atsName === "eightfold.ai" || atsName === "eightfoldai") {
       return collectPostingsForEightfoldCompany(company);

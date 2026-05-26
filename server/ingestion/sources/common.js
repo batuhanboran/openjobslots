@@ -18,7 +18,6 @@ const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parseOraclePostingsFromApi } = require("./oracle/parse");
 const { parsePageupPostingsFromResults } = require("./pageup/parse");
-const { parsePaylocityPostingsFromPageData } = require("./paylocity/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
@@ -729,15 +728,12 @@ const SOURCE_SPECS = Object.freeze({
   paylocity: {
     sourceFamily: "enterprise_api",
     confidence: 0.65,
-    parser: parsePaylocityPostingsFromPageData,
+    parser: () => [],
     officialDocs: "observed Paylocity public recruiting page data",
     discover(company) {
       const parsed = asUrl(company.url_string);
-      const parts = parsePathParts(company.url_string);
-      const companyId = parts[parts.length - 1] || "";
       return {
         config: {
-          companyId,
           siteBaseUrl: parsed ? parsed.origin : ""
         },
         listUrl: clean(company.url_string)

@@ -115,6 +115,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.disabled
   }),
+  paylocity: Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled
+  }),
   workday: Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.disabled
