@@ -1,0 +1,24 @@
+[
+  {
+    "source_job_id": "1001",
+    "company_name": "Fixture TalentLyft",
+    "position_name": "Civic Data Analyst",
+    "job_posting_url": "https://fixture.talentlyft.com/jobs/1001-civic-data-analyst",
+    "posting_date": null,
+    "location": "Istanbul, Turkey",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "1002",
+    "company_name": "Fixture TalentLyft",
+    "position_name": "Remote Program Manager",
+    "job_posting_url": "https://fixture.talentlyft.com/jobs/1002-remote-program-manager",
+    "posting_date": null,
+    "location": "Remote",
+    "remote_type": "remote",
+    "parser_confidence": 0.75
+  }
+]

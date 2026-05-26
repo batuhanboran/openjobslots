@@ -7,7 +7,6 @@ const {
   parseSagehrCompany,
   parseSapHrCloudCompany,
   parseSimplicantCompany,
-  parseTalentlyftCompany,
   parseTalexioCompany,
   parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
@@ -27,11 +26,6 @@ const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse"
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseGetroPostingsFromHtml } = require("./sources/getro/parse");
-const {
-  extractTalentlyftInitialConfig,
-  extractTalentlyftTotalPages,
-  parseTalentlyftPostingsFromFragment
-} = require("./sources/talentlyft/parse");
 const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theapplicantmanager/parse");
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
 const { parseHibobPostingsFromApi } = require("./sources/hibob/parse");
@@ -92,7 +86,6 @@ const CAREERPUCK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FOUNTAIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GETRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HRMDIRECT_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const TALENTLYFT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TEAMTAILOR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FRESHTEAM_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -683,67 +676,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.text();
   }
   
-  async function fetchTalentlyftLandingPage(urlString) {
-    const res = await fetchWithAtsRateLimit("talentlyft", TALENTLYFT_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Talentlyft landing page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".talentlyft.com")) {
-      throw new Error(`Talentlyft URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
-  async function fetchTalentlyftJobListFragment(config, page = 1, pageSize = 20) {
-    const apiUrl = String(config?.apiUrl || "").trim();
-    if (!apiUrl) {
-      throw new Error("Talentlyft API URL is missing");
-    }
-  
-    const params = new URLSearchParams({
-      layoutId: String(config?.layoutId || "Jobs-1"),
-      websiteUrl: String(config?.websiteUrl || ""),
-      themeId: String(config?.themeId || "2"),
-      language: String(config?.language || "en"),
-      subdomain: String(config?.subdomain || ""),
-      page: String(page),
-      pageSize: String(pageSize),
-      contains: ""
-    }).toString();
-    const url = `${apiUrl}${apiUrl.includes("?") ? "&" : "?"}${params}`;
-  
-    const res = await fetchWithAtsRateLimit("talentlyft", TALENTLYFT_RATE_LIMIT_WAIT_MS, url, {
-      method: "GET",
-      headers: {
-        Accept: "text/html, */*; q=0.01",
-        "x-requested-with": "XMLHttpRequest",
-        Referer: `${String(config?.websiteUrl || "").replace(/\/+$/, "")}/`,
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Talentlyft JobList request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
   async function fetchTalexioJobsPage(config, page = 1, limit = 10) {
     const apiUrl = String(config?.apiUrl || "").trim();
     if (!apiUrl) {
@@ -985,47 +917,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
     const pageHtml = await fetchGetroJobsPage(config.jobsUrl);
     return parseGetroPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
-  async function collectPostingsForTalentlyftCompany(company) {
-    const config = parseTalentlyftCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml: landingHtml, finalUrl } = await fetchTalentlyftLandingPage(config.careersUrl);
-    const initialConfig = extractTalentlyftInitialConfig(landingHtml, finalUrl || config.careersUrl);
-  
-    const finalParsed = parseUrl(finalUrl);
-    const baseOrigin = `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`;
-    const runtimeConfig = {
-      ...config,
-      ...initialConfig,
-      baseOrigin,
-      websiteUrl: String(initialConfig?.websiteUrl || baseOrigin).replace(/\/+$/, ""),
-      apiUrl: String(initialConfig?.apiUrl || `${baseOrigin}/JobList/`).replace(/\/+$/, "") + "/"
-    };
-  
-    const collected = [];
-    const seenUrls = new Set();
-    let totalPages = 1;
-  
-    for (let page = 1; page <= Math.min(MAX_PAGES_PER_COMPANY, totalPages); page += 1) {
-      const fragmentHtml = await fetchTalentlyftJobListFragment(runtimeConfig, page, 20);
-      const batch = parseTalentlyftPostingsFromFragment(companyNameForPostings, runtimeConfig, fragmentHtml);
-  
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      totalPages = Math.max(totalPages, extractTalentlyftTotalPages(fragmentHtml));
-      if (batch.length === 0 && page >= totalPages) break;
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForTalexioCompany(company) {
@@ -1729,7 +1620,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "hrmdirect");
     }
     if (atsName === "talentlyft" || atsName === "talentlyft.com" || atsName === "talentlyftcom") {
-      return collectPostingsForTalentlyftCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "talentlyft");
     }
     if (atsName === "talexio" || atsName === "talexio.com" || atsName === "talexiocom") {
       return collectPostingsForTalexioCompany(company);

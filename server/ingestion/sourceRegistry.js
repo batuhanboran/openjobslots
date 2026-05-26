@@ -147,6 +147,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     status: SOURCE_STATUSES.disabled,
     collectWhenDisabled: false
   }),
+  talentlyft: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
   teamtailor: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled

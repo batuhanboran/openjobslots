@@ -1,0 +1,19 @@
+{
+  "landingHtml": "<html><script>window.jobsConfig = { layoutId: 'Jobs-1', themeId: '2', language: 'en', subdomain: 'fixture', websiteUrl: 'https://fixture.talentlyft.com' };</script></html>",
+  "fragments": [
+    {
+      "page": 1,
+      "html": "<a class=\"jobs__box\" href=\"/jobs/1001-civic-data-analyst\" data-job-id=\"1001\"><h3 class=\"jobs__box__heading\">Civic Data Analyst</h3><p class=\"jobs__box__text\">Istanbul, Turkey</p></a><a class=\"jobs__box\" href=\"/jobs/1002-remote-program-manager\" data-job-id=\"1002\"><h3 class=\"jobs__box__heading\">Remote Program Manager</h3><p class=\"jobs__box__text\">Remote</p></a>"
+    }
+  ],
+  "__sourceConfig": {
+    "host": "fixture.talentlyft.com",
+    "subdomain": "fixture",
+    "subdomainLower": "fixture",
+    "baseOrigin": "https://fixture.talentlyft.com",
+    "careersUrl": "https://fixture.talentlyft.com/",
+    "websiteUrl": "https://fixture.talentlyft.com",
+    "apiUrl": "https://fixture.talentlyft.com/JobList/"
+  },
+  "__sourceFetchFinalUrl": "https://fixture.talentlyft.com/"
+}

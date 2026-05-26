@@ -89,7 +89,8 @@ function parseTalentlyftPostingsFromFragment(companyNameForPostings, config, fra
       position_name: title || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: null,
-      location: location || null
+      location: location || null,
+      source_job_id: id || null
     });
     seenUrls.add(absoluteUrl);
     itemMatch = itemPattern.exec(source);

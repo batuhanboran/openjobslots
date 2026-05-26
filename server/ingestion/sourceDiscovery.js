@@ -234,25 +234,6 @@ function parseHrmDirectCompany(urlString) {
   };
 }
 
-function parseTalentlyftCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (!host.endsWith(".talentlyft.com")) return null;
-
-  const [subdomain = ""] = host.split(".");
-  if (!subdomain) return null;
-
-  return {
-    host,
-    subdomain,
-    subdomainLower: subdomain.toLowerCase(),
-    baseOrigin: `${parsed.protocol}//${parsed.host}`,
-    careersUrl: `${parsed.protocol}//${parsed.host}/`
-  };
-}
-
 function parseTalexioCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -817,7 +798,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   saphrcloud: parseSapHrCloudCompany,
   simplicant: parseSimplicantCompany,
   taleo: parseTaleoCompany,
-  talentlyft: parseTalentlyftCompany,
   talexio: parseTalexioCompany,
   teamtailor: parseTeamtailorCompany,
   theapplicantmanager: parseTheApplicantManagerCompany,
@@ -858,7 +838,6 @@ module.exports = {
   parseSapHrCloudCompany,
   parseSimplicantCompany,
   parseTaleoCompany,
-  parseTalentlyftCompany,
   parseTalexioCompany,
   parseTeamtailorCompany,
   parseTheApplicantManagerCompany,
