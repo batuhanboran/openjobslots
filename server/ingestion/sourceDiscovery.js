@@ -730,32 +730,6 @@ function parseTheApplicantManagerCompany(urlString) {
   };
 }
 
-function parseIcimsCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (!host.endsWith(".icims.com")) return null;
-
-  const [subdomain = ""] = host.split(".");
-  if (!subdomain) return null;
-
-  const searchUrl = new URL(parsed.toString());
-  searchUrl.pathname = "/jobs/search";
-  if (!searchUrl.searchParams.has("ss")) {
-    searchUrl.searchParams.set("ss", "1");
-  }
-  searchUrl.searchParams.delete("in_iframe");
-
-  return {
-    host,
-    subdomain,
-    subdomainLower: subdomain.toLowerCase(),
-    origin: `${parsed.protocol}//${parsed.host}`,
-    searchUrl: searchUrl.toString()
-  };
-}
-
 function parseBreezyCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -915,7 +889,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   getro: parseGetroCompany,
   greenhouse: parseGreenhouseCompany,
   hrmdirect: parseHrmDirectCompany,
-  icims: parseIcimsCompany,
   jobaps: parseJobApsCompany,
   jobvite: parseJobviteCompany,
   join: parseJoinCompany,
@@ -961,7 +934,6 @@ module.exports = {
   parseGetroCompany,
   parseGreenhouseCompany,
   parseHrmDirectCompany,
-  parseIcimsCompany,
   parseJobApsCompany,
   parseJobviteCompany,
   parseJoinCompany,

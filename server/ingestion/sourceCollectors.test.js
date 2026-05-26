@@ -2178,3 +2178,50 @@ test("iCIMS pilot collector fetches iframe pages through the source registry", a
   assert.equal(postings[0].position_name, "Remote Data Analyst");
   assert.equal(postings[0].remote_type, "remote");
 });
+
+test("iCIMS dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "icims",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "icims",
+      source_family: "html_detail",
+      list_url: "https://fixtureco.icims.com/jobs/search?ss=1"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: company.company_name, position_name: "Registry iCIMS Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("iCIMS registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "icims.com",
+    company_name: "iCIMS Registry Co",
+    url_string: "https://fixtureco.icims.com/jobs/search?ss=1"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "icims"],
+    ["fetchList", "icims.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "iCIMS Registry Co",
+    position_name: "Registry iCIMS Posting"
+  }]);
+});

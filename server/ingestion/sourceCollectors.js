@@ -1,12 +1,10 @@
 const { safeFetch } = require("./safeFetch");
-const { decodeHtmlEntities } = require("./parsers/shared/html");
 const {
   parseApplicantAiCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
-  parseIcimsCompany,
   parseJobApsCompany,
   parseLoxoCompany,
   parsePeopleforceCompany,
@@ -18,13 +16,6 @@ const {
   parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
-const {
-  extractIcimsLocationFromHtml,
-  extractIcimsLocationFromTitleOrUrl,
-  extractIcimsPostingDateFromHtml,
-  extractIcimsRemoteTypeFromHtml,
-  parseIcimsPostingsFromHtml
-} = require("./sources/icims/parse");
 const {
   parseSapHrCloudPostingsFromApi,
   parseSapHrCloudPostingsFromHtml
@@ -101,7 +92,6 @@ const TALEO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOBVITE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLICANTPRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLYTOJOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const ICIMS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const THEAPPLICANTMANAGER_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BREEZY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ZOHO_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -129,7 +119,6 @@ const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const USAJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const USAJOBS_SEARCH_API_URL = "https://data.usajobs.gov/api/Search";
@@ -156,7 +145,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
   greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
-  icims: ICIMS_RATE_LIMIT_WAIT_MS,
+  icims: 60 * 1000,
   isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
   jobvite: JOBVITE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
@@ -436,83 +425,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   }
   
   
-  function ensureIcimsIframeUrl(urlString) {
-    const parsed = parseUrl(urlString);
-    if (!parsed) return String(urlString || "").trim();
-    parsed.searchParams.set("in_iframe", "1");
-    return parsed.toString();
-  }
-  
-  function extractIcimsIframeUrlFromHtml(pageHtml, baseUrl) {
-    const source = String(pageHtml || "");
-    const patterns = [
-      /icimsFrame\.src\s*=\s*'([^']+)'/i,
-      /icimsFrame\.src\s*=\s*"([^"]+)"/i,
-      /<iframe[^>]*id=["']icims_content_iframe["'][^>]*src=["']([^"']+)["']/i
-    ];
-  
-    for (const pattern of patterns) {
-      const match = source.match(pattern);
-      const rawValue = String(match?.[1] || "").trim();
-      if (!rawValue) continue;
-  
-      let candidate = decodeHtmlEntities(rawValue).replace(/\\\//g, "/");
-      if (!candidate) continue;
-  
-      if (candidate.startsWith("//")) {
-        const parsedBase = parseUrl(baseUrl);
-        const protocol = String(parsedBase?.protocol || "https:");
-        candidate = `${protocol}${candidate}`;
-      } else if (!/^https?:\/\//i.test(candidate)) {
-        try {
-          candidate = new URL(candidate, baseUrl).toString();
-        } catch {
-          continue;
-        }
-      }
-  
-      return ensureIcimsIframeUrl(candidate);
-    }
-  
-    return ensureIcimsIframeUrl(baseUrl);
-  }
-  
-  function extractIcimsNextPageUrlFromHtml(pageHtml, currentUrl) {
-    const source = String(pageHtml || "");
-    const patterns = [
-      /<link[^>]*rel=["']next["'][^>]*href=["']([^"']+)["']/i,
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']next["'][^>]*>/i
-    ];
-  
-    for (const pattern of patterns) {
-      const match = source.match(pattern);
-      const rawValue = String(match?.[1] || "").trim();
-      if (!rawValue) continue;
-  
-      let candidate = decodeHtmlEntities(rawValue).replace(/\\\//g, "/");
-      if (!candidate) continue;
-  
-      if (candidate.startsWith("//")) {
-        const parsedCurrent = parseUrl(currentUrl);
-        const protocol = String(parsedCurrent?.protocol || "https:");
-        candidate = `${protocol}${candidate}`;
-      } else if (!/^https?:\/\//i.test(candidate)) {
-        try {
-          candidate = new URL(candidate, currentUrl).toString();
-        } catch {
-          continue;
-        }
-      }
-  
-      const normalizedCandidate = ensureIcimsIframeUrl(candidate);
-      if (normalizedCandidate && normalizedCandidate !== String(currentUrl || "").trim()) {
-        return normalizedCandidate;
-      }
-    }
-  
-    return null;
-  }
-  
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -560,22 +472,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.text();
   }
   
-  async function fetchIcimsPage(urlString) {
-    const res = await fetchWithAtsRateLimit("icims", ICIMS_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`iCIMS page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-
   async function fetchRegistryPilotPayload(atsKey, urlString, target = {}) {
     const headers = String(target.source_family || "").includes("html")
       ? { Accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5" }
@@ -1062,66 +958,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.companyCodeLower;
     const pageHtml = await fetchTheApplicantManagerPage(config.careersUrl);
     return parseTheApplicantManagerPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
-  async function collectPostingsForIcimsCompany(company) {
-    const config = parseIcimsCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-  
-    const wrapperHtml = await fetchIcimsPage(config.searchUrl);
-    let pageUrl = extractIcimsIframeUrlFromHtml(wrapperHtml, config.searchUrl);
-    const collected = [];
-    const seenPostingUrls = new Set();
-    const seenPageUrls = new Set();
-    let detailFetches = 0;
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const normalizedPageUrl = ensureIcimsIframeUrl(pageUrl);
-      if (!normalizedPageUrl || seenPageUrls.has(normalizedPageUrl)) break;
-      seenPageUrls.add(normalizedPageUrl);
-  
-      const pageHtml = await fetchIcimsPage(normalizedPageUrl);
-      const batch = parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml);
-      for (let posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenPostingUrls.has(postingUrl)) continue;
-        seenPostingUrls.add(postingUrl);
-        if (
-          detailFetches < ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY &&
-          (
-            !String(posting?.location || "").trim() ||
-            !String(posting?.posting_date || "").trim() ||
-            !String(posting?.remote_type || "").trim()
-          )
-        ) {
-          try {
-            const detailHtml = await fetchIcimsPage(postingUrl);
-            detailFetches += 1;
-            posting = {
-              ...posting,
-              posting_date: posting.posting_date || extractIcimsPostingDateFromHtml(detailHtml),
-              remote_type: posting.remote_type || extractIcimsRemoteTypeFromHtml(detailHtml),
-              location:
-                posting.location ||
-                extractIcimsLocationFromHtml(detailHtml) ||
-                extractIcimsLocationFromTitleOrUrl(posting.position_name, postingUrl)
-            };
-          } catch {
-            detailFetches += 1;
-          }
-        }
-        collected.push(posting);
-      }
-  
-      const nextPageUrl = extractIcimsNextPageUrlFromHtml(pageHtml, normalizedPageUrl);
-      if (!nextPageUrl) break;
-      pageUrl = nextPageUrl;
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForApplicantAiCompany(company) {
@@ -1839,8 +1675,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "breezy");
     }
     if (atsName === "icims" || atsName === "icims.com" || atsName === "icimscom") {
-      if (isRegistryPilotSourceForRuntime("icims")) return collectPostingsForRegistryPilotCompany(company, "icims");
-      return collectPostingsForIcimsCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "icims");
     }
     if (atsName === "zoho" || atsName === "zohorecruit" || atsName === "zohorecruit.com" || atsName === "zohorecruitcom") {
       return collectPostingsForRegistryPilotCompany(company, "zoho");
