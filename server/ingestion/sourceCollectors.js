@@ -26,11 +26,6 @@ const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theappli
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
 const { parseHibobPostingsFromApi } = require("./sources/hibob/parse");
 const {
-  extractGovernmentJobsLastPage,
-  extractGovernmentJobsViewHtmlFromResponse,
-  parseGovernmentJobsPostingsFromViewHtml
-} = require("./sources/governmentjobs/parse");
-const {
   normalizePoliceappJobUrl,
   parsePoliceappPostingsFromHtml
 } = require("./sources/policeapp/parse");
@@ -121,6 +116,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   fountain: FOUNTAIN_RATE_LIMIT_WAIT_MS,
   freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
   greenhouse: 60 * 1000,
+  governmentjobs: GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: 60 * 1000,
   isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
@@ -901,71 +897,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl);
   }
   
-  async function fetchGovernmentJobsViewHtml(url, params) {
-    const requestUrl = new URL(url);
-    for (const [key, value] of Object.entries(params || {})) {
-      requestUrl.searchParams.set(key, String(value));
-    }
-  
-    const res = await fetchWithAtsRateLimit("governmentjobs", GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS, requestUrl.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "X-Requested-With": "XMLHttpRequest"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`GovernmentJobs request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const text = await res.text();
-    return extractGovernmentJobsViewHtmlFromResponse(res, text);
-  }
-  
-  async function collectPostingsForGovernmentJobsDynamic() {
-    const postings = [];
-    const seenUrls = new Set();
-    const timestamp = Date.now().toString();
-  
-    const firstViewHtml = await fetchGovernmentJobsViewHtml("https://www.governmentjobs.com/jobs", {
-      keyword: "",
-      location: "",
-      daysposted: "1",
-      isFiltered: "true",
-      _: timestamp
-    });
-  
-    const firstBatch = parseGovernmentJobsPostingsFromViewHtml(firstViewHtml);
-    for (const posting of firstBatch) {
-      if (seenUrls.has(posting.job_posting_url)) continue;
-      seenUrls.add(posting.job_posting_url);
-      postings.push(posting);
-    }
-  
-    const lastPage = extractGovernmentJobsLastPage(firstViewHtml);
-    for (let page = 2; page <= lastPage; page += 1) {
-      const pageViewHtml = await fetchGovernmentJobsViewHtml("https://www.governmentjobs.com/jobs", {
-        page: String(page),
-        daysPosted: "1",
-        isTransfer: "False",
-        isPromotional: "False",
-        _: Date.now().toString()
-      });
-  
-      const batch = parseGovernmentJobsPostingsFromViewHtml(pageViewHtml);
-      for (const posting of batch) {
-        if (seenUrls.has(posting.job_posting_url)) continue;
-        seenUrls.add(posting.job_posting_url);
-        postings.push(posting);
-      }
-    }
-  
-    return postings;
-  }
-  
   async function collectPostingsForPoliceappDynamic() {
     const endpoint =
       "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0";
@@ -1503,7 +1434,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "getro");
     }
     if (atsName === "governmentjobs" || atsName === "governmentjobs.com" || atsName === "governmentjobscom") {
-      return collectPostingsForGovernmentJobsDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "governmentjobs");
     }
     if (
       atsName === "smartrecruiters" ||

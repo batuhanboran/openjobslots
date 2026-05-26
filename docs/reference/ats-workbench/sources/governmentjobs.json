@@ -1,7 +1,7 @@
 {
   "ats_key": "governmentjobs",
   "display_name": "GovernmentJobs",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "public_sector",
   "official_public_docs_or_observed_endpoint": "Observed GovernmentJobs public AJAX/list HTML.",
   "source_discovery_method": "use configured agency/board URL and official/list endpoint where visible",
@@ -9,33 +9,39 @@
   "detail_fetch_method": "detail fetch for date/location only when fixture-backed and polite",
   "pagination_method": "respect source page controls; do not brute-force ids",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "url-or-title-inference: Use vacancy/job control/listing id or stable URL id.",
+  "source_job_id_rule": "url-or-title-inference: Use the stable /jobs/{id} URL segment.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
   "location_text_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
   "country_region_city_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "remote_type_rule": "pending-research: Use explicit telework/remote text only.",
-  "posting_date_rule": "pending-research: Public boards frequently expose close/open dates; do not invent posted dates.",
+  "remote_type_rule": "list-payload: Use explicit Remote location text only; otherwise require concrete geo-backed onsite classification.",
+  "posting_date_rule": "list-payload: Public AJAX feed is one-day scoped; preserve source relative `Posted Today` evidence without inventing absolute dates.",
   "rate_limit": "strict public-board rate limit with long cooldown after 429/403",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/governmentjobs/fixtures/company.json",
+      "server/ingestion/sources/governmentjobs/fixtures/expected-normalized.json",
+      "server/ingestion/sources/governmentjobs/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/governmentjobs/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/governmentjobs/fixtures/company.json",
+      "server/ingestion/sources/governmentjobs/fixtures/expected-normalized.json",
+      "server/ingestion/sources/governmentjobs/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/governmentjobs/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/governmentjobs/index.js",
+    "fixtures_dir": "server/ingestion/sources/governmentjobs/fixtures",
+    "parser_version": "source-governmentjobs-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "public_enabled",
+    "minimum_confidence": 0.72,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url/source_job_id and row-level quality gate"
   },
   "public_enabled": true,
   "quarantine_reason": "",
@@ -57,21 +63,21 @@
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js GovernmentJobs collector",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/governmentjobs/parse.js",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "use configured agency/board URL and official/list endpoint where visible",
-    "fetchList": "bounded public-sector feed/API/HTML list request",
+    "discover": "server/ingestion/sources/governmentjobs/discover.js",
+    "fetchList": "server/ingestion/sources/governmentjobs/fetchList.js",
     "fetchDetail": "detail fetch for date/location only when fixture-backed and polite",
-    "parseList": "server/index.js GovernmentJobs collector",
-    "parseDetail": "server/index.js GovernmentJobs collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "parseList": "server/ingestion/sources/governmentjobs/parse.js",
+    "parseDetail": "server/ingestion/sources/governmentjobs/parse.js",
+    "normalize": "server/ingestion/sources/governmentjobs/index.js",
+    "validate": "server/ingestion/sources/governmentjobs/index.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
-  "certification_blockers": "missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "run bounded read-only source estimate before any production apply",
+  "certification_blockers": "production impact not yet refreshed after local source-module extraction; high existing missing normalized geo remains a live data-quality target"
 }

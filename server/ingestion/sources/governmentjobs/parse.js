@@ -77,6 +77,7 @@ function parseGovernmentJobsPostingsFromViewHtml(viewHtml) {
       company_name: companyName,
       position_name: positionName,
       job_posting_url: jobPostingUrl,
+      source_job_id: extractGovernmentJobsSourceId(jobPostingUrl) || jobPostingUrl,
       posting_date: "Posted Today",
       location
     });
@@ -87,7 +88,19 @@ function parseGovernmentJobsPostingsFromViewHtml(viewHtml) {
   return postings;
 }
 
+function extractGovernmentJobsSourceId(jobPostingUrl) {
+  try {
+    const parts = new URL(String(jobPostingUrl || "")).pathname.split("/").filter(Boolean);
+    const jobsIndex = parts.findIndex((part) => part.toLowerCase() === "jobs");
+    if (jobsIndex >= 0 && parts[jobsIndex + 1]) return parts[jobsIndex + 1];
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 module.exports = {
+  extractGovernmentJobsSourceId,
   extractGovernmentJobsLastPage,
   extractGovernmentJobsViewHtmlFromResponse,
   parseGovernmentJobsPostingsFromViewHtml

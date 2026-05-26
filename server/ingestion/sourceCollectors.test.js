@@ -2560,3 +2560,50 @@ test("CareerPuck dispatch is registry-owned even when runtime pilot predicate is
     position_name: "CareerPuck Registry Posting"
   }]);
 });
+
+test("GovernmentJobs dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "governmentjobs",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "governmentjobs",
+      source_family: "public_sector",
+      list_url: "https://www.governmentjobs.com/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: "Fixture City", position_name: "Registry GovernmentJobs Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("GovernmentJobs registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "governmentjobs.com",
+    company_name: "GovernmentJobs Registry Co",
+    url_string: "https://www.governmentjobs.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "governmentjobs"],
+    ["fetchList", "governmentjobs.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Fixture City",
+    position_name: "Registry GovernmentJobs Posting"
+  }]);
+});

@@ -1,0 +1,36 @@
+[
+  {
+    "source_job_id": "4523011-0",
+    "company_name": "Fixture City",
+    "position_name": "Library Program Manager",
+    "job_posting_url": "https://www.governmentjobs.com/jobs/4523011-0/library-program-manager",
+    "posting_date": "Posted Today",
+    "location": "Austin, TX",
+    "country": "United States",
+    "city": "Austin",
+    "remote_type": "onsite",
+    "parser_confidence": 0.72
+  },
+  {
+    "source_job_id": "4523012-0",
+    "company_name": "Fixture County",
+    "position_name": "Remote Benefits Analyst",
+    "job_posting_url": "https://www.governmentjobs.com/jobs/4523012-0/remote-benefits-analyst",
+    "posting_date": "Posted Today",
+    "location": "Remote",
+    "remote_type": "remote",
+    "parser_confidence": 0.72
+  },
+  {
+    "source_job_id": "4523013-0",
+    "company_name": "Fixture Parks",
+    "position_name": "Parks Coordinator",
+    "job_posting_url": "https://www.governmentjobs.com/jobs/4523013-0/parks-coordinator",
+    "posting_date": "Posted Today",
+    "location": "Denver, CO",
+    "country": "United States",
+    "city": "Denver",
+    "remote_type": "onsite",
+    "parser_confidence": 0.72
+  }
+]

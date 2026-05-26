@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -30,6 +30,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("fountain"), true);
   assert.equal(isRegistryPilotSource("freshteam"), true);
   assert.equal(isRegistryPilotSource("getro"), true);
+  assert.equal(isRegistryPilotSource("governmentjobs"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
   assert.equal(isRegistryPilotSource("hirebridge"), true);
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
@@ -76,6 +77,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "freshteam",
     "gem",
     "getro",
+    "governmentjobs",
     "greenhouse",
     "hirebridge",
     "hrmdirect",
@@ -262,6 +264,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof greenhouse.normalize, "function");
   assert.equal(typeof greenhouse.validate, "function");
   assert.deepEqual(validateSourceContract(greenhouse), { ok: true, failures: [] });
+
+  const governmentJobs = getRegistrySourceModule("governmentjobs");
+  assert.equal(governmentJobs.atsKey, "governmentjobs");
+  assert.equal(governmentJobs.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(governmentJobs.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof governmentJobs.discover, "function");
+  assert.equal(typeof governmentJobs.fetchList, "function");
+  assert.equal(typeof governmentJobs.parse, "function");
+  assert.equal(typeof governmentJobs.normalize, "function");
+  assert.equal(typeof governmentJobs.validate, "function");
+  assert.deepEqual(validateSourceContract(governmentJobs), { ok: true, failures: [] });
 
   const hirebridge = getRegistrySourceModule("hirebridge");
   assert.equal(hirebridge.atsKey, "hirebridge");

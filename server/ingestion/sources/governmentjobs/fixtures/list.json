@@ -1,0 +1,9 @@
+{
+  "view_html_pages": [
+    "<ul><li class=\"job-item\"><a class=\"job-details-link\" href=\"/jobs/4523011-0/library-program-manager\">Library Program Manager</a><div class=\"job-organization\">Fixture City</div><span class=\"job-location\">Austin, TX</span></li><li class=\"job-item\"><a class=\"job-details-link\" href=\"https://www.governmentjobs.com/jobs/4523012-0/remote-benefits-analyst\">Remote Benefits Analyst</a><div class=\"job-organization\">Fixture County</div><span class=\"job-location\">Remote</span></li></ul><a href=\"/jobs?page=2\">2</a>",
+    "<ul><li class=\"job-item\"><a class=\"job-details-link\" href=\"/jobs/4523013-0/parks-coordinator\">Parks Coordinator</a><div class=\"job-organization\">Fixture Parks</div><span class=\"job-location\">Denver, CO</span></li></ul>"
+  ],
+  "__sourceConfig": {
+    "listUrl": "https://www.governmentjobs.com/jobs"
+  }
+}

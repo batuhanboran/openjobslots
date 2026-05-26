@@ -77,6 +77,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.disabled
   }),
+  governmentjobs: Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled
+  }),
   greenhouse: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
