@@ -72,11 +72,14 @@ function parseGemPostingsFromBatchResponse(companyNameForPostings, config, respo
 
   for (const posting of jobPostings) {
     const item = posting && typeof posting === "object" ? posting : {};
+    const normalizedId = extractGemNumericJobId(item?.id) || String(item?.extId || "").trim() || String(item?.id || "").trim();
     const postingUrl = buildGemJobPostingUrl(config, item);
     if (!postingUrl || seenUrls.has(postingUrl)) continue;
 
     const department = String(item?.job?.department?.name || "").trim();
     collected.push({
+      source_job_id: normalizedId,
+      id: normalizedId,
       company_name: companyNameForPostings,
       position_name: String(item?.title || "").trim() || "Untitled Position",
       job_posting_url: postingUrl,

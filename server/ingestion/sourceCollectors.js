@@ -7,7 +7,6 @@ const {
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseEightfoldCompany,
-  parseGemCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
   parseHirebridgeCompany,
@@ -88,7 +87,6 @@ const {
 } = require("./sources/eightfold/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
-const { parseGemPostingsFromBatchResponse } = require("./sources/gem/parse");
 const { parseJobApsPostingsFromHtml } = require("./sources/jobaps/parse");
 const { parseGetroPostingsFromHtml } = require("./sources/getro/parse");
 const {
@@ -129,7 +127,7 @@ const {
   parseStatejobsnyPostingsFromHtml
 } = require("./sources/statejobsny/parse");
 const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
-const { validateSourceContract } = require("./sourceContracts");
+const { SOURCE_STATUSES, validateSourceContract } = require("./sourceContracts");
 
 const MAX_PAGES_PER_COMPANY = 25;
 const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 30));
@@ -170,7 +168,6 @@ const PINPOINTHQ_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const RECRUITCRM_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const RIPPLING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const MANATAL_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const GEM_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOBAPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALENTREEF_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -457,9 +454,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       if (parsed.hostname === "app.loxo.co" || parsed.hostname === "www.app.loxo.co") {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
-      if (parsed.hostname === "jobs.gem.com" || parsed.hostname === "www.jobs.gem.com") {
-        return currentPostingLocationByJobUrl.get(url) || null;
-      }
       if (parsed.hostname.endsWith(".jobapscloud.com")) {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
@@ -693,6 +687,13 @@ function createSourceCollectorRuntime(dependencies = {}) {
             __sourceFetchFinalUrl: res.url || urlString
           };
         }
+        if (Array.isArray(parsedJson)) {
+          Object.defineProperty(parsedJson, "__sourceFetchFinalUrl", {
+            value: res.url || urlString,
+            enumerable: false,
+            configurable: true
+          });
+        }
         return parsedJson;
       } catch {
         return body;
@@ -710,6 +711,12 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const contract = validateSourceContract(sourceModule);
     if (!contract.ok) {
       throw new Error(`${atsKey} registry source contract failed: ${contract.failures.join(", ")}`);
+    }
+    if (
+      sourceModule.status === SOURCE_STATUSES.disabled &&
+      sourceModule.collectWhenDisabled === false
+    ) {
+      return [];
     }
 
     const rawPayload = await sourceModule.fetchList(company, {
@@ -732,48 +739,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return res.text();
-  }
-  
-  async function fetchGemJobBoard(config) {
-    const payload = [
-      {
-        operationName: "JobBoardTheme",
-        variables: {
-          boardId: config.boardId
-        },
-        query:
-          "query JobBoardTheme($boardId: String!) { publicBrandingTheme(externalId: $boardId) { id theme __typename } }"
-      },
-      {
-        operationName: "JobBoardList",
-        variables: {
-          boardId: config.boardId
-        },
-        query:
-          "query JobBoardList($boardId: String!) { oatsExternalJobPostings(boardId: $boardId) { jobPostings { id extId title locations { id name city isoCountry isRemote extId __typename } job { id department { id name extId __typename } locationType employmentType __typename } __typename } __typename } jobBoardExternal(vanityUrlPath: $boardId) { id teamDisplayName descriptionHtml pageTitle __typename } }"
-      }
-    ];
-  
-    const res = await fetchWithAtsRateLimit("gem", GEM_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Gem API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const responseJson = await res.json();
-    if (!Array.isArray(responseJson)) {
-      throw new Error("Gem API response is not a JSON array");
-    }
-  
-    return responseJson;
   }
   
   async function fetchJobApsCareersPage(urlString) {
@@ -1695,16 +1660,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.slugLower;
     const pageHtml = await fetchApplicantAiCareersPage(config.careersUrl);
     return parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
-  async function collectPostingsForGemCompany(company) {
-    const config = parseGemCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.boardIdLower;
-    const responseJson = await fetchGemJobBoard(config);
-    return parseGemPostingsFromBatchResponse(companyNameForPostings, config, responseJson);
   }
   
   async function collectPostingsForJobApsCompany(company) {
@@ -2691,7 +2646,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForApplicantAiCompany(company);
     }
     if (atsName === "gem" || atsName === "jobs.gem.com" || atsName === "gem.com" || atsName === "gemcom") {
-      return collectPostingsForGemCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "gem");
     }
     if (atsName === "jobaps" || atsName === "jobapscloud.com" || atsName === "jobapscloudcom") {
       return collectPostingsForJobApsCompany(company);

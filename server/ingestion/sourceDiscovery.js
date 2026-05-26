@@ -892,31 +892,6 @@ function parseManatalCompany(urlString) {
   };
 }
 
-function parseGemCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "jobs.gem.com" && host !== "www.jobs.gem.com") return null;
-
-  const pathParts = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length === 0) return null;
-
-  const boardId = String(pathParts[0] || "").trim();
-  if (!boardId) return null;
-
-  return {
-    host,
-    boardId,
-    boardIdLower: boardId.toLowerCase(),
-    boardUrl: `${parsed.protocol}//${parsed.host}/${boardId}`,
-    apiUrl: "https://jobs.gem.com/api/public/graphql/batch"
-  };
-}
-
 function parseJobApsCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1225,7 +1200,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   eightfold: parseEightfoldCompany,
   fountain: parseFountainCompany,
   freshteam: parseFreshteamCompany,
-  gem: parseGemCompany,
   getro: parseGetroCompany,
   greenhouse: parseGreenhouseCompany,
   hirebridge: parseHirebridgeCompany,
@@ -1280,7 +1254,6 @@ module.exports = {
   parseEightfoldCompany,
   parseFountainCompany,
   parseFreshteamCompany,
-  parseGemCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
   parseHirebridgeCompany,

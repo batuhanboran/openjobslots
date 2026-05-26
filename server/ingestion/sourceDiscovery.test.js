@@ -32,6 +32,7 @@ function testOracleAndDispatchParser() {
 
   assert.equal(parseCompanySourceConfig("ashby", "https://jobs.ashbyhq.com/example").organizationHostedJobsPageName, "example");
   assert.equal(parseCompanySourceConfig("greenhouse", "https://boards.greenhouse.io/example").boardToken, "example");
+  assert.equal(parseCompanySourceConfig("gem", "https://jobs.gem.com/fixture"), null);
   assert.equal(parseCompanySourceConfig("unknown", "https://example.com"), null);
 }
 

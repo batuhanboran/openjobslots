@@ -1,0 +1,34 @@
+[
+  {
+    "data": {
+      "oatsExternalJobPostings": {
+        "jobPostings": [
+          {
+            "id": "6001",
+            "extId": "fixture-6001",
+            "title": "Senior API Engineer",
+            "locations": [
+              {
+                "id": "loc-ny",
+                "name": "New York",
+                "city": "New York",
+                "isoCountry": "US",
+                "isRemote": false
+              }
+            ],
+            "job": {
+              "id": "job-6001",
+              "department": {
+                "id": "dept-eng",
+                "name": "Engineering",
+                "extId": "eng"
+              },
+              "locationType": "ONSITE",
+              "employmentType": "FULL_TIME"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

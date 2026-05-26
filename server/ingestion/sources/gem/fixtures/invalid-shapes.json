@@ -1,0 +1,58 @@
+{
+  "ats_key": "gem",
+  "description": "Invalid source-shape fixtures for Gem parser validation and public gate behavior.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture Gem",
+        "source_job_id": "gem-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://jobs.gem.com/fixtureco/fail-missing-title",
+        "location": "New York, United States",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing canonical URL",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Fixture Gem",
+        "source_job_id": "gem-missing-url",
+        "position_name": "Valid Gem Role",
+        "job_posting_url": "",
+        "location": "New York, United States",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture Gem",
+        "source_job_id": "",
+        "position_name": "Valid Gem Role",
+        "job_posting_url": "https://jobs.gem.com/fixtureco/fail-missing-source-id",
+        "location": "New York, United States",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing location with unknown remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture Gem",
+        "source_job_id": "gem-missing-location",
+        "position_name": "Valid Gem Role",
+        "job_posting_url": "https://jobs.gem.com/fixtureco/fail-missing-location",
+        "location": "",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}

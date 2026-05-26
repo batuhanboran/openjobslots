@@ -5,6 +5,7 @@ const {
   createSourceCollectorRuntime
 } = require("./sourceCollectors");
 const { SOURCE_FAMILIES, SOURCE_STATUSES } = require("./sourceContracts");
+const { getSourceModule } = require("./sources");
 
 function createTextResponse(body, options = {}) {
   return {
@@ -95,6 +96,128 @@ test("pilot ATS dispatches through registry modules before legacy collectors", a
     company_name: "Registry Co",
     position_name: "Registry Pilot Posting"
   }]);
+});
+
+test("Gem dispatches through registry source module", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "gem",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "gem",
+      source_family: "direct_json",
+      list_url: "https://jobs.gem.com/fixme"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return [{ test: "fixture" }];
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload) ? "Gem Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Gem registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "gem",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "gem",
+    company_name: "Gem Registry Co",
+    url_string: "https://jobs.gem.com/fixme"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "gem"],
+    ["fetchList", "gem", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Gem Registry Co",
+    position_name: "Gem Registry Posting"
+  }]);
+});
+
+test("Gem registry source stays idle while registry metadata is disabled", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "gem",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "gem",
+      source_family: "direct_json",
+      list_url: "https://jobs.gem.com/fixme"
+    }),
+    fetchList: async () => {
+      calls.push(["fetchList"]);
+      return [{ test: "fixture" }];
+    },
+    parse: () => [{
+      company_name: "Gem Registry Co",
+      position_name: "Unexpected Disabled Posting"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Gem disabled registry dispatch should not hit network");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "gem",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "gem",
+    company_name: "Gem Registry Co",
+    url_string: "https://jobs.gem.com/fixme"
+  });
+
+  assert.deepEqual(calls, [["module", "gem"]]);
+  assert.deepEqual(postings, []);
+});
+
+test("Gem registry JSON arrays preserve final URL metadata for host validation", async () => {
+  const gemSource = {
+    ...getSourceModule("gem"),
+    atsKey: "gem",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => createTextResponse("[]", {
+      contentType: "application/json",
+      url: "https://unexpected.example/api/public/graphql/batch"
+    }),
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "gem",
+    getRegistrySourceModule: () => gemSource
+  });
+
+  await assert.rejects(
+    () => runtime.collectPostingsForCompany({
+      ATS_name: "gem",
+      company_name: "Gem Registry Co",
+      url_string: "https://jobs.gem.com/fixme"
+    }),
+    /Gem API URL redirected to unexpected host/
+  );
 });
 
 test("Workday dispatches through registry source module instead of legacy collector", async () => {

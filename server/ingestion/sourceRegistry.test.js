@@ -21,6 +21,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("bamboohr"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
+  assert.equal(isRegistryPilotSource("gem"), true);
   assert.equal(isRegistryPilotSource("fountain"), true);
   assert.equal(isRegistryPilotSource("freshteam"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
@@ -53,6 +54,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "careerplug",
     "fountain",
     "freshteam",
+    "gem",
     "greenhouse",
     "hrmdirect",
     "icims",
@@ -161,6 +163,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof careerplug.normalize, "function");
   assert.equal(typeof careerplug.validate, "function");
   assert.deepEqual(validateSourceContract(careerplug), { ok: true, failures: [] });
+
+  const gem = getRegistrySourceModule("gem");
+  assert.equal(gem.atsKey, "gem");
+  assert.equal(gem.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(gem.status, SOURCE_STATUSES.disabled);
+  assert.equal(gem.collectWhenDisabled, false);
+  assert.equal(typeof gem.discover, "function");
+  assert.equal(typeof gem.fetchList, "function");
+  assert.equal(typeof gem.parse, "function");
+  assert.equal(typeof gem.normalize, "function");
+  assert.equal(typeof gem.validate, "function");
+  assert.deepEqual(validateSourceContract(gem), { ok: true, failures: [] });
 
   const greenhouse = getRegistrySourceModule("greenhouse");
   assert.equal(greenhouse.atsKey, "greenhouse");

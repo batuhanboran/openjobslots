@@ -88,6 +88,133 @@ for (const atsKey of PRIMARY_DIRECT_SOURCES) {
   });
 }
 
+test("gem source module parses list fixture and emits strict normalized evidence", () => {
+  const source = getSourceModule("gem");
+  assert.ok(source, "expected gem source module");
+  const sourceDir = path.join(__dirname, "gem");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const expectedRows = readJson(path.join(sourceDir, "fixtures", "expected-normalized.json"));
+
+  const discovered = source.discover(company);
+  assert.equal(discovered.ats_key, "gem");
+  assert.ok(source.parserVersion.startsWith("source-gem-v"));
+  assert.deepEqual(source.qualityThreshold().public_requires_geo_or_explicit_remote, true);
+
+  const parsed = source.parse(rawList, company);
+  assert.equal(parsed.length, expectedRows.length);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+
+  for (let index = 0; index < expectedRows.length; index += 1) {
+    const expected = expectedRows[index];
+    const row = normalized[index];
+    assert.equal(source.validate(row).ok, true);
+    assert.equal(row.ats_key, "gem");
+    assert.equal(row.parser_key, "gem");
+    assert.equal(row.parser_version, source.parserVersion);
+    assert.equal(typeof row.parser_confidence, "number");
+    assert.equal(typeof row.confidence_score, "number");
+    assert.ok(row.evidence?.title?.present);
+    assert.ok(row.evidence?.company?.present);
+    assert.ok(row.evidence?.canonical_url?.present);
+    assert.equal(row.source_job_id, expected.source_job_id);
+    assert.equal(row.company_name, expected.company_name);
+    assert.equal(row.position_name, expected.position_name);
+    assert.equal(row.country, expected.country || "");
+    assert.equal(row.remote_type, expected.remote_type || "unknown");
+    assert.equal(row.canonical_url, expected.job_posting_url);
+    const gate = evaluatePublicPosting(row, { parserVersion: source.parserVersion });
+    assert.equal(gate.status, "accepted", "gem valid fixture should pass public gate");
+  }
+});
+
+test("gem source module rejects or quarantines invalid-shape fixtures", () => {
+  const source = getSourceModule("gem");
+  const sourceDir = path.join(__dirname, "gem");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const invalid = readJson(path.join(sourceDir, "fixtures", "invalid-shapes.json"));
+
+  for (const item of invalid.cases) {
+    const normalized = source.normalize(item.posting, company);
+    const basic = source.validate(normalized);
+    const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
+    if (item.expected === "rejected") {
+      assert.equal(basic.ok, false, `gem ${item.name} should fail source validation`);
+      assert.match(basic.error, new RegExp(item.reason));
+    } else {
+      assert.equal(basic.ok, true, `gem ${item.name} should pass basic validation`);
+      assert.equal(gate.status, "quarantined", `gem ${item.name} should be quarantined`);
+      assert.ok(gate.reason_codes.includes(item.reason), `gem ${item.name} should include ${item.reason}`);
+    }
+  }
+});
+
+test("gem source module fetches API payload through source-local discovery and preserves array parse shape", async () => {
+  const source = getSourceModule("gem");
+  const company = readJson(path.join(__dirname, "gem", "fixtures", "company.json"));
+  const calls = [];
+  const listPayload = [
+    {
+      data: {
+        oatsExternalJobPostings: {
+          jobPostings: [
+            {
+              id: "6002",
+              title: "Runtime Gem Role",
+              locations: [{ id: "runtime", name: "Remote", city: "Austin", isoCountry: "US", isRemote: true }]
+            }
+          ]
+        }
+      }
+    }
+  ];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method, hasBody: typeof target.body === "string" });
+      assert.equal(target.body.includes("JobBoardList"), true);
+      return listPayload;
+    }
+  });
+
+  assert.deepEqual(calls, [{
+    url: "https://jobs.gem.com/api/public/graphql/batch",
+    method: "POST",
+    hasBody: true
+  }]);
+  assert.ok(Array.isArray(payload), "gem fetchList payload should stay an array");
+  assert.deepEqual(payload.__sourceConfig.boardId, "fixtureco");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+});
+
+test("gem source module rejects empty or invalid JSON API payloads", async () => {
+  const source = getSourceModule("gem");
+  const company = readJson(path.join(__dirname, "gem", "fixtures", "company.json"));
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://jobs.gem.com/api/public/graphql/batch",
+        body: ""
+      })
+    }),
+    /Gem API response body is empty/
+  );
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://jobs.gem.com/api/public/graphql/batch",
+        body: "not json"
+      })
+    }),
+    /Gem API response is not valid JSON/
+  );
+});
+
 test("target direct ATS modules return no postings for empty raw payloads", () => {
   for (const atsKey of ["recruitcrm", "recruitee"]) {
     const source = getSourceModule(atsKey);

@@ -38,6 +38,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
+  gem: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   fountain: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
@@ -137,7 +142,8 @@ function withContractMetadata(atsKey, sourceModule) {
     ...sourceModule,
     atsKey: key,
     family: metadata.family,
-    status: metadata.status
+    status: metadata.status,
+    collectWhenDisabled: metadata.collectWhenDisabled !== false
   };
 }
 
