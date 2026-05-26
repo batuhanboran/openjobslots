@@ -189,6 +189,113 @@ test("paylocity source fetchList rejects redirect to unexpected host", async () 
   );
 });
 
+test("brassring discovery normalizes preload board URLs to source-local config", () => {
+  const source = getSourceModule("brassring");
+  const sourceDir = path.join(__dirname, "brassring");
+  const fixtureCompany = readJson(path.join(sourceDir, "fixtures", "company.json"));
+
+  const discovered = source.discover(fixtureCompany);
+
+  assert.equal(discovered.ats_key, "brassring");
+  assert.equal(discovered.source_family, "brittle");
+  assert.equal(discovered.config.partnerId, "1");
+  assert.equal(discovered.config.siteId, "2");
+  assert.equal(discovered.config.boardUrl, "https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=1&siteid=2");
+  assert.equal(discovered.config.apiUrl, "https://sjobs.brassring.com/TgNewUI/Search/Ajax/MatchedJobs");
+  assert.equal(discovered.list_url, discovered.config.boardUrl);
+});
+
+test("brassring fetchList posts MatchedJobs request with source-local tokens and metadata", async () => {
+  const source = getSourceModule("brassring");
+  const sourceDir = path.join(__dirname, "brassring");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const requests = [];
+  const boardUrl = "https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=1&siteid=2";
+  const apiUrl = "https://sjobs.brassring.com/TgNewUI/Search/Ajax/MatchedJobs";
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      if (url === boardUrl) {
+        return {
+          status: 200,
+          url: boardUrl,
+          headers: {
+            get(name) {
+              return String(name || "").toLowerCase() === "set-cookie"
+                ? "BRSESSION=abc; Path=/, OTHER=def; Path=/"
+                : "";
+            }
+          },
+          body: `
+            <html><head><title>Search Jobs at | Fixture BrassRing</title></head>
+            <body>
+              <input type="hidden" name="__RequestVerificationToken" value="token-123">
+              <input type="hidden" name="CookieValue" value="encrypted-session">
+              <script>{"PartnerName":"Fixture BrassRing"}</script>
+            </body></html>
+          `
+        };
+      }
+      assert.equal(url, apiUrl);
+      return {
+        status: 200,
+        url: apiUrl,
+        Jobs: {
+          Job: [
+            {
+              Questions: [
+                { QuestionName: "reqid", Value: "BR-7001" },
+                { QuestionName: "jobtitle", Value: "BrassRing Role 1" },
+                { QuestionName: "location", Value: "Toronto, ON, Canada" },
+                { QuestionName: "lastupdated", Value: "2026-05-12" }
+              ]
+            }
+          ]
+        }
+      };
+    }
+  });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].target.method, "GET");
+  assert.equal(requests[0].target.source_family, "brittle");
+  assert.equal(requests[1].target.method, "POST");
+  assert.equal(requests[1].target.source_family, "brittle");
+  assert.equal(requests[1].target.headers.RFT, "token-123");
+  assert.equal(requests[1].target.headers.Cookie, "BRSESSION=abc; OTHER=def");
+  const body = JSON.parse(requests[1].target.body);
+  assert.equal(body.PartnerId, "1");
+  assert.equal(body.SiteId, "2");
+  assert.equal(body.encryptedsessionvalue, "encrypted-session");
+  assert.equal(raw.__sourceFetchFinalUrl, apiUrl);
+  assert.equal(raw.__sourceRequest.boardUrl, boardUrl);
+  assert.equal(raw.__sourceRequest.rateLimitMs, 60 * 1000);
+  assert.equal(raw.__sourceConfig.boardCompanyName, "Fixture BrassRing");
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].source_job_id, "BR-7001");
+  assert.equal(parsed[0].position_name, "BrassRing Role 1");
+});
+
+test("brassring source fetchList rejects redirect to unexpected host", async () => {
+  const source = getSourceModule("brassring");
+  const sourceDir = path.join(__dirname, "brassring");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://malicious.example.com/TGnewUI/Search/Home/Home?partnerid=1&siteid=2",
+        body: "<html></html>"
+      })
+    }),
+    /BrassRing URL redirected to unexpected host:/
+  );
+});
+
 test("target enterprise ATS modules return no postings for empty raw payloads", () => {
   for (const atsKey of ["workday", "icims"]) {
     const source = getSourceModule(atsKey);

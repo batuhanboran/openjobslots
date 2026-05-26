@@ -2,7 +2,6 @@ const { parseAdpWorkforcenowPostingsFromApi } = require("./adp_workforcenow/pars
 const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
-const { parseBrassringPostingsFromApi } = require("./brassring/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
@@ -825,17 +824,11 @@ const SOURCE_SPECS = Object.freeze({
   brassring: {
     sourceFamily: "brittle",
     confidence: 0.35,
-    parser: parseBrassringPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed BrassRing public TGNewUI search API",
     discover(company) {
-      const partnerId = queryParam(company.url_string, "partnerid");
-      const siteId = queryParam(company.url_string, "siteid");
       return {
-        config: {
-          partnerId,
-          siteId,
-          boardUrl: clean(company.url_string)
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

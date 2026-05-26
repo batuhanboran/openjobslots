@@ -470,6 +470,51 @@ test("Taleo dispatches through registry source module instead of legacy collecto
   }]);
 });
 
+test("BrassRing registry source stays idle while disabled", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "brassring",
+    family: SOURCE_FAMILIES.brittleHighRisk,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "brassring",
+      source_family: "brittle",
+      list_url: "https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=1&siteid=2"
+    }),
+    fetchList: async () => {
+      calls.push(["fetchList"]);
+      return { responseJson: { Jobs: { Job: [] } } };
+    },
+    parse: () => [{
+      company_name: "BrassRing Registry Co",
+      position_name: "Unexpected Disabled Posting"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("BrassRing disabled registry dispatch should not hit network");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "brassring",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "brassring",
+    company_name: "BrassRing Registry Co",
+    url_string: "https://sjobs.brassring.com/TGnewUI/Search/home/HomeWithPreLoad?partnerid=1&siteid=2"
+  });
+
+  assert.deepEqual(calls, [["module", "brassring"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("ApplyToJob dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

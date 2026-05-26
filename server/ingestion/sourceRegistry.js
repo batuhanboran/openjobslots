@@ -30,6 +30,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
+  brassring: Object.freeze({
+    family: SOURCE_FAMILIES.brittleHighRisk,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   breezy: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled

@@ -3,7 +3,6 @@ const { decodeHtmlEntities } = require("./parsers/shared/html");
 const {
   parseAdpWorkforcenowCompany,
   parseApplicantAiCompany,
-  parseBrassringCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseEightfoldCompany,
@@ -30,11 +29,6 @@ const {
   parseAdpWorkforcenowPostingsFromApi,
   resolveAdpWorkforcenowCompanyName
 } = require("./sources/adp_workforcenow/parse");
-const {
-  extractBrassringCompanyName,
-  extractBrassringHiddenInput,
-  parseBrassringPostingsFromApi
-} = require("./sources/brassring/parse");
 const {
   buildTalentreefSearchPayload,
   extractTalentreefAliasData,
@@ -173,7 +167,6 @@ const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HIREBRIDGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const PAGEUP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -695,7 +688,8 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return {
       body,
       url: res.url || urlString,
-      status: Number(res.status || 200)
+      status: Number(res.status || 200),
+      headers: res.headers
     };
   }
 
@@ -1263,97 +1257,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.json();
   }
   
-  function extractCookieHeaderFromResponse(response) {
-    const setCookieValues =
-      typeof response?.headers?.getSetCookie === "function"
-        ? response.headers.getSetCookie()
-        : String(response?.headers?.get("set-cookie") || "")
-            .split(/,(?=[^;]+=)/g)
-            .map((item) => item.trim())
-            .filter(Boolean);
-    const cookiePairs = [];
-    const seenNames = new Set();
-    for (const rawCookie of setCookieValues) {
-      const cookie = String(rawCookie || "").trim();
-      if (!cookie) continue;
-      const firstPart = cookie.split(";")[0]?.trim() || "";
-      if (!firstPart || !firstPart.includes("=")) continue;
-      const name = firstPart.split("=")[0]?.trim().toLowerCase();
-      if (!name || seenNames.has(name)) continue;
-      seenNames.add(name);
-      cookiePairs.push(firstPart);
-    }
-    return cookiePairs.join("; ");
-  }
-  
-  async function fetchBrassringMatchedJobs(config) {
-    const boardRes = await fetchWithAtsRateLimit("brassring", BRASSRING_RATE_LIMIT_WAIT_MS, config.boardUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-    if (!boardRes.ok) {
-      const body = await boardRes.text();
-      throw new Error(`BrassRing board request failed (${boardRes.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalBoardUrl = String(boardRes.url || config.boardUrl || "").trim();
-    const finalHost = String(parseUrl(finalBoardUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "sjobs.brassring.com" && finalHost !== "www.sjobs.brassring.com") {
-      throw new Error(`BrassRing URL redirected to unexpected host: ${finalBoardUrl}`);
-    }
-  
-    const pageHtml = await boardRes.text();
-    const requestVerificationToken = extractBrassringHiddenInput(pageHtml, "__RequestVerificationToken");
-    const encryptedSessionValue = extractBrassringHiddenInput(pageHtml, "CookieValue");
-    const rftHeaderValue = requestVerificationToken || extractBrassringHiddenInput(pageHtml, "hdRft");
-    const cookieHeader = extractCookieHeaderFromResponse(boardRes);
-    const companyName = extractBrassringCompanyName(pageHtml);
-  
-    const payload = {
-      PartnerId: config.partnerId,
-      SiteId: config.siteId,
-      Keyword: "",
-      Location: "",
-      LocationCustomSolrFields: "Location",
-      FacetFilterFields: null,
-      TurnOffHttps: false,
-      Latitude: 0,
-      Longitude: 0,
-      PowerSearchOptions: { PowerSearchOption: [] },
-      encryptedsessionvalue: encryptedSessionValue
-    };
-  
-    const headers = {
-      Accept: "application/json, text/javascript, */*; q=0.01",
-      "Content-Type": "application/json; charset=utf-8",
-      Origin: "https://sjobs.brassring.com",
-      Referer: config.boardUrl,
-      "X-Requested-With": "XMLHttpRequest",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    };
-    if (rftHeaderValue) headers.RFT = rftHeaderValue;
-    if (cookieHeader) headers.Cookie = cookieHeader;
-  
-    const res = await fetchWithAtsRateLimit("brassring", BRASSRING_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`BrassRing MatchedJobs request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const responseJson = await res.json();
-    return { responseJson, companyName };
-  }
-  
   async function fetchCareerpuckJobBoard(config) {
     const res = await fetchWithAtsRateLimit("careerpuck", CAREERPUCK_RATE_LIMIT_WAIT_MS, config.apiUrl, {
       method: "GET",
@@ -1747,19 +1650,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return collected;
-  }
-  
-  async function collectPostingsForBrassringCompany(company) {
-    const config = parseBrassringCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const { responseJson, companyName } = await fetchBrassringMatchedJobs(config);
-    const companyNameForPostings =
-      normalizedCompanyName ||
-      String(companyName || "").trim() ||
-      `${String(config.partnerId || "").trim()}_${String(config.siteId || "").trim()}`;
-    return parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson);
   }
   
   function parseHibobCompany(url) {
@@ -2620,7 +2510,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "sjobs.brassring.com" ||
       atsName === "sjobsbrassringcom"
     ) {
-      return collectPostingsForBrassringCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "brassring");
     }
     if (atsName === "applitrack" || atsName === "applitrack.com" || atsName === "applitrackcom") {
       return collectPostingsForRegistryPilotCompany(company, "applitrack");

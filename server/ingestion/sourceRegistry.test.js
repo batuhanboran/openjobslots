@@ -12,13 +12,14 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
   assert.equal(isRegistryPilotSource("applytojob"), true);
   assert.equal(isRegistryPilotSource("ashby"), true);
   assert.equal(isRegistryPilotSource("bamboohr"), true);
+  assert.equal(isRegistryPilotSource("brassring"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
   assert.equal(isRegistryPilotSource("gem"), true);
@@ -52,6 +53,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "applytojob",
     "ashby",
     "bamboohr",
+    "brassring",
     "breezy",
     "careerplug",
     "fountain",
@@ -145,6 +147,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof bamboohr.normalize, "function");
   assert.equal(typeof bamboohr.validate, "function");
   assert.deepEqual(validateSourceContract(bamboohr), { ok: true, failures: [] });
+
+  const brassring = getRegistrySourceModule("brassring");
+  assert.equal(brassring.atsKey, "brassring");
+  assert.equal(brassring.family, SOURCE_FAMILIES.brittleHighRisk);
+  assert.equal(brassring.status, SOURCE_STATUSES.disabled);
+  assert.equal(brassring.collectWhenDisabled, false);
+  assert.equal(typeof brassring.discover, "function");
+  assert.equal(typeof brassring.fetchList, "function");
+  assert.equal(typeof brassring.parse, "function");
+  assert.equal(typeof brassring.normalize, "function");
+  assert.equal(typeof brassring.validate, "function");
+  assert.deepEqual(validateSourceContract(brassring), { ok: true, failures: [] });
 
   const breezy = getRegistrySourceModule("breezy");
   assert.equal(breezy.atsKey, "breezy");

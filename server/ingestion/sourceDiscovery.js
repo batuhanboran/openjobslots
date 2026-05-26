@@ -369,29 +369,6 @@ function parseHirebridgeCompany(urlString) {
   };
 }
 
-function parseBrassringCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "sjobs.brassring.com" && host !== "www.sjobs.brassring.com") return null;
-
-  const partnerId = String(parsed.searchParams?.get("partnerid") || "").trim();
-  const siteId = String(parsed.searchParams?.get("siteid") || "").trim();
-  if (!partnerId || !siteId) return null;
-
-  const boardUrl =
-    `https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=${encodeURIComponent(partnerId)}` +
-    `&siteid=${encodeURIComponent(siteId)}`;
-  return {
-    host,
-    partnerId,
-    siteId,
-    boardUrl,
-    apiUrl: "https://sjobs.brassring.com/TgNewUI/Search/Ajax/MatchedJobs"
-  };
-}
-
 function parseCareerpuckCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1155,7 +1132,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   ashby: parseAshbyCompany,
   bamboohr: parseBambooHrCompany,
   breezy: parseBreezyCompany,
-  brassring: parseBrassringCompany,
   careerplug: parseCareerplugCompany,
   careerpuck: parseCareerpuckCompany,
   careerspage: parseCareerspageCompany,
@@ -1207,7 +1183,6 @@ module.exports = {
   parseAshbyCompany,
   parseBambooHrCompany,
   parseBreezyCompany,
-  parseBrassringCompany,
   parseCareerplugCompany,
   parseCareerpuckCompany,
   parseCareerspageCompany,
