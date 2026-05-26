@@ -19,6 +19,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "freshteam",
   "getro",
   "governmentjobs",
+  "usajobs",
   "k12jobspot",
   "schoolspring",
   "simplicant",

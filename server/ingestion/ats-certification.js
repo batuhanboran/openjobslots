@@ -283,6 +283,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Saved job-ad API fixture covers jobAdDetails[].id as stable source_job_id evidence.")
     }
   },
+  usajobs: {
+    priority: "P2",
+    sourcePattern: "USAJobs official Search API.",
+    parserPath: "server/ingestion/sources/usajobs/parse.js parseUsajobsPostingsFromPayload",
+    requiredFixtures: ["Search API response fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved official API fixture covers PositionLocationDisplay and PositionLocation city/subdivision/country evidence."),
+      date: decision("list-payload", "Saved official API fixture preserves PublicationStartDate as source posting-date evidence."),
+      remote: decision("list-payload", "Saved official API fixture covers explicit UserArea.Details.RemoteIndicator true/false evidence."),
+      sourceId: decision("list-payload", "Saved official API fixture covers PositionID/DocumentID as stable source_job_id evidence and URL fallback.")
+    }
+  },
   statejobsny: {
     priority: "P2",
     sourcePattern: "StateJobsNY public vacancyTable HTML plus vacancyDetailsView detail HTML.",

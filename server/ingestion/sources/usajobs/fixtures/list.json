@@ -1,0 +1,54 @@
+{
+  "SearchResult": {
+    "UserArea": {
+      "NumberOfPages": 1
+    },
+    "SearchResultItems": [
+      {
+        "MatchedObjectDescriptor": {
+          "PositionID": "806553000",
+          "PositionTitle": "IT Specialist",
+          "PositionURI": "https://www.usajobs.gov/job/806553000",
+          "OrganizationName": "Department of Example",
+          "PublicationStartDate": "2026-05-17T00:00:00.0000",
+          "PositionLocationDisplay": "Washington, District of Columbia",
+          "PositionLocation": [
+            {
+              "CityName": "Washington",
+              "CountrySubDivisionCode": "DC",
+              "CountryCode": "US"
+            }
+          ],
+          "UserArea": {
+            "Details": {
+              "RemoteIndicator": true,
+              "JobSummary": "Public API summary"
+            }
+          }
+        }
+      },
+      {
+        "MatchedObjectDescriptor": {
+          "DocumentID": "805000111",
+          "PositionTitle": "Program Analyst",
+          "OrganizationName": "Example Agency",
+          "PublicationStartDate": "2026-05-18T00:00:00.0000",
+          "PositionLocationDisplay": "Atlanta, Georgia",
+          "PositionLocation": [
+            {
+              "CityName": "Atlanta",
+              "CountrySubDivisionCode": "GA",
+              "CountryCode": "US"
+            }
+          ],
+          "UserArea": {
+            "Details": {
+              "RemoteIndicator": false,
+              "JobSummary": "Analyst role"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

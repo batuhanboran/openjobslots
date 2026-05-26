@@ -26,10 +26,6 @@ const {
   normalizePoliceappJobUrl,
   parsePoliceappPostingsFromHtml
 } = require("./sources/policeapp/parse");
-const {
-  parseUsajobsOfficialSearchPayload,
-  parseUsajobsPostingsFromPayload
-} = require("./sources/usajobs/parse");
 const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
 const { SOURCE_STATUSES, validateSourceContract } = require("./sourceContracts");
 
@@ -72,8 +68,6 @@ const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const USAJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const USAJOBS_SEARCH_API_URL = "https://data.usajobs.gov/api/Search";
 const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SCHOOLSPRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -122,6 +116,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   talentreef: 60 * 1000,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
   ultipro: ULTIPRO_RATE_LIMIT_WAIT_MS,
+  usajobs: 60 * 1000,
   workday: WORKDAY_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
@@ -798,74 +793,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parsePoliceappPostingsFromHtml(html);
   }
   
-  function getUsajobsApiConfig(env = process.env) {
-    const authorizationKey = String(
-      env.OPENJOBSLOTS_USAJOBS_AUTHORIZATION_KEY ||
-      env.USAJOBS_AUTHORIZATION_KEY ||
-      env.USAJOBS_API_KEY ||
-      ""
-    ).trim();
-    if (!authorizationKey) {
-      throw new Error("USAJobs official API key is not configured; set OPENJOBSLOTS_USAJOBS_AUTHORIZATION_KEY");
-    }
-    const userAgent = String(
-      env.OPENJOBSLOTS_USAJOBS_USER_AGENT ||
-      env.USAJOBS_USER_AGENT ||
-      env.OPENJOBSLOTS_CONTACT_EMAIL ||
-      "openjobslots.com"
-    ).trim();
-    return { authorizationKey, userAgent };
-  }async function collectPostingsForUsajobsDynamic(maxPages = 2, resultsPerPage = 25) {
-    const { authorizationKey, userAgent } = getUsajobsApiConfig(process.env);
-    const collected = [];
-    const seenUrls = new Set();
-    let totalPages = 1;
-    const pageLimit = Math.max(1, Math.min(20, Number(maxPages) || 2));
-    const perPage = Math.max(1, Math.min(500, Number(resultsPerPage) || 25));
-  
-    for (let page = 1; page <= pageLimit; page += 1) {
-      const url = new URL(USAJOBS_SEARCH_API_URL);
-      url.searchParams.set("HiringPath", "public");
-      url.searchParams.set("DatePosted", "30");
-      url.searchParams.set("SortField", "DatePosted");
-      url.searchParams.set("SortDirection", "Desc");
-      url.searchParams.set("ResultsPerPage", String(perPage));
-      url.searchParams.set("Page", String(page));
-  
-      const res = await fetchWithAtsRateLimit("usajobs", USAJOBS_RATE_LIMIT_WAIT_MS, url.toString(), {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Host: "data.usajobs.gov",
-          "User-Agent": userAgent,
-          "Authorization-Key": authorizationKey
-        }
-      });
-  
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`USAJobs official search request failed (${res.status}): ${body.slice(0, 180)}`);
-      }
-  
-      const payload = await res.json();
-      const numberOfPagesRaw = Number(payload?.SearchResult?.UserArea?.NumberOfPages || payload?.Pager?.NumberOfPages);
-      if (Number.isFinite(numberOfPagesRaw) && numberOfPagesRaw > 0) {
-        totalPages = numberOfPagesRaw;
-      }
-  
-      const batch = parseUsajobsPostingsFromPayload(payload);
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        collected.push(posting);
-        seenUrls.add(postingUrl);
-      }
-  
-      if (page >= totalPages) break;
-    }
-  
-    return collected;
-  }
   async function collectPostingsForCompany(company) {
     const atsName = String(company?.ATS_name || "").trim().toLowerCase();
     if (atsName === "workday") {
@@ -1074,7 +1001,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForPoliceappDynamic();
     }
     if (atsName === "usajobs" || atsName === "usajobs.gov" || atsName === "usajobsgov" || atsName === "www.usajobs.gov" || atsName === "wwwusajobsgov") {
-      return collectPostingsForUsajobsDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "usajobs");
     }
     if (atsName === "k12jobspot" || atsName === "k12jobspot.com" || atsName === "k12jobspotcom" || atsName === "www.k12jobspot.com" || atsName === "wwwk12jobspotcom" || atsName === "api.k12jobspot.com" || atsName === "apik12jobspotcom") {
       return collectPostingsForRegistryPilotCompany(company, "k12jobspot");
@@ -1141,7 +1068,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
 
   return {
     collectPostingsForCompany,
-    getUsajobsApiConfig,
     inferPostingLocationFromJobUrl,
     parsePostingDateToEpochSeconds,
     shouldStorePostingByDate

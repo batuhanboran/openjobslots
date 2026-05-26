@@ -1,0 +1,22 @@
+[
+  {
+    "source_job_id": "806553000",
+    "company_name": "Department of Example",
+    "position_name": "IT Specialist",
+    "country": "United States",
+    "city": "Washington",
+    "remote_type": "remote",
+    "posting_date": "2026-05-17T00:00:00.0000",
+    "parser_confidence": 0.68
+  },
+  {
+    "source_job_id": "805000111",
+    "company_name": "Example Agency",
+    "position_name": "Program Analyst",
+    "country": "United States",
+    "city": "Atlanta",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-18T00:00:00.0000",
+    "parser_confidence": 0.68
+  }
+]

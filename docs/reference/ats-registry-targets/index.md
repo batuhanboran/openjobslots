@@ -122,7 +122,7 @@ Test script: `node server/ingestion/sources/htmlPublicSourceModules.test.js`
 | `policeapp` | module-ready | `server/ingestion/sources/policeapp/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=policeapp --json` |
 | `schoolspring` | module-ready | `server/ingestion/sources/schoolspring/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=schoolspring --json` |
 | `statejobsny` | module-ready | `server/ingestion/sources/statejobsny/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=statejobsny --json` |
-| `usajobs` | module-ready | `server/ingestion/sources/usajobs/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=usajobs --json` |
+| `usajobs` | registry-backed-disabled | `server/ingestion/sources/usajobs/index.js` | Keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved. | `npm.cmd run ats:workbench -- --source=usajobs --json` |
 
 ## Brittle High Risk
 

@@ -89,5 +89,5 @@ This report is read-only. It ranks current ATS families by visible live postings
 | `teamtailor` | 0 | 1019 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `theapplicantmanager` | 0 | 156 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `ultipro` | 0 | 936 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `usajobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
+| `usajobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | source-local registry module; keep disabled until bounded live canary and source quality evidence are approved |
 | `workday` | 0 | 892 | 0 | 108 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |

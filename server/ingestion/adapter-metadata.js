@@ -109,7 +109,8 @@ const FIXTURE_BACKED = new Set([
   "statejobsny",
   "talentreef",
   "workday",
-  "taleo"
+  "taleo",
+  "usajobs"
 ]);
 
 const PARSER_FIXTURE_BACKED = new Set([
@@ -143,7 +144,8 @@ const PARSER_FIXTURE_BACKED = new Set([
   "talentreef",
   "zoho",
   "workday",
-  "taleo"
+  "taleo",
+  "usajobs"
 ]);
 
 const ADAPTER_CERTIFICATION_DETAILS = Object.freeze({

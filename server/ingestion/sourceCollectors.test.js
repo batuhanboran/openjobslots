@@ -2608,6 +2608,47 @@ test("GovernmentJobs dispatch is registry-owned even when runtime pilot predicat
   }]);
 });
 
+test("USAJobs dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "usajobs",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "usajobs",
+      source_family: "public_sector",
+      list_url: "https://data.usajobs.gov/api/Search"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled USAJobs registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("USAJobs registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "usajobs.gov",
+    company_name: "USAJobs Registry Co",
+    url_string: "https://data.usajobs.gov/api/Search"
+  });
+
+  assert.deepEqual(calls, [["module", "usajobs"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("SchoolSpring dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

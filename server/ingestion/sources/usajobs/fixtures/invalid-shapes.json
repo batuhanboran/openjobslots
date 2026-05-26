@@ -1,0 +1,43 @@
+{
+  "description": "Invalid USAJobs source-shape fixtures for rejection and quarantine.",
+  "cases": [
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "USAJobs",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://www.usajobs.gov/job/missing-id",
+        "location": "Washington, District of Columbia",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "no geo and no explicit remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "USAJobs",
+        "source_job_id": "USA-no-geo",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://www.usajobs.gov/job/USA-no-geo",
+        "location": "",
+        "remote_type": "unknown"
+      }
+    },
+    {
+      "name": "ambiguous multi location",
+      "expected": "quarantined",
+      "reason": "ambiguous_location",
+      "posting": {
+        "company_name": "USAJobs",
+        "source_job_id": "USA-multi",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://www.usajobs.gov/job/USA-multi",
+        "location": "Multiple Locations",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}

@@ -3056,8 +3056,8 @@
       "ats_key": "usajobs",
       "display_name": "USAJobs",
       "family": "public-sector-education",
-      "registry_status": "module-ready",
-      "current_status": "fallback",
+      "registry_status": "registry-backed-disabled",
+      "current_status": "source-local registry module",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -3071,7 +3071,7 @@
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
         "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "wave_priority": "wave-4-canary",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -3080,7 +3080,7 @@
         "dry_run": "npm.cmd run ats:source:dry-run -- --source=usajobs --limit=10 --json",
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
-      "next_action": "Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary.",
+      "next_action": "Keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved.",
       "work_packet": "docs/reference/ats-workbench/sources/usajobs.json"
     },
     {

@@ -20,9 +20,18 @@ function extractUsajobsOpenDate(dateDisplay) {
 
 function normalizeUsajobsRemoteType(value) {
   if (value === true) return "remote";
+  if (value === false) return "onsite";
   const normalized = cleanUsajobsText(value).toLowerCase();
   if (["true", "yes", "y", "remote"].includes(normalized)) return "remote";
+  if (["false", "no", "n", "onsite", "on-site", "not remote"].includes(normalized)) return "onsite";
   return "unknown";
+}
+
+function firstPresent(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && cleanUsajobsText(value) !== "") return value;
+  }
+  return "";
 }
 
 function getUsajobsStructuredLocation(descriptor = {}) {
@@ -53,6 +62,7 @@ function parseUsajobsOfficialSearchPayload(payload) {
 
     const details = descriptor.UserArea?.Details || {};
     const location = getUsajobsStructuredLocation(descriptor);
+
     postings.push({
       company_name: cleanUsajobsText(descriptor.OrganizationName || descriptor.DepartmentName) || "Unknown Agency",
       position_name: cleanUsajobsText(descriptor.PositionTitle) || "Untitled Position",
@@ -64,7 +74,28 @@ function parseUsajobsOfficialSearchPayload(payload) {
       region: location.region || null,
       country: location.country || null,
       remote_type: normalizeUsajobsRemoteType(details.RemoteIndicator),
-      description_plain: cleanUsajobsText(details.JobSummary || details.MajorDuties || details.Requirements || "")
+      description_plain: cleanUsajobsText(details.JobSummary || details.MajorDuties || details.Requirements || ""),
+      source_evidence: {
+        route_kind: "usajobs_official_search_api",
+        list_url: "https://data.usajobs.gov/api/Search",
+        title_path: "SearchResultItems[].MatchedObjectDescriptor.PositionTitle",
+        company_path: "SearchResultItems[].MatchedObjectDescriptor.OrganizationName|DepartmentName",
+        canonical_url_path: cleanUsajobsText(descriptor.PositionURI)
+          ? "SearchResultItems[].MatchedObjectDescriptor.PositionURI"
+          : "derived:/job/{PositionID|DocumentID|MatchedObjectId}",
+        source_job_id_path: "SearchResultItems[].MatchedObjectDescriptor.PositionID|DocumentID|MatchedObjectId",
+        location_path: location.location ? "SearchResultItems[].MatchedObjectDescriptor.PositionLocationDisplay|PositionLocation[]" : "source_absent",
+        country_path: location.country ? "SearchResultItems[].MatchedObjectDescriptor.PositionLocation[].CountryCode|CountryName" : "source_absent",
+        city_path: location.city ? "SearchResultItems[].MatchedObjectDescriptor.PositionLocation[].CityName" : "source_absent",
+        remote_path: details.RemoteIndicator === undefined ? "source_absent" : "SearchResultItems[].MatchedObjectDescriptor.UserArea.Details.RemoteIndicator",
+        remote_rule_name: details.RemoteIndicator === undefined ? "source_remote_type_absent" : "usajobs_remote_indicator",
+        posting_date_path: cleanUsajobsText(descriptor.PublicationStartDate)
+          ? "SearchResultItems[].MatchedObjectDescriptor.PublicationStartDate"
+          : "source_absent",
+        posting_date_rule_name: cleanUsajobsText(descriptor.PublicationStartDate)
+          ? "usajobs_publication_start_date"
+          : "source_posting_date_absent"
+      }
     });
     seenUrls.add(jobPostingUrl);
   }
@@ -83,10 +114,10 @@ function parseUsajobsPostingsFromPayload(payload) {
     if (!job || typeof job !== "object") continue;
 
     let jobPostingUrl = cleanUsajobsText(job.PositionURI);
+    const sourceJobId = cleanUsajobsText(job.DocumentID || job.PositionID || job.MatchedObjectId);
     if (!jobPostingUrl) {
-      const documentId = cleanUsajobsText(job.DocumentID);
-      if (documentId) {
-        jobPostingUrl = `https://www.usajobs.gov/job/${documentId}`;
+      if (sourceJobId) {
+        jobPostingUrl = `https://www.usajobs.gov/job/${sourceJobId}`;
       }
     }
     if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) continue;
@@ -95,13 +126,35 @@ function parseUsajobsPostingsFromPayload(payload) {
     const companyName = cleanUsajobsText(job.Agency) || "Unknown Agency";
     const location = cleanUsajobsText(job.LocationName || job.Location) || null;
     const postingDate = extractUsajobsOpenDate(job.DateDisplay);
+    const remoteSignal = firstPresent(job.RemoteIndicator, job.RemoteJob, job.IsRemote);
 
     postings.push({
       company_name: companyName,
       position_name: positionName,
       job_posting_url: jobPostingUrl,
+      source_job_id: sourceJobId,
       posting_date: postingDate,
-      location
+      location,
+      remote_type: normalizeUsajobsRemoteType(remoteSignal),
+      source_evidence: {
+        route_kind: "usajobs_legacy_search_payload",
+        list_url: "https://data.usajobs.gov/api/Search",
+        title_path: "Jobs[].Title",
+        company_path: "Jobs[].Agency",
+        canonical_url_path: cleanUsajobsText(job.PositionURI) ? "Jobs[].PositionURI" : "derived:/job/{DocumentID|PositionID|MatchedObjectId}",
+        source_job_id_path: sourceJobId ? "Jobs[].DocumentID|PositionID|MatchedObjectId" : "source_absent",
+        location_path: location ? "Jobs[].LocationName|Location" : "source_absent",
+        country_path: location ? "Jobs[].LocationName|Location" : "source_absent",
+        city_path: location ? "Jobs[].LocationName|Location" : "source_absent",
+        remote_path: cleanUsajobsText(remoteSignal)
+          ? "Jobs[].RemoteIndicator|RemoteJob|IsRemote"
+          : "source_absent",
+        remote_rule_name: cleanUsajobsText(remoteSignal)
+          ? "usajobs_remote_indicator"
+          : "source_remote_type_absent",
+        posting_date_path: postingDate ? "Jobs[].DateDisplay" : "source_absent",
+        posting_date_rule_name: postingDate ? "usajobs_date_display_open_date" : "source_posting_date_absent"
+      }
     });
     seenUrls.add(jobPostingUrl);
   }
