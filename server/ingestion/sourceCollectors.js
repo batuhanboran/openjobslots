@@ -12,8 +12,6 @@ const {
   parseJobApsCompany,
   parseLoxoCompany,
   parseOracleCompany,
-  parsePageupCompany,
-  extractPageupRouteConfigFromUrl,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -35,11 +33,6 @@ const {
 } = require("./sources/talentreef/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
-const {
-  extractPageupCompanyNameFromTitle,
-  extractPageupPostingDateFromDetailHtml,
-  parsePageupPostingsFromResults
-} = require("./sources/pageup/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsLocationFromTitleOrUrl,
@@ -158,7 +151,6 @@ const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const PAGEUP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
@@ -462,9 +454,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
         parsed.hostname === "www.eightfold.ai" ||
         parsed.hostname.endsWith(".eightfold.ai")
       ) {
-        return currentPostingLocationByJobUrl.get(url) || null;
-      }
-      if (parsed.hostname === "careers.pageuppeople.com" || parsed.hostname === "www.careers.pageuppeople.com") {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
       if (parsed.hostname.endsWith(".oraclecloud.com") && parsed.pathname.toLowerCase().includes("/hcmui/candidateexperience/")) {
@@ -912,103 +901,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       responseJson,
       finalUrl
     };
-  }
-  
-  async function fetchPageupBoardPage(config) {
-    const res = await fetchWithAtsRateLimit("pageup", PAGEUP_RATE_LIMIT_WAIT_MS, config.boardUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`PageUp board request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.boardUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
-      throw new Error(`PageUp URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return {
-      pageHtml: await res.text(),
-      finalUrl
-    };
-  }
-  
-  async function fetchPageupSearchResults(config) {
-    const res = await fetchWithAtsRateLimit("pageup", PAGEUP_RATE_LIMIT_WAIT_MS, config.searchUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Referer: String(config?.boardUrl || ""),
-        "X-Requested-With": "XMLHttpRequest",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`PageUp search request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.searchUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
-      throw new Error(`PageUp search URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    const bodyText = await res.text();
-    let responseJson = {};
-    try {
-      responseJson = JSON.parse(bodyText);
-    } catch {
-      throw new Error(`PageUp search response was not JSON: ${bodyText.slice(0, 180)}`);
-    }
-  
-    return {
-      responseJson,
-      finalUrl
-    };
-  }
-  
-  async function fetchPageupDetailsPage(jobPostingUrl) {
-    const res = await fetchWithAtsRateLimit("pageup", PAGEUP_RATE_LIMIT_WAIT_MS, jobPostingUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`PageUp details request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || jobPostingUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
-      throw new Error(`PageUp details URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return res.text();
   }
   
   async function fetchSagehrJobsPage(config) {
@@ -1654,58 +1546,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.companySlugLower;
     const { pageHtml } = await fetchCareerspageBoardPage(config.boardUrl);
     return parseCareerspagePostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
-  async function collectPostingsForPageupCompany(company) {
-    const config = parsePageupCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const { pageHtml, finalUrl } = await fetchPageupBoardPage(config);
-    const finalParsed = parseUrl(finalUrl);
-    const baseOrigin = `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`;
-    const routeConfig = extractPageupRouteConfigFromUrl(finalUrl, config.routeType, config.locale);
-    const runtimeConfig = {
-      ...config,
-      baseOrigin,
-      boardUrl: finalUrl || config.boardUrl,
-      routeType: routeConfig.routeType,
-      locale: routeConfig.locale,
-      searchUrl: `${baseOrigin}/${encodeURIComponent(config.boardId)}/${routeConfig.routeType}/${routeConfig.locale}/search/`
-    };
-  
-    const inferredCompanyName = extractPageupCompanyNameFromTitle(pageHtml);
-    const companyNameForPostings =
-      normalizedCompanyName ||
-      (inferredCompanyName !== "Unknown Company" ? inferredCompanyName : "") ||
-      `pageup_${String(config.boardId || "").toLowerCase()}`;
-    const { responseJson } = await fetchPageupSearchResults(runtimeConfig);
-    const resultsHtml = String(responseJson?.results || "");
-    const rawPostings = parsePageupPostingsFromResults(companyNameForPostings, runtimeConfig, resultsHtml);
-    const collected = [];
-    const seenUrls = new Set();
-  
-    for (const posting of rawPostings) {
-      const postingUrl = String(posting?.job_posting_url || "").trim();
-      if (!postingUrl || seenUrls.has(postingUrl)) continue;
-  
-      let postingDate = "";
-      try {
-        const detailsHtml = await fetchPageupDetailsPage(postingUrl);
-        postingDate = String(extractPageupPostingDateFromDetailHtml(detailsHtml) || "").trim();
-      } catch {
-        continue;
-      }
-      if (!postingDate) continue;
-  
-      collected.push({
-        ...posting,
-        posting_date: postingDate
-      });
-      seenUrls.add(postingUrl);
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForSagehrCompany(company) {
@@ -2438,7 +2278,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "careers.pageuppeople.com" ||
       atsName === "careerspageuppeoplecom"
     ) {
-      return collectPostingsForPageupCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "pageup");
     }
     if (
       atsName === "hirebridge" ||

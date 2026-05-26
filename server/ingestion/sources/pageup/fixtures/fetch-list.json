@@ -1,0 +1,8 @@
+{
+  "board_html": "<html><head><title>Careers | Fixture PageUp</title></head><body></body></html>",
+  "search_results_html": "<table><tr><td><a class=\"job-link\" href=\"/1234/cw/en-us/job/5001/hybrid-project-manager\">Hybrid Project Manager</a></td><td><span class=\"location\">Melbourne, Australia</span></td><td><span class=\"posted-date\"><time datetime=\"2026-05-01\">1 May 2026</time></span></td></tr><tr><td><a class=\"job-link\" href=\"/1234/cw/en-us/job/5002/remote-analyst\">Remote Analyst</a></td><td><span class=\"location\">Remote</span></td></tr><tr><td><a class=\"job-link\" href=\"/1234/cw/en-us/job/5001/hybrid-project-manager\">Hybrid Project Manager Duplicate</a></td><td><span class=\"location\">Melbourne, Australia</span></td></tr></table>",
+  "detail_html_by_id": {
+    "5001": "<span class=\"open-date\"><time datetime=\"2026-05-18\">18 May 2026</time></span>",
+    "5002": "<html><body>No deterministic posting date.</body></html>"
+  }
+}

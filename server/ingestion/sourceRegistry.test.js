@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -34,6 +34,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("join"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
   assert.equal(isRegistryPilotSource("manatal"), true);
+  assert.equal(isRegistryPilotSource("pageup"), true);
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("paylocity"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
@@ -69,6 +70,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "join",
     "lever",
     "manatal",
+    "pageup",
     "paylocity",
     "pinpointhq",
     "recruitcrm",
@@ -350,6 +352,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof paylocity.normalize, "function");
   assert.equal(typeof paylocity.validate, "function");
   assert.deepEqual(validateSourceContract(paylocity), { ok: true, failures: [] });
+
+  const pageup = getRegistrySourceModule("pageup");
+  assert.equal(pageup.atsKey, "pageup");
+  assert.equal(pageup.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(pageup.status, SOURCE_STATUSES.disabled);
+  assert.equal(pageup.collectWhenDisabled, false);
+  assert.equal(typeof pageup.discover, "function");
+  assert.equal(typeof pageup.fetchList, "function");
+  assert.equal(typeof pageup.parse, "function");
+  assert.equal(typeof pageup.normalize, "function");
+  assert.equal(typeof pageup.validate, "function");
+  assert.deepEqual(validateSourceContract(pageup), { ok: true, failures: [] });
 
   const recruitCrm = getRegistrySourceModule("recruitcrm");
   assert.equal(recruitCrm.atsKey, "recruitcrm");

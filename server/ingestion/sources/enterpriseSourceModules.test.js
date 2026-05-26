@@ -296,6 +296,136 @@ test("brassring source fetchList rejects redirect to unexpected host", async () 
   );
 });
 
+test("pageup source module fetches board, search results, and detail dates with source-local guards", async () => {
+  const source = getSourceModule("pageup");
+  const sourceDir = path.join(__dirname, "pageup");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const fixture = readJson(path.join(sourceDir, "fixtures", "fetch-list.json"));
+  const requests = [];
+
+  const discovered = source.discover(company);
+  assert.equal(discovered.ats_key, "pageup");
+  assert.equal(discovered.config.boardId, "1234");
+  assert.equal(discovered.config.routeType, "cw");
+  assert.equal(discovered.config.locale, "en-us");
+  assert.equal(discovered.config.boardUrl, "https://careers.pageuppeople.com/1234");
+  assert.equal(discovered.config.searchUrl, "https://careers.pageuppeople.com/1234/cw/en-us/search/");
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      if (url === "https://careers.pageuppeople.com/1234") {
+        return {
+          status: 200,
+          url: "https://careers.pageuppeople.com/1234/cw/en-us/listing",
+          body: fixture.board_html
+        };
+      }
+      if (url === "https://careers.pageuppeople.com/1234/cw/en-us/search/") {
+        return {
+          status: 200,
+          url,
+          body: JSON.stringify({ results: fixture.search_results_html })
+        };
+      }
+      if (url === "https://careers.pageuppeople.com/1234/cw/en-us/job/5001/hybrid-project-manager") {
+        return {
+          status: 200,
+          url,
+          body: fixture.detail_html_by_id["5001"]
+        };
+      }
+      if (url === "https://careers.pageuppeople.com/1234/cw/en-us/job/5002/remote-analyst") {
+        return {
+          status: 200,
+          url,
+          body: fixture.detail_html_by_id["5002"]
+        };
+      }
+      throw new Error(`unexpected PageUp fixture fetch ${url}`);
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => request.target.method), ["GET", "POST", "GET", "GET"]);
+  assert.equal(raw.__sourceFetchFinalUrl, "https://careers.pageuppeople.com/1234/cw/en-us/listing");
+  assert.equal(raw.__sourceSearchFinalUrl, "https://careers.pageuppeople.com/1234/cw/en-us/search/");
+  assert.equal(raw.__sourceRequest.rateLimitMs, 60 * 1000);
+  assert.equal(raw.__sourceRequest.detailFetchCount, 2);
+  assert.equal(raw.__sourceConfig.routeType, "cw");
+  assert.equal(raw.__sourceConfig.locale, "en-us");
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].external_id, "5001");
+  assert.equal(parsed[0].posting_date, "2026-05-18");
+  assert.equal(parsed[0].source_evidence.posting_date_rule_name, "pageup_detail_posting_date");
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "5001");
+  assert.equal(normalized.country, "Australia");
+  assert.equal(normalized.city, "Melbourne");
+  assert.equal(normalized.remote_type, "hybrid");
+  assert.equal(normalized.posting_date, "2026-05-18");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
+test("pageup source fetchList rejects redirects to unexpected hosts", async () => {
+  const source = getSourceModule("pageup");
+  const sourceDir = path.join(__dirname, "pageup");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://example.com/1234",
+        body: "<html></html>"
+      })
+    }),
+    /PageUp URL redirected to unexpected host:/
+  );
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async (url) => {
+        if (url === "https://careers.pageuppeople.com/1234") {
+          return { status: 200, url, body: "<title>Fixture</title>" };
+        }
+        return {
+          status: 200,
+          url: "https://example.com/search",
+          body: JSON.stringify({ results: "" })
+        };
+      }
+    }),
+    /PageUp search URL redirected to unexpected host:/
+  );
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async (url) => {
+        if (url === "https://careers.pageuppeople.com/1234") {
+          return { status: 200, url, body: "<title>Fixture</title>" };
+        }
+        if (url === "https://careers.pageuppeople.com/1234/cw/en-us/search/") {
+          return {
+            status: 200,
+            url,
+            body: JSON.stringify({
+              results: "<table><tr><td><a class=\"job-link\" href=\"/1234/cw/en-us/job/5001/role\">Role</a></td><td><span class=\"location\">Melbourne, Australia</span></td></tr></table>"
+            })
+          };
+        }
+        return {
+          status: 200,
+          url: "https://example.com/detail",
+          body: "<span class=\"open-date\"><time datetime=\"2026-05-18\">18 May 2026</time></span>"
+        };
+      }
+    }),
+    /PageUp details URL redirected to unexpected host:/
+  );
+});
+
 test("target enterprise ATS modules return no postings for empty raw payloads", () => {
   for (const atsKey of ["workday", "icims"]) {
     const source = getSourceModule(atsKey);

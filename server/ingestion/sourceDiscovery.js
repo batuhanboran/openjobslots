@@ -280,77 +280,6 @@ function parseEightfoldCompany(urlString) {
   };
 }
 
-function parsePageupCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "careers.pageuppeople.com" && host !== "www.careers.pageuppeople.com") return null;
-
-  const pathParts = String(parsed.pathname || "")
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length === 0) return null;
-
-  const boardId = String(pathParts[0] || "")
-    .trim()
-    .replace(/[^A-Za-z0-9_-]/g, "");
-  if (!boardId) return null;
-
-  let routeType = "cw";
-  let locale = "en-us";
-  if (pathParts.length >= 3) {
-    const maybeRouteType = String(pathParts[1] || "").trim().toLowerCase();
-    const maybeLocale = String(pathParts[2] || "").trim().toLowerCase();
-    if (maybeRouteType === "cw" || maybeRouteType === "ci") {
-      routeType = maybeRouteType;
-    }
-    if (/^[a-z]{2}(?:-[a-z]{2})$/i.test(maybeLocale)) {
-      locale = maybeLocale;
-    }
-  }
-
-  const encodedBoardId = encodeURIComponent(boardId);
-  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
-  return {
-    host,
-    boardId,
-    routeType,
-    locale,
-    baseOrigin,
-    boardUrl: `${baseOrigin}/${encodedBoardId}`,
-    searchUrl: `${baseOrigin}/${encodedBoardId}/${routeType}/${locale}/search/`
-  };
-}
-
-function extractPageupRouteConfigFromUrl(urlString, fallbackRouteType = "cw", fallbackLocale = "en-us") {
-  const parsed = parseUrl(urlString);
-  const pathParts = String(parsed?.pathname || "")
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-
-  let routeType = String(fallbackRouteType || "cw").trim().toLowerCase() || "cw";
-  let locale = String(fallbackLocale || "en-us").trim().toLowerCase() || "en-us";
-
-  if (pathParts.length >= 3) {
-    const maybeRouteType = String(pathParts[1] || "").trim().toLowerCase();
-    const maybeLocale = String(pathParts[2] || "").trim().toLowerCase();
-    if (maybeRouteType === "cw" || maybeRouteType === "ci") {
-      routeType = maybeRouteType;
-    }
-    if (/^[a-z]{2}(?:-[a-z]{2})$/i.test(maybeLocale)) {
-      locale = maybeLocale;
-    }
-  }
-
-  return {
-    routeType,
-    locale
-  };
-}
-
 function parseCareerpuckCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1131,7 +1060,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   loxo: parseLoxoCompany,
   manatal: parseManatalCompany,
   oracle: parseOracleCompany,
-  pageup: parsePageupCompany,
   peopleforce: parsePeopleforceCompany,
   pinpointhq: parsePinpointHqCompany,
   recruitcrm: parseRecruitCrmCompany,
@@ -1182,8 +1110,6 @@ module.exports = {
   parseLoxoCompany,
   parseManatalCompany,
   parseOracleCompany,
-  parsePageupCompany,
-  extractPageupRouteConfigFromUrl,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
   parseRecruitCrmCompany,

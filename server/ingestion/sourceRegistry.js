@@ -129,6 +129,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.enabled
   }),
+  pageup: Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   workday: Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.disabled

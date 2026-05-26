@@ -15,7 +15,6 @@ const {
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parseOraclePostingsFromApi } = require("./oracle/parse");
-const { parsePageupPostingsFromResults } = require("./pageup/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
@@ -790,15 +789,11 @@ const SOURCE_SPECS = Object.freeze({
   pageup: {
     sourceFamily: "html_detail",
     confidence: 0.55,
-    parser: (companyName, config, payload) => parsePageupPostingsFromResults(companyName, config, payload?.html || payload),
+    parser: () => [],
     officialDocs: "observed PageUp public job listing pages",
     discover(company) {
-      const parsed = asUrl(company.url_string);
       return {
-        config: {
-          baseOrigin: parsed ? parsed.origin : "",
-          boardUrl: clean(company.url_string)
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

@@ -616,6 +616,107 @@ test("HireBridge registry source stays idle while disabled", async () => {
   assert.deepEqual(postings, []);
 });
 
+test("PageUp dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "pageup",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "pageup",
+      source_family: "html_detail",
+      list_url: "https://careers.pageuppeople.com/123/cw/en-us"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return {
+        html: "<table></table>",
+        __detailHtmlByUrl: {}
+      };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload?.html ? "PageUp Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("PageUp registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "pageup",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "careers.pageuppeople.com",
+    company_name: "PageUp Registry Co",
+    url_string: "https://careers.pageuppeople.com/123/cw/en-us"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "pageup"],
+    ["fetchList", "careers.pageuppeople.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "PageUp Registry Co",
+    position_name: "PageUp Registry Posting"
+  }]);
+});
+
+test("PageUp registry source stays idle while disabled", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "pageup",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "pageup",
+      source_family: "html_detail",
+      list_url: "https://careers.pageuppeople.com/123/cw/en-us"
+    }),
+    fetchList: async () => {
+      calls.push(["fetchList"]);
+      return {
+        html: "<table></table>",
+        __detailHtmlByUrl: {}
+      };
+    },
+    parse: () => [{
+      company_name: "PageUp Registry Co",
+      position_name: "Unexpected Disabled Posting"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("PageUp disabled registry dispatch should not hit network");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "pageup",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "pageup",
+    company_name: "PageUp Registry Co",
+    url_string: "https://careers.pageuppeople.com/123/cw/en-us"
+  });
+
+  assert.deepEqual(calls, [["module", "pageup"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("ApplyToJob dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {
