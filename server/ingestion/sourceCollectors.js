@@ -4,7 +4,6 @@ const {
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
-  parseSimplicantCompany,
   parseTalexioCompany,
   parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
@@ -20,7 +19,6 @@ const {
   parseSagehrPostingsFromHtml
 } = require("./sources/sagehr/parse");
 const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
-const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theapplicantmanager/parse");
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
@@ -124,6 +122,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   loxo: 5 * 1000,
+  simplicant: SIMPLICANT_RATE_LIMIT_WAIT_MS,
   smartrecruiters: 1000,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
   oracle: 60 * 1000,
@@ -602,33 +601,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml, finalUrl };
   }
   
-  async function fetchSimplicantJobsPage(config) {
-    const res = await fetchWithAtsRateLimit("simplicant", SIMPLICANT_RATE_LIMIT_WAIT_MS, config.jobsUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Simplicant page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.jobsUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (
-      !finalHost.endsWith(".simplicant.com") ||
-      ["simplicant.com", "www.simplicant.com", "assets.simplicant.com", "app.simplicant.com", "jobs.simplicant.com"].includes(
-        finalHost
-      )
-    ) {
-      throw new Error(`Simplicant URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
   async function fetchTalexioJobsPage(config, page = 1, limit = 10) {
     const apiUrl = String(config?.apiUrl || "").trim();
     if (!apiUrl) {
@@ -832,24 +804,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       jobsUrl: finalUrl || config.jobsUrl
     };
     return parsePeopleforcePostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
-  async function collectPostingsForSimplicantCompany(company) {
-    const config = parseSimplicantCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml, finalUrl } = await fetchSimplicantJobsPage(config);
-    if (/page you were looking for could not be found/i.test(pageHtml)) return [];
-  
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      jobsUrl: finalUrl || config.jobsUrl
-    };
-    return parseSimplicantPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
   }
   
   async function collectPostingsForTalexioCompany(company) {
@@ -1353,7 +1307,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForPeopleforceCompany(company);
     }
     if (atsName === "simplicant" || atsName === "simplicant.com" || atsName === "simplicantcom") {
-      return collectPostingsForSimplicantCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "simplicant");
     }
     if (atsName === "pinpointhq" || atsName === "pinpointhq.com" || atsName === "pinpointhqcom") {
       return collectPostingsForRegistryPilotCompany(company, "pinpointhq");

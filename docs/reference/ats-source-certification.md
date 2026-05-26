@@ -140,7 +140,7 @@ Subagent/work-packet findings in this certification pass:
 | `sagehr` | SageHR vacancies HTML. | Date absent; anti-bot/403 and classes brittle. | Add saved HTML fixtures for open and restricted responses. |
 | `loxo` | Loxo HTML board. | Direct fetch bypasses central rate limiter; source id dropped. | Move through rate-limit wrapper and add date/location fixture. |
 | `peopleforce` | PeopleForce careers HTML. | Date absent; classes brittle; direct fetch bypasses limiter. | Add open/closed site fixtures and rate-limit wrapper. |
-| `simplicant` | Simplicant HTML board. | Date absent; strict detail URL rule; source id dropped. | Add jobs/leads path fixtures and malformed-card rejection. |
+| `simplicant` | Simplicant HTML board. | Date absent in observed list HTML; detail fetch not enabled. | Source-local registry module now preserves `/jobs/{id}/detail` and `/leads/{id}/detail` source ids with jobs/leads fixtures and malformed-card rejection. |
 | `rippling` | Rippling ATS public JSON. | Strong fields but `item.id` dropped; pagination unproven. | Add API fixture with pagination, workplace type, and source id. |
 | `careerpuck` | CareerPuck public job-board JSON. | Source id/apply URL dropped; pagination unproven. | Add API fixture for public filtering, applyUrl fallback, departments. |
 | `talentlyft` | TalentLyft landing config plus paged fragments. | Date absent; `data-job-id` not stored. | Add landing plus fragment fixtures and source id. |

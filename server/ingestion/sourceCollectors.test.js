@@ -2654,3 +2654,50 @@ test("SchoolSpring dispatch is registry-owned even when runtime pilot predicate 
     position_name: "Registry SchoolSpring Posting"
   }]);
 });
+
+test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "simplicant",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "simplicant",
+      source_family: "html_detail",
+      list_url: "https://fixture.simplicant.com/"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: "Fixture Simplicant", position_name: "Registry Simplicant Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Simplicant registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "simplicant.com",
+    company_name: "Simplicant Registry Co",
+    url_string: "https://fixture.simplicant.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "simplicant"],
+    ["fetchList", "simplicant.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Fixture Simplicant",
+    position_name: "Registry Simplicant Posting"
+  }]);
+});

@@ -1,0 +1,38 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture Simplicant",
+        "position_name": "Support Engineer",
+        "job_posting_url": "https://fixture.simplicant.com/jobs/detail",
+        "location": "Austin, TX"
+      }
+    },
+    {
+      "name": "placeholder title",
+      "expected": "rejected",
+      "reason": "placeholder position_name",
+      "posting": {
+        "source_job_id": "SIMP-BAD-TITLE",
+        "company_name": "Fixture Simplicant",
+        "position_name": "Untitled Position",
+        "job_posting_url": "https://fixture.simplicant.com/jobs/SIMP-BAD-TITLE/detail",
+        "location": "Austin, TX"
+      }
+    },
+    {
+      "name": "no geo no remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "source_job_id": "SIMP-NOGEO",
+        "company_name": "Fixture Simplicant",
+        "position_name": "Operations Associate",
+        "job_posting_url": "https://fixture.simplicant.com/jobs/SIMP-NOGEO/detail"
+      }
+    }
+  ]
+}

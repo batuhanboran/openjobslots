@@ -342,41 +342,6 @@ function parsePeopleforceCompany(urlString) {
   };
 }
 
-function parseSimplicantCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (!host.endsWith(".simplicant.com")) return null;
-  if (
-    host === "simplicant.com" ||
-    host === "www.simplicant.com" ||
-    host === "assets.simplicant.com" ||
-    host === "app.simplicant.com" ||
-    host === "jobs.simplicant.com"
-  ) {
-    return null;
-  }
-
-  const [subdomain = ""] = host.split(".");
-  if (!subdomain) return null;
-
-  const pathParts = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length > 0 && !["jobs", "leads"].includes(String(pathParts[0] || "").toLowerCase())) return null;
-
-  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
-  return {
-    host,
-    subdomain,
-    subdomainLower: subdomain.toLowerCase(),
-    baseOrigin,
-    jobsUrl: `${baseOrigin}/`
-  };
-}
-
 function parsePinpointHqCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -750,7 +715,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   rippling: parseRipplingCompany,
   sagehr: parseSagehrCompany,
   saphrcloud: parseSapHrCloudCompany,
-  simplicant: parseSimplicantCompany,
   taleo: parseTaleoCompany,
   talexio: parseTalexioCompany,
   teamtailor: parseTeamtailorCompany,
@@ -788,7 +752,6 @@ module.exports = {
   parseRipplingCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
-  parseSimplicantCompany,
   parseTaleoCompany,
   parseTalexioCompany,
   parseTeamtailorCompany,
