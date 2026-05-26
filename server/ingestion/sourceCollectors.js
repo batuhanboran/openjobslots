@@ -3,7 +3,6 @@ const {
   parseApplicantAiCompany,
   parseCareerpuckCompany,
   parseGetroCompany,
-  parseJobApsCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -27,7 +26,6 @@ const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/pars
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
-const { parseJobApsPostingsFromHtml } = require("./sources/jobaps/parse");
 const { parseGetroPostingsFromHtml } = require("./sources/getro/parse");
 const {
   extractTalentlyftInitialConfig,
@@ -139,6 +137,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: 60 * 1000,
   isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
+  jobaps: JOBAPS_RATE_LIMIT_WAIT_MS,
   jobvite: JOBVITE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
@@ -537,29 +536,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     return res.text();
   }
-  
-  async function fetchJobApsCareersPage(urlString) {
-    const res = await fetchWithAtsRateLimit("jobaps", JOBAPS_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`JobAps page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || urlString || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".jobapscloud.com")) {
-      throw new Error(`JobAps URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
+
   async function fetchSagehrJobsPage(config) {
     const headers = {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -870,17 +847,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.slugLower;
     const pageHtml = await fetchApplicantAiCareersPage(config.careersUrl);
     return parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
-  async function collectPostingsForJobApsCompany(company) {
-    const config = parseJobApsCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const hostPrefix = String(config.host || "").split(".")[0];
-    const companyNameForPostings = normalizedCompanyName || String(hostPrefix || "").toLowerCase();
-    const { pageHtml, finalUrl } = await fetchJobApsCareersPage(config.boardUrl);
-    return parseJobApsPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl || config.boardUrl);
   }
   
   function parseHibobCompany(url) {
@@ -1562,7 +1528,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "gem");
     }
     if (atsName === "jobaps" || atsName === "jobapscloud.com" || atsName === "jobapscloudcom") {
-      return collectPostingsForJobApsCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "jobaps");
     }
     if (atsName === "join" || atsName === "join.com" || atsName === "joincom") {
       return collectPostingsForRegistryPilotCompany(company, "join");

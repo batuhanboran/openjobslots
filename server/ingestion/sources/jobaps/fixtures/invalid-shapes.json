@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "posting": {
+        "company_name": "Fixture JobAps",
+        "position_name": "Valid Title",
+        "source_job_id": "",
+        "job_posting_url": "https://fixture.jobapscloud.com/Fixture/sup/bulpreview.asp",
+        "location": "Istanbul, Turkey",
+        "remote_type": "onsite"
+      },
+      "expected": "rejected",
+      "reason": "missing source_job_id"
+    },
+    {
+      "name": "missing geo and unknown remote",
+      "posting": {
+        "company_name": "Fixture JobAps",
+        "position_name": "Valid Title",
+        "source_job_id": "jobaps-no-location",
+        "job_posting_url": "https://fixture.jobapscloud.com/Fixture/sup/bulpreview.asp?JobNum=jobaps-no-location",
+        "location": "",
+        "remote_type": "unknown"
+      },
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote"
+    }
+  ]
+}

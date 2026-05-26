@@ -1,0 +1,24 @@
+[
+  {
+    "source_job_id": "1234",
+    "company_name": "Fixture JobAps",
+    "position_name": "Civic Data Analyst",
+    "job_posting_url": "https://fixture.jobapscloud.com/Fixture/sup/bulpreview.asp?R1=TR&JobNum=1234",
+    "posting_date": null,
+    "location": "Istanbul, Turkey",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "5678",
+    "company_name": "Fixture JobAps",
+    "position_name": "Remote Program Manager",
+    "job_posting_url": "https://fixture.jobapscloud.com/Fixture/sup/bulpreview.asp?R1=REM&JobNum=5678",
+    "posting_date": null,
+    "location": "Remote",
+    "remote_type": "remote",
+    "parser_confidence": 0.55
+  }
+]

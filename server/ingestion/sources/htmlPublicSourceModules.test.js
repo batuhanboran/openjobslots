@@ -8,6 +8,7 @@ const { getSourceModule } = require("./index");
 const HTML_PUBLIC_SOURCES = Object.freeze([
   "applitrack",
   "hirebridge",
+  "jobaps",
   "jobvite",
   "careerplug",
   "careerspage",

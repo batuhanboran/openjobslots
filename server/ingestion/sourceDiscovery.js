@@ -565,20 +565,6 @@ function parseManatalCompany(urlString) {
   };
 }
 
-function parseJobApsCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (!host.endsWith(".jobapscloud.com")) return null;
-
-  const boardUrl = parsed.toString();
-  return {
-    host,
-    boardUrl
-  };
-}
-
 function parseJoinCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -818,7 +804,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   freshteam: parseFreshteamCompany,
   getro: parseGetroCompany,
   hrmdirect: parseHrmDirectCompany,
-  jobaps: parseJobApsCompany,
   jobvite: parseJobviteCompany,
   join: parseJoinCompany,
   lever: parseLeverCompany,
@@ -860,7 +845,6 @@ module.exports = {
   parseFreshteamCompany,
   parseGetroCompany,
   parseHrmDirectCompany,
-  parseJobApsCompany,
   parseJobviteCompany,
   parseJoinCompany,
   parseLeverCompany,
