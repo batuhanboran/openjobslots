@@ -21,21 +21,6 @@ function parseAshbyCompany(urlString) {
   };
 }
 
-function parseGreenhouseCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-  const [boardToken = ""] = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (!boardToken) return null;
-
-  return {
-    boardToken,
-    boardTokenLower: boardToken.toLowerCase()
-  };
-}
-
 function parseLeverCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -887,7 +872,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   fountain: parseFountainCompany,
   freshteam: parseFreshteamCompany,
   getro: parseGetroCompany,
-  greenhouse: parseGreenhouseCompany,
   hrmdirect: parseHrmDirectCompany,
   jobaps: parseJobApsCompany,
   jobvite: parseJobviteCompany,
@@ -932,7 +916,6 @@ module.exports = {
   parseFountainCompany,
   parseFreshteamCompany,
   parseGetroCompany,
-  parseGreenhouseCompany,
   parseHrmDirectCompany,
   parseJobApsCompany,
   parseJobviteCompany,

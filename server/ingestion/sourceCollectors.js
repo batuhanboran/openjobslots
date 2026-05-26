@@ -4,7 +4,6 @@ const {
   parseCareerpuckCompany,
   parseCareerspageCompany,
   parseGetroCompany,
-  parseGreenhouseCompany,
   parseJobApsCompany,
   parseLoxoCompany,
   parsePeopleforceCompany,
@@ -15,7 +14,6 @@ const {
   parseTalexioCompany,
   parseTheApplicantManagerCompany
 } = require("./sourceDiscovery");
-const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
 const {
   parseSapHrCloudPostingsFromApi,
   parseSapHrCloudPostingsFromHtml
@@ -83,8 +81,6 @@ const DEFAULT_BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const WORKDAY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ASHBY_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const GREENHOUSE_API_URL_BASE = "https://boards-api.greenhouse.io/v1/boards";
-const GREENHOUSE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const LEVER_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const RECRUITEE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ULTIPRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -143,7 +139,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   eightfold: 60 * 1000,
   fountain: FOUNTAIN_RATE_LIMIT_WAIT_MS,
   freshteam: FRESHTEAM_RATE_LIMIT_WAIT_MS,
-  greenhouse: GREENHOUSE_RATE_LIMIT_WAIT_MS,
+  greenhouse: 60 * 1000,
   hrmdirect: HRMDIRECT_RATE_LIMIT_WAIT_MS,
   icims: 60 * 1000,
   isolvisolvedhire: ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS,
@@ -427,28 +423,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-  
-  async function fetchGreenhouseJobBoard(boardToken) {
-    const encodedBoardToken = encodeURIComponent(boardToken);
-    const res = await fetchWithAtsRateLimit(
-      "greenhouse",
-      GREENHOUSE_RATE_LIMIT_WAIT_MS,
-      `${GREENHOUSE_API_URL_BASE}/${encodedBoardToken}/jobs?content=true`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json"
-        }
-      }
-    );
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Greenhouse request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
   }
   
   async function fetchTheApplicantManagerPage(careersUrl) {
@@ -940,14 +914,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       pageHtml: await res.text(),
       finalUrl: String(res.url || urlString || "").trim()
     };
-  }
-  
-  async function collectPostingsForGreenhouseCompany(company) {
-    const config = parseGreenhouseCompany(company.url_string);
-    if (!config) return [];
-  
-    const response = await fetchGreenhouseJobBoard(config.boardToken);
-    return parseGreenhousePostingsFromApi(company.company_name, config, response);
   }
   
   async function collectPostingsForTheApplicantManagerCompany(company) {
@@ -1649,8 +1615,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "ashby");
     }
     if (atsName === "greenhouseio" || atsName === "greenhouse.io" || atsName === "greenhouse") {
-      if (isRegistryPilotSourceForRuntime("greenhouse")) return collectPostingsForRegistryPilotCompany(company, "greenhouse");
-      return collectPostingsForGreenhouseCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "greenhouse");
     }
     if (atsName === "leverco" || atsName === "lever.co" || atsName === "lever") {
       return collectPostingsForRegistryPilotCompany(company, "lever");

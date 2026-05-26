@@ -3,7 +3,6 @@ const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
-const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
 const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
@@ -235,13 +234,12 @@ const SOURCE_SPECS = Object.freeze({
   greenhouse: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseGreenhousePostingsFromApi,
+    parser: () => [],
     officialDocs: "https://developer.greenhouse.io/job-board.html",
     discover(company) {
-      const boardToken = firstPathSegment(company.url_string);
       return {
-        config: { boardToken, boardTokenLower: boardToken.toLowerCase() },
-        listUrl: boardToken ? `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(boardToken)}/jobs?content=true` : ""
+        config: {},
+        listUrl: clean(company.url_string)
       };
     }
   },

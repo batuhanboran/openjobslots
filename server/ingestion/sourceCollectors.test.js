@@ -2143,6 +2143,56 @@ test("Greenhouse pilot collector fetches and parses through the source registry"
   assert.equal(postings[0].source_job_id, "101");
 });
 
+test("Greenhouse dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "greenhouse",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "greenhouse",
+      source_family: "direct_json",
+      list_url: "https://boards-api.greenhouse.io/v1/boards/fixtureco/jobs?content=true"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { jobs: [{ id: 101, title: "Registry Greenhouse Posting" }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload.jobs[0].title
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Greenhouse registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "greenhouse.io",
+    company_name: "Greenhouse Registry Co",
+    url_string: "https://job-boards.greenhouse.io/fixtureco"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "greenhouse"],
+    ["fetchList", "greenhouse.io", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Greenhouse Registry Co",
+    position_name: "Registry Greenhouse Posting"
+  }]);
+});
+
 test("iCIMS pilot collector fetches iframe pages through the source registry", async () => {
   const calls = [];
   const listHtml = `
