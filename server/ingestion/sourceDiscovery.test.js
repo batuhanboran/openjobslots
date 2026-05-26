@@ -4,8 +4,7 @@ const {
   parseAshbyCompany,
   parseCompanySourceConfig,
   parseGreenhouseCompany,
-  parseOracleCompany,
-  parseTalentreefCompany
+  parseOracleCompany
 } = require("./sourceDiscovery");
 
 function testDirectCompanyParsers() {
@@ -19,9 +18,6 @@ function testDirectCompanyParsers() {
     boardTokenLower: "example"
   });
 
-  const talentreef = parseTalentreefCompany("https://apply.jobappnetwork.com/example");
-  assert.equal(talentreef.companyName, "example");
-  assert.equal(talentreef.searchApiUrl, "https://prod-kong.internal.talentreef.com/apply/proxy-es/search-en-us/posting/_search");
 }
 
 function testOracleAndDispatchParser() {

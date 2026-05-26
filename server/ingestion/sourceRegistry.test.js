@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -43,6 +43,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
+  assert.equal(isRegistryPilotSource("talentreef"), true);
   assert.equal(isRegistryPilotSource("teamtailor"), true);
   assert.equal(isRegistryPilotSource("ultipro"), true);
   assert.equal(isRegistryPilotSource("workday"), true);
@@ -79,6 +80,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "recruitee",
     "rippling",
     "smartrecruiters",
+    "talentreef",
     "taleo",
     "teamtailor",
     "ultipro",
@@ -433,6 +435,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof taleo.normalize, "function");
   assert.equal(typeof taleo.validate, "function");
   assert.deepEqual(validateSourceContract(taleo), { ok: true, failures: [] });
+
+  const talentreef = getRegistrySourceModule("talentreef");
+  assert.equal(talentreef.atsKey, "talentreef");
+  assert.equal(talentreef.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
+  assert.equal(talentreef.status, SOURCE_STATUSES.disabled);
+  assert.equal(talentreef.collectWhenDisabled, false);
+  assert.equal(typeof talentreef.discover, "function");
+  assert.equal(typeof talentreef.fetchList, "function");
+  assert.equal(typeof talentreef.parse, "function");
+  assert.equal(typeof talentreef.normalize, "function");
+  assert.equal(typeof talentreef.validate, "function");
+  assert.deepEqual(validateSourceContract(talentreef), { ok: true, failures: [] });
 
   const ultipro = getRegistrySourceModule("ultipro");
   assert.equal(ultipro.atsKey, "ultipro");

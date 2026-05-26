@@ -15,7 +15,6 @@ const {
   parseSagehrCompany,
   parseSapHrCloudCompany,
   parseSimplicantCompany,
-  parseTalentreefCompany,
   parseTalentlyftCompany,
   parseTalexioCompany,
   parseTheApplicantManagerCompany
@@ -25,11 +24,6 @@ const {
   parseAdpWorkforcenowPostingsFromApi,
   resolveAdpWorkforcenowCompanyName
 } = require("./sources/adp_workforcenow/parse");
-const {
-  buildTalentreefSearchPayload,
-  extractTalentreefAliasData,
-  parseTalentreefPostingsFromSearchResponse
-} = require("./sources/talentreef/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
 const {
@@ -139,7 +133,6 @@ const RIPPLING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const MANATAL_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOBAPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const TALENTREEF_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -184,6 +177,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
+  talentreef: 60 * 1000,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
   ultipro: ULTIPRO_RATE_LIMIT_WAIT_MS,
   workday: WORKDAY_RATE_LIMIT_WAIT_MS,
@@ -716,41 +710,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchTalentreefAlias(config) {
-    const res = await fetchWithAtsRateLimit("talentreef", TALENTREEF_RATE_LIMIT_WAIT_MS, config.aliasApiUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`TalentReef alias request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
-  async function fetchTalentreefSearchResults(config, clientId, brand, from = 0, size = 100) {
-    const payload = buildTalentreefSearchPayload(clientId, brand, from, size);
-    const res = await fetchWithAtsRateLimit("talentreef", TALENTREEF_RATE_LIMIT_WAIT_MS, config.searchApiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`TalentReef search request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchCareerspageBoardPage(urlString) {
     const res = await fetchWithAtsRateLimit("careerspage", CAREERSPAGE_RATE_LIMIT_WAIT_MS, urlString, {
       method: "GET",
@@ -1276,49 +1235,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || String(hostPrefix || "").toLowerCase();
     const { pageHtml, finalUrl } = await fetchJobApsCareersPage(config.boardUrl);
     return parseJobApsPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl || config.boardUrl);
-  }
-  
-  async function collectPostingsForTalentreefCompany(company) {
-    const config = parseTalentreefCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companyNameLower;
-    const aliasResponse = await fetchTalentreefAlias(config);
-    const { clientId, brand } = extractTalentreefAliasData(aliasResponse);
-    if (!clientId) return [];
-  
-    const collected = [];
-    const seenUrls = new Set();
-    const pageSize = 100;
-    let totalHits = null;
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const from = page * pageSize;
-      const responseJson = await fetchTalentreefSearchResults(config, clientId, brand, from, pageSize);
-      const batch = parseTalentreefPostingsFromSearchResponse(companyNameForPostings, config, responseJson);
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      const totalRaw = responseJson?.hits?.total;
-      const totalValue =
-        typeof totalRaw === "number"
-          ? totalRaw
-          : totalRaw && typeof totalRaw === "object"
-            ? Number(totalRaw?.value || 0)
-            : 0;
-      if (Number.isFinite(totalValue) && totalValue >= 0) {
-        totalHits = totalValue;
-      }
-      if (batch.length < pageSize) break;
-      if (Number.isFinite(totalHits) && from + pageSize >= Number(totalHits)) break;
-    }
-  
-    return collected;
   }
   
   async function collectPostingsForAdpWorkforcenowCompany(company) {
@@ -2080,7 +1996,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "apply.jobappnetwork.com" ||
       atsName === "applyjobappnetworkcom"
     ) {
-      return collectPostingsForTalentreefCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "talentreef");
     }
     if (atsName === "careerplug" || atsName === "careerplug.com" || atsName === "careerplugcom") {
       return collectPostingsForRegistryPilotCompany(company, "careerplug");

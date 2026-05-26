@@ -18,7 +18,6 @@ const { parseOraclePostingsFromApi } = require("./oracle/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
-const { parseTalentreefPostingsFromSearchResponse } = require("./talentreef/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { parseWorkdayPostingsFromApi } = require("./workday/parse");
 const { parseZohoPostingsFromHtml } = require("./zoho/parse");
@@ -892,17 +891,11 @@ const SOURCE_SPECS = Object.freeze({
   talentreef: {
     sourceFamily: "html_detail",
     confidence: 0.55,
-    parser: parseTalentreefPostingsFromSearchResponse,
+    parser: () => [],
     officialDocs: "observed TalentReef public career-page alias and posting search response",
     discover(company) {
-      const parsed = asUrl(company.url_string);
-      const companyName = firstPathSegment(company.url_string);
       return {
-        config: {
-          baseOrigin: parsed ? parsed.origin : "",
-          companyName,
-          boardUrl: clean(company.url_string)
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

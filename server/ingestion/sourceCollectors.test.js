@@ -565,6 +565,101 @@ test("Taleo dispatches through registry source module instead of legacy collecto
   }]);
 });
 
+test("TalentReef dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "talentreef",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "talentreef",
+      source_family: "html_detail",
+      list_url: "https://apply.jobappnetwork.com/fixture"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { hits: { hits: [{ _source: { jobId: "TR-1" } }] } };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.hits?.hits) ? "TalentReef Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("TalentReef registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "talentreef",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "jobappnetwork.com",
+    company_name: "TalentReef Registry Co",
+    url_string: "https://apply.jobappnetwork.com/fixture"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "talentreef"],
+    ["fetchList", "jobappnetwork.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "TalentReef Registry Co",
+    position_name: "TalentReef Registry Posting"
+  }]);
+});
+
+test("TalentReef registry source stays idle while disabled", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "talentreef",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "talentreef",
+      source_family: "html_detail",
+      list_url: "https://apply.jobappnetwork.com/fixture"
+    }),
+    fetchList: async () => {
+      calls.push(["fetchList"]);
+      return { hits: { hits: [{ _source: { jobId: "TR-1" } }] } };
+    },
+    parse: () => [{
+      company_name: "TalentReef Registry Co",
+      position_name: "Unexpected Disabled Posting"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("TalentReef disabled registry dispatch should not hit network");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "talentreef",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "talentreef",
+    company_name: "TalentReef Registry Co",
+    url_string: "https://apply.jobappnetwork.com/fixture"
+  });
+
+  assert.deepEqual(calls, [["module", "talentreef"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("BrassRing registry source stays idle while disabled", async () => {
   const calls = [];
   const registrySource = {

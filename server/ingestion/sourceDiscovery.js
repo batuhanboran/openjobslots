@@ -759,33 +759,6 @@ function parseJoinCompany(urlString) {
   };
 }
 
-function parseTalentreefCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "apply.jobappnetwork.com" && host !== "www.apply.jobappnetwork.com") return null;
-
-  const pathParts = parsed.pathname
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  if (pathParts.length === 0) return null;
-
-  const companyName = String(pathParts[0] || "").trim();
-  if (!companyName) return null;
-
-  return {
-    host,
-    companyName,
-    companyNameLower: companyName.toLowerCase(),
-    baseOrigin: `${parsed.protocol}//${parsed.host}`,
-    boardUrl: `${parsed.protocol}//${parsed.host}/${companyName}`,
-    aliasApiUrl: `https://prod-kong.internal.talentreef.com/apply/careerPages/alias/${encodeURIComponent(companyName)}`,
-    searchApiUrl: "https://prod-kong.internal.talentreef.com/apply/proxy-es/search-en-us/posting/_search"
-  };
-}
-
 function parseApplicantProCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1047,7 +1020,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   saphrcloud: parseSapHrCloudCompany,
   simplicant: parseSimplicantCompany,
   taleo: parseTaleoCompany,
-  talentreef: parseTalentreefCompany,
   talentlyft: parseTalentlyftCompany,
   talexio: parseTalexioCompany,
   teamtailor: parseTeamtailorCompany,
@@ -1096,7 +1068,6 @@ module.exports = {
   parseSapHrCloudCompany,
   parseSimplicantCompany,
   parseTaleoCompany,
-  parseTalentreefCompany,
   parseTalentlyftCompany,
   parseTalexioCompany,
   parseTeamtailorCompany,

@@ -122,6 +122,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.brittleHighRisk,
     status: SOURCE_STATUSES.disabled
   }),
+  talentreef: Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   teamtailor: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled
