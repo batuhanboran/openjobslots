@@ -1,0 +1,31 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "posting": {
+        "company_name": "Office of Mental Health",
+        "position_name": "Valid Title",
+        "source_job_id": "",
+        "job_posting_url": "https://www.statejobsny.com/public/vacancyDetailsView.cfm?id=",
+        "location": "Albany, NY",
+        "remote_type": "onsite"
+      },
+      "expected": "rejected",
+      "reason": "missing source_job_id"
+    },
+    {
+      "name": "county only without detail geo",
+      "posting": {
+        "company_name": "Office of Mental Health",
+        "position_name": "Valid Title",
+        "source_job_id": "216799",
+        "job_posting_url": "https://www.statejobsny.com/public/vacancyDetailsView.cfm?id=216799",
+        "county": "Albany",
+        "location": "",
+        "remote_type": "unknown"
+      },
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote"
+    }
+  ]
+}

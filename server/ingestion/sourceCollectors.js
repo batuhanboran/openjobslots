@@ -41,10 +41,6 @@ const {
   extractCaloppsNextPageUrl,
   parseCaloppsPostingsFromHtml
 } = require("./sources/calopps/parse");
-const {
-  buildStatejobsnyWindowUrl,
-  parseStatejobsnyPostingsFromHtml
-} = require("./sources/statejobsny/parse");
 const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
 const { SOURCE_STATUSES, validateSourceContract } = require("./sourceContracts");
 
@@ -93,7 +89,6 @@ const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SCHOOLSPRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALOPPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const STATEJOBSNY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HIBOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -131,6 +126,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
   schoolspring: SCHOOLSPRING_RATE_LIMIT_WAIT_MS,
+  statejobsny: 60 * 1000,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
   talentreef: 60 * 1000,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
@@ -1054,25 +1050,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return postings;
-  }async function collectPostingsForStatejobsnyDynamic() {
-    const endpoint = buildStatejobsnyWindowUrl();
-    const res = await fetchWithAtsRateLimit("statejobsny", STATEJOBSNY_RATE_LIMIT_WAIT_MS, endpoint, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`StateJobsNY request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const pageHtml = await res.text();
-    return parseStatejobsnyPostingsFromHtml(pageHtml, endpoint);
   }
   
   async function collectPostingsForCompany(company) {
@@ -1316,7 +1293,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "www.statejobsny.com" ||
       atsName === "wwwstatejobsnycom"
     ) {
-      return collectPostingsForStatejobsnyDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "statejobsny");
     }
     if (atsName === "hrmdirect" || atsName === "hrmdirect.com" || atsName === "hrmdirectcom") {
       return collectPostingsForRegistryPilotCompany(company, "hrmdirect");

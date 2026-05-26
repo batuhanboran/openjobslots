@@ -146,6 +146,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
+  statejobsny: Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   schoolspring: Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
     status: SOURCE_STATUSES.enabled

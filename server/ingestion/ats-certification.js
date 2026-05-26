@@ -247,6 +247,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Saved raw API fixture covers jobs[].id as source_job_id.")
     }
   },
+  statejobsny: {
+    priority: "P2",
+    sourcePattern: "StateJobsNY public vacancyTable HTML plus vacancyDetailsView detail HTML.",
+    parserPath: "server/ingestion/sources/statejobsny/parse.js parseStatejobsnyPostingsFromHtml and parseStatejobsnyDetailFromHtml",
+    requiredFixtures: ["vacancyTable HTML fixture", "detail HTML fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("detail-page", "Saved detail fixture covers City and State labels; county-only list rows are preserved as county evidence but not published as fake city geo."),
+      date: decision("list-payload", "Saved list fixture covers the Posted column as source posting-date evidence."),
+      remote: decision("detail-page", "Saved detail fixture covers exact Telecommuting allowed Yes/No labels; Yes maps to hybrid, No maps to onsite, and county-only list rows do not create remote evidence."),
+      sourceId: decision("list-payload", "Saved list fixture covers vacancyDetailsView id and Item # as stable source_job_id evidence.")
+    }
+  },
   lever: {
     priority: "P1",
     sourcePattern: "Lever postings API JSON.",

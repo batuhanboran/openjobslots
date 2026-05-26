@@ -1,0 +1,11 @@
+{
+  "html": "<table id=\"vacancyTable\"><thead><tr><th>Item #</th><th>Title</th><th>Grade</th><th>Posted</th><th>Deadline</th><th>Agency</th><th>County</th></tr></thead><tbody><tr><td>216785</td><td><a href=\"vacancyDetailsView.cfm?id=216785\">Food Service Worker 1</a></td><td>SG-5</td><td>05/25/26</td><td>06/10/26</td><td>Office of Mental Health</td><td>Albany</td></tr><tr><td>216786</td><td><a href=\"https://www.statejobsny.com/public/vacancyDetailsView.cfm?id=216786\">Health Program Administrator</a></td><td>SG-18</td><td>05/24/26</td><td>06/12/26</td><td>Department of Health</td><td>Erie</td></tr></tbody></table>",
+  "detail_html_by_source_job_id": {
+    "216785": "<html><body><table><tr><th>County</th><td>Albany</td></tr><tr><th>Street Address</th><td>44 Holland Avenue</td></tr><tr><th>City</th><td>Albany</td></tr><tr><th>State</th><td>NY</td></tr><tr><th>Zip Code</th><td>12229</td></tr><tr><th>Telecommuting allowed?</th><td>No</td></tr></table></body></html>",
+    "216786": "<html><body><dl><dt>County</dt><dd>Erie</dd><dt>City</dt><dd>Buffalo</dd><dt>State</dt><dd>NY</dd><dt>Zip Code</dt><dd>14202</dd><dt>Telecommuting allowed?</dt><dd>Yes</dd></dl></body></html>"
+  },
+  "__sourceConfig": {
+    "listUrl": "https://www.statejobsny.com/public/vacancyTable.cfm?searchResults=yes&minDate=05%2F25%2F26&maxDate=05%2F27%2F26"
+  },
+  "__sourceFetchFinalUrl": "https://www.statejobsny.com/public/vacancyTable.cfm?searchResults=yes&minDate=05%2F25%2F26&maxDate=05%2F27%2F26"
+}

@@ -2702,6 +2702,47 @@ test("K12JobSpot dispatch is registry-owned even when runtime pilot predicate is
   }]);
 });
 
+test("StateJobsNY dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "statejobsny",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "statejobsny",
+      source_family: "public_sector",
+      list_url: "https://www.statejobsny.com/public/vacancyTable.cfm?searchResults=yes"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled StateJobsNY registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("StateJobsNY registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "www.statejobsny.com",
+    company_name: "StateJobsNY Registry Co",
+    url_string: "https://www.statejobsny.com/public/vacancyTable.cfm"
+  });
+
+  assert.deepEqual(calls, [["module", "statejobsny"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

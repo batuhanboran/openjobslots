@@ -1,7 +1,7 @@
 {
   "ats_key": "statejobsny",
   "display_name": "StateJobsNY",
-  "current_status": "fallback",
+  "current_status": "source-local registry module",
   "source_family": "public_sector",
   "official_public_docs_or_observed_endpoint": "Observed StateJobsNY public dated HTML table.",
   "source_discovery_method": "use configured agency/board URL and official/list endpoint where visible",
@@ -9,36 +9,41 @@
   "detail_fetch_method": "detail fetch for date/location only when fixture-backed and polite",
   "pagination_method": "respect source page controls; do not brute-force ids",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "url-or-title-inference: Use vacancy/job control/listing id or stable URL id.",
+  "source_job_id_rule": "list-payload: Use vacancyDetailsView.cfm?id=... or the table Item # as stable source_job_id.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "country_region_city_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "remote_type_rule": "pending-research: Use explicit telework/remote text only.",
-  "posting_date_rule": "pending-research: Public boards frequently expose close/open dates; do not invent posted dates.",
+  "location_text_rule": "detail-page: Use detail City and State labels for public geo; preserve list County as county evidence only.",
+  "country_region_city_rule": "detail-page: Detail City plus State gives city/region and United States country; county-only list rows stay non-public unless another explicit remote/geo signal exists.",
+  "remote_type_rule": "detail-page: Map exact Telecommuting allowed? Yes to hybrid and No to onsite; do not infer remote/hybrid from county-only list rows.",
+  "posting_date_rule": "list-payload: Use the Posted column from the dated table; do not invent dates.",
   "rate_limit": "strict public-board rate limit with long cooldown after 429/403",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/statejobsny/fixtures/list.json",
+      "server/ingestion/sources/statejobsny/fixtures/detail-pages.json",
+      "server/ingestion/sources/statejobsny/fixtures/expected-normalized.json",
+      "server/ingestion/sources/statejobsny/fixtures/invalid-shapes.json"
+    ],
+    "present": [
       "raw source fixture",
       "expected normalized fixture",
       "parser rejection tests"
-    ]
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/statejobsny/index.js",
+    "fixtures_dir": "server/ingestion/sources/statejobsny/fixtures",
+    "parser_version": "source-statejobsny-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "disabled_until_canary",
+    "minimum_confidence": 0.58,
+    "public_write_rule": "source remains disabled/collect-when-disabled off; public writes require live canary proof that detail-backed geo/telecommuting evidence exists and county-only rows stay quarantined"
   },
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven",
+  "quarantine_reason": "hold/quarantine recommendation: strict raw fixture exists, but source has zero live rows and detail volume/field quality are unproven",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -57,21 +62,21 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js StateJobsNY collector",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/statejobsny/index.js",
+    "parser_version_status": "source-statejobsny-v1",
+    "confidence": "medium-low"
   },
   "runner_interface": {
     "discover": "use configured agency/board URL and official/list endpoint where visible",
     "fetchList": "bounded public-sector feed/API/HTML list request",
     "fetchDetail": "detail fetch for date/location only when fixture-backed and polite",
-    "parseList": "server/index.js StateJobsNY collector",
-    "parseDetail": "server/index.js StateJobsNY collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "parseList": "server/ingestion/sources/statejobsny/parse.js parseStatejobsnyPostingsFromHtml",
+    "parseDetail": "server/ingestion/sources/statejobsny/parse.js parseStatejobsnyDetailFromHtml",
+    "normalize": "server/ingestion/sources/statejobsny/index.js normalize",
     "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "run bounded live canary/estimate only after explicit approval; otherwise target CalCareers next for public-sector extraction",
+  "certification_blockers": "live canary quality and detail fetch volume unproven"
 }

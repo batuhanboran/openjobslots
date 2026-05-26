@@ -85,7 +85,7 @@ Current workbench counts: 60 configured ATS, 23 strict parser-fixture-backed, 0 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
 - Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
-- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `statejobsny`, `theapplicantmanager`, `usajobs`.
+- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `statejobsny` now has raw fixtures but remains disabled until live canary evidence proves detail volume and field quality.
 - Keep disabled: `dayforcehcm`.
 
 Subagent/work-packet findings in this certification pass:
@@ -153,7 +153,7 @@ Subagent/work-packet findings in this certification pass:
 | `schoolspring` | SchoolSpring JSON API. | Date format unproven; source id absent. | Add fixture and map `jobId`. |
 | `calcareers` | CalCareers ASP.NET HTML. | Markup order brittle; source id absent. | Add postback HTML fixture and JobControl source id. |
 | `calopps` | CalOpps paged HTML. | Uses current timestamp as posting date; location only region. | Stop invented dates; add fixture and preserve source id. |
-| `statejobsny` | StateJobsNY dated HTML table. | Column indexes brittle; vacancy id not source id. | Add table fixture and vacancy id extraction. |
+| `statejobsny` | StateJobsNY dated vacancy table plus vacancy detail pages. | List `County` is not city-level geo; telecommuting semantics come only from exact detail labels. | Source-local registry module preserves vacancy id from detail URL/Item #, uses the Posted column, merges detail `City`/`State` as geo, maps exact `Telecommuting allowed? Yes/No` to hybrid/onsite, keeps county-only rows quarantined, and has raw/expected/invalid fixtures. Keep disabled until live canary evidence proves detail volume and quality. |
 | `policeapp` | PoliceApp AJAX endpoint. | No pagination; invented date; location null. | Add pagination/date strategy or leave date null; raw fixture. |
 | `jobaps` | JobAps company page. | No posting date; external id ignored by normalizer. | Add raw fixture and map JobNum to source id. |
 | `applitrack` | Applitrack `Output.asp?all=1` plus `JobPostings/view.asp` detail pages. | Existing rows are often blank because `Output.asp` omits geo/date; full repair requires polite detail-page backfill, not only normalization. | Wave A supports single/double-quoted `applyFor`, extra call arguments, `Location(s)`/building/worksite labels, explicit negative remote text, and source footer address fallback for generic `DISTRICT WIDE` locations. Run bounded `refetch:details:dry-run` and then guarded `refetch:details` before reindexing Applitrack-heavy repair batches. |

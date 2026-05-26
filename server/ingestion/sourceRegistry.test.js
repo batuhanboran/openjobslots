@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, StateJobsNY, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -51,6 +51,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("schoolspring"), true);
   assert.equal(isRegistryPilotSource("simplicant"), true);
   assert.equal(isRegistryPilotSource("smartrecruiters"), true);
+  assert.equal(isRegistryPilotSource("statejobsny"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
@@ -103,6 +104,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "schoolspring",
     "simplicant",
     "smartrecruiters",
+    "statejobsny",
     "talentlyft",
     "talentreef",
     "taleo",
@@ -481,6 +483,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof smartRecruiters.normalize, "function");
   assert.equal(typeof smartRecruiters.validate, "function");
   assert.deepEqual(validateSourceContract(smartRecruiters), { ok: true, failures: [] });
+
+  const stateJobsNy = getRegistrySourceModule("statejobsny");
+  assert.equal(stateJobsNy.atsKey, "statejobsny");
+  assert.equal(stateJobsNy.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(stateJobsNy.status, SOURCE_STATUSES.disabled);
+  assert.equal(stateJobsNy.collectWhenDisabled, false);
+  assert.equal(typeof stateJobsNy.discover, "function");
+  assert.equal(typeof stateJobsNy.fetchList, "function");
+  assert.equal(typeof stateJobsNy.parse, "function");
+  assert.equal(typeof stateJobsNy.normalize, "function");
+  assert.equal(typeof stateJobsNy.validate, "function");
+  assert.deepEqual(validateSourceContract(stateJobsNy), { ok: true, failures: [] });
 
   const schoolSpring = getRegistrySourceModule("schoolspring");
   assert.equal(schoolSpring.atsKey, "schoolspring");

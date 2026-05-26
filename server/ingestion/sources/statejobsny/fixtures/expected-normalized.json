@@ -1,0 +1,26 @@
+[
+  {
+    "source_job_id": "216785",
+    "company_name": "Office of Mental Health",
+    "position_name": "Food Service Worker 1",
+    "job_posting_url": "https://www.statejobsny.com/public/vacancyDetailsView.cfm?id=216785",
+    "posting_date": "05/25/26",
+    "location": "Albany, NY",
+    "country": "United States",
+    "city": "Albany",
+    "remote_type": "onsite",
+    "parser_confidence": 0.58
+  },
+  {
+    "source_job_id": "216786",
+    "company_name": "Department of Health",
+    "position_name": "Health Program Administrator",
+    "job_posting_url": "https://www.statejobsny.com/public/vacancyDetailsView.cfm?id=216786",
+    "posting_date": "05/24/26",
+    "location": "Buffalo, NY",
+    "country": "United States",
+    "city": "Buffalo",
+    "remote_type": "hybrid",
+    "parser_confidence": 0.58
+  }
+]

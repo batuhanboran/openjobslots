@@ -222,6 +222,7 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
       "recruitcrm",
       "recruitee",
       "smartrecruiters",
+      "statejobsny",
       "talentreef",
       "taleo",
       "workday",
