@@ -2784,6 +2784,47 @@ test("CalCareers dispatch is registry-owned and stays disabled without hitting l
   assert.deepEqual(postings, []);
 });
 
+test("CalOpps dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "calopps",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "calopps",
+      source_family: "public_sector",
+      list_url: "https://www.calopps.org/job-search-list"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled CalOpps registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("CalOpps registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "www.calopps.org",
+    company_name: "CalOpps Registry Co",
+    url_string: "https://www.calopps.org/job-search-list"
+  });
+
+  assert.deepEqual(calls, [["module", "calopps"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

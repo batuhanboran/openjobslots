@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "CalOpps",
+        "position_name": "Unidentified Role",
+        "job_posting_url": "https://www.calopps.org/agency/job-without-id",
+        "location": "San Mateo, CA"
+      }
+    },
+    {
+      "name": "no geo and no remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "source_job_id": "431237",
+        "company_name": "CalOpps",
+        "position_name": "Administrative Aide",
+        "job_posting_url": "https://www.calopps.org/city-of-fixture/job-431237",
+        "location": null,
+        "posting_date": null
+      }
+    }
+  ]
+}

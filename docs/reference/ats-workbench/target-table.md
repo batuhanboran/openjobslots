@@ -56,7 +56,7 @@ This report is read-only. It ranks current ATS families by visible live postings
 | `applicantai` | 0 | 179 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `brassring` | 0 | 136 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `calcareers` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until bounded live canary and source quality evidence are approved |
-| `calopps` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
+| `calopps` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until bounded live canary and source quality evidence are approved |
 | `careerpuck` | 0 | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `careerspage` | 0 | 132 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `dayforcehcm` | 0 | 226 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |

@@ -80,12 +80,12 @@ npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreb
 
 The command is read-only and includes every configured ATS key, including sources with no visible rows. The generated fields now include wave priority, certification blockers, exact next parser action, public-enabled recommendation, source-id reliability, canonical URL reliability, and detail-refetch requirement.
 
-Current workbench counts: 60 configured ATS, 23 strict parser-fixture-backed, 0 partial, 36 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
+Current workbench counts: 60 configured ATS, 24 strict parser-fixture-backed, 0 partial, 35 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
 - Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
-- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `calcareers` and `statejobsny` now have raw fixtures but remain disabled until live canary evidence proves detail volume and field quality.
+- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `calcareers`, `calopps`, and `statejobsny` now have raw fixtures but remain disabled until live canary evidence proves source quality and field coverage.
 - Keep disabled: `dayforcehcm`.
 
 Subagent/work-packet findings in this certification pass:
@@ -93,7 +93,7 @@ Subagent/work-packet findings in this certification pass:
 - Direct JSON/API: `teamtailor`, `freshteam`, and `getro` are the main certification gaps. `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
 - Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module fixtures and invalid-shape tests. `eightfold` still needs raw parser fixtures before public enablement can be called safe. `taleo` and `brassring` remain low-confidence; `pageup`, `saphrcloud`, and `ultipro` need live canaries before promotion.
 - Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `jobvite`, `theapplicantmanager`, `talentreef`, `hirebridge`, and `isolvisolvedhire` remain raw-fixture blockers.
-- Vendor/public-sector: `manatal` is certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs`, `calopps`, and `policeapp` must stop fabricated recency before public confidence can be raised.
+- Vendor/public-sector: `manatal` is certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs` and `policeapp` must stop fabricated recency before public confidence can be raised; CalOpps now keeps close dates separate and leaves posting dates null.
 
 | ATS | Current source/parser path | Field gaps seen | Certification action |
 | --- | --- | --- | --- |
@@ -152,7 +152,7 @@ Subagent/work-packet findings in this certification pass:
 | `k12jobspot` | K12JobSpot JSON API. | No detail fetch enabled; public API source-backed list fields only. | Source-local registry module now preserves `jobs[].id` as `source_job_id`, maps US city/state/postal list objects, and has raw/expected/invalid fixtures. |
 | `schoolspring` | SchoolSpring JSON API. | Date format unproven; source id absent. | Add fixture and map `jobId`. |
 | `calcareers` | CalCareers ASP.NET Search/JobSearchResults HTML plus search, row-count, and pager postbacks. | Markup order can drift; remote semantics are source-absent in the saved fixture. | Source-local registry module preserves Job Control/JobControlId source ids, Department, Location, Publish Date, bounded pager pages, raw/expected/invalid fixtures, and keeps the source disabled until live canary evidence proves quality. |
-| `calopps` | CalOpps paged HTML. | Uses current timestamp as posting date; location only region. | Stop invented dates; add fixture and preserve source id. |
+| `calopps` | CalOpps public job-search-list HTML plus bounded next-page links. | Source exposes region/location and close dates in saved fixtures, but no true posting-date field. | Source-local registry module preserves `/job-{id}` source ids, agency-from-path company names, close_date separately from posting_date, raw/expected/invalid fixtures, and keeps the source disabled until live canary evidence proves quality. |
 | `statejobsny` | StateJobsNY dated vacancy table plus vacancy detail pages. | List `County` is not city-level geo; telecommuting semantics come only from exact detail labels. | Source-local registry module preserves vacancy id from detail URL/Item #, uses the Posted column, merges detail `City`/`State` as geo, maps exact `Telecommuting allowed? Yes/No` to hybrid/onsite, keeps county-only rows quarantined, and has raw/expected/invalid fixtures. Keep disabled until live canary evidence proves detail volume and quality. |
 | `policeapp` | PoliceApp AJAX endpoint. | No pagination; invented date; location null. | Add pagination/date strategy or leave date null; raw fixture. |
 | `jobaps` | JobAps company page. | No posting date; external id ignored by normalizer. | Add raw fixture and map JobNum to source id. |

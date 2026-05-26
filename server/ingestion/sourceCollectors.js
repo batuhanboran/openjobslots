@@ -31,10 +31,6 @@ const {
   parseUsajobsOfficialSearchPayload,
   parseUsajobsPostingsFromPayload
 } = require("./sources/usajobs/parse");
-const {
-  extractCaloppsNextPageUrl,
-  parseCaloppsPostingsFromHtml
-} = require("./sources/calopps/parse");
 const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
 const { SOURCE_STATUSES, validateSourceContract } = require("./sourceContracts");
 
@@ -96,6 +92,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
   calcareers: CALCAREERS_RATE_LIMIT_WAIT_MS,
+  calopps: CALOPPS_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
   careerspage: CAREERSPAGE_RATE_LIMIT_WAIT_MS,
   eightfold: 60 * 1000,
@@ -931,41 +928,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     return collected;
   }
-  async function collectPostingsForCaloppsDynamic(maxPages = 25) {
-    let nextPageUrl = "https://www.calopps.org/job-search-list";
-    let pagesFetched = 0;
-    const pageLimit = Math.max(1, Math.min(100, Number(maxPages) || 25));
-    const postings = [];
-    const seenUrls = new Set();
-  
-    while (nextPageUrl && pagesFetched < pageLimit) {
-      const res = await fetchWithAtsRateLimit("calopps", CALOPPS_RATE_LIMIT_WAIT_MS, nextPageUrl, {
-        method: "GET",
-        headers: {
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9"
-        }
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`CalOpps request failed (${res.status}): ${body.slice(0, 180)}`);
-      }
-      const pageHtml = await res.text();
-      const batch = parseCaloppsPostingsFromHtml(pageHtml, nextPageUrl);
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        postings.push(posting);
-        seenUrls.add(postingUrl);
-      }
-  
-      pagesFetched += 1;
-      nextPageUrl = extractCaloppsNextPageUrl(pageHtml, nextPageUrl);
-    }
-  
-    return postings;
-  }
-  
   async function collectPostingsForCompany(company) {
     const atsName = String(company?.ATS_name || "").trim().toLowerCase();
     if (atsName === "workday") {
@@ -1198,7 +1160,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "www.calopps.org" ||
       atsName === "wwwcaloppsorg"
     ) {
-      return collectPostingsForCaloppsDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "calopps");
     }
     if (
       atsName === "statejobsny" ||

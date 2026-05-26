@@ -80,15 +80,20 @@ function parseCaloppsPostingsFromHtml(pageHtml, pageUrl) {
     const category = cleanCaloppsText(cells[2]) || null;
     const jobType = cleanCaloppsText(cells[3]) || null;
     const closeDate = cleanCaloppsText(cells[4]) || null;
-    const postingIdMatch = href.match(/\/job-(\d+)/i);
-    const postingId = postingIdMatch?.[1] || jobPostingUrl;
+    const postingIdMatch = href.match(/\/job-(\d+)/i) || jobPostingUrl.match(/\/job-(\d+)/i);
+    const postingId = postingIdMatch?.[1] || "";
+    if (!postingId) {
+      rowMatch = rowRegex.exec(source);
+      continue;
+    }
 
     postings.push({
       id: postingId,
+      source_job_id: postingId,
       company_name: inferCaloppsCompanyFromPath(href),
       position_name: title,
       job_posting_url: jobPostingUrl,
-      posting_date: new Date().toISOString(),
+      posting_date: null,
       location: region,
       category,
       work_type: jobType,

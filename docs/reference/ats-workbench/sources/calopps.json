@@ -1,44 +1,50 @@
 {
   "ats_key": "calopps",
   "display_name": "CalOpps",
-  "current_status": "fallback",
+  "current_status": "source-local registry module; disabled with collect-when-disabled off",
   "source_family": "public_sector",
   "official_public_docs_or_observed_endpoint": "CalOpps paged public HTML.",
-  "source_discovery_method": "use configured agency/board URL and official/list endpoint where visible",
-  "list_fetch_method": "bounded public-sector feed/API/HTML list request",
-  "detail_fetch_method": "detail fetch for date/location only when fixture-backed and polite",
-  "pagination_method": "respect source page controls; do not brute-force ids",
+  "source_discovery_method": "source-local host guard for calopps.org and the official job-search-list endpoint",
+  "list_fetch_method": "source-local GET list fetch with bounded next-page links",
+  "detail_fetch_method": "not enabled for this checkpoint; use list title, agency path, region/location, category, job type, and close date fields",
+  "pagination_method": "follow source <li class=\"next\"> page controls up to a safe maxPages limit; do not brute-force ids",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "url-or-title-inference: Use vacancy/job control/listing id or stable URL id.",
+  "source_job_id_rule": "url-or-title-inference: preserve /job-{id} URL ids as source_job_id.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "country_region_city_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "remote_type_rule": "pending-research: Use explicit telework/remote text only.",
-  "posting_date_rule": "pending-research: Public boards frequently expose close/open dates; do not invent posted dates.",
+  "location_text_rule": "list-payload: preserve the region/location cell and normalize country/region/city conservatively.",
+  "country_region_city_rule": "list-payload: normalize only when the region/location text proves a concrete place.",
+  "remote_type_rule": "source-absent unless exact remote/telework text appears; geo-backed list rows normalize as onsite through the generic gate.",
+  "posting_date_rule": "source-absent in saved fixtures: preserve close_date separately and leave posting_date null unless a future source fixture proves a true posted/open date.",
   "rate_limit": "strict public-board rate limit with long cooldown after 429/403",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/calopps/fixtures/company.json",
+      "server/ingestion/sources/calopps/fixtures/list.json",
+      "server/ingestion/sources/calopps/fixtures/expected-normalized.json",
+      "server/ingestion/sources/calopps/fixtures/invalid-shapes.json"
+    ],
+    "present": [
+      "server/ingestion/sources/calopps/fixtures/company.json",
+      "server/ingestion/sources/calopps/fixtures/list.json",
+      "server/ingestion/sources/calopps/fixtures/expected-normalized.json",
+      "server/ingestion/sources/calopps/fixtures/invalid-shapes.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/calopps/index.js",
+    "fixtures_dir": "server/ingestion/sources/calopps/fixtures",
+    "parser_version": "source-calopps-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "disabled_until_canary",
+    "minimum_confidence": 0.56,
+    "public_write_rule": "source remains disabled/collect-when-disabled off; public writes require live canary proof that geo-backed rows stay clean and close dates are not treated as posting dates"
   },
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven",
+  "quarantine_reason": "disabled hold: source-local parser/fetch fixtures exist, but live canary/source quality evidence has not been approved or applied",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -53,25 +59,25 @@
     "missing_any_geo_pct": 0,
     "weak_remote_pct": 0,
     "risk_score": 35,
-    "wave_priority": "wave-4-fixture",
+    "wave_priority": "wave-4-canary",
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js CalOpps collector",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/calopps/index.js",
+    "parser_version_status": "source-calopps-v1",
+    "confidence": 0.56
   },
   "runner_interface": {
-    "discover": "use configured agency/board URL and official/list endpoint where visible",
-    "fetchList": "bounded public-sector feed/API/HTML list request",
-    "fetchDetail": "detail fetch for date/location only when fixture-backed and polite",
-    "parseList": "server/index.js CalOpps collector",
-    "parseDetail": "server/index.js CalOpps collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "discover": "server/ingestion/sources/calopps/discover.js createDiscover",
+    "fetchList": "server/ingestion/sources/calopps/fetchList.js createFetchList",
+    "fetchDetail": "not enabled for this checkpoint",
+    "parseList": "server/ingestion/sources/calopps/parse.js parseCaloppsPostingsFromHtml",
+    "parseDetail": "not enabled for this checkpoint",
+    "normalize": "server/ingestion/sources/calopps/index.js normalize",
     "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "keep disabled until a bounded live canary proves source quality and net-new clean public candidates",
+  "certification_blockers": "live canary/source quality evidence pending; no production source apply has been run"
 }

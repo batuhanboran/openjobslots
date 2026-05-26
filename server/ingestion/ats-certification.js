@@ -259,6 +259,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Saved postback fixture covers Job Control text and JobControlId URL as stable source_job_id evidence.")
     }
   },
+  calopps: {
+    priority: "P2",
+    sourcePattern: "CalOpps public job-search-list HTML plus bounded next-page links.",
+    parserPath: "server/ingestion/sources/calopps/parse.js parseCaloppsPostingsFromHtml",
+    requiredFixtures: ["paged list HTML fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved CalOpps fixture covers the region cell as source-backed city/state evidence when present."),
+      date: decision("source-absent", "Saved CalOpps fixture has close dates but no posting-date field; close_date is preserved separately and posting_date stays null."),
+      remote: decision("url-or-title-inference", "Saved list fixture exposes no explicit remote/hybrid field; concrete geo-backed rows normalize as onsite and missing-geo rows remain gated."),
+      sourceId: decision("url-or-title-inference", "Saved list fixture covers /job-{id} canonical URLs as stable source_job_id evidence.")
+    }
+  },
   statejobsny: {
     priority: "P2",
     sourcePattern: "StateJobsNY public vacancyTable HTML plus vacancyDetailsView detail HTML.",

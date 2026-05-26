@@ -23,6 +23,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("brassring"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
   assert.equal(isRegistryPilotSource("calcareers"), true);
+  assert.equal(isRegistryPilotSource("calopps"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
   assert.equal(isRegistryPilotSource("careerpuck"), true);
   assert.equal(isRegistryPilotSource("careerspage"), true);
@@ -75,6 +76,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "brassring",
     "breezy",
     "calcareers",
+    "calopps",
     "careerplug",
     "careerpuck",
     "careerspage",
@@ -509,6 +511,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof calCareers.normalize, "function");
   assert.equal(typeof calCareers.validate, "function");
   assert.deepEqual(validateSourceContract(calCareers), { ok: true, failures: [] });
+
+  const calOpps = getRegistrySourceModule("calopps");
+  assert.equal(calOpps.atsKey, "calopps");
+  assert.equal(calOpps.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(calOpps.status, SOURCE_STATUSES.disabled);
+  assert.equal(calOpps.collectWhenDisabled, false);
+  assert.equal(typeof calOpps.discover, "function");
+  assert.equal(typeof calOpps.fetchList, "function");
+  assert.equal(typeof calOpps.parse, "function");
+  assert.equal(typeof calOpps.normalize, "function");
+  assert.equal(typeof calOpps.validate, "function");
+  assert.deepEqual(validateSourceContract(calOpps), { ok: true, failures: [] });
 
   const schoolSpring = getRegistrySourceModule("schoolspring");
   assert.equal(schoolSpring.atsKey, "schoolspring");

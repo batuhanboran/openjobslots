@@ -1,0 +1,38 @@
+[
+  {
+    "source_job_id": "431234",
+    "company_name": "San Mateo County",
+    "position_name": "Senior Planner",
+    "job_posting_url": "https://www.calopps.org/san-mateo-county/job-431234",
+    "posting_date": null,
+    "location": "San Mateo, CA",
+    "country": "United States",
+    "city": "San Mateo",
+    "remote_type": "onsite",
+    "parser_confidence": 0.56
+  },
+  {
+    "source_job_id": "431235",
+    "company_name": "City Of Sunnyvale",
+    "position_name": "Permit Technician",
+    "job_posting_url": "https://www.calopps.org/city-of-sunnyvale/job-431235",
+    "posting_date": null,
+    "location": "Sunnyvale, CA",
+    "country": "United States",
+    "city": "Sunnyvale",
+    "remote_type": "onsite",
+    "parser_confidence": 0.56
+  },
+  {
+    "source_job_id": "431236",
+    "company_name": "City Of Palo Alto",
+    "position_name": "Library Assistant",
+    "job_posting_url": "https://www.calopps.org/city-of-palo-alto/job-431236",
+    "posting_date": null,
+    "location": "Palo Alto, CA",
+    "country": "United States",
+    "city": "Palo Alto",
+    "remote_type": "onsite",
+    "parser_confidence": 0.56
+  }
+]
