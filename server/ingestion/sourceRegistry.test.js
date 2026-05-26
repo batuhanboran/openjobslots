@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -47,6 +47,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("paylocity"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
+  assert.equal(isRegistryPilotSource("schoolspring"), true);
   assert.equal(isRegistryPilotSource("smartrecruiters"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
@@ -96,6 +97,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "recruitcrm",
     "recruitee",
     "rippling",
+    "schoolspring",
     "smartrecruiters",
     "talentlyft",
     "talentreef",
@@ -464,6 +466,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof smartRecruiters.normalize, "function");
   assert.equal(typeof smartRecruiters.validate, "function");
   assert.deepEqual(validateSourceContract(smartRecruiters), { ok: true, failures: [] });
+
+  const schoolSpring = getRegistrySourceModule("schoolspring");
+  assert.equal(schoolSpring.atsKey, "schoolspring");
+  assert.equal(schoolSpring.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(schoolSpring.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof schoolSpring.discover, "function");
+  assert.equal(typeof schoolSpring.fetchList, "function");
+  assert.equal(typeof schoolSpring.parse, "function");
+  assert.equal(typeof schoolSpring.normalize, "function");
+  assert.equal(typeof schoolSpring.validate, "function");
+  assert.deepEqual(validateSourceContract(schoolSpring), { ok: true, failures: [] });
 
   const recruitee = getRegistrySourceModule("recruitee");
   assert.equal(recruitee.atsKey, "recruitee");

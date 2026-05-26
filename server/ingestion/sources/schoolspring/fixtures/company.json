@@ -1,0 +1,5 @@
+{
+  "company_name": "Fixture SchoolSpring",
+  "ATS_name": "schoolspring",
+  "url_string": "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch?domainName=&keyword=&location=&category=&gradelevel=&jobtype=&organization=&swLat=&swLon=&neLat=&neLon=&page=1&size=25&sortDateAscending=false"
+}

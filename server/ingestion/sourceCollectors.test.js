@@ -2607,3 +2607,50 @@ test("GovernmentJobs dispatch is registry-owned even when runtime pilot predicat
     position_name: "Registry GovernmentJobs Posting"
   }]);
 });
+
+test("SchoolSpring dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "schoolspring",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "schoolspring",
+      source_family: "public_sector",
+      list_url: "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: "Fixture School", position_name: "Registry SchoolSpring Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("SchoolSpring registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "api.schoolspring.com",
+    company_name: "SchoolSpring Registry Co",
+    url_string: "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch?page=1&size=25"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "schoolspring"],
+    ["fetchList", "api.schoolspring.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Fixture School",
+    position_name: "Registry SchoolSpring Posting"
+  }]);
+});

@@ -142,6 +142,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
+  schoolspring: Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled
+  }),
   recruitee: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.quarantine

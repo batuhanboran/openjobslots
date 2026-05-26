@@ -1,0 +1,41 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture Public Schools",
+        "position_name": "Teacher Missing Source Id",
+        "job_posting_url": "https://www.schoolspring.com/job.cfm?jid=9001999",
+        "location": "Austin, TX",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "placeholder company",
+      "expected": "rejected",
+      "reason": "placeholder company_name",
+      "posting": {
+        "source_job_id": "9001998",
+        "company_name": "Unknown Employer",
+        "position_name": "Placeholder School Teacher",
+        "job_posting_url": "https://www.schoolspring.com/job.cfm?jid=9001998",
+        "location": "Boston, MA",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "no geo and no remote evidence",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "source_job_id": "9001997",
+        "company_name": "Fixture Public Schools",
+        "position_name": "Unlocated Teacher",
+        "job_posting_url": "https://www.schoolspring.com/job.cfm?jid=9001997",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}

@@ -34,7 +34,6 @@ const {
   parseUsajobsPostingsFromPayload
 } = require("./sources/usajobs/parse");
 const { parseK12jobspotPostingsFromPayload } = require("./sources/k12jobspot/parse");
-const { parseSchoolspringPostingsFromPayload } = require("./sources/schoolspring/parse");
 const {
   buildCalcareersPostPayload,
   extractCalcareersHiddenInputs,
@@ -132,6 +131,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
+  schoolspring: SCHOOLSPRING_RATE_LIMIT_WAIT_MS,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
   talentreef: 60 * 1000,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
@@ -1046,67 +1046,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     return postings;
   }
-  async function fetchSchoolspringSearchPayload(page, size = 25) {
-    const endpoint = new URL("https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch");
-    endpoint.searchParams.set("domainName", "");
-    endpoint.searchParams.set("keyword", "");
-    endpoint.searchParams.set("location", "");
-    endpoint.searchParams.set("category", "");
-    endpoint.searchParams.set("gradelevel", "");
-    endpoint.searchParams.set("jobtype", "");
-    endpoint.searchParams.set("organization", "");
-    endpoint.searchParams.set("swLat", "");
-    endpoint.searchParams.set("swLon", "");
-    endpoint.searchParams.set("neLat", "");
-    endpoint.searchParams.set("neLon", "");
-    endpoint.searchParams.set("page", String(page));
-    endpoint.searchParams.set("size", String(size));
-    endpoint.searchParams.set("sortDateAscending", "false");
-  
-    const res = await fetchWithAtsRateLimit("schoolspring", SCHOOLSPRING_RATE_LIMIT_WAIT_MS, endpoint.toString(), {
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        Origin: "https://www.schoolspring.com",
-        Referer: "https://www.schoolspring.com/"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`SchoolSpring request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-    return res.json();
-  }
-  
-  async function collectPostingsForSchoolspringDynamic(pageSize = 25) {
-    const size = Math.max(1, Number(pageSize) || 25);
-    const postings = [];
-    const seenUrls = new Set();
-    const referenceEpoch = nowEpochSeconds();
-    let page = 1;
-  
-    while (true) {
-      const payload = await fetchSchoolspringSearchPayload(page, size);
-      const batch = parseSchoolspringPostingsFromPayload(payload);
-      if (batch.length === 0) break;
-  
-      let hasWithin24h = false;
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        if (!shouldStorePostingByDate(posting?.posting_date, referenceEpoch)) continue;
-        hasWithin24h = true;
-        postings.push(posting);
-        seenUrls.add(postingUrl);
-      }
-  
-      if (!hasWithin24h) break;
-      page += 1;
-    }
-  
-    return postings;
-  }async function collectPostingsForCalcareersDynamic() {
+  async function collectPostingsForCalcareersDynamic() {
     const endpoint = "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx";
     const headers = {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -1455,7 +1395,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForK12jobspotDynamic();
     }
     if (atsName === "schoolspring" || atsName === "schoolspring.com" || atsName === "schoolspringcom" || atsName === "api.schoolspring.com" || atsName === "apischoolspringcom" || atsName === "www.schoolspring.com" || atsName === "wwwschoolspringcom") {
-      return collectPostingsForSchoolspringDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "schoolspring");
     }
     if (
       atsName === "calcareers" ||

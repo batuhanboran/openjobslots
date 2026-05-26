@@ -1,0 +1,45 @@
+{
+  "value": {
+    "jobsList": [
+      {
+        "jobId": 9001001,
+        "title": "Elementary Math Teacher",
+        "employer": "Fixture Public Schools",
+        "location": "Austin, TX",
+        "displayDate": "Posted Today"
+      },
+      {
+        "jobId": 9001002,
+        "title": "Remote Curriculum Designer",
+        "employer": "Fixture Virtual Academy",
+        "location": "Remote - United States",
+        "displayDate": "Posted Yesterday"
+      },
+      {
+        "jobId": 9001003,
+        "title": "Hybrid School Counselor",
+        "employer": "Fixture County Schools",
+        "location": "Hybrid - Denver, CO",
+        "displayDate": "2026-05-25"
+      },
+      {
+        "jobId": 9001001,
+        "title": "Duplicate Math Teacher",
+        "employer": "Fixture Public Schools",
+        "location": "Austin, TX",
+        "displayDate": "Posted Today"
+      },
+      {
+        "jobId": 0,
+        "title": "Missing Id Teacher",
+        "employer": "Fixture Public Schools",
+        "location": "Boston, MA",
+        "displayDate": "Posted Today"
+      }
+    ]
+  },
+  "__sourceConfig": {
+    "apiUrl": "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch"
+  },
+  "__sourceFetchFinalUrl": "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch?domainName=&keyword=&location=&category=&gradelevel=&jobtype=&organization=&swLat=&swLon=&neLat=&neLon=&page=1&size=25&sortDateAscending=false"
+}

@@ -1,0 +1,34 @@
+[
+  {
+    "source_job_id": "9001001",
+    "company_name": "Fixture Public Schools",
+    "position_name": "Elementary Math Teacher",
+    "job_posting_url": "https://www.schoolspring.com/job.cfm?jid=9001001",
+    "country": "United States",
+    "city": "Austin",
+    "remote_type": "onsite",
+    "posting_date": "Posted Today",
+    "parser_confidence": 0.74
+  },
+  {
+    "source_job_id": "9001002",
+    "company_name": "Fixture Virtual Academy",
+    "position_name": "Remote Curriculum Designer",
+    "job_posting_url": "https://www.schoolspring.com/job.cfm?jid=9001002",
+    "country": "United States",
+    "remote_type": "remote",
+    "posting_date": "Posted Yesterday",
+    "parser_confidence": 0.74
+  },
+  {
+    "source_job_id": "9001003",
+    "company_name": "Fixture County Schools",
+    "position_name": "Hybrid School Counselor",
+    "job_posting_url": "https://www.schoolspring.com/job.cfm?jid=9001003",
+    "country": "United States",
+    "city": "Denver",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-25",
+    "parser_confidence": 0.74
+  }
+]
