@@ -660,6 +660,56 @@ test("TalentReef registry source stays idle while disabled", async () => {
   assert.deepEqual(postings, []);
 });
 
+test("Oracle dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "oracle",
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "oracle",
+      source_family: "enterprise_api",
+      list_url: "https://example.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { items: [{ requisitionList: [{ Id: "OR-1" }] }] };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: Array.isArray(payload?.items) ? "Oracle Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Oracle registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "oracle",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "oraclecloud.com",
+    company_name: "Oracle Registry Co",
+    url_string: "https://example.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "oracle"],
+    ["fetchList", "oraclecloud.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Oracle Registry Co",
+    position_name: "Oracle Registry Posting"
+  }]);
+});
+
 test("BrassRing registry source stays idle while disabled", async () => {
   const calls = [];
   const registrySource = {

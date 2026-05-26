@@ -14,7 +14,6 @@ const {
 } = require("./icims/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
-const { parseOraclePostingsFromApi } = require("./oracle/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
@@ -700,24 +699,12 @@ const SOURCE_SPECS = Object.freeze({
   oracle: {
     sourceFamily: "enterprise_api",
     confidence: 0.65,
-    parser: parseOraclePostingsFromApi,
+    parser: () => [],
     officialDocs: "Oracle HCM Candidate Experience public requisitions endpoint",
     discover(company) {
-      const parsed = asUrl(company.url_string);
-      const parts = parsePathParts(company.url_string);
-      const languageIndex = parts.findIndex((part) => part.toLowerCase() === "candidateexperience");
-      const language = languageIndex >= 0 ? parts[languageIndex + 1] || "en" : "en";
-      const sitesIndex = parts.findIndex((part) => part.toLowerCase() === "sites");
-      const siteNumber = sitesIndex >= 0 ? parts[sitesIndex + 1] || "CX_1" : "CX_1";
-      const siteBaseUrl = parsed ? parsed.origin : "";
       return {
-        config: {
-          siteBaseUrl,
-          language,
-          siteNumber,
-          boardUrl: clean(company.url_string)
-        },
-        listUrl: siteBaseUrl ? `${siteBaseUrl}/hcmRestApi/resources/latest/recruitingCEJobRequisitions` : ""
+        config: {},
+        listUrl: clean(company.url_string)
       };
     }
   },

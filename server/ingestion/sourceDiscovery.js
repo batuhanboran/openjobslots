@@ -1,6 +1,3 @@
-const ORACLE_FACETS_VALUE =
-  "LOCATIONS;WORK_LOCATIONS;WORKPLACE_TYPES;TITLES;CATEGORIES;ORGANIZATIONS;POSTING_DATES;FLEX_FIELDS";
-
 function parseUrl(urlString) {
   if (!urlString) return null;
   try {
@@ -199,63 +196,6 @@ function parseCareerspageCompany(urlString) {
     companySlug,
     companySlugLower: companySlug.toLowerCase(),
     boardUrl: `https://careerspage.io/${companySlug}`
-  };
-}
-
-function parseOracleCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (!host.endsWith(".oraclecloud.com")) return null;
-
-  const pathParts = String(parsed.pathname || "")
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
-  const loweredPathParts = pathParts.map((part) => part.toLowerCase());
-
-  const candidateExperienceIndex = loweredPathParts.indexOf("candidateexperience");
-  if (candidateExperienceIndex < 0) return null;
-
-  let language = "en";
-  if (candidateExperienceIndex + 1 < pathParts.length) {
-    const maybeLanguage = String(pathParts[candidateExperienceIndex + 1] || "").trim();
-    if (maybeLanguage && maybeLanguage.toLowerCase() !== "sites") {
-      language = maybeLanguage;
-    }
-  }
-
-  let siteNumber = "";
-  const sitesIndex = loweredPathParts.indexOf("sites", candidateExperienceIndex + 1);
-  if (sitesIndex >= 0 && sitesIndex + 1 < pathParts.length) {
-    siteNumber = String(pathParts[sitesIndex + 1] || "").trim();
-  }
-  if (!siteNumber) {
-    siteNumber = String(parsed.searchParams?.get("siteNumber") || "").trim();
-  }
-  if (!siteNumber) {
-    siteNumber = "CX";
-  }
-
-  const safeLanguage = language.replace(/[^A-Za-z0-9_-]/g, "") || "en";
-  const safeSiteNumber = siteNumber.replace(/[^A-Za-z0-9_-]/g, "") || "CX";
-  const siteBaseUrl = `${parsed.protocol}//${parsed.host}`;
-  const boardUrl = `${siteBaseUrl}/hcmUI/CandidateExperience/${safeLanguage}/sites/${safeSiteNumber}/jobs`;
-  const apiUrl = `${siteBaseUrl}/hcmRestApi/resources/latest/recruitingCEJobRequisitions`;
-  const finder =
-    `findReqs;siteNumber=${safeSiteNumber},` +
-    `facetsList=${ORACLE_FACETS_VALUE},` +
-    "limit=25,sortBy=POSTING_DATES_DESC";
-
-  return {
-    host,
-    siteBaseUrl,
-    boardUrl,
-    apiUrl,
-    siteNumber: safeSiteNumber,
-    language: safeLanguage,
-    finder
   };
 }
 
@@ -1010,7 +950,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   lever: parseLeverCompany,
   loxo: parseLoxoCompany,
   manatal: parseManatalCompany,
-  oracle: parseOracleCompany,
   peopleforce: parsePeopleforceCompany,
   pinpointhq: parsePinpointHqCompany,
   recruitcrm: parseRecruitCrmCompany,
@@ -1058,7 +997,6 @@ module.exports = {
   parseLeverCompany,
   parseLoxoCompany,
   parseManatalCompany,
-  parseOracleCompany,
   parsePeopleforceCompany,
   parsePinpointHqCompany,
   parseRecruitCrmCompany,

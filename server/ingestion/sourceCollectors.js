@@ -10,7 +10,6 @@ const {
   parseIcimsCompany,
   parseJobApsCompany,
   parseLoxoCompany,
-  parseOracleCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -25,7 +24,6 @@ const {
   resolveAdpWorkforcenowCompanyName
 } = require("./sources/adp_workforcenow/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
-const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
 const {
   extractIcimsLocationFromHtml,
   extractIcimsLocationFromTitleOrUrl,
@@ -137,7 +135,6 @@ const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY = Math.max(0, Number(process.env.OPENJOBSLOTS_ICIMS_DETAIL_FETCH_LIMIT_PER_COMPANY || 5));
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -172,6 +169,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   smartrecruiters: 1000,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
+  oracle: 60 * 1000,
   pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
@@ -184,15 +182,6 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
 const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
-const ORACLE_EXPAND_VALUE = [
-  "requisitionList.workLocation",
-  "requisitionList.otherWorkLocations",
-  "requisitionList.secondaryLocations",
-  "flexFieldsFacet.values",
-  "requisitionList.requisitionFlexFields"
-].join(",");
-const ORACLE_FACETS_VALUE =
-  "LOCATIONS;WORK_LOCATIONS;WORKPLACE_TYPES;TITLES;CATEGORIES;ORGANIZATIONS;POSTING_DATES;FLEX_FIELDS";
 function defaultNowEpochSeconds() {
   return Math.floor(Date.now() / 1000);
 }
@@ -737,45 +726,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return { pageHtml: await res.text(), finalUrl };
   }
   
-  async function fetchOracleJobRequisitionsPage(config, offset = 0, limit = 25) {
-    const safeOffset = Number.isFinite(Number(offset)) && Number(offset) >= 0 ? Math.floor(Number(offset)) : 0;
-    const safeLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.floor(Number(limit)) : 25;
-    const finder = String(config?.finder || "").replace(/limit=\d+/i, `limit=${safeLimit}`);
-    const url = new URL(String(config?.apiUrl || "").trim());
-    url.searchParams.set("onlyData", "true");
-    url.searchParams.set("expand", ORACLE_EXPAND_VALUE);
-    if (finder) {
-      url.searchParams.set("finder", finder);
-    }
-    url.searchParams.set("offset", String(safeOffset));
-    url.searchParams.set("limit", String(safeLimit));
-  
-    const res = await fetchWithAtsRateLimit("oracle", ORACLE_RATE_LIMIT_WAIT_MS, url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Oracle job requisitions request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || url.toString()).trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".oraclecloud.com")) {
-      throw new Error(`Oracle API URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return res.json();
-  }
-  
   async function fetchSagehrJobsPage(config) {
     const headers = {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -1245,36 +1195,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson);
     const responseJson = await fetchAdpWorkforcenowJobsPage(config);
     return parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, responseJson);
-  }
-  
-  async function collectPostingsForOracleCompany(company) {
-    const config = parseOracleCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || "";
-    const pageSize = 25;
-    const seenUrls = new Set();
-    const collected = [];
-  
-    for (let page = 0; page < MAX_PAGES_PER_COMPANY; page += 1) {
-      const offset = page * pageSize;
-      const responseJson = await fetchOracleJobRequisitionsPage(config, offset, pageSize);
-      const batch = parseOraclePostingsFromApi(companyNameForPostings, config, responseJson);
-  
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        if (!String(posting?.posting_date || "").trim()) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      if (!Boolean(responseJson?.hasMore)) break;
-      if (batch.length === 0) break;
-    }
-  
-    return collected;
   }
   
   function parseHibobCompany(url) {
@@ -2033,7 +1953,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "oraclecloud.com" ||
       atsName === "oraclecloudcom"
     ) {
-      return collectPostingsForOracleCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "oracle");
     }
     if (
       atsName === "brassring" ||

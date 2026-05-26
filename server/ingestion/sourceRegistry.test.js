@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Eightfold, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -35,6 +35,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("join"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
   assert.equal(isRegistryPilotSource("manatal"), true);
+  assert.equal(isRegistryPilotSource("oracle"), true);
   assert.equal(isRegistryPilotSource("pageup"), true);
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("paylocity"), true);
@@ -73,6 +74,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "join",
     "lever",
     "manatal",
+    "oracle",
     "pageup",
     "paylocity",
     "pinpointhq",
@@ -346,6 +348,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof teamtailor.normalize, "function");
   assert.equal(typeof teamtailor.validate, "function");
   assert.deepEqual(validateSourceContract(teamtailor), { ok: true, failures: [] });
+
+  const oracle = getRegistrySourceModule("oracle");
+  assert.equal(oracle.atsKey, "oracle");
+  assert.equal(oracle.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(oracle.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof oracle.discover, "function");
+  assert.equal(typeof oracle.fetchList, "function");
+  assert.equal(typeof oracle.parse, "function");
+  assert.equal(typeof oracle.normalize, "function");
+  assert.equal(typeof oracle.validate, "function");
+  assert.deepEqual(validateSourceContract(oracle), { ok: true, failures: [] });
 
   const pinpointHq = getRegistrySourceModule("pinpointhq");
   assert.equal(pinpointHq.atsKey, "pinpointhq");
