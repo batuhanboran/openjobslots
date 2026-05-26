@@ -43,6 +43,11 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
+  calcareers: Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false
+  }),
   careerplug: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled

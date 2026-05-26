@@ -23,6 +23,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "schoolspring",
   "simplicant",
   "statejobsny",
+  "calcareers",
   "hrmdirect",
   "breezy",
   "applytojob"

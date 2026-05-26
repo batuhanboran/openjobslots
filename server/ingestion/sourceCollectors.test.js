@@ -2743,6 +2743,47 @@ test("StateJobsNY dispatch is registry-owned and stays disabled without hitting 
   assert.deepEqual(postings, []);
 });
 
+test("CalCareers dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "calcareers",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "calcareers",
+      source_family: "public_sector",
+      list_url: "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled CalCareers registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("CalCareers registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "www.calcareers.ca.gov",
+    company_name: "CalCareers Registry Co",
+    url_string: "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx"
+  });
+
+  assert.deepEqual(calls, [["module", "calcareers"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

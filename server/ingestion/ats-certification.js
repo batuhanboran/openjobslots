@@ -247,6 +247,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Saved raw API fixture covers jobs[].id as source_job_id.")
     }
   },
+  calcareers: {
+    priority: "P2",
+    sourcePattern: "CalCareers ASP.NET Search/JobSearchResults HTML plus search, row-count, and pager postbacks.",
+    parserPath: "server/ingestion/sources/calcareers/parse.js parseCalcareersPostingsFromHtml",
+    requiredFixtures: ["landing hidden-field fixture", "postback HTML fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved postback fixture covers the Location label as source-backed city/state evidence."),
+      date: decision("list-payload", "Saved postback fixture covers the Publish Date time field as source posting-date evidence."),
+      remote: decision("source-absent", "Saved CalCareers list fixture exposes no explicit remote/hybrid field; concrete geo-backed rows normalize as onsite and missing-geo rows remain gated."),
+      sourceId: decision("list-payload", "Saved postback fixture covers Job Control text and JobControlId URL as stable source_job_id evidence.")
+    }
+  },
   statejobsny: {
     priority: "P2",
     sourcePattern: "StateJobsNY public vacancyTable HTML plus vacancyDetailsView detail HTML.",

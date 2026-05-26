@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, StateJobsNY, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CalCareers, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, StateJobsNY, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -22,6 +22,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("bamboohr"), true);
   assert.equal(isRegistryPilotSource("brassring"), true);
   assert.equal(isRegistryPilotSource("breezy"), true);
+  assert.equal(isRegistryPilotSource("calcareers"), true);
   assert.equal(isRegistryPilotSource("careerplug"), true);
   assert.equal(isRegistryPilotSource("careerpuck"), true);
   assert.equal(isRegistryPilotSource("careerspage"), true);
@@ -73,6 +74,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "bamboohr",
     "brassring",
     "breezy",
+    "calcareers",
     "careerplug",
     "careerpuck",
     "careerspage",
@@ -495,6 +497,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof stateJobsNy.normalize, "function");
   assert.equal(typeof stateJobsNy.validate, "function");
   assert.deepEqual(validateSourceContract(stateJobsNy), { ok: true, failures: [] });
+
+  const calCareers = getRegistrySourceModule("calcareers");
+  assert.equal(calCareers.atsKey, "calcareers");
+  assert.equal(calCareers.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(calCareers.status, SOURCE_STATUSES.disabled);
+  assert.equal(calCareers.collectWhenDisabled, false);
+  assert.equal(typeof calCareers.discover, "function");
+  assert.equal(typeof calCareers.fetchList, "function");
+  assert.equal(typeof calCareers.parse, "function");
+  assert.equal(typeof calCareers.normalize, "function");
+  assert.equal(typeof calCareers.validate, "function");
+  assert.deepEqual(validateSourceContract(calCareers), { ok: true, failures: [] });
 
   const schoolSpring = getRegistrySourceModule("schoolspring");
   assert.equal(schoolSpring.atsKey, "schoolspring");

@@ -1,0 +1,10 @@
+{
+  "landing_html": "<html><body><form><input name=\"__VIEWSTATE\" type=\"hidden\" value=\"view-fixture\"><input type=\"hidden\" name=\"__EVENTVALIDATION\" value=\"event-fixture\"><input type=\"hidden\" name=\"ctl00$hdnShowHeaderPadding\" value=\"1\"></form></body></html>",
+  "html_pages": [
+    "<html><body><section class=\"job-search-result\"><div>Working Title:</div><div class=\"col-xs-6 job-details\"><span>Air Pollution Specialist</span></div><div>Job Control:</div><div class=\"col-xs-6 job-details\">JC-431234</div><div>Department:</div><div class=\"col-xs-6 job-details\">Air Resources Board</div><div>Location:</div><div class=\"col-xs-6 job-details\">Sacramento, CA</div><div>Publish Date:</div><div class=\"col-xs-6 job-details\"><time>05/26/2026</time></div><a href=\"https://www.calcareers.ca.gov/CalHrPublic/Jobs/JobPosting.aspx?JobControlId=431234\">View Job</a></section><a href=\"javascript:__doPostBack(&#39;ctl00$cphMainContent$rptPager$ctl02$btnPagerItem&#39;,&#39;&#39;)\">2</a></body></html>",
+    "<html><body><section class=\"job-search-result\"><div>Working Title:</div><div class=\"col-xs-6 job-details\"><span>Staff Services Manager I</span></div><div>Job Control:</div><div class=\"col-xs-6 job-details\">431235</div><div>Department:</div><div class=\"col-xs-6 job-details\">Department of Health Care Services</div><div>Location:</div><div class=\"col-xs-6 job-details\">Los Angeles, CA</div><div>Publish Date:</div><div class=\"col-xs-6 job-details\"><time>05/26/2026</time></div><a href=\"https://www.calcareers.ca.gov/CalHrPublic/Jobs/JobPosting.aspx?JobControlId=431235\">View Job</a></section></body></html>"
+  ],
+  "__sourceConfig": {
+    "listUrl": "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx"
+  }
+}

@@ -1,36 +1,42 @@
 {
   "ats_key": "calcareers",
   "display_name": "CalCareers",
-  "current_status": "fallback",
+  "current_status": "source-local registry module; disabled with collect-when-disabled off",
   "source_family": "public_sector",
   "official_public_docs_or_observed_endpoint": "CalCareers ASP.NET list/postback HTML.",
-  "source_discovery_method": "use configured agency/board URL and official/list endpoint where visible",
-  "list_fetch_method": "bounded public-sector feed/API/HTML list request",
-  "detail_fetch_method": "detail fetch for date/location only when fixture-backed and polite",
-  "pagination_method": "respect source page controls; do not brute-force ids",
+  "source_discovery_method": "source-local host guard for calcareers.ca.gov and the official Search/JobSearchResults.aspx endpoint",
+  "list_fetch_method": "source-local ASP.NET GET landing page, search postback, row-count postback, and bounded pager postbacks",
+  "detail_fetch_method": "not enabled for this checkpoint; use list Publish Date, Location, Department, and Job Control fields",
+  "pagination_method": "extract and replay ASP.NET pager __doPostBack targets from source HTML; do not brute-force ids",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "url-or-title-inference: Use vacancy/job control/listing id or stable URL id.",
+  "source_job_id_rule": "list-payload: normalize Job Control text such as JC-431234 or JobControlId URL params to source_job_id.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
   "location_text_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
   "country_region_city_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "remote_type_rule": "pending-research: Use explicit telework/remote text only.",
-  "posting_date_rule": "pending-research: Public boards frequently expose close/open dates; do not invent posted dates.",
+  "remote_type_rule": "source-absent unless exact remote/telework text appears; geo-backed list rows normalize as onsite through the generic gate.",
+  "posting_date_rule": "list-payload: use the card Publish Date <time> field; do not invent dates when absent.",
   "rate_limit": "strict public-board rate limit with long cooldown after 429/403",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/calcareers/fixtures/company.json",
+      "server/ingestion/sources/calcareers/fixtures/list.json",
+      "server/ingestion/sources/calcareers/fixtures/expected-normalized.json",
+      "server/ingestion/sources/calcareers/fixtures/invalid-shapes.json"
+    ],
+    "present": [
+      "server/ingestion/sources/calcareers/fixtures/company.json",
+      "server/ingestion/sources/calcareers/fixtures/list.json",
+      "server/ingestion/sources/calcareers/fixtures/expected-normalized.json",
+      "server/ingestion/sources/calcareers/fixtures/invalid-shapes.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/calcareers/index.js",
+    "fixtures_dir": "server/ingestion/sources/calcareers/fixtures",
+    "parser_version": "source-calcareers-v1"
   },
   "quality_threshold": {
     "mode": "quarantine_or_canary",
@@ -38,7 +44,7 @@
     "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
   },
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven",
+  "quarantine_reason": "disabled hold: source-local parser/fetch fixtures exist, but live canary/source quality evidence has not been approved or applied",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -57,21 +63,21 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js CalCareers collector",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/calcareers/index.js",
+    "parser_version_status": "source-calcareers-v1",
+    "confidence": 0.62
   },
   "runner_interface": {
-    "discover": "use configured agency/board URL and official/list endpoint where visible",
-    "fetchList": "bounded public-sector feed/API/HTML list request",
-    "fetchDetail": "detail fetch for date/location only when fixture-backed and polite",
-    "parseList": "server/index.js CalCareers collector",
-    "parseDetail": "server/index.js CalCareers collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
+    "discover": "server/ingestion/sources/calcareers/discover.js createDiscover",
+    "fetchList": "server/ingestion/sources/calcareers/fetchList.js createFetchList",
+    "fetchDetail": "not enabled for this checkpoint",
+    "parseList": "server/ingestion/sources/calcareers/parse.js parseCalcareersPostingsFromHtml",
+    "parseDetail": "not enabled for this checkpoint",
+    "normalize": "server/ingestion/sources/calcareers/index.js normalize",
     "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "keep disabled until a bounded live canary proves source quality and net-new clean public candidates",
+  "certification_blockers": "live canary/source quality evidence pending; no production source apply has been run"
 }

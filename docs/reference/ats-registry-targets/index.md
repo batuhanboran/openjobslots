@@ -114,7 +114,7 @@ Test script: `node server/ingestion/sources/htmlPublicSourceModules.test.js`
 | ATS | Registry status | Source module | Next action | Workbench script |
 | --- | --- | --- | --- | --- |
 | `applitrack` | module-ready | `server/ingestion/sources/applitrack/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=applitrack --json` |
-| `calcareers` | module-ready | `server/ingestion/sources/calcareers/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=calcareers --json` |
+| `calcareers` | registry-backed-disabled | `server/ingestion/sources/calcareers/index.js` | Keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved. | `npm.cmd run ats:workbench -- --source=calcareers --json` |
 | `calopps` | module-ready | `server/ingestion/sources/calopps/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=calopps --json` |
 | `governmentjobs` | module-ready | `server/ingestion/sources/governmentjobs/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=governmentjobs --json` |
 | `jobaps` | module-ready | `server/ingestion/sources/jobaps/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=jobaps --json` |

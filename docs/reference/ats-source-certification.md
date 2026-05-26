@@ -85,7 +85,7 @@ Current workbench counts: 60 configured ATS, 23 strict parser-fixture-backed, 0 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
 - Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
-- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `calcareers`, `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `statejobsny` now has raw fixtures but remains disabled until live canary evidence proves detail volume and field quality.
+- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `calopps`, `hibob`, `isolvisolvedhire`, `policeapp`, `sagehr`, `theapplicantmanager`, `usajobs`. `calcareers` and `statejobsny` now have raw fixtures but remain disabled until live canary evidence proves detail volume and field quality.
 - Keep disabled: `dayforcehcm`.
 
 Subagent/work-packet findings in this certification pass:
@@ -151,7 +151,7 @@ Subagent/work-packet findings in this certification pass:
 | `usajobs` | USAJobs landing token plus search POST. | Remote flags and DocumentID not carried. | Add raw fixture and map `DocumentID` to source id. |
 | `k12jobspot` | K12JobSpot JSON API. | No detail fetch enabled; public API source-backed list fields only. | Source-local registry module now preserves `jobs[].id` as `source_job_id`, maps US city/state/postal list objects, and has raw/expected/invalid fixtures. |
 | `schoolspring` | SchoolSpring JSON API. | Date format unproven; source id absent. | Add fixture and map `jobId`. |
-| `calcareers` | CalCareers ASP.NET HTML. | Markup order brittle; source id absent. | Add postback HTML fixture and JobControl source id. |
+| `calcareers` | CalCareers ASP.NET Search/JobSearchResults HTML plus search, row-count, and pager postbacks. | Markup order can drift; remote semantics are source-absent in the saved fixture. | Source-local registry module preserves Job Control/JobControlId source ids, Department, Location, Publish Date, bounded pager pages, raw/expected/invalid fixtures, and keeps the source disabled until live canary evidence proves quality. |
 | `calopps` | CalOpps paged HTML. | Uses current timestamp as posting date; location only region. | Stop invented dates; add fixture and preserve source id. |
 | `statejobsny` | StateJobsNY dated vacancy table plus vacancy detail pages. | List `County` is not city-level geo; telecommuting semantics come only from exact detail labels. | Source-local registry module preserves vacancy id from detail URL/Item #, uses the Posted column, merges detail `City`/`State` as geo, maps exact `Telecommuting allowed? Yes/No` to hybrid/onsite, keeps county-only rows quarantined, and has raw/expected/invalid fixtures. Keep disabled until live canary evidence proves detail volume and quality. |
 | `policeapp` | PoliceApp AJAX endpoint. | No pagination; invented date; location null. | Add pagination/date strategy or leave date null; raw fixture. |

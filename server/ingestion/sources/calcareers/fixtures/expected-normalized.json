@@ -1,0 +1,26 @@
+[
+  {
+    "source_job_id": "431234",
+    "company_name": "Air Resources Board",
+    "position_name": "Air Pollution Specialist",
+    "job_posting_url": "https://www.calcareers.ca.gov/CalHrPublic/Jobs/JobPosting.aspx?JobControlId=431234",
+    "posting_date": "05/26/2026",
+    "location": "Sacramento, CA",
+    "country": "United States",
+    "city": "Sacramento",
+    "remote_type": "onsite",
+    "parser_confidence": 0.62
+  },
+  {
+    "source_job_id": "431235",
+    "company_name": "Department of Health Care Services",
+    "position_name": "Staff Services Manager I",
+    "job_posting_url": "https://www.calcareers.ca.gov/CalHrPublic/Jobs/JobPosting.aspx?JobControlId=431235",
+    "posting_date": "05/26/2026",
+    "location": "Los Angeles, CA",
+    "country": "United States",
+    "city": "Los Angeles",
+    "remote_type": "onsite",
+    "parser_confidence": 0.62
+  }
+]

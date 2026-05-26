@@ -32,12 +32,6 @@ const {
   parseUsajobsPostingsFromPayload
 } = require("./sources/usajobs/parse");
 const {
-  buildCalcareersPostPayload,
-  extractCalcareersHiddenInputs,
-  extractCalcareersPagerTargets,
-  parseCalcareersPostingsFromHtml
-} = require("./sources/calcareers/parse");
-const {
   extractCaloppsNextPageUrl,
   parseCaloppsPostingsFromHtml
 } = require("./sources/calopps/parse");
@@ -101,6 +95,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   ashby: ASHBY_RATE_LIMIT_WAIT_MS,
   bamboohr: BAMBOOHR_RATE_LIMIT_WAIT_MS,
   breezy: BREEZY_RATE_LIMIT_WAIT_MS,
+  calcareers: CALCAREERS_RATE_LIMIT_WAIT_MS,
   careerplug: CAREERPLUG_RATE_LIMIT_WAIT_MS,
   careerspage: CAREERSPAGE_RATE_LIMIT_WAIT_MS,
   eightfold: 60 * 1000,
@@ -936,88 +931,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
     return collected;
   }
-  async function collectPostingsForCalcareersDynamic() {
-    const endpoint = "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx";
-    const headers = {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Content-Type": "application/x-www-form-urlencoded",
-      Referer: endpoint
-    };
-    const referenceEpoch = nowEpochSeconds();
-    const postings = [];
-    const seenUrls = new Set();
-    const pendingTargets = [];
-    const visitedTargets = new Set();
-  
-    const landing = await fetchWithAtsRateLimit("calcareers", CALCAREERS_RATE_LIMIT_WAIT_MS, endpoint, {
-      method: "GET",
-      headers
-    });
-    if (!landing.ok) {
-      const body = await landing.text();
-      throw new Error(`CalCareers landing request failed (${landing.status}): ${body.slice(0, 180)}`);
-    }
-  
-    let hidden = extractCalcareersHiddenInputs(await landing.text());
-    let nextEventTarget = "ctl00$cphMainContent$btnSearch";
-    let rowCountApplied = false;
-  
-    while (true) {
-      const payload = buildCalcareersPostPayload(hidden, nextEventTarget);
-      if (nextEventTarget === "ctl00$cphMainContent$ddlRowCount") {
-        payload["ctl00$cphMainContent$ddlRowCount"] = "100";
-      }
-  
-      const res = await fetchWithAtsRateLimit("calcareers", CALCAREERS_RATE_LIMIT_WAIT_MS, endpoint, {
-        method: "POST",
-        headers,
-        body: new URLSearchParams(payload).toString()
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`CalCareers postback failed (${res.status}): ${body.slice(0, 180)}`);
-      }
-      const pageHtml = await res.text();
-      hidden = extractCalcareersHiddenInputs(pageHtml);
-  
-      const batch = parseCalcareersPostingsFromHtml(pageHtml);
-      let hasWithin24h = false;
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        if (!shouldStorePostingByDate(posting?.posting_date, referenceEpoch)) continue;
-        postings.push(posting);
-        seenUrls.add(postingUrl);
-        hasWithin24h = true;
-      }
-  
-      if (!rowCountApplied) {
-        rowCountApplied = true;
-        nextEventTarget = "ctl00$cphMainContent$ddlRowCount";
-        continue;
-      }
-  
-      if (!hasWithin24h) break;
-  
-      const pagerTargets = extractCalcareersPagerTargets(pageHtml);
-      for (const target of pagerTargets) {
-        if (visitedTargets.has(target)) continue;
-        if (!pendingTargets.includes(target)) {
-          pendingTargets.push(target);
-        }
-      }
-      while (pendingTargets.length > 0 && visitedTargets.has(pendingTargets[0])) {
-        pendingTargets.shift();
-      }
-      if (pendingTargets.length === 0) break;
-  
-      nextEventTarget = pendingTargets.shift();
-      visitedTargets.add(nextEventTarget);
-    }
-  
-    return postings;
-  }async function collectPostingsForCaloppsDynamic(maxPages = 25) {
+  async function collectPostingsForCaloppsDynamic(maxPages = 25) {
     let nextPageUrl = "https://www.calopps.org/job-search-list";
     let pagesFetched = 0;
     const pageLimit = Math.max(1, Math.min(100, Number(maxPages) || 25));
@@ -1275,7 +1189,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "www.calcareers.ca.gov" ||
       atsName === "wwwcalcareerscagov"
     ) {
-      return collectPostingsForCalcareersDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "calcareers");
     }
     if (
       atsName === "calopps" ||

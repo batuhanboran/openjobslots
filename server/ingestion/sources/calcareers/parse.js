@@ -2,6 +2,9 @@
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
 
+const CALCAREERS_PUBLIC_ORIGIN = "https://www.calcareers.ca.gov";
+const CALCAREERS_LIST_URL = "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx";
+
 function cleanCalcareersText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
     .replace(/\u00a0/g, " ")
@@ -12,10 +15,15 @@ function cleanCalcareersText(value) {
 function extractCalcareersHiddenInputs(htmlSource) {
   const source = String(htmlSource || "");
   const hidden = {};
-  const regex = /<input[^>]+type=["']hidden["'][^>]*>/gi;
+  const regex = /<input\b[^>]*>/gi;
   let match = regex.exec(source);
   while (match) {
     const tag = String(match[0] || "");
+    const typeMatch = tag.match(/\btype=["']?([^"'\s>]+)["']?/i);
+    if (String(typeMatch?.[1] || "").toLowerCase() !== "hidden") {
+      match = regex.exec(source);
+      continue;
+    }
     const nameMatch = tag.match(/\bname=["']([^"']+)["']/i);
     if (!nameMatch?.[1]) {
       match = regex.exec(source);
@@ -29,10 +37,10 @@ function extractCalcareersHiddenInputs(htmlSource) {
 }
 
 function extractCalcareersPagerTargets(htmlSource) {
-  const source = String(htmlSource || "");
+  const source = decodeHtmlEntities(String(htmlSource || ""));
   const targets = [];
   const seen = new Set();
-  const regex = /__doPostBack\(&#39;([^']+btnPagerItem[^']*)&#39;,\s*&#39;[^']*&#39;\)/gi;
+  const regex = /__doPostBack\(['"]([^'"]+btnPagerItem[^'"]*)['"],\s*['"][^'"]*['"]\)/gi;
   let match = regex.exec(source);
   while (match) {
     const target = String(match[1] || "").trim();
@@ -45,42 +53,79 @@ function extractCalcareersPagerTargets(htmlSource) {
   return targets;
 }
 
-function parseCalcareersPostingsFromHtml(htmlSource) {
+function fieldAfterLabel(block, label) {
+  const escaped = String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(
+    `${escaped}:\\s*</div>\\s*<div[^>]*class=["'][^"']*job-details[^"']*["'][^>]*>([\\s\\S]*?)</div>`,
+    "i"
+  );
+  const match = String(block || "").match(regex);
+  return cleanCalcareersText(match?.[1] || "");
+}
+
+function extractFirstJobUrl(block, pageUrl = CALCAREERS_LIST_URL) {
+  const hrefMatch = String(block || "").match(/\bhref=["']([^"']*JobPosting\.aspx\?[^"']*JobControlId=[^"']+)["']/i);
+  const href = decodeHtmlEntities(hrefMatch?.[1] || "");
+  if (!href) return "";
+  try {
+    return new URL(href, pageUrl || CALCAREERS_PUBLIC_ORIGIN).toString();
+  } catch {
+    return "";
+  }
+}
+
+function sourceJobIdFromControl(jobControl, jobUrl) {
+  const controlMatch = cleanCalcareersText(jobControl).match(/(?:JC[-\s]*)?(\d{3,})/i);
+  if (controlMatch?.[1]) return controlMatch[1];
+  try {
+    const parsed = new URL(jobUrl);
+    const urlId = parsed.searchParams.get("JobControlId") || "";
+    const urlMatch = urlId.match(/(\d{3,})/);
+    return urlMatch?.[1] || "";
+  } catch {
+    return "";
+  }
+}
+
+function extractCalcareersCards(htmlSource) {
+  const source = String(htmlSource || "");
+  const sectionMatches = source.match(/<section\b[^>]*class=["'][^"']*job-search-result[^"']*["'][^>]*>[\s\S]*?<\/section>/gi);
+  if (sectionMatches?.length) return sectionMatches;
+  return source.split(/Working Title:\s*<\/div>/i).slice(1).map((chunk) => `Working Title:</div>${chunk}`);
+}
+
+function parseCalcareersPostingsFromHtml(htmlSource, pageUrl = CALCAREERS_LIST_URL) {
   const source = String(htmlSource || "");
   if (!source) return [];
 
   const postings = [];
   const seenUrls = new Set();
-  const cardRegex = new RegExp(
-    String.raw`Working Title:\s*</div>\s*<div class="col-xs-6 job-details">\s*<span[^>]*>(.*?)</span>` +
-      String.raw`[\s\S]*?Job Control:\s*</div>\s*<div class="col-xs-6 job-details">\s*(\d+)\s*</div>` +
-      String.raw`[\s\S]*?Department:\s*</div>\s*<div class="col-xs-6 job-details">\s*(.*?)\s*</div>` +
-      String.raw`[\s\S]*?Location:\s*</div>\s*<div class="col-xs-6 job-details">\s*(.*?)\s*</div>` +
-      String.raw`[\s\S]*?Publish Date:\s*</div>\s*<div class="col-xs-6 job-details">\s*<time[^>]*>\s*([^<]+)\s*</time>` +
-      String.raw`[\s\S]*?href="(https:\/\/www\.calcareers\.ca\.gov\/CalHrPublic\/Jobs\/JobPosting\.aspx\?JobControlId=\d+)"`,
-    "gi"
-  );
+  for (const card of extractCalcareersCards(source)) {
+    const positionName = fieldAfterLabel(card, "Working Title") || "Untitled Position";
+    const companyName = fieldAfterLabel(card, "Department") || "Unknown Department";
+    const jobControl = fieldAfterLabel(card, "Job Control");
+    const location = fieldAfterLabel(card, "Location") || null;
+    const postingDate = fieldAfterLabel(card, "Publish Date") || null;
+    const jobPostingUrl = extractFirstJobUrl(card, pageUrl);
+    const sourceJobId = sourceJobIdFromControl(jobControl, jobPostingUrl);
+    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) continue;
 
-  let match = cardRegex.exec(source);
-  while (match) {
-    const positionName = cleanCalcareersText(match[1]) || "Untitled Position";
-    const companyName = cleanCalcareersText(match[3]) || "Unknown Department";
-    const location = cleanCalcareersText(match[4]) || null;
-    const postingDate = cleanCalcareersText(match[5]) || null;
-    const jobPostingUrl = cleanCalcareersText(match[6]);
-    if (!jobPostingUrl || seenUrls.has(jobPostingUrl)) {
-      match = cardRegex.exec(source);
-      continue;
-    }
     postings.push({
       company_name: companyName,
       position_name: positionName,
       job_posting_url: jobPostingUrl,
+      source_job_id: sourceJobId,
       posting_date: postingDate,
-      location
+      location,
+      department: companyName,
+      source_evidence: {
+        list_url: pageUrl,
+        source_id_path: jobControl ? "Job Control" : "JobControlId",
+        location_path: "Location",
+        posting_date_path: "Publish Date"
+      }
     });
     seenUrls.add(jobPostingUrl);
-    match = cardRegex.exec(source);
   }
 
   return postings;
