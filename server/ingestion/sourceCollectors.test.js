@@ -2463,3 +2463,50 @@ test("Talentlyft dispatch is registry-owned even when runtime pilot predicate is
     position_name: "Registry Talentlyft Posting"
   }]);
 });
+
+test("Getro dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "getro",
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "getro",
+      source_family: "html_detail",
+      list_url: "https://fixture.getro.com/jobs"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: company.company_name, position_name: "Registry Getro Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("Getro registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "getro.com",
+    company_name: "Getro Registry Co",
+    url_string: "https://fixture.getro.com/jobs"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "getro"],
+    ["fetchList", "getro.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Getro Registry Co",
+    position_name: "Registry Getro Posting"
+  }]);
+});

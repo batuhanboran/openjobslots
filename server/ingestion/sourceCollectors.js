@@ -2,7 +2,6 @@ const { safeFetch } = require("./safeFetch");
 const {
   parseApplicantAiCompany,
   parseCareerpuckCompany,
-  parseGetroCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -25,7 +24,6 @@ const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/pars
 const { parseSimplicantPostingsFromHtml } = require("./sources/simplicant/parse");
 const { parseCareerpuckPostingsFromApi } = require("./sources/careerpuck/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
-const { parseGetroPostingsFromHtml } = require("./sources/getro/parse");
 const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theapplicantmanager/parse");
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
 const { parseHibobPostingsFromApi } = require("./sources/hibob/parse");
@@ -84,7 +82,6 @@ const CAREERPLUG_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BAMBOOHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERPUCK_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FOUNTAIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const GETRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HRMDIRECT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TEAMTAILOR_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -655,27 +652,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return res.json();
   }
   
-  async function fetchGetroJobsPage(urlString) {
-    const res = await fetchWithAtsRateLimit("getro", GETRO_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Getro page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
   async function fetchTalexioJobsPage(config, page = 1, limit = 10) {
     const apiUrl = String(config?.apiUrl || "").trim();
     if (!apiUrl) {
@@ -907,16 +883,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const companyNameForPostings = normalizedCompanyName || config.boardSlugLower;
     const responseJson = await fetchCareerpuckJobBoard(config);
     return parseCareerpuckPostingsFromApi(companyNameForPostings, responseJson);
-  }
-  
-  async function collectPostingsForGetroCompany(company) {
-    const config = parseGetroCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const pageHtml = await fetchGetroJobsPage(config.jobsUrl);
-    return parseGetroPostingsFromHtml(companyNameForPostings, config, pageHtml);
   }
   
   async function collectPostingsForTalexioCompany(company) {
@@ -1563,7 +1529,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "fountain");
     }
     if (atsName === "getro" || atsName === "getro.com" || atsName === "getrocom") {
-      return collectPostingsForGetroCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "getro");
     }
     if (atsName === "governmentjobs" || atsName === "governmentjobs.com" || atsName === "governmentjobscom") {
       return collectPostingsForGovernmentJobsDynamic();

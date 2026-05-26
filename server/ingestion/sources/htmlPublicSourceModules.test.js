@@ -17,6 +17,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "join",
   "teamtailor",
   "freshteam",
+  "getro",
   "hrmdirect",
   "breezy",
   "applytojob"

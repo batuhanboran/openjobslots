@@ -187,25 +187,6 @@ function parseFountainCompany(urlString) {
   };
 }
 
-function parseGetroCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host === "www.getro.com") return null;
-  if (!host.endsWith(".getro.com")) return null;
-
-  const [subdomain = ""] = host.split(".");
-  if (!subdomain) return null;
-
-  return {
-    host,
-    subdomain,
-    subdomainLower: subdomain.toLowerCase(),
-    jobsUrl: `${parsed.protocol}//${parsed.host}/jobs`
-  };
-}
-
 function parseHrmDirectCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -783,7 +764,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   careerpuck: parseCareerpuckCompany,
   fountain: parseFountainCompany,
   freshteam: parseFreshteamCompany,
-  getro: parseGetroCompany,
   hrmdirect: parseHrmDirectCompany,
   jobvite: parseJobviteCompany,
   join: parseJoinCompany,
@@ -823,7 +803,6 @@ module.exports = {
   parseCompanySourceConfig,
   parseFountainCompany,
   parseFreshteamCompany,
-  parseGetroCompany,
   parseHrmDirectCompany,
   parseJobviteCompany,
   parseJoinCompany,

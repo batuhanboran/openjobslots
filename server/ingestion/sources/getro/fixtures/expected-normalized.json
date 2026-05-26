@@ -1,0 +1,24 @@
+[
+  {
+    "source_job_id": "getro-1001",
+    "company_name": "Fixture Getro",
+    "position_name": "Civic Data Analyst",
+    "job_posting_url": "https://fixture.getro.com/jobs/getro-1001",
+    "posting_date": "2026-05-01",
+    "location": "Istanbul, Turkey",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "getro-1002",
+    "company_name": "Fixture Getro",
+    "position_name": "Remote Program Manager",
+    "job_posting_url": "https://fixture.getro.com/jobs/getro-1002",
+    "posting_date": "1778889600",
+    "location": "Remote",
+    "remote_type": "remote",
+    "parser_confidence": 0.75
+  }
+]

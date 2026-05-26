@@ -51,7 +51,8 @@ function parseGetroPostingsFromHtml(companyNameForPostings, _config, pageHtml) {
       position_name: String(item?.title || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
-      location: locationValue || null
+      location: locationValue || null,
+      source_job_id: String(item?.id || item?.jobId || item?._id || "").trim() || jobUrl
     });
     seenUrls.add(jobUrl);
   }
