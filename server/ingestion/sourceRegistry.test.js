@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -39,6 +39,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("jobaps"), true);
   assert.equal(isRegistryPilotSource("jobvite"), true);
   assert.equal(isRegistryPilotSource("join"), true);
+  assert.equal(isRegistryPilotSource("k12jobspot"), true);
   assert.equal(isRegistryPilotSource("lever"), true);
   assert.equal(isRegistryPilotSource("loxo"), true);
   assert.equal(isRegistryPilotSource("manatal"), true);
@@ -88,6 +89,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "jobaps",
     "jobvite",
     "join",
+    "k12jobspot",
     "lever",
     "loxo",
     "manatal",
@@ -357,6 +359,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof jobvite.normalize, "function");
   assert.equal(typeof jobvite.validate, "function");
   assert.deepEqual(validateSourceContract(jobvite), { ok: true, failures: [] });
+
+  const k12jobspot = getRegistrySourceModule("k12jobspot");
+  assert.equal(k12jobspot.atsKey, "k12jobspot");
+  assert.equal(k12jobspot.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(k12jobspot.status, SOURCE_STATUSES.enabled);
+  assert.equal(typeof k12jobspot.discover, "function");
+  assert.equal(typeof k12jobspot.fetchList, "function");
+  assert.equal(typeof k12jobspot.parse, "function");
+  assert.equal(typeof k12jobspot.normalize, "function");
+  assert.equal(typeof k12jobspot.validate, "function");
+  assert.deepEqual(validateSourceContract(k12jobspot), { ok: true, failures: [] });
 
   const lever = getRegistrySourceModule("lever");
   assert.equal(lever.atsKey, "lever");

@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "K12 Fixture District",
+        "position_name": "Teacher",
+        "job_posting_url": "https://www.k12jobspot.com/Job/Detail/",
+        "location_text": "Aurora, IL, 60505",
+        "country": "United States",
+        "region": "IL",
+        "city": "Aurora"
+      }
+    },
+    {
+      "name": "ambiguous district-wide location",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote|ambiguous_location",
+      "posting": {
+        "company_name": "K12 Fixture District",
+        "position_name": "Substitute Teacher",
+        "job_posting_url": "https://www.k12jobspot.com/Job/Detail/ambiguous-1",
+        "source_job_id": "ambiguous-1",
+        "location_text": "District Wide"
+      }
+    }
+  ]
+}

@@ -106,6 +106,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled
   }),
+  k12jobspot: Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled
+  }),
   jobaps: Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
     status: SOURCE_STATUSES.disabled

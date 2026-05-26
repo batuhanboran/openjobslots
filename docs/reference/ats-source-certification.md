@@ -149,7 +149,7 @@ Subagent/work-packet findings in this certification pass:
 | `brassring` | BrassRing board tokens/cookies plus matched jobs JSON. | Date is last-updated; company can be unknown; source shape remains brittle. | Low-confidence source module now carries `reqid`; add paired board/API variants before public promotion. |
 | `governmentjobs` | GovernmentJobs AJAX HTML. | Invents `Posted Today`; no source id; location basic. | Stop invented dates; parse real date or null; add raw fixture and URL id. |
 | `usajobs` | USAJobs landing token plus search POST. | Remote flags and DocumentID not carried. | Add raw fixture and map `DocumentID` to source id. |
-| `k12jobspot` | K12JobSpot JSON API. | US state/country normalization weak; source id absent. | Add fixture and map job id; improve US location normalization. |
+| `k12jobspot` | K12JobSpot JSON API. | No detail fetch enabled; public API source-backed list fields only. | Source-local registry module now preserves `jobs[].id` as `source_job_id`, maps US city/state/postal list objects, and has raw/expected/invalid fixtures. |
 | `schoolspring` | SchoolSpring JSON API. | Date format unproven; source id absent. | Add fixture and map `jobId`. |
 | `calcareers` | CalCareers ASP.NET HTML. | Markup order brittle; source id absent. | Add postback HTML fixture and JobControl source id. |
 | `calopps` | CalOpps paged HTML. | Uses current timestamp as posting date; location only region. | Stop invented dates; add fixture and preserve source id. |

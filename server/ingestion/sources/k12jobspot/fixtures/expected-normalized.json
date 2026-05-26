@@ -1,0 +1,28 @@
+[
+  {
+    "source_job_id": "123456",
+    "company_name": "Aurora Public Schools",
+    "position_name": "Elementary Teacher",
+    "job_posting_url": "https://www.k12jobspot.com/Job/Detail/123456",
+    "location_text": "Aurora, IL, 60505",
+    "country": "United States",
+    "region": "IL",
+    "city": "Aurora",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-24",
+    "parser_confidence": 0.74
+  },
+  {
+    "source_job_id": "789012",
+    "company_name": "Portland School District",
+    "position_name": "High School Counselor",
+    "job_posting_url": "https://www.k12jobspot.com/Job/Detail/789012",
+    "location_text": "Portland, OR, 97205",
+    "country": "United States",
+    "region": "OR",
+    "city": "Portland",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-23",
+    "parser_confidence": 0.74
+  }
+]

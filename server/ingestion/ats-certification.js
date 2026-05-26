@@ -235,6 +235,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "JobId is available and must be preserved.")
     }
   },
+  k12jobspot: {
+    priority: "P2",
+    sourcePattern: "K12JobSpot public Jobs/Search JSON API.",
+    parserPath: "server/ingestion/sources/k12jobspot/parse.js parseK12jobspotPostingsFromPayload",
+    requiredFixtures: ["Jobs/Search JSON response fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw API fixture covers jobs[].location city, regionCode, and postalCode evidence."),
+      date: decision("list-payload", "Saved raw API fixture covers jobs[].postedDate when source exposes it."),
+      remote: decision("source-absent", "Saved K12JobSpot list fixture exposes no remote/hybrid field; concrete geo-backed rows normalize as onsite and missing-geo rows remain gated."),
+      sourceId: decision("list-payload", "Saved raw API fixture covers jobs[].id as source_job_id.")
+    }
+  },
   lever: {
     priority: "P1",
     sourcePattern: "Lever postings API JSON.",

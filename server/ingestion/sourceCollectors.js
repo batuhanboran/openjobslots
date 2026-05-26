@@ -31,7 +31,6 @@ const {
   parseUsajobsOfficialSearchPayload,
   parseUsajobsPostingsFromPayload
 } = require("./sources/usajobs/parse");
-const { parseK12jobspotPostingsFromPayload } = require("./sources/k12jobspot/parse");
 const {
   buildCalcareersPostPayload,
   extractCalcareersHiddenInputs,
@@ -120,6 +119,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   jobaps: JOBAPS_RATE_LIMIT_WAIT_MS,
   jobvite: JOBVITE_RATE_LIMIT_WAIT_MS,
   join: JOIN_RATE_LIMIT_WAIT_MS,
+  k12jobspot: K12JOBSPOT_RATE_LIMIT_WAIT_MS,
   lever: LEVER_RATE_LIMIT_WAIT_MS,
   loxo: 5 * 1000,
   simplicant: SIMPLICANT_RATE_LIMIT_WAIT_MS,
@@ -939,66 +939,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
   
     return collected;
-  }async function fetchK12jobspotSearchPayload(pageStartIndex, pageEndIndex) {
-    const endpoint = "https://api.k12jobspot.com/api/Jobs/Search";
-    const requestBody = {
-      searchPhrase: "",
-      filters: [
-        { name: "positionAreas", filters: [] },
-        { name: "gradeLevels", filters: [] },
-        { name: "jobTypes", filters: [] }
-      ],
-      pageStartIndex,
-      pageEndIndex
-    };
-  
-    const res = await fetchWithAtsRateLimit("k12jobspot", K12JOBSPOT_RATE_LIMIT_WAIT_MS, endpoint, {
-      method: "POST",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Content-Type": "application/json",
-        Origin: "https://www.k12jobspot.com",
-        Referer: "https://www.k12jobspot.com/"
-      },
-      body: JSON.stringify(requestBody)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`K12JobSpot request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-    return res.json();
-  }
-  
-  async function collectPostingsForK12jobspotDynamic(pageWindowSize = 25) {
-    const windowSize = Math.max(1, Number(pageWindowSize) || 25);
-    const postings = [];
-    const seenUrls = new Set();
-    const referenceEpoch = nowEpochSeconds();
-    let pageStartIndex = 1;
-  
-    while (true) {
-      const pageEndIndex = pageStartIndex + windowSize - 1;
-      const payload = await fetchK12jobspotSearchPayload(pageStartIndex, pageEndIndex);
-      const batch = parseK12jobspotPostingsFromPayload(payload);
-      if (batch.length === 0) break;
-  
-      let hasWithin24h = false;
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        if (!shouldStorePostingByDate(posting?.posting_date, referenceEpoch)) continue;
-        hasWithin24h = true;
-        postings.push(posting);
-        seenUrls.add(postingUrl);
-      }
-  
-      if (!hasWithin24h) break;
-      pageStartIndex = pageEndIndex + 1;
-    }
-  
-    return postings;
   }
   async function collectPostingsForCalcareersDynamic() {
     const endpoint = "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx";
@@ -1346,7 +1286,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForUsajobsDynamic();
     }
     if (atsName === "k12jobspot" || atsName === "k12jobspot.com" || atsName === "k12jobspotcom" || atsName === "www.k12jobspot.com" || atsName === "wwwk12jobspotcom" || atsName === "api.k12jobspot.com" || atsName === "apik12jobspotcom") {
-      return collectPostingsForK12jobspotDynamic();
+      return collectPostingsForRegistryPilotCompany(company, "k12jobspot");
     }
     if (atsName === "schoolspring" || atsName === "schoolspring.com" || atsName === "schoolspringcom" || atsName === "api.schoolspring.com" || atsName === "apischoolspringcom" || atsName === "www.schoolspring.com" || atsName === "wwwschoolspringcom") {
       return collectPostingsForRegistryPilotCompany(company, "schoolspring");

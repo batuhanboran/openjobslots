@@ -2655,6 +2655,53 @@ test("SchoolSpring dispatch is registry-owned even when runtime pilot predicate 
   }]);
 });
 
+test("K12JobSpot dispatch is registry-owned even when runtime pilot predicate is false", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "k12jobspot",
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled,
+    discover: () => ({
+      ats_key: "k12jobspot",
+      source_family: "public_sector",
+      list_url: "https://api.k12jobspot.com/api/Jobs/Search"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return { __legacyParsed: [{ company_name: "Fixture District", position_name: "Registry K12JobSpot Posting" }] };
+    },
+    parse: (payload) => payload.__legacyParsed,
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("K12JobSpot registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "api.k12jobspot.com",
+    company_name: "K12JobSpot Registry Co",
+    url_string: "https://api.k12jobspot.com/api/Jobs/Search"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "k12jobspot"],
+    ["fetchList", "api.k12jobspot.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "Fixture District",
+    position_name: "Registry K12JobSpot Posting"
+  }]);
+});
+
 test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

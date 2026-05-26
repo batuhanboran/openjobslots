@@ -1,0 +1,46 @@
+{
+  "jobs": [
+    {
+      "id": "123456",
+      "title": "Elementary Teacher",
+      "hiringOrganization": "Aurora Public Schools",
+      "postedDate": "2026-05-24",
+      "location": {
+        "city": "Aurora",
+        "regionCode": "IL",
+        "postalCode": "60505"
+      }
+    },
+    {
+      "id": "789012",
+      "title": "High School Counselor",
+      "hiringOrganization": "Portland School District",
+      "postedDate": "2026-05-23",
+      "location": {
+        "city": "Portland",
+        "regionCode": "OR",
+        "postalCode": "97205"
+      }
+    },
+    {
+      "id": "123456",
+      "title": "Duplicate Elementary Teacher",
+      "hiringOrganization": "Aurora Public Schools",
+      "postedDate": "2026-05-24",
+      "location": {
+        "city": "Aurora",
+        "regionCode": "IL",
+        "postalCode": "60505"
+      }
+    },
+    {
+      "title": "Missing Source Id",
+      "hiringOrganization": "Skipped District",
+      "postedDate": "2026-05-24",
+      "location": {
+        "city": "Madison",
+        "regionCode": "WI"
+      }
+    }
+  ]
+}
