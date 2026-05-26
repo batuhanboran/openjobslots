@@ -515,6 +515,107 @@ test("BrassRing registry source stays idle while disabled", async () => {
   assert.deepEqual(postings, []);
 });
 
+test("HireBridge dispatches through registry source module instead of legacy collector", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "hirebridge",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.disabled,
+    discover: () => ({
+      ats_key: "hirebridge",
+      source_family: "html_detail",
+      list_url: "https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=1234"
+    }),
+    fetchList: async (company, options) => {
+      calls.push(["fetchList", company.ATS_name, typeof options.fetcher]);
+      return {
+        html: "<ul></ul>",
+        __detailHtmlByUrl: {}
+      };
+    },
+    parse: (payload, company) => [{
+      company_name: company.company_name,
+      position_name: payload?.html ? "HireBridge Registry Posting" : "Unexpected Payload"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("HireBridge registry dispatch should not hit legacy network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "hirebridge",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "recruit.hirebridge.com",
+    company_name: "HireBridge Registry Co",
+    url_string: "https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=1234"
+  });
+
+  assert.deepEqual(calls, [
+    ["module", "hirebridge"],
+    ["fetchList", "recruit.hirebridge.com", "function"]
+  ]);
+  assert.deepEqual(postings, [{
+    company_name: "HireBridge Registry Co",
+    position_name: "HireBridge Registry Posting"
+  }]);
+});
+
+test("HireBridge registry source stays idle while disabled", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "hirebridge",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "hirebridge",
+      source_family: "html_detail",
+      list_url: "https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=1234"
+    }),
+    fetchList: async () => {
+      calls.push(["fetchList"]);
+      return {
+        html: "<ul></ul>",
+        __detailHtmlByUrl: {}
+      };
+    },
+    parse: () => [{
+      company_name: "HireBridge Registry Co",
+      position_name: "Unexpected Disabled Posting"
+    }],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("HireBridge disabled registry dispatch should not hit network");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: (atsKey) => atsKey === "hirebridge",
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "hirebridge",
+    company_name: "HireBridge Registry Co",
+    url_string: "https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=1234"
+  });
+
+  assert.deepEqual(calls, [["module", "hirebridge"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("ApplyToJob dispatches through registry source module instead of legacy collector", async () => {
   const calls = [];
   const registrySource = {

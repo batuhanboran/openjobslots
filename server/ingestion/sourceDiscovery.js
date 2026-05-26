@@ -351,24 +351,6 @@ function extractPageupRouteConfigFromUrl(urlString, fallbackRouteType = "cw", fa
   };
 }
 
-function parseHirebridgeCompany(urlString) {
-  const parsed = parseUrl(urlString);
-  if (!parsed) return null;
-
-  const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "recruit.hirebridge.com" && host !== "www.recruit.hirebridge.com") return null;
-
-  const cid = String(parsed.searchParams?.get("cid") || "").trim();
-  if (!cid) return null;
-
-  return {
-    host,
-    cid,
-    boardUrl: `https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=${encodeURIComponent(cid)}`,
-    detailsBaseUrl: "https://recruit.hirebridge.com/v3/CareerCenter/v2/details.aspx"
-  };
-}
-
 function parseCareerpuckCompany(urlString) {
   const parsed = parseUrl(urlString);
   if (!parsed) return null;
@@ -1140,7 +1122,6 @@ const COMPANY_SOURCE_PARSERS = Object.freeze({
   freshteam: parseFreshteamCompany,
   getro: parseGetroCompany,
   greenhouse: parseGreenhouseCompany,
-  hirebridge: parseHirebridgeCompany,
   hrmdirect: parseHrmDirectCompany,
   icims: parseIcimsCompany,
   jobaps: parseJobApsCompany,
@@ -1192,7 +1173,6 @@ module.exports = {
   parseFreshteamCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
-  parseHirebridgeCompany,
   parseHrmDirectCompany,
   parseIcimsCompany,
   parseJobApsCompany,

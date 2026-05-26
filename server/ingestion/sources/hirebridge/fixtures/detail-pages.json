@@ -1,0 +1,7 @@
+{
+  "list_html": "<ul><li><span class=\"department\">Istanbul, Turkiye</span><a href=\"/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001\">Support Engineer</a></li><li><span class=\"department\">Remote</span><a href=\"/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1002\">Remote QA Analyst</a></li><li><span class=\"department\">Remote</span><a href=\"/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001\">Support Engineer Duplicate</a></li></ul>",
+  "detail_html_by_jid": {
+    "HB1001": "<script type=\"application/ld+json\">{\"datePosted\":\"2026-05-18\"}</script>",
+    "HB1002": "<html><body>No structured posting date here.</body></html>"
+  }
+}

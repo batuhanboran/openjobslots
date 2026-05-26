@@ -100,6 +100,89 @@ test("target html/public ATS modules return no postings for empty raw payloads",
   }
 });
 
+test("hirebridge source module fetches list plus detail pages, enriches posting dates, and filters rows missing detail dates", async () => {
+  const source = getSourceModule("hirebridge");
+  assert.ok(source, "expected HireBridge source module");
+  const company = readJson(path.join(__dirname, "hirebridge", "fixtures", "company.json"));
+  const fixture = readJson(path.join(__dirname, "hirebridge", "fixtures", "detail-pages.json"));
+  const requests = [];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      requests.push({ url, method: target.method, headers: target.headers });
+      if (url === "https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=1234") {
+        return {
+          status: 200,
+          url,
+          text: fixture.list_html
+        };
+      }
+      if (url === "https://recruit.hirebridge.com/v3/CareerCenter/v2/details.aspx?cid=1234&jid=HB1001") {
+        return {
+          status: 200,
+          url,
+          text: fixture.detail_html_by_jid.HB1001
+        };
+      }
+      if (url === "https://recruit.hirebridge.com/v3/CareerCenter/v2/details.aspx?cid=1234&jid=HB1002") {
+        return {
+          status: 200,
+          url,
+          text: fixture.detail_html_by_jid.HB1002
+        };
+      }
+      return { status: 404, url, text: "" };
+    }
+  });
+
+  assert.equal(payload.__sourceConfig.cid, "1234");
+  assert.equal(payload.__sourceFetchFinalUrl, "https://recruit.hirebridge.com/v3/jobs/list.aspx?cid=1234");
+  const detailRequests = requests.filter((request) => request.url.includes("/v3/CareerCenter/v2/details.aspx"));
+  assert.equal(detailRequests.length, 2);
+
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].source_job_id, "HB1001");
+  assert.equal(parsed[0].posting_date, "2026-05-18");
+  assert.equal(parsed[0].job_posting_url, "https://recruit.hirebridge.com/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001");
+});
+
+test("hirebridge source module enforces recruit.hirebridge.com host guards for list and detail fetches", async () => {
+  const source = getSourceModule("hirebridge");
+  const company = readJson(path.join(__dirname, "hirebridge", "fixtures", "company.json"));
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async () => ({
+        status: 200,
+        url: "https://example.com/list",
+        text: "<ul></ul>"
+      })
+    }),
+    /unexpected host/
+  );
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async (url) => {
+        if (url.includes("/v3/jobs/list.aspx")) {
+          return {
+            status: 200,
+            url,
+            text: `<ul><li><a href="/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001">Support Engineer</a></li></ul>`
+          };
+        }
+        return {
+          status: 200,
+          url: "https://example.com/details",
+          text: `<script type="application/ld+json">{"datePosted":"2026-05-18"}</script>`
+        };
+      }
+    }),
+    /unexpected host/
+  );
+});
+
 test("freshteam source module fetches jobs HTML with source-local discovery and host guard", async () => {
   const source = getSourceModule("freshteam");
   assert.ok(source, "expected Freshteam source module");

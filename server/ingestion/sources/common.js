@@ -5,7 +5,6 @@ const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseGreenhousePostingsFromApi } = require("./greenhouse/parse");
-const { parseHirebridgePostingsFromHtml } = require("./hirebridge/parse");
 const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const {
   extractIcimsLocationFromHtml,
@@ -847,16 +846,11 @@ const SOURCE_SPECS = Object.freeze({
   hirebridge: {
     sourceFamily: "html_detail",
     confidence: 0.45,
-    parser: (companyName, config, payload) => parseHirebridgePostingsFromHtml(companyName, config, payload?.html || payload),
+    parser: () => [],
     officialDocs: "observed Hirebridge public list HTML and detail pages",
     discover(company) {
-      const parsed = asUrl(company.url_string);
       return {
-        config: {
-          baseOrigin: parsed ? parsed.origin : "",
-          cid: queryParam(company.url_string, "cid"),
-          detailsBaseUrl: parsed ? `${parsed.origin}/v3/CareerCenter/v2/details.aspx` : ""
-        },
+        config: {},
         listUrl: clean(company.url_string)
       };
     }

@@ -8,7 +8,6 @@ const {
   parseEightfoldCompany,
   parseGetroCompany,
   parseGreenhouseCompany,
-  parseHirebridgeCompany,
   parseIcimsCompany,
   parseJobApsCompany,
   parseLoxoCompany,
@@ -35,11 +34,6 @@ const {
   parseTalentreefPostingsFromSearchResponse
 } = require("./sources/talentreef/parse");
 const { parseGreenhousePostingsFromApi } = require("./sources/greenhouse/parse");
-const {
-  buildHirebridgeDetailsUrl,
-  extractHirebridgeDatePostedFromDetailHtml,
-  parseHirebridgePostingsFromHtml
-} = require("./sources/hirebridge/parse");
 const { parseOraclePostingsFromApi } = require("./sources/oracle/parse");
 const {
   extractPageupCompanyNameFromTitle,
@@ -164,7 +158,6 @@ const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_WORKFORCENOW_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ORACLE_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const HIREBRIDGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const PAGEUP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const EIGHTFOLD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -475,9 +468,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
       if (parsed.hostname.endsWith(".oraclecloud.com") && parsed.pathname.toLowerCase().includes("/hcmui/candidateexperience/")) {
-        return currentPostingLocationByJobUrl.get(url) || null;
-      }
-      if (parsed.hostname === "recruit.hirebridge.com" || parsed.hostname === "www.recruit.hirebridge.com") {
         return currentPostingLocationByJobUrl.get(url) || null;
       }
       if (parsed.hostname === "sjobs.brassring.com" || parsed.hostname === "www.sjobs.brassring.com") {
@@ -1016,63 +1006,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
     if (finalHost !== "careers.pageuppeople.com" && finalHost !== "www.careers.pageuppeople.com") {
       throw new Error(`PageUp details URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return res.text();
-  }
-  
-  async function fetchHirebridgeJobsPage(config) {
-    const res = await fetchWithAtsRateLimit("hirebridge", HIREBRIDGE_RATE_LIMIT_WAIT_MS, config.boardUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Hirebridge page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || config.boardUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "recruit.hirebridge.com" && finalHost !== "www.recruit.hirebridge.com") {
-      throw new Error(`Hirebridge URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    return { pageHtml: await res.text(), finalUrl };
-  }
-  
-  async function fetchHirebridgeDetailsPage(config, jobPostingUrl) {
-    const detailsUrl = buildHirebridgeDetailsUrl(config, jobPostingUrl);
-    if (!detailsUrl) return "";
-  
-    const res = await fetchWithAtsRateLimit("hirebridge", HIREBRIDGE_RATE_LIMIT_WAIT_MS, detailsUrl, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Hirebridge details request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const finalUrl = String(res.url || detailsUrl || "").trim();
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "recruit.hirebridge.com" && finalHost !== "www.recruit.hirebridge.com") {
-      throw new Error(`Hirebridge details URL redirected to unexpected host: ${finalUrl}`);
     }
   
     return res.text();
@@ -1760,47 +1693,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       try {
         const detailsHtml = await fetchPageupDetailsPage(postingUrl);
         postingDate = String(extractPageupPostingDateFromDetailHtml(detailsHtml) || "").trim();
-      } catch {
-        continue;
-      }
-      if (!postingDate) continue;
-  
-      collected.push({
-        ...posting,
-        posting_date: postingDate
-      });
-      seenUrls.add(postingUrl);
-    }
-  
-    return collected;
-  }
-  
-  async function collectPostingsForHirebridgeCompany(company) {
-    const config = parseHirebridgeCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || `hirebridge_${config.cid}`;
-    const { pageHtml, finalUrl } = await fetchHirebridgeJobsPage(config);
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      boardUrl: finalUrl || config.boardUrl
-    };
-  
-    const rawPostings = parseHirebridgePostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-    const collected = [];
-    const seenUrls = new Set();
-  
-    for (const posting of rawPostings) {
-      const postingUrl = String(posting?.job_posting_url || "").trim();
-      if (!postingUrl || seenUrls.has(postingUrl)) continue;
-  
-      let postingDate = "";
-      try {
-        const detailsHtml = await fetchHirebridgeDetailsPage(parseConfig, postingUrl);
-        postingDate = String(extractHirebridgeDatePostedFromDetailHtml(detailsHtml) || "").trim();
       } catch {
         continue;
       }
@@ -2555,7 +2447,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "recruit.hirebridge.com" ||
       atsName === "recruithirebridgecom"
     ) {
-      return collectPostingsForHirebridgeCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "hirebridge");
     }
     if (atsName === "teamtailor" || atsName === "teamtailor.com" || atsName === "teamtailorcom") {
       return collectPostingsForRegistryPilotCompany(company, "teamtailor");

@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CareerPlug, Fountain, Freshteam, Greenhouse, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, Jobvite, Join, Lever, Manatal, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SmartRecruiters, Taleo, Teamtailor, UltiPro, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
   assert.equal(isRegistryPilotSource("applitrack"), true);
@@ -26,6 +26,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
   assert.equal(isRegistryPilotSource("fountain"), true);
   assert.equal(isRegistryPilotSource("freshteam"), true);
   assert.equal(isRegistryPilotSource("greenhouse"), true);
+  assert.equal(isRegistryPilotSource("hirebridge"), true);
   assert.equal(isRegistryPilotSource("hrmdirect"), true);
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("isolvisolvedhire"), true);
@@ -60,6 +61,7 @@ test("registry exposes ADP MyJobs, ApplicantPro, Applitrack, ApplyToJob, Ashby, 
     "freshteam",
     "gem",
     "greenhouse",
+    "hirebridge",
     "hrmdirect",
     "icims",
     "isolvisolvedhire",
@@ -204,6 +206,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof greenhouse.normalize, "function");
   assert.equal(typeof greenhouse.validate, "function");
   assert.deepEqual(validateSourceContract(greenhouse), { ok: true, failures: [] });
+
+  const hirebridge = getRegistrySourceModule("hirebridge");
+  assert.equal(hirebridge.atsKey, "hirebridge");
+  assert.equal(hirebridge.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
+  assert.equal(hirebridge.status, SOURCE_STATUSES.disabled);
+  assert.equal(hirebridge.collectWhenDisabled, false);
+  assert.equal(typeof hirebridge.discover, "function");
+  assert.equal(typeof hirebridge.fetchList, "function");
+  assert.equal(typeof hirebridge.parse, "function");
+  assert.equal(typeof hirebridge.normalize, "function");
+  assert.equal(typeof hirebridge.validate, "function");
+  assert.deepEqual(validateSourceContract(hirebridge), { ok: true, failures: [] });
 
   const fountain = getRegistrySourceModule("fountain");
   assert.equal(fountain.atsKey, "fountain");
