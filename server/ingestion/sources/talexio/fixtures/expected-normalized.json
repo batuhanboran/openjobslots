@@ -1,0 +1,20 @@
+[
+  {
+    "source_job_id": "tx-1001",
+    "company_name": "Fixture Talexio",
+    "position_name": "Remote Payroll Engineer",
+    "country": "United States",
+    "remote_type": "remote",
+    "job_posting_url": "https://fixture.talexio.com/jobs/remote-payroll-engineer",
+    "parser_confidence": 0.58
+  },
+  {
+    "source_job_id": "tx-1002",
+    "company_name": "Fixture Talexio",
+    "position_name": "Malta Finance Analyst",
+    "country": "Malta",
+    "remote_type": "onsite",
+    "job_posting_url": "https://fixture.talexio.com/jobs/malta-finance-analyst",
+    "parser_confidence": 0.58
+  }
+]

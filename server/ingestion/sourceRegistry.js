@@ -204,6 +204,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled
   }),
+  saphrcloud: Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.disabled
+  }),
   taleo: Object.freeze({
     family: SOURCE_FAMILIES.brittleHighRisk,
     status: SOURCE_STATUSES.disabled
@@ -219,6 +223,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     collectWhenDisabled: false
   }),
   talentlyft: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
+  talexio: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled
   }),
@@ -363,6 +371,8 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   ripplingcom: "rippling",
   "sage.hr": "sagehr",
   sagehr: "sagehr",
+  "saphrcloud.com": "saphrcloud",
+  saphrcloudcom: "saphrcloud",
   "schoolspring.com": "schoolspring",
   schoolspringcom: "schoolspring",
   "simplicant.com": "simplicant",
@@ -377,6 +387,8 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   taleonet: "taleo",
   "talentlyft.com": "talentlyft",
   talentlyftcom: "talentlyft",
+  "talexio.com": "talexio",
+  talexiocom: "talexio",
   "teamtailor.com": "teamtailor",
   teamtailorcom: "teamtailor",
   "theapplicantmanager.com": "theapplicantmanager",
@@ -404,6 +416,8 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   wwwstatejobsnycom: "statejobsny",
   "www.usajobs.gov": "usajobs",
   wwwusajobsgov: "usajobs",
+  "jobs.hr.cloud.sap": "saphrcloud",
+  jobshrcloudsap: "saphrcloud",
   "talent.sage.hr": "sagehr",
   talentsagehr: "sagehr",
   "zohorecruit.com": "zoho",

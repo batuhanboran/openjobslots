@@ -23,6 +23,8 @@ function parseTalexioPostingsFromApi(companyNameForPostings, config, responseJso
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: vacancyId || String(item?.reference || "").trim() || undefined,
+      id: vacancyId || undefined,
       position_name: String(item?.title || "").trim() || "Untitled Position",
       job_posting_url: itemUrl,
       posting_date: postingDate,

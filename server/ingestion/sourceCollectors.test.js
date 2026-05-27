@@ -3147,3 +3147,108 @@ test("PoliceApp dispatch is source-owned and does not invent posting dates", asy
     route_kind: "policeapp_public_ajax"
   });
 });
+
+test("Talexio dispatch is source-owned and preserves API source evidence", async () => {
+  const calls = [];
+  const payload = {
+    totalVacancies: 1,
+    vacancies: [
+      {
+        id: "tx-1001",
+        title: "Remote Payroll Engineer",
+        url: "/jobs/remote-payroll-engineer",
+        publishDate: "2026-05-21",
+        workLocation: "Remote",
+        country: "United States",
+        department: "Engineering",
+        jobType: "Full-time"
+      }
+    ]
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async (atsKey, waitMs, urlString, init) => {
+      calls.push([atsKey, waitMs, urlString, init?.method]);
+      return createTextResponse(JSON.stringify(payload), {
+        url: urlString,
+        contentType: "application/json"
+      });
+    },
+    getPostingLocationByJobUrl: () => new Map()
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "talexio.com",
+    company_name: "Talexio Fixture",
+    url_string: "https://fixture.talexio.com/jobs/"
+  });
+
+  assert.deepEqual(calls, [[
+    "talexio",
+    60 * 1000,
+    "https://fixture.talexio.com/api/jobs?search=&sortBy=relevance&page=1&limit=10",
+    "GET"
+  ]]);
+  assert.deepEqual(postings, [{
+    company_name: "Talexio Fixture",
+    source_job_id: "tx-1001",
+    id: "tx-1001",
+    position_name: "Remote Payroll Engineer",
+    job_posting_url: "https://fixture.talexio.com/jobs/remote-payroll-engineer",
+    posting_date: "2026-05-21",
+    location: "Remote, United States",
+    reference: null,
+    department: "Engineering",
+    employment_type: "Full-time",
+    source_evidence: {
+      list_url: "https://fixture.talexio.com/api/jobs",
+      route_kind: "talexio_public_jobs_api"
+    }
+  }]);
+});
+
+test("SAP HR Cloud dispatch is source-owned and preserves board HTML evidence", async () => {
+  const calls = [];
+  const html = `
+    <a class="jobTitle-link" href="/job/Remote-Basis-Consultant/5001-en_US">Remote Basis Consultant</a>
+    <span class="jobLocation">Remote - United States</span>
+    <span class="jobDate">2026-05-08</span>
+    <span class="jobDepartment">Consulting</span>
+  `;
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async (atsKey, waitMs, urlString, init) => {
+      calls.push([atsKey, waitMs, urlString, init?.method]);
+      return createTextResponse(html, {
+        url: "https://fixture.jobs.hr.cloud.sap/search/?createNewAlert=false&q=",
+        contentType: "text/html"
+      });
+    },
+    getPostingLocationByJobUrl: () => new Map()
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "jobs.hr.cloud.sap",
+    company_name: "SAP Fixture",
+    url_string: "https://fixture.jobs.hr.cloud.sap/search/?locale=en_US"
+  });
+
+  assert.deepEqual(calls, [[
+    "saphrcloud",
+    60 * 1000,
+    "https://fixture.jobs.hr.cloud.sap/search/?createNewAlert=false&q=",
+    "GET"
+  ]]);
+  assert.deepEqual(postings, [{
+    company_name: "SAP Fixture",
+    source_job_id: "5001",
+    id: "5001",
+    position_name: "Remote Basis Consultant",
+    job_posting_url: "https://fixture.jobs.hr.cloud.sap/job/Remote-Basis-Consultant/5001-en_US",
+    posting_date: "2026-05-08",
+    location: "Remote - United States",
+    department: "Consulting",
+    source_evidence: {
+      list_url: "https://fixture.jobs.hr.cloud.sap/search/?createNewAlert=false&q=",
+      route_kind: "saphrcloud_public_board"
+    }
+  }]);
+});

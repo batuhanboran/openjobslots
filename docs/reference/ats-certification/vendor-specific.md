@@ -120,8 +120,9 @@ Current raw fixture status for every ATS in this file: pending. There are no sav
 
 ### `talexio`
 
-- Source endpoint: API GET `https://{subdomain}.talexio.com/api/jobs?search=&sortBy=relevance&page={page}&limit=10` from `fetchTalexioJobsPage`.
-- Parser path: `server/index.js` `collectPostingsForTalexioCompany` -> `parseTalexioPostingsFromApi`; normalization path is `server/ingestion/adapters.js` -> `normalizePosting`.
+- Source endpoint: API GET `https://{subdomain}.talexio.com/api/jobs?search=&sortBy=relevance&page={page}&limit=10` from `server/ingestion/sources/talexio/index.js`.
+- Parser path: source-local registry module `server/ingestion/sources/talexio/index.js` -> `parseTalexioPostingsFromApi`; normalization path is source-local contract `normalize`. `sourceCollectors.js` only dispatches through registry.
+- Fixtures now cover API list rows, expected normalized rows, invalid-shape validation, source ids from vacancy `id`, country normalization, and remote/onsite examples.
 - Raw fixture status: pending saved API fixture.
 - Field decisions: geo comes from `workLocation` plus `country`; date uses `publishDate`; remote should use any source workplace/remote flag if found, otherwise location/title text; source id should prefer `id` or `reference`, but current parser stores `reference` only and relies on URL/query fallback.
 - Tests needed: add fixture with `vacancies[]`, `totalVacancies`, `id`, `reference`, `publishDate`, country normalization, remote/hybrid fields if present, missing URL fallback, pagination stop conditions, and source id preservation.

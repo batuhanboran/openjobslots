@@ -17,6 +17,7 @@ const PRIMARY_DIRECT_SOURCES = Object.freeze([
   "pinpointhq",
   "fountain",
   "isolvisolvedhire",
+  "talexio",
   "zoho"
 ]);
 

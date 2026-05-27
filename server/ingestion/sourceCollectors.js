@@ -1,22 +1,12 @@
 const {
-  parseSapHrCloudCompany,
-  parseTalexioCompany
-} = require("./sourceDiscovery");
-const {
-  parseSapHrCloudPostingsFromApi,
-  parseSapHrCloudPostingsFromHtml
-} = require("./sources/saphrcloud/parse");
-const {
   inferWorkdayLocationFromJobUrl
 } = require("./sources/workday/parse");
-const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
 const {
   getRegistrySourceModule,
   resolveRegistrySourceKey
 } = require("./sourceRegistry");
 const { SOURCE_STATUSES, validateSourceContract } = require("./sourceContracts");
 
-const MAX_PAGES_PER_COMPANY = 25;
 const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 30));
 const DEFAULT_POSTING_TTL_SECONDS = Number(process.env.POSTING_TTL_SECONDS || POSTING_VISIBLE_RETENTION_DAYS * 24 * 60 * 60);
 const DEFAULT_BROWSER_USER_AGENT =
@@ -37,7 +27,6 @@ const CAREERPLUG_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BAMBOOHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FOUNTAIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const HRMDIRECT_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TEAMTAILOR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FRESHTEAM_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SIMPLICANT_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -47,7 +36,6 @@ const RIPPLING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const MANATAL_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOBAPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -57,14 +45,6 @@ const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALOPPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const LEGACY_COLLECTOR_ALIASES = Object.freeze({
-  "jobs.hr.cloud.sap": "saphrcloud",
-  jobshrcloudsap: "saphrcloud",
-  "saphrcloud.com": "saphrcloud",
-  saphrcloudcom: "saphrcloud",
-  talexiocom: "talexio",
-  "talexio.com": "talexio"
-});
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
   adp_workforcenow: 60 * 1000,
@@ -105,9 +85,11 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
   sagehr: 60 * 1000,
+  saphrcloud: 60 * 1000,
   schoolspring: SCHOOLSPRING_RATE_LIMIT_WAIT_MS,
   statejobsny: 60 * 1000,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
+  talexio: 60 * 1000,
   talentreef: 60 * 1000,
   theapplicantmanager: 60 * 1000,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
@@ -116,7 +98,6 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   workday: WORKDAY_RATE_LIMIT_WAIT_MS,
   zoho: ZOHO_RATE_LIMIT_WAIT_MS
 });
-const SAPHRCLOUD_LOCALE_CANDIDATES = Object.freeze(["en_US", "en_GB"]);
 function defaultNowEpochSeconds() {
   return Math.floor(Date.now() / 1000);
 }
@@ -465,136 +446,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return sourceModule.parse(rawPayload, company);
   }
 
-  async function fetchTalexioJobsPage(config, page = 1, limit = 10) {
-    const apiUrl = String(config?.apiUrl || "").trim();
-    if (!apiUrl) {
-      throw new Error("Talexio API URL is missing");
-    }
-  
-    const url = `${apiUrl}?${new URLSearchParams({
-      search: "",
-      sortBy: "relevance",
-      page: String(page),
-      limit: String(limit)
-    }).toString()}`;
-  
-    const res = await fetchWithAtsRateLimit("talexio", TALEXIO_RATE_LIMIT_WAIT_MS, url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Talexio API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
-  function buildSapHrCloudSearchPayload(locale = "en_US", pageNumber = 0) {
-    const normalizedPage = Math.max(0, Math.floor(Number(pageNumber || 0)));
-    return {
-      locale: String(locale || "en_US"),
-      pageNumber: normalizedPage,
-      sortBy: "",
-      keywords: "",
-      location: "",
-      facetFilters: {},
-      brand: "",
-      skills: [],
-      categoryId: 0,
-      alertId: "",
-      rcmCandidateId: ""
-    };
-  }
-  
-  async function fetchSapHrCloudJobsPage(config, locale = "en_US", pageNumber = 0) {
-    const payload = buildSapHrCloudSearchPayload(locale, pageNumber);
-    const res = await fetchWithAtsRateLimit("saphrcloud", SAPHRCLOUD_RATE_LIMIT_WAIT_MS, config.apiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`SAP HR Cloud API request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.json();
-  }
-  
-  async function fetchSapHrCloudBoardPage(urlString) {
-    const res = await fetchWithAtsRateLimit("saphrcloud", SAPHRCLOUD_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`SAP HR Cloud page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return {
-      pageHtml: await res.text(),
-      finalUrl: String(res.url || urlString || "").trim()
-    };
-  }
-  
-  async function collectPostingsForTalexioCompany(company) {
-    const config = parseTalexioCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-  
-    const collected = [];
-    const seenUrls = new Set();
-    const pageSize = 10;
-    let totalVacancies = null;
-  
-    for (let page = 1; page <= MAX_PAGES_PER_COMPANY; page += 1) {
-      const responseJson = await fetchTalexioJobsPage(config, page, pageSize);
-      const batch = parseTalexioPostingsFromApi(companyNameForPostings, config, responseJson);
-      for (const posting of batch) {
-        const postingUrl = String(posting?.job_posting_url || "").trim();
-        if (!postingUrl || seenUrls.has(postingUrl)) continue;
-        seenUrls.add(postingUrl);
-        collected.push(posting);
-      }
-  
-      const vacancies = Array.isArray(responseJson?.vacancies) ? responseJson.vacancies : [];
-      const totalRaw = Number(responseJson?.totalVacancies);
-      if (Number.isFinite(totalRaw) && totalRaw >= 0) {
-        totalVacancies = totalRaw;
-      }
-  
-      if (vacancies.length < pageSize) break;
-      if (Number.isFinite(totalVacancies) && collected.length >= Number(totalVacancies)) break;
-    }
-  
-    return collected;
-  }
-  
-  async function collectPostingsForSapHrCloudCompany(company) {
-    const config = parseSapHrCloudCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companyNameLower;
-    const { pageHtml, finalUrl } = await fetchSapHrCloudBoardPage(company.url_string || config.boardUrl);
-    return parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl);
-  }
-  
   async function collectPostingsForCompany(company) {
     const atsName = String(company?.ATS_name || "").trim().toLowerCase();
     const registryKey = resolveRegistrySourceKeyForRuntime(atsName);
@@ -602,9 +453,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, registryKey);
     }
 
-    const legacyKey = LEGACY_COLLECTOR_ALIASES[atsName] || atsName;
-    if (legacyKey === "talexio") return collectPostingsForTalexioCompany(company);
-    if (legacyKey === "saphrcloud") return collectPostingsForSapHrCloudCompany(company);
     return [];
   }
 

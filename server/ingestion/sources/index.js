@@ -5,6 +5,8 @@ const {
   setLegacyCollectPostingsForCompany
 } = require("./common");
 
+const LOCAL_ONLY_SOURCE_ATS_KEYS = Object.freeze(["talexio"]);
+
 function loadSourceModule(atsKey) {
   const key = String(atsKey || "").trim().toLowerCase();
   const spec = getSourceSpec(key);
@@ -33,7 +35,9 @@ function hasSourceModuleContractShape(sourceModule = {}) {
 }
 
 const modules = new Map(
-  Object.keys(SOURCE_SPECS).map((atsKey) => [atsKey, loadSourceModule(atsKey)])
+  Array.from(new Set([...Object.keys(SOURCE_SPECS), ...LOCAL_ONLY_SOURCE_ATS_KEYS]))
+    .map((atsKey) => [atsKey, loadSourceModule(atsKey)])
+    .filter(([, sourceModule]) => sourceModule)
 );
 
 function getSourceModule(atsKey) {

@@ -66,7 +66,9 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.equal(isRegistryPilotSource("taleo"), true);
   assert.equal(isRegistryPilotSource("talentlyft"), true);
   assert.equal(isRegistryPilotSource("talentreef"), true);
+  assert.equal(isRegistryPilotSource("talexio"), true);
   assert.equal(isRegistryPilotSource("theapplicantmanager"), true);
+  assert.equal(isRegistryPilotSource("saphrcloud"), true);
   assert.equal(isRegistryPilotSource("teamtailor"), true);
   assert.equal(isRegistryPilotSource("ultipro"), true);
   assert.equal(isRegistryPilotSource("usajobs"), true);
@@ -120,6 +122,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
     "recruitee",
     "rippling",
     "sagehr",
+    "saphrcloud",
     "schoolspring",
     "simplicant",
     "smartrecruiters",
@@ -127,6 +130,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
     "talentlyft",
     "talentreef",
     "taleo",
+    "talexio",
     "teamtailor",
     "theapplicantmanager",
     "ultipro",
@@ -677,6 +681,28 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof taleo.validate, "function");
   assert.deepEqual(validateSourceContract(taleo), { ok: true, failures: [] });
 
+  const talexio = getRegistrySourceModule("talexio");
+  assert.equal(talexio.atsKey, "talexio");
+  assert.equal(talexio.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(talexio.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof talexio.discover, "function");
+  assert.equal(typeof talexio.fetchList, "function");
+  assert.equal(typeof talexio.parse, "function");
+  assert.equal(typeof talexio.normalize, "function");
+  assert.equal(typeof talexio.validate, "function");
+  assert.deepEqual(validateSourceContract(talexio), { ok: true, failures: [] });
+
+  const sapHrCloud = getRegistrySourceModule("saphrcloud");
+  assert.equal(sapHrCloud.atsKey, "saphrcloud");
+  assert.equal(sapHrCloud.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(sapHrCloud.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof sapHrCloud.discover, "function");
+  assert.equal(typeof sapHrCloud.fetchList, "function");
+  assert.equal(typeof sapHrCloud.parse, "function");
+  assert.equal(typeof sapHrCloud.normalize, "function");
+  assert.equal(typeof sapHrCloud.validate, "function");
+  assert.deepEqual(validateSourceContract(sapHrCloud), { ok: true, failures: [] });
+
   const talentreef = getRegistrySourceModule("talentreef");
   assert.equal(talentreef.atsKey, "talentreef");
   assert.equal(talentreef.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
@@ -738,4 +764,10 @@ test("registry resolves legacy collector aliases to source-owned modules", () =>
   assert.equal(resolveRegistrySourceKey("www.policeapp.com"), "policeapp");
   assert.equal(resolveRegistrySourceKey("talent.sage.hr"), "sagehr");
   assert.equal(resolveRegistrySourceKey("sage.hr"), "sagehr");
+  assert.equal(resolveRegistrySourceKey("talexio.com"), "talexio");
+  assert.equal(resolveRegistrySourceKey("talexiocom"), "talexio");
+  assert.equal(resolveRegistrySourceKey("jobs.hr.cloud.sap"), "saphrcloud");
+  assert.equal(resolveRegistrySourceKey("jobshrcloudsap"), "saphrcloud");
+  assert.equal(resolveRegistrySourceKey("saphrcloud.com"), "saphrcloud");
+  assert.equal(resolveRegistrySourceKey("saphrcloudcom"), "saphrcloud");
 });

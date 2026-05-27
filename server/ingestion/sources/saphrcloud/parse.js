@@ -135,6 +135,8 @@ function parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtm
       jobUrl = "";
     }
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
+    const sourceIdMatch = jobUrl.match(/\/job\/[^/]+\/(?<id>[^/?#]+?)(?:-[a-z]{2}_[A-Z]{2})?(?:[?#]|$)/);
+    const sourceJobId = cleanSapHrCloudText(sourceIdMatch?.groups?.id || "");
 
     const startIndex = Math.max(0, Number(match.index || 0) - 600);
     const endIndex = Math.min(sourceHtml.length, Number(match.index || 0) + String(match[0] || "").length + 1500);
@@ -156,6 +158,8 @@ function parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtm
 
     postings.push({
       company_name: companyNameForPostings,
+      source_job_id: sourceJobId || undefined,
+      id: sourceJobId || undefined,
       position_name: title,
       job_posting_url: jobUrl,
       posting_date: postingDate,

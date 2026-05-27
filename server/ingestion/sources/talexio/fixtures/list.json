@@ -1,0 +1,25 @@
+{
+  "totalVacancies": 2,
+  "vacancies": [
+    {
+      "id": "tx-1001",
+      "title": "Remote Payroll Engineer",
+      "url": "/jobs/remote-payroll-engineer",
+      "publishDate": "2026-05-21",
+      "workLocation": "Remote",
+      "country": "United States",
+      "department": "Engineering",
+      "jobType": "Full-time"
+    },
+    {
+      "id": "tx-1002",
+      "title": "Malta Finance Analyst",
+      "url": "/jobs/malta-finance-analyst",
+      "publishDate": "2026-05-18",
+      "workLocation": "Valletta",
+      "country": "Malta",
+      "department": "Finance",
+      "jobType": "Full-time"
+    }
+  ]
+}
