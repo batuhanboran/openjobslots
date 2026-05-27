@@ -12,7 +12,7 @@ const {
   listRegistrySourceModules
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CalCareers, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HiBob, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, StateJobsNY, Taleo, TalentLyft, TalentReef, Teamtailor, UltiPro, USAJobs, Workday, and Zoho as pilot sources", () => {
+test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CalCareers, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HiBob, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, StateJobsNY, Taleo, TalentLyft, TalentReef, Teamtailor, TheApplicantManager, UltiPro, USAJobs, Workday, and Zoho as pilot sources", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantpro"), true);
@@ -60,6 +60,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
   assert.equal(isRegistryPilotSource("taleo"), true);
   assert.equal(isRegistryPilotSource("talentlyft"), true);
   assert.equal(isRegistryPilotSource("talentreef"), true);
+  assert.equal(isRegistryPilotSource("theapplicantmanager"), true);
   assert.equal(isRegistryPilotSource("teamtailor"), true);
   assert.equal(isRegistryPilotSource("ultipro"), true);
   assert.equal(isRegistryPilotSource("usajobs"), true);
@@ -116,6 +117,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantPro, Applitrack, A
     "talentreef",
     "taleo",
     "teamtailor",
+    "theapplicantmanager",
     "ultipro",
     "usajobs",
     "workday",
@@ -327,6 +329,18 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof hirebridge.normalize, "function");
   assert.equal(typeof hirebridge.validate, "function");
   assert.deepEqual(validateSourceContract(hirebridge), { ok: true, failures: [] });
+
+  const theApplicantManager = getRegistrySourceModule("theapplicantmanager");
+  assert.equal(theApplicantManager.atsKey, "theapplicantmanager");
+  assert.equal(theApplicantManager.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
+  assert.equal(theApplicantManager.status, SOURCE_STATUSES.disabled);
+  assert.equal(theApplicantManager.collectWhenDisabled, false);
+  assert.equal(typeof theApplicantManager.discover, "function");
+  assert.equal(typeof theApplicantManager.fetchList, "function");
+  assert.equal(typeof theApplicantManager.parse, "function");
+  assert.equal(typeof theApplicantManager.normalize, "function");
+  assert.equal(typeof theApplicantManager.validate, "function");
+  assert.deepEqual(validateSourceContract(theApplicantManager), { ok: true, failures: [] });
 
   const fountain = getRegistrySourceModule("fountain");
   assert.equal(fountain.atsKey, "fountain");

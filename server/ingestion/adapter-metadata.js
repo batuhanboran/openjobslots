@@ -108,6 +108,7 @@ const FIXTURE_BACKED = new Set([
   "manatal",
   "statejobsny",
   "talentreef",
+  "theapplicantmanager",
   "workday",
   "taleo",
   "usajobs"
@@ -142,6 +143,7 @@ const PARSER_FIXTURE_BACKED = new Set([
   "manatal",
   "statejobsny",
   "talentreef",
+  "theapplicantmanager",
   "zoho",
   "workday",
   "taleo",

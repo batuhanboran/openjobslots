@@ -4,8 +4,7 @@ const {
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
-  parseTalexioCompany,
-  parseTheApplicantManagerCompany
+  parseTalexioCompany
 } = require("./sourceDiscovery");
 const {
   parseSapHrCloudPostingsFromApi,
@@ -20,7 +19,6 @@ const {
 } = require("./sources/sagehr/parse");
 const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
-const { parseTheApplicantManagerPostingsFromHtml } = require("./sources/theapplicantmanager/parse");
 const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
 const {
   normalizePoliceappJobUrl,
@@ -44,7 +42,6 @@ const TALEO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const JOBVITE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLICANTPRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLYTOJOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const THEAPPLICANTMANAGER_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BREEZY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ZOHO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLICANTAI_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -114,6 +111,7 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   statejobsny: 60 * 1000,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
   talentreef: 60 * 1000,
+  theapplicantmanager: 60 * 1000,
   teamtailor: TEAMTAILOR_RATE_LIMIT_WAIT_MS,
   ultipro: ULTIPRO_RATE_LIMIT_WAIT_MS,
   usajobs: 60 * 1000,
@@ -385,27 +383,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
   
-  async function fetchTheApplicantManagerPage(careersUrl) {
-    const res = await fetchWithAtsRateLimit(
-      "theapplicantmanager",
-      THEAPPLICANTMANAGER_RATE_LIMIT_WAIT_MS,
-      careersUrl,
-      {
-        method: "GET",
-        headers: {
-          Accept: "text/html,application/xhtml+xml"
-        }
-      }
-    );
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`TheApplicantManager page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-  
   async function fetchRegistryPilotPayload(atsKey, urlString, target = {}) {
     const headers = String(target.source_family || "").includes("html")
       ? { Accept: "text/html,application/xhtml+xml,application/json;q=0.7,*/*;q=0.5" }
@@ -668,16 +645,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     };
   }
   
-  async function collectPostingsForTheApplicantManagerCompany(company) {
-    const config = parseTheApplicantManagerCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.companyCodeLower;
-    const pageHtml = await fetchTheApplicantManagerPage(config.careersUrl);
-    return parseTheApplicantManagerPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
   async function collectPostingsForApplicantAiCompany(company) {
     const config = parseApplicantAiCompany(company.url_string);
     if (!config) return [];
@@ -821,7 +788,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       atsName === "theapplicantmanager.com" ||
       atsName === "theapplicantmanagercom"
     ) {
-      return collectPostingsForTheApplicantManagerCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "theapplicantmanager");
     }
     if (atsName === "breezy" || atsName === "breezyhr" || atsName === "breezy.hr" || atsName === "breezyhrcom") {
       return collectPostingsForRegistryPilotCompany(company, "breezy");

@@ -2649,6 +2649,47 @@ test("USAJobs dispatch is registry-owned and stays disabled without hitting lega
   assert.deepEqual(postings, []);
 });
 
+test("TheApplicantManager dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "theapplicantmanager",
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "theapplicantmanager",
+      source_family: "html_detail",
+      list_url: "https://theapplicantmanager.com/careers?co=fixtureco"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled TheApplicantManager registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("TheApplicantManager registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "theapplicantmanager.com",
+    company_name: "TheApplicantManager Registry Co",
+    url_string: "https://theapplicantmanager.com/careers?co=fixtureco"
+  });
+
+  assert.deepEqual(calls, [["module", "theapplicantmanager"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("SchoolSpring dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {

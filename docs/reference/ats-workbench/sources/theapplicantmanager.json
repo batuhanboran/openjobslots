@@ -1,7 +1,7 @@
 {
   "ats_key": "theapplicantmanager",
   "display_name": "The Applicant Manager",
-  "current_status": "fallback",
+  "current_status": "source-local registry module",
   "source_family": "html_detail",
   "official_public_docs_or_observed_endpoint": "Observed The Applicant Manager public careers HTML.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
@@ -9,36 +9,44 @@
   "detail_fetch_method": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
   "pagination_method": "only follow known next-page/list links with max-page and max-row limits",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "url-or-title-inference: Use stable URL id when raw row id is absent.",
+  "source_job_id_rule": "url-or-title-inference: Saved fixture covers stable pos query values in job URLs as source_job_id evidence.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "detail-page: List cards may omit geo; detail fixture decides whether detail fetch is required.",
-  "country_region_city_rule": "detail-page: List cards may omit geo; detail fixture decides whether detail fetch is required.",
-  "remote_type_rule": "url-or-title-inference: Only infer remote/hybrid from explicit card/detail text.",
-  "posting_date_rule": "detail-page: List cards often omit date; detail fixture decides whether date exists.",
+  "location_text_rule": "list-payload: Saved public careers HTML fixture covers labeled .pos_location_list values as source-backed location evidence when present.",
+  "country_region_city_rule": "list-payload: Saved public careers HTML fixture covers labeled .pos_location_list values as source-backed location evidence when present.",
+  "remote_type_rule": "list-payload: Saved fixture covers exact labeled Remote and Hybrid location values; title-only remote text is not enough by itself.",
+  "posting_date_rule": "source-absent: Saved TheApplicantManager list fixture exposes no posting-date field; posting_date stays null unless a future detail/source fixture proves an exact date.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/theapplicantmanager/fixtures/company.json",
+      "server/ingestion/sources/theapplicantmanager/fixtures/expected-normalized.json",
+      "server/ingestion/sources/theapplicantmanager/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/theapplicantmanager/fixtures/list.json",
+      "server/ingestion/sources/theapplicantmanager/theapplicantmanager.local.test.js"
+    ],
+    "present": [
+      "server/ingestion/sources/theapplicantmanager/fixtures/company.json",
+      "server/ingestion/sources/theapplicantmanager/fixtures/expected-normalized.json",
+      "server/ingestion/sources/theapplicantmanager/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/theapplicantmanager/fixtures/list.json",
+      "server/ingestion/sources/theapplicantmanager/theapplicantmanager.local.test.js"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/theapplicantmanager/index.js",
+    "fixtures_dir": "server/ingestion/sources/theapplicantmanager/fixtures",
+    "parser_version": "source-theapplicantmanager-v1"
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "registry-backed-disabled",
+    "minimum_confidence": 0.56,
+    "public_write_rule": "keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved"
   },
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven",
+  "quarantine_reason": "registry-backed but disabled; live canary/source quality evidence pending",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -57,21 +65,21 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseTheApplicantManagerPostingsFromHtml",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/theapplicantmanager/parse.js parseTheApplicantManagerPostingsFromHtml",
+    "parser_version_status": "source-theapplicantmanager-v1",
+    "confidence": 0.56
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseTheApplicantManagerPostingsFromHtml",
-    "parseDetail": "server/index.js parseTheApplicantManagerPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/theapplicantmanager/discover.js",
+    "fetchList": "server/ingestion/sources/theapplicantmanager/fetchList.js",
+    "fetchDetail": "not enabled",
+    "parseList": "server/ingestion/sources/theapplicantmanager/parse.js",
+    "parseDetail": "not enabled",
+    "normalize": "server/ingestion/sources/theapplicantmanager/index.js source-specific normalizer",
+    "validate": "server/ingestion/sources/theapplicantmanager/index.js source-specific validation plus public gate",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "keep disabled until bounded live canary proves source quality",
+  "certification_blockers": "live canary/source quality evidence pending; no production source apply has been run"
 }

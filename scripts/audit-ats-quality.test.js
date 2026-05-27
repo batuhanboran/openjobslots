@@ -63,13 +63,14 @@ function testHighGapEmbeddedSourceNeedsDetailRefetchAndHoldRecommendation() {
   });
   const row = rows[0];
 
-  assert.equal(row.current_status, "fallback");
+  assert.equal(row.current_status, "certified");
   assert.equal(detailRefetchNeeded(row), true);
   assert.equal(row.detail_refetch_needed, true);
   assert.equal(publicEnabledRecommendation(row), false);
   assert.equal(row.should_be_public_enabled, false);
   assert.equal(row.wave_priority, "wave-1-live-gap");
-  assert.match(row.certification_blockers, /missing strict raw parser fixture/);
+  assert.doesNotMatch(row.certification_blockers, /missing strict raw parser fixture/);
+  assert.match(row.certification_blockers, /high missing normalized geo/);
   assert.match(row.exact_next_parser_action, /detail-refetch/);
 }
 

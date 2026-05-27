@@ -295,6 +295,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "Saved official API fixture covers PositionID/DocumentID as stable source_job_id evidence and URL fallback.")
     }
   },
+  theapplicantmanager: {
+    priority: "P2",
+    sourcePattern: "The Applicant Manager public careers HTML.",
+    parserPath: "server/ingestion/sources/theapplicantmanager/parse.js parseTheApplicantManagerPostingsFromHtml",
+    requiredFixtures: ["public careers HTML fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved public careers HTML fixture covers labeled .pos_location_list values as source-backed location evidence when present."),
+      date: decision("source-absent", "Saved TheApplicantManager list fixture exposes no posting-date field; posting_date stays null unless a future detail/source fixture proves an exact date."),
+      remote: decision("list-payload", "Saved fixture covers exact labeled Remote and Hybrid location values; title-only remote text is not enough by itself."),
+      sourceId: decision("url-or-title-inference", "Saved fixture covers stable pos query values in job URLs as source_job_id evidence.")
+    }
+  },
   statejobsny: {
     priority: "P2",
     sourcePattern: "StateJobsNY public vacancyTable HTML plus vacancyDetailsView detail HTML.",

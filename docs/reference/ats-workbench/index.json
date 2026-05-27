@@ -2,8 +2,8 @@
   "generated_at": "2026-05-12T14:21:39.933Z",
   "ats_count": 60,
   "status_counts": {
-    "fallback": 33,
-    "certified": 26,
+    "fallback": 32,
+    "certified": 27,
     "unsupported": 1
   },
   "source_family_counts": {
@@ -320,8 +320,8 @@
   "quarantine_or_disabled_sources": [
     {
       "ats_key": "adp_myjobs",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "source-local registry module",
+      "reason": "registry-backed but disabled; live canary/source quality evidence pending"
     },
     {
       "ats_key": "applitrack",
@@ -690,15 +690,6 @@
       "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
     },
     {
-      "ats_key": "theapplicantmanager",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
       "ats_key": "ultipro",
       "missing": [
         "raw source fixture",
@@ -721,7 +712,7 @@
     {
       "ats_key": "adp_myjobs",
       "file": "sources/adp_myjobs.json",
-      "current_status": "fallback",
+      "current_status": "source-local registry module",
       "source_family": "enterprise_api",
       "public_enabled": false,
       "risk_score": 35

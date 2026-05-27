@@ -1,0 +1,27 @@
+[
+  {
+    "source_job_id": "ENG-1001",
+    "company_name": "Fixture Applicant Manager",
+    "position_name": "Remote Platform Engineer",
+    "remote_type": "remote",
+    "parser_confidence": 0.56
+  },
+  {
+    "source_job_id": "ENG-1002",
+    "company_name": "Fixture Applicant Manager",
+    "position_name": "Product Support Analyst",
+    "country": "United States",
+    "city": "Austin",
+    "remote_type": "onsite",
+    "parser_confidence": 0.56
+  },
+  {
+    "source_job_id": "OPS-2001",
+    "company_name": "Fixture Applicant Manager",
+    "position_name": "Hybrid Operations Lead",
+    "country": "Canada",
+    "city": "Toronto",
+    "remote_type": "hybrid",
+    "parser_confidence": 0.56
+  }
+]
