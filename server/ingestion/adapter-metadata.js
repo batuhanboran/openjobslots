@@ -85,6 +85,7 @@ const FIXTURE_BACKED = new Set([
   "smartrecruiters",
   "recruitee",
   "bamboohr",
+  "applicantai",
   "applicantpro",
   "applytojob",
   "breezy",
@@ -116,6 +117,7 @@ const FIXTURE_BACKED = new Set([
 
 const PARSER_FIXTURE_BACKED = new Set([
   "adp_workforcenow",
+  "applicantai",
   "applicantpro",
   "applitrack",
   "ashby",

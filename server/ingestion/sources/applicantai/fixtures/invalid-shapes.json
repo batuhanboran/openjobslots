@@ -1,0 +1,38 @@
+{
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name",
+      "posting": {
+        "company_name": "Fixture ApplicantAI",
+        "job_posting_url": "https://applicantai.com/acmejobs/missing-title/10003",
+        "source_job_id": "10003",
+        "location": "Remote"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "rejected",
+      "reason": "missing source_job_id",
+      "posting": {
+        "company_name": "Fixture ApplicantAI",
+        "position_name": "No Stable Id",
+        "job_posting_url": "https://applicantai.com/acmejobs/no-stable-id",
+        "location": "Remote"
+      }
+    },
+    {
+      "name": "no geo and no explicit remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture ApplicantAI",
+        "position_name": "Flexible Role",
+        "job_posting_url": "https://applicantai.com/acmejobs/flexible-role/10004",
+        "source_job_id": "10004",
+        "location": "Flexible"
+      }
+    }
+  ]
+}

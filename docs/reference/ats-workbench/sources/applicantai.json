@@ -1,7 +1,7 @@
 {
   "ats_key": "applicantai",
   "display_name": "ApplicantAI",
-  "current_status": "fallback",
+  "current_status": "source-local registry module",
   "source_family": "html_detail",
   "official_public_docs_or_observed_endpoint": "Observed ApplicantAI public careers HTML.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
@@ -9,36 +9,36 @@
   "detail_fetch_method": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
   "pagination_method": "only follow known next-page/list links with max-page and max-row limits",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "pending-research: Prefer raw id; otherwise stable URL id.",
+  "source_job_id_rule": "preserve numeric URL path tail from ApplicantAI posting URLs",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "pending-research: Vendor-specific payload shape needs saved fixture proof.",
-  "country_region_city_rule": "pending-research: Vendor-specific payload shape needs saved fixture proof.",
-  "remote_type_rule": "pending-research: Use explicit remote/workplace fields or conservative text only.",
-  "posting_date_rule": "pending-research: Use source date only; leave null when source omits it.",
+  "location_text_rule": "use only card-level text-muted location labels from the saved public careers HTML fixture",
+  "country_region_city_rule": "derive normalized geo only from concrete source location labels; weak labels such as Flexible stay blank/quarantined",
+  "remote_type_rule": "use explicit remote/hybrid evidence from source location labels only; do not infer from title/body prose",
+  "posting_date_rule": "posting_date stays null because the observed public careers HTML fixture has no source-backed posting-date field",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
+    "status": "raw fixture present",
+    "files": [
+      "server/ingestion/sources/applicantai/fixtures/list.json",
+      "server/ingestion/sources/applicantai/fixtures/expected-normalized.json",
+      "server/ingestion/sources/applicantai/fixtures/invalid-shapes.json"
+    ],
     "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/applicantai/index.js",
+    "fixtures_dir": "server/ingestion/sources/applicantai/fixtures",
+    "parser_version": "source-applicantai-v1"
   },
   "quality_threshold": {
     "mode": "quarantine_or_canary",
     "minimum_confidence": 0.85,
     "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled": false,
+  "quarantine_reason": "disabled until bounded live canary proves source quality",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -57,21 +57,21 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseApplicantAiPostingsFromHtml",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/applicantai/parse.js",
+    "parser_version_status": "source-applicantai-v1",
+    "confidence": "fixture-backed"
   },
   "runner_interface": {
     "discover": "fetch public board HTML and parse validated cards/links only",
     "fetchList": "bounded HTML list fetch through source runner",
     "fetchDetail": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
-    "parseList": "server/index.js parseApplicantAiPostingsFromHtml",
-    "parseDetail": "server/index.js parseApplicantAiPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "parseList": "server/ingestion/sources/applicantai/parse.js",
+    "parseDetail": "not enabled; detail fetch is null until fixture-backed",
+    "normalize": "server/ingestion/sources/applicantai/index.js source-specific normalizer plus common posting shape",
+    "validate": "server/ingestion/sources/applicantai/index.js validate/validatePublic quality gate",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved",
+  "certification_blockers": "high live missing normalized geo; production canary source quality not proven"
 }

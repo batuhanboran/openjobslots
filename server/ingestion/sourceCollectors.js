@@ -1,6 +1,5 @@
 const { safeFetch } = require("./safeFetch");
 const {
-  parseApplicantAiCompany,
   parsePeopleforceCompany,
   parseSagehrCompany,
   parseSapHrCloudCompany,
@@ -19,7 +18,6 @@ const {
 } = require("./sources/sagehr/parse");
 const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
-const { parseApplicantAiPostingsFromHtml } = require("./sources/applicantai/parse");
 const {
   normalizePoliceappJobUrl,
   parsePoliceappPostingsFromHtml
@@ -44,7 +42,6 @@ const APPLICANTPRO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLYTOJOB_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BREEZY_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ZOHO_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const APPLICANTAI_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERPLUG_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const BAMBOOHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FOUNTAIN_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -74,6 +71,7 @@ const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
   adp_workforcenow: 60 * 1000,
+  applicantai: 60 * 1000,
   applicantpro: APPLICANTPRO_RATE_LIMIT_WAIT_MS,
   applitrack: APPLITRACK_RATE_LIMIT_WAIT_MS,
   applytojob: APPLYTOJOB_RATE_LIMIT_WAIT_MS,
@@ -462,22 +460,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return sourceModule.parse(rawPayload, company);
   }
 
-  async function fetchApplicantAiCareersPage(urlString) {
-    const res = await fetchWithAtsRateLimit("applicantai", APPLICANTAI_RATE_LIMIT_WAIT_MS, urlString, {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`ApplicantAI page request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    return res.text();
-  }
-
   async function fetchSagehrJobsPage(config) {
     const headers = {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -645,16 +627,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     };
   }
   
-  async function collectPostingsForApplicantAiCompany(company) {
-    const config = parseApplicantAiCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.slugLower;
-    const pageHtml = await fetchApplicantAiCareersPage(config.careersUrl);
-    return parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHtml);
-  }
-  
   async function collectPostingsForSagehrCompany(company) {
     const config = parseSagehrCompany(company.url_string);
     if (!config) return [];
@@ -800,7 +772,7 @@ function createSourceCollectorRuntime(dependencies = {}) {
       return collectPostingsForRegistryPilotCompany(company, "zoho");
     }
     if (atsName === "applicantai" || atsName === "applicantai.com" || atsName === "applicantaicom") {
-      return collectPostingsForApplicantAiCompany(company);
+      return collectPostingsForRegistryPilotCompany(company, "applicantai");
     }
     if (atsName === "gem" || atsName === "jobs.gem.com" || atsName === "gem.com" || atsName === "gemcom") {
       return collectPostingsForRegistryPilotCompany(company, "gem");

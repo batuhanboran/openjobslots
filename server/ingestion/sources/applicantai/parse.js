@@ -41,10 +41,44 @@ function isApplicantAiJobHref(href) {
   return /^\d+$/.test(String(pathParts[pathParts.length - 1] || ""));
 }
 
+function extractApplicantAiSourceJobId(urlString) {
+  const parsed = parseUrl(urlString);
+  const path = parsed ? String(parsed.pathname || "") : String(urlString || "");
+  const pathParts = path
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  const tail = String(pathParts[pathParts.length - 1] || "").trim();
+  return /^\d+$/.test(tail) ? tail : "";
+}
+
+function buildApplicantAiPosting(companyNameForPostings, config, href, titleHtml, locationHtml, listUrl) {
+  const absoluteUrl = new URL(href, `${config.baseOrigin}/`).toString();
+  const title = cleanApplicantAiText(titleHtml || "");
+  const sourceJobId = extractApplicantAiSourceJobId(absoluteUrl);
+  if (!title || !sourceJobId) return null;
+
+  return {
+    company_name: companyNameForPostings,
+    position_name: title,
+    job_posting_url: absoluteUrl,
+    source_job_id: sourceJobId,
+    posting_date: null,
+    location: cleanApplicantAiText(locationHtml || "") || null,
+    source_evidence: {
+      list_url: String(listUrl || config.careersUrl || "").trim(),
+      route_kind: "applicantai_public_careers_html",
+      source_job_id_path: "url_path_tail",
+      posting_date: null
+    }
+  };
+}
+
 function parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
   const seenUrls = new Set();
+  const listUrl = String(config?.careersUrl || "").trim();
 
   const blockPattern = /<div[^>]*class=["'][^"']*\bmy-4\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
   const headingLinkPattern = /<h4[^>]*>\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h4>/i;
@@ -72,16 +106,18 @@ function parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHt
     }
 
     const locationMatch = blockHtml.match(locationPattern);
-    const title = cleanApplicantAiText(headingMatch[2] || "") || "Untitled Position";
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: cleanApplicantAiText(locationMatch?.[1] || "") || null
-    });
-    seenUrls.add(absoluteUrl);
+    const posting = buildApplicantAiPosting(
+      companyNameForPostings,
+      config,
+      href,
+      headingMatch[2],
+      locationMatch?.[1],
+      listUrl
+    );
+    if (posting) {
+      postings.push(posting);
+      seenUrls.add(absoluteUrl);
+    }
     blockMatch = blockPattern.exec(source);
   }
 
@@ -107,16 +143,18 @@ function parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHt
       Math.min(source.length, Number(fallbackMatch.index || 0) + 700)
     );
     const locationMatch = contextHtml.match(locationPattern);
-    const title = cleanApplicantAiText(fallbackMatch[2] || "") || "Untitled Position";
-
-    postings.push({
-      company_name: companyNameForPostings,
-      position_name: title,
-      job_posting_url: absoluteUrl,
-      posting_date: null,
-      location: cleanApplicantAiText(locationMatch?.[1] || "") || null
-    });
-    seenUrls.add(absoluteUrl);
+    const posting = buildApplicantAiPosting(
+      companyNameForPostings,
+      config,
+      href,
+      fallbackMatch[2],
+      locationMatch?.[1],
+      listUrl
+    );
+    if (posting) {
+      postings.push(posting);
+      seenUrls.add(absoluteUrl);
+    }
     fallbackMatch = fallbackPattern.exec(source);
   }
 
@@ -124,5 +162,6 @@ function parseApplicantAiPostingsFromHtml(companyNameForPostings, config, pageHt
 }
 
 module.exports = {
+  extractApplicantAiSourceJobId,
   parseApplicantAiPostingsFromHtml
 };

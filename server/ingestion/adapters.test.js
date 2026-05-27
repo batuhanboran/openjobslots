@@ -200,6 +200,7 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
     Array.from(PARSER_FIXTURE_BACKED).sort(),
     [
       "adp_workforcenow",
+      "applicantai",
       "applicantpro",
       "applitrack",
       "ashby",

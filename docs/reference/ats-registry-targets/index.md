@@ -89,7 +89,7 @@ Test script: `node server/ingestion/sources/directSourceModules.test.js && node 
 
 | ATS | Registry status | Source module | Next action | Workbench script |
 | --- | --- | --- | --- | --- |
-| `applicantai` | module-ready | `server/ingestion/sources/applicantai/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=applicantai --json` |
+| `applicantai` | registry-backed-disabled | `server/ingestion/sources/applicantai/index.js` | Keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved. | `npm.cmd run ats:workbench -- --source=applicantai --json` |
 | `careerpuck` | module-ready | `server/ingestion/sources/careerpuck/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=careerpuck --json` |
 | `careerspage` | module-ready | `server/ingestion/sources/careerspage/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=careerspage --json` |
 | `gem` | module-ready | `server/ingestion/sources/gem/index.js` | Add registry metadata, run focused source tests, then route this ATS through registry dispatch canary. | `npm.cmd run ats:workbench -- --source=gem --json` |

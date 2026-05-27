@@ -139,6 +139,18 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("url-or-title-inference", "Stable source id comes from /jobs/{id} canonical URL.")
     }
   },
+  applicantai: {
+    priority: "P2",
+    sourcePattern: "ApplicantAI public careers HTML at https://applicantai.com/{board}.",
+    parserPath: "server/ingestion/sources/applicantai/parse.js parseApplicantAiPostingsFromHtml",
+    requiredFixtures: ["public careers HTML fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw fixture covers card-level text-muted location labels; weak labels are cleared and quarantined unless concrete geo or explicit remote evidence exists."),
+      date: decision("source-absent", "Saved ApplicantAI list fixture contains no posting date; leave posting_date null unless a future source fixture proves date evidence."),
+      remote: decision("list-payload", "Saved raw fixture covers explicit remote/hybrid evidence from source location labels only; title/body prose is not enough."),
+      sourceId: decision("url-or-title-inference", "Stable source id comes from the numeric ApplicantAI posting URL path tail.")
+    }
+  },
   applicantpro: {
     priority: "P2",
     sourcePattern: "ApplicantPro board HTML domain-id discovery plus core jobs JSON.",

@@ -2948,6 +2948,47 @@ test("HiBob dispatch is registry-owned and stays disabled without hitting legacy
   assert.deepEqual(postings, []);
 });
 
+test("ApplicantAI dispatch is registry-owned and stays disabled without hitting legacy dynamic network code", async () => {
+  const calls = [];
+  const registrySource = {
+    atsKey: "applicantai",
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled,
+    collectWhenDisabled: false,
+    discover: () => ({
+      ats_key: "applicantai",
+      source_family: "html_detail",
+      list_url: "https://applicantai.com/fixture"
+    }),
+    fetchList: async () => {
+      throw new Error("disabled ApplicantAI registry source should not fetch");
+    },
+    parse: (payload) => payload.__legacyParsed || [],
+    normalize: () => null,
+    validate: () => ({ ok: true })
+  };
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async () => {
+      throw new Error("ApplicantAI registry dispatch should not hit legacy dynamic network code");
+    },
+    getPostingLocationByJobUrl: () => new Map(),
+    isRegistryPilotSource: () => false,
+    getRegistrySourceModule: (atsKey) => {
+      calls.push(["module", atsKey]);
+      return registrySource;
+    }
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "applicantai.com",
+    company_name: "ApplicantAI Registry Co",
+    url_string: "https://applicantai.com/fixture"
+  });
+
+  assert.deepEqual(calls, [["module", "applicantai"]]);
+  assert.deepEqual(postings, []);
+});
+
 test("Simplicant dispatch is registry-owned even when runtime pilot predicate is false", async () => {
   const calls = [];
   const registrySource = {
