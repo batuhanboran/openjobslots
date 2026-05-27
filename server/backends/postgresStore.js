@@ -137,6 +137,11 @@ function clonePostgresCounts(counts = {}) {
     company_count: Number(counts.company_count || 0),
     sync_enabled_company_count: Number(counts.sync_enabled_company_count || 0),
     configured_enabled_ats_count: Number(counts.configured_enabled_ats_count || 0),
+    full_enabled_ats_count: Number(counts.full_enabled_ats_count || 0),
+    canary_enabled_ats_count: Number(counts.canary_enabled_ats_count || 0),
+    quarantine_only_ats_count: Number(counts.quarantine_only_ats_count || 0),
+    disabled_ats_count: Number(counts.disabled_ats_count || 0),
+    worker_auto_eligible_ats_count: Number(counts.worker_auto_eligible_ats_count || 0),
     posting_count: Number(counts.posting_count || 0),
     job_slot_count: Number(counts.job_slot_count || counts.posting_count || 0),
     visible_company_count: Number(counts.visible_company_count || 0),
@@ -778,7 +783,7 @@ async function getPostgresCounts(pool, options = {}) {
   const [
     companyRow,
     syncCompanyRow,
-    enabledAtsRow,
+    sourceStateRow,
     configuredAtsRow,
     postingRow,
     visibleCompanyRow,
@@ -793,10 +798,37 @@ async function getPostgresCounts(pool, options = {}) {
         FROM companies c
         INNER JOIN ats_sources s
           ON s.ats_key = c.ats_key
-        WHERE s.enabled = true;
+        WHERE s.enabled = true
+          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') IN ('normal', 'public_enabled', 'canary_only');
       `
     ),
-    pool.query("SELECT COUNT(*)::int AS count FROM ats_sources WHERE enabled = true;"),
+    pool.query(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE enabled = true)::int AS configured_enabled_ats_count,
+          COUNT(*) FILTER (
+            WHERE enabled = true
+              AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('normal', 'public_enabled')
+          )::int AS full_enabled_ats_count,
+          COUNT(*) FILTER (
+            WHERE enabled = true
+              AND COALESCE(NULLIF(protection_status, ''), 'normal') = 'canary_only'
+          )::int AS canary_enabled_ats_count,
+          COUNT(*) FILTER (
+            WHERE enabled = true
+              AND COALESCE(NULLIF(protection_status, ''), 'normal') = 'quarantine_only'
+          )::int AS quarantine_only_ats_count,
+          COUNT(*) FILTER (
+            WHERE enabled = false
+              OR COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled')
+          )::int AS disabled_ats_count,
+          COUNT(*) FILTER (
+            WHERE enabled = true
+              AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('normal', 'public_enabled', 'canary_only')
+          )::int AS worker_auto_eligible_ats_count
+        FROM ats_sources;
+      `
+    ),
     pool.query("SELECT COUNT(*)::int AS count FROM ats_sources;"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false;"),
     pool.query("SELECT COUNT(DISTINCT NULLIF(company_name, ''))::int AS count FROM postings WHERE hidden = false;"),
@@ -811,7 +843,12 @@ async function getPostgresCounts(pool, options = {}) {
   const counts = {
     company_count: Number(companyRow.rows[0]?.count || 0),
     sync_enabled_company_count: Number(syncCompanyRow.rows[0]?.count || 0),
-    configured_enabled_ats_count: Number(enabledAtsRow.rows[0]?.count || 0),
+    configured_enabled_ats_count: Number(sourceStateRow.rows[0]?.configured_enabled_ats_count || 0),
+    full_enabled_ats_count: Number(sourceStateRow.rows[0]?.full_enabled_ats_count || 0),
+    canary_enabled_ats_count: Number(sourceStateRow.rows[0]?.canary_enabled_ats_count || 0),
+    quarantine_only_ats_count: Number(sourceStateRow.rows[0]?.quarantine_only_ats_count || 0),
+    disabled_ats_count: Number(sourceStateRow.rows[0]?.disabled_ats_count || 0),
+    worker_auto_eligible_ats_count: Number(sourceStateRow.rows[0]?.worker_auto_eligible_ats_count || 0),
     posting_count: Number(postingRow.rows[0]?.count || 0),
     job_slot_count: Number(postingRow.rows[0]?.count || 0),
     visible_company_count: Number(visibleCompanyRow.rows[0]?.count || 0),
@@ -2321,6 +2358,7 @@ async function getPostgresSyncStatus(pool, options = {}) {
           ON st.ats_key = c.ats_key
           AND st.company_url = c.url_string
         WHERE s.enabled = true
+          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') IN ('normal', 'public_enabled', 'canary_only')
           AND COALESCE(st.next_sync_epoch, 0) <= $1;
       `,
       [nowEpoch]

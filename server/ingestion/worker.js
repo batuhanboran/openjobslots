@@ -1023,7 +1023,9 @@ async function countPostgresDueTargetsByAts(pool) {
       LEFT JOIN company_sync_state st
         ON st.ats_key = c.ats_key
         AND st.company_url = c.url_string
-      WHERE COALESCE(st.next_sync_epoch, 0) <= $1
+      WHERE s.enabled = true
+        AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled', 'quarantine_only')
+        AND COALESCE(st.next_sync_epoch, 0) <= $1
       GROUP BY c.ats_key
       ORDER BY due_count DESC, c.ats_key ASC;
     `,
@@ -1131,7 +1133,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
           ON st.ats_key = c.ats_key
           AND st.company_url = c.url_string
         WHERE s.enabled = true
-          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
+          AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled', 'quarantine_only')
           AND COALESCE(st.next_sync_epoch, 0) <= $1
       )
       SELECT

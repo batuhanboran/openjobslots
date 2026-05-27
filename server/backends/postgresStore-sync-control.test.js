@@ -128,8 +128,17 @@ function createStatusMockPool(controlStatus = "requested", options = {}) {
       if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) {
         return { rows: [{ count: 20 }] };
       }
-      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) {
-        return { rows: [{ count: 57 }] };
+      if (/configured_enabled_ats_count/i.test(sql)) {
+        return {
+          rows: [{
+            configured_enabled_ats_count: 57,
+            full_enabled_ats_count: 14,
+            canary_enabled_ats_count: 35,
+            quarantine_only_ats_count: 8,
+            disabled_ats_count: 5,
+            worker_auto_eligible_ats_count: 49
+          }]
+        };
       }
       if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) {
         return { rows: [{ count: 62 }] };
@@ -1154,7 +1163,18 @@ async function testPostgresCountsCacheReusesShortTtlSnapshot() {
       calls.push({ sql, params });
       if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) return { rows: [{ count: 20 }] };
       if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) return { rows: [{ count: 12 }] };
-      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) return { rows: [{ count: 18 }] };
+      if (/configured_enabled_ats_count/i.test(sql)) {
+        return {
+          rows: [{
+            configured_enabled_ats_count: 18,
+            full_enabled_ats_count: 12,
+            canary_enabled_ats_count: 4,
+            quarantine_only_ats_count: 2,
+            disabled_ats_count: 44,
+            worker_auto_eligible_ats_count: 16
+          }]
+        };
+      }
       if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) return { rows: [{ count: 62 }] };
       if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) return { rows: [{ count: 8 }] };
       if (/COUNT\(DISTINCT ats_key/i.test(sql)) return { rows: [{ count: 3 }] };
@@ -1231,7 +1251,18 @@ async function testPostgresCountsExposePublicStatsCounters() {
     async query(sql, params = []) {
       if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) return { rows: [{ count: 40860 }] };
       if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) return { rows: [{ count: 27511 }] };
-      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) return { rows: [{ count: 19 }] };
+      if (/configured_enabled_ats_count/i.test(sql)) {
+        return {
+          rows: [{
+            configured_enabled_ats_count: 55,
+            full_enabled_ats_count: 14,
+            canary_enabled_ats_count: 34,
+            quarantine_only_ats_count: 7,
+            disabled_ats_count: 7,
+            worker_auto_eligible_ats_count: 48
+          }]
+        };
+      }
       if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) return { rows: [{ count: 62 }] };
       if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) return { rows: [{ count: 8076 }] };
       if (/COUNT\(DISTINCT ats_key/i.test(sql)) return { rows: [{ count: 18 }] };
@@ -1247,7 +1278,12 @@ async function testPostgresCountsExposePublicStatsCounters() {
   assert.equal(counts.job_slot_count, 157355);
   assert.equal(counts.company_count, 40860);
   assert.equal(counts.visible_company_count, 8076);
-  assert.equal(counts.configured_enabled_ats_count, 19);
+  assert.equal(counts.configured_enabled_ats_count, 55);
+  assert.equal(counts.full_enabled_ats_count, 14);
+  assert.equal(counts.canary_enabled_ats_count, 34);
+  assert.equal(counts.quarantine_only_ats_count, 7);
+  assert.equal(counts.disabled_ats_count, 7);
+  assert.equal(counts.worker_auto_eligible_ats_count, 48);
   assert.equal(counts.configured_ats_count, 62);
   assert.equal(counts.visible_ats_count, 18);
 }

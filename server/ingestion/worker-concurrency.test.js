@@ -350,6 +350,29 @@ test("postgres due target query clamps candidates per ATS before global candidat
   assert.ok(observedParams[2] > observedParams[1]);
 });
 
+test("postgres due target query excludes quarantine-only sources from automatic worker selection", async () => {
+  let observedSql = "";
+  const pool = {
+    async query(sql) {
+      if (String(sql).includes("WITH due_targets")) {
+        observedSql = String(sql);
+        return { rows: [] };
+      }
+      if (String(sql).includes("FROM company_sync_state")) {
+        return { rows: [] };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  await selectPostgresDueTargets(pool, 25, {
+    dueByAtsRows: [],
+    adaptiveSignals: {}
+  });
+
+  assert.match(observedSql, /NOT IN \('disabled', 'auto_disabled', 'quarantine_only'\)/);
+});
+
 test("postgres due target selection uses adaptive caps for parser-risk sources", async () => {
   const rows = [
     {
