@@ -600,7 +600,7 @@ const PUBLIC_RELEASE_NOTES = [
     date: "May 27, 2026",
     title: "Coverage, ATS ingestion, and search parity",
     summary:
-      "Since 1.9.3, OpenJobSlots moved into a broader coverage baseline: exact job-slot counts, ATS and company coverage in the search header, more source-specific ATS ingestion and parser work, guarded canary expansion, higher worker throughput, and refreshed search-index parity."
+      "Adds exact job-slot counts, ATS and company coverage in the search header, more source-specific ATS ingestion and parser work, guarded canary expansion, higher worker throughput, and refreshed search-index parity."
   },
   {
     version: "1.9.3",
