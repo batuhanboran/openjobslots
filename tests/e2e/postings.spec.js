@@ -163,7 +163,8 @@ async function expectSearchEngineVisualContract(page) {
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
     await expect(page.getByText("Version 2.0.0")).toBeVisible();
-    await expect(page.getByText("Public coverage release")).toBeVisible();
+    await expect(page.getByText("Coverage, ATS ingestion, and search parity")).toBeVisible();
+    await expect(page.getByText(/Since 1\.9\.3, OpenJobSlots moved into a broader coverage baseline/i)).toBeVisible();
     await expect(page.getByText("Version 1.6.1")).toBeVisible();
     await expect(page.getByText("Data quality tooling release")).toBeVisible();
     await expect(page.getByText("Version 1.6.0")).toBeVisible();
