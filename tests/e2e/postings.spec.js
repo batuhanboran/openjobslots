@@ -561,6 +561,11 @@ async function installSyncControlMock(page) {
     queue_backend: "pg-boss",
     legacy_api_sync: false,
     posting_count: 3,
+    job_slot_count: 3,
+    configured_ats_count: 2,
+    configured_enabled_ats_count: 2,
+    visible_ats_count: 1,
+    visible_company_count: 3,
     postings_seen_24h_count: 3,
     sync_enabled_company_count: 3,
     failed_companies: 0,
@@ -857,6 +862,38 @@ test.describe("postings page QA", () => {
     await expectNoRawErrors(page);
     await expectPublicSearchChrome(page);
     await expectNoProtectedPublicRouteCalls(protectedRouteCalls, "reload");
+  });
+
+  test("public stat chips load ATS and company counts from status", async ({ page }) => {
+    let statusRequests = 0;
+    await page.route("**/sync/status**", async (route) => {
+      statusRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          status: "idle",
+          running: false,
+          posting_count: 157355,
+          job_slot_count: 157355,
+          configured_ats_count: 62,
+          configured_enabled_ats_count: 57,
+          visible_ats_count: 18,
+          visible_company_count: 8076,
+          company_count: 40860,
+          ingestion_worker: {
+            latest_status: "idle"
+          }
+        })
+      });
+    });
+
+    await openJobSlots(page);
+
+    await expect.poll(() => statusRequests).toBeGreaterThan(0);
+    await expect(page.getByTestId("public-stat-ats")).toHaveText(/62\s+ATS/i);
+    await expect(page.getByTestId("public-stat-companies")).toHaveText(/8,076\s+companies/i);
   });
 
   test("loads branded search-first page without raw backend errors", async ({ page }) => {

@@ -4455,7 +4455,8 @@ export default function App() {
       try {
         await Promise.all([
           loadPostings("", { filters: postingsFiltersRef.current }),
-          loadPostingFilterOptions()
+          loadPostingFilterOptions(),
+          loadStatus()
         ]);
       } catch (e) {
         setError(String(e.message || e));
@@ -4467,7 +4468,8 @@ export default function App() {
     bootstrap();
   }, [
     loadPostings,
-    loadPostingFilterOptions
+    loadPostingFilterOptions,
+    loadStatus
   ]);
 
   useEffect(() => {
