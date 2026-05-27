@@ -1148,10 +1148,11 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
         ats_rank,
         protection_priority
       FROM due_targets
+      WHERE ats_rank <= $2
       ORDER BY protection_priority ASC, ats_rank ASC, next_sync_epoch ASC, ats_key ASC, company_name ASC
-      LIMIT $2;
+      LIMIT $3;
     `,
-    [nowEpoch, candidateLimit]
+    [nowEpoch, targetLimit, candidateLimit]
   );
 
   const targets = [];

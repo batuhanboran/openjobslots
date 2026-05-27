@@ -296,7 +296,7 @@ test("postgres due target selection over-selects when early sources exhaust dail
   const pool = {
     async query(sql, params) {
       if (String(sql).includes("WITH due_targets")) {
-        candidateLimit = Number(params[1] || 0);
+        candidateLimit = Number(params[2] || 0);
         return { rows: rows.slice(0, candidateLimit) };
       }
       if (String(sql).includes("FROM company_sync_state")) {
@@ -321,6 +321,33 @@ test("postgres due target selection over-selects when early sources exhaust dail
 
   assert.ok(candidateLimit > 2, "candidate query should over-select beyond the run target limit");
   assert.deepEqual(targets.map((target) => target.atsKey), ["applytojob", "breezy"]);
+});
+
+test("postgres due target query clamps candidates per ATS before global candidate limit", async () => {
+  let observedSql = "";
+  let observedParams = [];
+  const pool = {
+    async query(sql, params) {
+      if (String(sql).includes("WITH due_targets")) {
+        observedSql = String(sql);
+        observedParams = params;
+        return { rows: [] };
+      }
+      if (String(sql).includes("FROM company_sync_state")) {
+        return { rows: [] };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  await selectPostgresDueTargets(pool, 25, {
+    dueByAtsRows: [],
+    adaptiveSignals: {}
+  });
+
+  assert.match(observedSql, /WHERE ats_rank <= \$2/);
+  assert.equal(observedParams[1], 25);
+  assert.ok(observedParams[2] > observedParams[1]);
 });
 
 test("postgres due target selection uses adaptive caps for parser-risk sources", async () => {
@@ -385,7 +412,7 @@ test("postgres due target selection uses adaptive caps for parser-risk sources",
   const pool = {
     async query(sql, params) {
       if (String(sql).includes("WITH due_targets")) {
-        return { rows: rows.slice(0, Number(params[1] || 0)) };
+        return { rows: rows.slice(0, Number(params[2] || 0)) };
       }
       if (String(sql).includes("FROM company_sync_state")) {
         return { rows: [] };
