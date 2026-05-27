@@ -1130,11 +1130,11 @@ test.describe("postings page QA", () => {
     await openJobSlots(page);
     await page.getByTestId("search-input").fill("dynamic");
     await page.getByTestId("search-input").press("Enter");
-    await expect(page.getByTestId("result-count")).toContainText("42 slots");
+    await expect(page.getByTestId("result-count")).toContainText("42 job slots");
 
     await ensureFiltersVisible(page);
     await page.getByTestId("freshness-filter-3d").click();
-    await expect(page.getByTestId("result-count")).toContainText("7 slots");
+    await expect(page.getByTestId("result-count")).toContainText("7 job slots");
     await expect
       .poll(() => requestedPostings.some((request) => request.search === "dynamic" && request.freshnessDays === "3"))
       .toBeTruthy();

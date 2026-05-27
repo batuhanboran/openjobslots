@@ -1205,7 +1205,7 @@ function buildResultCountLabel({ showResultsSurface, resultTotalCount, t }) {
     ? formatExactNumberLabel(resultTotalCount)
     : t("results.indexLoading", "Loading index");
   const unit = showResultsSurface || resultTotalCount > 0
-    ? resultTotalCount === 1 ? t("results.slot", "slot") : t("results.slots", "slots")
+    ? resultTotalCount === 1 ? t("results.slotIndexed", "job slot") : t("results.slotsIndexed", "job slots")
     : "";
   return {
     value,
