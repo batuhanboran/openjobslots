@@ -2824,6 +2824,30 @@ export default function App() {
       return nextTheme;
     });
   }, []);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
+    const backgroundColor = activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme
+      ? OJS_DARK_COLORS.bg
+      : OJS_COLORS.bg;
+    const previousBodyBackground = document.body?.style?.backgroundColor || "";
+    const previousDocumentBackground = document.documentElement?.style?.backgroundColor || "";
+
+    if (document.body?.style) {
+      document.body.style.backgroundColor = backgroundColor;
+    }
+    if (document.documentElement?.style) {
+      document.documentElement.style.backgroundColor = backgroundColor;
+    }
+
+    return () => {
+      if (document.body?.style) {
+        document.body.style.backgroundColor = previousBodyBackground;
+      }
+      if (document.documentElement?.style) {
+        document.documentElement.style.backgroundColor = previousDocumentBackground;
+      }
+    };
+  }, [activePage, isDarkPublicTheme]);
   const remoteFilterOptions = useMemo(
     () => [
       { value: "all", label: t("remote.all", "All Locations"), shortLabel: t("remote.allShort", "Any") },
@@ -6102,8 +6126,14 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={[styles.header, activePage === PAGE_KEYS.POSTINGS ? styles.headerCompact : null]}>
+    <SafeAreaView style={[styles.container, activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme ? styles.containerPublicDark : null]}>
+      <View
+        style={[
+          styles.header,
+          activePage === PAGE_KEYS.POSTINGS ? styles.headerCompact : null,
+          activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme ? styles.headerPublicDark : null
+        ]}
+      >
         <View style={styles.headerTopRow}>
           {activePage !== PAGE_KEYS.POSTINGS ? (
             <Pressable
@@ -6183,11 +6213,17 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.bg,
     fontFamily: OJS_FONT_STACK
   },
+  containerPublicDark: {
+    backgroundColor: OJS_DARK_COLORS.bg
+  },
   header: {
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 6,
     backgroundColor: OJS_COLORS.bg
+  },
+  headerPublicDark: {
+    backgroundColor: OJS_DARK_COLORS.bg
   },
   headerCompact: {
     paddingBottom: 0,

@@ -113,6 +113,14 @@ async function submitSearchAndExpectResults(page, query = "remote jobs") {
   await expect(page.getByText("Refreshing results...")).toHaveCount(0);
 }
 
+async function enableDarkMode(page) {
+  const toggle = page.getByTestId("theme-toggle");
+  if (!/Night|Dark|Gece|Nuit|Noche|Nacht/i.test(await toggle.textContent())) {
+    await toggle.click();
+  }
+  await expect(toggle).toContainText(/Night|Dark|Gece|Nuit|Noche|Nacht/i);
+}
+
 async function expectSearchEngineVisualContract(page) {
   const searchBox = await page.getByTestId("search-input").boundingBox();
   const shell = await page.getByTestId("search-shell").boundingBox();
@@ -945,6 +953,44 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("search-panel")).toContainText("İlan ara");
     await expect(page.getByTestId("theme-toggle")).toContainText(/Night|Dark|Gece/i);
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("dark mode paints the top viewport strip with the public dark background", async ({ page }) => {
+    await openJobSlots(page);
+    await enableDarkMode(page);
+
+    const backgrounds = await page.evaluate(() => {
+      const parseRgb = (value) => {
+        const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/i);
+        if (!match) return null;
+        return {
+          r: Number(match[1]),
+          g: Number(match[2]),
+          b: Number(match[3]),
+          a: match[4] === undefined ? 1 : Number(match[4])
+        };
+      };
+      const nearestSolidBackground = (node) => {
+        let current = node;
+        while (current) {
+          const style = window.getComputedStyle(current);
+          const background = parseRgb(style.backgroundColor);
+          if (background && background.a > 0.01) return style.backgroundColor;
+          current = current.parentElement;
+        }
+        return window.getComputedStyle(document.body).backgroundColor;
+      };
+      const topNode = document.elementFromPoint(Math.floor(window.innerWidth / 2), 2);
+      const scroll = document.querySelector('[data-testid="postings-page-scroll"]');
+      return {
+        top: nearestSolidBackground(topNode),
+        scroll: window.getComputedStyle(scroll).backgroundColor,
+        body: window.getComputedStyle(document.body).backgroundColor
+      };
+    });
+
+    expect(backgrounds.top).toBe(backgrounds.scroll);
+    expect(backgrounds.body).toBe(backgrounds.scroll);
   });
 
   test("localized desktop header controls stay aligned in dark mode", async ({ page }) => {
