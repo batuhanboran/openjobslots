@@ -3035,3 +3035,115 @@ test("Simplicant dispatch is registry-owned even when runtime pilot predicate is
     position_name: "Registry Simplicant Posting"
   }]);
 });
+
+test("SageHR dispatch is source-owned and accepts verified 403 list layout", async () => {
+  const calls = [];
+  const html = `
+    <div class="title-wrap"><h1>Sage Fixture Co</h1></div>
+    <div class="job">
+      <a class="title" href="/fixture/jobs/123">Support Lead</a>
+      <span>Team</span>
+    </div>
+  `;
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async (atsKey, waitMs, urlString) => {
+      calls.push([atsKey, waitMs, urlString]);
+      return createTextResponse(html, {
+        ok: false,
+        status: 403,
+        url: "https://talent.sage.hr/fixture/vacancies",
+        contentType: "text/html"
+      });
+    },
+    getPostingLocationByJobUrl: () => new Map()
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "talent.sage.hr",
+    company_name: "",
+    url_string: "https://talent.sage.hr/fixture/vacancies"
+  });
+
+  assert.deepEqual(calls.map((call) => call[0]), ["sagehr"]);
+  assert.deepEqual(postings, [{
+    company_name: "Sage Fixture Co",
+    position_name: "Support Lead",
+    job_posting_url: "https://talent.sage.hr/fixture/jobs/123",
+    posting_date: null,
+    location: null,
+    source_evidence: {
+      list_url: "https://talent.sage.hr/fixture/vacancies",
+      route_kind: "sagehr_public_vacancies"
+    }
+  }]);
+});
+
+test("Peopleforce dispatch is source-owned and parses public careers HTML", async () => {
+  const calls = [];
+  const html = `
+    <a class="stretched-link" href="/careers/v/senior-engineer">Senior Engineer</a>
+    <div class="tw-text-neutral-dark-80 small">Kyiv, Ukraine</div>
+  `;
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async (atsKey, waitMs, urlString) => {
+      calls.push([atsKey, waitMs, urlString]);
+      return createTextResponse(html, {
+        url: "https://fixture.peopleforce.io/careers",
+        contentType: "text/html"
+      });
+    },
+    getPostingLocationByJobUrl: () => new Map()
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "peopleforce.io",
+    company_name: "Peopleforce Fixture Co",
+    url_string: "https://fixture.peopleforce.io/careers"
+  });
+
+  assert.deepEqual(calls.map((call) => call[0]), ["peopleforce"]);
+  assert.deepEqual(postings, [{
+    company_name: "Peopleforce Fixture Co",
+    position_name: "Senior Engineer",
+    job_posting_url: "https://fixture.peopleforce.io/careers/v/senior-engineer",
+    posting_date: null,
+    location: "Kyiv, Ukraine",
+    source_evidence: {
+      list_url: "https://fixture.peopleforce.io/careers",
+      route_kind: "peopleforce_public_careers"
+    }
+  }]);
+});
+
+test("PoliceApp dispatch is source-owned and does not invent posting dates", async () => {
+  const calls = [];
+  const html = '<a href="/jobs/123">Town Police - Patrol Officer Deadline: June 2026</a>';
+  const runtime = createSourceCollectorRuntime({
+    fetchWithAtsRateLimit: async (atsKey, waitMs, urlString) => {
+      calls.push([atsKey, waitMs, urlString]);
+      return createTextResponse(html, {
+        url: "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0",
+        contentType: "text/html"
+      });
+    },
+    getPostingLocationByJobUrl: () => new Map()
+  });
+
+  const postings = await runtime.collectPostingsForCompany({
+    ATS_name: "www.policeapp.com",
+    company_name: "PoliceApp Fixture",
+    url_string: "https://www.policeapp.com/jobs/"
+  });
+
+  assert.deepEqual(calls.map((call) => call[0]), ["policeapp"]);
+  assert.equal(postings.length, 1);
+  assert.equal(postings[0].company_name, "Town Police");
+  assert.equal(postings[0].position_name, "Town Police - Patrol Officer");
+  assert.equal(postings[0].job_posting_url, "https://www.policeapp.com/jobs/123");
+  assert.equal(postings[0].posting_date, null);
+  assert.equal(postings[0].location, null);
+  assert.deepEqual(postings[0].source_evidence, {
+    list_url: "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0",
+    route_kind: "policeapp_public_ajax"
+  });
+});

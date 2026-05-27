@@ -160,7 +160,7 @@ test("every configured ATS has a certified adapter contract", () => {
 });
 
 test("fetch dispatcher has registry or legacy ownership for every configured ATS", () => {
-  const legacyCollectorOwned = new Set(["peopleforce", "policeapp", "sagehr", "saphrcloud", "talexio"]);
+  const legacyCollectorOwned = new Set(["saphrcloud", "talexio"]);
   const missing = [];
   for (const item of ATS_FILTER_OPTION_ITEMS) {
     const key = String(item.value || "");

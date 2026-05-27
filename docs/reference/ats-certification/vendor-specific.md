@@ -64,9 +64,9 @@ Current raw fixture status for every ATS in this file: pending. There are no sav
 
 ### `sagehr`
 
-- Source endpoint: public vacancies HTML at `https://talent.sage.hr/{companySlug}/vacancies` from `fetchSagehrJobsPage`.
-- Parser path: `server/index.js` `collectPostingsForSagehrCompany` -> `extractSagehrCompanyNameFromHtml` -> `parseSagehrPostingsFromHtml`; normalization path is `server/ingestion/adapters.js` -> `normalizePosting`.
-- Raw fixture status: pending saved HTML fixtures for open and restricted/403 layouts.
+- Source endpoint: public vacancies HTML at `https://talent.sage.hr/{companySlug}/vacancies` from the source-local `fetchList`.
+- Parser path: source-local registry module `server/ingestion/sources/sagehr/index.js` -> `extractSagehrCompanyNameFromHtml` -> `parseSagehrPostingsFromHtml`; `sourceCollectors.js` dispatches SageHR aliases through `collectPostingsForRegistryPilotCompany(company, "sagehr")`.
+- Raw fixture status: pending saved HTML fixtures for open and restricted/403 layouts; collector regression coverage proves allowed 403-with-layout behavior.
 - Field decisions: geo comes from `.location`; date is null; remote comes from location/title text; source id should be URL-derived from `/jobs/{id}` but current parser does not set it directly.
 - Tests needed: add fixtures for normal 200, allowed 403-with-layout, empty/blocked 403, location present/missing, source-id URL extraction, nullable date, and class drift.
 
@@ -80,9 +80,9 @@ Current raw fixture status for every ATS in this file: pending. There are no sav
 
 ### `peopleforce`
 
-- Source endpoint: public careers HTML at `https://{tenant}.peopleforce.io/careers` from `fetchPeopleforceJobsPage`.
-- Parser path: `server/index.js` `collectPostingsForPeopleforceCompany` -> `parsePeopleforcePostingsFromHtml`; normalization path is `server/ingestion/adapters.js` -> `normalizePosting`.
-- Raw fixture status: pending saved HTML fixtures for open and closed sites.
+- Source endpoint: public careers HTML at `https://{tenant}.peopleforce.io/careers` from the source-local `fetchList`.
+- Parser path: source-local registry module `server/ingestion/sources/peopleforce/index.js` -> `parsePeopleforcePostingsFromHtml`; `sourceCollectors.js` dispatches Peopleforce aliases through `collectPostingsForRegistryPilotCompany(company, "peopleforce")`.
+- Raw fixture status: pending saved HTML fixtures for open and closed sites; collector regression coverage proves public careers HTML parsing and rate-limit wrapper dispatch.
 - Field decisions: geo comes from the small neutral text near each card; date is null; remote comes from location/title text; source id should be URL-derived from `/careers/v/{id}` but current parser does not set it directly.
 - Tests needed: add open-site, closed-site, malformed-card, missing-location, source-id extraction, nullable date, and remote/unknown fixtures; also cover rate-limit wrapper use because current fetch path is direct.
 

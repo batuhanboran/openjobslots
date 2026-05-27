@@ -1,7 +1,4 @@
-const { safeFetch } = require("./safeFetch");
 const {
-  parsePeopleforceCompany,
-  parseSagehrCompany,
   parseSapHrCloudCompany,
   parseTalexioCompany
 } = require("./sourceDiscovery");
@@ -12,16 +9,7 @@ const {
 const {
   inferWorkdayLocationFromJobUrl
 } = require("./sources/workday/parse");
-const {
-  extractSagehrCompanyNameFromHtml,
-  parseSagehrPostingsFromHtml
-} = require("./sources/sagehr/parse");
-const { parsePeopleforcePostingsFromHtml } = require("./sources/peopleforce/parse");
 const { parseTalexioPostingsFromApi } = require("./sources/talexio/parse");
-const {
-  normalizePoliceappJobUrl,
-  parsePoliceappPostingsFromHtml
-} = require("./sources/policeapp/parse");
 const {
   getRegistrySourceModule,
   resolveRegistrySourceKey
@@ -52,7 +40,6 @@ const HRMDIRECT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const TEAMTAILOR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const FRESHTEAM_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const SAGEHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SIMPLICANT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const PINPOINTHQ_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const RECRUITCRM_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -64,7 +51,6 @@ const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ADP_MYJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CAREERSPAGE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const APPLITRACK_RATE_LIMIT_WAIT_MS = 60 * 1000;
-const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const K12JOBSPOT_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const SCHOOLSPRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -74,20 +60,10 @@ const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const LEGACY_COLLECTOR_ALIASES = Object.freeze({
   "jobs.hr.cloud.sap": "saphrcloud",
   jobshrcloudsap: "saphrcloud",
-  peopleforceio: "peopleforce",
-  "peopleforce.io": "peopleforce",
-  policeappcom: "policeapp",
-  "policeapp.com": "policeapp",
-  sagehr: "sagehr",
-  "sage.hr": "sagehr",
   "saphrcloud.com": "saphrcloud",
   saphrcloudcom: "saphrcloud",
-  "talent.sage.hr": "sagehr",
-  talentsagehr: "sagehr",
   talexiocom: "talexio",
-  "talexio.com": "talexio",
-  "www.policeapp.com": "policeapp",
-  wwwpoliceappcom: "policeapp"
+  "talexio.com": "talexio"
 });
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
@@ -122,10 +98,13 @@ const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   smartrecruiters: 1000,
   manatal: MANATAL_RATE_LIMIT_WAIT_MS,
   oracle: 60 * 1000,
+  peopleforce: 60 * 1000,
   pinpointhq: PINPOINTHQ_RATE_LIMIT_WAIT_MS,
+  policeapp: 60 * 1000,
   recruitcrm: RECRUITCRM_RATE_LIMIT_WAIT_MS,
   recruitee: RECRUITEE_RATE_LIMIT_WAIT_MS,
   rippling: RIPPLING_RATE_LIMIT_WAIT_MS,
+  sagehr: 60 * 1000,
   schoolspring: SCHOOLSPRING_RATE_LIMIT_WAIT_MS,
   statejobsny: 60 * 1000,
   taleo: TALEO_RATE_LIMIT_WAIT_MS,
@@ -423,7 +402,12 @@ function createSourceCollectorRuntime(dependencies = {}) {
       }
     );
 
-    if (!res.ok) {
+    const allowedStatuses = new Set(
+      Array.isArray(target.allowStatuses)
+        ? target.allowStatuses.map((status) => Number(status)).filter(Number.isFinite)
+        : []
+    );
+    if (!res.ok && !allowedStatuses.has(Number(res.status || 0))) {
       const body = await res.text();
       const error = new Error(`${atsKey} registry source request failed (${res.status}): ${body.slice(0, 180)}`);
       error.status = res.status;
@@ -481,88 +465,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return sourceModule.parse(rawPayload, company);
   }
 
-  async function fetchSagehrJobsPage(config) {
-    const headers = {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    };
-  
-    const res = await fetchWithAtsRateLimit("sagehr", SAGEHR_RATE_LIMIT_WAIT_MS, config.boardUrl, {
-      method: "GET",
-      headers
-    });
-  
-    let statusCode = Number(res.status || 0);
-    let finalUrl = String(res.url || config.boardUrl || "").trim();
-    let pageHtml = await res.text();
-  
-    // Disabled curl fallback to prevent external console process launches on Windows MSI runtime.
-  
-    if (statusCode !== 200 && statusCode !== 403) {
-      throw new Error(`SageHR page request failed (${statusCode})`);
-    }
-  
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (finalHost !== "talent.sage.hr" && finalHost !== "www.talent.sage.hr") {
-      throw new Error(`SageHR URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    if (!String(pageHtml || "").trim()) {
-      throw new Error(`SageHR page response was empty (${statusCode})`);
-    }
-  
-    const loweredPageHtml = String(pageHtml || "").toLowerCase();
-    const hasExpectedLayout =
-      loweredPageHtml.includes("title-wrap") ||
-      loweredPageHtml.includes("other-jobs");
-    if (statusCode === 403 && !hasExpectedLayout) {
-      throw new Error("SageHR page request failed (403)");
-    }
-  
-    return { pageHtml, finalUrl };
-  }
-  
-  async function fetchPeopleforceJobsPage(config) {
-    const headers = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache"
-    };
-  
-    const res = await safeFetch(config.jobsUrl, {
-      method: "GET",
-      headers
-    });
-  
-    let statusCode = Number(res.status || 0);
-    let finalUrl = String(res.url || config.jobsUrl || "").trim();
-    let pageHtml = statusCode === 200 ? await res.text() : "";
-  
-    // Disabled curl fallback to prevent external console process launches on Windows MSI runtime.
-  
-    if (statusCode !== 200) {
-      throw new Error(`Peopleforce page request failed (${statusCode})`);
-    }
-  
-    const finalHost = String(parseUrl(finalUrl)?.hostname || "").toLowerCase();
-    if (!finalHost.endsWith(".peopleforce.io") || finalHost === "peopleforce.io" || finalHost === "www.peopleforce.io") {
-      throw new Error(`Peopleforce URL redirected to unexpected host: ${finalUrl}`);
-    }
-  
-    if (/\bclosed career site\b/i.test(pageHtml)) {
-      return { pageHtml: "", finalUrl };
-    }
-  
-    return { pageHtml, finalUrl };
-  }
-  
   async function fetchTalexioJobsPage(config, page = 1, limit = 10) {
     const apiUrl = String(config?.apiUrl || "").trim();
     if (!apiUrl) {
@@ -648,45 +550,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     };
   }
   
-  async function collectPostingsForSagehrCompany(company) {
-    const config = parseSagehrCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const { pageHtml, finalUrl } = await fetchSagehrJobsPage(config);
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      boardUrl: finalUrl || config.boardUrl
-    };
-    const inferredCompanyName = extractSagehrCompanyNameFromHtml(pageHtml);
-    const companyNameForPostings =
-      normalizedCompanyName ||
-      (inferredCompanyName !== "Unknown Company" ? inferredCompanyName : "") ||
-      `sagehr_${config.companySlugLower}`;
-  
-    return parseSagehrPostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
-  async function collectPostingsForPeopleforceCompany(company) {
-    const config = parsePeopleforceCompany(company.url_string);
-    if (!config) return [];
-  
-    const normalizedCompanyName = String(company?.company_name || "").trim();
-    const companyNameForPostings = normalizedCompanyName || config.subdomainLower;
-    const { pageHtml, finalUrl } = await fetchPeopleforceJobsPage(config);
-    if (!pageHtml) return [];
-  
-    const finalParsed = parseUrl(finalUrl);
-    const parseConfig = {
-      ...config,
-      baseOrigin: `${finalParsed?.protocol || "https:"}//${finalParsed?.host || config.host}`,
-      jobsUrl: finalUrl || config.jobsUrl
-    };
-    return parsePeopleforcePostingsFromHtml(companyNameForPostings, parseConfig, pageHtml);
-  }
-  
   async function collectPostingsForTalexioCompany(company) {
     const config = parseTalexioCompany(company.url_string);
     if (!config) return [];
@@ -732,27 +595,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     return parseSapHrCloudPostingsFromHtml(companyNameForPostings, config, pageHtml, finalUrl);
   }
   
-  async function collectPostingsForPoliceappDynamic() {
-    const endpoint =
-      "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0";
-    const res = await fetchWithAtsRateLimit("policeapp", POLICEAPP_RATE_LIMIT_WAIT_MS, endpoint, {
-      method: "GET",
-      headers: {
-        Accept: "text/html, */*; q=0.01",
-        "Accept-Language": "en-US,en;q=0.9",
-        "X-Requested-With": "XMLHttpRequest"
-      }
-    });
-  
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`PoliceApp request failed (${res.status}): ${body.slice(0, 180)}`);
-    }
-  
-    const html = await res.text();
-    return parsePoliceappPostingsFromHtml(html);
-  }
-  
   async function collectPostingsForCompany(company) {
     const atsName = String(company?.ATS_name || "").trim().toLowerCase();
     const registryKey = resolveRegistrySourceKeyForRuntime(atsName);
@@ -761,9 +603,6 @@ function createSourceCollectorRuntime(dependencies = {}) {
     }
 
     const legacyKey = LEGACY_COLLECTOR_ALIASES[atsName] || atsName;
-    if (legacyKey === "sagehr") return collectPostingsForSagehrCompany(company);
-    if (legacyKey === "peopleforce") return collectPostingsForPeopleforceCompany(company);
-    if (legacyKey === "policeapp") return collectPostingsForPoliceappDynamic();
     if (legacyKey === "talexio") return collectPostingsForTalexioCompany(company);
     if (legacyKey === "saphrcloud") return collectPostingsForSapHrCloudCompany(company);
     return [];

@@ -159,8 +159,16 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.enabled
   }),
+  peopleforce: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
   pinpointhq: Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.disabled
+  }),
+  policeapp: Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
     status: SOURCE_STATUSES.disabled
   }),
   recruitcrm: Object.freeze({
@@ -189,6 +197,10 @@ const PILOT_SOURCE_METADATA = Object.freeze({
     status: SOURCE_STATUSES.quarantine
   }),
   rippling: Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.disabled
+  }),
+  sagehr: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.disabled
   }),
@@ -332,8 +344,12 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   pageuppeoplecom: "pageup",
   "paylocity.com": "paylocity",
   paylocitycom: "paylocity",
+  "peopleforce.io": "peopleforce",
+  peopleforceio: "peopleforce",
   "pinpointhq.com": "pinpointhq",
   pinpointhqcom: "pinpointhq",
+  "policeapp.com": "policeapp",
+  policeappcom: "policeapp",
   "recruit.hirebridge.com": "hirebridge",
   recruithirebridgecom: "hirebridge",
   "recruitcrm.io": "recruitcrm",
@@ -345,6 +361,8 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   recruitingpaylocitycom: "paylocity",
   "rippling.com": "rippling",
   ripplingcom: "rippling",
+  "sage.hr": "sagehr",
+  sagehr: "sagehr",
   "schoolspring.com": "schoolspring",
   schoolspringcom: "schoolspring",
   "simplicant.com": "simplicant",
@@ -374,6 +392,8 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   wwwcaloppsorg: "calopps",
   "www.k12jobspot.com": "k12jobspot",
   wwwk12jobspotcom: "k12jobspot",
+  "www.policeapp.com": "policeapp",
+  wwwpoliceappcom: "policeapp",
   "api.k12jobspot.com": "k12jobspot",
   apik12jobspotcom: "k12jobspot",
   "api.schoolspring.com": "schoolspring",
@@ -384,6 +404,8 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   wwwstatejobsnycom: "statejobsny",
   "www.usajobs.gov": "usajobs",
   wwwusajobsgov: "usajobs",
+  "talent.sage.hr": "sagehr",
+  talentsagehr: "sagehr",
   "zohorecruit.com": "zoho",
   zohorecruit: "zoho",
   zohorecruitcom: "zoho",

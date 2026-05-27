@@ -63,7 +63,7 @@ function parsePoliceappPostingsFromHtml(responseHtml) {
       company_name: companyName,
       position_name: positionName,
       job_posting_url: jobPostingUrl,
-      posting_date: "Posted Today",
+      posting_date: null,
       location: null
     });
     seenUrls.add(jobPostingUrl);

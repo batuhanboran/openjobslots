@@ -9,10 +9,11 @@ const {
 const {
   getRegistrySourceModule,
   isRegistryPilotSource,
-  listRegistrySourceModules
+  listRegistrySourceModules,
+  resolveRegistrySourceKey
 } = require("./sourceRegistry");
 
-test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantAI, ApplicantPro, Applitrack, ApplyToJob, Ashby, BambooHR, BrassRing, Breezy, CalCareers, CareerPlug, CareerPuck, CareersPage, Eightfold, Fountain, Freshteam, Getro, GovernmentJobs, Greenhouse, HiBob, HireBridge, HRMDirect, iCIMS, isolvisolvedhire, JobAps, Jobvite, Join, K12JobSpot, Lever, Loxo, Manatal, Oracle, PageUp, Paylocity, PinpointHQ, RecruitCRM, Recruitee, Rippling, SchoolSpring, Simplicant, SmartRecruiters, StateJobsNY, Taleo, TalentLyft, TalentReef, Teamtailor, TheApplicantManager, UltiPro, USAJobs, Workday, and Zoho as pilot sources", () => {
+test("registry exposes source-owned pilot sources including legacy collector migrations", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
   assert.equal(isRegistryPilotSource("applicantai"), true);
@@ -52,6 +53,8 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantAI, ApplicantPro, 
   assert.equal(isRegistryPilotSource("pageup"), true);
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("paylocity"), true);
+  assert.equal(isRegistryPilotSource("peopleforce"), true);
+  assert.equal(isRegistryPilotSource("policeapp"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
   assert.equal(isRegistryPilotSource("schoolspring"), true);
   assert.equal(isRegistryPilotSource("simplicant"), true);
@@ -59,6 +62,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantAI, ApplicantPro, 
   assert.equal(isRegistryPilotSource("statejobsny"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
+  assert.equal(isRegistryPilotSource("sagehr"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
   assert.equal(isRegistryPilotSource("talentlyft"), true);
   assert.equal(isRegistryPilotSource("talentreef"), true);
@@ -109,10 +113,13 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantAI, ApplicantPro, 
     "oracle",
     "pageup",
     "paylocity",
+    "peopleforce",
     "pinpointhq",
+    "policeapp",
     "recruitcrm",
     "recruitee",
     "rippling",
+    "sagehr",
     "schoolspring",
     "simplicant",
     "smartrecruiters",
@@ -512,6 +519,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof paylocity.validate, "function");
   assert.deepEqual(validateSourceContract(paylocity), { ok: true, failures: [] });
 
+  const peopleforce = getRegistrySourceModule("peopleforce");
+  assert.equal(peopleforce.atsKey, "peopleforce");
+  assert.equal(peopleforce.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(peopleforce.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof peopleforce.discover, "function");
+  assert.equal(typeof peopleforce.fetchList, "function");
+  assert.equal(typeof peopleforce.parse, "function");
+  assert.equal(typeof peopleforce.normalize, "function");
+  assert.equal(typeof peopleforce.validate, "function");
+  assert.deepEqual(validateSourceContract(peopleforce), { ok: true, failures: [] });
+
   const pageup = getRegistrySourceModule("pageup");
   assert.equal(pageup.atsKey, "pageup");
   assert.equal(pageup.family, SOURCE_FAMILIES.enterpriseDirect);
@@ -523,6 +541,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof pageup.normalize, "function");
   assert.equal(typeof pageup.validate, "function");
   assert.deepEqual(validateSourceContract(pageup), { ok: true, failures: [] });
+
+  const policeapp = getRegistrySourceModule("policeapp");
+  assert.equal(policeapp.atsKey, "policeapp");
+  assert.equal(policeapp.family, SOURCE_FAMILIES.publicSectorEducation);
+  assert.equal(policeapp.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof policeapp.discover, "function");
+  assert.equal(typeof policeapp.fetchList, "function");
+  assert.equal(typeof policeapp.parse, "function");
+  assert.equal(typeof policeapp.normalize, "function");
+  assert.equal(typeof policeapp.validate, "function");
+  assert.deepEqual(validateSourceContract(policeapp), { ok: true, failures: [] });
 
   const recruitCrm = getRegistrySourceModule("recruitcrm");
   assert.equal(recruitCrm.atsKey, "recruitcrm");
@@ -626,6 +655,17 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof rippling.validate, "function");
   assert.deepEqual(validateSourceContract(rippling), { ok: true, failures: [] });
 
+  const sagehr = getRegistrySourceModule("sagehr");
+  assert.equal(sagehr.atsKey, "sagehr");
+  assert.equal(sagehr.family, SOURCE_FAMILIES.vendorSpecific);
+  assert.equal(sagehr.status, SOURCE_STATUSES.disabled);
+  assert.equal(typeof sagehr.discover, "function");
+  assert.equal(typeof sagehr.fetchList, "function");
+  assert.equal(typeof sagehr.parse, "function");
+  assert.equal(typeof sagehr.normalize, "function");
+  assert.equal(typeof sagehr.validate, "function");
+  assert.deepEqual(validateSourceContract(sagehr), { ok: true, failures: [] });
+
   const taleo = getRegistrySourceModule("taleo");
   assert.equal(taleo.atsKey, "taleo");
   assert.equal(taleo.family, SOURCE_FAMILIES.brittleHighRisk);
@@ -689,4 +729,13 @@ test("registry returns typed unsupported module for unknown sources", async () =
   assert.equal(unknown.status, SOURCE_STATUSES.unsupported);
   assert.deepEqual(validateSourceContract(unknown), { ok: true, failures: [] });
   assert.equal((await unknown.fetchList()).ok, false);
+});
+
+test("registry resolves legacy collector aliases to source-owned modules", () => {
+  assert.equal(resolveRegistrySourceKey("peopleforce.io"), "peopleforce");
+  assert.equal(resolveRegistrySourceKey("peopleforceio"), "peopleforce");
+  assert.equal(resolveRegistrySourceKey("policeapp.com"), "policeapp");
+  assert.equal(resolveRegistrySourceKey("www.policeapp.com"), "policeapp");
+  assert.equal(resolveRegistrySourceKey("talent.sage.hr"), "sagehr");
+  assert.equal(resolveRegistrySourceKey("sage.hr"), "sagehr");
 });
