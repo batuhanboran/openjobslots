@@ -36,9 +36,12 @@ test.describe("openjobslots API compatibility", () => {
       expect.objectContaining({
         db_backend: expect.any(String),
         ingestion_worker: expect.any(Object),
+        job_slot_count: expect.any(Number),
         legacy_api_sync: expect.any(Boolean),
         parser_attention_count: expect.any(Number),
-        postings_seen_24h_count: expect.any(Number)
+        postings_seen_24h_count: expect.any(Number),
+        configured_ats_count: expect.any(Number),
+        visible_company_count: expect.any(Number)
       })
     );
     expect(syncPayload).not.toHaveProperty("heavy_job");

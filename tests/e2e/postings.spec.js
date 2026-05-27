@@ -78,6 +78,10 @@ async function openJobSlots(page) {
   await expect(page.getByTestId("search-panel")).toBeVisible();
   await expect(page.getByTestId("search-input")).toBeVisible();
   await expect(page.getByTestId("result-count")).toBeVisible();
+  await expect(page.getByTestId("public-stats-chips")).toBeVisible();
+  await expect(page.getByTestId("public-stat-ats")).toContainText(/ATS/i);
+  await expect(page.getByTestId("public-stat-companies")).toContainText(/companies/i);
+  await expect(page.getByTestId("public-stats-chips")).not.toContainText(/indexed/i);
   await expect(page.getByTestId("sort-control")).toBeVisible();
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
   if (viewport.width >= 768) {
@@ -158,6 +162,8 @@ async function expectSearchEngineVisualContract(page) {
     await expect(attributionLink).toHaveAttribute("href", "https://batuhanboran.com");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await expect(page.getByText("Version 2.0.0")).toBeVisible();
+    await expect(page.getByText("Public coverage release")).toBeVisible();
     await expect(page.getByText("Version 1.6.1")).toBeVisible();
     await expect(page.getByText("Data quality tooling release")).toBeVisible();
     await expect(page.getByText("Version 1.6.0")).toBeVisible();
@@ -174,7 +180,7 @@ async function expectSearchEngineVisualContract(page) {
     await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
   } else {
     await expect(page.getByTestId("public-version-button")).toHaveCount(0);
-    await expect(page.getByText("Public v1.6.1")).toHaveCount(0);
+    await expect(page.getByText(`Public v${APP_VERSION}`)).toHaveCount(0);
     await expect(page.getByText("Deployed and developed by")).toHaveCount(0);
   }
 

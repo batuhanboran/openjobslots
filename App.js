@@ -596,6 +596,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "2.0.0",
+    date: "May 27, 2026",
+    title: "Public coverage release",
+    summary:
+      "Shows exact job-slot coverage, ATS coverage, and company coverage in the public search shell, expands source-specific ATS ingestion through guarded canary lanes, and keeps release status copy public-safe."
+  },
+  {
     version: "1.9.3",
     date: "May 18, 2026",
     title: "Index freshness and public count polish",
@@ -4697,6 +4704,7 @@ export default function App() {
       unit: resultCountUnitLabel,
       label: resultCountLabel
     } = buildResultCountLabel({ showResultsSurface, resultTotalCount, t });
+    const publicResultStatsChips = buildPublicStatsChips(status).filter((chip) => chip.key !== "job-slots");
     const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
       ? postingFilterOptions.sort_options
       : DEFAULT_POSTING_SORT_OPTIONS;
@@ -5196,6 +5204,18 @@ export default function App() {
                 <Text style={[styles.resultCountUnitText, isDarkPublicTheme ? styles.textMutedDark : null]}> {resultCountUnitLabel}</Text>
               ) : null}
             </Text>
+            <View style={styles.publicStatsChipRow} testID="public-stats-chips">
+              {publicResultStatsChips.map((chip) => (
+                <Text
+                  key={chip.key}
+                  style={[styles.publicStatsChip, isDarkPublicTheme ? styles.publicStatsChipDark : null]}
+                  testID={`public-stat-${chip.key}`}
+                >
+                  <Text style={[styles.publicStatsChipValue, isDarkPublicTheme ? styles.textInkDark : null]}>{chip.value}</Text>
+                  <Text style={[styles.publicStatsChipLabel, isDarkPublicTheme ? styles.textMutedDark : null]}> {chip.label}</Text>
+                </Text>
+              ))}
+            </View>
             <View
               style={[
                 styles.sortControlWrap,
@@ -7691,6 +7711,52 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted,
     fontSize: 12,
     lineHeight: 18,
+    fontWeight: "700"
+  },
+  publicStatsChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+    maxWidth: "100%"
+  },
+  publicStatsChip: {
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: OJS_COLORS.softBorder,
+    borderRadius: 14,
+    backgroundColor: OJS_COLORS.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    minHeight: 38,
+    color: OJS_COLORS.text,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "800",
+    ...(Platform.OS === "web"
+      ? {
+          fontVariantNumeric: "tabular-nums",
+          boxShadow: "0 6px 16px rgba(38, 51, 45, 0.05)"
+        }
+      : {})
+  },
+  publicStatsChipDark: {
+    borderColor: OJS_DARK_COLORS.softBorder,
+    backgroundColor: OJS_DARK_COLORS.surface,
+    color: OJS_DARK_COLORS.text,
+    ...(Platform.OS === "web" ? { boxShadow: "0 8px 20px rgba(0, 0, 0, 0.22)" } : {})
+  },
+  publicStatsChipValue: {
+    color: OJS_COLORS.ink,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900"
+  },
+  publicStatsChipLabel: {
+    color: OJS_COLORS.muted,
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: "700"
   },
   sortControlWrap: {

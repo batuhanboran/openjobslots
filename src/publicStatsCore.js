@@ -18,20 +18,21 @@ function firstPositiveNumber(...values) {
 }
 
 function buildPublicStatsChips(status = {}) {
+  const source = status || {};
   return [
     {
       key: "job-slots",
-      value: formatExactNumberLabel(firstPositiveNumber(status.job_slot_count, status.posting_count)),
+      value: formatExactNumberLabel(firstPositiveNumber(source.job_slot_count, source.posting_count)),
       label: "job slots"
     },
     {
       key: "ats",
-      value: formatExactNumberLabel(firstPositiveNumber(status.configured_ats_count, status.visible_ats_count, status.configured_enabled_ats_count)),
+      value: formatExactNumberLabel(firstPositiveNumber(source.configured_ats_count, source.visible_ats_count, source.configured_enabled_ats_count)),
       label: "ATS"
     },
     {
       key: "companies",
-      value: formatExactNumberLabel(firstPositiveNumber(status.visible_company_count, status.company_count)),
+      value: formatExactNumberLabel(firstPositiveNumber(source.visible_company_count, source.company_count)),
       label: "companies"
     }
   ];

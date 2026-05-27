@@ -4,11 +4,11 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## v2.0 Prep Update - May 27, 2026
 
-- Public UI/backend now expose exact public counters for `job_slot_count`, `configured_ats_count`, `visible_company_count`, and `visible_ats_count`; the public result chip no longer says compact `157K slots indexed`, and now renders exact job slot wording.
-- `quality:gate --skip-e2e` now includes `test:public-stats`, and `scripts/test/setup-e2e-db.js` can build an isolated minimal SQLite fixture when repo-root `jobs.db` is absent.
-- Production canary enablement increased active ATS sources from `19` to `23`: `freshteam`, `isolvisolvedhire`, `jobvite`, and `teamtailor` are enabled as `canary_only`. A fresh Postgres backup was created first under `/root/OpenJobSlots/backups/v2-public-stats-canary-enable-20260527T125144Z.dump`; no public rows were deleted/hidden and no Meili replace reindex was run.
-- Post-enable worker run `617` completed with `50` targets, `25` successes, `25` failures, and `302` postings stored; queue depth was about `26.4k`, configured sync-enabled companies `30,465`, and visible posting count had grown to `157,738` at the verification snapshot.
-- Release blocker remains: Meili/Postgres validation drift is still nonzero (`last_count_delta=-2`), so do not tag or claim v2.0.0 release readiness until parity is repaired through the documented Meili repair order.
+- Public release line is prepared as `v2.0.0`: public release notes are public-safe, the result count says exact `job slots`, and the search header also exposes public ATS and company coverage chips. `/sync/status` now carries the same public count fields as `/health` for both Postgres and SQLite paths.
+- Worker throughput stage increased from the live `4000/50/300` posture to `6000` automatic targets/day, `100` targets/run, and `500` successful targets/source/day while keeping worker concurrency `2` and interval `900000` ms.
+- Production canary enablement opened the disabled-normal ATS batch as `canary_only` after a fresh Postgres backup at `/root/OpenJobSlots/backups/v2-ats-canary-enable-20260527T134552Z.dump`. Dayforce remains disabled because it is explicitly unsupported. Auto-disabled `manatal`, `pinpointhq`, `taleo`, and `workday` remain blocked by their recorded failure reasons.
+- Post-enable live state before the v2 code deploy: `57` configured-enabled ATS, `39` canary-only sources, `14` normal enabled sources, `4` quarantine-only sources, `4` auto-disabled sources, `37,534` sync-enabled companies, `62` configured ATS, and about `159.3k` visible job slots. Worker runs moved to `100` targets/run; run `622` completed with `62` successes, `38` failures, and `1,082` posting upserts, and run `623` was active during verification.
+- Release blocker to keep watching: Meili/Postgres validation drift was already nonzero before this work. Do not call the source-quality recovery complete until parity is repaired through the documented Meili repair order, even though the public v2 UI/release metadata is prepared.
 
 ## Architecture Update - May 24, 2026
 
@@ -115,11 +115,11 @@ Scale posture:
 
 ## Current Version
 
-- Package/public release line: `v1.9.3`.
-- Previous public release tag: `v1.9.2`.
+- Package/public release line: `v2.0.0`.
+- Previous public release tag: `v1.9.3`.
 - Current release branch: `main`.
 - Last verified production checkout before this patch metadata/docs refresh: May 24, 2026 architecture deployment on `main`.
-- Last verified production deployment date: May 24, 2026.
+- Last verified production deployment date: May 27, 2026 v2 prep deployment.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 

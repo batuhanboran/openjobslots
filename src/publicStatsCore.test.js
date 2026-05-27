@@ -30,7 +30,16 @@ function testBuildsPublicStatsChipsWithoutIndexedCopyOrCompaction() {
   assert.ok(!chips.some((chip) => /K|M/.test(chip.value)));
 }
 
+function testBuildsPublicStatsChipsBeforeStatusLoads() {
+  assert.deepEqual(buildPublicStatsChips(null), [
+    { key: "job-slots", value: "0", label: "job slots" },
+    { key: "ats", value: "0", label: "ATS" },
+    { key: "companies", value: "0", label: "companies" }
+  ]);
+}
+
 testFormatsExactNumbers();
 testBuildsPublicStatsChipsWithoutIndexedCopyOrCompaction();
+testBuildsPublicStatsChipsBeforeStatusLoads();
 
 console.log("public stats core tests passed");

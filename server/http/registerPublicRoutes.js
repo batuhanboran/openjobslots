@@ -178,9 +178,10 @@ function registerPublicRoutes(app, context) {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       const includeAdminDiagnostics = hasAdminAccess(req);
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts] = await Promise.all([
+        const [status, parserAttentionByAts, counts] = await Promise.all([
           getPostgresSyncStatus(postgresPool, { includeWorkerDiagnostics: includeAdminDiagnostics }),
-          getPostgresParserAttentionByAts(postgresPool)
+          getPostgresParserAttentionByAts(postgresPool),
+          getPostgresCounts(postgresPool)
         ]);
         return sanitizeFrontendValue({
           running: Boolean(status.running),
@@ -200,8 +201,12 @@ function registerPublicRoutes(app, context) {
           sync_enabled_company_count: Number(status.sync_enabled_company_count || 0),
           configured_enabled_ats_count: Number(status.configured_enabled_ats_count || 0),
           excluded_ats_count: Number(status.excluded_ats_count || 0),
-          company_count: Number(status.company_count || 0),
-          posting_count: Number(status.posting_count || 0),
+          company_count: Number(status.company_count || counts.company_count || 0),
+          posting_count: Number(counts.posting_count || status.posting_count || 0),
+          job_slot_count: Number(counts.job_slot_count || counts.posting_count || status.posting_count || 0),
+          visible_company_count: Number(counts.visible_company_count || 0),
+          configured_ats_count: Number(counts.configured_ats_count || 0),
+          visible_ats_count: Number(counts.visible_ats_count || 0),
           postings_seen_24h_count: Number(status.postings_seen_24h_count || 0),
           write_pressure: status.running ? "active" : Number(status.queue_depth || 0) > 0 ? "due" : "idle",
           parser_attention_count: parserAttentionByAts.reduce((sum, item) => sum + Number(item?.error_count || 0), 0),

@@ -49,9 +49,9 @@ The worker keeps manual sync controls available, but automatic Postgres syncs ar
 
 - `OPENJOBSLOTS_AUTO_SYNC`: set to `0` to disable automatic sync scheduling. Manual sync requests still work.
 - `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `900000` ms.
-- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `2000`; set to `0` for a reversible pause of automatic sync work.
-- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `50`.
-- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `300`.
+- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `6000`; set to `0` for a reversible pause of automatic sync work.
+- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `100`.
+- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `500`.
 - `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose keeps this at `500`; manual requested syncs may continue across runs until due targets drain.
 - `INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER`: over-select factor for due target candidates before source budget and protection filtering. Worker code defaults to `8`.
 
