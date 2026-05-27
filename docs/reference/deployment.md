@@ -49,13 +49,13 @@ The worker keeps manual sync controls available, but automatic Postgres syncs ar
 
 - `OPENJOBSLOTS_AUTO_SYNC`: set to `0` to disable automatic sync scheduling. Manual sync requests still work.
 - `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `600000` ms.
-- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `12000`; set to `0` for a reversible pause of automatic sync work.
-- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `200`.
+- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `18000`; set to `0` for a reversible pause of automatic sync work.
+- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `300`.
 - `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `1000`.
 - `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose keeps this at `500`; manual requested syncs may continue across runs until due targets drain.
 - `INGESTION_WORKER_CONCURRENCY`: concurrent worker target processors. Compose defaults to `3`; per-host concurrency remains serialized by default.
 - `INGESTION_ADAPTIVE_SELECTION_LOOKBACK_HOURS`: recent success/failure and error-signal window for adaptive ATS source caps. Compose defaults to `24`.
-- `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY`: HRMDirect detail-page cap per company. Compose defaults to `35` so large sparse HRMDirect boards cannot stall a 100-target worker run; raise only during targeted HRMDirect recovery windows.
+- `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY`: HRMDirect detail-page cap per company. Compose defaults to `35` so large sparse HRMDirect boards cannot stall an automatic worker run; raise only during targeted HRMDirect recovery windows.
 - `INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER`: over-select factor for due target candidates before source budget and protection filtering. Worker code defaults to `8`.
 
 The daily budget is conservative and restart-safe because the worker counts targets already recorded in `ingestion_runs` since UTC midnight before starting another automatic run. Manual requested syncs are not blocked by the budget, but their recorded targets count against later automatic work for the same day.
