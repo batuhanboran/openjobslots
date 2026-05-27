@@ -29,6 +29,11 @@ const {
 const { ensureMeiliPostingsIndex } = require("../search/meili");
 const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
 const { readWorkerBudgetConfig } = require("./workerConfig");
+const {
+  decideAdaptiveSourceSelection,
+  sortAdaptiveDueTargetCandidates,
+  summarizeAdaptiveSourceSignals
+} = require("./adaptiveSourceSelection");
 
 function positiveNumber(value, fallback) {
   const number = Number(value);
@@ -380,6 +385,7 @@ function createRunCounters() {
     httpStatusFamilyCounts: {},
     dueByAts: {},
     selectedByAts: {},
+    adaptiveSourceSelectionByAts: {},
     skippedByReason: {},
     skippedByAtsAndReason: {},
     successByReason: {},
@@ -406,6 +412,20 @@ function recordSelectedTarget(counters, target) {
   if (!counters) return;
   counters.selectedByAts = counters.selectedByAts || {};
   incrementCounterMap(counters.selectedByAts, sourceKeyForObservability(target?.atsKey || target?.ats_key));
+}
+
+function recordAdaptiveSourceDecision(counters, atsKey, decision) {
+  if (!counters || !decision) return;
+  const key = sourceKeyForObservability(atsKey || decision.ats_key);
+  counters.adaptiveSourceSelectionByAts = counters.adaptiveSourceSelectionByAts || {};
+  counters.adaptiveSourceSelectionByAts[key] = {
+    lane: String(decision.lane || "healthy"),
+    maxTargetsPerRun: Number(decision.maxTargetsPerRun || 0),
+    dueCount: Number(decision.due_count || 0),
+    recentAttemptCount: Number(decision.recent_attempt_count || 0),
+    successRatePct: decision.success_rate_pct == null ? null : Number(decision.success_rate_pct),
+    reasons: Array.isArray(decision.reasons) ? decision.reasons.slice(0, 6) : []
+  };
 }
 
 function recordSkippedTarget(counters, targetOrAtsKey, reason = "unknown") {
@@ -1012,6 +1032,60 @@ async function countPostgresDueTargetsByAts(pool) {
   return result.rows || [];
 }
 
+async function loadPostgresAdaptiveSourceSignals(pool, options = {}) {
+  const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || nowEpochSeconds())));
+  const lookbackHours = Math.max(1, Math.min(168, Math.floor(positiveNumber(
+    process.env.INGESTION_ADAPTIVE_SELECTION_LOOKBACK_HOURS,
+    24
+  ))));
+  const lookbackEpoch = nowEpoch - lookbackHours * 60 * 60;
+  const dueRows = Array.isArray(options.dueRows) ? options.dueRows : [];
+  try {
+    const [syncRows, errorRows] = await Promise.all([
+      pool.query(
+        `
+          SELECT
+            ats_key,
+            COUNT(*) FILTER (WHERE COALESCE(last_success_epoch, 0) >= $1)::int AS recent_success_count,
+            COUNT(*) FILTER (WHERE COALESCE(last_failure_epoch, 0) >= $1)::int AS recent_failure_count,
+            COUNT(*) FILTER (
+              WHERE COALESCE(last_success_epoch, 0) >= $1
+                 OR COALESCE(last_failure_epoch, 0) >= $1
+            )::int AS recent_attempt_count
+          FROM company_sync_state
+          WHERE COALESCE(last_success_epoch, 0) >= $1
+             OR COALESCE(last_failure_epoch, 0) >= $1
+          GROUP BY ats_key;
+        `,
+        [lookbackEpoch]
+      ),
+      pool.query(
+        `
+          SELECT
+            ats_key,
+            error_type,
+            COALESCE(http_status, 0)::int AS http_status,
+            COALESCE(error_message, '') AS error_message,
+            COUNT(*)::int AS count
+          FROM ingestion_run_errors
+          WHERE created_at >= now() - ($1::int * interval '1 hour')
+          GROUP BY ats_key, error_type, COALESCE(http_status, 0), COALESCE(error_message, '')
+          ORDER BY count DESC, ats_key ASC, error_type ASC;
+        `,
+        [lookbackHours]
+      )
+    ]);
+    return summarizeAdaptiveSourceSignals({
+      dueRows,
+      syncRows: syncRows.rows || [],
+      errorRows: errorRows.rows || []
+    });
+  } catch (error) {
+    console.warn(`[ingestion] adaptive source signal load failed; using due-count only selection: ${error.message}`);
+    return summarizeAdaptiveSourceSignals({ dueRows });
+  }
+}
+
 async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, options = {}) {
   const nowEpoch = nowEpochSeconds();
   const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
@@ -1083,6 +1157,29 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
   const targets = [];
   const selectedByAts = new Map();
   const sourceBudgetUsedToday = new Map();
+  const dueRows = Array.isArray(options.dueByAtsRows)
+    ? options.dueByAtsRows
+    : await countPostgresDueTargetsByAts(pool);
+  const adaptiveSignals = options.adaptiveSignals || await loadPostgresAdaptiveSourceSignals(pool, {
+    nowEpoch,
+    dueRows
+  });
+  const adaptiveDecisions = {};
+  for (const row of result.rows || []) {
+    const atsKey = normalizeAtsKey(row.ats_key);
+    if (!atsKey || adaptiveDecisions[atsKey]) continue;
+    const sourcePolicy = getSourceSyncPolicy(row.ats_key, {
+      protectionStatus: row.protection_status,
+      disabledReason: row.disabled_reason
+    });
+    const decision = decideAdaptiveSourceSelection(atsKey, {
+      targetLimit,
+      sourcePolicy,
+      signal: adaptiveSignals[atsKey] || { due_count: 0 }
+    });
+    adaptiveDecisions[atsKey] = decision;
+    recordAdaptiveSourceDecision(counters, atsKey, decision);
+  }
   if (SOURCE_DAILY_TARGET_BUDGET > 0) {
     const budgetRows = await pool.query(
       `
@@ -1097,7 +1194,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
       sourceBudgetUsedToday.set(String(row.ats_key || ""), Number(row.count || 0));
     }
   }
-  for (const row of sortDueTargetCandidates(result.rows || [])) {
+  for (const row of sortAdaptiveDueTargetCandidates(result.rows || [], adaptiveDecisions)) {
     if (targets.length >= targetLimit) break;
     const sourcePolicy = getSourceSyncPolicy(row.ats_key, {
       protectionStatus: row.protection_status,
@@ -1110,6 +1207,15 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
     const selectedCount = Number(selectedByAts.get(row.ats_key) || 0);
     if (Number.isFinite(sourcePolicy.maxTargetsPerRun) && selectedCount >= sourcePolicy.maxTargetsPerRun) {
       recordSkippedTarget(counters, row.ats_key, "max_targets_per_run");
+      continue;
+    }
+    const adaptiveDecision = adaptiveDecisions[normalizeAtsKey(row.ats_key)] || decideAdaptiveSourceSelection(row.ats_key, {
+      targetLimit,
+      sourcePolicy,
+      signal: adaptiveSignals[normalizeAtsKey(row.ats_key)] || { due_count: 0 }
+    });
+    if (selectedCount >= Number(adaptiveDecision.maxTargetsPerRun || 0)) {
+      recordSkippedTarget(counters, row.ats_key, "adaptive_source_cap");
       continue;
     }
     const startedToday = Number(sourceBudgetUsedToday.get(row.ats_key) || 0);
@@ -1641,8 +1747,9 @@ async function runPostgresIngestionOnce(pool, options = {}) {
   }
 
   const counters = createRunCounters();
-  recordDueTargetsByAts(counters, await countPostgresDueTargetsByAts(pool));
-  const targets = await selectPostgresDueTargets(pool, targetLimit, { counters });
+  const dueByAtsRows = await countPostgresDueTargetsByAts(pool);
+  recordDueTargetsByAts(counters, dueByAtsRows);
+  const targets = await selectPostgresDueTargets(pool, targetLimit, { counters, dueByAtsRows });
   const runId = await createPostgresRun(pool, targets);
   const rateLimitStore = createAtsRateLimitStateStore({ pool });
   let cancelled = false;

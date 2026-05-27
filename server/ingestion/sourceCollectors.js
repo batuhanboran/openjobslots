@@ -22,7 +22,10 @@ const {
   normalizePoliceappJobUrl,
   parsePoliceappPostingsFromHtml
 } = require("./sources/policeapp/parse");
-const { getRegistrySourceModule, isRegistryPilotSource } = require("./sourceRegistry");
+const {
+  getRegistrySourceModule,
+  resolveRegistrySourceKey
+} = require("./sourceRegistry");
 const { SOURCE_STATUSES, validateSourceContract } = require("./sourceContracts");
 
 const MAX_PAGES_PER_COMPANY = 25;
@@ -68,6 +71,24 @@ const CALCAREERS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const CALOPPS_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const ISOLVISOLVEDHIRE_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const GOVERNMENTJOBS_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const LEGACY_COLLECTOR_ALIASES = Object.freeze({
+  "jobs.hr.cloud.sap": "saphrcloud",
+  jobshrcloudsap: "saphrcloud",
+  peopleforceio: "peopleforce",
+  "peopleforce.io": "peopleforce",
+  policeappcom: "policeapp",
+  "policeapp.com": "policeapp",
+  sagehr: "sagehr",
+  "sage.hr": "sagehr",
+  "saphrcloud.com": "saphrcloud",
+  saphrcloudcom: "saphrcloud",
+  "talent.sage.hr": "sagehr",
+  talentsagehr: "sagehr",
+  talexiocom: "talexio",
+  "talexio.com": "talexio",
+  "www.policeapp.com": "policeapp",
+  wwwpoliceappcom: "policeapp"
+});
 const REGISTRY_PILOT_RATE_LIMIT_WAIT_MS = Object.freeze({
   adp_myjobs: ADP_MYJOBS_RATE_LIMIT_WAIT_MS,
   adp_workforcenow: 60 * 1000,
@@ -129,9 +150,9 @@ function createSourceCollectorRuntime(dependencies = {}) {
   const getRegistrySourceModuleForRuntime = typeof dependencies.getRegistrySourceModule === "function"
     ? dependencies.getRegistrySourceModule
     : getRegistrySourceModule;
-  const isRegistryPilotSourceForRuntime = typeof dependencies.isRegistryPilotSource === "function"
-    ? dependencies.isRegistryPilotSource
-    : isRegistryPilotSource;
+  const resolveRegistrySourceKeyForRuntime = typeof dependencies.resolveRegistrySourceKey === "function"
+    ? dependencies.resolveRegistrySourceKey
+    : resolveRegistrySourceKey;
 
   const getPostingLocationByJobUrl = typeof dependencies.getPostingLocationByJobUrl === "function"
     ? dependencies.getPostingLocationByJobUrl
@@ -734,274 +755,17 @@ function createSourceCollectorRuntime(dependencies = {}) {
   
   async function collectPostingsForCompany(company) {
     const atsName = String(company?.ATS_name || "").trim().toLowerCase();
-    if (atsName === "workday") {
-      return collectPostingsForRegistryPilotCompany(company, "workday");
+    const registryKey = resolveRegistrySourceKeyForRuntime(atsName);
+    if (registryKey) {
+      return collectPostingsForRegistryPilotCompany(company, registryKey);
     }
-    if (atsName === "ashbyhq" || atsName === "ashby") {
-      return collectPostingsForRegistryPilotCompany(company, "ashby");
-    }
-    if (atsName === "greenhouseio" || atsName === "greenhouse.io" || atsName === "greenhouse") {
-      return collectPostingsForRegistryPilotCompany(company, "greenhouse");
-    }
-    if (atsName === "leverco" || atsName === "lever.co" || atsName === "lever") {
-      return collectPostingsForRegistryPilotCompany(company, "lever");
-    }
-    if (atsName === "jobvite" || atsName === "jobvite.com" || atsName === "jobvitecom") {
-      return collectPostingsForRegistryPilotCompany(company, "jobvite");
-    }
-    if (atsName === "applicantpro" || atsName === "applicantpro.com" || atsName === "applicantprocom") {
-      return collectPostingsForRegistryPilotCompany(company, "applicantpro");
-    }
-    if (atsName === "applytojob" || atsName === "applytojob.com" || atsName === "applytojobcom") {
-      return collectPostingsForRegistryPilotCompany(company, "applytojob");
-    }
-    if (
-      atsName === "theapplicantmanager" ||
-      atsName === "theapplicantmanager.com" ||
-      atsName === "theapplicantmanagercom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "theapplicantmanager");
-    }
-    if (atsName === "breezy" || atsName === "breezyhr" || atsName === "breezy.hr" || atsName === "breezyhrcom") {
-      return collectPostingsForRegistryPilotCompany(company, "breezy");
-    }
-    if (atsName === "icims" || atsName === "icims.com" || atsName === "icimscom") {
-      return collectPostingsForRegistryPilotCompany(company, "icims");
-    }
-    if (atsName === "zoho" || atsName === "zohorecruit" || atsName === "zohorecruit.com" || atsName === "zohorecruitcom") {
-      return collectPostingsForRegistryPilotCompany(company, "zoho");
-    }
-    if (atsName === "applicantai" || atsName === "applicantai.com" || atsName === "applicantaicom") {
-      return collectPostingsForRegistryPilotCompany(company, "applicantai");
-    }
-    if (atsName === "gem" || atsName === "jobs.gem.com" || atsName === "gem.com" || atsName === "gemcom") {
-      return collectPostingsForRegistryPilotCompany(company, "gem");
-    }
-    if (atsName === "jobaps" || atsName === "jobapscloud.com" || atsName === "jobapscloudcom") {
-      return collectPostingsForRegistryPilotCompany(company, "jobaps");
-    }
-    if (atsName === "join" || atsName === "join.com" || atsName === "joincom") {
-      return collectPostingsForRegistryPilotCompany(company, "join");
-    }
-    if (
-      atsName === "talentreef" ||
-      atsName === "jobappnetwork.com" ||
-      atsName === "jobappnetworkcom" ||
-      atsName === "apply.jobappnetwork.com" ||
-      atsName === "applyjobappnetworkcom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "talentreef");
-    }
-    if (atsName === "careerplug" || atsName === "careerplug.com" || atsName === "careerplugcom") {
-      return collectPostingsForRegistryPilotCompany(company, "careerplug");
-    }
-    if (atsName === "bamboohr" || atsName === "bamboohr.com" || atsName === "bamboohrcom") {
-      return collectPostingsForRegistryPilotCompany(company, "bamboohr");
-    }
-    if (atsName === "adp_myjobs" || atsName === "adpmyjobs") {
-      return collectPostingsForRegistryPilotCompany(company, "adp_myjobs");
-    }
-    if (
-      atsName === "adp_workforcenow" ||
-      atsName === "adpworkforcenow" ||
-      atsName === "workforcenow.adp.com" ||
-      atsName === "workforcenowadpcom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "adp_workforcenow");
-    }
-    if (
-      atsName === "paylocity" ||
-      atsName === "paylocity.com" ||
-      atsName === "paylocitycom" ||
-      atsName === "recruiting.paylocity.com" ||
-      atsName === "recruitingpaylocitycom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "paylocity");
-    }
-    if (atsName === "eightfold" || atsName === "eightfold.ai" || atsName === "eightfoldai") {
-      return collectPostingsForRegistryPilotCompany(company, "eightfold");
-    }
-    if (
-      atsName === "oracle" ||
-      atsName === "oraclecloud" ||
-      atsName === "oraclecloud.com" ||
-      atsName === "oraclecloudcom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "oracle");
-    }
-    if (
-      atsName === "brassring" ||
-      atsName === "brassring.com" ||
-      atsName === "brassringcom" ||
-      atsName === "sjobs.brassring.com" ||
-      atsName === "sjobsbrassringcom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "brassring");
-    }
-    if (atsName === "applitrack" || atsName === "applitrack.com" || atsName === "applitrackcom") {
-      return collectPostingsForRegistryPilotCompany(company, "applitrack");
-    }
-    if (atsName === "hibob" || atsName === "hibob.com" || atsName === "hibobcom" || atsName === "careers.hibob.com" || atsName === "careershibobcom") {
-      return collectPostingsForRegistryPilotCompany(company, "hibob");
-    }
-    if (
-      atsName === "isolvisolvedhire" ||
-      atsName === "isolvedhire" ||
-      atsName === "isolvedhire.com" ||
-      atsName === "isolvedhirecom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "isolvisolvedhire");
-    }
-    if (
-      atsName === "manatal" ||
-      atsName === "manatal.com" ||
-      atsName === "manatalcom" ||
-      atsName === "careers-page.com" ||
-      atsName === "careerspagecom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "manatal");
-    }
-    if (atsName === "careerspage" || atsName === "careerspage.io" || atsName === "careerspageio") {
-      return collectPostingsForRegistryPilotCompany(company, "careerspage");
-    }
-    if (
-      atsName === "pageup" ||
-      atsName === "pageuppeople" ||
-      atsName === "pageuppeople.com" ||
-      atsName === "pageuppeoplecom" ||
-      atsName === "careers.pageuppeople.com" ||
-      atsName === "careerspageuppeoplecom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "pageup");
-    }
-    if (
-      atsName === "hirebridge" ||
-      atsName === "hirebridge.com" ||
-      atsName === "hirebridgecom" ||
-      atsName === "recruit.hirebridge.com" ||
-      atsName === "recruithirebridgecom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "hirebridge");
-    }
-    if (atsName === "teamtailor" || atsName === "teamtailor.com" || atsName === "teamtailorcom") {
-      return collectPostingsForRegistryPilotCompany(company, "teamtailor");
-    }
-    if (atsName === "freshteam" || atsName === "freshteam.com" || atsName === "freshteamcom") {
-      return collectPostingsForRegistryPilotCompany(company, "freshteam");
-    }
-    if (
-      atsName === "sagehr" ||
-      atsName === "sage.hr" ||
-      atsName === "talent.sage.hr" ||
-      atsName === "talentsagehr"
-    ) {
-      return collectPostingsForSagehrCompany(company);
-    }
-    if (atsName === "loxo" || atsName === "loxo.co" || atsName === "loxoco") {
-      return collectPostingsForRegistryPilotCompany(company, "loxo");
-    }
-    if (atsName === "peopleforce" || atsName === "peopleforce.io" || atsName === "peopleforceio") {
-      return collectPostingsForPeopleforceCompany(company);
-    }
-    if (atsName === "simplicant" || atsName === "simplicant.com" || atsName === "simplicantcom") {
-      return collectPostingsForRegistryPilotCompany(company, "simplicant");
-    }
-    if (atsName === "pinpointhq" || atsName === "pinpointhq.com" || atsName === "pinpointhqcom") {
-      return collectPostingsForRegistryPilotCompany(company, "pinpointhq");
-    }
-    if (atsName === "recruitcrm" || atsName === "recruitcrm.io" || atsName === "recruitcrmiocom" || atsName === "recruitcrmio") {
-      return collectPostingsForRegistryPilotCompany(company, "recruitcrm");
-    }
-    if (atsName === "rippling" || atsName === "rippling.com" || atsName === "ripplingcom" || atsName === "ats.rippling.com" || atsName === "atsripplingcom") {
-      return collectPostingsForRegistryPilotCompany(company, "rippling");
-    }
-    if (atsName === "careerpuck" || atsName === "careerpuck.com" || atsName === "careerpuckcom") {
-      return collectPostingsForRegistryPilotCompany(company, "careerpuck");
-    }
-    if (atsName === "fountain" || atsName === "fountain.com" || atsName === "fountaincom") {
-      return collectPostingsForRegistryPilotCompany(company, "fountain");
-    }
-    if (atsName === "getro" || atsName === "getro.com" || atsName === "getrocom") {
-      return collectPostingsForRegistryPilotCompany(company, "getro");
-    }
-    if (atsName === "governmentjobs" || atsName === "governmentjobs.com" || atsName === "governmentjobscom") {
-      return collectPostingsForRegistryPilotCompany(company, "governmentjobs");
-    }
-    if (
-      atsName === "smartrecruiters" ||
-      atsName === "smartrecruiters.com" ||
-      atsName === "smartrecruiterscom" ||
-      atsName === "jobs.smartrecruiters.com" ||
-      atsName === "jobssmartrecruiterscom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "smartrecruiters");
-    }
-    if (atsName === "policeapp" || atsName === "policeapp.com" || atsName === "policeappcom" || atsName === "www.policeapp.com" || atsName === "wwwpoliceappcom") {
-      return collectPostingsForPoliceappDynamic();
-    }
-    if (atsName === "usajobs" || atsName === "usajobs.gov" || atsName === "usajobsgov" || atsName === "www.usajobs.gov" || atsName === "wwwusajobsgov") {
-      return collectPostingsForRegistryPilotCompany(company, "usajobs");
-    }
-    if (atsName === "k12jobspot" || atsName === "k12jobspot.com" || atsName === "k12jobspotcom" || atsName === "www.k12jobspot.com" || atsName === "wwwk12jobspotcom" || atsName === "api.k12jobspot.com" || atsName === "apik12jobspotcom") {
-      return collectPostingsForRegistryPilotCompany(company, "k12jobspot");
-    }
-    if (atsName === "schoolspring" || atsName === "schoolspring.com" || atsName === "schoolspringcom" || atsName === "api.schoolspring.com" || atsName === "apischoolspringcom" || atsName === "www.schoolspring.com" || atsName === "wwwschoolspringcom") {
-      return collectPostingsForRegistryPilotCompany(company, "schoolspring");
-    }
-    if (
-      atsName === "calcareers" ||
-      atsName === "calcareers.ca.gov" ||
-      atsName === "calcareerscagov" ||
-      atsName === "www.calcareers.ca.gov" ||
-      atsName === "wwwcalcareerscagov"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "calcareers");
-    }
-    if (
-      atsName === "calopps" ||
-      atsName === "calopps.org" ||
-      atsName === "caloppsorg" ||
-      atsName === "www.calopps.org" ||
-      atsName === "wwwcaloppsorg"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "calopps");
-    }
-    if (
-      atsName === "statejobsny" ||
-      atsName === "statejobsny.com" ||
-      atsName === "statejobsnycom" ||
-      atsName === "www.statejobsny.com" ||
-      atsName === "wwwstatejobsnycom"
-    ) {
-      return collectPostingsForRegistryPilotCompany(company, "statejobsny");
-    }
-    if (atsName === "hrmdirect" || atsName === "hrmdirect.com" || atsName === "hrmdirectcom") {
-      return collectPostingsForRegistryPilotCompany(company, "hrmdirect");
-    }
-    if (atsName === "talentlyft" || atsName === "talentlyft.com" || atsName === "talentlyftcom") {
-      return collectPostingsForRegistryPilotCompany(company, "talentlyft");
-    }
-    if (atsName === "talexio" || atsName === "talexio.com" || atsName === "talexiocom") {
-      return collectPostingsForTalexioCompany(company);
-    }
-    if (
-      atsName === "saphrcloud" ||
-      atsName === "saphrcloud.com" ||
-      atsName === "saphrcloudcom" ||
-      atsName === "jobs.hr.cloud.sap" ||
-      atsName === "jobshrcloudsap"
-    ) {
-      return collectPostingsForSapHrCloudCompany(company);
-    }
-    if (atsName === "recruiteecom" || atsName === "recruitee.com" || atsName === "recruitee") {
-      return collectPostingsForRegistryPilotCompany(company, "recruitee");
-    }
-    if (atsName === "ultipro" || atsName === "ukg") {
-      return collectPostingsForRegistryPilotCompany(company, "ultipro");
-    }
-    if (atsName === "taleo" || atsName === "taleo.net" || atsName === "taleonet") {
-      return collectPostingsForRegistryPilotCompany(company, "taleo");
-    }
+
+    const legacyKey = LEGACY_COLLECTOR_ALIASES[atsName] || atsName;
+    if (legacyKey === "sagehr") return collectPostingsForSagehrCompany(company);
+    if (legacyKey === "peopleforce") return collectPostingsForPeopleforceCompany(company);
+    if (legacyKey === "policeapp") return collectPostingsForPoliceappDynamic();
+    if (legacyKey === "talexio") return collectPostingsForTalexioCompany(company);
+    if (legacyKey === "saphrcloud") return collectPostingsForSapHrCloudCompany(company);
     return [];
   }
 

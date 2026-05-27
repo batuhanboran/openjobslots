@@ -17,6 +17,7 @@ const {
   isAtsEnabledByDefault
 } = require("./adapter-metadata");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("./posting");
+const { resolveRegistrySourceKey } = require("./sourceRegistry");
 
 test("canonicalizePostingUrl removes fragments and tracking query noise", () => {
   assert.equal(
@@ -158,23 +159,18 @@ test("every configured ATS has a certified adapter contract", () => {
   }
 });
 
-test("legacy fetch dispatcher is explicit for every configured ATS", () => {
-  const collectorsSource = fs.readFileSync(path.join(__dirname, "sourceCollectors.js"), "utf8");
-  const dispatcherStart = collectorsSource.indexOf("async function collectPostingsForCompany");
-  const dispatcherEnd = collectorsSource.indexOf("\n\n  return {", dispatcherStart);
-  const body = collectorsSource.slice(
-    dispatcherStart,
-    dispatcherEnd
-  );
+test("fetch dispatcher has registry or legacy ownership for every configured ATS", () => {
+  const legacyCollectorOwned = new Set(["peopleforce", "policeapp", "sagehr", "saphrcloud", "talexio"]);
   const missing = [];
   for (const item of ATS_FILTER_OPTION_ITEMS) {
     const key = String(item.value || "");
-    const directPattern = new RegExp(`atsName\\s*===\\s*["']${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`);
     const override = LEGACY_FETCH_ATS_NAME_OVERRIDES[key];
-    const overridePattern = override
-      ? new RegExp(`atsName\\s*===\\s*["']${String(override).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`)
-      : null;
-    if (directPattern.test(body) || (overridePattern && overridePattern.test(body)) || UNSUPPORTED_LEGACY_FETCH_ATS.has(key)) {
+    if (
+      resolveRegistrySourceKey(key) === key ||
+      (override && resolveRegistrySourceKey(override) === key) ||
+      legacyCollectorOwned.has(key) ||
+      UNSUPPORTED_LEGACY_FETCH_ATS.has(key)
+    ) {
       continue;
     }
     missing.push(key);

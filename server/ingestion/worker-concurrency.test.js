@@ -306,10 +306,116 @@ test("postgres due target selection over-selects when early sources exhaust dail
     }
   };
 
-  const targets = await selectPostgresDueTargets(pool, 2);
+  const targets = await selectPostgresDueTargets(pool, 2, {
+    dueByAtsRows: [
+      { ats_key: "bamboohr", due_count: 2 },
+      { ats_key: "applytojob", due_count: 1 },
+      { ats_key: "breezy", due_count: 1 }
+    ],
+    adaptiveSignals: {
+      bamboohr: { due_count: 2, recent_success_count: 20, recent_failure_count: 0, success_rate_pct: 100 },
+      applytojob: { due_count: 1, recent_success_count: 20, recent_failure_count: 0, success_rate_pct: 100 },
+      breezy: { due_count: 1, recent_success_count: 20, recent_failure_count: 0, success_rate_pct: 100 }
+    }
+  });
 
   assert.ok(candidateLimit > 2, "candidate query should over-select beyond the run target limit");
   assert.deepEqual(targets.map((target) => target.atsKey), ["applytojob", "breezy"]);
+});
+
+test("postgres due target selection uses adaptive caps for parser-risk sources", async () => {
+  const rows = [
+    {
+      id: 1,
+      company_name: "Healthy Apply One",
+      url_string: "https://healthy-one.applytojob.com/apply",
+      ats_key: "applytojob",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 1,
+      ats_rank: 1
+    },
+    {
+      id: 2,
+      company_name: "Healthy Apply Two",
+      url_string: "https://healthy-two.applytojob.com/apply",
+      ats_key: "applytojob",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 2,
+      ats_rank: 2
+    },
+    {
+      id: 3,
+      company_name: "Risky Bamboo One",
+      url_string: "https://risky-one.bamboohr.com/careers",
+      ats_key: "bamboohr",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 3,
+      ats_rank: 1
+    },
+    {
+      id: 4,
+      company_name: "Risky Bamboo Two",
+      url_string: "https://risky-two.bamboohr.com/careers",
+      ats_key: "bamboohr",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 4,
+      ats_rank: 2
+    },
+    {
+      id: 5,
+      company_name: "Risky Bamboo Three",
+      url_string: "https://risky-three.bamboohr.com/careers",
+      ats_key: "bamboohr",
+      protection_status: "normal",
+      default_ttl_seconds: 3600,
+      rate_limit_ms: 0,
+      next_sync_epoch: 5,
+      ats_rank: 3
+    }
+  ];
+  const counters = createRunCounters();
+  const pool = {
+    async query(sql, params) {
+      if (String(sql).includes("WITH due_targets")) {
+        return { rows: rows.slice(0, Number(params[1] || 0)) };
+      }
+      if (String(sql).includes("FROM company_sync_state")) {
+        return { rows: [] };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const targets = await selectPostgresDueTargets(pool, 4, {
+    counters,
+    dueByAtsRows: [
+      { ats_key: "applytojob", due_count: 2 },
+      { ats_key: "bamboohr", due_count: 3 }
+    ],
+    adaptiveSignals: {
+      applytojob: { due_count: 2, recent_success_count: 20, recent_failure_count: 0, success_rate_pct: 100 },
+      bamboohr: {
+        due_count: 3,
+        recent_success_count: 0,
+        recent_failure_count: 8,
+        success_rate_pct: 0,
+        failure_reason_counts: { parser_bug: 8 }
+      }
+    }
+  });
+
+  assert.deepEqual(targets.map((target) => target.atsKey), ["applytojob", "applytojob", "bamboohr"]);
+  assert.deepEqual(counters.selectedByAts, { applytojob: 2, bamboohr: 1 });
+  assert.deepEqual(counters.skippedByReason, { adaptive_source_cap: 2 });
+  assert.equal(counters.adaptiveSourceSelectionByAts.bamboohr.lane, "parser_attention");
 });
 
 test("postgres due target sorting prioritizes healthy targets before failure-pressure retries", () => {

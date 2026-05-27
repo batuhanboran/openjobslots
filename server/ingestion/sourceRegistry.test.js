@@ -28,6 +28,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantAI, ApplicantPro, 
   assert.equal(isRegistryPilotSource("careerplug"), true);
   assert.equal(isRegistryPilotSource("careerpuck"), true);
   assert.equal(isRegistryPilotSource("careerspage"), true);
+  assert.equal(isRegistryPilotSource("dayforcehcm"), true);
   assert.equal(isRegistryPilotSource("eightfold"), true);
   assert.equal(isRegistryPilotSource("gem"), true);
   assert.equal(isRegistryPilotSource("fountain"), true);
@@ -85,6 +86,7 @@ test("registry exposes ADP MyJobs, ADP WorkForceNow, ApplicantAI, ApplicantPro, 
     "careerplug",
     "careerpuck",
     "careerspage",
+    "dayforcehcm",
     "eightfold",
     "fountain",
     "freshteam",
