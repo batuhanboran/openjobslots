@@ -48,6 +48,10 @@ import {
   trackPublicFilterChange,
   trackPublicSearch
 } from "./src/publicAnalytics";
+import {
+  buildPublicStatsChips,
+  formatExactNumberLabel
+} from "./src/publicStatsCore";
 
 const PAGE_KEYS = {
   POSTINGS: "postings",
@@ -260,8 +264,8 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Search jobs",
     "results.slot": "slot",
     "results.slots": "slots",
-    "results.slotIndexed": "slot indexed",
-    "results.slotsIndexed": "slots indexed",
+    "results.slotIndexed": "job slot",
+    "results.slotsIndexed": "job slots",
     "results.indexLoading": "Loading index",
     "initial.title": "Search fresh public ATS openings.",
     "initial.copy": "Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.",
@@ -351,8 +355,8 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "İlan ara",
     "results.slot": "ilan",
     "results.slots": "ilan",
-    "results.slotIndexed": "ilan indeksli",
-    "results.slotsIndexed": "ilan indeksli",
+    "results.slotIndexed": "is ilani",
+    "results.slotsIndexed": "is ilani",
     "results.indexLoading": "Indeks yukleniyor",
     "initial.title": "Taze public ATS ilanlarını ara.",
     "initial.copy": "Ünvan, şirket, konum, ülke veya çalışma modu ile başla. Filtreler desktop görünümde sonuçların yanında sabit kalır.",
@@ -442,8 +446,8 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Stellen suchen",
     "results.slot": "Slot",
     "results.slots": "Slots",
-    "results.slotIndexed": "Slot indexiert",
-    "results.slotsIndexed": "Slots indexiert",
+    "results.slotIndexed": "Jobslot",
+    "results.slotsIndexed": "Jobslots",
     "results.indexLoading": "Index wird geladen",
     "initial.title": "Frische oeffentliche ATS-Stellen suchen.",
     "initial.copy": "Beginne mit Titel, Firma, Ort, Land oder Arbeitsmodus. Filter bleiben am Desktop neben den Ergebnissen fixiert.",
@@ -507,8 +511,8 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Chercher des offres",
     "results.slot": "slot",
     "results.slots": "slots",
-    "results.slotIndexed": "slot indexe",
-    "results.slotsIndexed": "slots indexes",
+    "results.slotIndexed": "offre",
+    "results.slotsIndexed": "offres",
     "results.indexLoading": "Index en chargement",
     "initial.title": "Rechercher des offres ATS publiques recentes.",
     "initial.copy": "Commencez par un titre, une entreprise, un lieu, un pays ou un mode de travail. Les filtres restent fixes sur desktop.",
@@ -572,8 +576,8 @@ const PUBLIC_MESSAGES = {
     "results.searchPrompt": "Buscar empleos",
     "results.slot": "slot",
     "results.slots": "slots",
-    "results.slotIndexed": "slot indexado",
-    "results.slotsIndexed": "slots indexados",
+    "results.slotIndexed": "puesto",
+    "results.slotsIndexed": "puestos",
     "results.indexLoading": "Cargando indice",
     "initial.title": "Busca ofertas ATS publicas recientes.",
     "initial.copy": "Empieza con titulo, empresa, ubicacion, pais o modo de trabajo. Los filtros quedan fijos junto a los resultados en desktop.",
@@ -757,7 +761,7 @@ const PUBLIC_RELEASE_NOTES = [
     date: "May 7, 2026",
     title: "Search filter diagnostics",
     summary:
-      "Expanded search quality coverage to 1000 deterministic title/filter cases and added clearer empty-state actions when a title, location, and remote-mode intersection has no indexed slots."
+      "Expanded search quality coverage to 1000 deterministic title/filter cases and added clearer empty-state actions when a title, location, and remote-mode intersection has no job slots."
   },
   {
     version: "1.5.5",
@@ -1194,6 +1198,20 @@ function formatCompactNumberLabel(value, fallback = "0") {
   if (absValue >= 1_000_000) return `${(numberValue / 1_000_000).toFixed(absValue >= 10_000_000 ? 0 : 1)}M`;
   if (absValue >= 1_000) return `${(numberValue / 1_000).toFixed(absValue >= 10_000 ? 0 : 1)}K`;
   return formatNumberLabel(numberValue, fallback);
+}
+
+function buildResultCountLabel({ showResultsSurface, resultTotalCount, t }) {
+  const value = showResultsSurface || resultTotalCount > 0
+    ? formatExactNumberLabel(resultTotalCount)
+    : t("results.indexLoading", "Loading index");
+  const unit = showResultsSurface || resultTotalCount > 0
+    ? resultTotalCount === 1 ? t("results.slot", "slot") : t("results.slots", "slots")
+    : "";
+  return {
+    value,
+    unit,
+    label: unit ? `${value} ${unit}` : value
+  };
 }
 
 function formatEpochSeconds(value, fallback = "Not available") {
@@ -2897,9 +2915,10 @@ export default function App() {
         latestRunText: "Retrying status in the background",
         activeAts: [],
         metrics: [
-          { label: "Indexed slots", value: "0" },
+          { label: "Job slots", value: "0" },
+          { label: "ATS", value: "0" },
+          { label: "Companies", value: "0" },
           { label: "Seen in 24h", value: "0" },
-          { label: "Sync companies", value: "0" },
           { label: "Queue due", value: "0" },
           { label: "Failures", value: "0" },
           { label: "Parser errors", value: "0" }
@@ -2923,7 +2942,6 @@ export default function App() {
       ? formatDateTimeSafe(status.last_sync_at, "Unknown sync time")
       : "No sync has run yet";
     const summary = status.last_sync_summary || {};
-    const syncEnabledCompanies = Number(status.sync_enabled_company_count ?? summary.sync_enabled_company_count ?? 0);
     const failedCompanies = Number(status.failed_companies ?? summary.failed_companies ?? 0);
     const worker = status.ingestion_worker || {};
     const workerStatus = sanitizeDisplayText(worker.latest_status, worker.latest_run_id ? "unknown" : "not started");
@@ -2935,9 +2953,11 @@ export default function App() {
     const failureCount = Number(worker.failure_count || 0) + failedCompanies;
     const parserErrorCount = Number(worker.parser_error_count_24h || 0);
     const metrics = [
-      { label: "Indexed slots", value: formatCompactNumberLabel(status.posting_count || 0) },
-      { label: "Seen in 24h", value: formatCompactNumberLabel(status.postings_seen_24h_count || 0) },
-      { label: "Sync companies", value: formatCompactNumberLabel(syncEnabledCompanies) },
+      ...buildPublicStatsChips(status).map((chip) => ({
+        label: chip.label === "ATS" ? "ATS" : chip.label.replace(/\b\w/g, (char) => char.toUpperCase()),
+        value: chip.value
+      })),
+      { label: "Seen in 24h", value: formatExactNumberLabel(status.postings_seen_24h_count || 0) },
       { label: "Queue due", value: formatCompactNumberLabel(worker.queue_due_count || 0) },
       { label: "Failures", value: formatCompactNumberLabel(failureCount) },
       { label: "Parser errors", value: formatCompactNumberLabel(parserErrorCount) }
@@ -4672,18 +4692,11 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
-    const resultCountValueLabel =
-      showResultsSurface || resultTotalCount > 0
-        ? formatCompactNumberLabel(resultTotalCount)
-        : t("results.indexLoading", "Loading index");
-    const resultCountUnitLabel = showResultsSurface
-      ? resultTotalCount === 1 ? t("results.slot", "slot") : t("results.slots", "slots")
-      : resultTotalCount > 0
-        ? resultTotalCount === 1 ? t("results.slotIndexed", "slot indexed") : t("results.slotsIndexed", "slots indexed")
-        : "";
-    const resultCountLabel = resultCountUnitLabel
-      ? `${resultCountValueLabel} ${resultCountUnitLabel}`
-      : resultCountValueLabel;
+    const {
+      value: resultCountValueLabel,
+      unit: resultCountUnitLabel,
+      label: resultCountLabel
+    } = buildResultCountLabel({ showResultsSurface, resultTotalCount, t });
     const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
       ? postingFilterOptions.sort_options
       : DEFAULT_POSTING_SORT_OPTIONS;

@@ -138,6 +138,10 @@ function clonePostgresCounts(counts = {}) {
     sync_enabled_company_count: Number(counts.sync_enabled_company_count || 0),
     configured_enabled_ats_count: Number(counts.configured_enabled_ats_count || 0),
     posting_count: Number(counts.posting_count || 0),
+    job_slot_count: Number(counts.job_slot_count || counts.posting_count || 0),
+    visible_company_count: Number(counts.visible_company_count || 0),
+    configured_ats_count: Number(counts.configured_ats_count || 0),
+    visible_ats_count: Number(counts.visible_ats_count || 0),
     postings_seen_24h_count: Number(counts.postings_seen_24h_count || 0),
     company_count_by_ats: { ...(counts.company_count_by_ats || {}) }
   };
@@ -771,7 +775,17 @@ async function getPostgresCounts(pool, options = {}) {
   if (!options.force && cacheTtlMs > 0 && cached && cached.expiresAtMs > nowMs) {
     return clonePostgresCounts(cached.counts);
   }
-  const [companyRow, syncCompanyRow, enabledAtsRow, postingRow, seenRow, atsRows] = await Promise.all([
+  const [
+    companyRow,
+    syncCompanyRow,
+    enabledAtsRow,
+    configuredAtsRow,
+    postingRow,
+    visibleCompanyRow,
+    visibleAtsRow,
+    seenRow,
+    atsRows
+  ] = await Promise.all([
     pool.query("SELECT COUNT(*)::int AS count FROM companies;"),
     pool.query(
       `
@@ -783,7 +797,10 @@ async function getPostgresCounts(pool, options = {}) {
       `
     ),
     pool.query("SELECT COUNT(*)::int AS count FROM ats_sources WHERE enabled = true;"),
+    pool.query("SELECT COUNT(*)::int AS count FROM ats_sources;"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false;"),
+    pool.query("SELECT COUNT(DISTINCT NULLIF(company_name, ''))::int AS count FROM postings WHERE hidden = false;"),
+    pool.query("SELECT COUNT(DISTINCT ats_key)::int AS count FROM postings WHERE hidden = false AND COALESCE(ats_key, '') <> '';"),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false AND last_seen_epoch >= $1;", [
       Math.floor(nowMs / 1000) - 24 * 60 * 60
     ]),
@@ -796,6 +813,10 @@ async function getPostgresCounts(pool, options = {}) {
     sync_enabled_company_count: Number(syncCompanyRow.rows[0]?.count || 0),
     configured_enabled_ats_count: Number(enabledAtsRow.rows[0]?.count || 0),
     posting_count: Number(postingRow.rows[0]?.count || 0),
+    job_slot_count: Number(postingRow.rows[0]?.count || 0),
+    visible_company_count: Number(visibleCompanyRow.rows[0]?.count || 0),
+    configured_ats_count: Number(configuredAtsRow.rows[0]?.count || 0),
+    visible_ats_count: Number(visibleAtsRow.rows[0]?.count || 0),
     postings_seen_24h_count: Number(seenRow.rows[0]?.count || 0),
     company_count_by_ats
   };

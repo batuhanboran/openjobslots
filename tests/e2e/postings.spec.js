@@ -310,7 +310,7 @@ async function expectInitialIndexCountVisible(page) {
   const count = page.getByTestId("result-count");
   await expect(count).toBeVisible();
   await expect(count).toContainText(/\d/);
-  await expect(count).toContainText(/indexed/i);
+  await expect(count).toContainText(/slots?/i);
   await expect(count).not.toContainText(/^Search jobs$/i);
 }
 

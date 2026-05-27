@@ -2533,11 +2533,20 @@ function getDb() {
 
 async function getCounts() {
   const companyRow = await db.get(`SELECT COUNT(*) AS count FROM companies;`);
+  const configuredAtsRow = await db.get(`SELECT COUNT(DISTINCT ATS_name) AS count FROM companies;`);
   const postingRow = await db.get(
     `
       SELECT COUNT(*) AS count
       FROM Postings
       WHERE COALESCE(hidden, 0) = 0;
+    `
+  );
+  const visibleCompanyRow = await db.get(
+    `
+      SELECT COUNT(DISTINCT company_name) AS count
+      FROM Postings
+      WHERE COALESCE(hidden, 0) = 0
+        AND COALESCE(company_name, '') <> '';
     `
   );
   const seen24hRow = await db.get(
@@ -2560,10 +2569,15 @@ async function getCounts() {
     const key = String(row?.ATS_name || "").trim() || "Unknown";
     companyCountByAts[key] = Number(row?.count || 0);
   }
+  const visibleAtsCount = Number(configuredAtsRow?.count || 0);
 
   return {
     company_count: Number(companyRow?.count || 0),
+    visible_company_count: Number(visibleCompanyRow?.count || 0),
+    configured_ats_count: Number(configuredAtsRow?.count || 0),
+    visible_ats_count: visibleAtsCount,
     posting_count: Number(postingRow?.count || 0),
+    job_slot_count: Number(postingRow?.count || 0),
     postings_seen_24h_count: Number(seen24hRow?.count || 0),
     company_count_by_ats: companyCountByAts
   };

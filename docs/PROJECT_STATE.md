@@ -2,6 +2,14 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## v2.0 Prep Update - May 27, 2026
+
+- Public UI/backend now expose exact public counters for `job_slot_count`, `configured_ats_count`, `visible_company_count`, and `visible_ats_count`; the public result chip no longer says compact `157K slots indexed`, and now renders exact job slot wording.
+- `quality:gate --skip-e2e` now includes `test:public-stats`, and `scripts/test/setup-e2e-db.js` can build an isolated minimal SQLite fixture when repo-root `jobs.db` is absent.
+- Production canary enablement increased active ATS sources from `19` to `23`: `freshteam`, `isolvisolvedhire`, `jobvite`, and `teamtailor` are enabled as `canary_only`. A fresh Postgres backup was created first under `/root/OpenJobSlots/backups/v2-public-stats-canary-enable-20260527T125144Z.dump`; no public rows were deleted/hidden and no Meili replace reindex was run.
+- Post-enable worker run `617` completed with `50` targets, `25` successes, `25` failures, and `302` postings stored; queue depth was about `26.4k`, configured sync-enabled companies `30,465`, and visible posting count had grown to `157,738` at the verification snapshot.
+- Release blocker remains: Meili/Postgres validation drift is still nonzero (`last_count_delta=-2`), so do not tag or claim v2.0.0 release readiness until parity is repaired through the documented Meili repair order.
+
 ## Architecture Update - May 24, 2026
 
 This update records the ATS parser modularization decision. It is architecture-only: no source apply, backfill, cleanup, public-row delete/hide, worker budget change, threshold change, or Meili replace reindex is part of this update.

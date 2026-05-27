@@ -131,8 +131,17 @@ function createStatusMockPool(controlStatus = "requested", options = {}) {
       if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) {
         return { rows: [{ count: 57 }] };
       }
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) {
+        return { rows: [{ count: 62 }] };
+      }
       if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) {
         return { rows: [{ count: 18 }] };
+      }
+      if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) {
+        return { rows: [{ count: 8 }] };
+      }
+      if (/COUNT\(DISTINCT ats_key/i.test(sql)) {
+        return { rows: [{ count: 3 }] };
       }
       if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) {
         return { rows: [{ count: 7 }] };
@@ -1146,6 +1155,9 @@ async function testPostgresCountsCacheReusesShortTtlSnapshot() {
       if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) return { rows: [{ count: 20 }] };
       if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) return { rows: [{ count: 12 }] };
       if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) return { rows: [{ count: 18 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) return { rows: [{ count: 62 }] };
+      if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) return { rows: [{ count: 8 }] };
+      if (/COUNT\(DISTINCT ats_key/i.test(sql)) return { rows: [{ count: 3 }] };
       if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) return { rows: [{ count: 7 }] };
       if (/FROM postings WHERE hidden = false/i.test(sql)) return { rows: [{ count: 30 }] };
       if (/SELECT ats_key, COUNT\(\*\)::int AS count FROM companies/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 2 }] };
@@ -1155,7 +1167,7 @@ async function testPostgresCountsCacheReusesShortTtlSnapshot() {
 
   const first = await getPostgresCounts(pool, { nowMs: 1000, cacheTtlMs: 30000 });
   const second = await getPostgresCounts(pool, { nowMs: 2000, cacheTtlMs: 30000 });
-  assert.equal(calls.length, 6);
+  assert.equal(calls.length, 9);
   assert.deepEqual(second, first);
 
   second.company_count_by_ats.greenhouse = 99;
@@ -1163,7 +1175,7 @@ async function testPostgresCountsCacheReusesShortTtlSnapshot() {
   assert.equal(third.company_count_by_ats.greenhouse, 2);
 
   await getPostgresCounts(pool, { nowMs: 32000, cacheTtlMs: 30000 });
-  assert.equal(calls.length, 12);
+  assert.equal(calls.length, 18);
 }
 
 async function testPayloadDriftDoesNotBootstrapEmptyShapes() {
@@ -1212,6 +1224,32 @@ async function testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape() 
   assert.equal(result.baseline_replaced, true);
   assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
+async function testPostgresCountsExposePublicStatsCounters() {
+  const pool = {
+    async query(sql, params = []) {
+      if (/SELECT COUNT\(\*\)::int AS count FROM companies;/i.test(sql)) return { rows: [{ count: 40860 }] };
+      if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) return { rows: [{ count: 27511 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE enabled = true/i.test(sql)) return { rows: [{ count: 19 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) return { rows: [{ count: 62 }] };
+      if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) return { rows: [{ count: 8076 }] };
+      if (/COUNT\(DISTINCT ats_key/i.test(sql)) return { rows: [{ count: 18 }] };
+      if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) return { rows: [{ count: 48451 }] };
+      if (/FROM postings WHERE hidden = false/i.test(sql)) return { rows: [{ count: 157355 }] };
+      if (/SELECT ats_key, COUNT\(\*\)::int AS count FROM companies/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 44 }] };
+      throw new Error(`Unexpected public stats count query: ${sql}`);
+    }
+  };
+
+  const counts = await getPostgresCounts(pool, { force: true, nowMs: 1000, cacheTtlMs: 30000 });
+  assert.equal(counts.posting_count, 157355);
+  assert.equal(counts.job_slot_count, 157355);
+  assert.equal(counts.company_count, 40860);
+  assert.equal(counts.visible_company_count, 8076);
+  assert.equal(counts.configured_enabled_ats_count, 19);
+  assert.equal(counts.configured_ats_count, 62);
+  assert.equal(counts.visible_ats_count, 18);
 }
 
 async function testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape() {
@@ -1518,6 +1556,7 @@ async function main() {
   await testPostgresSuggestionsUseMeiliWhenConfigured();
   await testPostgresSuggestionsFallbackAvoidsUnaccentSeqScanPath();
   await testPostgresCountsCacheReusesShortTtlSnapshot();
+  await testPostgresCountsExposePublicStatsCounters();
   await testPayloadDriftDoesNotBootstrapEmptyShapes();
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();

@@ -59,7 +59,11 @@ async function main() {
     }
   }
 
-  fs.copyFileSync(fixtureSource, testDbPath);
+  if (fs.existsSync(fixtureSource)) {
+    fs.copyFileSync(fixtureSource, testDbPath);
+  } else {
+    await createMinimalFixtureDb(testDbPath);
+  }
 
   const db = await open({
     filename: testDbPath,
@@ -78,6 +82,45 @@ async function main() {
   }
 
   console.log(`Prepared isolated OpenJobSlots test DB at ${testDbPath}`);
+}
+
+async function createMinimalFixtureDb(targetPath) {
+  const db = await open({
+    filename: targetPath,
+    driver: sqlite3.Database
+  });
+
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS companies (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        url_string TEXT NOT NULL,
+        ATS_name TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS Postings (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        position_name TEXT NOT NULL,
+        job_posting_url TEXT NOT NULL UNIQUE,
+        location TEXT,
+        posting_date TEXT,
+        first_seen_epoch INTEGER,
+        last_seen_epoch INTEGER,
+        source_job_id TEXT NOT NULL DEFAULT '',
+        parser_version TEXT NOT NULL DEFAULT 'legacy-adapter-v1',
+        confidence REAL NOT NULL DEFAULT 0,
+        quality_score INTEGER NOT NULL DEFAULT 0,
+        quality_flags TEXT NOT NULL DEFAULT '[]',
+        rejection_reason TEXT NOT NULL DEFAULT '',
+        hidden INTEGER NOT NULL DEFAULT 0,
+        hidden_at_epoch INTEGER
+      );
+    `);
+  } finally {
+    await db.close();
+  }
 }
 
 async function addColumnIfMissing(db, tableName, columnName, ddl) {
@@ -126,6 +169,23 @@ async function ensureReferenceTables(db) {
 
 async function seedFixtureRows(db) {
   const now = Math.floor(Date.now() / 1000);
+  const companies = [
+    {
+      company_name: "QA Greenhouse Turkey",
+      url_string: "https://boards.greenhouse.io/openjobslotsqa",
+      ATS_name: "greenhouse"
+    },
+    {
+      company_name: "QA Lever Remote",
+      url_string: "https://jobs.lever.co/openjobslotsqa",
+      ATS_name: "lever"
+    },
+    {
+      company_name: "QA Ashby Europe",
+      url_string: "https://jobs.ashbyhq.com/openjobslotsqa",
+      ATS_name: "ashby"
+    }
+  ];
   const postings = [
     {
       company_name: "QA Greenhouse Turkey",
@@ -150,6 +210,37 @@ async function seedFixtureRows(db) {
       posting_date: "2026-05-04"
     }
   ];
+  for (let index = 1; index <= 28; index += 1) {
+    const isTurkey = index % 3 === 0;
+    const isStale = index % 7 === 0;
+    postings.push({
+      company_name: isTurkey ? "QA Greenhouse Turkey" : "QA Lever Remote",
+      position_name: `Remote QA Engineer ${index}`,
+      job_posting_url: isTurkey
+        ? `https://boards.greenhouse.io/openjobslotsqa/jobs/scroll-${index}`
+        : `https://jobs.lever.co/openjobslotsqa/scroll-${index}`,
+      location: isTurkey ? "Istanbul, Turkey" : "Remote - EMEA",
+      posting_date: `2026-05-${String(Math.max(1, 24 - (index % 20))).padStart(2, "0")}`,
+      last_seen_epoch: isStale ? now - 10 * 24 * 60 * 60 : now
+    });
+  }
+
+  for (const company of companies) {
+    await db.run(
+      `
+        INSERT INTO companies (
+          company_name,
+          url_string,
+          ATS_name
+        ) VALUES (?, ?, ?);
+      `,
+      [
+        company.company_name,
+        company.url_string,
+        company.ATS_name
+      ]
+    );
+  }
 
   for (const posting of postings) {
     await db.run(

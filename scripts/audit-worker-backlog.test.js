@@ -809,9 +809,9 @@ test("summarizeBacklogRows uses live worker stage-1 defaults when audit env omit
 
   assert.equal(report.daily_budget_projection.auto_sync_daily_target_budget, 2000);
   assert.equal(report.daily_budget_projection.auto_sync_targets_per_run, 50);
-  assert.equal(report.daily_budget_projection.source_daily_target_budget, 200);
-  assert.equal(report.daily_budget_projection.source_budget_limited_due_count, 200);
-  assert.equal(report.daily_budget_projection.effective_daily_target_budget, 200);
+  assert.equal(report.daily_budget_projection.source_daily_target_budget, 300);
+  assert.equal(report.daily_budget_projection.source_budget_limited_due_count, 300);
+  assert.equal(report.daily_budget_projection.effective_daily_target_budget, 300);
 });
 
 test("runPostgresBacklogAudit performs one read-only query", async () => {
@@ -1066,8 +1066,8 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   const applytojob = report.items.find((item) => item.ats_key === "applytojob");
   assert.equal(applytojob.recent_run_trend.success_rate_pct, 21.43);
   assert.equal(applytojob.source_daily_budget_usage.successful_targets_today, 200);
-  assert.equal(applytojob.source_daily_budget_usage.remaining_daily_budget, 0);
-  assert.equal(applytojob.source_daily_budget_usage.daily_budget_exhausted, true);
+  assert.equal(applytojob.source_daily_budget_usage.remaining_daily_budget, 100);
+  assert.equal(applytojob.source_daily_budget_usage.daily_budget_exhausted, false);
 });
 
 test("summarizeAutoSyncBudgetUsage explains consumed and remaining daily budget", () => {
