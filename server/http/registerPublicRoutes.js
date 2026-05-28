@@ -3,6 +3,31 @@ const crypto = require("crypto");
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+function getRequestHeader(req, name) {
+  if (req && typeof req.get === "function") return req.get(name) || "";
+  return req?.headers?.[String(name || "").toLowerCase()] || "";
+}
+
+function normalizeRequestHost(value) {
+  const raw = String(value || "").split(",")[0].trim().toLowerCase();
+  return raw.replace(/:\d+$/, "");
+}
+
+function normalizeRedirectPath(value) {
+  const raw = String(value || "").trim();
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
+
+function getCanonicalPublicHostRedirectTarget(req) {
+  const method = String(req?.method || "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return "";
+  const forwardedHost = getRequestHeader(req, "x-forwarded-host");
+  const host = normalizeRequestHost(forwardedHost || getRequestHeader(req, "host"));
+  if (host !== "www.openjobslots.com") return "";
+  return `https://openjobslots.com${normalizeRedirectPath(req?.originalUrl || req?.url || "/")}`;
+}
+
 function parseCookieHeader(header) {
   const cookies = {};
   for (const part of String(header || "").split(";")) {
@@ -59,6 +84,7 @@ function registerPublicRoutes(app, context) {
     appendFrontendLogEntry,
     buildPublicIngestionStatusItem,
     buildPublicPreferences,
+    buildLlmsTxt,
     buildRobotsTxt,
     buildSitemapXml,
     createEmptyGrowthSummary,
@@ -109,6 +135,12 @@ function registerPublicRoutes(app, context) {
       `public, max-age=${browserTtl}, s-maxage=${edgeTtl}, stale-while-revalidate=86400`
     );
   }
+
+  app.use((req, res, next) => {
+    const canonicalTarget = getCanonicalPublicHostRedirectTarget(req);
+    if (canonicalTarget) return res.redirect(301, canonicalTarget);
+    return next();
+  });
 
   function recordPublicSearchEvent(req, res, eventType, search, payload, options = {}, info = {}) {
     if (DB_BACKEND !== "postgres" || typeof recordPostgresPublicSearchEvent !== "function") return;
@@ -548,6 +580,10 @@ function registerPublicRoutes(app, context) {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("text/plain").send(buildRobotsTxt(req));
     });
+    app.get("/llms.txt", (req, res) => {
+      setPublicSeoCacheHeaders(res, 300, 3600);
+      res.type("text/plain").send(buildLlmsTxt(req));
+    });
     app.get("/sitemap.xml", (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("application/xml").send(buildSitemapXml(req));
@@ -568,5 +604,6 @@ function registerPublicRoutes(app, context) {
 }
 
 module.exports = {
+  getCanonicalPublicHostRedirectTarget,
   registerPublicRoutes
 };

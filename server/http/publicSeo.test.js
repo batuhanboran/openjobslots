@@ -91,6 +91,25 @@ function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {
   assert.ok(!html.includes("\"stale\":true"));
 }
 
+function testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id=\"root\"></div></body></html>",
+    createRequest()
+  );
+
+  assert.ok(html.includes("<noscript>"));
+  assert.ok(html.includes("<h1>OpenJobSlots</h1>"));
+  assert.ok(html.includes("Find fresh job openings from public employer ATS boards."));
+  assert.ok(html.includes('href="https://openjobslots.com/en/job-openings"'));
+  assert.ok(html.includes('href="https://openjobslots.com/ats/greenhouse-jobs"'));
+  assert.ok(!html.includes("You need to enable JavaScript"));
+}
+
 function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com",
@@ -206,13 +225,30 @@ function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages() {
   assert.doesNotMatch(sitemap, /%40/);
 }
 
+function testBuildLlmsTxtUsesPlainMarkdownFormat() {
+  const { buildLlmsTxt } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const llms = buildLlmsTxt(createRequest());
+
+  assert.match(llms, /^# OpenJobSlots$/m);
+  assert.match(llms, /^> Find fresh job openings from public employer ATS boards\.$/m);
+  assert.match(llms, /^## Core pages$/m);
+  assert.match(llms, /^- \[Search open job slots\]\(https:\/\/openjobslots\.com\/en\):/m);
+  assert.match(llms, /^- \[Greenhouse jobs\]\(https:\/\/openjobslots\.com\/ats\/greenhouse-jobs\):/m);
+  assert.doesNotMatch(llms, /<html|<script|<meta|<\/a>/i);
+}
+
 testRenderSeoIndexHtmlReplacesMetadata();
 testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
+testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback();
 testSearchQueryPagesGetSpecificMetadataAndCanonical();
 testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
 testHomeLanguagePagesGetBidirectionalHreflang();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
 testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages();
+testBuildLlmsTxtUsesPlainMarkdownFormat();
 
 console.log("public SEO tests passed");

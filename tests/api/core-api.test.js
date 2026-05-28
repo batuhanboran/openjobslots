@@ -49,6 +49,15 @@ test.describe("openjobslots API compatibility", () => {
     expect(robotsText).toMatch(/^Disallow: \/postings$/m);
     expect(robotsText).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:8877\/sitemap\.xml$/m);
 
+    const llms = await request.get(`${apiBaseUrl}/llms.txt`);
+    expect(llms.status()).toBe(200);
+    expect(llms.headers()["content-type"]).toMatch(/text\/plain/i);
+    expect(llms.headers()["cache-control"]).toContain("s-maxage=3600");
+    const llmsText = await llms.text();
+    expect(llmsText).toMatch(/^# OpenJobSlots$/m);
+    expect(llmsText).toMatch(/^- \[Search open job slots\]\(http:\/\/127\.0\.0\.1:8877\/en\):/m);
+    expect(llmsText).not.toMatch(/<html|<script|postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_/i);
+
     const sitemap = await request.get(`${apiBaseUrl}/sitemap.xml`, {
       params: { q: "private@example.com" }
     });

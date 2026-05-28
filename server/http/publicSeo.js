@@ -24,6 +24,24 @@ function escapeHtmlAttribute(value) {
     .replace(/>/g, "&gt;");
 }
 
+function normalizeInlineText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function stripOpenJobSlotsTitleSuffix(value) {
+  return normalizeInlineText(value).replace(/\s+\|\s+OpenJobSlots\s*$/i, "").trim();
+}
+
+function getSeoHeadingFromTitle(value) {
+  const normalized = normalizeInlineText(value);
+  if (/^OpenJobSlots\s+\|/i.test(normalized)) return "OpenJobSlots";
+  return stripOpenJobSlotsTitleSuffix(normalized);
+}
+
+function escapeMarkdownLinkText(value) {
+  return normalizeInlineText(value).replace(/[\[\]]/g, "");
+}
+
 function removeExistingSeoTags(html) {
   return String(html || "")
     .replace(/\s*<meta[^>]+name=["'](?:description|robots|twitter:card|twitter:title|twitter:description)["'][^>]*>/gi, "")
@@ -193,6 +211,61 @@ function createPublicSeoHelpers(dependencies = {}) {
     ].join("\n    ");
   }
 
+  function getStaticSeoFallbackLinks(req) {
+    const seoMeta = getSeoMeta(req);
+    const languageCode = seoMeta.languageCode || "en";
+    const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
+      (route) => route.languageCode === languageCode && route.alternateGroup && route.alternateGroup !== "home"
+    );
+    const atsRoutes = PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/")).slice(0, 3);
+    return [...localizedRoutes, ...atsRoutes].slice(0, 10);
+  }
+
+  function buildStaticSeoFallback(req) {
+    const siteOrigin = getPublicSiteOrigin(req);
+    const seoMeta = getSeoMeta(req);
+    const heading = getSeoHeadingFromTitle(seoMeta.title) || "OpenJobSlots";
+    const description = normalizeInlineText(seoMeta.description || seoDescription);
+    const links = getStaticSeoFallbackLinks(req)
+      .map((route) => {
+        const label = stripOpenJobSlotsTitleSuffix(route.title) || route.searchQuery || route.path;
+        return [
+          "        <li>",
+          '<a href="' + escapeHtmlAttribute(`${siteOrigin}${route.path}`) + '">',
+          escapeHtmlAttribute(label),
+          "</a>",
+          "</li>"
+        ].join("");
+      })
+      .join("\n");
+
+    return [
+      "<noscript>",
+      '  <main id="openjobslots-seo-fallback">',
+      "    <h1>" + escapeHtmlAttribute(heading) + "</h1>",
+      "    <p>" + escapeHtmlAttribute(description) + "</p>",
+      "    <p>OpenJobSlots indexes fresh public employer ATS job openings for role, company, location, remote mode, source, and posting freshness searches. Use the curated public landing pages below to browse common searches while the interactive job search app loads.</p>",
+      '    <nav aria-label="Popular job search pages">',
+      "      <ul>",
+      links,
+      "      </ul>",
+      "    </nav>",
+      "  </main>",
+      "</noscript>"
+    ].join("\n");
+  }
+
+  function replaceStaticSeoFallback(html, req) {
+    const fallback = buildStaticSeoFallback(req);
+    if (/<noscript>[\s\S]*?<\/noscript>/i.test(html)) {
+      return html.replace(/<noscript>[\s\S]*?<\/noscript>/i, fallback);
+    }
+    if (/<body\b[^>]*>/i.test(html)) {
+      return html.replace(/<body\b[^>]*>/i, (match) => `${match}\n    ${fallback}`);
+    }
+    return html;
+  }
+
   function setHtmlLanguage(html, languageCode) {
     const htmlLang = escapeHtmlAttribute(languageCode || "en");
     return String(html || "").replace(/<html\b([^>]*)>/i, (match, attrs) => {
@@ -236,12 +309,59 @@ function createPublicSeoHelpers(dependencies = {}) {
 
     let html = setHtmlLanguage(stripPublicWebAnalyticsHeadTags(removeExistingSeoTags(indexHtml)), seoMeta.languageCode || "en")
       .replace(/<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
+    html = replaceStaticSeoFallback(html, req);
     if (!/<\/head>/i.test(html)) return html;
     const analyticsBlock = managedAnalyticsTags ? `\n    ${managedAnalyticsTags}` : "";
     return html.replace(
       /<\/head>/i,
       `    <!-- OpenJobSlots SEO metadata -->\n    ${tags}\n    ${structuredDataTags}${analyticsBlock}\n</head>`
     );
+  }
+
+  function buildLlmsTxt(req) {
+    const siteOrigin = getPublicSiteOrigin(req);
+    const description = normalizeInlineText(seoDescription || "Find fresh job openings from public employer ATS boards.");
+    const byPath = new Map(PUBLIC_SEO_ROUTES.map((route) => [route.path, route]));
+    const corePaths = [
+      "/en",
+      "/en/job-openings",
+      "/en/remote-job-openings",
+      "/en/software-engineer-jobs",
+      "/en/product-manager-jobs",
+      "/en/technical-support-engineer-jobs"
+    ];
+    const atsRoutes = PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/"));
+
+    function markdownRoute(route) {
+      const title = escapeMarkdownLinkText(stripOpenJobSlotsTitleSuffix(route.title) || route.searchQuery || route.path);
+      const summary = normalizeInlineText(route.description || `OpenJobSlots landing page for ${route.searchQuery || route.path}.`);
+      return `- [${title}](${siteOrigin}${route.path}): ${summary}`;
+    }
+
+    const coreLinks = corePaths.map((routePath) => byPath.get(routePath)).filter(Boolean).map(markdownRoute);
+    const atsLinks = atsRoutes.map(markdownRoute);
+
+    return [
+      "# OpenJobSlots",
+      "",
+      `> ${description}`,
+      "",
+      "OpenJobSlots is a public job search product for discovering fresh job slots from employer ATS boards. Public pages focus on crawlable search entry points; app endpoints return structured public posting data.",
+      "",
+      "## Core pages",
+      "",
+      ...coreLinks,
+      "",
+      "## ATS source pages",
+      "",
+      ...atsLinks,
+      "",
+      "## Optional",
+      "",
+      `- [Sitemap](${siteOrigin}/sitemap.xml): XML sitemap for curated public landing pages.`,
+      `- [Robots policy](${siteOrigin}/robots.txt): Crawl policy for public and internal routes.`,
+      ""
+    ].join("\n");
   }
 
   function buildRobotsTxt(req) {
@@ -299,6 +419,7 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   return {
+    buildLlmsTxt,
     buildRobotsTxt,
     buildSitemapXml,
     buildStructuredDataTags,

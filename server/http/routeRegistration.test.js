@@ -1,7 +1,10 @@
 const assert = require("assert");
 
 const { registerAdminRoutes } = require("./registerAdminRoutes");
-const { registerPublicRoutes } = require("./registerPublicRoutes");
+const {
+  getCanonicalPublicHostRedirectTarget,
+  registerPublicRoutes
+} = require("./registerPublicRoutes");
 const { registerUserRoutes } = require("./registerUserRoutes");
 
 function createRecordingApp() {
@@ -77,8 +80,29 @@ function testPublicRoutes() {
     "GET /",
     "GET /index.html",
     "GET /robots.txt",
+    "GET /llms.txt",
     "GET /sitemap.xml"
   ]);
+}
+
+function testCanonicalPublicHostRedirectTarget() {
+  const req = {
+    method: "GET",
+    originalUrl: "/en/job-openings?q=remote",
+    get(name) {
+      return String(name).toLowerCase() === "host" ? "www.openjobslots.com" : "";
+    }
+  };
+  assert.equal(
+    getCanonicalPublicHostRedirectTarget(req),
+    "https://openjobslots.com/en/job-openings?q=remote"
+  );
+
+  const postReq = {
+    ...req,
+    method: "POST"
+  };
+  assert.equal(getCanonicalPublicHostRedirectTarget(postReq), "");
 }
 
 function testAdminRoutes() {
@@ -146,6 +170,7 @@ function testUserRoutes() {
 }
 
 testPublicRoutes();
+testCanonicalPublicHostRedirectTarget();
 testAdminRoutes();
 testUserRoutes();
 
