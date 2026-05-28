@@ -225,7 +225,13 @@ async function expectExampleSearchPlaceholderRotatesWithoutSuggestions(page) {
 
 async function expectSuggestionPanelDoesNotOverlap(page) {
   const suggestions = await page.getByTestId("search-suggestions-panel").boundingBox();
+  const searchFrame = await page.getByTestId("search-box-frame").boundingBox();
   expect(suggestions).toBeTruthy();
+  expect(searchFrame).toBeTruthy();
+  expect(Math.abs(suggestions.x - searchFrame.x)).toBeLessThanOrEqual(3);
+  expect(Math.abs(suggestions.width - searchFrame.width)).toBeLessThanOrEqual(4);
+  expect(suggestions.y - (searchFrame.y + searchFrame.height)).toBeGreaterThanOrEqual(-8);
+  expect(suggestions.y - (searchFrame.y + searchFrame.height)).toBeLessThanOrEqual(6);
   if ((await page.getByTestId("sync-status-panel").count()) > 0) {
     const coverage = await page.getByTestId("sync-status-panel").boundingBox();
     expect(coverage).toBeTruthy();

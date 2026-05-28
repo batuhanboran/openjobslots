@@ -5001,65 +5001,125 @@ export default function App() {
       !initializing && !loading && !error && !resultsAwaitingFreshResponse && postings.length === 0;
     const renderSearchBox = (mode = "home") => {
       const compact = mode === "results";
+      const showAttachedSuggestions = suggestionsVisible && searchSuggestions.length > 0;
       return (
         <View style={[styles.searchBoxRow, styles.yahooSearchBoxRow, compact ? styles.yahooSearchBoxRowResults : null]}>
           <View
             style={[
-              styles.yahooSearchBoxFrame,
-              compact ? styles.yahooSearchBoxFrameResults : null,
-              isDarkPublicTheme ? styles.yahooSearchBoxFrameDark : null,
-              searchFocused ? styles.yahooSearchBoxFrameFocused : null,
-              searchFocused && isDarkPublicTheme ? styles.yahooSearchBoxFrameFocusedDark : null
+              styles.searchBoxAutocomplete,
+              compact ? styles.searchBoxAutocompleteResults : null
             ]}
+            testID="search-box-autocomplete"
           >
-            {!compact ? <SearchGlyph isDark={isDarkPublicTheme} /> : null}
-            <TextInput
-              ref={searchInputRef}
+            <View
               style={[
-                styles.search,
-                isDarkPublicTheme ? styles.searchDark : null,
-                styles.yahooSearchInput,
-                isDarkPublicTheme ? styles.yahooSearchInputDark : null
+                styles.yahooSearchBoxFrame,
+                compact ? styles.yahooSearchBoxFrameResults : null,
+                showAttachedSuggestions ? styles.yahooSearchBoxFrameWithSuggestions : null,
+                isDarkPublicTheme ? styles.yahooSearchBoxFrameDark : null,
+                searchFocused ? styles.yahooSearchBoxFrameFocused : null,
+                searchFocused && isDarkPublicTheme ? styles.yahooSearchBoxFrameFocusedDark : null
               ]}
-              value={search}
-              onChangeText={handleSearchChange}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              onSubmitEditing={() => submitSearch(search)}
-              onKeyPress={handleSearchKeyPress}
-              placeholder={
-                !String(search || "").trim()
-                  ? exampleSearchPlaceholder
-                  : t("search.placeholder", "Search title, company, location, or country")
-              }
-              placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
-              autoCapitalize="none"
-              returnKeyType="search"
-              blurOnSubmit={false}
-              testID="search-input"
-              accessibilityLabel="Search postings"
-            />
-            {compact && String(search || "").trim() ? (
-              <Pressable
-                onPress={clearSearchAndSuggestions}
-                style={({ pressed }) => [styles.yahooSearchIconButton, pressed ? styles.yahooSearchIconButtonPressed : null]}
-                testID="postings-search-clear"
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-              >
-                <ClearGlyph isDark={isDarkPublicTheme} />
-              </Pressable>
-            ) : null}
-            {compact ? (
-              <Pressable
-                onPress={() => submitSearch(search)}
-                style={({ pressed }) => [styles.yahooSearchSubmitButton, pressed ? styles.yahooSearchSubmitButtonPressed : null]}
-                testID="postings-search-submit"
-                accessibilityRole="button"
+              testID="search-box-frame"
+            >
+              {!compact ? <SearchGlyph isDark={isDarkPublicTheme} /> : null}
+              <TextInput
+                ref={searchInputRef}
+                style={[
+                  styles.search,
+                  isDarkPublicTheme ? styles.searchDark : null,
+                  styles.yahooSearchInput,
+                  isDarkPublicTheme ? styles.yahooSearchInputDark : null
+                ]}
+                value={search}
+                onChangeText={handleSearchChange}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                onSubmitEditing={() => submitSearch(search)}
+                onKeyPress={handleSearchKeyPress}
+                placeholder={
+                  !String(search || "").trim()
+                    ? exampleSearchPlaceholder
+                    : t("search.placeholder", "Search title, company, location, or country")
+                }
+                placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
+                autoCapitalize="none"
+                returnKeyType="search"
+                blurOnSubmit={false}
+                testID="search-input"
                 accessibilityLabel="Search postings"
+              />
+              {compact && String(search || "").trim() ? (
+                <Pressable
+                  onPress={clearSearchAndSuggestions}
+                  style={({ pressed }) => [styles.yahooSearchIconButton, pressed ? styles.yahooSearchIconButtonPressed : null]}
+                  testID="postings-search-clear"
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                >
+                  <ClearGlyph isDark={isDarkPublicTheme} />
+                </Pressable>
+              ) : null}
+              {compact ? (
+                <Pressable
+                  onPress={() => submitSearch(search)}
+                  style={({ pressed }) => [styles.yahooSearchSubmitButton, pressed ? styles.yahooSearchSubmitButtonPressed : null]}
+                  testID="postings-search-submit"
+                  accessibilityRole="button"
+                  accessibilityLabel="Search postings"
+                >
+                  <SearchGlyph isDark={isDarkPublicTheme} compact />
+                </Pressable>
+              ) : null}
+            </View>
+            {showAttachedSuggestions ? (
+              <Animated.View
+                style={[
+                  styles.searchSuggestionsPanel,
+                  compact ? styles.searchSuggestionsPanelResults : null,
+                  isDarkPublicTheme ? styles.searchSuggestionsPanelDark : null,
+                  suggestionsMotionStyle
+                ]}
+                testID="search-suggestions-panel"
               >
-                <SearchGlyph isDark={isDarkPublicTheme} compact />
-              </Pressable>
+                {searchSuggestions.map((suggestion, index) => {
+                  const label = String(suggestion?.label || suggestion?.value || "").trim();
+                  const hint = String(suggestion?.type || "").trim();
+                  const selected = index === activeSuggestionIndex;
+                  return (
+                    <Pressable
+                      key={`${hint}-${label}-${index}`}
+                      onPress={() => selectSearchSuggestion(suggestion)}
+                      style={[
+                        styles.searchSuggestionItem,
+                        selected ? styles.searchSuggestionItemActive : null,
+                        selected && isDarkPublicTheme ? styles.searchSuggestionItemActiveDark : null
+                      ]}
+                      testID={`search-suggestion-${index}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Search ${label}`}
+                    >
+                      <View style={styles.searchSuggestionIconSlot}>
+                        <SearchGlyph isDark={isDarkPublicTheme} compact />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.searchSuggestionLabel, isDarkPublicTheme ? styles.searchSuggestionLabelDark : null]}
+                      >
+                        {label}
+                      </Text>
+                      {hint ? (
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.searchSuggestionHint, isDarkPublicTheme ? styles.searchSuggestionHintDark : null]}
+                        >
+                          {hint}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </Animated.View>
             ) : null}
           </View>
         </View>
@@ -5261,6 +5321,7 @@ export default function App() {
         {renderSearchBox("home")}
         <View
           style={[styles.searchIntentPanel, searchIntentChips.length === 0 ? styles.searchIntentPanelEmpty : null]}
+          pointerEvents={searchIntentChips.length > 0 ? "auto" : "none"}
           testID={searchIntentChips.length > 0 ? "search-intent-chips" : undefined}
         >
           {searchIntentChips.length > 0 ? (
@@ -5300,31 +5361,7 @@ export default function App() {
         <View
           style={styles.searchLowerRail}
         >
-          {suggestionsVisible ? (
-            <Animated.View
-              style={[styles.searchSuggestionsPanel, suggestionsMotionStyle]}
-              testID="search-suggestions-panel"
-            >
-              {searchSuggestions.map((suggestion, index) => {
-                const label = String(suggestion?.label || suggestion?.value || "").trim();
-                const hint = String(suggestion?.type || "").trim();
-                const selected = index === activeSuggestionIndex;
-                return (
-                  <Pressable
-                    key={`${hint}-${label}-${index}`}
-                    onPress={() => selectSearchSuggestion(suggestion)}
-                    style={[styles.searchSuggestionItem, selected ? styles.searchSuggestionItemActive : null]}
-                    testID={`search-suggestion-${index}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Search ${label}`}
-                  >
-                    <Text numberOfLines={1} style={styles.searchSuggestionLabel}>{label}</Text>
-                    {hint ? <Text numberOfLines={1} style={styles.searchSuggestionHint}>{hint}</Text> : null}
-                  </Pressable>
-                );
-              })}
-            </Animated.View>
-          ) : (
+          {!suggestionsVisible ? (
             <>
               <Text style={[styles.searchShortcutHint, isDarkPublicTheme ? styles.textMutedDark : null]}>
                 {t("search.shortcut", "Enter to search · Esc to clear")}
@@ -5340,7 +5377,7 @@ export default function App() {
                 </Text>
               ) : null}
             </>
-          )}
+          ) : null}
         </View>
       </Animated.View>
       ) : null}
@@ -7002,6 +7039,21 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "flex-start"
   },
+  searchBoxAutocomplete: {
+    position: "relative",
+    width: 614,
+    maxWidth: "100%",
+    height: 52,
+    alignSelf: "center",
+    zIndex: 24
+  },
+  searchBoxAutocompleteResults: {
+    width: "100%",
+    maxWidth: 640,
+    height: 46,
+    alignSelf: "flex-start",
+    zIndex: 24
+  },
   yahooSearchBoxFrame: {
     width: 614,
     maxWidth: "100%",
@@ -7022,6 +7074,10 @@ const styles = StyleSheet.create({
           transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
       : {})
+  },
+  yahooSearchBoxFrameWithSuggestions: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0
   },
   yahooSearchBoxFrameResults: {
     width: "100%",
@@ -7761,31 +7817,50 @@ const styles = StyleSheet.create({
     fontSize: 15
   },
   searchSuggestionsPanel: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
     width: "100%",
-    maxWidth: 760,
-    alignSelf: "center",
-    marginTop: 9,
+    maxWidth: "100%",
+    alignSelf: "stretch",
+    marginTop: -1,
     overflow: "hidden",
-    zIndex: 4,
-    elevation: 4,
+    zIndex: 25,
+    elevation: 8,
     borderWidth: 1,
+    borderTopWidth: 0,
     borderColor: OJS_COLORS.softBorder,
-    borderRadius: 22,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     backgroundColor: OJS_COLORS.surface,
-    paddingVertical: 6,
+    paddingTop: 7,
+    paddingBottom: 8,
     ...(Platform.OS === "web"
       ? {
-          boxShadow: "0 5px 14px rgba(38, 51, 45, 0.10)",
+          boxShadow: "0 14px 24px rgba(35, 42, 49, 0.10)",
           transitionProperty: "opacity, transform, margin, max-height",
           transitionDuration: "180ms",
           transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
       : {
           shadowColor: OJS_COLORS.shadow,
-          shadowOpacity: 0.1,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 5 }
+          shadowOpacity: 0.12,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 10 }
         })
+  },
+  searchSuggestionsPanelResults: {
+    top: 46,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20
+  },
+  searchSuggestionsPanelDark: {
+    borderColor: OJS_DARK_COLORS.border,
+    backgroundColor: "#18151F",
+    ...(Platform.OS === "web" ? { boxShadow: "0 16px 28px rgba(0, 0, 0, 0.34)" } : {})
   },
   searchIntentPanel: {
     width: "100%",
@@ -7836,28 +7911,47 @@ const styles = StyleSheet.create({
   },
   searchSuggestionItem: {
     minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10
+    gap: 11
   },
   searchSuggestionItemActive: {
     backgroundColor: OJS_COLORS.surfaceMuted
   },
+  searchSuggestionItemActiveDark: {
+    backgroundColor: OJS_DARK_COLORS.pressed
+  },
+  searchSuggestionIconSlot: {
+    width: 24,
+    minWidth: 24,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   searchSuggestionLabel: {
     flex: 1,
     color: OJS_COLORS.ink,
-    fontSize: 13,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: "600"
+  },
+  searchSuggestionLabelDark: {
+    color: OJS_DARK_COLORS.ink
   },
   searchSuggestionHint: {
     flexShrink: 0,
     maxWidth: 120,
     color: OJS_COLORS.muted,
-    fontSize: 11,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 12,
+    lineHeight: 16,
     textTransform: "capitalize"
+  },
+  searchSuggestionHintDark: {
+    color: OJS_DARK_COLORS.muted
   },
   searchNotice: {
     marginTop: 8,
