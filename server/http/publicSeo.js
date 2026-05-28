@@ -124,9 +124,12 @@ function createPublicSeoHelpers(dependencies = {}) {
     const seoRoute = getSeoRoute(req);
     const requestPath = getRequestPath(req);
     const alternateGroup = seoRoute?.alternateGroup || (requestPath === "/" ? "home" : "");
+    return getPublicSeoAlternateLinksForGroup(getPublicSiteOrigin(req), alternateGroup);
+  }
+
+  function getPublicSeoAlternateLinksForGroup(siteOrigin, alternateGroup) {
     const groupPages = getPublicSeoAlternateGroupPages(alternateGroup);
     if (groupPages.length === 0) return [];
-    const siteOrigin = getPublicSiteOrigin(req);
     const links = groupPages.map((page) => ({
       hreflang: page.languageCode,
       href: `${siteOrigin}${page.path}`
@@ -262,25 +265,34 @@ function createPublicSeoHelpers(dependencies = {}) {
       {
         loc: `${siteOrigin}/`,
         changefreq: "daily",
-        priority: "1.0"
+        priority: "1.0",
+        alternateGroup: "home"
       },
       ...PUBLIC_SEO_ROUTES.map((route) => ({
         loc: `${siteOrigin}${route.path}`,
         changefreq: route.changefreq || "daily",
-        priority: route.priority || "0.8"
+        priority: route.priority || "0.8",
+        alternateGroup: route.alternateGroup || ""
       }))
     ];
-    const urlEntries = urls.map((item) => [
-      "  <url>",
-      `    <loc>${escapeHtmlAttribute(item.loc)}</loc>`,
-      `    <changefreq>${escapeHtmlAttribute(item.changefreq)}</changefreq>`,
-      `    <priority>${escapeHtmlAttribute(item.priority)}</priority>`,
-      "  </url>"
-    ].join("\n"));
+    const urlEntries = urls.map((item) => {
+      const alternateEntries = getPublicSeoAlternateLinksForGroup(siteOrigin, item.alternateGroup)
+        .map((alternate) =>
+          `    <xhtml:link rel="alternate" hreflang="${escapeHtmlAttribute(alternate.hreflang)}" href="${escapeHtmlAttribute(alternate.href)}" />`
+        );
+      return [
+        "  <url>",
+        `    <loc>${escapeHtmlAttribute(item.loc)}</loc>`,
+        ...alternateEntries,
+        `    <changefreq>${escapeHtmlAttribute(item.changefreq)}</changefreq>`,
+        `    <priority>${escapeHtmlAttribute(item.priority)}</priority>`,
+        "  </url>"
+      ].join("\n");
+    });
 
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
       ...urlEntries,
       "</urlset>"
     ].join("\n") + "\n";

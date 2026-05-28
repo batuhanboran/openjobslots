@@ -1101,6 +1101,22 @@ test.describe("postings page QA", () => {
     await expect.poll(() => requestedSearch).toBe(expectedQuery);
   });
 
+  test("home exposes crawlable SEO landing links for search engines", async ({ page }) => {
+    await openJobSlots(page);
+
+    const englishRemoteLink = page.locator('a[href="/en/remote-job-openings"]');
+    await expect(page.getByTestId("seo-landing-links")).toBeVisible();
+    await expect(englishRemoteLink).toBeVisible();
+    await expect(englishRemoteLink).toContainText(/remote job openings/i);
+
+    await page.getByTestId("language-selector").click();
+    await page.getByTestId("language-option-tr").click();
+
+    const turkishRemoteLink = page.locator('a[href="/tr/uzaktan-calisma-ilanlari"]');
+    await expect(turkishRemoteLink).toBeVisible();
+    await expect(turkishRemoteLink).toContainText(/uzaktan/i);
+  });
+
   test("public localization covers home, results, suggestions, footer, and release notes in every language", async ({ page }) => {
     test.setTimeout(120_000);
     const viewport = page.viewportSize() || { width: 1440, height: 900 };

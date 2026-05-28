@@ -181,10 +181,13 @@ function testRobotsAndSitemapStayCrawlSafe() {
   assert.doesNotMatch(robots, /noindex/i);
   assert.match(robots, /^Sitemap: https:\/\/openjobslots\.com\/sitemap\.xml$/m);
 
-  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/tr\/yazilim-muhendisi-is-ilanlari<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/ats\/greenhouse-jobs<\/loc>/);
+  assert.match(sitemap, /xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
+  assert.match(sitemap, /<xhtml:link rel="alternate" hreflang="tr" href="https:\/\/openjobslots\.com\/tr\/uzaktan-calisma-ilanlari" \/>/);
+  assert.match(sitemap, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/openjobslots\.com\/en\/remote-job-openings" \/>/);
   assert.doesNotMatch(sitemap, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
   assert.doesNotMatch(sitemap, /\?q=/);
 }

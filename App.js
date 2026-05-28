@@ -53,6 +53,7 @@ import {
   formatExactNumberLabel
 } from "./src/publicStatsCore";
 import {
+  PUBLIC_SEO_ROUTES,
   getPublicSeoRouteHintByPath
 } from "./src/publicSeoRoutes";
 
@@ -299,6 +300,7 @@ const PUBLIC_MESSAGES = {
     "search.placeholder": "Search title, company, location, or country",
     "search.examplePrefix": "Try",
     "search.shortcut": "Enter to search · Esc to clear",
+    "seo.popularSearches": "Popular searches",
     "search.clear": "Clear",
     "filters.loading": "Loading filter options...",
     "filters.show": "Filters",
@@ -424,6 +426,7 @@ const PUBLIC_MESSAGES = {
     "search.placeholder": "Ünvan, şirket, konum veya ülke ara",
     "search.examplePrefix": "Orn.",
     "search.shortcut": "Aramak için Enter · Temizlemek için Esc",
+    "seo.popularSearches": "Popüler aramalar",
     "search.clear": "Temizle",
     "filters.loading": "Filtreler yükleniyor...",
     "filters.show": "Filtreler",
@@ -549,6 +552,7 @@ const PUBLIC_MESSAGES = {
     "search.placeholder": "Titel, Firma, Ort oder Land suchen",
     "search.examplePrefix": "Beispiel",
     "search.shortcut": "Enter zum Suchen · Esc zum Leeren",
+    "seo.popularSearches": "Beliebte Suchen",
     "search.clear": "Leeren",
     "filters.loading": "Filter werden geladen...",
     "filters.show": "Filter",
@@ -674,6 +678,7 @@ const PUBLIC_MESSAGES = {
     "search.placeholder": "Titre, entreprise, lieu ou pays",
     "search.examplePrefix": "Essayez",
     "search.shortcut": "Entrer pour rechercher · Esc pour vider",
+    "seo.popularSearches": "Recherches populaires",
     "search.clear": "Vider",
     "filters.loading": "Chargement des filtres...",
     "filters.show": "Filtres",
@@ -799,6 +804,7 @@ const PUBLIC_MESSAGES = {
     "search.placeholder": "Título, empresa, ubicación o país",
     "search.examplePrefix": "Prueba",
     "search.shortcut": "Enter para buscar · Esc para limpiar",
+    "seo.popularSearches": "Búsquedas populares",
     "search.clear": "Limpiar",
     "filters.loading": "Cargando filtros...",
     "filters.show": "Filtros",
@@ -1547,6 +1553,55 @@ function interpolatePublicText(template, values = {}) {
 
 function translatedPublicText(t, key, fallback = "", values = {}) {
   return interpolatePublicText(t(key, fallback), values);
+}
+
+const SEO_LANDING_LINK_LIMIT = 8;
+
+function getSeoLandingLinksForLanguage(languageCode) {
+  const normalizedLanguageCode = PUBLIC_LANGUAGE_BY_CODE.has(languageCode) ? languageCode : "en";
+  const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
+    (route) => route.languageCode === normalizedLanguageCode && route.alternateGroup && route.alternateGroup !== "home"
+  );
+  const atsRoutes = normalizedLanguageCode === "en"
+    ? PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/")).slice(0, 3)
+    : [];
+  return [...localizedRoutes, ...atsRoutes].slice(0, SEO_LANDING_LINK_LIMIT);
+}
+
+function getSeoLandingLinkLabel(route) {
+  const title = String(route?.title || "").replace(/\s+\|\s+OpenJobSlots\s*$/i, "").trim();
+  return title || String(route?.searchQuery || route?.path || "").trim();
+}
+
+function getSeoLandingLinkTestId(route) {
+  return `seo-landing-link-${String(route?.path || "route").replace(/^\/+/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}`;
+}
+
+function SeoLandingLinks({ languageCode, t, isDarkTheme }) {
+  if (Platform.OS !== "web") return null;
+  const links = getSeoLandingLinksForLanguage(languageCode);
+  if (links.length === 0) return null;
+  return (
+    <View style={styles.seoLandingLinks} testID="seo-landing-links">
+      <Text style={[styles.seoLandingLinksTitle, isDarkTheme ? styles.textMutedDark : null]}>
+        {t("seo.popularSearches", "Popular searches")}
+      </Text>
+      <View style={styles.seoLandingLinksList}>
+        {links.map((route) => (
+          <Text
+            key={route.path}
+            href={route.path}
+            hrefAttrs={{ rel: "bookmark" }}
+            style={[styles.seoLandingLink, isDarkTheme ? styles.seoLandingLinkDark : null]}
+            testID={getSeoLandingLinkTestId(route)}
+            accessibilityRole="link"
+          >
+            {getSeoLandingLinkLabel(route)}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 function getPublicLocale(languageCode) {
@@ -5892,6 +5947,11 @@ export default function App() {
                   {syncNotice}
                 </Text>
               ) : null}
+              <SeoLandingLinks
+                languageCode={publicLanguageCode}
+                t={t}
+                isDarkTheme={isDarkPublicTheme}
+              />
             </>
           ) : null}
         </View>
@@ -7901,6 +7961,50 @@ const styles = StyleSheet.create({
     color: OJS_COLORS.muted,
     fontSize: 11,
     textAlign: "center"
+  },
+  seoLandingLinks: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    marginTop: 24,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 10
+  },
+  seoLandingLinksTitle: {
+    color: OJS_COLORS.muted,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "700",
+    textTransform: "uppercase"
+  },
+  seoLandingLinksList: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8
+  },
+  seoLandingLink: {
+    color: YAHOO_COLORS.purple,
+    backgroundColor: "rgba(100, 79, 240, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(100, 79, 240, 0.16)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+    textDecorationLine: "none"
+  },
+  seoLandingLinkDark: {
+    color: "#D8CCFF",
+    backgroundColor: "rgba(183, 158, 255, 0.14)",
+    borderColor: "rgba(183, 158, 255, 0.24)"
   },
   searchActionsRow: {
     marginTop: 12,
