@@ -311,6 +311,56 @@ async function expectResultCountPill(page) {
   expect(Number.parseFloat(state.minHeight || "0")).toBeGreaterThanOrEqual(40);
 }
 
+async function expectStatsChipsAligned(page) {
+  const chips = await page.evaluate(() => {
+    const readChip = (testId) => {
+      const node = document.querySelector(`[data-testid="${testId}"]`);
+      if (!node) return null;
+      const children = Array.from(node.children);
+      const value = children[0];
+      const label = children[1];
+      const rect = node.getBoundingClientRect();
+      const valueRect = value?.getBoundingClientRect();
+      const labelRect = label?.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      const valueStyle = value ? window.getComputedStyle(value) : null;
+      const labelStyle = label ? window.getComputedStyle(label) : null;
+      return {
+        testId,
+        height: rect.height,
+        minHeight: style.minHeight,
+        display: style.display,
+        alignItems: style.alignItems,
+        gap: style.columnGap || style.gap,
+        fontVariantNumeric: style.fontVariantNumeric,
+        valueFont: valueStyle?.fontFamily || "",
+        labelFont: labelStyle?.fontFamily || "",
+        valueTopInset: valueRect ? valueRect.top - rect.top : -1,
+        labelTopInset: labelRect ? labelRect.top - rect.top : -1,
+        textBottomDelta: valueRect && labelRect ? Math.abs(valueRect.bottom - labelRect.bottom) : 999,
+        children: children.length
+      };
+    };
+    return ["result-count", "public-stat-ats", "public-stat-companies"].map(readChip);
+  });
+
+  for (const chip of chips) {
+    expect(chip, "stats chip should exist").toBeTruthy();
+    expect(chip.children, `${chip.testId} should render value and label as separate text nodes`).toBe(2);
+    expect(chip.display, `${chip.testId} should use flex layout`).toBe("flex");
+    expect(chip.alignItems, `${chip.testId} should baseline-align value and label`).toBe("baseline");
+    expect(Number.parseFloat(chip.minHeight), `${chip.testId} should keep stable height`).toBeGreaterThanOrEqual(42);
+    expect(chip.height, `${chip.testId} visual height should be consistent`).toBeGreaterThanOrEqual(40);
+    expect(chip.height, `${chip.testId} visual height should be compact`).toBeLessThanOrEqual(48);
+    expect(chip.fontVariantNumeric, `${chip.testId} should use tabular numerals`).toContain("tabular-nums");
+    expect(chip.valueFont, `${chip.testId} value and label should share a font family`).toBe(chip.labelFont);
+    expect(chip.valueFont, `${chip.testId} should not fall back to the old Arial-first stack`).not.toMatch(/^Arial\b/i);
+    expect(chip.valueTopInset, `${chip.testId} value should sit inside the chip`).toBeGreaterThanOrEqual(4);
+    expect(chip.labelTopInset, `${chip.testId} label should sit inside the chip`).toBeGreaterThanOrEqual(6);
+    expect(chip.textBottomDelta, `${chip.testId} value and label baselines should visually align`).toBeLessThanOrEqual(4);
+  }
+}
+
 async function expectNoHorizontalOverflow(page) {
   const overflow = await page.evaluate(() => {
     const viewportWidth = window.innerWidth;
@@ -885,6 +935,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("result-count")).toHaveText(/17\s+job slots/i);
     await expect(page.getByTestId("public-stat-ats")).toHaveText(/6\s+ATS/i);
     await expect(page.getByTestId("public-stat-companies")).toHaveText(/12\s+companies/i);
+    await expectStatsChipsAligned(page);
   });
 
   test("loads branded search-first page without raw backend errors", async ({ page }) => {
@@ -1241,6 +1292,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("result-count")).toContainText("42 job slots");
     await expect(page.getByTestId("public-stat-ats")).toContainText("4 ATS");
     await expect(page.getByTestId("public-stat-companies")).toContainText("11 companies");
+    await expectStatsChipsAligned(page);
     await expect(page.getByTestId("sort-control")).toHaveCount(0);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
     await expect

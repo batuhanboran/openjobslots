@@ -228,7 +228,9 @@ const YAHOO_WORDMARK_SEGMENTS_DARK = [
 const OJS_FONT_STACK = Platform.OS === "web"
   ? "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   : undefined;
-const YAHOO_FONT_STACK = Platform.OS === "web" ? "Arial, Helvetica, sans-serif" : undefined;
+const YAHOO_FONT_STACK = Platform.OS === "web"
+  ? "'SF Pro Display', 'Geist Sans', 'Helvetica Neue', 'Segoe UI', system-ui, -apple-system, sans-serif"
+  : undefined;
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
 const DEFAULT_PUBLIC_LANGUAGE = "en";
@@ -5071,24 +5073,27 @@ export default function App() {
           {publicShellStatsChips.map((chip) => {
             const isJobSlots = chip.key === "job-slots";
             return (
-              <Text
+              <View
                 key={chip.key}
                 style={[
-                  isJobSlots ? styles.resultCountText : styles.publicStatsChip,
+                  styles.publicStatsChip,
+                  isJobSlots ? styles.resultCountText : null,
+                  chip.key === "ats" ? styles.publicStatsChipAts : null,
+                  chip.key === "companies" ? styles.publicStatsChipCompanies : null,
                   styles.yahooStatsChip,
-                  isDarkPublicTheme ? (isJobSlots ? styles.resultCountTextDark : styles.publicStatsChipDark) : null
+                  isDarkPublicTheme ? styles.publicStatsChipDark : null
                 ]}
                 testID={isJobSlots ? "result-count" : `public-stat-${chip.key}`}
                 accessibilityRole={isJobSlots ? "status" : "text"}
                 accessibilityLabel={`${chip.value} ${chip.label}`}
               >
-                <Text style={[isJobSlots ? styles.resultCountValueText : styles.publicStatsChipValue, isDarkPublicTheme ? styles.textInkDark : null]}>
+                <Text style={[styles.publicStatsChipValue, isJobSlots ? styles.resultCountValueText : null, isDarkPublicTheme ? styles.textInkDark : null]}>
                   {chip.value}
                 </Text>
-                <Text style={[isJobSlots ? styles.resultCountUnitText : styles.publicStatsChipLabel, isDarkPublicTheme ? styles.textMutedDark : null]}>
+                <Text style={[styles.publicStatsChipLabel, isJobSlots ? styles.resultCountUnitText : null, isDarkPublicTheme ? styles.textMutedDark : null]}>
                   {" "}{chip.label}
                 </Text>
-              </Text>
+              </View>
             );
           })}
         </View>
@@ -8477,34 +8482,12 @@ const styles = StyleSheet.create({
     color: OJS_DARK_COLORS.ink
   },
   resultCountText: {
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: YAHOO_COLORS.border,
-    borderRadius: 14,
-    backgroundColor: YAHOO_COLORS.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    minHeight: 38,
-    color: YAHOO_COLORS.ink,
-    fontSize: 13,
-    lineHeight: 20,
-    fontWeight: "800",
-    ...(Platform.OS === "web"
-      ? {
-          fontVariantNumeric: "tabular-nums",
-          boxShadow: "none"
-        }
-      : {})
-  },
-  resultCountTextDark: {
-    borderColor: OJS_DARK_COLORS.softBorder,
-    backgroundColor: OJS_DARK_COLORS.surface,
-    color: OJS_DARK_COLORS.text,
-    ...(Platform.OS === "web" ? { boxShadow: "0 8px 20px rgba(0, 0, 0, 0.24)" } : {})
+    minWidth: 116,
+    paddingHorizontal: 14
   },
   resultCountValueText: {
     color: YAHOO_COLORS.ink,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 20,
     fontWeight: "800"
   },
@@ -8519,28 +8502,38 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 6,
+    gap: 8,
     maxWidth: "100%"
   },
   publicStatsChip: {
     overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+    gap: 4,
     borderWidth: 1,
     borderColor: YAHOO_COLORS.border,
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: YAHOO_COLORS.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    minHeight: 38,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 9,
+    minWidth: 70,
+    minHeight: 42,
     color: YAHOO_COLORS.ink,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "800",
+    fontFamily: YAHOO_FONT_STACK,
     ...(Platform.OS === "web"
       ? {
           fontVariantNumeric: "tabular-nums",
           boxShadow: "none"
         }
       : {})
+  },
+  publicStatsChipAts: {
+    minWidth: 68
+  },
+  publicStatsChipCompanies: {
+    minWidth: 118
   },
   publicStatsChipDark: {
     borderColor: OJS_DARK_COLORS.softBorder,
@@ -8550,22 +8543,21 @@ const styles = StyleSheet.create({
   },
   publicStatsChipValue: {
     color: YAHOO_COLORS.ink,
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900"
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800"
   },
   publicStatsChipLabel: {
     color: YAHOO_COLORS.muted,
+    fontFamily: YAHOO_FONT_STACK,
     fontSize: 11,
     lineHeight: 16,
-    fontWeight: "700"
+    fontWeight: "600"
   },
   yahooStatsChip: {
     borderColor: YAHOO_COLORS.border,
     borderRadius: 12,
-    minHeight: 40,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
     fontFamily: YAHOO_FONT_STACK
   },
   sortControlWrap: {
