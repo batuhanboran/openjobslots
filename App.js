@@ -52,6 +52,9 @@ import {
   buildPublicStatsChips,
   formatExactNumberLabel
 } from "./src/publicStatsCore";
+import {
+  getPublicSeoRouteHintByPath
+} from "./src/publicSeoRoutes";
 
 const PAGE_KEYS = {
   POSTINGS: "postings",
@@ -1474,11 +1477,16 @@ function sanitizePublicSearchUrlQuery(value) {
   return normalized.slice(0, 80);
 }
 
+function getPublicSeoRouteHint() {
+  if (Platform.OS !== "web" || typeof window === "undefined") return null;
+  return getPublicSeoRouteHintByPath(window.location?.pathname || "/");
+}
+
 function readInitialPublicSearchQuery() {
   if (Platform.OS !== "web" || typeof window === "undefined" || typeof URLSearchParams === "undefined") return "";
   try {
     const params = new URLSearchParams(window.location.search || "");
-    return sanitizePublicSearchUrlQuery(params.get("q") || params.get("search") || "");
+    return sanitizePublicSearchUrlQuery(params.get("q") || params.get("search") || getPublicSeoRouteHint()?.searchQuery || "");
   } catch {
     return "";
   }
@@ -1510,7 +1518,11 @@ function getBrowserLanguageCode() {
 }
 
 function getInitialPublicLanguageCode() {
-  return normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY)) || getBrowserLanguageCode();
+  return (
+    normalizePublicLanguageCode(getPublicSeoRouteHint()?.languageCode) ||
+    normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY)) ||
+    getBrowserLanguageCode()
+  );
 }
 
 function getInitialPublicTheme() {

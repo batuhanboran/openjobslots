@@ -1,3 +1,10 @@
+const {
+  PUBLIC_SEO_ROUTES,
+  getPublicSeoAlternateGroupPages,
+  getPublicSeoRouteHintByPath,
+  normalizePublicSeoPath
+} = require("../../src/publicSeoRoutes");
+
 function normalizeOrigin(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -22,6 +29,7 @@ function removeExistingSeoTags(html) {
     .replace(/\s*<meta[^>]+name=["'](?:description|robots|twitter:card|twitter:title|twitter:description)["'][^>]*>/gi, "")
     .replace(/\s*<meta[^>]+property=["'](?:og:title|og:description|og:type|og:url|og:site_name)["'][^>]*>/gi, "")
     .replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/gi, "")
+    .replace(/\s*<link[^>]+rel=["']alternate["'][^>]*hreflang=["'][^"']+["'][^>]*>/gi, "")
     .replace(/\s*<script[^>]+id=["']openjobslots-(?:organization|website)-jsonld["'][^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
@@ -42,33 +50,9 @@ function sanitizeSearchQuery(value) {
   return normalized.slice(0, 80);
 }
 
-const PUBLIC_SITEMAP_SEARCH_TERMS = Object.freeze([
-  "remote jobs",
-  "frontend engineer",
-  "backend engineer",
-  "software engineer",
-  "full stack engineer",
-  "product manager",
-  "data analyst",
-  "data engineer",
-  "customer success",
-  "account executive",
-  "sales manager",
-  "marketing manager",
-  "operations manager",
-  "project manager",
-  "qa engineer",
-  "devops engineer",
-  "cybersecurity analyst",
-  "designer",
-  "human resources",
-  "finance analyst",
-  "workday jobs",
-  "greenhouse jobs",
-  "lever jobs",
-  "ashby jobs",
-  "bamboohr jobs"
-]);
+function getRequestPath(req) {
+  return normalizePublicSeoPath(req?.path || req?.originalUrl || req?.url || "/");
+}
 
 function createPublicSeoHelpers(dependencies = {}) {
   const {
@@ -94,7 +78,13 @@ function createPublicSeoHelpers(dependencies = {}) {
     return normalizeOrigin(`${protocol}://${host}`) || `http://localhost:${port}`;
   }
 
+  function getSeoRoute(req) {
+    return getPublicSeoRouteHintByPath(getRequestPath(req));
+  }
+
   function getPublicSiteCanonicalUrl(req) {
+    const seoRoute = getSeoRoute(req);
+    if (seoRoute) return `${getPublicSiteOrigin(req)}${seoRoute.path}`;
     const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
     if (!searchQuery) return `${getPublicSiteOrigin(req)}/`;
     return `${getPublicSiteOrigin(req)}/?q=${encodeURIComponent(searchQuery)}`;
@@ -107,23 +97,67 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   function getSeoMeta(req) {
+    const seoRoute = getSeoRoute(req);
+    if (seoRoute) {
+      return {
+        title: seoRoute.title,
+        description: seoRoute.description,
+        languageCode: seoRoute.languageCode || "en"
+      };
+    }
     const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
     if (!searchQuery) {
       return {
         title: String(seoTitle || "OpenJobSlots").trim(),
-        description: String(seoDescription || "").trim()
+        description: String(seoDescription || "").trim(),
+        languageCode: "en"
       };
     }
     return {
       title: `${searchQuery} jobs | OpenJobSlots`,
-      description: `Search fresh ${searchQuery} job slots from public employer ATS boards.`
+      description: `Search fresh ${searchQuery} job slots from public employer ATS boards.`,
+      languageCode: "en"
     };
+  }
+
+  function getPublicSeoAlternateLinks(req) {
+    const seoRoute = getSeoRoute(req);
+    const requestPath = getRequestPath(req);
+    const alternateGroup = seoRoute?.alternateGroup || (requestPath === "/" ? "home" : "");
+    const groupPages = getPublicSeoAlternateGroupPages(alternateGroup);
+    if (groupPages.length === 0) return [];
+    const siteOrigin = getPublicSiteOrigin(req);
+    const links = groupPages.map((page) => ({
+      hreflang: page.languageCode,
+      href: `${siteOrigin}${page.path}`
+    }));
+    const xDefaultPath = alternateGroup === "home" ? "/" : groupPages.find((page) => page.languageCode === "en")?.path;
+    if (xDefaultPath) {
+      links.push({
+        hreflang: "x-default",
+        href: `${siteOrigin}${xDefaultPath}`
+      });
+    }
+    return links;
+  }
+
+  function buildAlternateLanguageLinkTags(req) {
+    return getPublicSeoAlternateLinks(req)
+      .map((item) =>
+        '<link rel="alternate" hreflang="' +
+        escapeHtmlAttribute(item.hreflang) +
+        '" href="' +
+        escapeHtmlAttribute(item.href) +
+        '" />'
+      )
+      .join("\n    ");
   }
 
   function buildStructuredDataTags(req) {
     const siteOrigin = getPublicSiteOrigin(req);
     const siteUrl = `${siteOrigin}/`;
-    const description = String(seoDescription || "").trim();
+    const seoMeta = getSeoMeta(req);
+    const description = String(seoMeta.description || seoDescription || "").trim();
     const organization = {
       "@context": "https://schema.org",
       "@type": "Organization",
@@ -139,7 +173,7 @@ function createPublicSeoHelpers(dependencies = {}) {
       name: "OpenJobSlots",
       url: siteUrl,
       description,
-      inLanguage: "en",
+      inLanguage: seoMeta.languageCode || "en",
       publisher: {
         "@id": organization["@id"]
       },
@@ -156,16 +190,28 @@ function createPublicSeoHelpers(dependencies = {}) {
     ].join("\n    ");
   }
 
+  function setHtmlLanguage(html, languageCode) {
+    const htmlLang = escapeHtmlAttribute(languageCode || "en");
+    return String(html || "").replace(/<html\b([^>]*)>/i, (match, attrs) => {
+      if (/\s+lang\s*=\s*["'][^"']*["']/i.test(attrs)) {
+        return `<html${attrs.replace(/\s+lang\s*=\s*["'][^"']*["']/i, ` lang="${htmlLang}"`)}>`;
+      }
+      return `<html lang="${htmlLang}"${attrs}>`;
+    });
+  }
+
   function renderSeoIndexHtml(indexHtml, req) {
     const canonicalUrl = getPublicSiteCanonicalUrl(req);
     const seoMeta = getSeoMeta(req);
     const title = escapeHtmlAttribute(seoMeta.title);
     const description = escapeHtmlAttribute(seoMeta.description);
     const canonical = escapeHtmlAttribute(canonicalUrl);
+    const alternateTags = buildAlternateLanguageLinkTags(req);
     const analyticsTags = buildPublicWebAnalyticsHeadTags(readPublicWebAnalyticsConfig());
     const tags = [
       '<meta name="description" content="' + description + '" />',
       '<link rel="canonical" href="' + canonical + '" />',
+      alternateTags,
       '<meta name="robots" content="index, follow" />',
       '<meta property="og:type" content="website" />',
       '<meta property="og:site_name" content="OpenJobSlots" />',
@@ -175,7 +221,7 @@ function createPublicSeoHelpers(dependencies = {}) {
       '<meta name="twitter:card" content="summary" />',
       '<meta name="twitter:title" content="' + title + '" />',
       '<meta name="twitter:description" content="' + description + '" />'
-    ].join("\n    ");
+    ].filter(Boolean).join("\n    ");
     const structuredDataTags = buildStructuredDataTags(req);
     const managedAnalyticsTags = analyticsTags
       ? [
@@ -185,10 +231,8 @@ function createPublicSeoHelpers(dependencies = {}) {
       ].join("\n    ")
       : "";
 
-    let html = stripPublicWebAnalyticsHeadTags(removeExistingSeoTags(indexHtml)).replace(
-      /<title>[\s\S]*?<\/title>/i,
-      `<title>${title}</title>`
-    );
+    let html = setHtmlLanguage(stripPublicWebAnalyticsHeadTags(removeExistingSeoTags(indexHtml)), seoMeta.languageCode || "en")
+      .replace(/<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
     if (!/<\/head>/i.test(html)) return html;
     const analyticsBlock = managedAnalyticsTags ? `\n    ${managedAnalyticsTags}` : "";
     return html.replace(
@@ -220,11 +264,11 @@ function createPublicSeoHelpers(dependencies = {}) {
         changefreq: "daily",
         priority: "1.0"
       },
-      ...PUBLIC_SITEMAP_SEARCH_TERMS.map((term) => ({
-        loc: getPublicSearchLandingUrl(req, term),
-        changefreq: "daily",
-        priority: "0.8"
-      })).filter((item) => item.loc)
+      ...PUBLIC_SEO_ROUTES.map((route) => ({
+        loc: `${siteOrigin}${route.path}`,
+        changefreq: route.changefreq || "daily",
+        priority: route.priority || "0.8"
+      }))
     ];
     const urlEntries = urls.map((item) => [
       "  <url>",

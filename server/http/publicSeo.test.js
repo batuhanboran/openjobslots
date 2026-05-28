@@ -9,6 +9,8 @@ function createRequest(overrides = {}) {
   };
   return {
     protocol: overrides.protocol || "http",
+    path: overrides.path || "/",
+    originalUrl: overrides.originalUrl || overrides.path || "/",
     query: overrides.query || {},
     get(name) {
       return headers[String(name || "").toLowerCase()] || "";
@@ -106,6 +108,49 @@ function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
   assert.ok(html.includes('<meta property="og:url" content="https://openjobslots.com/?q=Frontend%20Engineer" />'));
 }
 
+function testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html lang=\"en\"><head><title>Old</title><link rel=\"alternate\" hreflang=\"en\" href=\"https://old.example/en\" /></head><body></body></html>",
+    createRequest({ path: "/tr/uzaktan-calisma-ilanlari" })
+  );
+
+  assert.ok(html.includes("<html lang=\"tr\">"));
+  assert.ok(html.includes("<title>Uzaktan çalışma ilanları | OpenJobSlots</title>"));
+  assert.ok(html.includes("Türkiye ve global pazarlardaki güncel uzaktan çalışma ilanlarını ara."));
+  assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/tr/uzaktan-calisma-ilanlari" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="tr" href="https://openjobslots.com/tr/uzaktan-calisma-ilanlari" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="en" href="https://openjobslots.com/en/remote-job-openings" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="x-default" href="https://openjobslots.com/en/remote-job-openings" />'));
+  assert.ok(!html.includes("https://old.example/en"));
+
+  const website = parseJsonLdById(html, "openjobslots-website-jsonld");
+  assert.equal(website.inLanguage, "tr");
+}
+
+function testHomeLanguagePagesGetBidirectionalHreflang() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com"
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body></body></html>",
+    createRequest({ path: "/de" })
+  );
+
+  assert.ok(html.includes("<html lang=\"de\">"));
+  assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/de" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="x-default" href="https://openjobslots.com/" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="en" href="https://openjobslots.com/en" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="tr" href="https://openjobslots.com/tr" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="de" href="https://openjobslots.com/de" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="fr" href="https://openjobslots.com/fr" />'));
+  assert.ok(html.includes('<link rel="alternate" hreflang="es" href="https://openjobslots.com/es" />'));
+}
+
 function testRobotsAndSitemapUseConfiguredPublicOrigin() {
   const { buildRobotsTxt, buildSitemapXml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
@@ -114,7 +159,8 @@ function testRobotsAndSitemapUseConfiguredPublicOrigin() {
 
   assert.ok(buildRobotsTxt(req).includes("Sitemap: https://openjobslots.com/sitemap.xml"));
   assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/</loc>"));
-  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/?q=remote%20jobs</loc>"));
+  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/tr/is-ilanlari</loc>"));
+  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/en/remote-job-openings</loc>"));
 }
 
 function testRobotsAndSitemapStayCrawlSafe() {
@@ -137,21 +183,22 @@ function testRobotsAndSitemapStayCrawlSafe() {
 
   assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/\?q=frontend%20engineer<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/\?q=greenhouse%20jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/tr\/yazilim-muhendisi-is-ilanlari<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/ats\/greenhouse-jobs<\/loc>/);
   assert.doesNotMatch(sitemap, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
+  assert.doesNotMatch(sitemap, /\?q=/);
 }
 
-function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicSearches() {
+function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages() {
   const { buildSitemapXml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
   });
   const sitemap = buildSitemapXml(createRequest({ query: { q: "private@example.com" } }));
   const locMatches = sitemap.match(/<loc>/g) || [];
 
-  assert.equal(locMatches.length, 26);
+  assert.equal(locMatches.length, 36);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/\?q=product%20manager<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/product-manager-jobs<\/loc>/);
   assert.doesNotMatch(sitemap, /private@example\.com/);
   assert.doesNotMatch(sitemap, /%40/);
 }
@@ -159,8 +206,10 @@ function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicSearches() {
 testRenderSeoIndexHtmlReplacesMetadata();
 testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
 testSearchQueryPagesGetSpecificMetadataAndCanonical();
+testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
+testHomeLanguagePagesGetBidirectionalHreflang();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
-testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicSearches();
+testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages();
 
 console.log("public SEO tests passed");

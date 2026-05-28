@@ -1066,6 +1066,41 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("SEO landing routes bootstrap localized language and search intent", async ({ page }) => {
+    const expectedQuery = "uzaktan \u00e7al\u0131\u015fma ilanlar\u0131";
+    let requestedSearch = "";
+
+    await page.route("**/postings?**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      requestedSearch = requestUrl.searchParams.get("search") || "";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [],
+          count: 0,
+          count_exact: true,
+          source_facets: [],
+          limit: 500,
+          offset: 0,
+          filters: {
+            search: requestedSearch,
+            sort_by: "posted_date",
+            freshness_days: "all"
+          },
+          has_more: false,
+          next_offset: null
+        })
+      });
+    });
+
+    await page.goto("/tr/uzaktan-calisma-ilanlari");
+
+    await expect(page.getByTestId("language-selector")).toContainText("TR");
+    await expect(page.getByTestId("search-input")).toHaveValue(expectedQuery);
+    await expect.poll(() => requestedSearch).toBe(expectedQuery);
+  });
+
   test("public localization covers home, results, suggestions, footer, and release notes in every language", async ({ page }) => {
     test.setTimeout(120_000);
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
