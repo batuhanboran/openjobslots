@@ -22,6 +22,10 @@ let meiliSettingsStatus = {
   last_error: ""
 };
 
+const DEFAULT_MEILI_TASK_TIMEOUT_MS = 300000;
+const MIN_MEILI_TASK_TIMEOUT_MS = 5000;
+const MAX_MEILI_TASK_TIMEOUT_MS = 1800000;
+
 function inferCountryFromLocation(location) {
   return normalizeCountryFromLocation(location);
 }
@@ -46,8 +50,16 @@ function getMeiliConfig(env = process.env) {
     enabled: String(env.OPENJOBSLOTS_SEARCH_BACKEND || "sqlite").trim().toLowerCase() === "meili",
     host: String(env.MEILI_HOST || "http://meilisearch:7700").trim(),
     apiKey: String(env.MEILI_MASTER_KEY || env.MEILI_API_KEY || "").trim(),
-    indexName: String(env.MEILI_POSTINGS_INDEX || MEILI_POSTINGS_INDEX).trim() || MEILI_POSTINGS_INDEX
+    indexName: String(env.MEILI_POSTINGS_INDEX || MEILI_POSTINGS_INDEX).trim() || MEILI_POSTINGS_INDEX,
+    taskTimeoutMs: resolveMeiliTaskTimeoutMs(env)
   };
+}
+
+function resolveMeiliTaskTimeoutMs(env = process.env) {
+  const raw = env.OPENJOBSLOTS_MEILI_TASK_TIMEOUT_MS ?? env.MEILI_TASK_TIMEOUT_MS ?? DEFAULT_MEILI_TASK_TIMEOUT_MS;
+  const timeoutMs = Number(raw);
+  if (!Number.isFinite(timeoutMs)) return DEFAULT_MEILI_TASK_TIMEOUT_MS;
+  return Math.max(MIN_MEILI_TASK_TIMEOUT_MS, Math.min(MAX_MEILI_TASK_TIMEOUT_MS, Math.floor(timeoutMs)));
 }
 
 async function meiliRequest(config, path, options = {}) {
@@ -67,7 +79,7 @@ async function meiliRequest(config, path, options = {}) {
   return response.json();
 }
 
-async function waitForMeiliTask(config, task, timeoutMs = 30000) {
+async function waitForMeiliTask(config, task, timeoutMs = resolveMeiliTaskTimeoutMs()) {
   const taskUid = Number(task?.taskUid ?? task?.uid ?? 0);
   if (!taskUid) return task;
   const started = Date.now();
@@ -81,6 +93,10 @@ async function waitForMeiliTask(config, task, timeoutMs = 30000) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`Meilisearch task ${taskUid} did not finish within ${timeoutMs}ms`);
+}
+
+function isMeiliTaskTimeoutError(error) {
+  return /Meilisearch task \d+ did not finish within \d+ms/i.test(String(error?.message || error));
 }
 
 function setMeiliSettingsStatus(nextStatus) {
@@ -102,6 +118,9 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
   }
 
   try {
+    const taskTimeoutMs = Number.isFinite(Number(config.taskTimeoutMs))
+      ? Number(config.taskTimeoutMs)
+      : resolveMeiliTaskTimeoutMs();
     let existingIndex = null;
     try {
       existingIndex = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`);
@@ -113,7 +132,7 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
       const deleteTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}`, {
         method: "DELETE"
       });
-      await waitForMeiliTask(config, deleteTask);
+      await waitForMeiliTask(config, deleteTask, taskTimeoutMs);
       existingIndex = null;
     }
 
@@ -126,7 +145,7 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
         })
       });
       try {
-        await waitForMeiliTask(config, createTask);
+        await waitForMeiliTask(config, createTask, taskTimeoutMs);
       } catch (error) {
         if (!/already exists/i.test(String(error?.message || error))) {
           throw error;
@@ -138,7 +157,27 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
       method: "PATCH",
       body: JSON.stringify(MEILI_POSTINGS_SETTINGS)
     });
-    await waitForMeiliTask(config, settingsTask);
+    try {
+      await waitForMeiliTask(config, settingsTask, taskTimeoutMs);
+    } catch (error) {
+      if (existingIndex && isMeiliTaskTimeoutError(error)) {
+        setMeiliSettingsStatus({
+          ok: false,
+          skipped: false,
+          pending: true,
+          indexName: config.indexName,
+          last_error: String(error?.message || error).slice(0, 500)
+        });
+        console.warn("[openjobslots meili] settings task still processing; continuing API startup:", String(error?.message || error).slice(0, 240));
+        return {
+          ok: true,
+          indexName: config.indexName,
+          settings_pending: true,
+          settings_task_uid: Number(settingsTask?.taskUid ?? settingsTask?.uid ?? 0) || null
+        };
+      }
+      throw error;
+    }
     setMeiliSettingsStatus({ ok: true, skipped: false, indexName: config.indexName, last_error: "" });
     return { ok: true, indexName: config.indexName };
   } catch (error) {
@@ -379,6 +418,7 @@ module.exports = {
   ensureMeiliPostingsIndex,
   getMeiliConfig,
   getMeiliSettingsStatus,
+  resolveMeiliTaskTimeoutMs,
   searchMeiliPostings,
   toMeiliDocumentId,
   toMeiliPostingDocument,
