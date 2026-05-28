@@ -37,6 +37,14 @@ function testBuildAnalyticsEmailMessage() {
     date: "2026-05-22",
     timezone: "Europe/Istanbul"
   });
+  report.top_normalized_queries = [
+    { query: "te", count: 19 },
+    { query: "tec", count: 13 }
+  ];
+  report.top_final_posting_searches = [
+    { query: "technical support engineer", count: 7 },
+    { query: "remote jobs", count: 4 }
+  ];
   const message = buildAnalyticsEmailMessage(report, {
     to: "maintainer@example.com",
     from: "reports@openjobslots.com"
@@ -46,6 +54,9 @@ function testBuildAnalyticsEmailMessage() {
   assert.equal(message.from, "reports@openjobslots.com");
   assert.match(message.subject, /OpenJobSlots analytics:daily 2026-05-22/);
   assert.match(message.text, /Demand snapshot/);
+  assert.match(message.text, /Top queries: technical support engineer \(7\), remote jobs \(4\)/);
+  assert.doesNotMatch(message.text, /Top queries: te \(19\)/);
+  assert.match(message.html, /Top query<\/div><div[^>]*>technical support engineer/);
   assert.match(message.text, /Top countries: United States \(96\), Turkey \(42\)/);
   assert.match(message.text, /Remote intent: remote=312, hybrid=96, non_remote=41/);
   assert.match(message.text, /Search gaps/);

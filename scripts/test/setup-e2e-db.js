@@ -208,6 +208,14 @@ async function seedFixtureRows(db) {
       job_posting_url: "https://jobs.ashbyhq.com/openjobslotsqa/ashby-platform-engineer",
       location: "Ankara, Turkey",
       posting_date: "2026-05-04"
+    },
+    {
+      company_name: "QA Yahoo Results",
+      position_name: "Technical Support Engineer",
+      job_posting_url: "https://jobs.lever.co/openjobslotsqa/technical-support-engineer",
+      location: "London, United Kingdom",
+      posting_date: "2026-05-20",
+      last_seen_epoch: now
     }
   ];
   for (let index = 1; index <= 28; index += 1) {

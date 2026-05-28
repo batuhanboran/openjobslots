@@ -440,6 +440,10 @@ function buildAnalyticsEmailText(report) {
   const zeroRate = Number(report.total_events || 0) > 0
     ? Number(resultCounts.zero_result || 0) / Number(report.total_events || 0)
     : null;
+  const topFinalSearches = report.top_final_posting_searches || [];
+  const topDisplayedQueries = topFinalSearches.length > 0
+    ? topFinalSearches
+    : (report.top_normalized_queries || report.top_terms || []);
 
   return [
     `OpenJobSlots analytics:daily - ${report.date} (${report.timezone})`,
@@ -450,7 +454,7 @@ function buildAnalyticsEmailText(report) {
     `- Cache hit rate: ${formatPercent(report.cache_hit_rate)}`,
     "",
     "Demand snapshot",
-    `- Top queries: ${formatQueryList(report.top_normalized_queries || report.top_terms)}`,
+    `- Top queries: ${formatQueryList(topDisplayedQueries)}`,
     `- Top final searches: ${formatQueryList(report.top_final_posting_searches)}`,
     `- Top countries: ${formatQueryList(report.top_country_filters || [], "value")}`,
     `- Remote intent: ${formatRemoteIntent(report.remote_filter_counts || {})}`,
@@ -493,6 +497,10 @@ function buildAnalyticsEmailHtml(report) {
   const zeroRate = Number(report.total_events || 0) > 0
     ? Number(resultCounts.zero_result || 0) / Number(report.total_events || 0)
     : null;
+  const topFinalSearches = report.top_final_posting_searches || [];
+  const topDisplayedQueries = topFinalSearches.length > 0
+    ? topFinalSearches
+    : (report.top_normalized_queries || report.top_terms || []);
   const traffic = report.cloudflare_traffic || {};
   const cloudflareSummary = traffic.ok === true
     ? `${formatCount(traffic.visits ?? traffic.visitors)} visits / ${formatCount(traffic.requests)} requests / ${formatBytes(traffic.bandwidth_bytes)}`
@@ -516,12 +524,12 @@ function buildAnalyticsEmailHtml(report) {
     '</tr><tr>',
     metricCard("Cache hit rate", formatPercent(report.cache_hit_rate)),
     metricCard("Cloudflare edge", cloudflareSummary),
-    metricCard("Top query", (report.top_normalized_queries || report.top_terms || [])[0]?.query || "none"),
+    metricCard("Top query", topDisplayedQueries[0]?.query || "none"),
     '</tr>',
     '</table>',
     '<h2>Demand snapshot</h2>',
     '<h3>Top queries</h3><ol>',
-    listItems(report.top_normalized_queries || report.top_terms),
+    listItems(topDisplayedQueries),
     '</ol>',
     '<h3>Top countries</h3><ol>',
     listItems(report.top_country_filters || [], "value"),

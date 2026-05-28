@@ -469,7 +469,7 @@ function registerPublicRoutes(app, context) {
       search: String(req.query.search || "").trim(),
       limit: Number(req.query.limit || 500),
       offset: Number(req.query.offset || 0),
-      sort_by: String(req.query.sort_by || "").trim(),
+      sort_by: String(req.query.sort_by || "posted_date").trim(),
       freshness_days: req.query.freshness_days,
       ats: parseCsvParam(req.query.ats),
       industries: parseCsvParam(req.query.industries),

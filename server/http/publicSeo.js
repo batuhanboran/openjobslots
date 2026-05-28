@@ -34,6 +34,14 @@ function stringifyJsonLd(value) {
     .replace(/\u2029/g, "\\u2029");
 }
 
+function sanitizeSearchQuery(value) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalized.length < 2) return "";
+  if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(normalized)) return "";
+  if (/\b(?:https?:\/\/|www\.)\S+/i.test(normalized)) return "";
+  return normalized.slice(0, 80);
+}
+
 function createPublicSeoHelpers(dependencies = {}) {
   const {
     buildPublicWebAnalyticsHeadTags = () => "",
@@ -59,7 +67,23 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   function getPublicSiteCanonicalUrl(req) {
-    return `${getPublicSiteOrigin(req)}/`;
+    const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
+    if (!searchQuery) return `${getPublicSiteOrigin(req)}/`;
+    return `${getPublicSiteOrigin(req)}/?q=${encodeURIComponent(searchQuery)}`;
+  }
+
+  function getSeoMeta(req) {
+    const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
+    if (!searchQuery) {
+      return {
+        title: String(seoTitle || "OpenJobSlots").trim(),
+        description: String(seoDescription || "").trim()
+      };
+    }
+    return {
+      title: `${searchQuery} jobs | OpenJobSlots`,
+      description: `Search fresh ${searchQuery} job slots from public employer ATS boards.`
+    };
   }
 
   function buildStructuredDataTags(req) {
@@ -84,6 +108,11 @@ function createPublicSeoHelpers(dependencies = {}) {
       inLanguage: "en",
       publisher: {
         "@id": organization["@id"]
+      },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${siteOrigin}/?q={search_term_string}`,
+        "query-input": "required name=search_term_string"
       }
     };
 
@@ -95,8 +124,9 @@ function createPublicSeoHelpers(dependencies = {}) {
 
   function renderSeoIndexHtml(indexHtml, req) {
     const canonicalUrl = getPublicSiteCanonicalUrl(req);
-    const title = escapeHtmlAttribute(seoTitle);
-    const description = escapeHtmlAttribute(seoDescription);
+    const seoMeta = getSeoMeta(req);
+    const title = escapeHtmlAttribute(seoMeta.title);
+    const description = escapeHtmlAttribute(seoMeta.description);
     const canonical = escapeHtmlAttribute(canonicalUrl);
     const analyticsTags = buildPublicWebAnalyticsHeadTags(readPublicWebAnalyticsConfig());
     const tags = [

@@ -5,6 +5,7 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const apiPort = process.env.OPENJOBSLOTS_E2E_API_PORT || "8877";
 const webPort = process.env.OPENJOBSLOTS_E2E_WEB_PORT || "19006";
 const testDbPath = process.env.DB_PATH || path.join(repoRoot, ".tmp", "openjobslots-test", "jobs.db");
+const usePublicApiProxy = process.env.OPENJOBSLOTS_E2E_PUBLIC_API_PROXY === "1";
 
 const children = [];
 
@@ -43,21 +44,27 @@ function shutdown(code = 0) {
 }
 
 async function main() {
-  await new Promise((resolve, reject) => {
-    const setup = spawnChild(process.execPath, ["scripts/test/setup-e2e-db.js"], { DB_PATH: testDbPath });
-    setup.once("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`test:e2e:db exited with code ${code}`));
+  if (usePublicApiProxy) {
+    spawnChild(process.execPath, ["scripts/test/public-api-proxy.js"], {
+      PORT: apiPort
     });
-  });
+  } else {
+    await new Promise((resolve, reject) => {
+      const setup = spawnChild(process.execPath, ["scripts/test/setup-e2e-db.js"], { DB_PATH: testDbPath });
+      setup.once("exit", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`test:e2e:db exited with code ${code}`));
+      });
+    });
 
-  spawnChild(process.execPath, ["server/index.js"], {
-    DB_PATH: testDbPath,
-    PORT: apiPort,
-    OPENJOBSLOTS_DISABLE_API_SCHEDULER: "1",
-    OPENJOBSLOTS_ADMIN_TOKEN: process.env.OPENJOBSLOTS_E2E_ADMIN_TOKEN || "openjobslots-e2e-admin-token",
-    OPENJOBSLOTS_ALLOW_LOCAL_ADMIN: "0"
-  });
+    spawnChild(process.execPath, ["server/index.js"], {
+      DB_PATH: testDbPath,
+      PORT: apiPort,
+      OPENJOBSLOTS_DISABLE_API_SCHEDULER: "1",
+      OPENJOBSLOTS_ADMIN_TOKEN: process.env.OPENJOBSLOTS_E2E_ADMIN_TOKEN || "openjobslots-e2e-admin-token",
+      OPENJOBSLOTS_ALLOW_LOCAL_ADMIN: "0"
+    });
+  }
 
   spawnChild(process.execPath, ["node_modules/expo/bin/cli", "start", "--web", "--port", webPort], {
     EXPO_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}`,

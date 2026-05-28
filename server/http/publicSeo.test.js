@@ -9,6 +9,7 @@ function createRequest(overrides = {}) {
   };
   return {
     protocol: overrides.protocol || "http",
+    query: overrides.query || {},
     get(name) {
       return headers[String(name || "").toLowerCase()] || "";
     }
@@ -80,7 +81,29 @@ function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {
   assert.equal(website.url, "https://openjobslots.com/");
   assert.equal(website.description, "Find fresh job openings from public employer ATS boards.");
   assert.deepEqual(website.publisher, { "@id": "https://openjobslots.com/#organization" });
+  assert.deepEqual(website.potentialAction, {
+    "@type": "SearchAction",
+    target: "https://openjobslots.com/?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  });
   assert.ok(!html.includes("\"stale\":true"));
+}
+
+function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body></body></html>",
+    createRequest({ query: { q: "Frontend Engineer" } })
+  );
+
+  assert.ok(html.includes("<title>Frontend Engineer jobs | OpenJobSlots</title>"));
+  assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/?q=Frontend%20Engineer" />'));
+  assert.ok(html.includes("Search fresh Frontend Engineer job slots from public employer ATS boards."));
+  assert.ok(html.includes('<meta property="og:url" content="https://openjobslots.com/?q=Frontend%20Engineer" />'));
 }
 
 function testRobotsAndSitemapUseConfiguredPublicOrigin() {
@@ -118,6 +141,7 @@ function testRobotsAndSitemapStayCrawlSafe() {
 
 testRenderSeoIndexHtmlReplacesMetadata();
 testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
+testSearchQueryPagesGetSpecificMetadataAndCanonical();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
 

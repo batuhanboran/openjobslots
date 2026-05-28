@@ -88,6 +88,34 @@ const SEARCH_SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SEARCH_SUGGESTION_DEBOUNCE_MS = 90;
 const SEARCH_SUGGESTION_LIMIT = 4;
 const SEARCH_INTENT_CHIP_LIMIT = 4;
+
+function readPublicCountOverride(key) {
+  const value = typeof process !== "undefined" ? process?.env?.[key] : undefined;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+}
+
+const PUBLIC_STATS_OVERRIDE = {
+  job_slot_count: readPublicCountOverride("EXPO_PUBLIC_OPENJOBSLOTS_JOB_SLOT_COUNT"),
+  posting_count: readPublicCountOverride("EXPO_PUBLIC_OPENJOBSLOTS_JOB_SLOT_COUNT"),
+  configured_ats_count: readPublicCountOverride("EXPO_PUBLIC_OPENJOBSLOTS_ATS_COUNT"),
+  visible_company_count: readPublicCountOverride("EXPO_PUBLIC_OPENJOBSLOTS_COMPANY_COUNT")
+};
+
+function hasPublicStatsOverride() {
+  return Object.values(PUBLIC_STATS_OVERRIDE).some((value) => Number(value) > 0);
+}
+
+function applyPublicStatsOverride(status = {}) {
+  if (!hasPublicStatsOverride()) return status || {};
+  const source = status || {};
+  return {
+    ...source,
+    ...Object.fromEntries(
+      Object.entries(PUBLIC_STATS_OVERRIDE).filter(([, value]) => Number(value) > 0)
+    )
+  };
+}
 const SOURCE_INTELLIGENCE_LIMIT = 8;
 const LOCAL_SEARCH_SHORTCUTS = [
   { type: "search", value: "remote jobs", label: "remote jobs" },
@@ -98,6 +126,20 @@ const LOCAL_SEARCH_SHORTCUTS = [
   { type: "country", value: "türkiye", label: "türkiye" },
   { type: "country", value: "turkiye", label: "turkiye" },
   { type: "search", value: "turkish jobs", label: "turkish jobs" }
+];
+const SEARCH_PLACEHOLDER_TYPE_MS = 38;
+const SEARCH_PLACEHOLDER_DELETE_MS = 20;
+const SEARCH_PLACEHOLDER_HOLD_MS = 700;
+const SEARCH_PLACEHOLDER_NEXT_MS = 140;
+const SEARCH_PLACEHOLDER_EXAMPLES = [
+  "Technical Support Engineer in London",
+  "Remote Software Engineer",
+  "Product Manager in Berlin",
+  "Data Analyst in Toronto",
+  "Customer Success Manager remote",
+  "Nurse Practitioner in New York",
+  "Frontend Engineer in Amsterdam",
+  "Operations Manager in Singapore"
 ];
 const OJS_COLORS = {
   blue: "#26332D",
@@ -126,10 +168,18 @@ const OJS_COLORS = {
   dangerSoft: "#F1DEDC",
   shadow: "#26332D"
 };
+const OJS_BRAND_PURPLES = {
+  open: "#5F36F2",
+  job: "#7C3AED",
+  slots: "#A855F7",
+  openDark: "#D6CCFF",
+  jobDark: "#C4B5FD",
+  slotsDark: "#F0ABFC"
+};
 const WORDMARK_SEGMENTS = [
-  { text: "open", color: OJS_COLORS.green },
-  { text: "job", color: OJS_COLORS.focus },
-  { text: "slots", color: OJS_COLORS.muted }
+  { text: "open", color: OJS_BRAND_PURPLES.open },
+  { text: "job", color: OJS_BRAND_PURPLES.job },
+  { text: "slots", color: OJS_BRAND_PURPLES.slots }
 ];
 const OJS_DARK_COLORS = {
   bg: "#101713",
@@ -146,14 +196,39 @@ const OJS_DARK_COLORS = {
   green: "#8ED6B9",
   shadow: "#050806"
 };
+const YAHOO_COLORS = {
+  purple: OJS_BRAND_PURPLES.job,
+  purpleHover: OJS_BRAND_PURPLES.open,
+  purplePressed: "#4C1D95",
+  blue: "#4B5DFF",
+  ink: "#232A31",
+  text: "#000000",
+  muted: "#6E7780",
+  border: "#E3E3E3",
+  borderStrong: "#C7CDD2",
+  surface: "#FFFFFF",
+  section: "#F0F3F5",
+  focusRing: "rgba(124, 58, 237, 0.2)"
+};
 const DARK_WORDMARK_SEGMENTS = [
   { text: "open", color: OJS_DARK_COLORS.green },
   { text: "job", color: "#BFE4D3" },
   { text: "slots", color: OJS_DARK_COLORS.muted }
 ];
+const YAHOO_WORDMARK_SEGMENTS = [
+  { text: "open", color: OJS_BRAND_PURPLES.open },
+  { text: "job", color: OJS_BRAND_PURPLES.job },
+  { text: "slots", color: OJS_BRAND_PURPLES.slots }
+];
+const YAHOO_WORDMARK_SEGMENTS_DARK = [
+  { text: "open", color: OJS_BRAND_PURPLES.openDark },
+  { text: "job", color: OJS_BRAND_PURPLES.jobDark },
+  { text: "slots", color: OJS_BRAND_PURPLES.slotsDark }
+];
 const OJS_FONT_STACK = Platform.OS === "web"
   ? "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   : undefined;
+const YAHOO_FONT_STACK = Platform.OS === "web" ? "Arial, Helvetica, sans-serif" : undefined;
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
 const DEFAULT_PUBLIC_LANGUAGE = "en";
@@ -207,6 +282,7 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Find fresh openings across public ATS job boards.",
     "search.label": "Search openings",
     "search.placeholder": "Search title, company, location, or country",
+    "search.examplePrefix": "Try",
     "search.shortcut": "Enter to search · Esc to clear",
     "search.clear": "Clear",
     "filters.loading": "Loading filter options...",
@@ -310,6 +386,7 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Public ATS iş panolarında taze ilanları bul.",
     "search.label": "İlan ara",
     "search.placeholder": "Ünvan, şirket, konum veya ülke ara",
+    "search.examplePrefix": "Orn.",
     "search.shortcut": "Aramak için Enter · Temizlemek için Esc",
     "search.clear": "Temizle",
     "filters.loading": "Filtreler yükleniyor...",
@@ -401,6 +478,7 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Finde frische Stellen auf oeffentlichen ATS-Jobboards.",
     "search.label": "Stellen suchen",
     "search.placeholder": "Titel, Firma, Ort oder Land suchen",
+    "search.examplePrefix": "Beispiel",
     "search.shortcut": "Enter zum Suchen · Esc zum Leeren",
     "search.clear": "Leeren",
     "filters.loading": "Filter werden geladen...",
@@ -466,6 +544,7 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Trouvez des offres recentes sur les ATS publics.",
     "search.label": "Rechercher",
     "search.placeholder": "Titre, entreprise, lieu ou pays",
+    "search.examplePrefix": "Essayez",
     "search.shortcut": "Entrer pour rechercher · Esc pour vider",
     "search.clear": "Vider",
     "filters.loading": "Chargement des filtres...",
@@ -531,6 +610,7 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Encuentra ofertas recientes en ATS publicos.",
     "search.label": "Buscar empleos",
     "search.placeholder": "Titulo, empresa, ubicacion o pais",
+    "search.examplePrefix": "Prueba",
     "search.shortcut": "Enter para buscar · Esc para limpiar",
     "search.clear": "Limpiar",
     "filters.loading": "Cargando filtros...",
@@ -894,7 +974,7 @@ function createDefaultPostingsFilters() {
     remote: "all",
     hide_no_date: false,
     freshness_days: "all",
-    sort_by: "relevance"
+    sort_by: "posted_date"
   };
 }
 
@@ -910,8 +990,45 @@ function getPostingsFiltersSignature(filters = {}) {
     remote: String(filters.remote || "all"),
     hide_no_date: Boolean(filters.hide_no_date),
     freshness_days: String(filters.freshness_days || "all"),
-    sort_by: String(filters.sort_by || "relevance")
+    sort_by: String(filters.sort_by || "posted_date")
   });
+}
+
+function countDistinctPostingValues(items, getValue) {
+  const values = new Set();
+  for (const item of Array.isArray(items) ? items : []) {
+    const value = String(getValue(item) || "").trim().toLowerCase();
+    if (value) values.add(value);
+  }
+  return values.size;
+}
+
+function readPositiveInteger(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
+}
+
+function buildFrontendResultCoverage(response = {}, items = [], sourceFacets = [], totalCount = 0) {
+  const jobSlotCount = Math.max(0, Math.floor(Number(totalCount || items.length || 0)));
+  const sourceFacetCount = Array.isArray(sourceFacets) ? sourceFacets.filter((item) => Number(item?.count || 0) > 0).length : 0;
+  const responseAtsCount =
+    readPositiveInteger(response?.visible_ats_count) ??
+    readPositiveInteger(response?.configured_ats_count) ??
+    readPositiveInteger(response?.ats_count);
+  const responseCompanyCount =
+    readPositiveInteger(response?.visible_company_count) ??
+    readPositiveInteger(response?.company_count);
+  const atsCount = responseAtsCount ?? (sourceFacetCount || countDistinctPostingValues(items, (item) => item?.ats));
+  const companyCount = responseCompanyCount ?? countDistinctPostingValues(items, (item) => item?.company_name);
+  return {
+    posting_count: jobSlotCount,
+    job_slot_count: jobSlotCount,
+    configured_ats_count: atsCount,
+    configured_enabled_ats_count: atsCount,
+    visible_ats_count: atsCount,
+    company_count: companyCount,
+    visible_company_count: companyCount
+  };
 }
 
 function normalizePublicLanguageCode(value) {
@@ -939,6 +1056,41 @@ function writeWebStorageValue(key, value) {
     window.localStorage.setItem(key, String(value || ""));
   } catch {
     // Local storage is optional; ignore private browsing or quota failures.
+  }
+}
+
+function sanitizePublicSearchUrlQuery(value) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalized.length < 2) return "";
+  if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(normalized)) return "";
+  if (/\b(?:https?:\/\/|www\.)\S+/i.test(normalized)) return "";
+  return normalized.slice(0, 80);
+}
+
+function readInitialPublicSearchQuery() {
+  if (Platform.OS !== "web" || typeof window === "undefined" || typeof URLSearchParams === "undefined") return "";
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    return sanitizePublicSearchUrlQuery(params.get("q") || params.get("search") || "");
+  } catch {
+    return "";
+  }
+}
+
+function replacePublicSearchUrlQuery(query) {
+  if (Platform.OS !== "web" || typeof window === "undefined" || !window.history || typeof URL === "undefined") return;
+  try {
+    const nextQuery = sanitizePublicSearchUrlQuery(query);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("search");
+    if (nextQuery) url.searchParams.set("q", nextQuery);
+    else url.searchParams.delete("q");
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    if (nextUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState({}, "", nextUrl);
+    }
+  } catch {
+    // URL state is best-effort; search remains functional without History API.
   }
 }
 
@@ -2015,6 +2167,7 @@ function PostingCard({
   blockedCompanyNames,
   blockingCompanyNames,
   showAdminActions = false,
+  isDarkTheme = false,
   t = (key, fallback) => fallback || key
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -2045,7 +2198,7 @@ function PostingCard({
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
   const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
   return (
-    <View style={styles.card} testID="posting-card">
+    <View style={[styles.card, isDarkTheme ? styles.cardDark : null]} testID="posting-card">
       <View style={styles.postingCardTopRow}>
         <Pressable
           onPress={onOpenPosting}
@@ -2054,15 +2207,15 @@ function PostingCard({
           accessibilityRole="link"
           accessibilityLabel={`Open posting: ${positionName} at ${companyLabel}`}
         >
-          <Text style={styles.position}>{positionName}</Text>
-          <Text style={styles.location}>{locationLabel}</Text>
-          <Text style={styles.company}>{companyLabel}</Text>
-          <Text style={styles.ats}>{t("posting.atsLabel", "ATS")}: {atsLabel}</Text>
-          <Text style={styles.posted}>{postingDateLabel}</Text>
+          <Text style={[styles.position, isDarkTheme ? styles.positionDark : null]}>{companyLabel}</Text>
+          <Text style={[styles.postingRole, isDarkTheme ? styles.postingRoleDark : null]}>{positionName}</Text>
+          <Text style={[styles.location, isDarkTheme ? styles.locationDark : null]}>{locationLabel}</Text>
+          <Text style={[styles.ats, isDarkTheme ? styles.atsDark : null]}>{t("posting.atsLabel", "ATS")}: {atsLabel}</Text>
+          <Text style={[styles.posted, isDarkTheme ? styles.postedDark : null]}>{postingDateLabel}</Text>
           {isApplied ? (
             <Text style={styles.postingAppliedNotice}>{appliedByLabel}</Text>
           ) : null}
-          <Text numberOfLines={1} style={styles.url}>
+          <Text numberOfLines={1} style={[styles.url, isDarkTheme ? styles.urlDark : null]}>
             {postingUrlLabel}
           </Text>
         </Pressable>
@@ -2508,19 +2661,36 @@ function ThemeToggle({ themeMode, onToggleTheme, t }) {
       onPress={onToggleTheme}
       style={({ pressed }) => [styles.themeToggle, isDark ? styles.themeToggleDark : null, pressed ? styles.themeTogglePressed : null]}
       testID="theme-toggle"
-      accessibilityRole="switch"
-      accessibilityState={{ checked: isDark }}
+      accessibilityRole="button"
       accessibilityLabel={isDark ? t("theme.night", "Night") : t("theme.day", "Day")}
     >
-      <View style={[styles.themeToggleTrack, isDark ? styles.themeToggleTrackDark : null]}>
-        <View style={[styles.themeToggleKnob, isDark ? styles.themeToggleKnobDark : null]}>
-          <View style={[styles.themeToggleGlyph, isDark ? styles.themeToggleGlyphMoon : styles.themeToggleGlyphSun]} />
+      <View style={[styles.themeIconButton, isDark ? styles.themeIconButtonDark : null]}>
+        <View style={[styles.themeIconCore, isDark ? styles.themeIconCoreDark : null]}>
+          {isDark ? <View style={styles.themeIconMoonCutout} /> : null}
         </View>
       </View>
       <Text style={[styles.themeToggleText, isDark ? styles.themeToggleTextDark : null]}>
         {isDark ? t("theme.night", "Night") : t("theme.day", "Day")}
       </Text>
     </Pressable>
+  );
+}
+
+function SearchGlyph({ isDark = false, compact = false }) {
+  return (
+    <View style={[styles.searchGlyph, compact ? styles.searchGlyphCompact : null]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={[styles.searchGlyphCircle, isDark ? styles.searchGlyphCircleDark : null]} />
+      <View style={[styles.searchGlyphHandle, isDark ? styles.searchGlyphHandleDark : null]} />
+    </View>
+  );
+}
+
+function ClearGlyph({ isDark = false }) {
+  return (
+    <View style={styles.clearGlyph} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={[styles.clearGlyphBar, isDark ? styles.clearGlyphBarDark : null, styles.clearGlyphBarForward]} />
+      <View style={[styles.clearGlyphBar, isDark ? styles.clearGlyphBarDark : null, styles.clearGlyphBarBackward]} />
+    </View>
   );
 }
 
@@ -2638,12 +2808,19 @@ function ToggleRow({ label, value, onValueChange }) {
 export default function App() {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktopViewport = Platform.OS === "web" && Number(viewportWidth || 0) >= 768;
+  const initialPublicSearchQuery = useMemo(readInitialPublicSearchQuery, []);
   const [activePage, setActivePage] = useState(PAGE_KEYS.POSTINGS);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [publicLanguageCode, setPublicLanguageCode] = useState(getInitialPublicLanguageCode);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [publicTheme, setPublicTheme] = useState(getInitialPublicTheme);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialPublicSearchQuery);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchExampleTypeState, setSearchExampleTypeState] = useState({
+    index: 0,
+    length: 2,
+    deleting: false
+  });
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [postingsFilters, setPostingsFilters] = useState(createDefaultPostingsFilters);
   const [postingFilterOptions, setPostingFilterOptions] = useState({
@@ -2660,6 +2837,7 @@ export default function App() {
   const [postings, setPostings] = useState([]);
   const [sourceFacets, setSourceFacets] = useState([]);
   const [postingsTotalCount, setPostingsTotalCount] = useState(0);
+  const [postingsResultCoverage, setPostingsResultCoverage] = useState(null);
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
   const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
@@ -2686,7 +2864,7 @@ export default function App() {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
-  const [searchResultsMode, setSearchResultsMode] = useState(false);
+  const [searchResultsMode, setSearchResultsMode] = useState(Boolean(initialPublicSearchQuery));
   const [coverageDetailsOpen, setCoverageDetailsOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const [statusError, setStatusError] = useState("");
@@ -2719,8 +2897,12 @@ export default function App() {
   const [mcpSettingsNotice, setMcpSettingsNotice] = useState("");
   const searchInputRef = useRef(null);
   const postingsListRef = useRef(null);
-  const searchRef = useRef("");
-  const lastSearchSubmitRef = useRef({ value: "", at: 0 });
+  const searchRef = useRef(initialPublicSearchQuery);
+  const lastSearchSubmitRef = useRef({
+    value: initialPublicSearchQuery,
+    filtersSignature: getPostingsFiltersSignature(createDefaultPostingsFilters()),
+    at: Date.now()
+  });
   const suppressedSuggestionQueryRef = useRef("");
   const postingsFiltersRef = useRef(postingsFilters);
   const autoSyncInFlightRef = useRef(false);
@@ -2748,10 +2930,18 @@ export default function App() {
 
   const pageTitle = PAGE_TITLES[activePage] || PAGE_TITLES[PAGE_KEYS.POSTINGS];
   const isDarkPublicTheme = publicTheme === "dark";
-  const publicWordmarkSegments = isDarkPublicTheme ? DARK_WORDMARK_SEGMENTS : WORDMARK_SEGMENTS;
+  const publicWordmarkSegments = isDarkPublicTheme ? YAHOO_WORDMARK_SEGMENTS_DARK : YAHOO_WORDMARK_SEGMENTS;
   const t = useCallback(
     (key, fallback = "") => translatePublicText(publicLanguageCode, key, fallback),
     [publicLanguageCode]
+  );
+  const currentSearchExample =
+    SEARCH_PLACEHOLDER_EXAMPLES[searchExampleTypeState.index % SEARCH_PLACEHOLDER_EXAMPLES.length] ||
+    SEARCH_PLACEHOLDER_EXAMPLES[0] ||
+    "";
+  const exampleSearchPlaceholder = currentSearchExample.slice(
+    0,
+    Math.max(1, Math.min(currentSearchExample.length, searchExampleTypeState.length))
   );
   const flushFrontendLogs = useCallback(async () => {
     if (frontendLogFlushInFlightRef.current) return;
@@ -3151,6 +3341,7 @@ export default function App() {
     const requestSequence = append
       ? postingsRequestSequenceRef.current
       : postingsRequestSequenceRef.current + 1;
+    const previousVisiblePostings = append ? [] : postingsRef.current;
 
     if (append && postingsLoadingMoreRef.current) {
       return;
@@ -3163,6 +3354,15 @@ export default function App() {
       setPostingsLoadingMore(true);
     } else if (!silent) {
       setLoading(true);
+      postingsRef.current = [];
+      postingsNextOffsetRef.current = 0;
+      postingsHasMoreRef.current = false;
+      setPostings([]);
+      setSourceFacets([]);
+      setPostingsTotalCount(0);
+      setPostingsResultCoverage(null);
+      setPostingsNextOffset(0);
+      setPostingsHasMore(false);
     }
     setError("");
     try {
@@ -3176,6 +3376,7 @@ export default function App() {
         : normalizedItems;
       const nextSourceFacets = normalizeSourceFacets(response?.source_facets);
       const fallbackSourceFacets = buildSourceFacetsFromPostings(nextVisibleItems);
+      const effectiveSourceFacets = nextSourceFacets.length > 0 ? nextSourceFacets : fallbackSourceFacets;
       const visibleCountAfterLoad = nextVisibleItems.length;
       const responseCount = Number(response?.count || 0);
       const totalCount = Math.max(responseCount, visibleCountAfterLoad);
@@ -3194,8 +3395,9 @@ export default function App() {
       postingsNextOffsetRef.current = nextOffset;
       postingsHasMoreRef.current = Boolean(responseHasMore && normalizedItems.length > 0);
       setPostings(nextVisibleItems);
-      setSourceFacets(nextSourceFacets.length > 0 ? nextSourceFacets : fallbackSourceFacets);
+      setSourceFacets(effectiveSourceFacets);
       setPostingsTotalCount(totalCount);
+      setPostingsResultCoverage(buildFrontendResultCoverage(response, nextVisibleItems, effectiveSourceFacets, totalCount));
       setPostingsNextOffset(nextOffset);
       setPostingsHasMore(Boolean(responseHasMore && normalizedItems.length > 0));
       setSearchNotice("");
@@ -3204,6 +3406,20 @@ export default function App() {
       if (requestSequence === postingsRequestSequenceRef.current) {
         if (e?.isTransientBusy) {
           setSearchNotice("Showing the latest results while indexing catches up. Search will retry shortly.");
+          if (!append && Array.isArray(previousVisiblePostings) && previousVisiblePostings.length > 0) {
+            const restoredSourceFacets = buildSourceFacetsFromPostings(previousVisiblePostings);
+            postingsRef.current = previousVisiblePostings;
+            postingsNextOffsetRef.current = previousVisiblePostings.length;
+            postingsHasMoreRef.current = false;
+            setPostings(previousVisiblePostings);
+            setSourceFacets(restoredSourceFacets);
+            setPostingsTotalCount(previousVisiblePostings.length);
+            setPostingsResultCoverage(
+              buildFrontendResultCoverage({}, previousVisiblePostings, restoredSourceFacets, previousVisiblePostings.length)
+            );
+            setPostingsNextOffset(previousVisiblePostings.length);
+            setPostingsHasMore(false);
+          }
         } else if (!append) {
           setError(String(e.message || e));
         } else {
@@ -3481,6 +3697,8 @@ export default function App() {
     }
     setSearchResultsMode(true);
     setSearch(nextSearch);
+    replacePublicSearchUrlQuery(nextSearch);
+    setPostingsResultCoverage(null);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
@@ -3499,9 +3717,11 @@ export default function App() {
     };
     suppressedSuggestionQueryRef.current = "";
     setSearch("");
+    replacePublicSearchUrlQuery("");
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
+    setPostingsResultCoverage(null);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
@@ -3525,6 +3745,7 @@ export default function App() {
     suppressedSuggestionQueryRef.current = query;
     setPostingsFilters(nextFilters);
     setSearchResultsMode(true);
+    setPostingsResultCoverage(null);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
@@ -3545,9 +3766,11 @@ export default function App() {
     setActivePage(PAGE_KEYS.POSTINGS);
     setDrawerOpen(false);
     setSearch("");
+    replacePublicSearchUrlQuery("");
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
+    setPostingsResultCoverage(null);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     suppressedSuggestionQueryRef.current = "";
@@ -4298,6 +4521,41 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
+    if (String(search || "").trim()) return undefined;
+    const text = SEARCH_PLACEHOLDER_EXAMPLES[searchExampleTypeState.index % SEARCH_PLACEHOLDER_EXAMPLES.length] || "";
+    const atEnd = !searchExampleTypeState.deleting && searchExampleTypeState.length >= text.length;
+    const atStart = searchExampleTypeState.deleting && searchExampleTypeState.length <= 1;
+    const delay = atEnd
+      ? SEARCH_PLACEHOLDER_HOLD_MS
+      : atStart
+        ? SEARCH_PLACEHOLDER_NEXT_MS
+        : searchExampleTypeState.deleting
+          ? SEARCH_PLACEHOLDER_DELETE_MS
+          : SEARCH_PLACEHOLDER_TYPE_MS;
+    const timer = setTimeout(() => {
+      setSearchExampleTypeState((current) => {
+        const currentText = SEARCH_PLACEHOLDER_EXAMPLES[current.index % SEARCH_PLACEHOLDER_EXAMPLES.length] || "";
+        if (!current.deleting && current.length >= currentText.length) {
+          return { ...current, deleting: true };
+        }
+        if (current.deleting && current.length <= 1) {
+          return {
+            index: (current.index + 1) % SEARCH_PLACEHOLDER_EXAMPLES.length,
+            length: 2,
+            deleting: false
+          };
+        }
+        return {
+          ...current,
+          length: Math.max(1, current.length + (current.deleting ? -1 : 1))
+        };
+      });
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [activePage, search, searchExampleTypeState]);
+
+  useEffect(() => {
     Animated.timing(searchMotionRef.current, {
       toValue: searchShellCompact ? 1 : 0,
       duration: prefersReducedMotionRef.current ? 0 : 300,
@@ -4477,9 +4735,11 @@ export default function App() {
       setInitializing(true);
       setError("");
       try {
+        const bootstrapSearch = String(searchRef.current || "").trim();
+        const bootstrapFilters = postingsFiltersRef.current;
         await Promise.all([
-          loadPostings("", { filters: postingsFiltersRef.current }),
-          loadPostingFilterOptions(),
+          loadPostings(bootstrapSearch, { filters: bootstrapFilters }),
+          loadPostingFilterOptions({ search: bootstrapSearch, filters: bootstrapFilters }),
           loadStatus()
         ]);
       } catch (e) {
@@ -4723,18 +4983,187 @@ export default function App() {
   );
 
   const renderPostingsPage = () => {
-    const filtersVisible = isDesktopViewport || postingsFilterPanelOpen;
+    const filtersVisible = false;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
-    const {
-      value: resultCountValueLabel,
-      unit: resultCountUnitLabel,
-      label: resultCountLabel
-    } = buildResultCountLabel({ showResultsSurface, resultTotalCount, t });
-    const publicResultStatsChips = buildPublicStatsChips(status).filter((chip) => chip.key !== "job-slots");
-    const sortOptions = Array.isArray(postingFilterOptions.sort_options) && postingFilterOptions.sort_options.length > 0
-      ? postingFilterOptions.sort_options
-      : DEFAULT_POSTING_SORT_OPTIONS;
-    const translatedSortOptions = sortOptions.map((option) => getTranslatedSortOption(option, publicLanguageCode));
+    const resultStatsSource = postingsResultCoverage || buildFrontendResultCoverage({}, postings, sourceFacets, resultTotalCount);
+    const publicStatsSource = showResultsSurface ? resultStatsSource : applyPublicStatsOverride(status);
+    const resultStatsLoading = showResultsSurface && loading && postings.length === 0 && !postingsResultCoverage;
+    const publicShellStatsChips = resultStatsLoading ? [] : buildPublicStatsChips(publicStatsSource);
+    const renderSearchBox = (mode = "home") => {
+      const compact = mode === "results";
+      return (
+        <View style={[styles.searchBoxRow, styles.yahooSearchBoxRow, compact ? styles.yahooSearchBoxRowResults : null]}>
+          <View
+            style={[
+              styles.yahooSearchBoxFrame,
+              compact ? styles.yahooSearchBoxFrameResults : null,
+              isDarkPublicTheme ? styles.yahooSearchBoxFrameDark : null,
+              searchFocused ? styles.yahooSearchBoxFrameFocused : null,
+              searchFocused && isDarkPublicTheme ? styles.yahooSearchBoxFrameFocusedDark : null
+            ]}
+          >
+            {!compact ? <SearchGlyph isDark={isDarkPublicTheme} /> : null}
+            <TextInput
+              ref={searchInputRef}
+              style={[
+                styles.search,
+                isDarkPublicTheme ? styles.searchDark : null,
+                styles.yahooSearchInput,
+                isDarkPublicTheme ? styles.yahooSearchInputDark : null
+              ]}
+              value={search}
+              onChangeText={handleSearchChange}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onSubmitEditing={() => submitSearch(search)}
+              onKeyPress={handleSearchKeyPress}
+              placeholder={
+                !String(search || "").trim()
+                  ? exampleSearchPlaceholder
+                  : t("search.placeholder", "Search title, company, location, or country")
+              }
+              placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
+              autoCapitalize="none"
+              returnKeyType="search"
+              blurOnSubmit={false}
+              testID="search-input"
+              accessibilityLabel="Search postings"
+            />
+            {compact && String(search || "").trim() ? (
+              <Pressable
+                onPress={clearSearchAndSuggestions}
+                style={({ pressed }) => [styles.yahooSearchIconButton, pressed ? styles.yahooSearchIconButtonPressed : null]}
+                testID="postings-search-clear"
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <ClearGlyph isDark={isDarkPublicTheme} />
+              </Pressable>
+            ) : null}
+            {compact ? (
+              <Pressable
+                onPress={() => submitSearch(search)}
+                style={({ pressed }) => [styles.yahooSearchSubmitButton, pressed ? styles.yahooSearchSubmitButtonPressed : null]}
+                testID="postings-search-submit"
+                accessibilityRole="button"
+                accessibilityLabel="Search postings"
+              >
+                <SearchGlyph isDark={isDarkPublicTheme} compact />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      );
+    };
+    const renderPublicStatsChips = () => {
+      if (!showResultsSurface) return null;
+      if (publicShellStatsChips.length === 0) return null;
+      return (
+        <View style={styles.publicStatsChipRow} testID="public-stats-chips">
+          {publicShellStatsChips.map((chip) => {
+            const isJobSlots = chip.key === "job-slots";
+            return (
+              <Text
+                key={chip.key}
+                style={[
+                  isJobSlots ? styles.resultCountText : styles.publicStatsChip,
+                  styles.yahooStatsChip,
+                  isDarkPublicTheme ? (isJobSlots ? styles.resultCountTextDark : styles.publicStatsChipDark) : null
+                ]}
+                testID={isJobSlots ? "result-count" : `public-stat-${chip.key}`}
+                accessibilityRole={isJobSlots ? "status" : "text"}
+                accessibilityLabel={`${chip.value} ${chip.label}`}
+              >
+                <Text style={[isJobSlots ? styles.resultCountValueText : styles.publicStatsChipValue, isDarkPublicTheme ? styles.textInkDark : null]}>
+                  {chip.value}
+                </Text>
+                <Text style={[isJobSlots ? styles.resultCountUnitText : styles.publicStatsChipLabel, isDarkPublicTheme ? styles.textMutedDark : null]}>
+                  {" "}{chip.label}
+                </Text>
+              </Text>
+            );
+          })}
+        </View>
+      );
+    };
+    const brandMark = (
+      <Pressable
+        onPress={handleBrandHome}
+        style={({ pressed }) => [
+          styles.brandWordmark,
+          styles.yahooBrandWordmark,
+          showResultsSurface ? styles.yahooBrandWordmarkResults : null,
+          pressed ? styles.brandWordmarkPressed : null
+        ]}
+        testID="app-logo"
+        accessibilityRole="link"
+        accessibilityLabel="openjobslots home"
+      >
+        <View style={styles.brandWordmarkInner} testID="brand-wordmark">
+          {publicWordmarkSegments.map((segment, index) => (
+            <Text
+              key={`brand-wordmark-${segment.text}-${index}`}
+              style={[
+                styles.brandWordmarkLetter,
+                styles.yahooBrandWordmarkLetter,
+                showResultsSurface ? styles.yahooBrandWordmarkLetterResults : null,
+                { color: segment.color }
+              ]}
+            >
+              {segment.text}
+            </Text>
+          ))}
+        </View>
+      </Pressable>
+    );
+    const publicFooterMeta = (
+      <View
+        style={[
+          styles.publicFooterMeta,
+          showResultsSurface ? styles.publicFooterMetaResults : null,
+          !isDesktopViewport ? styles.publicFooterMetaMobile : null,
+          isDarkPublicTheme ? styles.publicFooterMetaDark : null
+        ]}
+        testID="public-footer-meta"
+      >
+        <Pressable
+          onPress={() => setReleaseNotesOpen(true)}
+          style={({ pressed }) => [
+            styles.publicVersionButton,
+            styles.publicFooterVersionButton,
+            pressed ? styles.publicVersionButtonPressed : null,
+            pressed && isDarkPublicTheme ? styles.publicVersionButtonPressedDark : null
+          ]}
+          testID="public-version-button"
+          accessibilityRole="button"
+          accessibilityLabel={`Open release notes for version ${PUBLIC_APP_VERSION}`}
+        >
+          <Text
+            style={[styles.publicVersionLabel, isDarkPublicTheme ? styles.publicVersionLabelDark : null]}
+            testID="public-version-label"
+          >
+            {translatedPublicText(t, "version.label", PUBLIC_VERSION_LABEL, { version: PUBLIC_APP_VERSION })}
+          </Text>
+        </Pressable>
+        <Text
+          style={[styles.searchCreditText, styles.yahooCreditText, styles.publicFooterCredit, isDarkPublicTheme ? styles.searchCreditTextDark : null]}
+          testID="search-credit-text"
+        >
+          {t("credit.deployed", "Deployed and developed by")}{" "}
+          <Text
+            href={BATUHAN_WEBSITE_URL}
+            hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
+            onPress={handleOpenDeveloperCredit}
+            style={[styles.searchCreditLink, isDarkPublicTheme ? styles.searchCreditLinkDark : null]}
+            testID="search-credit-link"
+            accessibilityRole="link"
+            accessibilityLabel="Batuhan Boran website"
+          >
+            Batuhan Boran
+          </Text>
+        </Text>
+      </View>
+    );
 
     return (
     <View style={[styles.postingsPageFrame, isDarkPublicTheme ? styles.postingsPageFrameDark : null]}>
@@ -4754,101 +5183,75 @@ export default function App() {
       <View
         style={[
           styles.searchPanel,
+          styles.yahooSearchPanel,
           isDesktopViewport ? styles.searchPanelDesktop : styles.searchPanelMobile,
-          isDesktopViewport ? styles.searchPanelSticky : null,
+          showResultsSurface ? styles.yahooSearchPanelResults : null,
+          showResultsSurface && isDesktopViewport ? styles.searchPanelSticky : null,
           isDarkPublicTheme ? styles.searchPanelDark : null
         ]}
         testID="search-panel"
       >
+      <View
+        style={[
+          styles.yahooTopBar,
+          showResultsSurface ? styles.yahooTopBarResults : null,
+          !isDesktopViewport ? styles.yahooTopBarMobile : null
+        ]}
+      >
+        {showResultsSurface ? (
+          <View style={[styles.yahooResultsSearchTop, !isDesktopViewport ? styles.yahooResultsSearchTopMobile : null]}>
+            {renderSearchBox("results")}
+          </View>
+        ) : (
+          <View style={styles.yahooBrandCluster}>
+            {brandMark}
+          </View>
+        )}
+        <View
+          style={[
+            styles.yahooTopActions,
+            showResultsSurface ? styles.yahooTopActionsResults : null,
+            !isDesktopViewport ? styles.yahooTopActionsMobile : null
+          ]}
+        >
+          {showResultsSurface ? <View style={styles.yahooResultsBrandSlot}>{brandMark}</View> : null}
+          {renderPublicStatsChips()}
+          <View style={styles.resultsUtilityControls}>
+            <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} />
+            <LanguageSelector
+              languageCode={publicLanguageCode}
+              menuOpen={languageMenuOpen}
+              onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
+              onSelectLanguage={selectPublicLanguage}
+              t={t}
+            />
+          </View>
+        </View>
+      </View>
+      {!showResultsSurface ? (
       <Animated.View
         style={[
           styles.searchShell,
+          styles.yahooSearchShell,
+          showResultsSurface ? styles.yahooSearchShellCompact : styles.yahooSearchShellHome,
+          !isDesktopViewport ? styles.yahooSearchShellMobile : null,
           Platform.OS === "web" ? styles.webSmoothMotion : null
         ]}
         testID="search-controls"
       >
-        {isDesktopViewport ? (
-          <View pointerEvents={Platform.OS === "web" ? undefined : "box-none"} style={styles.searchMetaRail}>
-            <Pressable
-              onPress={() => setReleaseNotesOpen(true)}
-              style={({ pressed }) => [
-                styles.publicVersionButton,
-                pressed ? styles.publicVersionButtonPressed : null,
-                pressed && isDarkPublicTheme ? styles.publicVersionButtonPressedDark : null
-              ]}
-              testID="public-version-button"
-              accessibilityRole="button"
-              accessibilityLabel={`Open release notes for version ${PUBLIC_APP_VERSION}`}
-            >
-              <Text
-                style={[styles.publicVersionLabel, isDarkPublicTheme ? styles.publicVersionLabelDark : null]}
-                testID="public-version-label"
-              >
-                {translatedPublicText(t, "version.label", PUBLIC_VERSION_LABEL, { version: PUBLIC_APP_VERSION })}
-              </Text>
-            </Pressable>
-            <Text
-              style={[styles.searchCreditText, isDarkPublicTheme ? styles.searchCreditTextDark : null]}
-              testID="search-credit-text"
-            >
-              {t("credit.deployed", "Deployed and developed by")}{" "}
-              <Text
-                href={BATUHAN_WEBSITE_URL}
-                hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
-                onPress={handleOpenDeveloperCredit}
-                style={[styles.searchCreditLink, isDarkPublicTheme ? styles.searchCreditLinkDark : null]}
-                testID="search-credit-link"
-                accessibilityRole="link"
-                accessibilityLabel="Batuhan Boran website"
-              >
-                Batuhan Boran
-              </Text>
-            </Text>
-          </View>
-        ) : null}
-        <Pressable
-          onPress={handleBrandHome}
-          style={({ pressed }) => [styles.brandWordmark, pressed ? styles.brandWordmarkPressed : null]}
-          testID="app-logo"
-          accessibilityRole="link"
-          accessibilityLabel="openjobslots home"
-        >
-          <View style={styles.brandWordmarkInner} testID="brand-wordmark">
-            {publicWordmarkSegments.map((segment, index) => (
-              <Text
-                key={`brand-wordmark-${segment.text}-${index}`}
-                style={[styles.brandWordmarkLetter, { color: segment.color }]}
-              >
-                {segment.text}
-              </Text>
-            ))}
-          </View>
-        </Pressable>
-        <Text style={[styles.searchLead, isDarkPublicTheme ? styles.textMutedDark : null]}>
+        <Text style={[styles.yahooHeroTitle, isDarkPublicTheme ? styles.textInkDark : null]}>
+          {showResultsSurface ? t("results.title", "Open roles") : t("search.heroTitle", "Search open job slots")}
+        </Text>
+        <Text style={[styles.searchLead, styles.yahooSearchLead, isDarkPublicTheme ? styles.textMutedDark : null]}>
           {t("search.lead", "Find fresh openings across public ATS job boards.")}
         </Text>
-        <Text style={[styles.searchPanelLabel, isDarkPublicTheme ? styles.textMutedDark : null]}>
-          {t("search.label", "Search openings")}
-        </Text>
-        <View style={styles.searchBoxRow}>
-          <TextInput
-            ref={searchInputRef}
-            style={[styles.search, isDarkPublicTheme ? styles.searchDark : null]}
-            value={search}
-            onChangeText={handleSearchChange}
-            onSubmitEditing={() => submitSearch(search)}
-            onKeyPress={handleSearchKeyPress}
-            placeholder={t("search.placeholder", "Search title, company, location, or country")}
-            placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : OJS_COLORS.muted}
-            autoCapitalize="none"
-            returnKeyType="search"
-            blurOnSubmit={false}
-            testID="search-input"
-            accessibilityLabel="Search postings"
-          />
-        </View>
-        {searchIntentChips.length > 0 ? (
-          <View style={styles.searchIntentPanel} testID="search-intent-chips">
+        {renderSearchBox("home")}
+        <View
+          style={[styles.searchIntentPanel, searchIntentChips.length === 0 ? styles.searchIntentPanelEmpty : null]}
+          testID={searchIntentChips.length > 0 ? "search-intent-chips" : undefined}
+        >
+          {searchIntentChips.length > 0 ? (
+            <>
             <Text style={styles.searchIntentLabel}>{t("search.intentDetected", "Detected intent")}</Text>
             <View style={styles.searchIntentChipsRow}>
               {searchIntentChips.map((suggestion, index) => {
@@ -4878,8 +5281,9 @@ export default function App() {
                 );
               })}
             </View>
-          </View>
-        ) : null}
+            </>
+          ) : null}
+        </View>
         <View
           style={styles.searchLowerRail}
         >
@@ -4917,30 +5321,6 @@ export default function App() {
                   {searchNotice}
                 </Text>
               ) : null}
-              <View style={styles.searchActionsRow}>
-                {!isDesktopViewport ? (
-                  <Pressable
-                    onPress={() => setPostingsFilterPanelOpen((prev) => !prev)}
-                    style={({ pressed }) => [styles.postingsFiltersToggleBtn, pressed ? styles.buttonPressed : null]}
-                    testID="postings-filter-toggle"
-                    accessibilityRole="button"
-                    accessibilityLabel={postingsFilterPanelOpen ? "Hide posting filters" : "Show posting filters"}
-                  >
-                    <Text style={styles.postingsFiltersToggleText}>
-                      {postingsFilterPanelOpen ? t("filters.hide", "Hide filters") : t("filters.show", "Filters")}
-                    </Text>
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  onPress={clearSearchAndSuggestions}
-                  style={({ pressed }) => [styles.postingsFiltersClearBtn, pressed ? styles.buttonPressed : null]}
-                  testID="postings-filter-clear"
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear search and posting filters"
-                >
-                  <Text style={styles.postingsFiltersClearText}>{t("search.clear", "Clear")}</Text>
-                </Pressable>
-              </View>
               {syncNotice ? (
                 <Text style={styles.syncNotice} testID="sync-action-notice" accessibilityRole="status">
                   {syncNotice}
@@ -4950,6 +5330,7 @@ export default function App() {
           )}
         </View>
       </Animated.View>
+      ) : null}
 
       {filtersVisible ? (
         <View
@@ -5198,80 +5579,8 @@ export default function App() {
 
       </View>
 
-      <View style={styles.resultsColumn}>
-        <View style={[styles.resultsHeader, isDarkPublicTheme ? styles.resultsHeaderDark : null]}>
-          <View>
-            <Text style={[styles.resultsEyebrow, isDarkPublicTheme ? styles.textMutedDark : null]}>
-              {t("results.eyebrow", "Public search")}
-            </Text>
-            <Text style={[styles.resultsTitle, isDarkPublicTheme ? styles.textInkDark : null]} testID="results-header-title">
-              {t("results.title", "Open roles")}
-            </Text>
-          </View>
-          <View style={[styles.resultsToolbar, isDesktopViewport ? styles.resultsToolbarDesktop : styles.resultsToolbarMobile]}>
-            <View style={styles.resultsUtilityControls}>
-              <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} />
-              <LanguageSelector
-                languageCode={publicLanguageCode}
-                menuOpen={languageMenuOpen}
-                onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
-                onSelectLanguage={selectPublicLanguage}
-                t={t}
-              />
-            </View>
-            <Text
-              style={[styles.resultCountText, isDarkPublicTheme ? styles.resultCountTextDark : null]}
-              testID="result-count"
-              accessibilityRole="status"
-              accessibilityLabel={resultCountLabel}
-            >
-              <Text style={[styles.resultCountValueText, isDarkPublicTheme ? styles.textInkDark : null]}>{resultCountValueLabel}</Text>
-              {resultCountUnitLabel ? (
-                <Text style={[styles.resultCountUnitText, isDarkPublicTheme ? styles.textMutedDark : null]}> {resultCountUnitLabel}</Text>
-              ) : null}
-            </Text>
-            <View style={styles.publicStatsChipRow} testID="public-stats-chips">
-              {publicResultStatsChips.map((chip) => (
-                <Text
-                  key={chip.key}
-                  style={[styles.publicStatsChip, isDarkPublicTheme ? styles.publicStatsChipDark : null]}
-                  testID={`public-stat-${chip.key}`}
-                >
-                  <Text style={[styles.publicStatsChipValue, isDarkPublicTheme ? styles.textInkDark : null]}>{chip.value}</Text>
-                  <Text style={[styles.publicStatsChipLabel, isDarkPublicTheme ? styles.textMutedDark : null]}> {chip.label}</Text>
-                </Text>
-              ))}
-            </View>
-            <View
-              style={[
-                styles.sortControlWrap,
-                isDesktopViewport ? styles.sortControlWrapDesktop : styles.sortControlWrapMobile
-              ]}
-            >
-              <SortSegmentedControl
-                options={translatedSortOptions}
-                selectedValue={postingsFilters.sort_by}
-                onSelectValue={(value) => {
-                  setSearchResultsMode(true);
-                  setPostingsFilters((prev) => ({
-                    ...prev,
-                    sort_by: value || "relevance"
-                  }));
-                }}
-              />
-            </View>
-          </View>
-        </View>
-
-      {!showResultsSurface ? (
-        <View style={[styles.initialResultsState, isDarkPublicTheme ? styles.initialResultsStateDark : null]} testID="postings-initial-state">
-          <Text style={[styles.emptyTitle, isDarkPublicTheme ? styles.textInkDark : null]}>{t("initial.title", "Search fresh public ATS openings.")}</Text>
-          <Text style={[styles.emptyText, isDarkPublicTheme ? styles.textMutedDark : null]}>
-            {t("initial.copy", "Start with a title, company, location, country, or work mode. Filters stay pinned beside the results on desktop.")}
-          </Text>
-        </View>
-      ) : null}
-
+      {showResultsSurface ? (
+      <View style={[styles.resultsColumn, !isDesktopViewport ? styles.resultsColumnMobile : null]}>
       {showResultsSurface ? (
         <Animated.View
           style={[styles.resultsSurface, Platform.OS === "web" ? styles.resultsSurfaceMotion : null, resultsMotionStyle]}
@@ -5280,6 +5589,11 @@ export default function App() {
           {loading && !initializing ? (
             <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" accessibilityRole="status">
               {t("results.updating", "Updating visible results...")}
+            </Text>
+          ) : null}
+          {searchNotice ? (
+            <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
+              {searchNotice}
             </Text>
           ) : null}
           {applicationsNotice ? <Text style={styles.inlineNotice}>{applicationsNotice}</Text> : null}
@@ -5292,7 +5606,7 @@ export default function App() {
                 <View style={styles.emptyState} testID="postings-empty-state">
                   <Text style={styles.emptyTitle}>{t("empty.noSlotsExact", "No slots match this exact search.")}</Text>
                   <Text style={styles.emptyText}>
-                    {t("empty.tryDifferent", "Try another title, source, location, or freshness window.")}
+                    {t("empty.tryDifferent", "Try another title, company, location, or keyword.")}
                   </Text>
                   <View style={styles.emptyActions}>
                     {hasLocationPostingFilters ? (
@@ -5339,6 +5653,7 @@ export default function App() {
                     ignoringPostingIds={ignoringPostingIds}
                     blockedCompanyNames={blockedCompanyNames}
                     blockingCompanyNames={blockingCompanyNamesSet}
+                    isDarkTheme={isDarkPublicTheme}
                     t={t}
                   />
                 ))
@@ -5368,8 +5683,10 @@ export default function App() {
         </Animated.View>
       ) : null}
       </View>
+      ) : null}
       </View>
       </ScrollView>
+      {!showResultsSurface ? publicFooterMeta : null}
       {showResultsSurface && showScrollTopButton ? (
         <Pressable
           onPress={scrollPostingsToTop}
@@ -5385,7 +5702,7 @@ export default function App() {
           <Text style={styles.scrollTopButtonText}>Top</Text>
         </Pressable>
       ) : null}
-      {isDesktopViewport ? renderReleaseNotesModal() : null}
+      {renderReleaseNotesModal()}
     </View>
     );
   };
@@ -6126,40 +6443,38 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme ? styles.containerPublicDark : null]}>
-      <View
-        style={[
-          styles.header,
-          activePage === PAGE_KEYS.POSTINGS ? styles.headerCompact : null,
-          activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme ? styles.headerPublicDark : null
-        ]}
-      >
+    <SafeAreaView
+      style={[
+        styles.container,
+        activePage === PAGE_KEYS.POSTINGS ? styles.containerPublic : null,
+        activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme ? styles.containerPublicDark : null
+      ]}
+    >
+      {activePage !== PAGE_KEYS.POSTINGS ? (
+      <View style={styles.header}>
         <View style={styles.headerTopRow}>
-          {activePage !== PAGE_KEYS.POSTINGS ? (
-            <Pressable
-              onPress={handleBrandHome}
-              style={({ pressed }) => [styles.headerLogoContainer, pressed ? styles.buttonPressed : null]}
-              accessibilityRole="link"
-              accessibilityLabel="openjobslots home"
-            >
-              <View style={styles.headerWordmark}>
-                {WORDMARK_SEGMENTS.map((segment, index) => (
-                  <Text
-                    key={`header-wordmark-${segment.text}-${index}`}
-                    style={[styles.headerWordmarkLetter, { color: segment.color }]}
-                  >
-                    {segment.text}
-                  </Text>
-                ))}
-              </View>
-            </Pressable>
-          ) : (
-            <View style={styles.headerPublicSpacer} />
-          )}
+          <Pressable
+            onPress={handleBrandHome}
+            style={({ pressed }) => [styles.headerLogoContainer, pressed ? styles.buttonPressed : null]}
+            accessibilityRole="link"
+            accessibilityLabel="openjobslots home"
+          >
+            <View style={styles.headerWordmark}>
+              {WORDMARK_SEGMENTS.map((segment, index) => (
+                <Text
+                  key={`header-wordmark-${segment.text}-${index}`}
+                  style={[styles.headerWordmarkLetter, { color: segment.color }]}
+                >
+                  {segment.text}
+                </Text>
+              ))}
+            </View>
+          </Pressable>
           {renderHeaderNav()}
         </View>
-        {activePage !== PAGE_KEYS.POSTINGS ? <Text style={styles.pageTitle}>{pageTitle}</Text> : null}
+        <Text style={styles.pageTitle}>{pageTitle}</Text>
       </View>
+      ) : null}
 
       {error ? (
         <Text style={styles.error} testID="app-error-message" accessibilityRole="alert">
@@ -6212,6 +6527,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: OJS_COLORS.bg,
     fontFamily: OJS_FONT_STACK
+  },
+  containerPublic: {
+    backgroundColor: YAHOO_COLORS.surface,
+    fontFamily: YAHOO_FONT_STACK
   },
   containerPublicDark: {
     backgroundColor: OJS_DARK_COLORS.bg
@@ -6356,11 +6675,11 @@ const styles = StyleSheet.create({
   },
   postingsPageScroll: {
     flex: 1,
-    backgroundColor: OJS_COLORS.bg,
-    fontFamily: OJS_FONT_STACK,
+    backgroundColor: YAHOO_COLORS.surface,
+    fontFamily: YAHOO_FONT_STACK,
     ...(Platform.OS === "web"
       ? {
-          scrollbarColor: `${OJS_COLORS.border} ${OJS_COLORS.bg}`,
+          scrollbarColor: `${YAHOO_COLORS.borderStrong} ${YAHOO_COLORS.surface}`,
           scrollbarWidth: "thin"
         }
       : {})
@@ -6376,16 +6695,16 @@ const styles = StyleSheet.create({
   postingsPageFrame: {
     flex: 1,
     position: "relative",
-    backgroundColor: OJS_COLORS.bg,
-    fontFamily: OJS_FONT_STACK
+    backgroundColor: YAHOO_COLORS.surface,
+    fontFamily: YAHOO_FONT_STACK
   },
   postingsPageFrameDark: {
     backgroundColor: OJS_DARK_COLORS.bg
   },
   postingsPageContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 96
   },
   webSmoothMotion: {
     transitionProperty: "min-height, padding, margin, transform, opacity",
@@ -6399,13 +6718,13 @@ const styles = StyleSheet.create({
   },
   publicSearchLayout: {
     width: "100%",
-    maxWidth: 1280,
+    maxWidth: "100%",
     alignSelf: "center",
-    gap: 16
+    gap: 0
   },
   publicSearchLayoutDesktop: {
-    flexDirection: "row",
-    alignItems: "flex-start"
+    flexDirection: "column",
+    alignItems: "stretch"
   },
   publicSearchLayoutMobile: {
     flexDirection: "column"
@@ -6427,32 +6746,417 @@ const styles = StyleSheet.create({
           shadowOffset: { width: 0, height: 8 }
         })
   },
+  yahooSearchPanel: {
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: YAHOO_COLORS.surface,
+    paddingHorizontal: 48,
+    paddingTop: 32,
+    paddingBottom: 44,
+    fontFamily: YAHOO_FONT_STACK,
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "none",
+          minHeight: "100svh"
+        }
+      : {})
+  },
+  yahooSearchPanelResults: {
+    ...(Platform.OS === "web" ? { minHeight: "auto" } : {}),
+    paddingBottom: 14
+  },
   searchPanelDark: {
     borderColor: OJS_DARK_COLORS.softBorder,
-    backgroundColor: OJS_DARK_COLORS.surface,
+    backgroundColor: OJS_DARK_COLORS.bg,
     ...(Platform.OS === "web" ? { boxShadow: "0 12px 28px rgba(0, 0, 0, 0.34)" } : {})
   },
   searchPanelDesktop: {
-    width: 340,
-    flexShrink: 0,
+    width: "100%",
+    flexShrink: 1,
     ...(Platform.OS === "web"
       ? {
-          maxHeight: "calc(100svh - 28px)",
-          overflow: "hidden"
+          minHeight: "100svh",
+          overflow: "visible"
         }
       : {})
   },
   searchPanelMobile: {
-    width: "100%"
+    width: "100%",
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 32
   },
   searchPanelSticky: {
     ...(Platform.OS === "web"
       ? {
           position: "sticky",
-          top: 14,
-          alignSelf: "flex-start"
+          top: 0,
+          alignSelf: "stretch"
         }
       : {})
+  },
+  yahooTopBar: {
+    width: "100%",
+    maxWidth: 1200,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 24,
+    zIndex: 80
+  },
+  yahooTopBarResults: {
+    maxWidth: "100%",
+    paddingHorizontal: 84,
+    paddingTop: 0,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: YAHOO_COLORS.border,
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  yahooTopBarMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 16,
+    paddingHorizontal: 0
+  },
+  yahooBrandCluster: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 14
+  },
+  yahooMetaLinks: {
+    flexShrink: 1,
+    minWidth: 180,
+    paddingTop: 5,
+    color: YAHOO_COLORS.ink,
+    gap: 4
+  },
+  yahooMetaLinksDark: {
+    color: OJS_DARK_COLORS.muted
+  },
+  yahooTopActions: {
+    flexShrink: 0,
+    maxWidth: "58%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "flex-end",
+    gap: 12,
+    flexWrap: "wrap",
+    zIndex: 85
+  },
+  yahooTopActionsResults: {
+    maxWidth: "none",
+    alignItems: "center",
+    flexWrap: "nowrap",
+    flexShrink: 0
+  },
+  yahooTopActionsMobile: {
+    width: "100%",
+    maxWidth: "100%",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    flexWrap: "wrap"
+  },
+  yahooResultsBrandSlot: {
+    flexShrink: 0
+  },
+  yahooResultsSearchTop: {
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: 560,
+    minWidth: 380,
+    maxWidth: 560,
+    alignItems: "flex-start"
+  },
+  yahooResultsSearchTopMobile: {
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
+    flexBasis: "auto"
+  },
+  yahooBrandWordmark: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0
+  },
+  yahooBrandWordmarkResults: {
+    paddingHorizontal: 0,
+    flexShrink: 0
+  },
+  yahooBrandWordmarkLetter: {
+    color: YAHOO_COLORS.purple,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 40,
+    lineHeight: 48,
+    fontWeight: "700",
+    letterSpacing: 0
+  },
+  yahooBrandWordmarkLetterResults: {
+    fontSize: 28,
+    lineHeight: 34
+  },
+  yahooCreditText: {
+    maxWidth: 260,
+    textAlign: "left",
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400"
+  },
+  publicFooterMeta: {
+    position: Platform.OS === "web" ? "fixed" : "absolute",
+    left: 48,
+    right: 48,
+    bottom: 24,
+    zIndex: 70,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 16
+  },
+  publicFooterMetaResults: {
+    bottom: 18
+  },
+  publicFooterMetaMobile: {
+    left: 18,
+    right: 18,
+    bottom: 14,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 6
+  },
+  publicFooterMetaDark: {
+    color: OJS_DARK_COLORS.muted
+  },
+  publicFooterVersionButton: {
+    alignSelf: "flex-start"
+  },
+  publicFooterCredit: {
+    maxWidth: 360,
+    textAlign: "right"
+  },
+  yahooSearchShell: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  yahooSearchShellHome: {
+    minHeight: Platform.OS === "web" ? "calc(100svh - 190px)" : 520,
+    paddingTop: 64,
+    paddingBottom: 80
+  },
+  yahooSearchShellMobile: {
+    minHeight: Platform.OS === "web" ? "min(360px, calc(100svh - 220px))" : 320,
+    paddingTop: 24,
+    paddingBottom: 28
+  },
+  yahooSearchShellCompact: {
+    minHeight: Platform.OS === "web" ? 170 : 160,
+    paddingTop: 34,
+    paddingBottom: 24
+  },
+  yahooHeroTitle: {
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 40,
+    lineHeight: 48,
+    fontWeight: "400",
+    textAlign: "center",
+    letterSpacing: 0
+  },
+  yahooSearchLead: {
+    maxWidth: 760,
+    marginTop: 10,
+    marginBottom: 22,
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center"
+  },
+  yahooSearchBoxRow: {
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  yahooSearchBoxRowResults: {
+    width: "100%",
+    alignItems: "flex-start",
+    justifyContent: "flex-start"
+  },
+  yahooSearchBoxFrame: {
+    width: 614,
+    maxWidth: "100%",
+    height: 52,
+    borderWidth: 1,
+    borderColor: YAHOO_COLORS.border,
+    borderRadius: 28,
+    backgroundColor: YAHOO_COLORS.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 18,
+    paddingRight: 18,
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0 2px 8px rgba(35, 42, 49, 0.16)",
+          transitionProperty: "box-shadow, border-color, background-color",
+          transitionDuration: "180ms",
+          transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
+        }
+      : {})
+  },
+  yahooSearchBoxFrameResults: {
+    width: "100%",
+    maxWidth: 640,
+    height: 46,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 6,
+    ...(Platform.OS === "web" ? { boxShadow: "none" } : {})
+  },
+  yahooSearchBoxFrameDark: {
+    borderColor: "#3F3858",
+    backgroundColor: "#18151F",
+    ...(Platform.OS === "web" ? { boxShadow: "0 2px 10px rgba(0, 0, 0, 0.32)" } : {})
+  },
+  yahooSearchBoxFrameFocused: {
+    borderColor: YAHOO_COLORS.focusRing,
+    ...(Platform.OS === "web" ? { boxShadow: "0 2px 12px rgba(35, 42, 49, 0.18), 0 0 0 3px rgba(74, 116, 255, 0.14)" } : {})
+  },
+  yahooSearchBoxFrameFocusedDark: {
+    borderColor: "#8EA0FF",
+    ...(Platform.OS === "web" ? { boxShadow: "0 2px 12px rgba(0, 0, 0, 0.36), 0 0 0 3px rgba(142, 160, 255, 0.18)" } : {})
+  },
+  yahooSearchIcon: {
+    marginRight: 12,
+    color: YAHOO_COLORS.ink,
+    fontSize: 20,
+    lineHeight: 24
+  },
+  yahooSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    height: 50,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 18,
+    lineHeight: 24,
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "none",
+          outlineStyle: "none",
+          outlineWidth: 0
+        }
+      : {})
+  },
+  yahooSearchInputDark: {
+    color: OJS_DARK_COLORS.ink,
+    ...(Platform.OS === "web" ? { outlineStyle: "none", outlineWidth: 0 } : {})
+  },
+  searchGlyph: {
+    width: 22,
+    height: 22,
+    position: "relative",
+    flexShrink: 0,
+    marginRight: 12
+  },
+  searchGlyphCompact: {
+    marginRight: 0
+  },
+  searchGlyphCircle: {
+    position: "absolute",
+    left: 3,
+    top: 3,
+    width: 11,
+    height: 11,
+    borderWidth: 2,
+    borderColor: YAHOO_COLORS.blue,
+    borderRadius: 999
+  },
+  searchGlyphCircleDark: {
+    borderColor: "#8EA0FF"
+  },
+  searchGlyphHandle: {
+    position: "absolute",
+    left: 13,
+    top: 14,
+    width: 8,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: YAHOO_COLORS.blue,
+    transform: [{ rotate: "45deg" }]
+  },
+  searchGlyphHandleDark: {
+    backgroundColor: "#8EA0FF"
+  },
+  yahooSearchIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 2
+  },
+  yahooSearchIconButtonPressed: {
+    backgroundColor: YAHOO_COLORS.section,
+    transform: [{ scale: 0.96 }]
+  },
+  clearGlyph: {
+    width: 18,
+    height: 18,
+    position: "relative"
+  },
+  clearGlyphBar: {
+    position: "absolute",
+    left: 2,
+    top: 8,
+    width: 14,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: YAHOO_COLORS.muted
+  },
+  clearGlyphBarDark: {
+    backgroundColor: OJS_DARK_COLORS.muted
+  },
+  clearGlyphBarForward: {
+    transform: [{ rotate: "45deg" }]
+  },
+  clearGlyphBarBackward: {
+    transform: [{ rotate: "-45deg" }]
+  },
+  yahooSearchSubmitButton: {
+    width: 36,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent"
+  },
+  yahooSearchSubmitButtonPressed: {
+    backgroundColor: "rgba(114, 63, 245, 0.08)",
+    transform: [{ scale: 0.96 }]
+  },
+  yahooSearchSubmitButtonText: {
+    color: YAHOO_COLORS.blue,
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: "700"
+  },
+  yahooMobileResultsActions: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 10
   },
   searchShellHome: {
     minHeight: Platform.OS === "web" ? "calc(100svh - 48px)" : 620,
@@ -6596,7 +7300,7 @@ const styles = StyleSheet.create({
   },
   searchLowerRail: {
     width: "100%",
-    minHeight: 0,
+    minHeight: Platform.OS === "web" ? 204 : 176,
     alignItems: "stretch"
   },
   searchLowerRailCompact: {
@@ -7075,7 +7779,11 @@ const styles = StyleSheet.create({
     maxWidth: 760,
     alignSelf: "center",
     marginTop: 10,
+    minHeight: Platform.OS === "web" ? 78 : 72,
     gap: 7
+  },
+  searchIntentPanelEmpty: {
+    opacity: 0
   },
   searchIntentLabel: {
     color: OJS_COLORS.muted,
@@ -7404,13 +8112,24 @@ const styles = StyleSheet.create({
   },
   resultsColumn: {
     flex: 1,
-    minWidth: 0
+    minWidth: 0,
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "flex-start",
+    marginLeft: 140,
+    paddingTop: 12,
+    paddingBottom: 48
+  },
+  resultsColumnMobile: {
+    maxWidth: "100%",
+    marginLeft: 0,
+    paddingHorizontal: 18
   },
   resultsHeader: {
     position: "relative",
     zIndex: 60,
     elevation: 8,
-    marginBottom: 10,
+    marginBottom: 6,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -7421,18 +8140,20 @@ const styles = StyleSheet.create({
     borderColor: OJS_DARK_COLORS.softBorder
   },
   resultsEyebrow: {
-    color: OJS_COLORS.muted,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: "700",
-    textTransform: "uppercase"
+    color: YAHOO_COLORS.muted,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "400",
+    textTransform: "none"
   },
   resultsTitle: {
-    marginTop: 2,
-    color: OJS_COLORS.ink,
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: "800"
+    marginTop: 0,
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "400"
   },
   resultsToolbar: {
     position: "relative",
@@ -7444,8 +8165,8 @@ const styles = StyleSheet.create({
     flexWrap: "wrap"
   },
   resultsToolbarDesktop: {
-    width: 700,
-    maxWidth: "100%"
+    width: "100%",
+    maxWidth: 640
   },
   resultsToolbarMobile: {
     width: "100%",
@@ -7636,21 +8357,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#101713"
   },
   themeToggle: {
-    minHeight: 44,
+    minHeight: 40,
     borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
+    borderColor: YAHOO_COLORS.border,
     borderRadius: 999,
-    backgroundColor: OJS_COLORS.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    backgroundColor: YAHOO_COLORS.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 8,
     ...(Platform.OS === "web"
       ? {
           cursor: "pointer",
-          boxShadow: "0 8px 18px rgba(38, 51, 45, 0.07)",
-          transitionProperty: "background-color, border-color, transform",
+          boxShadow: "0 8px 18px rgba(35, 42, 49, 0.08)",
+          transitionProperty: "background-color, border-color, transform, box-shadow",
           transitionDuration: "220ms",
           transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
@@ -7658,7 +8379,7 @@ const styles = StyleSheet.create({
   },
   themeToggleDark: {
     borderColor: OJS_DARK_COLORS.border,
-    backgroundColor: OJS_COLORS.surface
+    backgroundColor: OJS_DARK_COLORS.surface
   },
   themeTogglePressed: {
     transform: [{ scale: 0.975 }]
@@ -7704,32 +8425,66 @@ const styles = StyleSheet.create({
   themeToggleGlyphMoon: {
     backgroundColor: OJS_DARK_COLORS.surface
   },
+  themeIconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: "#E6EFE5",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  themeIconButtonDark: {
+    backgroundColor: "#221B32"
+  },
+  themeIconCore: {
+    width: 16,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "#F5C96B",
+    borderWidth: 3,
+    borderColor: "#FFF6D7"
+  },
+  themeIconCoreDark: {
+    position: "relative",
+    backgroundColor: "#D7D0FF",
+    borderColor: "#D7D0FF"
+  },
+  themeIconMoonCutout: {
+    position: "absolute",
+    right: -4,
+    top: -3,
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    backgroundColor: "#221B32"
+  },
   themeToggleText: {
-    color: OJS_COLORS.ink,
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
     fontSize: 12,
-    lineHeight: 15,
-    fontWeight: "900"
+    lineHeight: 16,
+    fontWeight: "700"
   },
   themeToggleTextDark: {
-    color: OJS_COLORS.ink
+    color: OJS_DARK_COLORS.ink
   },
   resultCountText: {
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
+    borderColor: YAHOO_COLORS.border,
     borderRadius: 14,
-    backgroundColor: OJS_COLORS.surface,
+    backgroundColor: YAHOO_COLORS.surface,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 40,
-    color: OJS_COLORS.text,
+    paddingVertical: 7,
+    minHeight: 38,
+    color: YAHOO_COLORS.ink,
     fontSize: 13,
     lineHeight: 20,
     fontWeight: "800",
     ...(Platform.OS === "web"
       ? {
           fontVariantNumeric: "tabular-nums",
-          boxShadow: "0 6px 16px rgba(38, 51, 45, 0.06)"
+          boxShadow: "none"
         }
       : {})
   },
@@ -7740,13 +8495,13 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? { boxShadow: "0 8px 20px rgba(0, 0, 0, 0.24)" } : {})
   },
   resultCountValueText: {
-    color: OJS_COLORS.ink,
+    color: YAHOO_COLORS.ink,
     fontSize: 17,
     lineHeight: 20,
     fontWeight: "800"
   },
   resultCountUnitText: {
-    color: OJS_COLORS.muted,
+    color: YAHOO_COLORS.muted,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "700"
@@ -7762,20 +8517,20 @@ const styles = StyleSheet.create({
   publicStatsChip: {
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
+    borderColor: YAHOO_COLORS.border,
     borderRadius: 14,
-    backgroundColor: OJS_COLORS.surface,
+    backgroundColor: YAHOO_COLORS.surface,
     paddingHorizontal: 10,
     paddingVertical: 7,
     minHeight: 38,
-    color: OJS_COLORS.text,
+    color: YAHOO_COLORS.ink,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "800",
     ...(Platform.OS === "web"
       ? {
           fontVariantNumeric: "tabular-nums",
-          boxShadow: "0 6px 16px rgba(38, 51, 45, 0.05)"
+          boxShadow: "none"
         }
       : {})
   },
@@ -7786,16 +8541,24 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? { boxShadow: "0 8px 20px rgba(0, 0, 0, 0.22)" } : {})
   },
   publicStatsChipValue: {
-    color: OJS_COLORS.ink,
+    color: YAHOO_COLORS.ink,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: "900"
   },
   publicStatsChipLabel: {
-    color: OJS_COLORS.muted,
+    color: YAHOO_COLORS.muted,
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "700"
+  },
+  yahooStatsChip: {
+    borderColor: YAHOO_COLORS.border,
+    borderRadius: 12,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    fontFamily: YAHOO_FONT_STACK
   },
   sortControlWrap: {
     flexGrow: 1,
@@ -7932,7 +8695,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingTop: 8,
     paddingBottom: 12,
-    gap: 10
+    gap: 0
   },
   postingsRefreshIndicator: {
     marginTop: 2,
@@ -7969,16 +8732,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: OJS_COLORS.green,
+    backgroundColor: OJS_BRAND_PURPLES.job,
     borderWidth: 1,
-    borderColor: OJS_COLORS.focus,
+    borderColor: OJS_BRAND_PURPLES.slots,
     elevation: 8,
     zIndex: 40,
     ...(Platform.OS === "web"
-      ? { boxShadow: "0 10px 20px rgba(38, 51, 45, 0.18)" }
+      ? { boxShadow: "0 10px 22px rgba(124, 58, 237, 0.24)" }
       : {
-          shadowColor: OJS_COLORS.shadow,
-          shadowOpacity: 0.18,
+          shadowColor: OJS_BRAND_PURPLES.job,
+          shadowOpacity: 0.24,
           shadowRadius: 20,
           shadowOffset: { width: 0, height: 10 }
         })
@@ -7996,7 +8759,7 @@ const styles = StyleSheet.create({
     minWidth: 72
   },
   scrollTopButtonPressed: {
-    backgroundColor: OJS_COLORS.ink,
+    backgroundColor: OJS_BRAND_PURPLES.open,
     transform: [{ scale: 0.97 }]
   },
   scrollTopButtonText: {
@@ -8006,38 +8769,79 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   card: {
-    backgroundColor: OJS_COLORS.surface,
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: OJS_COLORS.softBorder,
-    fontFamily: OJS_FONT_STACK
+    backgroundColor: YAHOO_COLORS.surface,
+    borderRadius: 0,
+    paddingTop: 16,
+    paddingBottom: 18,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: YAHOO_COLORS.border,
+    fontFamily: YAHOO_FONT_STACK
+  },
+  cardDark: {
+    backgroundColor: "transparent",
+    borderBottomColor: OJS_DARK_COLORS.softBorder
   },
   position: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: OJS_COLORS.ink
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: "400",
+    color: "#0000AA"
+  },
+  positionDark: {
+    color: "#A9B4FF"
+  },
+  postingRole: {
+    marginTop: 4,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 14,
+    lineHeight: 20,
+    color: YAHOO_COLORS.ink,
+    fontWeight: "400"
+  },
+  postingRoleDark: {
+    color: OJS_DARK_COLORS.text
   },
   location: {
-    marginTop: 4,
-    fontSize: 12,
-    color: OJS_COLORS.muted
+    marginTop: 6,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 14,
+    lineHeight: 20,
+    color: YAHOO_COLORS.ink
+  },
+  locationDark: {
+    color: OJS_DARK_COLORS.text
   },
   company: {
-    marginTop: 4,
+    marginTop: 3,
+    fontFamily: YAHOO_FONT_STACK,
     fontSize: 14,
-    color: OJS_COLORS.text
+    lineHeight: 20,
+    color: YAHOO_COLORS.ink,
+    fontWeight: "700"
+  },
+  companyDark: {
+    color: OJS_DARK_COLORS.ink
   },
   ats: {
     marginTop: 3,
-    fontSize: 12,
-    color: OJS_COLORS.text,
-    fontWeight: "600"
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 13,
+    lineHeight: 18,
+    color: YAHOO_COLORS.muted,
+    fontWeight: "400"
+  },
+  atsDark: {
+    color: OJS_DARK_COLORS.muted
   },
   posted: {
     marginTop: 2,
-    fontSize: 12,
-    color: OJS_COLORS.muted
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 13,
+    lineHeight: 18,
+    color: YAHOO_COLORS.muted
   },
   postingAppliedNotice: {
     marginTop: 6,
@@ -8047,8 +8851,16 @@ const styles = StyleSheet.create({
   },
   url: {
     marginTop: 6,
-    fontSize: 11,
-    color: OJS_COLORS.muted
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 13,
+    lineHeight: 18,
+    color: YAHOO_COLORS.muted
+  },
+  urlDark: {
+    color: "#A6B5AA"
+  },
+  postedDark: {
+    color: OJS_DARK_COLORS.muted
   },
   postingCardTopRow: {
     flexDirection: "row",

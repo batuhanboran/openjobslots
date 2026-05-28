@@ -97,7 +97,7 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   const regions = Array.isArray(filters?.regions) ? filters.regions.filter(Boolean) : [];
   const remote = String(filters?.remote || "all").trim().toLowerCase();
   const freshnessDays = Number(filters?.freshness_days || 0);
-  const sortBy = String(filters?.sort_by || "relevance").trim().toLowerCase();
+  const sortBy = String(filters?.sort_by || "posted_date").trim().toLowerCase();
 
   if (atsArray.length > 0) {
     params.set("ats", atsArray.join(","));
