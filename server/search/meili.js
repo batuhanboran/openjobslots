@@ -169,6 +169,72 @@ function normalizeBooleanFlag(value, defaultValue = false) {
   return defaultValue;
 }
 
+const ROLE_PHRASE_TAIL_TERMS = new Set([
+  "accountant",
+  "administrator",
+  "analyst",
+  "architect",
+  "associate",
+  "consultant",
+  "coordinator",
+  "developer",
+  "director",
+  "engineer",
+  "executive",
+  "lead",
+  "manager",
+  "nurse",
+  "operator",
+  "owner",
+  "recruiter",
+  "representative",
+  "researcher",
+  "scientist",
+  "specialist",
+  "teacher",
+  "technician"
+]);
+
+const LOCATION_QUERY_TERMS = new Set([
+  "apac",
+  "emea",
+  "global",
+  "hybrid",
+  "near",
+  "onsite",
+  "remote",
+  "uk",
+  "united kingdom",
+  "united states",
+  "us",
+  "usa",
+  "worldwide",
+  ...COUNTRY_FILTER_ALIASES.keys(),
+  ...REGION_FILTER_ALIASES.keys()
+]);
+
+function shouldUseExactRolePhrase(rawSearch, normalizedQuery) {
+  const raw = String(rawSearch || "").trim();
+  const normalized = normalizeText(normalizedQuery);
+  if (!raw || !normalized) return false;
+  if (/[,/]/.test(raw)) return false;
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  if (tokens.length < 2 || tokens.length > 5) return false;
+  if (tokens.some((token) => token === "in" || token === "at" || token === "near")) return false;
+  if (LOCATION_QUERY_TERMS.has(normalized)) return false;
+  if (tokens.some((token) => LOCATION_QUERY_TERMS.has(token))) return false;
+  return ROLE_PHRASE_TAIL_TERMS.has(tokens[tokens.length - 1]);
+}
+
+function buildMeiliSearchQuery(rawSearch) {
+  const normalizedQuery = normalizeSearchQuery(rawSearch);
+  if (!normalizedQuery) return "";
+  if (shouldUseExactRolePhrase(rawSearch, normalizedQuery)) {
+    return `"${String(normalizedQuery).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+  return normalizedQuery;
+}
+
 function toMeiliPostingDocument(posting) {
   const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
   const title = String(posting?.title || posting?.position_name || "").trim();
@@ -268,17 +334,30 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
         ? ["posted_at_epoch:desc", "last_seen_epoch:desc"]
         : undefined;
 
-  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {
+  const normalizedQuery = normalizeSearchQuery(options.search);
+  const q = buildMeiliSearchQuery(options.search);
+  const payload = {
+    q,
+    limit: Math.max(1, Math.min(2000, Number(options.limit || 500))),
+    offset: Math.max(0, Number(options.offset || 0)),
+    filter: filters.length > 0 ? filters.join(" AND ") : undefined,
+    matchingStrategy: "all",
+    ...(sort ? { sort } : {})
+  };
+
+  const result = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {
     method: "POST",
-    body: JSON.stringify({
-      q: normalizeSearchQuery(options.search),
-      limit: Math.max(1, Math.min(2000, Number(options.limit || 500))),
-      offset: Math.max(0, Number(options.offset || 0)),
-      filter: filters.length > 0 ? filters.join(" AND ") : undefined,
-      matchingStrategy: "all",
-      ...(sort ? { sort } : {})
-    })
+    body: JSON.stringify(payload)
   });
+
+  if (q && q !== normalizedQuery && Number(result?.estimatedTotalHits || 0) === 0) {
+    return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {
+      method: "POST",
+      body: JSON.stringify({ ...payload, q: normalizedQuery })
+    });
+  }
+
+  return result;
 }
 
 module.exports = {

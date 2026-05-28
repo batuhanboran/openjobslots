@@ -972,6 +972,90 @@ async function testMeiliSearchNormalizesGenericWordsAndTypos() {
   }
 }
 
+async function testMeiliSearchQuotesLikelyRolePhrases() {
+  const previousFetch = global.fetch;
+  let body = null;
+  global.fetch = async (_url, options = {}) => {
+    body = JSON.parse(String(options.body || "{}"));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { hits: [], estimatedTotalHits: 12 };
+      }
+    };
+  };
+
+  try {
+    await searchMeiliPostings(
+      { search: "Customer Success Engineer", sort_by: "posted_date", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+
+    assert.equal(body.q, "\"customer success engineer\"");
+    assert.deepEqual(body.sort, ["posted_at_epoch:desc", "last_seen_epoch:desc"]);
+  } finally {
+    global.fetch = previousFetch;
+  }
+}
+
+async function testMeiliSearchLeavesLocationQueriesBroad() {
+  const previousFetch = global.fetch;
+  let body = null;
+  global.fetch = async (_url, options = {}) => {
+    body = JSON.parse(String(options.body || "{}"));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { hits: [], estimatedTotalHits: 12 };
+      }
+    };
+  };
+
+  try {
+    await searchMeiliPostings(
+      { search: "Product Manager in Berlin", sort_by: "posted_date", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+
+    assert.equal(body.q, "product manager in berlin");
+  } finally {
+    global.fetch = previousFetch;
+  }
+}
+
+async function testMeiliSearchFallsBackWhenExactRolePhraseHasNoHits() {
+  const previousFetch = global.fetch;
+  const bodies = [];
+  global.fetch = async (_url, options = {}) => {
+    bodies.push(JSON.parse(String(options.body || "{}")));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          hits: [],
+          estimatedTotalHits: bodies.length === 1 ? 0 : 3
+        };
+      }
+    };
+  };
+
+  try {
+    await searchMeiliPostings(
+      { search: "Customer Success Engineer", sort_by: "posted_date", limit: 10, offset: 0 },
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
+    );
+
+    assert.equal(bodies.length, 2);
+    assert.equal(bodies[0].q, "\"customer success engineer\"");
+    assert.equal(bodies[1].q, "customer success engineer");
+  } finally {
+    global.fetch = previousFetch;
+  }
+}
+
 function testPostgresSearchRankPrioritizesTitleCompanyBeforeDescription() {
   const rank = buildSearchRankSql("software engineer jobs", 7);
   assert.match(rank.sql, /p\.position_name[\s\S]*THEN 40/);
@@ -1585,6 +1669,9 @@ async function main() {
   await testMeiliHideNoDateUsesPostingDatePresence();
   await testMeiliSearchRequiresExplicitVisibleFlag();
   await testMeiliSearchNormalizesGenericWordsAndTypos();
+  await testMeiliSearchQuotesLikelyRolePhrases();
+  await testMeiliSearchLeavesLocationQueriesBroad();
+  await testMeiliSearchFallsBackWhenExactRolePhraseHasNoHits();
   testPostgresSearchRankPrioritizesTitleCompanyBeforeDescription();
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
