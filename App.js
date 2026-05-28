@@ -3789,8 +3789,11 @@ export default function App() {
     if (suppressedSuggestionQueryRef.current !== nextValue.trim()) {
       suppressedSuggestionQueryRef.current = "";
     }
+    if (showResultsSurface && nextValue.trim() !== String(searchRef.current || "").trim()) {
+      setPostingsResultCoverage(null);
+    }
     setSearch(nextValue);
-  }, []);
+  }, [showResultsSurface]);
 
   const focusSearch = useCallback(() => {
     setActivePage(PAGE_KEYS.POSTINGS);
@@ -4985,10 +4988,15 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = false;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
+    const resultsAwaitingFreshResponse =
+      showResultsSurface && !initializing && !error && postings.length === 0 && !postingsResultCoverage;
     const resultStatsSource = postingsResultCoverage || buildFrontendResultCoverage({}, postings, sourceFacets, resultTotalCount);
     const publicStatsSource = showResultsSurface ? resultStatsSource : applyPublicStatsOverride(status);
-    const resultStatsLoading = showResultsSurface && loading && postings.length === 0 && !postingsResultCoverage;
+    const resultStatsLoading = resultsAwaitingFreshResponse;
     const publicShellStatsChips = resultStatsLoading ? [] : buildPublicStatsChips(publicStatsSource);
+    const showPostingsRefreshIndicator = !initializing && (loading || resultsAwaitingFreshResponse);
+    const showPostingsEmptyState =
+      !initializing && !loading && !error && !resultsAwaitingFreshResponse && postings.length === 0;
     const renderSearchBox = (mode = "home") => {
       const compact = mode === "results";
       return (
@@ -5586,7 +5594,7 @@ export default function App() {
           style={[styles.resultsSurface, Platform.OS === "web" ? styles.resultsSurfaceMotion : null, resultsMotionStyle]}
           testID="results-surface"
         >
-          {loading && !initializing ? (
+          {showPostingsRefreshIndicator ? (
             <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" accessibilityRole="status">
               {t("results.updating", "Updating visible results...")}
             </Text>
@@ -5602,7 +5610,7 @@ export default function App() {
             <ActivityIndicator size="large" style={styles.loader} />
           ) : (
             <View style={styles.list} testID="postings-list">
-              {postings.length === 0 ? (
+              {showPostingsEmptyState ? (
                 <View style={styles.emptyState} testID="postings-empty-state">
                   <Text style={styles.emptyTitle}>{t("empty.noSlotsExact", "No slots match this exact search.")}</Text>
                   <Text style={styles.emptyText}>

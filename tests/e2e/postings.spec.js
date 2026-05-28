@@ -1325,6 +1325,68 @@ test.describe("postings page QA", () => {
     await expectNoRawErrors(page);
   });
 
+  test("submitted searches do not show no-results while the response is pending", async ({ page }) => {
+    let releasePendingSearchResponse = null;
+    const pendingSearchResponse = new Promise((resolve) => {
+      releasePendingSearchResponse = resolve;
+    });
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      const search = url.searchParams.get("search") || "";
+      if (search === "pending-probe") {
+        await pendingSearchResponse;
+      }
+      const items = search === "pending-probe"
+        ? [
+            {
+              id: 8401,
+              company_name: "Pending Response Company",
+              position_name: "Pending Probe Engineer",
+              job_posting_url: "https://jobs.example.com/pending-probe",
+              location: "Remote",
+              posting_date: "2026-05-27",
+              ats: "greenhouse"
+            }
+          ]
+        : [];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items,
+          count: items.length,
+          count_exact: true,
+          visible_ats_count: items.length ? 1 : 0,
+          visible_company_count: items.length ? 1 : 0,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          filters: {
+            search,
+            sort_by: url.searchParams.get("sort_by") || "relevance"
+          }
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("pending-probe");
+    await page.getByTestId("search-input").press("Enter");
+    try {
+      await expect(page.getByTestId("postings-refresh-indicator")).toBeVisible();
+      await expect(page.getByTestId("postings-empty-state")).toHaveCount(0);
+      await expect(page.getByText(/No slots match this exact search/i)).toHaveCount(0);
+    } finally {
+      releasePendingSearchResponse();
+    }
+    await expect(page.getByTestId("posting-card").first()).toContainText("Pending Response Company", { timeout: 5000 });
+  });
+
   test("source facets stay data-only while visible source filters stay hidden", async ({ page }) => {
     const requestedPostings = [];
     const basePosting = {
