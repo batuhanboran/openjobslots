@@ -42,6 +42,34 @@ function sanitizeSearchQuery(value) {
   return normalized.slice(0, 80);
 }
 
+const PUBLIC_SITEMAP_SEARCH_TERMS = Object.freeze([
+  "remote jobs",
+  "frontend engineer",
+  "backend engineer",
+  "software engineer",
+  "full stack engineer",
+  "product manager",
+  "data analyst",
+  "data engineer",
+  "customer success",
+  "account executive",
+  "sales manager",
+  "marketing manager",
+  "operations manager",
+  "project manager",
+  "qa engineer",
+  "devops engineer",
+  "cybersecurity analyst",
+  "designer",
+  "human resources",
+  "finance analyst",
+  "workday jobs",
+  "greenhouse jobs",
+  "lever jobs",
+  "ashby jobs",
+  "bamboohr jobs"
+]);
+
 function createPublicSeoHelpers(dependencies = {}) {
   const {
     buildPublicWebAnalyticsHeadTags = () => "",
@@ -69,6 +97,12 @@ function createPublicSeoHelpers(dependencies = {}) {
   function getPublicSiteCanonicalUrl(req) {
     const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
     if (!searchQuery) return `${getPublicSiteOrigin(req)}/`;
+    return `${getPublicSiteOrigin(req)}/?q=${encodeURIComponent(searchQuery)}`;
+  }
+
+  function getPublicSearchLandingUrl(req, searchTerm) {
+    const searchQuery = sanitizeSearchQuery(searchTerm);
+    if (!searchQuery) return "";
     return `${getPublicSiteOrigin(req)}/?q=${encodeURIComponent(searchQuery)}`;
   }
 
@@ -179,15 +213,31 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   function buildSitemapXml(req) {
-    const canonicalUrl = escapeHtmlAttribute(getPublicSiteCanonicalUrl(req));
+    const siteOrigin = getPublicSiteOrigin(req);
+    const urls = [
+      {
+        loc: `${siteOrigin}/`,
+        changefreq: "daily",
+        priority: "1.0"
+      },
+      ...PUBLIC_SITEMAP_SEARCH_TERMS.map((term) => ({
+        loc: getPublicSearchLandingUrl(req, term),
+        changefreq: "daily",
+        priority: "0.8"
+      })).filter((item) => item.loc)
+    ];
+    const urlEntries = urls.map((item) => [
+      "  <url>",
+      `    <loc>${escapeHtmlAttribute(item.loc)}</loc>`,
+      `    <changefreq>${escapeHtmlAttribute(item.changefreq)}</changefreq>`,
+      `    <priority>${escapeHtmlAttribute(item.priority)}</priority>`,
+      "  </url>"
+    ].join("\n"));
+
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      "  <url>",
-      `    <loc>${canonicalUrl}</loc>`,
-      "    <changefreq>daily</changefreq>",
-      "    <priority>1.0</priority>",
-      "  </url>",
+      ...urlEntries,
       "</urlset>"
     ].join("\n") + "\n";
   }
@@ -196,6 +246,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     buildRobotsTxt,
     buildSitemapXml,
     buildStructuredDataTags,
+    getPublicSearchLandingUrl,
     getPublicSiteCanonicalUrl,
     getPublicSiteOrigin,
     renderSeoIndexHtml

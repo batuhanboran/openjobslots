@@ -101,6 +101,15 @@ function registerPublicRoutes(app, context) {
     syncStatus
   } = context;
 
+  function setPublicSeoCacheHeaders(res, maxAgeSeconds, edgeMaxAgeSeconds) {
+    const browserTtl = Math.max(0, Number(maxAgeSeconds || 0));
+    const edgeTtl = Math.max(browserTtl, Number(edgeMaxAgeSeconds || browserTtl || 0));
+    res.setHeader(
+      "Cache-Control",
+      `public, max-age=${browserTtl}, s-maxage=${edgeTtl}, stale-while-revalidate=86400`
+    );
+  }
+
   function recordPublicSearchEvent(req, res, eventType, search, payload, options = {}, info = {}) {
     if (DB_BACKEND !== "postgres" || typeof recordPostgresPublicSearchEvent !== "function") return;
     const event = {
@@ -526,6 +535,7 @@ function registerPublicRoutes(app, context) {
     const sendSeoIndex = (req, res, next) => {
       try {
         const indexHtml = fs.readFileSync(webIndexPath, "utf8");
+        setPublicSeoCacheHeaders(res, 60, 300);
         res.type("html").send(renderSeoIndexHtml(indexHtml, req));
       } catch (error) {
         next(error);
@@ -534,9 +544,11 @@ function registerPublicRoutes(app, context) {
 
     app.get(["/", "/index.html"], sendSeoIndex);
     app.get("/robots.txt", (req, res) => {
+      setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("text/plain").send(buildRobotsTxt(req));
     });
     app.get("/sitemap.xml", (req, res) => {
+      setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("application/xml").send(buildSitemapXml(req));
     });
     app.use(express.static(webDistPath, {

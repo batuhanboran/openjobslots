@@ -114,6 +114,7 @@ function testRobotsAndSitemapUseConfiguredPublicOrigin() {
 
   assert.ok(buildRobotsTxt(req).includes("Sitemap: https://openjobslots.com/sitemap.xml"));
   assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/</loc>"));
+  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/?q=remote%20jobs</loc>"));
 }
 
 function testRobotsAndSitemapStayCrawlSafe() {
@@ -136,7 +137,23 @@ function testRobotsAndSitemapStayCrawlSafe() {
 
   assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/\?q=frontend%20engineer<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/\?q=greenhouse%20jobs<\/loc>/);
   assert.doesNotMatch(sitemap, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
+}
+
+function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicSearches() {
+  const { buildSitemapXml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com"
+  });
+  const sitemap = buildSitemapXml(createRequest({ query: { q: "private@example.com" } }));
+  const locMatches = sitemap.match(/<loc>/g) || [];
+
+  assert.equal(locMatches.length, 26);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/\?q=product%20manager<\/loc>/);
+  assert.doesNotMatch(sitemap, /private@example\.com/);
+  assert.doesNotMatch(sitemap, /%40/);
 }
 
 testRenderSeoIndexHtmlReplacesMetadata();
@@ -144,5 +161,6 @@ testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
 testSearchQueryPagesGetSpecificMetadataAndCanonical();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
+testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicSearches();
 
 console.log("public SEO tests passed");

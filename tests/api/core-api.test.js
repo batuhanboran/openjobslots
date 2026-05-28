@@ -24,6 +24,42 @@ test.describe("openjobslots API compatibility", () => {
     }
   });
 
+  test("SEO shell, robots, and sitemap expose public-safe crawl metadata", async ({ request }) => {
+    const html = await request.get(`${apiBaseUrl}/`, {
+      params: { q: "Frontend Engineer" }
+    });
+    expect(html.status()).toBe(200);
+    expect(html.headers()["content-type"]).toMatch(/text\/html/i);
+    expect(html.headers()["cache-control"]).toContain("s-maxage=300");
+    expect(html.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+    const htmlText = await html.text();
+    expect(htmlText).toContain("<title>Frontend Engineer jobs | OpenJobSlots</title>");
+    expect(htmlText).toContain('<link rel="canonical" href="http://127.0.0.1:8877/?q=Frontend%20Engineer" />');
+    expect(htmlText).toContain('"@type":"SearchAction"');
+    expect(htmlText).not.toMatch(/postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_|stack trace/i);
+
+    const robots = await request.get(`${apiBaseUrl}/robots.txt`);
+    expect(robots.status()).toBe(200);
+    expect(robots.headers()["content-type"]).toMatch(/text\/plain/i);
+    expect(robots.headers()["cache-control"]).toContain("s-maxage=3600");
+    const robotsText = await robots.text();
+    expect(robotsText).toMatch(/^User-agent: \*/m);
+    expect(robotsText).toMatch(/^Disallow: \/postings$/m);
+    expect(robotsText).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:8877\/sitemap\.xml$/m);
+
+    const sitemap = await request.get(`${apiBaseUrl}/sitemap.xml`, {
+      params: { q: "private@example.com" }
+    });
+    expect(sitemap.status()).toBe(200);
+    expect(sitemap.headers()["content-type"]).toMatch(/application\/xml/i);
+    expect(sitemap.headers()["cache-control"]).toContain("s-maxage=3600");
+    const sitemapText = await sitemap.text();
+    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/</loc>");
+    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/?q=frontend%20engineer</loc>");
+    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/?q=greenhouse%20jobs</loc>");
+    expect(sitemapText).not.toMatch(/private@example\.com|%40|\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
+  });
+
   test("health and status endpoints respond with JSON", async ({ request }) => {
     const health = await request.get(`${apiBaseUrl}/health`);
     expect(health.ok()).toBeTruthy();
