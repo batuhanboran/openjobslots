@@ -1018,16 +1018,41 @@ function normalizedSuggestionContainsTerm(text, term) {
   return normalizedTerm.length >= 4 && normalizedText.includes(normalizedTerm);
 }
 
+function suggestionValueMatchesQuery(value, query) {
+  const normalizedValue = normalizeText(value);
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedValue || !normalizedQuery) return false;
+  if (normalizedValue.includes(normalizedQuery)) return true;
+
+  const valueWords = normalizedValue.split(/\s+/).filter(Boolean);
+  const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  let valueIndex = 0;
+  for (const token of queryTokens) {
+    let matchedAt = -1;
+    for (let index = valueIndex; index < valueWords.length; index += 1) {
+      const word = valueWords[index];
+      if (word.startsWith(token) || (token.length >= 4 && word.includes(token))) {
+        matchedAt = index;
+        break;
+      }
+    }
+    if (matchedAt < 0) return false;
+    valueIndex = matchedAt + 1;
+  }
+  return true;
+}
+
 function escapePostgresLikePattern(value) {
   return String(value || "").replace(/[\\%_]/g, "\\$&");
 }
 
-function buildMeiliSuggestionCandidates(hits = []) {
+function buildMeiliSuggestionCandidates(hits = [], query = "") {
   const byKey = new Map();
   const collect = (type, value, extras = {}) => {
     const normalizedType = String(type || "search").trim().toLowerCase() || "search";
     const suggestionValue = String(value || "").trim();
     if (!suggestionValue) return;
+    if (!suggestionValueMatchesQuery(suggestionValue, query)) return;
     const key = `${normalizedType}:${normalizeText(suggestionValue)}`;
     const current = byKey.get(key) || {
       type: normalizedType,
@@ -1071,7 +1096,7 @@ async function addMeiliSuggestions({ query, resolvedLimit, suggestions, add }) {
     config
   );
   let added = false;
-  for (const candidate of buildMeiliSuggestionCandidates(result?.hits || [])) {
+  for (const candidate of buildMeiliSuggestionCandidates(result?.hits || [], query)) {
     add(candidate.type, candidate.value, candidate.count, candidate.extras);
     added = true;
     if (suggestions.length >= resolvedLimit) break;

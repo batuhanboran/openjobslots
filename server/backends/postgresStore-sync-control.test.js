@@ -1210,14 +1210,14 @@ async function testPostgresSuggestionsUseMeiliWhenConfigured() {
           hits: [
             {
               title: "Software Engineer",
-              company: "Acme",
+              company: "Engineering Labs",
               location: "Istanbul, Turkey",
               ats_key: "greenhouse"
             },
             {
               title: "Software Engineer",
               company: "Globex",
-              location: "Remote",
+              location: "Engineering City",
               ats_key: "lever"
             }
           ],
@@ -1233,14 +1233,75 @@ async function testPostgresSuggestionsUseMeiliWhenConfigured() {
   };
 
   try {
-    const suggestions = await getPostgresSuggestions(pool, "engineer", 5, []);
+    const suggestions = await getPostgresSuggestions(pool, "engineer", 3, []);
     assert.equal(fetchCalls.length, 1);
     assert.match(fetchCalls[0].url, /\/indexes\/postings\/search$/);
     assert.equal(fetchCalls[0].body.q, "engineer");
     assert.equal(fetchCalls[0].body.matchingStrategy, "all");
     assert.ok(suggestions.some((item) => item.type === "title" && item.value === "Software Engineer"));
-    assert.ok(suggestions.some((item) => item.type === "company" && item.value === "Acme"));
-    assert.ok(suggestions.some((item) => item.type === "location" && item.value === "Remote"));
+    assert.ok(suggestions.some((item) => item.type === "company" && item.value === "Engineering Labs"));
+    assert.ok(suggestions.some((item) => item.type === "location" && item.value === "Engineering City"));
+  } finally {
+    if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+    if (previousHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = previousHost;
+    if (previousIndex === undefined) delete process.env.MEILI_POSTINGS_INDEX;
+    else process.env.MEILI_POSTINGS_INDEX = previousIndex;
+    global.fetch = previousFetch;
+  }
+}
+
+async function testPostgresSuggestionsSkipUnmatchedMeiliHitFields() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousHost = process.env.MEILI_HOST;
+  const previousIndex = process.env.MEILI_POSTINGS_INDEX;
+  const previousFetch = global.fetch;
+  const fetchCalls = [];
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  process.env.MEILI_HOST = "http://meili.test";
+  process.env.MEILI_POSTINGS_INDEX = "postings";
+  global.fetch = async (url, options = {}) => {
+    fetchCalls.push({ url: String(url), body: JSON.parse(String(options.body || "{}")) });
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          hits: [
+            {
+              title: "Product Manager",
+              company: "ortnec",
+              location: "Montreal, QC",
+              ats_key: "ashby"
+            },
+            {
+              title: "Senior Product Manager",
+              company: "emedlabsllc",
+              location: "Miami, FL",
+              ats_key: "greenhouse"
+            }
+          ],
+          estimatedTotalHits: 2
+        };
+      }
+    };
+  };
+  const pool = {
+    async query(sql) {
+      throw new Error(`Postgres suggestion fallback should not run when Meili has matching candidates: ${sql}`);
+    }
+  };
+
+  try {
+    const suggestions = await getPostgresSuggestions(pool, "Product Manager", 2, []);
+    assert.equal(fetchCalls.length, 1);
+    assert.ok(suggestions.some((item) => item.type === "title" && item.value === "Product Manager"));
+    assert.ok(suggestions.some((item) => item.type === "title" && item.value === "Senior Product Manager"));
+    assert.equal(suggestions.some((item) => item.value === "ortnec"), false);
+    assert.equal(suggestions.some((item) => item.value === "Montreal, QC"), false);
+    assert.equal(suggestions.some((item) => item.value === "emedlabsllc"), false);
+    assert.equal(suggestions.some((item) => item.value === "Miami, FL"), false);
   } finally {
     if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
     else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
@@ -1720,6 +1781,7 @@ async function main() {
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();
   await testPostgresSuggestionsUseMeiliWhenConfigured();
+  await testPostgresSuggestionsSkipUnmatchedMeiliHitFields();
   await testPostgresSuggestionsFallbackAvoidsUnaccentSeqScanPath();
   await testPostgresCountsCacheReusesShortTtlSnapshot();
   await testPostgresCountsExposePublicStatsCounters();
