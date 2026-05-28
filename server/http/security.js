@@ -56,6 +56,11 @@ function getBearerToken(req) {
   return match ? match[1].trim() : "";
 }
 
+function setNoStoreHeaders(res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+}
+
 function isPostingDiagnosticsRoute(pathname) {
   return pathname === "/postings/diagnostics" || /^\/postings\/[^/]+\/diagnostics$/.test(pathname);
 }
@@ -112,6 +117,7 @@ function createRateLimiter({ windowMs, max, name }) {
     res.setHeader("RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
 
     if (bucket.count > max) {
+      setNoStoreHeaders(res);
       return res.status(429).json({
         ok: false,
         error: "Too many requests. Please retry shortly."
@@ -131,6 +137,7 @@ function genericErrorMiddleware(error, req, res, _next) {
     message: String(error?.message || error)
   });
   if (res.headersSent) return;
+  setNoStoreHeaders(res);
   res.status(safeStatus).json({
     ok: false,
     error: safeStatus >= 500 ? "Internal server error. Details were logged for debugging." : "Request failed."
@@ -153,7 +160,9 @@ function createHttpSecurity(options = {}) {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     res.setHeader("Content-Security-Policy", buildSecurityContentSecurityPolicy());
     if (nodeEnv === "production") {
@@ -165,6 +174,7 @@ function createHttpSecurity(options = {}) {
   function adminGateMiddleware(req, res, next) {
     if (!isControlRoute(req)) return next();
     if (hasAdminAccess(req)) return next();
+    setNoStoreHeaders(res);
     return res.status(401).json({
       ok: false,
       error: adminToken
@@ -191,5 +201,6 @@ module.exports = {
   createRateLimiter,
   genericErrorMiddleware,
   isControlRoute,
-  isLocalRequest
+  isLocalRequest,
+  setNoStoreHeaders
 };

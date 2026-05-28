@@ -32,6 +32,8 @@ test.describe("openjobslots API compatibility", () => {
     expect(html.headers()["content-type"]).toMatch(/text\/html/i);
     expect(html.headers()["cache-control"]).toContain("s-maxage=300");
     expect(html.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(html.headers()["cross-origin-opener-policy"]).toBe("same-origin");
+    expect(html.headers()["x-permitted-cross-domain-policies"]).toBe("none");
     const htmlText = await html.text();
     expect(htmlText).toContain("<title>Frontend Engineer jobs | OpenJobSlots</title>");
     expect(htmlText).toContain('<link rel="canonical" href="http://127.0.0.1:8877/?q=Frontend%20Engineer" />');
@@ -400,6 +402,10 @@ test.describe("openjobslots API compatibility", () => {
       expect(body).toMatch(/Admin token required|Admin endpoint requires/i);
       expect(body).not.toMatch(/postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_|OPENJOBSLOTS_SEARCH_|stack trace/i);
     }
+
+    const unauthorized = await request.get(`${apiBaseUrl}/admin/services`);
+    expect(unauthorized.headers()["cache-control"]).toBe("no-store");
+    expect(unauthorized.headers()["pragma"]).toBe("no-cache");
   });
 
   test("data quality diagnostics are bounded and explainable", async ({ request }) => {

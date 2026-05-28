@@ -86,6 +86,8 @@ function testControlRoutesAndAdminGate() {
 
   assert.equal(nextCalled, false);
   assert.equal(res.statusCode, 401);
+  assert.equal(res.headers["Cache-Control"], "no-store");
+  assert.equal(res.headers.Pragma, "no-cache");
   assert.equal(res.body.ok, false);
 }
 
@@ -105,6 +107,8 @@ function testSecurityHeaders() {
   assert.equal(nextCalled, true);
   assert.equal(res.headers["X-Frame-Options"], "DENY");
   assert.equal(res.headers["Strict-Transport-Security"], "max-age=15552000; includeSubDomains");
+  assert.equal(res.headers["Cross-Origin-Opener-Policy"], "same-origin");
+  assert.equal(res.headers["X-Permitted-Cross-Domain-Policies"], "none");
   assert.ok(buildSecurityContentSecurityPolicy().includes("default-src 'self'"));
   assert.ok(res.headers["Content-Security-Policy"].includes("frame-ancestors 'none'"));
 }
@@ -132,6 +136,8 @@ function testRateLimiterAndGenericErrorMiddleware() {
   assert.equal(firstNextCalled, true);
   assert.equal(secondNextCalled, false);
   assert.equal(second.statusCode, 429);
+  assert.equal(second.headers["Cache-Control"], "no-store");
+  assert.equal(second.headers.Pragma, "no-cache");
   assert.equal(second.body.ok, false);
 
   const errorRes = createResponse();
@@ -143,6 +149,8 @@ function testRateLimiterAndGenericErrorMiddleware() {
     console.error = originalConsoleError;
   }
   assert.equal(errorRes.statusCode, 500);
+  assert.equal(errorRes.headers["Cache-Control"], "no-store");
+  assert.equal(errorRes.headers.Pragma, "no-cache");
   assert.equal(errorRes.body.error, "Internal server error. Details were logged for debugging.");
 }
 
