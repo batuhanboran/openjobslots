@@ -2,12 +2,20 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Runtime Safety Update - May 28, 2026
+
+- Backend runtime defaults now prioritize swap stability over throughput expansion. The Compose defaults are `INGESTION_WORKER_CONCURRENCY=2`, `INGESTION_WORKER_INTERVAL_MS=900000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=6000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=100`, `INGESTION_SOURCE_DAILY_TARGET_BUDGET=500`, and `INGESTION_MAX_TARGETS_PER_RUN=250`.
+- Compose now sets memory and swap ceilings for `openjobslots-app`, `openjobslots-worker`, `openjobslots-postgres`, and `openjobslots-meilisearch`. App/worker Node heap limits are explicit so Node heap growth stays below the container boundary.
+- Public `/postings` reads cap large requests before query execution. Defaults are `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT=500` and `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET=2000`; responses expose `page_capped` when a request is clamped.
+- Docker image cleanup is repo-side: multi-stage runtime image, pruned dev dependencies, and `.dockerignore` excludes README screenshots and Windows project files from backend images.
+- Meili/Postgres parity is still a release risk to verify separately. Runtime caps do not replace the documented Meili repair/check order.
+
 ## v2.0 Prep Update - May 27, 2026
 
 - Adaptive worker scale prep is implemented and tested. Postgres target selection now reads due backlog, recent source success/failure counts, and recent parser/network/rate-limit/source-quality errors before assigning per-ATS run caps. This lets healthy backlog sources scale while parser-attention or stability-risk sources are throttled instead of globally blocking throughput.
 - Postgres worker target selection also clamps SQL candidates per ATS before the global candidate limit. This closes the live underfill case where a few large normal backlogs could occupy the candidate window and leave `targets/run=200` with only a partial selected run.
 - Automatic worker target selection excludes `quarantine_only` sources. Public status/count payloads now split ATS source state into full, canary, quarantine-only, disabled, and worker-auto-eligible counts so enabled source rows are not confused with the worker target set.
-- Worker throughput defaults are staged at `INGESTION_WORKER_CONCURRENCY=3`, `INGESTION_WORKER_INTERVAL_MS=600000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=18000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=300`, `INGESTION_SOURCE_DAILY_TARGET_BUDGET=1000`, and `INGESTION_ADAPTIVE_SELECTION_LOOKBACK_HOURS=24`. Rollback defaults are documented in `docs/reference/deployment.md`.
+- Worker throughput defaults from May 27 were staged at `INGESTION_WORKER_CONCURRENCY=3`, `INGESTION_WORKER_INTERVAL_MS=600000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=18000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=300`, `INGESTION_SOURCE_DAILY_TARGET_BUDGET=1000`, and `INGESTION_ADAPTIVE_SELECTION_LOOKBACK_HOURS=24`; the May 28 runtime safety update above supersedes these as repo defaults.
 - Collector dispatch is registry-driven again: `sourceCollectors.js` now resolves registry aliases through `sourceRegistry.js` instead of carrying a long ATS-specific dispatch chain. The former collector-local legacy paths for `talexio` and `saphrcloud` now own fetch/parse behavior in their source modules, so no ATS-specific legacy collector branch remains in `sourceCollectors.js`.
 - Repo source-module coverage is `60/60` configured ATS directories with `index.js` and `parse.js`. `dayforcehcm` is represented by an explicit unsupported source stub and remains disabled until raw fixtures and parser certification exist.
 - Public release line is prepared as `v2.0.0`: public release notes are public-safe, the result count says exact `job slots`, and the search header also exposes public ATS and company coverage chips. `/sync/status` now carries the same public count fields as `/health` for both Postgres and SQLite paths.

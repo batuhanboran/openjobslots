@@ -513,6 +513,7 @@ function registerPublicRoutes(app, context) {
         count: publicCount,
         count_exact: result?.count_exact === false ? false : true,
         count_capped: Boolean(result?.count_capped),
+        page_capped: Boolean(result?.page_capped),
         source_facets: sanitizeFrontendValue(sanitizePublicSourceFacets(result?.source_facets)),
         limit: resultLimit,
         offset: resultOffset,

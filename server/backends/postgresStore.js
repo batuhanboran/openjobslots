@@ -41,6 +41,9 @@ const POSTING_SORT_OPTIONS = new Set(["relevance", "last_seen", "posted_date", "
 const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
 const PUBLIC_SOURCE_FACET_LIMIT = 8;
 const PUBLIC_SOURCE_FACET_FRESH_DAYS = 3;
+const DEFAULT_PUBLIC_POSTINGS_LIMIT = 500;
+const DEFAULT_PUBLIC_POSTINGS_MAX_LIMIT = 500;
+const DEFAULT_PUBLIC_POSTINGS_MAX_OFFSET = 2000;
 const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "relevance", label: "Relevance" },
   { value: "last_seen", label: "Fresh source" },
@@ -211,6 +214,37 @@ function normalizeFreshnessDays(value) {
   if (!Number.isFinite(numberValue)) return null;
   const rounded = Math.floor(numberValue);
   return POSTING_FRESHNESS_DAY_OPTIONS.has(rounded) ? rounded : null;
+}
+
+function boundedInteger(value, fallback, min, max) {
+  const numberValue = Number(value);
+  const resolved = Number.isFinite(numberValue) ? Math.floor(numberValue) : fallback;
+  return Math.max(min, Math.min(max, resolved));
+}
+
+function resolvePublicPostingsPage(options = {}, env = process.env) {
+  const maxLimit = boundedInteger(
+    env.OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT,
+    DEFAULT_PUBLIC_POSTINGS_MAX_LIMIT,
+    1,
+    2000
+  );
+  const maxOffset = boundedInteger(
+    env.OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET,
+    DEFAULT_PUBLIC_POSTINGS_MAX_OFFSET,
+    0,
+    20000
+  );
+  const requestedLimit = Number(options.limit ?? DEFAULT_PUBLIC_POSTINGS_LIMIT);
+  const requestedOffset = Number(options.offset ?? 0);
+  const limit = boundedInteger(requestedLimit, DEFAULT_PUBLIC_POSTINGS_LIMIT, 1, maxLimit);
+  const offset = boundedInteger(requestedOffset, 0, 0, maxOffset);
+  return {
+    limit,
+    offset,
+    limit_capped: Number.isFinite(requestedLimit) && Math.floor(requestedLimit) > limit,
+    offset_capped: Number.isFinite(requestedOffset) && Math.floor(requestedOffset) > offset
+  };
 }
 
 function getPublicPostingSortOptions() {
@@ -674,8 +708,9 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
 }
 
 async function listPostgresPostings(pool, options = {}) {
-  const limit = Math.max(1, Math.min(2000, Number(options.limit || 500)));
-  const offset = Math.max(0, Number(options.offset || 0));
+  const page = resolvePublicPostingsPage(options);
+  const limit = page.limit;
+  const offset = page.offset;
   const meiliConfig = getMeiliConfig();
   const sortBy = normalizePostingSort(options.sort_by);
   const meiliSortable = sortBy === "relevance" || sortBy === "last_seen" || sortBy === "posted_date";
@@ -692,6 +727,7 @@ async function listPostgresPostings(pool, options = {}) {
           items: [],
           count: 0,
           count_exact: false,
+          page_capped: page.limit_capped || page.offset_capped,
           source_facets: [],
           limit,
           offset,
@@ -745,6 +781,7 @@ async function listPostgresPostings(pool, options = {}) {
         items: items.slice(0, limit),
         count,
         count_exact: true,
+        page_capped: page.limit_capped || page.offset_capped,
         source_facets: sourceFacets,
         limit,
         offset,
@@ -770,7 +807,11 @@ async function listPostgresPostings(pool, options = {}) {
     }
   }
 
-  return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+  const result = await listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+  return {
+    ...result,
+    page_capped: page.limit_capped || page.offset_capped
+  };
 }
 
 async function getPostgresCounts(pool, options = {}) {

@@ -48,18 +48,32 @@ Search correctness checks are part of deployment verification. Service health al
 The worker keeps manual sync controls available, but automatic Postgres syncs are budgeted so idle due-target pressure does not turn into continuous fetch/write load.
 
 - `OPENJOBSLOTS_AUTO_SYNC`: set to `0` to disable automatic sync scheduling. Manual sync requests still work.
-- `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `600000` ms.
-- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `18000`; set to `0` for a reversible pause of automatic sync work.
-- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `300`.
-- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `1000`.
-- `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose keeps this at `500`; manual requested syncs may continue across runs until due targets drain.
-- `INGESTION_WORKER_CONCURRENCY`: concurrent worker target processors. Compose defaults to `3`; per-host concurrency remains serialized by default.
+- `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `900000` ms.
+- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `6000`; set to `0` for a reversible pause of automatic sync work.
+- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `100`.
+- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `500`.
+- `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose defaults to `250`; manual requested syncs may continue across runs until due targets drain.
+- `INGESTION_WORKER_CONCURRENCY`: concurrent worker target processors. Compose defaults to `2`; per-host concurrency remains serialized by default.
 - `INGESTION_ADAPTIVE_SELECTION_LOOKBACK_HOURS`: recent success/failure and error-signal window for adaptive ATS source caps. Compose defaults to `24`.
 - `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY`: HRMDirect detail-page cap per company. Compose defaults to `35` so large sparse HRMDirect boards cannot stall an automatic worker run; raise only during targeted HRMDirect recovery windows.
 - `INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER`: over-select factor for due target candidates before source budget and protection filtering. Worker code defaults to `8`.
+- `INGESTION_DUE_TARGET_CANDIDATE_MAX`: hard ceiling for due-target candidate selection. Compose defaults to `2500`.
 
 The daily budget is conservative and restart-safe because the worker counts targets already recorded in `ingestion_runs` since UTC midnight before starting another automatic run. Manual requested syncs are not blocked by the budget, but their recorded targets count against later automatic work for the same day.
-To roll back this throughput stage without code changes, override `INGESTION_WORKER_CONCURRENCY=2`, `INGESTION_WORKER_INTERVAL_MS=900000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=6000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=100`, `INGESTION_SOURCE_DAILY_TARGET_BUDGET=500`, and `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY=35` in the production environment.
+To temporarily return to the May 27 high-throughput stage, override `INGESTION_WORKER_CONCURRENCY=3`, `INGESTION_WORKER_INTERVAL_MS=600000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=18000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=300`, and `INGESTION_SOURCE_DAILY_TARGET_BUDGET=1000` in the production environment only after worker health, Meili/Postgres parity, and host memory pressure are clean.
+
+## Runtime Memory Guardrails
+
+Compose sets memory and swap ceilings for the four production services. Defaults are:
+
+- `OPENJOBSLOTS_POSTGRES_MEM_LIMIT=1536m` and `OPENJOBSLOTS_POSTGRES_MEMSWAP_LIMIT=1536m`.
+- `OPENJOBSLOTS_MEILI_MEM_LIMIT=4096m` and `OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=4096m`.
+- `OPENJOBSLOTS_APP_MEM_LIMIT=768m` and `OPENJOBSLOTS_APP_MEMSWAP_LIMIT=768m`.
+- `OPENJOBSLOTS_WORKER_MEM_LIMIT=768m` and `OPENJOBSLOTS_WORKER_MEMSWAP_LIMIT=768m`.
+
+App and worker Node heaps are separately bounded with `OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB=384` and `OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB=512`. Keep `memswap_limit` equal to `mem_limit` unless you intentionally want a service to use host swap.
+
+Public `/postings` requests are also clamped before query execution with `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT=500` and `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET=2000`. Responses include `page_capped=true` when a caller asks beyond those bounds.
 
 ## Container DNS
 

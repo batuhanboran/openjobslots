@@ -30,6 +30,7 @@ const orderedCandidates = [
   { key: "public-stats", script: "test:public-stats" },
   { key: "rate-limit", script: "test:rate-limit" },
   { key: "http", script: "test:http" },
+  { key: "docker-runtime", script: "test:docker-runtime" },
   { key: "backend", script: "test:backend" },
   { key: "api", script: "test:api" },
   { key: "parser", script: "test:parsers" },

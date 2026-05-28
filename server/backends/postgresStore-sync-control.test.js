@@ -817,6 +817,48 @@ async function testPublicPostingReadsDoNotWrite() {
   }
 }
 
+async function testPublicPostingsCapsLargeLimitAndOffset() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  delete process.env.OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT;
+  delete process.env.OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "sqlite";
+  let selectLimit = null;
+  let selectOffset = null;
+  const pool = {
+    async query(sql, params = []) {
+      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) return { rows: [{ count: 6000 }] };
+      if (isSourceFacetQuery(sql)) return createSourceFacetRows("fixture", 1);
+      if (/SELECT\s+row_number\(\) OVER/i.test(sql)) {
+        selectLimit = params[params.length - 2];
+        selectOffset = params[params.length - 1];
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected capped postings query: ${sql}`);
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "director",
+      limit: 5000,
+      offset: 999999,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    assert.equal(selectLimit, 500);
+    assert.equal(selectOffset, 2000);
+    assert.equal(result.limit, 500);
+    assert.equal(result.offset, 2000);
+  } finally {
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 async function testPostgresUpsertRejectsInvalidPostingsBeforeStorage() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   process.env.OPENJOBSLOTS_SEARCH_BACKEND = "sqlite";
@@ -1663,6 +1705,7 @@ async function main() {
   await testEmptyMeiliSearchReturnsFastZero();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
   await testPublicPostingReadsDoNotWrite();
+  await testPublicPostingsCapsLargeLimitAndOffset();
   await testPostgresUpsertRejectsInvalidPostingsBeforeStorage();
   testMeiliDocumentsCarryHiddenFlagSafely();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();

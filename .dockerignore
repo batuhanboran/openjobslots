@@ -21,6 +21,8 @@ logs
 .tmp
 tests
 docs
+README-Images
+windows
 coverage
 playwright-report
 test-results
@@ -28,5 +30,10 @@ test-results
 .expo-shared
 .vscode
 .idea
+*.sln
+*.wixproj
+*.vcxproj
+*.vcxproj.filters
+NuGet.config
 *.log
 npm-debug.log*
