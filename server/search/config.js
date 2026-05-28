@@ -15,7 +15,39 @@ const SEARCH_STOP_WORDS_LIST = Object.freeze([
   "position",
   "positions",
   "vacancy",
-  "vacancies"
+  "vacancies",
+  "empleo",
+  "empleos",
+  "oferta",
+  "ofertas",
+  "trabajo",
+  "trabajos",
+  "puesto",
+  "puestos",
+  "vacante",
+  "vacantes",
+  "emploi",
+  "emplois",
+  "offre",
+  "offres",
+  "poste",
+  "postes",
+  "ouvert",
+  "ouverts",
+  "stelle",
+  "stellen",
+  "stellenangebot",
+  "stellenangebote",
+  "is",
+  "ilan",
+  "ilani",
+  "ilanlar",
+  "ilanlari",
+  "acik",
+  "pozisyon",
+  "pozisyonlar",
+  "pozisyonlari",
+  "calisma"
 ]);
 
 const SEARCH_STOP_WORDS = new Set(SEARCH_STOP_WORDS_LIST);
@@ -66,7 +98,7 @@ const SEARCH_SYNONYMS = Object.freeze({
   turkish: ["turkey", "turkiye", "t\u00fcrkiye", "turkyie", "turksih"],
   turkyie: ["turkey", "turkiye", "t\u00fcrkiye", "turkish"],
   turksih: ["turkey", "turkiye", "t\u00fcrkiye", "turkish"],
-  remote: ["wfh", "work from home", "work from anywhere", "remote work", "home based", "telecommute", "telework", "virtual"],
+  remote: ["wfh", "work from home", "work from anywhere", "remote work", "home based", "telecommute", "telework", "virtual", "remoto", "remotos", "remota", "remotas", "uzaktan", "uzaktan calisma"],
   wfh: ["remote", "work from home", "work from anywhere"],
   "work from home": ["remote", "wfh"],
   "work from anywhere": ["remote", "wfh"],
@@ -85,6 +117,24 @@ const SEARCH_TOKEN_CANONICAL = Object.freeze({
   turkyie: "turkey",
   turksih: "turkish",
   "remote jobs": "remote",
+  "remote job openings": "remote",
+  remoto: "remote",
+  remotos: "remote",
+  remota: "remote",
+  remotas: "remote",
+  "trabajos remotos": "remote",
+  "empleos remotos": "remote",
+  "ofertas empleo remote": "remote",
+  "offres emploi remote": "remote",
+  uzaktan: "remote",
+  "uzaktan calisma": "remote",
+  "uzaktan calisma ilanlari": "remote",
+  "ofertas empleo": "job openings",
+  "offres emploi": "job openings",
+  stellenangebote: "job openings",
+  "is ilanlari": "job openings",
+  "yazilim muhendisi": "software engineer",
+  "teknik destek muhendisi": "technical support engineer",
   "work from home": "remote",
   "work from anywhere": "remote",
   wfh: "remote",
@@ -183,8 +233,18 @@ const MEILI_POSTINGS_SETTINGS = Object.freeze({
   }
 });
 
-function normalizeText(value) {
+function normalizeLocaleLetters(value) {
   return String(value || "")
+    .replace(/[İı]/g, "i")
+    .replace(/[Şş]/g, "s")
+    .replace(/[Ğğ]/g, "g")
+    .replace(/[Çç]/g, "c")
+    .replace(/[Öö]/g, "o")
+    .replace(/[Üü]/g, "u");
+}
+
+function normalizeText(value) {
+  return normalizeLocaleLetters(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -195,7 +255,7 @@ function normalizeText(value) {
 }
 
 function normalizeLookup(value) {
-  return String(value || "")
+  return normalizeLocaleLetters(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()

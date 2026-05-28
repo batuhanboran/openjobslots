@@ -43,6 +43,7 @@ const PUBLIC_SEO_HOME_PAGES = Object.freeze([
 const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
   {
     key: "job-search",
+    canonicalSearchQuery: "job openings",
     pages: [
       {
         languageCode: "en",
@@ -83,6 +84,7 @@ const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
   },
   {
     key: "remote",
+    canonicalSearchQuery: "remote",
     pages: [
       {
         languageCode: "en",
@@ -123,6 +125,7 @@ const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
   },
   {
     key: "software-engineer",
+    canonicalSearchQuery: "software engineer",
     pages: [
       {
         languageCode: "en",
@@ -163,6 +166,7 @@ const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
   },
   {
     key: "product-manager",
+    canonicalSearchQuery: "product manager",
     pages: [
       {
         languageCode: "en",
@@ -203,6 +207,7 @@ const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
   },
   {
     key: "technical-support",
+    canonicalSearchQuery: "technical support engineer",
     pages: [
       {
         languageCode: "en",
@@ -247,30 +252,35 @@ const PUBLIC_SEO_ATS_PAGES = Object.freeze([
   {
     path: "/ats/greenhouse-jobs",
     searchQuery: "greenhouse jobs",
+    canonicalSearchQuery: "greenhouse",
     title: "Greenhouse jobs | OpenJobSlots",
     description: "Search fresh public Greenhouse job openings indexed by OpenJobSlots."
   },
   {
     path: "/ats/lever-jobs",
     searchQuery: "lever jobs",
+    canonicalSearchQuery: "lever",
     title: "Lever jobs | OpenJobSlots",
     description: "Search fresh public Lever job openings indexed by OpenJobSlots."
   },
   {
     path: "/ats/ashby-jobs",
     searchQuery: "ashby jobs",
+    canonicalSearchQuery: "ashby",
     title: "Ashby jobs | OpenJobSlots",
     description: "Search fresh public Ashby job openings indexed by OpenJobSlots."
   },
   {
     path: "/ats/workday-jobs",
     searchQuery: "workday jobs",
+    canonicalSearchQuery: "workday",
     title: "Workday jobs | OpenJobSlots",
     description: "Search fresh public Workday job openings indexed by OpenJobSlots."
   },
   {
     path: "/ats/bamboohr-jobs",
     searchQuery: "bamboohr jobs",
+    canonicalSearchQuery: "bamboohr",
     title: "BambooHR jobs | OpenJobSlots",
     description: "Search fresh public BambooHR job openings indexed by OpenJobSlots."
   }
@@ -287,6 +297,8 @@ const PUBLIC_SEO_ROUTES = Object.freeze([
     group.pages.map((page) => ({
       ...page,
       alternateGroup: group.key,
+      searchIntent: group.key,
+      canonicalSearchQuery: page.canonicalSearchQuery || group.canonicalSearchQuery || page.searchQuery,
       changefreq: "daily",
       priority: "0.8"
     }))
@@ -294,6 +306,8 @@ const PUBLIC_SEO_ROUTES = Object.freeze([
   ...PUBLIC_SEO_ATS_PAGES.map((page) => ({
     ...page,
     languageCode: "en",
+    searchIntent: `ats-${String(page.path || "").replace(/^\/ats\//, "").replace(/-jobs$/, "")}`,
+    canonicalSearchQuery: page.canonicalSearchQuery || page.searchQuery,
     changefreq: "daily",
     priority: "0.7"
   }))
@@ -304,6 +318,95 @@ const PUBLIC_SEO_ALTERNATE_GROUPS = new Map([
   ["home", PUBLIC_SEO_HOME_PAGES],
   ...PUBLIC_SEO_LANDING_GROUPS.map((group) => [group.key, group.pages])
 ]);
+
+const SEO_LANDING_LINK_LIMIT = 8;
+
+function normalizePublicSeoQueryKey(value) {
+  return String(value || "")
+    .replace(/[İı]/g, "i")
+    .replace(/[Şş]/g, "s")
+    .replace(/[Ğğ]/g, "g")
+    .replace(/[Çç]/g, "c")
+    .replace(/[Öö]/g, "o")
+    .replace(/[Üü]/g, "u")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,]/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripOpenJobSlotsTitleSuffix(title) {
+  return String(title || "").replace(/\s+\|\s+OpenJobSlots\s*$/i, "").trim();
+}
+
+function getPublicSeoCanonicalSearchQuery(route) {
+  return String(route?.canonicalSearchQuery || route?.searchQuery || "").replace(/\s+/g, " ").trim();
+}
+
+function getPublicSeoRouteLabel(route) {
+  return stripOpenJobSlotsTitleSuffix(route?.title) || String(route?.searchQuery || route?.path || "").trim();
+}
+
+function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_LINK_LIMIT) {
+  const normalizedLanguageCode = ["en", "tr", "de", "fr", "es"].includes(languageCode) ? languageCode : "en";
+  const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
+    (route) => route.languageCode === normalizedLanguageCode && route.alternateGroup && route.alternateGroup !== "home"
+  );
+  const atsRoutes = normalizedLanguageCode === "en"
+    ? PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/")).slice(0, 3)
+    : [];
+  return [...localizedRoutes, ...atsRoutes].slice(0, Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT))));
+}
+
+function buildPublicSeoIntentByQueryKey() {
+  const byQuery = new Map();
+  for (const route of PUBLIC_SEO_ROUTES) {
+    const intent = String(route?.searchIntent || "").trim();
+    if (!intent) continue;
+    for (const query of [route.searchQuery, route.canonicalSearchQuery]) {
+      const key = normalizePublicSeoQueryKey(query);
+      if (key) byQuery.set(key, intent);
+    }
+  }
+  return byQuery;
+}
+
+const PUBLIC_SEO_INTENT_BY_QUERY_KEY = buildPublicSeoIntentByQueryKey();
+
+function getPublicSeoPopularSearchItems(languageCode, queryCounts = [], limit = SEO_LANDING_LINK_LIMIT) {
+  const routes = getPublicSeoLandingRoutesForLanguage(languageCode, 20);
+  const routeByIntent = new Map(routes.map((route) => [String(route.searchIntent || "").trim(), route]));
+  const countByIntent = new Map();
+
+  for (const item of Array.isArray(queryCounts) ? queryCounts : []) {
+    const query = item?.query || item?.query_normalized || item?.searchQuery || item?.value || "";
+    const intent = PUBLIC_SEO_INTENT_BY_QUERY_KEY.get(normalizePublicSeoQueryKey(query));
+    if (!intent || !routeByIntent.has(intent)) continue;
+    countByIntent.set(intent, Number(countByIntent.get(intent) || 0) + Math.max(0, Number(item?.count || 0)));
+  }
+
+  const rankedRoutes = [...countByIntent.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([intent, count]) => ({ route: routeByIntent.get(intent), count }));
+  const seenPaths = new Set(rankedRoutes.map((item) => item.route?.path).filter(Boolean));
+  const fallbackRoutes = routes
+    .filter((route) => !seenPaths.has(route.path))
+    .map((route) => ({ route, count: 0 }));
+
+  return [...rankedRoutes, ...fallbackRoutes]
+    .slice(0, Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT))))
+    .map(({ route, count }) => ({
+      path: route.path,
+      label: getPublicSeoRouteLabel(route),
+      searchIntent: route.searchIntent || "",
+      searchQuery: getPublicSeoCanonicalSearchQuery(route),
+      localizedSearchQuery: String(route.searchQuery || "").trim(),
+      count
+    }));
+}
 
 function getPublicSeoRouteHintByPath(pathname) {
   return PUBLIC_SEO_ROUTE_BY_PATH.get(normalizePublicSeoPath(pathname)) || null;
@@ -316,7 +419,12 @@ function getPublicSeoAlternateGroupPages(alternateGroup) {
 
 module.exports = {
   PUBLIC_SEO_ROUTES,
+  getPublicSeoCanonicalSearchQuery,
   getPublicSeoAlternateGroupPages,
+  getPublicSeoLandingRoutesForLanguage,
+  getPublicSeoPopularSearchItems,
+  getPublicSeoRouteLabel,
   getPublicSeoRouteHintByPath,
-  normalizePublicSeoPath
+  normalizePublicSeoPath,
+  normalizePublicSeoQueryKey
 };

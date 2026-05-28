@@ -74,6 +74,7 @@ function testPublicRoutes() {
     "GET /public/preferences",
     "GET /sync/status",
     "GET /ingestion/status",
+    "GET /search/popular",
     "GET /search/suggest",
     "GET /postings/filter-options",
     "GET /postings",

@@ -174,6 +174,15 @@ export function fetchSearchSuggestions(search = "", limit = 8) {
   return request(`/search/suggest?${params.toString()}`);
 }
 
+export function fetchPopularSearches(language = "en", limit = 8) {
+  const params = new URLSearchParams({
+    language: String(language || "en"),
+    limit: String(limit),
+    _ts: String(Date.now())
+  });
+  return request(`/search/popular?${params.toString()}`);
+}
+
 export function fetchPublicPreferences() {
   return request(`/public/preferences?_ts=${Date.now()}`);
 }

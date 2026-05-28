@@ -1130,6 +1130,8 @@ async function addMeiliSuggestions({ query, resolvedLimit, suggestions, add }) {
 
 async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
   const query = String(search || "").trim();
+  const indexedQuery = searchConfig.normalizeSearchQuery(query);
+  const suggestionQuery = indexedQuery || query;
   const resolvedLimit = Math.max(1, Math.min(20, Number(limit || 8)));
   const suggestions = [];
   const seen = new Set();
@@ -1147,7 +1149,7 @@ async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
     if (filter) suggestion.filter = filter;
     suggestions.push(suggestion);
   };
-  const normalizedQuery = normalizeText(query);
+  const normalizedQuery = normalizeText(suggestionQuery);
   if (normalizedQuery.length >= 2) {
     if (normalizedSuggestionContainsTerm(normalizedQuery, "remote") || normalizedSuggestionContainsTerm(normalizedQuery, "wfh") || normalizedQuery.includes("work from home")) {
       add("intent", "remote", 1, { label: "Remote", intent_type: "remote", filter: { remote: "remote" } });
@@ -1176,12 +1178,12 @@ async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
   if (query && suggestions.length < resolvedLimit) {
     let meiliAdded = false;
     try {
-      meiliAdded = await addMeiliSuggestions({ query, resolvedLimit, suggestions, add });
+      meiliAdded = await addMeiliSuggestions({ query: suggestionQuery, resolvedLimit, suggestions, add });
     } catch (error) {
       console.warn("[openjobslots suggestions] Meili suggestion fallback failed:", String(error?.message || error).slice(0, 240));
     }
     if (!meiliAdded || suggestions.length < resolvedLimit) {
-      const pattern = `%${escapePostgresLikePattern(query)}%`;
+      const pattern = `%${escapePostgresLikePattern(suggestionQuery)}%`;
       const rows = await pool.query(
         `
           SELECT 'title' AS type, position_name AS value, COUNT(*)::int AS count FROM postings
@@ -3032,7 +3034,7 @@ function normalizeAnonymousSessionKey(value) {
 async function recordPostgresPublicSearchEvent(pool, event = {}) {
   if (!pool) return { ok: true, skipped: true, reason: "no_pool" };
   const query = normalizePublicSearchQuery(event.search);
-  const normalizedQuery = normalizeText(query).slice(0, 160);
+  const normalizedQuery = (searchConfig.normalizeSearchQuery(query) || normalizeText(query)).slice(0, 160);
   const values = [
     normalizePublicSearchEventType(event.eventType),
     query,

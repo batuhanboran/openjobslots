@@ -223,6 +223,40 @@ test.describe("openjobslots API compatibility", () => {
     const remoteCombinedPayload = await remoteCombined.json();
     expect(remoteCombinedPayload.items.length).toBeGreaterThan(0);
     expect(remoteCombinedPayload.items.every((item) => /Remote/i.test(`${item.location || ""} ${item.position_name || ""}`))).toBeTruthy();
+
+    const localizedQa = await request.get(`${apiBaseUrl}/postings`, {
+      params: {
+        search: "empleos QA",
+        limit: "10",
+        include_applied: "1",
+        include_ignored: "1"
+      }
+    });
+    expect(localizedQa.ok()).toBeTruthy();
+    const localizedQaPayload = await localizedQa.json();
+    expect(localizedQaPayload.items.length).toBeGreaterThan(0);
+    expect(localizedQaPayload.filters.search).toBe("empleos QA");
+
+    const popular = await request.get(`${apiBaseUrl}/search/popular`, {
+      params: {
+        language: "es",
+        limit: "5"
+      }
+    });
+    expect(popular.ok()).toBeTruthy();
+    const popularPayload = await popular.json();
+    expect(popularPayload.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "/es/empleos-software-engineer",
+          searchQuery: "software engineer"
+        }),
+        expect.objectContaining({
+          path: "/es/trabajos-remotos",
+          searchQuery: "remote"
+        })
+      ])
+    );
   });
 
   test("postings expose exact count metadata plus read-only freshness and sort params", async ({ request }) => {

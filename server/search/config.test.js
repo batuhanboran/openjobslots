@@ -34,6 +34,18 @@ test("expanded search tokens include useful alias groups", () => {
   assert.ok(remoteGroups[0].includes("remote"));
 });
 
+test("search config maps localized SEO search phrases to indexed search intent", () => {
+  assert.equal(normalizeSearchQuery("empleos software engineer"), "software engineer");
+  assert.equal(normalizeSearchQuery("emplois software engineer"), "software engineer");
+  assert.equal(normalizeSearchQuery("trabajos remotos"), "remote");
+  assert.equal(normalizeSearchQuery("offres emploi remote"), "remote");
+  assert.equal(normalizeSearchQuery("ofertas empleo"), "job openings");
+  assert.equal(normalizeSearchQuery("stellenangebote"), "job openings");
+  assert.equal(normalizeSearchQuery("i\u015f ilanlar\u0131"), "job openings");
+  assert.equal(normalizeSearchQuery("yaz\u0131l\u0131m m\u00fchendisi i\u015f ilanlar\u0131"), "software engineer");
+  assert.equal(normalizeSearchQuery("teknik destek m\u00fchendisi i\u015f ilanlar\u0131"), "technical support engineer");
+});
+
 test("Meili settings keep title/company ahead of description and include filters", () => {
   const attrs = MEILI_POSTINGS_SETTINGS.searchableAttributes;
   assert.ok(attrs.indexOf("title") < attrs.indexOf("company"));

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { getPublicSeoPopularSearchItems } = require("../../src/publicSeoRoutes");
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -98,6 +99,7 @@ function registerPublicRoutes(app, context) {
     getPostgresFilterOptions,
     getPostgresGrowthSummary,
     getPostgresParserAttentionByAts,
+    getPostgresPublicSearchReport,
     getPostgresSuggestions,
     getPostgresSyncStatus,
     getPostingLocationGeoFilterOptions,
@@ -339,6 +341,42 @@ function registerPublicRoutes(app, context) {
           ...(includeAdminDiagnostics ? { growth_24h: createEmptyGrowthSummary({ hours: 24 }) } : {})
         })
       });
+    });
+  });
+
+  app.get("/search/popular", async (req, res) => {
+    const languageCode = String(req.query.language || req.query.lang || "en").trim().toLowerCase();
+    const limit = Math.max(1, Math.min(20, Number(req.query.limit || 8)));
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      let report = null;
+      let topQueries = [];
+      let source = "fallback";
+
+      if (DB_BACKEND === "postgres" && typeof getPostgresPublicSearchReport === "function") {
+        try {
+          report = await getPostgresPublicSearchReport(postgresPool, {
+            date: req.query.date || "today",
+            limit: 50
+          });
+          topQueries = Array.isArray(report?.top_final_posting_searches)
+            ? report.top_final_posting_searches
+            : Array.isArray(report?.top_terms)
+              ? report.top_terms
+              : [];
+          if (topQueries.length > 0) source = "analytics";
+        } catch (error) {
+          console.warn("[openjobslots public search] popular search analytics fallback:", String(error?.message || error).slice(0, 240));
+        }
+      }
+
+      const items = getPublicSeoPopularSearchItems(languageCode, topQueries, limit);
+      return {
+        ok: true,
+        items,
+        count: items.length,
+        source,
+        date: report?.date || null
+      };
     });
   });
 

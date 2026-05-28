@@ -28,6 +28,7 @@ import {
   fetchPostingFilterOptions,
   fetchPersonalInformation,
   fetchPostings,
+  fetchPopularSearches,
   fetchPublicPreferences,
   fetchSearchSuggestions,
   postFrontendLog,
@@ -53,7 +54,8 @@ import {
   formatExactNumberLabel
 } from "./src/publicStatsCore";
 import {
-  PUBLIC_SEO_ROUTES,
+  getPublicSeoPopularSearchItems,
+  getPublicSeoRouteLabel,
   getPublicSeoRouteHintByPath
 } from "./src/publicSeoRoutes";
 
@@ -1557,29 +1559,19 @@ function translatedPublicText(t, key, fallback = "", values = {}) {
 
 const SEO_LANDING_LINK_LIMIT = 8;
 
-function getSeoLandingLinksForLanguage(languageCode) {
-  const normalizedLanguageCode = PUBLIC_LANGUAGE_BY_CODE.has(languageCode) ? languageCode : "en";
-  const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
-    (route) => route.languageCode === normalizedLanguageCode && route.alternateGroup && route.alternateGroup !== "home"
-  );
-  const atsRoutes = normalizedLanguageCode === "en"
-    ? PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/")).slice(0, 3)
-    : [];
-  return [...localizedRoutes, ...atsRoutes].slice(0, SEO_LANDING_LINK_LIMIT);
-}
-
 function getSeoLandingLinkLabel(route) {
-  const title = String(route?.title || "").replace(/\s+\|\s+OpenJobSlots\s*$/i, "").trim();
-  return title || String(route?.searchQuery || route?.path || "").trim();
+  return String(route?.label || "").trim() || getPublicSeoRouteLabel(route);
 }
 
 function getSeoLandingLinkTestId(route) {
   return `seo-landing-link-${String(route?.path || "route").replace(/^\/+/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}`;
 }
 
-function SeoLandingLinks({ languageCode, t, isDarkTheme }) {
+function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems }) {
   if (Platform.OS !== "web") return null;
-  const links = getSeoLandingLinksForLanguage(languageCode);
+  const links = Array.isArray(popularSearchItems) && popularSearchItems.length > 0
+    ? popularSearchItems
+    : getPublicSeoPopularSearchItems(languageCode, [], SEO_LANDING_LINK_LIMIT);
   if (links.length === 0) return null;
   return (
     <View style={styles.seoLandingLinks} testID="seo-landing-links">
@@ -3422,6 +3414,7 @@ export default function App() {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const [popularSearchItems, setPopularSearchItems] = useState([]);
   const [searchResultsMode, setSearchResultsMode] = useState(Boolean(initialPublicSearchQuery));
   const [coverageDetailsOpen, setCoverageDetailsOpen] = useState(false);
   const [status, setStatus] = useState(null);
@@ -5081,6 +5074,32 @@ export default function App() {
   }, [queueFrontendLog]);
 
   useEffect(() => {
+    if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
+    const fallbackItems = getPublicSeoPopularSearchItems(publicLanguageCode, [], SEO_LANDING_LINK_LIMIT);
+    setPopularSearchItems(fallbackItems);
+    if (Platform.OS !== "web") return undefined;
+
+    let cancelled = false;
+    const loadPopularSearches = async () => {
+      try {
+        const response = await fetchPopularSearches(publicLanguageCode, SEO_LANDING_LINK_LIMIT);
+        if (cancelled) return;
+        const items = Array.isArray(response?.items) ? response.items.slice(0, SEO_LANDING_LINK_LIMIT) : [];
+        setPopularSearchItems(items.length > 0 ? items : fallbackItems);
+      } catch (e) {
+        if (!cancelled) {
+          setPopularSearchItems(fallbackItems);
+          queueFrontendLog("warn", "popular_searches_failed", String(e?.message || e), { language: publicLanguageCode });
+        }
+      }
+    };
+    void loadPopularSearches();
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, publicLanguageCode, queueFrontendLog]);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || !window.matchMedia) return undefined;
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updatePreference = () => {
@@ -5956,6 +5975,7 @@ export default function App() {
                 languageCode={publicLanguageCode}
                 t={t}
                 isDarkTheme={isDarkPublicTheme}
+                popularSearchItems={popularSearchItems}
               />
             </>
           ) : null}
