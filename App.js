@@ -233,6 +233,8 @@ const YAHOO_FONT_STACK = Platform.OS === "web"
   : undefined;
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
+const VISITED_POSTING_URLS_STORAGE_KEY = "openjobslots.visitedPostingUrls.v1";
+const MAX_VISITED_POSTING_URLS = 1000;
 const DEFAULT_PUBLIC_LANGUAGE = "en";
 const PUBLIC_LANGUAGE_OPTIONS = [
   {
@@ -1059,6 +1061,41 @@ function writeWebStorageValue(key, value) {
   } catch {
     // Local storage is optional; ignore private browsing or quota failures.
   }
+}
+
+function normalizeVisitedPostingUrl(value) {
+  return String(value || "").trim();
+}
+
+function normalizeVisitedPostingUrlList(value) {
+  return (Array.isArray(value) ? value : [])
+    .map(normalizeVisitedPostingUrl)
+    .filter(Boolean)
+    .slice(-MAX_VISITED_POSTING_URLS);
+}
+
+function readVisitedPostingUrls() {
+  const raw = readWebStorageValue(VISITED_POSTING_URLS_STORAGE_KEY);
+  if (!raw) return new Set();
+  try {
+    return new Set(normalizeVisitedPostingUrlList(JSON.parse(raw)));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeVisitedPostingUrls(urls) {
+  const normalized = normalizeVisitedPostingUrlList(Array.from(urls || []));
+  writeWebStorageValue(VISITED_POSTING_URLS_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+function addVisitedPostingUrl(currentUrls, postingUrl) {
+  const normalized = normalizeVisitedPostingUrl(postingUrl);
+  if (!normalized) return currentUrls instanceof Set ? currentUrls : new Set();
+  const next = new Set(currentUrls instanceof Set ? currentUrls : []);
+  next.delete(normalized);
+  next.add(normalized);
+  return new Set(Array.from(next).slice(-MAX_VISITED_POSTING_URLS));
 }
 
 function sanitizePublicSearchUrlQuery(value) {
@@ -2164,6 +2201,8 @@ function PostingCard({
   onTrackApplication,
   onIgnorePosting,
   onBlockCompany,
+  onMarkPostingVisited,
+  visitedPostingUrls,
   savingApplicationIds,
   ignoringPostingIds,
   blockedCompanyNames,
@@ -2178,10 +2217,11 @@ function PostingCard({
     if (!postingUrl || !isSafeExternalHttpUrl(postingUrl)) return;
     const supported = await Linking.canOpenURL(postingUrl);
     if (supported) {
+      onMarkPostingVisited?.(postingUrl);
       trackPublicApplyClick(item);
       await Linking.openURL(postingUrl);
     }
-  }, [item, postingUrl]);
+  }, [item, onMarkPostingVisited, postingUrl]);
 
   const isSaving = Boolean(savingApplicationIds?.[postingUrl]);
   const isIgnoring = Boolean(ignoringPostingIds?.[postingUrl]);
@@ -2192,6 +2232,7 @@ function PostingCard({
   const saveDisabled = isSaving || isApplied || isIgnoring;
   const ignoreDisabled = isIgnoring;
   const blockDisabled = isCompanyBlocked || isBlockingCompany;
+  const isPostingVisited = Boolean(visitedPostingUrls?.has(postingUrl));
   const atsLabel = getAtsDisplayLabel(item?.ats);
   const positionName = sanitizeDisplayText(item?.position_name, "Unknown position");
   const locationLabel = sanitizeDisplayText(item?.location, "Location unavailable");
@@ -2209,7 +2250,17 @@ function PostingCard({
           accessibilityRole="link"
           accessibilityLabel={`Open posting: ${positionName} at ${companyLabel}`}
         >
-          <Text style={[styles.position, isDarkTheme ? styles.positionDark : null]}>{companyLabel}</Text>
+          <Text
+            style={[
+              styles.position,
+              isDarkTheme ? styles.positionDark : null,
+              isPostingVisited ? styles.positionVisited : null,
+              isPostingVisited && isDarkTheme ? styles.positionVisitedDark : null
+            ]}
+            testID="posting-card-title"
+          >
+            {companyLabel}
+          </Text>
           <Text style={[styles.postingRole, isDarkTheme ? styles.postingRoleDark : null]}>{positionName}</Text>
           <Text style={[styles.location, isDarkTheme ? styles.locationDark : null]}>{locationLabel}</Text>
           <Text style={[styles.ats, isDarkTheme ? styles.atsDark : null]}>{t("posting.atsLabel", "ATS")}: {atsLabel}</Text>
@@ -2843,6 +2894,7 @@ export default function App() {
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
   const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
+  const [visitedPostingUrls, setVisitedPostingUrls] = useState(readVisitedPostingUrls);
   const [showScrollTopButton, setShowScrollTopButton] = useState(false);
   const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
@@ -3330,6 +3382,16 @@ export default function App() {
       postingsListRef.current?.scrollTo?.({ y: 0, animated: true });
       postingsListRef.current?.scrollToOffset?.({ offset: 0, animated: true });
     }, 0);
+  }, []);
+
+  const markPostingVisited = useCallback((postingUrl) => {
+    const normalized = normalizeVisitedPostingUrl(postingUrl);
+    if (!normalized) return;
+    setVisitedPostingUrls((prev) => {
+      const next = addVisitedPostingUrl(prev, normalized);
+      writeVisitedPostingUrls(next);
+      return next;
+    });
   }, []);
 
   const loadPostings = useCallback(async (q, options = {}) => {
@@ -5699,6 +5761,8 @@ export default function App() {
                     onTrackApplication={handleTrackPostingApplication}
                     onIgnorePosting={handleIgnorePosting}
                     onBlockCompany={handleBlockCompany}
+                    onMarkPostingVisited={markPostingVisited}
+                    visitedPostingUrls={visitedPostingUrls}
                     savingApplicationIds={savingApplicationIds}
                     ignoringPostingIds={ignoringPostingIds}
                     blockedCompanyNames={blockedCompanyNames}
@@ -8886,6 +8950,12 @@ const styles = StyleSheet.create({
   },
   positionDark: {
     color: "#A9B4FF"
+  },
+  positionVisited: {
+    color: "#681DA8"
+  },
+  positionVisitedDark: {
+    color: "#C58AF9"
   },
   postingRole: {
     marginTop: 4,

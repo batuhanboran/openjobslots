@@ -12,6 +12,8 @@ const SEARCH_COMPATIBILITY_QUERIES = [
 
 const PROTECTED_PUBLIC_ROUTE_PREFIXES = ["/settings", "/mcp", "/applications"];
 const PROTECTED_PUBLIC_ROUTE_EXACT = ["/sync/start", "/sync/stop", "/postings/ignore"];
+const VISITED_POSTING_URLS_STORAGE_KEY = "openjobslots.visitedPostingUrls.v1";
+const VISITED_POSTING_COLOR_RGB = "rgb(104, 29, 168)";
 
 function protectedPublicRouteLabel(rawUrl) {
   const url = new URL(rawUrl);
@@ -942,6 +944,65 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("public-stat-ats")).toHaveText(/6\s+ATS/i);
     await expect(page.getByTestId("public-stat-companies")).toHaveText(/12\s+companies/i);
     await expectStatsChipsAligned(page);
+  });
+
+  test("marks opened posting results with a visited link color", async ({ page }) => {
+    const postingUrl = "https://jobs.example.test/visited-posting";
+    await page.addInitScript(() => {
+      window.__openjobslotsOpenedUrls = [];
+      window.open = (url) => {
+        window.__openjobslotsOpenedUrls.push(String(url || ""));
+        return { closed: false, close() {} };
+      };
+    });
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            {
+              id: 6421,
+              company_name: "QA Visited Company",
+              position_name: "Visited Result Engineer",
+              job_posting_url: postingUrl,
+              location: "Remote",
+              posting_date: "2026-05-28",
+              last_seen_epoch: 1779974400,
+              ats: "greenhouse"
+            }
+          ],
+          count: 1,
+          visible_ats_count: 1,
+          visible_company_count: 1,
+          count_exact: true,
+          has_more: false,
+          next_offset: null
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("visited result");
+    await page.getByTestId("search-input").press("Enter");
+    const targetCard = page.getByTestId("posting-card").filter({ hasText: "QA Visited Company" }).first();
+    await expect(targetCard).toBeVisible({ timeout: 15_000 });
+
+    await targetCard.getByTestId("posting-card-open").click();
+
+    await expect.poll(() => page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      const items = raw ? JSON.parse(raw) : [];
+      return items.includes("https://jobs.example.test/visited-posting");
+    }, VISITED_POSTING_URLS_STORAGE_KEY)).toBe(true);
+    await expect.poll(() => targetCard.getByTestId("posting-card-title").evaluate((node) => {
+      return window.getComputedStyle(node).color;
+    })).toBe(VISITED_POSTING_COLOR_RGB);
   });
 
   test("loads branded search-first page without raw backend errors", async ({ page }) => {
