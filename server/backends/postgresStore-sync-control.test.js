@@ -526,9 +526,111 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     assert.match(searchBody.filter, /posting_date IS NOT EMPTY/);
     assert.equal(searchBody.q, "engineer");
     assert.equal(searchBody.matchingStrategy, "all");
+    assert.deepEqual(searchBody.facets, ["ats_key"]);
+    assert.deepEqual(searchBody.attributesToRetrieve, ["canonical_url"]);
     assert.equal(result.items.length, 1);
-    assert.equal(result.count, 1);
+    assert.equal(result.count, 2);
+    assert.equal(result.count_exact, false);
     assert.equal(result.items[0].job_posting_url, "https://example.com/visible");
+  } finally {
+    global.fetch = previousFetch;
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
+async function testMeiliPostgresPathUsesMeiliAggregatesWithoutPostgresCount() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousFetch = global.fetch;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  let searchBody = null;
+  const postgresAggregateCalls = [];
+
+  global.fetch = async (_url, options = {}) => {
+    searchBody = JSON.parse(String(options.body || "{}"));
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          hits: [
+            { canonical_url: "https://example.com/product-1" },
+            { canonical_url: "https://example.com/product-2" }
+          ],
+          estimatedTotalHits: 37,
+          facetDistribution: {
+            ats_key: {
+              greenhouse: 31,
+              lever: 6
+            }
+          }
+        };
+      }
+    };
+  };
+
+  const pool = {
+    async query(sql) {
+      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql) || isSourceFacetQuery(sql)) {
+        postgresAggregateCalls.push(sql);
+        throw new Error("unexpected expensive Postgres aggregate during Meili search path");
+      }
+      if (/p\.canonical_url = ANY\(\$1\)/i.test(sql)) {
+        return {
+          rows: [
+            {
+              canonical_url: "https://example.com/product-1",
+              company_name: "Product Co",
+              position_name: "Product Manager",
+              location_text: "Remote",
+              country: "United States",
+              region: "North America",
+              remote_type: "remote",
+              ats_key: "greenhouse",
+              last_seen_epoch: 200
+            },
+            {
+              canonical_url: "https://example.com/product-2",
+              company_name: "Platform Co",
+              position_name: "Senior Product Manager",
+              location_text: "Berlin, Germany",
+              country: "Germany",
+              region: "Europe",
+              remote_type: "hybrid",
+              ats_key: "lever",
+              last_seen_epoch: 100
+            }
+          ]
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "product manager jobs",
+      limit: 2,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    assert.deepEqual(searchBody.facets, ["ats_key"]);
+    assert.equal(postgresAggregateCalls.length, 0);
+    assert.equal(result.count, 37);
+    assert.equal(result.count_exact, false);
+    assert.deepEqual(result.source_facets.map((facet) => [facet.value, facet.count]), [
+      ["greenhouse", 31],
+      ["lever", 6]
+    ]);
+    assert.deepEqual(result.items.map((item) => item.job_posting_url), [
+      "https://example.com/product-1",
+      "https://example.com/product-2"
+    ]);
   } finally {
     global.fetch = previousFetch;
     if (previousSearchBackend === undefined) {
@@ -1762,6 +1864,7 @@ async function main() {
   await testIngestionSourcesReportDueAndFailurePressure();
   await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
+  await testMeiliPostgresPathUsesMeiliAggregatesWithoutPostgresCount();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchReturnsFastZero();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();

@@ -615,6 +615,26 @@ function sanitizePostgresSourceFacetItem(row = {}) {
   };
 }
 
+function getMeiliEstimatedTotalHits(searchResult = {}, fallbackCount = 0) {
+  const rawEstimated = searchResult?.estimatedTotalHits ?? searchResult?.totalHits ?? searchResult?.count;
+  const estimated = Number(rawEstimated);
+  return Math.max(0, Number.isFinite(estimated) ? estimated : 0, Number(fallbackCount || 0));
+}
+
+function getMeiliFacetDistribution(searchResult = {}, field) {
+  const distribution = searchResult?.facetDistribution || searchResult?.facetsDistribution || {};
+  const values = distribution?.[field];
+  return values && typeof values === "object" && !Array.isArray(values) ? values : {};
+}
+
+function buildMeiliSourceFacets(searchResult = {}, limit = PUBLIC_SOURCE_FACET_LIMIT) {
+  return Object.entries(getMeiliFacetDistribution(searchResult, "ats_key"))
+    .map(([value, count]) => sanitizePostgresSourceFacetItem({ value, count }))
+    .filter((facet) => facet.count > 0)
+    .sort((left, right) => right.count - left.count || left.value.localeCompare(right.value))
+    .slice(0, limit);
+}
+
 async function getPostgresSourceFacets(pool, options = {}, limit = PUBLIC_SOURCE_FACET_LIMIT) {
   const filter = buildFilterSql(options, 1);
   const freshCutoffIndex = filter.nextIndex;
@@ -718,11 +738,19 @@ async function listPostgresPostings(pool, options = {}) {
 
   if (useMeili) {
     try {
-      const searchLimit = Math.min(2000, offset + Math.max(limit * 3, limit + 100));
-      const normalizedOptions = { ...options, sort_by: sortBy, limit: searchLimit, offset: 0 };
+      const searchLimit = Math.min(2000, offset + Math.max(limit * 2, limit + 40));
+      const normalizedOptions = {
+        ...options,
+        sort_by: sortBy,
+        limit: searchLimit,
+        offset: 0,
+        facets: ["ats_key"],
+        attributesToRetrieve: ["canonical_url"]
+      };
       const searchResult = await searchMeiliPostings(normalizedOptions, meiliConfig);
       const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
-      if (urls.length === 0 && Number(searchResult.estimatedTotalHits || 0) === 0) {
+      const estimatedTotalHits = getMeiliEstimatedTotalHits(searchResult, urls.length);
+      if (urls.length === 0 && estimatedTotalHits === 0) {
         return {
           items: [],
           count: 0,
@@ -747,7 +775,6 @@ async function listPostgresPostings(pool, options = {}) {
       }
       const hydratedItems = await hydratePostgresPostings(pool, urls, options);
       const items = hydratedItems.slice(offset, offset + limit);
-      const estimatedTotalHits = Number(searchResult.estimatedTotalHits || 0);
       const loadedThrough = offset + items.length;
       const hydrationDroppedHits = hydratedItems.length < urls.length;
       const pageUnderfilled = items.length < limit && estimatedTotalHits > loadedThrough;
@@ -773,14 +800,11 @@ async function listPostgresPostings(pool, options = {}) {
         });
         return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
       }
-      const [count, sourceFacets] = await Promise.all([
-        countPostgresPostingsSql(pool, { ...options, sort_by: sortBy }),
-        getPostgresSourceFacets(pool, { ...options, sort_by: sortBy })
-      ]);
+      const sourceFacets = buildMeiliSourceFacets(searchResult);
       return {
         items: items.slice(0, limit),
-        count,
-        count_exact: true,
+        count: Math.max(estimatedTotalHits, loadedThrough),
+        count_exact: false,
         page_capped: page.limit_capped || page.offset_capped,
         source_facets: sourceFacets,
         limit,

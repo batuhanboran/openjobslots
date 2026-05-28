@@ -1130,7 +1130,7 @@ test.describe("postings page QA", () => {
         version: `Public v${APP_VERSION}`,
         credit: "Deployed and developed by",
         updating: "Updating visible results...",
-        suggestionHint: "Search",
+        suggestionHint: "Title",
         slots: "job slots",
         companies: "companies",
         releaseTitle: "Release notes",
@@ -1146,7 +1146,7 @@ test.describe("postings page QA", () => {
         version: `Genel v${APP_VERSION}`,
         credit: "Yayına alan ve geliştiren",
         updating: "Görünen sonuçlar güncelleniyor...",
-        suggestionHint: "Arama",
+        suggestionHint: "Ünvan",
         slots: "iş ilanı",
         companies: "şirket",
         releaseTitle: "Sürüm notları",
@@ -1162,7 +1162,7 @@ test.describe("postings page QA", () => {
         version: `Öffentlich v${APP_VERSION}`,
         credit: "Bereitgestellt und entwickelt von",
         updating: "Sichtbare Ergebnisse werden aktualisiert...",
-        suggestionHint: "Suche",
+        suggestionHint: "Titel",
         slots: "Jobslots",
         companies: "Unternehmen",
         releaseTitle: "Versionshinweise",
@@ -1178,7 +1178,7 @@ test.describe("postings page QA", () => {
         version: `Public v${APP_VERSION}`,
         credit: "Déployé et développé par",
         updating: "Mise à jour des résultats visibles...",
-        suggestionHint: "Recherche",
+        suggestionHint: "Titre",
         slots: "offres",
         companies: "entreprises",
         releaseTitle: "Notes de version",
@@ -1194,7 +1194,7 @@ test.describe("postings page QA", () => {
         version: `Público v${APP_VERSION}`,
         credit: "Desplegado y desarrollado por",
         updating: "Actualizando resultados visibles...",
-        suggestionHint: "Búsqueda",
+        suggestionHint: "Título",
         slots: "puestos",
         companies: "empresas",
         releaseTitle: "Notas de la versión",
@@ -1204,6 +1204,17 @@ test.describe("postings page QA", () => {
         releaseSummary: /Añade recuentos exactos de puestos, cobertura ATS y de empresas/i
       }
     };
+
+    await page.route("**/search/suggest**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [{ type: "title", value: "Product Manager", label: "Product Manager", count: 5 }],
+          count: 1
+        })
+      });
+    });
 
     for (const [languageCode, expected] of Object.entries(localizedExpectations)) {
       await page.goto("/");
@@ -1906,6 +1917,22 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
     await expectNoRawErrors(page);
     await expectNoProtectedPublicRouteCalls(protectedCalls, "autocomplete intent");
+  });
+
+  test("autocomplete does not echo an unmatched raw query as a Search suggestion", async ({ page }) => {
+    await page.route("**/search/suggest**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: [], count: 0 })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("zzzxqv nohit");
+
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await expect(page.getByText("zzzxqv nohit")).toHaveCount(0);
   });
 
   test("keyboard shortcuts and brand home keep search fast", async ({ page }) => {

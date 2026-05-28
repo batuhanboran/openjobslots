@@ -2152,6 +2152,11 @@ function mergeSearchSuggestions(...groups) {
   groups.flat().forEach((item) => {
     const normalized = normalizeSearchSuggestionItem(item);
     if (!normalized) return;
+    const normalizedType = String(normalized.type || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    if (normalizedType === "search") return;
     const key = `${normalized.type}:${normalizeSuggestionQuery(normalized.value)}`;
     if (seen.has(key)) return;
     seen.add(key);
@@ -2333,7 +2338,7 @@ function buildLocalSearchSuggestions(query, limit = 5, context = {}) {
   if (scored.length > 0 || intentItems.length > 0) {
     return mergeSearchSuggestions(intentItems, scored).slice(0, limit);
   }
-  return [{ type: "search", value: query.trim(), label: query.trim(), count: 1 }];
+  return [];
 }
 
 function normalizeAtsValue(value) {

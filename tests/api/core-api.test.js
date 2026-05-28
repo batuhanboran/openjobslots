@@ -57,8 +57,9 @@ test.describe("openjobslots API compatibility", () => {
     expect(sitemap.headers()["cache-control"]).toContain("s-maxage=3600");
     const sitemapText = await sitemap.text();
     expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/</loc>");
-    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/?q=frontend%20engineer</loc>");
-    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/?q=greenhouse%20jobs</loc>");
+    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/en/software-engineer-jobs</loc>");
+    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/tr/uzaktan-calisma-ilanlari</loc>");
+    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/ats/greenhouse-jobs</loc>");
     expect(sitemapText).not.toMatch(/private@example\.com|%40|\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
   });
 

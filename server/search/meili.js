@@ -344,6 +344,18 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
     matchingStrategy: "all",
     ...(sort ? { sort } : {})
   };
+  const facets = (Array.isArray(options.facets) ? options.facets : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+  if (facets.length > 0) {
+    payload.facets = facets;
+  }
+  const attributesToRetrieve = (Array.isArray(options.attributesToRetrieve) ? options.attributesToRetrieve : Array.isArray(options.attributes_to_retrieve) ? options.attributes_to_retrieve : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+  if (attributesToRetrieve.length > 0) {
+    payload.attributesToRetrieve = attributesToRetrieve;
+  }
 
   const result = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/search`, {
     method: "POST",
