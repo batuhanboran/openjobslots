@@ -1066,6 +1066,140 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("public localization covers home, results, suggestions, footer, and release notes in every language", async ({ page }) => {
+    test.setTimeout(120_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width < 768, "desktop release notes localization is covered by the desktop project");
+
+    const localizedExpectations = {
+      en: {
+        code: "EN",
+        hero: "Search open job slots",
+        lead: "Find fresh openings across public ATS job boards.",
+        version: `Public v${APP_VERSION}`,
+        credit: "Deployed and developed by",
+        updating: "Updating visible results...",
+        suggestionHint: "Search",
+        slots: "job slots",
+        companies: "companies",
+        releaseTitle: "Release notes",
+        releaseClose: "Close",
+        releaseVersion: "Version 2.0.0",
+        releaseHeading: "Coverage, ATS ingestion, and search parity",
+        releaseSummary: /Adds exact job-slot counts, ATS and company coverage/i
+      },
+      tr: {
+        code: "TR",
+        hero: "Açık iş ilanlarını ara",
+        lead: "Herkese açık ATS iş panolarındaki güncel ilanları bul.",
+        version: `Genel v${APP_VERSION}`,
+        credit: "Yayına alan ve geliştiren",
+        updating: "Görünen sonuçlar güncelleniyor...",
+        suggestionHint: "Arama",
+        slots: "iş ilanı",
+        companies: "şirket",
+        releaseTitle: "Sürüm notları",
+        releaseClose: "Kapat",
+        releaseVersion: "Sürüm 2.0.0",
+        releaseHeading: "Kapsam, ATS alımı ve arama eşitliği",
+        releaseSummary: /Net iş ilanı sayılarını, arama başlığında ATS/i
+      },
+      de: {
+        code: "DE",
+        hero: "Offene Jobslots suchen",
+        lead: "Finde aktuelle Stellen auf öffentlichen ATS-Jobbörsen.",
+        version: `Öffentlich v${APP_VERSION}`,
+        credit: "Bereitgestellt und entwickelt von",
+        updating: "Sichtbare Ergebnisse werden aktualisiert...",
+        suggestionHint: "Suche",
+        slots: "Jobslots",
+        companies: "Unternehmen",
+        releaseTitle: "Versionshinweise",
+        releaseClose: "Schließen",
+        releaseVersion: "Version 2.0.0",
+        releaseHeading: "Abdeckung, ATS-Erfassung und Suchparität",
+        releaseSummary: /Fügt genaue Jobslot-Zahlen, ATS- und Unternehmensabdeckung/i
+      },
+      fr: {
+        code: "FR",
+        hero: "Rechercher des postes ouverts",
+        lead: "Trouvez des offres récentes sur les jobboards ATS publics.",
+        version: `Public v${APP_VERSION}`,
+        credit: "Déployé et développé par",
+        updating: "Mise à jour des résultats visibles...",
+        suggestionHint: "Recherche",
+        slots: "offres",
+        companies: "entreprises",
+        releaseTitle: "Notes de version",
+        releaseClose: "Fermer",
+        releaseVersion: "Version 2.0.0",
+        releaseHeading: "Couverture, ingestion ATS et parité de recherche",
+        releaseSummary: /Ajoute des comptes exacts d'offres, la couverture ATS et entreprises/i
+      },
+      es: {
+        code: "ES",
+        hero: "Buscar puestos abiertos",
+        lead: "Encuentra ofertas recientes en bolsas ATS públicas.",
+        version: `Público v${APP_VERSION}`,
+        credit: "Desplegado y desarrollado por",
+        updating: "Actualizando resultados visibles...",
+        suggestionHint: "Búsqueda",
+        slots: "puestos",
+        companies: "empresas",
+        releaseTitle: "Notas de la versión",
+        releaseClose: "Cerrar",
+        releaseVersion: "Versión 2.0.0",
+        releaseHeading: "Cobertura, ingesta ATS y paridad de búsqueda",
+        releaseSummary: /Añade recuentos exactos de puestos, cobertura ATS y de empresas/i
+      }
+    };
+
+    for (const [languageCode, expected] of Object.entries(localizedExpectations)) {
+      await page.goto("/");
+      await expect(page.getByTestId("app-logo")).toContainText("openjobslots");
+      if (languageCode !== "en") {
+        await page.getByTestId("language-selector").click();
+        await page.getByTestId(`language-option-${languageCode}`).click();
+      }
+      await expect(page.getByTestId("language-selector")).toContainText(expected.code);
+      await expect(page.getByText(expected.hero)).toBeVisible();
+      await expect(page.getByText(expected.lead)).toBeVisible();
+      await expect(page.getByTestId("public-version-label")).toHaveText(expected.version);
+      await expect(page.getByTestId("search-credit-text")).toContainText(expected.credit);
+
+      await page.getByTestId("public-version-button").click();
+      await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+      await expect(page.getByTestId("release-notes-title")).toHaveText(expected.releaseTitle);
+      await expect(page.getByTestId("release-notes-close")).toContainText(expected.releaseClose);
+      await expect(page.getByText(expected.releaseVersion)).toBeVisible();
+      await expect(page.getByText(expected.releaseHeading)).toBeVisible();
+      await expect(page.getByText(expected.releaseSummary)).toBeVisible();
+      await page.getByTestId("release-notes-close").click();
+      await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+
+      await page.getByTestId("search-input").fill("Product manager");
+      await expect(page.getByTestId("search-suggestions-panel")).toBeVisible();
+      await expect(page.getByTestId("search-suggestion-0")).toContainText(expected.suggestionHint);
+
+      await page.route("**/postings?**", async (route) => {
+        await page.waitForTimeout(500);
+        await route.continue();
+      }, { times: 1 });
+      await page.getByTestId("search-input").press("Enter");
+      await expect(page.getByTestId("postings-refresh-indicator")).toContainText(expected.updating);
+      await expect(page.getByTestId("result-count")).toContainText(expected.slots, { timeout: 15_000 });
+      await expect(page.getByTestId("public-stat-companies")).toContainText(expected.companies);
+
+      if (languageCode !== "en") {
+        const visibleText = await page.locator("body").innerText();
+        expect(visibleText, `${languageCode} should not show the English hero`).not.toContain("Search open job slots");
+        expect(visibleText, `${languageCode} should not show the English footer credit`).not.toContain("Deployed and developed by");
+        expect(visibleText, `${languageCode} should not show the English release title`).not.toContain("Release notes");
+        expect(visibleText, `${languageCode} should not show the English updating indicator`).not.toContain("Updating visible results...");
+      }
+    }
+  });
+
   test("dark mode paints the top viewport strip with the public dark background", async ({ page }) => {
     await openJobSlots(page);
     await enableDarkMode(page);

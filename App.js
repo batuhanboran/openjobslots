@@ -279,10 +279,18 @@ const PUBLIC_LANGUAGE_OPTIONS = [
   }
 ];
 const PUBLIC_LANGUAGE_BY_CODE = new Map(PUBLIC_LANGUAGE_OPTIONS.map((language) => [language.code, language]));
+const PUBLIC_LOCALE_BY_LANGUAGE_CODE = {
+  en: "en-US",
+  tr: "tr-TR",
+  de: "de-DE",
+  fr: "fr-FR",
+  es: "es-ES"
+};
 const PUBLIC_MESSAGES = {
   en: {
     "results.eyebrow": "Public search",
     "results.title": "Open roles",
+    "search.heroTitle": "Search open job slots",
     "search.lead": "Find fresh openings across public ATS job boards.",
     "search.label": "Search openings",
     "search.placeholder": "Search title, company, location, or country",
@@ -359,6 +367,26 @@ const PUBLIC_MESSAGES = {
     "language.label": "Language",
     "version.label": "Public v{version}",
     "credit.deployed": "Deployed and developed by",
+    "release.title": "Release notes",
+    "release.close": "Close",
+    "release.closeA11y": "Close release notes",
+    "release.historyLabel": "Release notes history",
+    "release.openA11y": "Open release notes for version {version}",
+    "release.versionLabel": "Version {version}",
+    "release.genericTitle": "Public search update",
+    "release.genericSummary": "This release improved public search, data quality, coverage, and production reliability.",
+    "stats.jobSlots": "job slots",
+    "stats.ats": "ATS",
+    "stats.companies": "companies",
+    "suggestion.search": "Search",
+    "suggestion.title": "Title",
+    "suggestion.company": "Company",
+    "suggestion.location": "Location",
+    "suggestion.country": "Country",
+    "suggestion.region": "Region",
+    "suggestion.industry": "Industry",
+    "suggestion.recent": "Recent",
+    "suggestion.ats": "ATS",
     "dropdown.search": "Search {label}",
     "dropdown.empty": "{label} are not indexed yet. Worldwide search is still active.",
     "dropdown.noMatch": "No {label} match \"{search}\".",
@@ -387,7 +415,8 @@ const PUBLIC_MESSAGES = {
   tr: {
     "results.eyebrow": "Genel arama",
     "results.title": "Açık roller",
-    "search.lead": "Public ATS iş panolarında taze ilanları bul.",
+    "search.heroTitle": "Açık iş ilanlarını ara",
+    "search.lead": "Herkese açık ATS iş panolarındaki güncel ilanları bul.",
     "search.label": "İlan ara",
     "search.placeholder": "Ünvan, şirket, konum veya ülke ara",
     "search.examplePrefix": "Orn.",
@@ -412,6 +441,18 @@ const PUBLIC_MESSAGES = {
     "filters.states.any": "Tüm eyaletler",
     "filters.counties": "İlçeler",
     "filters.counties.any": "Tüm ilçeler",
+    "filters.industries.empty": "Uygun sektör yok.",
+    "filters.industries.helper": "İsteğe bağlı. Tüm indekslenmiş sektörlerde aramak için boş bırak.",
+    "filters.regions.empty": "Dünya geneli arama aktif. Bölge metadatası henüz indekslenmedi.",
+    "filters.regions.helper": "Geniş başla, gerekiyorsa ülkeye daralt.",
+    "filters.countries.emptyRegion": "Seçilen bölgeyle eşleşen ülke yok. Dünya geneli aramak için Bölgeleri temizle.",
+    "filters.countries.empty": "Eşleşen ülke yok. Dünya geneli arama aktif kalır.",
+    "filters.countries.helperRegion": "Ülkeler seçilen bölgeye göre sınırlı.",
+    "filters.countries.helper": "Tüm ülkeleri dahil etmek için boş bırak.",
+    "filters.states.empty": "Seçilen ülkeler için eyalet veya bölge indekslenmedi.",
+    "filters.states.helper": "Ülke seçildikten sonra görünür. Tüm eyalet/bölgeleri dahil etmek için boş bırak.",
+    "filters.counties.empty": "Seçilen eyaletlerle eşleşen ilçe yok.",
+    "filters.counties.helper": "İlçe metadatası olan kaynaklarda eyalet seçiminden sonra görünür.",
     "filters.countryHint": "Eyalet veya bölge kırılımı için önce ülke seç.",
     "filters.stateHint": "Varsa ilçe kırılımı için eyalet/bölge seç.",
     "freshness.label": "Güncellik",
@@ -450,7 +491,27 @@ const PUBLIC_MESSAGES = {
     "theme.night": "Gece",
     "language.label": "Dil",
     "version.label": "Genel v{version}",
-    "credit.deployed": "Yayina alan ve gelistiren",
+    "credit.deployed": "Yayına alan ve geliştiren",
+    "release.title": "Sürüm notları",
+    "release.close": "Kapat",
+    "release.closeA11y": "Sürüm notlarını kapat",
+    "release.historyLabel": "Sürüm notları geçmişi",
+    "release.openA11y": "{version} sürümü için sürüm notlarını aç",
+    "release.versionLabel": "Sürüm {version}",
+    "release.genericTitle": "Genel arama güncellemesi",
+    "release.genericSummary": "Bu sürüm genel arama deneyimini, veri kalitesini, kapsamı ve üretim güvenilirliğini iyileştirdi.",
+    "stats.jobSlots": "iş ilanı",
+    "stats.ats": "ATS",
+    "stats.companies": "şirket",
+    "suggestion.search": "Arama",
+    "suggestion.title": "Ünvan",
+    "suggestion.company": "Şirket",
+    "suggestion.location": "Konum",
+    "suggestion.country": "Ülke",
+    "suggestion.region": "Bölge",
+    "suggestion.industry": "Sektör",
+    "suggestion.recent": "Son arama",
+    "suggestion.ats": "ATS",
     "dropdown.search": "{label} ara",
     "dropdown.empty": "{label} henuz indekslenmedi. Global arama aktif kalir.",
     "dropdown.noMatch": "\"{search}\" icin {label} eslesmesi yok.",
@@ -470,16 +531,17 @@ const PUBLIC_MESSAGES = {
     "empty.searchAllLocations": "Tum konumlarda ara",
     "empty.allWorkModes": "Tum calisma modlari",
     "empty.clearFilters": "Filtreleri temizle",
-    "results.updating": "Gorunen sonuclar guncelleniyor...",
+    "results.updating": "Görünen sonuçlar güncelleniyor...",
     "results.showingOf": "{visible} / {total} ilan gosteriliyor",
     "results.loadingMore": "Daha fazla ilan yukleniyor...",
     "results.scrollMore": "Daha fazlasi icin kaydir",
     "results.allLoaded": "Gorunen tum ilanlar yuklendi"
   },
   de: {
-    "results.eyebrow": "Oeffentliche Suche",
+    "results.eyebrow": "Öffentliche Suche",
     "results.title": "Offene Rollen",
-    "search.lead": "Finde frische Stellen auf oeffentlichen ATS-Jobboards.",
+    "search.heroTitle": "Offene Jobslots suchen",
+    "search.lead": "Finde aktuelle Stellen auf öffentlichen ATS-Jobbörsen.",
     "search.label": "Stellen suchen",
     "search.placeholder": "Titel, Firma, Ort oder Land suchen",
     "search.examplePrefix": "Beispiel",
@@ -498,15 +560,27 @@ const PUBLIC_MESSAGES = {
     "filters.industries.any": "Alle Branchen",
     "filters.regions": "Regionen",
     "filters.regions.any": "Weltweit",
-    "filters.countries": "Laender",
-    "filters.countries.any": "Alle Laender",
-    "filters.states": "Bundeslaender",
-    "filters.states.any": "Alle Bundeslaender",
+    "filters.countries": "Länder",
+    "filters.countries.any": "Alle Länder",
+    "filters.states": "Bundesländer",
+    "filters.states.any": "Alle Bundesländer",
     "filters.counties": "Kreise",
     "filters.counties.any": "Alle Kreise",
-    "filters.countryHint": "Waehle ein Land, um nach Bundesland oder Region zu filtern.",
-    "filters.stateHint": "Waehle eine Region, um vorhandene Kreis-Daten zu nutzen.",
-    "freshness.label": "Aktualitaet",
+    "filters.industries.empty": "Keine Branchen verfügbar.",
+    "filters.industries.helper": "Optional. Leer lassen, um alle indizierten Branchen zu durchsuchen.",
+    "filters.regions.empty": "Die weltweite Suche ist aktiv. Regionsdaten sind noch nicht indiziert.",
+    "filters.regions.helper": "Breit nach Kontinent starten und bei Bedarf auf Länder eingrenzen.",
+    "filters.countries.emptyRegion": "Keine Länder passen zur ausgewählten Region. Regionen löschen, um weltweit zu suchen.",
+    "filters.countries.empty": "Keine Länder passen. Die weltweite Suche bleibt aktiv.",
+    "filters.countries.helperRegion": "Länder sind durch die ausgewählte Region begrenzt.",
+    "filters.countries.helper": "Leer lassen, um jedes Land einzubeziehen.",
+    "filters.states.empty": "Für die ausgewählten Länder sind keine Staaten oder Provinzen indiziert.",
+    "filters.states.helper": "Wird nach der Länderauswahl angezeigt. Leer lassen, um alle Staaten/Provinzen einzubeziehen.",
+    "filters.counties.empty": "Keine Kreise passen zu den ausgewählten Staaten.",
+    "filters.counties.helper": "Wird nach der Staatsauswahl für Quellen mit Kreisdaten angezeigt.",
+    "filters.countryHint": "Wähle ein Land, um nach Bundesland oder Region zu filtern.",
+    "filters.stateHint": "Wähle eine Region, um vorhandene Kreis-Daten zu nutzen.",
+    "freshness.label": "Aktualität",
     "freshness.all": "Alle",
     "freshness.3": "3 Tage",
     "freshness.7": "7 Tage",
@@ -531,21 +605,68 @@ const PUBLIC_MESSAGES = {
     "results.slotIndexed": "Jobslot",
     "results.slotsIndexed": "Jobslots",
     "results.indexLoading": "Index wird geladen",
-    "initial.title": "Frische oeffentliche ATS-Stellen suchen.",
+    "initial.title": "Aktuelle öffentliche ATS-Stellen suchen.",
     "initial.copy": "Beginne mit Titel, Firma, Ort, Land oder Arbeitsmodus. Filter bleiben am Desktop neben den Ergebnissen fixiert.",
     "sort.relevance": "Relevanz",
     "sort.last_seen": "Frische Quelle",
-    "sort.posted_date": "Veroeffentlicht",
+    "sort.posted_date": "Veröffentlicht",
     "sort.ats_source": "ATS/Quelle",
     "sort.confidence": "Vertrauen",
     "theme.day": "Tag",
     "theme.night": "Nacht",
-    "language.label": "Sprache"
+    "language.label": "Sprache",
+    "version.label": "Öffentlich v{version}",
+    "credit.deployed": "Bereitgestellt und entwickelt von",
+    "release.title": "Versionshinweise",
+    "release.close": "Schließen",
+    "release.closeA11y": "Versionshinweise schließen",
+    "release.historyLabel": "Verlauf der Versionshinweise",
+    "release.openA11y": "Versionshinweise für Version {version} öffnen",
+    "release.versionLabel": "Version {version}",
+    "release.genericTitle": "Update der öffentlichen Suche",
+    "release.genericSummary": "Diese Version verbessert öffentliche Suche, Datenqualität, Abdeckung und Produktionszuverlässigkeit.",
+    "stats.jobSlots": "Jobslots",
+    "stats.ats": "ATS",
+    "stats.companies": "Unternehmen",
+    "suggestion.search": "Suche",
+    "suggestion.title": "Titel",
+    "suggestion.company": "Unternehmen",
+    "suggestion.location": "Standort",
+    "suggestion.country": "Land",
+    "suggestion.region": "Region",
+    "suggestion.industry": "Branche",
+    "suggestion.recent": "Zuletzt",
+    "suggestion.ats": "ATS",
+    "dropdown.search": "{label} suchen",
+    "dropdown.empty": "{label} sind noch nicht indiziert. Die weltweite Suche bleibt aktiv.",
+    "dropdown.noMatch": "Keine {label} passen zu \"{search}\".",
+    "dropdown.showing": "{visible} von {total} {label} angezeigt.",
+    "dropdown.clear": "{label} löschen",
+    "sources.result": "Ergebnis",
+    "sources.results": "Ergebnisse",
+    "sources.confidence": "Vertr.",
+    "sources.quality": "Qualität",
+    "sources.freshSeen": "{fresh}% frisch - gesehen {date}",
+    "sources.currentSet": "{fresh}% frisch - aktuelles Set",
+    "search.intentDetected": "Erkannte Absicht",
+    "posting.atsLabel": "ATS",
+    "posting.dateUnavailable": "Veröffentlichungsdatum nicht verfügbar",
+    "empty.noSlotsExact": "Keine Jobslots passen genau zu dieser Suche.",
+    "empty.tryDifferent": "Versuche einen anderen Titel, eine andere Quelle, einen anderen Standort oder ein anderes Aktualitätsfenster.",
+    "empty.searchAllLocations": "Alle Standorte durchsuchen",
+    "empty.allWorkModes": "Alle Arbeitsmodi",
+    "empty.clearFilters": "Filter löschen",
+    "results.updating": "Sichtbare Ergebnisse werden aktualisiert...",
+    "results.showingOf": "{visible} von {total} Jobslots angezeigt",
+    "results.loadingMore": "Weitere Jobslots werden geladen...",
+    "results.scrollMore": "Scrollen, um mehr zu laden",
+    "results.allLoaded": "Alle sichtbaren Jobslots geladen"
   },
   fr: {
     "results.eyebrow": "Recherche publique",
     "results.title": "Postes ouverts",
-    "search.lead": "Trouvez des offres recentes sur les ATS publics.",
+    "search.heroTitle": "Rechercher des postes ouverts",
+    "search.lead": "Trouvez des offres récentes sur les jobboards ATS publics.",
     "search.label": "Rechercher",
     "search.placeholder": "Titre, entreprise, lieu ou pays",
     "search.examplePrefix": "Essayez",
@@ -555,24 +676,36 @@ const PUBLIC_MESSAGES = {
     "filters.show": "Filtres",
     "filters.hide": "Masquer les filtres",
     "filters.global.title": "Recherche mondiale",
-    "filters.global.locationTitle": "Lieu precise",
+    "filters.global.locationTitle": "Lieu précisé",
     "filters.global.copy": "La recherche reste mondiale jusqu'au choix d'un lieu.",
-    "filters.global.locationCopy": "Les filtres region et pays sont actifs.",
+    "filters.global.locationCopy": "Les filtres région et pays sont actifs.",
     "filters.ats": "ATS",
     "filters.ats.any": "Tous les ATS",
     "filters.industries": "Secteurs",
     "filters.industries.any": "Tous les secteurs",
-    "filters.regions": "Regions",
+    "filters.regions": "Régions",
     "filters.regions.any": "Monde entier",
     "filters.countries": "Pays",
     "filters.countries.any": "Tous les pays",
-    "filters.states": "Etats/regions",
-    "filters.states.any": "Tous les etats",
-    "filters.counties": "Comtes",
-    "filters.counties.any": "Tous les comtes",
-    "filters.countryHint": "Choisissez un pays pour filtrer par etat ou region.",
-    "filters.stateHint": "Choisissez une region si des donnees locales existent.",
-    "freshness.label": "Fraicheur",
+    "filters.states": "États/régions",
+    "filters.states.any": "Tous les états",
+    "filters.counties": "Comtés",
+    "filters.counties.any": "Tous les comtés",
+    "filters.industries.empty": "Aucun secteur disponible.",
+    "filters.industries.helper": "Facultatif. Laissez vide pour rechercher tous les secteurs indexés.",
+    "filters.regions.empty": "La recherche mondiale est active. Les métadonnées de région ne sont pas encore indexées.",
+    "filters.regions.helper": "Commencez large par continent, puis affinez par pays si utile.",
+    "filters.countries.emptyRegion": "Aucun pays ne correspond à la région sélectionnée. Effacez les régions pour rechercher partout.",
+    "filters.countries.empty": "Aucun pays ne correspond. La recherche mondiale reste active.",
+    "filters.countries.helperRegion": "Les pays sont limités par la région sélectionnée.",
+    "filters.countries.helper": "Laissez vide pour inclure tous les pays.",
+    "filters.states.empty": "Aucun état ou province n'est indexé pour les pays sélectionnés.",
+    "filters.states.helper": "Affiché après le choix du pays. Laissez vide pour inclure tous les états/provinces.",
+    "filters.counties.empty": "Aucun comté ne correspond aux états sélectionnés.",
+    "filters.counties.helper": "Affiché après le choix d'un état pour les sources avec données de comté.",
+    "filters.countryHint": "Choisissez un pays pour filtrer par état ou région.",
+    "filters.stateHint": "Choisissez une région si des données locales existent.",
+    "freshness.label": "Fraîcheur",
     "freshness.all": "Toutes",
     "freshness.3": "3 jours",
     "freshness.7": "7 jours",
@@ -587,7 +720,7 @@ const PUBLIC_MESSAGES = {
     "remote.nonRemote": "Sur site / inconnu",
     "remote.nonRemoteShort": "Sur site",
     "remote.hideNoDate": "Masquer les offres sans date",
-    "sources.title": "Sources des resultats",
+    "sources.title": "Sources des résultats",
     "sources.empty": "Lancez une recherche pour voir les sources.",
     "results.search": "Rechercher",
     "results.toSeeSlots": "pour voir les slots",
@@ -597,64 +730,123 @@ const PUBLIC_MESSAGES = {
     "results.slotIndexed": "offre",
     "results.slotsIndexed": "offres",
     "results.indexLoading": "Index en chargement",
-    "initial.title": "Rechercher des offres ATS publiques recentes.",
+    "initial.title": "Rechercher des offres ATS publiques récentes.",
     "initial.copy": "Commencez par un titre, une entreprise, un lieu, un pays ou un mode de travail. Les filtres restent fixes sur desktop.",
     "sort.relevance": "Pertinence",
-    "sort.last_seen": "Source recente",
+    "sort.last_seen": "Source récente",
     "sort.posted_date": "Date de publication",
     "sort.ats_source": "ATS/source",
     "sort.confidence": "Confiance",
     "theme.day": "Jour",
     "theme.night": "Nuit",
-    "language.label": "Langue"
+    "language.label": "Langue",
+    "version.label": "Public v{version}",
+    "credit.deployed": "Déployé et développé par",
+    "release.title": "Notes de version",
+    "release.close": "Fermer",
+    "release.closeA11y": "Fermer les notes de version",
+    "release.historyLabel": "Historique des notes de version",
+    "release.openA11y": "Ouvrir les notes de version {version}",
+    "release.versionLabel": "Version {version}",
+    "release.genericTitle": "Mise à jour de la recherche publique",
+    "release.genericSummary": "Cette version améliore la recherche publique, la qualité des données, la couverture et la fiabilité en production.",
+    "stats.jobSlots": "offres",
+    "stats.ats": "ATS",
+    "stats.companies": "entreprises",
+    "suggestion.search": "Recherche",
+    "suggestion.title": "Titre",
+    "suggestion.company": "Entreprise",
+    "suggestion.location": "Lieu",
+    "suggestion.country": "Pays",
+    "suggestion.region": "Région",
+    "suggestion.industry": "Secteur",
+    "suggestion.recent": "Récent",
+    "suggestion.ats": "ATS",
+    "dropdown.search": "Rechercher {label}",
+    "dropdown.empty": "{label} ne sont pas encore indexés. La recherche mondiale reste active.",
+    "dropdown.noMatch": "Aucun {label} ne correspond à \"{search}\".",
+    "dropdown.showing": "{visible} sur {total} {label} affichés.",
+    "dropdown.clear": "Effacer {label}",
+    "sources.result": "résultat",
+    "sources.results": "résultats",
+    "sources.confidence": "Conf.",
+    "sources.quality": "Qualité",
+    "sources.freshSeen": "{fresh}% frais - vu le {date}",
+    "sources.currentSet": "{fresh}% frais - jeu actuel",
+    "search.intentDetected": "Intention détectée",
+    "posting.atsLabel": "ATS",
+    "posting.dateUnavailable": "Date de publication indisponible",
+    "empty.noSlotsExact": "Aucune offre ne correspond exactement à cette recherche.",
+    "empty.tryDifferent": "Essayez un autre titre, une autre source, un autre lieu ou une autre période de fraîcheur.",
+    "empty.searchAllLocations": "Rechercher tous les lieux",
+    "empty.allWorkModes": "Tous les modes de travail",
+    "empty.clearFilters": "Effacer les filtres",
+    "results.updating": "Mise à jour des résultats visibles...",
+    "results.showingOf": "{visible} offres sur {total} affichées",
+    "results.loadingMore": "Chargement de plus d'offres...",
+    "results.scrollMore": "Faites défiler pour charger plus",
+    "results.allLoaded": "Toutes les offres visibles sont chargées"
   },
   es: {
-    "results.eyebrow": "Busqueda publica",
+    "results.eyebrow": "Búsqueda pública",
     "results.title": "Roles abiertos",
-    "search.lead": "Encuentra ofertas recientes en ATS publicos.",
+    "search.heroTitle": "Buscar puestos abiertos",
+    "search.lead": "Encuentra ofertas recientes en bolsas ATS públicas.",
     "search.label": "Buscar empleos",
-    "search.placeholder": "Titulo, empresa, ubicacion o pais",
+    "search.placeholder": "Título, empresa, ubicación o país",
     "search.examplePrefix": "Prueba",
     "search.shortcut": "Enter para buscar · Esc para limpiar",
     "search.clear": "Limpiar",
     "filters.loading": "Cargando filtros...",
     "filters.show": "Filtros",
     "filters.hide": "Ocultar filtros",
-    "filters.global.title": "Busqueda global",
-    "filters.global.locationTitle": "Ubicacion acotada",
-    "filters.global.copy": "La busqueda sigue global hasta elegir una ubicacion.",
-    "filters.global.locationCopy": "Los filtros de region y pais estan activos.",
+    "filters.global.title": "Búsqueda global",
+    "filters.global.locationTitle": "Ubicación acotada",
+    "filters.global.copy": "La búsqueda sigue global hasta elegir una ubicación.",
+    "filters.global.locationCopy": "Los filtros de región y país están activos.",
     "filters.ats": "ATS",
     "filters.ats.any": "Todos los ATS",
     "filters.industries": "Industrias",
     "filters.industries.any": "Cualquier industria",
     "filters.regions": "Regiones",
     "filters.regions.any": "Mundial",
-    "filters.countries": "Paises",
-    "filters.countries.any": "Todos los paises",
+    "filters.countries": "Países",
+    "filters.countries.any": "Todos los países",
     "filters.states": "Estados",
     "filters.states.any": "Todos los estados",
     "filters.counties": "Condados",
     "filters.counties.any": "Todos los condados",
-    "filters.countryHint": "Elige un pais para filtrar por estado o provincia.",
+    "filters.industries.empty": "No hay industrias disponibles.",
+    "filters.industries.helper": "Opcional. Déjalo vacío para buscar en todas las industrias indexadas.",
+    "filters.regions.empty": "La búsqueda mundial está activa. Los metadatos de región aún no están indexados.",
+    "filters.regions.helper": "Empieza amplio por continente y luego reduce a países cuando sirva.",
+    "filters.countries.emptyRegion": "Ningún país coincide con la región seleccionada. Limpia Regiones para buscar globalmente.",
+    "filters.countries.empty": "Ningún país coincide. La búsqueda mundial sigue activa.",
+    "filters.countries.helperRegion": "Los países se limitan por la región seleccionada.",
+    "filters.countries.helper": "Déjalo vacío para incluir todos los países.",
+    "filters.states.empty": "No hay estados o provincias indexados para los países seleccionados.",
+    "filters.states.helper": "Se muestra después de elegir país. Déjalo vacío para incluir todos los estados/provincias.",
+    "filters.counties.empty": "Ningún condado coincide con los estados seleccionados.",
+    "filters.counties.helper": "Se muestra después de elegir estado para fuentes con metadatos de condado.",
+    "filters.countryHint": "Elige un país para filtrar por estado o provincia.",
     "filters.stateHint": "Elige un estado/provincia cuando existan datos de condado.",
     "freshness.label": "Frescura",
     "freshness.all": "Todas",
-    "freshness.3": "3 dias",
-    "freshness.7": "7 dias",
-    "freshness.30": "30 dias",
+    "freshness.3": "3 días",
+    "freshness.7": "7 días",
+    "freshness.30": "30 días",
     "remote.label": "Modo de trabajo",
     "remote.all": "Todas las ubicaciones",
     "remote.allShort": "Todas",
     "remote.remote": "Solo remoto",
     "remote.remoteShort": "Remoto",
-    "remote.hybrid": "Solo hibrido",
-    "remote.hybridShort": "Hibrido",
+    "remote.hybrid": "Solo híbrido",
+    "remote.hybridShort": "Híbrido",
     "remote.nonRemote": "Presencial / desconocido",
     "remote.nonRemoteShort": "Presencial",
     "remote.hideNoDate": "Ocultar ofertas sin fecha",
     "sources.title": "Fuentes en resultados",
-    "sources.empty": "Haz una busqueda para ver las fuentes del resultado.",
+    "sources.empty": "Haz una búsqueda para ver las fuentes del resultado.",
     "results.search": "Buscar",
     "results.toSeeSlots": "para ver slots",
     "results.searchPrompt": "Buscar empleos",
@@ -662,17 +854,63 @@ const PUBLIC_MESSAGES = {
     "results.slots": "slots",
     "results.slotIndexed": "puesto",
     "results.slotsIndexed": "puestos",
-    "results.indexLoading": "Cargando indice",
-    "initial.title": "Busca ofertas ATS publicas recientes.",
-    "initial.copy": "Empieza con titulo, empresa, ubicacion, pais o modo de trabajo. Los filtros quedan fijos junto a los resultados en desktop.",
+    "results.indexLoading": "Cargando índice",
+    "initial.title": "Busca ofertas ATS públicas recientes.",
+    "initial.copy": "Empieza con título, empresa, ubicación, país o modo de trabajo. Los filtros quedan fijos junto a los resultados en desktop.",
     "sort.relevance": "Relevancia",
     "sort.last_seen": "Fuente fresca",
     "sort.posted_date": "Fecha publicada",
     "sort.ats_source": "ATS/fuente",
     "sort.confidence": "Confianza",
-    "theme.day": "Dia",
+    "theme.day": "Día",
     "theme.night": "Noche",
-    "language.label": "Idioma"
+    "language.label": "Idioma",
+    "version.label": "Público v{version}",
+    "credit.deployed": "Desplegado y desarrollado por",
+    "release.title": "Notas de la versión",
+    "release.close": "Cerrar",
+    "release.closeA11y": "Cerrar notas de la versión",
+    "release.historyLabel": "Historial de notas de la versión",
+    "release.openA11y": "Abrir notas de la versión {version}",
+    "release.versionLabel": "Versión {version}",
+    "release.genericTitle": "Actualización de búsqueda pública",
+    "release.genericSummary": "Esta versión mejora la búsqueda pública, la calidad de datos, la cobertura y la fiabilidad en producción.",
+    "stats.jobSlots": "puestos",
+    "stats.ats": "ATS",
+    "stats.companies": "empresas",
+    "suggestion.search": "Búsqueda",
+    "suggestion.title": "Título",
+    "suggestion.company": "Empresa",
+    "suggestion.location": "Ubicación",
+    "suggestion.country": "País",
+    "suggestion.region": "Región",
+    "suggestion.industry": "Industria",
+    "suggestion.recent": "Reciente",
+    "suggestion.ats": "ATS",
+    "dropdown.search": "Buscar {label}",
+    "dropdown.empty": "{label} aún no están indexados. La búsqueda mundial sigue activa.",
+    "dropdown.noMatch": "Ningún {label} coincide con \"{search}\".",
+    "dropdown.showing": "Mostrando {visible} de {total} {label}.",
+    "dropdown.clear": "Limpiar {label}",
+    "sources.result": "resultado",
+    "sources.results": "resultados",
+    "sources.confidence": "Conf.",
+    "sources.quality": "Calidad",
+    "sources.freshSeen": "{fresh}% fresco - visto {date}",
+    "sources.currentSet": "{fresh}% fresco - conjunto actual",
+    "search.intentDetected": "Intención detectada",
+    "posting.atsLabel": "ATS",
+    "posting.dateUnavailable": "Fecha de publicación no disponible",
+    "empty.noSlotsExact": "Ningún puesto coincide exactamente con esta búsqueda.",
+    "empty.tryDifferent": "Prueba otro título, fuente, ubicación o ventana de frescura.",
+    "empty.searchAllLocations": "Buscar en todas las ubicaciones",
+    "empty.allWorkModes": "Todos los modos de trabajo",
+    "empty.clearFilters": "Limpiar filtros",
+    "results.updating": "Actualizando resultados visibles...",
+    "results.showingOf": "Mostrando {visible} de {total} puestos",
+    "results.loadingMore": "Cargando más puestos...",
+    "results.scrollMore": "Desplázate para cargar más",
+    "results.allLoaded": "Todos los puestos visibles cargados"
   }
 };
 const PUBLIC_APP_VERSION = String(appMetadata?.expo?.version || packageMetadata?.version || "1.8.0");
@@ -932,6 +1170,136 @@ const PUBLIC_RELEASE_NOTES = [
       "Launched the openjobslots public job-search baseline with searchable postings, ATS coverage, filters, and live service deployment."
   }
 ];
+const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
+  tr: {
+    "2.0.0": {
+      title: "Kapsam, ATS alımı ve arama eşitliği",
+      summary:
+        "Net iş ilanı sayılarını, arama başlığında ATS ve şirket kapsamını, daha fazla kaynağa özel ATS alımını ve parser çalışmasını, kontrollü canary genişlemesini, daha yüksek worker verimini ve yenilenmiş arama indeksi eşitliğini ekler."
+    },
+    "1.9.3": {
+      title: "İndeks tazeliği ve genel sayı düzeni",
+      summary:
+        "Genel arama sayısını canlı indeksle uyumlu tuttu, sıralama geçişini iyileştirdi, worker tazelik bütçesini geri getirdi ve daha büyük, daha taze bir indeks için sonraki güvenli kaynak kalitesi yolunu belgeledi."
+    },
+    "1.9.2": {
+      title: "Genel arama bağımlılıklarını sağlamlaştırma",
+      summary:
+        "Genel arama güncellemesini canlı tuttu ve web build için sabitlenmiş geçişli override'larla deploy zamanı bağımlılık uyarılarını çözdü."
+    },
+    "1.9.1": {
+      title: "Genel arama deneyimi güncellemesi",
+      summary:
+        "Genel arama kabuğunu temizledi, openjobslots logosunu korudu, masaüstü için yapışkan arama paneli, mobil uyumlu filtreler, dinamik sonuç sayıları, 3 günlük güncellik filtresi, genişletilmiş sıralama kontrolleri, görünür niyet çipleri olan arama önerileri ve kompakt kaynak paneli ekledi."
+    },
+    "1.8.0": {
+      title: "Sertifikalı kaynak indeksleme sürümü",
+      summary:
+        "Kaynağa özel modüller, sertifikasyon çalışma alanı, API ve HTML parser dalgaları, eşik tabanlı indeksleme, sertifikalı genel veri seti yeniden oluşturma ve son Meili/Postgres eşitliği ile ATS fetch/parser/indeks döngüsünü kapattı."
+    },
+    "1.7.0": {
+      title: "Temiz parser kalite sürümü",
+      summary:
+        "Parser kalite kapısı, ATS sertifikasyon çalışma alanı, parser onarımları, kontrollü genel veri seti yeniden oluşturma, sürekli kaynak kalitesi koruması ve son Meili rebuild ile temiz parser/veri kalitesi döngüsünü kapattı."
+    }
+  },
+  de: {
+    "2.0.0": {
+      title: "Abdeckung, ATS-Erfassung und Suchparität",
+      summary:
+        "Fügt genaue Jobslot-Zahlen, ATS- und Unternehmensabdeckung im Suchkopf, mehr quellenspezifische ATS-Erfassung und Parser-Arbeit, kontrollierte Canary-Erweiterung, höheren Worker-Durchsatz und erneuerte Suchindex-Parität hinzu."
+    },
+    "1.9.3": {
+      title: "Indexfrische und öffentliche Zählungen",
+      summary:
+        "Hielt die öffentliche Suchzählung mit dem Live-Index synchron, verbesserte die Sortierbewegung, stellte das Frischebudget des Workers wieder her und dokumentierte den nächsten sicheren Weg zu einem größeren, frischeren Index."
+    },
+    "1.9.2": {
+      title: "Härtung der öffentlichen Suchabhängigkeiten",
+      summary:
+        "Hielt das öffentliche Suchupdate live und löste Deploy-Warnungen zu Abhängigkeiten mit festen transitiven Overrides für den Web-Build."
+    },
+    "1.9.1": {
+      title: "Update der öffentlichen Suche",
+      summary:
+        "Bereinigte die öffentliche Suchoberfläche, behielt das openjobslots-Logo, ergänzte ein fixiertes Desktop-Suchpanel, mobilfreundliche Filter, dynamische Ergebniszahlen, einen 3-Tage-Frischefilter, erweiterte Sortierung, Suchvorschläge mit sichtbaren Absicht-Chips und ein kompaktes Quellenpanel."
+    },
+    "1.8.0": {
+      title: "Release für zertifizierte Quellenindizes",
+      summary:
+        "Schloss den ATS-spezifischen Fetch-, Parser- und Indexzyklus mit Quellmodulen, Zertifizierungs-Workbench, API-/HTML-Parserwellen, Schwellenindexierung, zertifiziertem öffentlichen Datensatz und finaler Meili/Postgres-Parität ab."
+    },
+    "1.7.0": {
+      title: "Release für saubere Parser-Qualität",
+      summary:
+        "Schloss den Parser- und Datenqualitätszyklus mit Qualitäts-Gate, ATS-Workbench, Parser-Reparaturen, kontrolliertem öffentlichen Datensatz, kontinuierlichem Quellschutz und finalem Meili-Rebuild ab."
+    }
+  },
+  fr: {
+    "2.0.0": {
+      title: "Couverture, ingestion ATS et parité de recherche",
+      summary:
+        "Ajoute des comptes exacts d'offres, la couverture ATS et entreprises dans l'en-tête de recherche, davantage d'ingestion ATS et de travail parser par source, une extension canary contrôlée, un meilleur débit worker et une parité d'index de recherche rafraîchie."
+    },
+    "1.9.3": {
+      title: "Fraîcheur de l'index et comptes publics",
+      summary:
+        "A gardé le compteur public aligné avec l'index live, amélioré le mouvement du tri, restauré le budget de fraîcheur du worker et documenté le prochain chemin sûr vers un index plus large et plus frais."
+    },
+    "1.9.2": {
+      title: "Renforcement des dépendances de recherche publique",
+      summary:
+        "A gardé la mise à jour de recherche publique en ligne et résolu les avertissements de dépendances au déploiement avec des overrides transitifs épinglés pour le build web."
+    },
+    "1.9.1": {
+      title: "Mise à jour de l'expérience de recherche publique",
+      summary:
+        "A nettoyé l'interface de recherche publique, conservé le logo openjobslots, ajouté un panneau de recherche desktop collant, des filtres adaptés au mobile, des compteurs dynamiques, un filtre de fraîcheur 3 jours, des tris étendus, des suggestions avec intentions visibles et un panneau de sources compact."
+    },
+    "1.8.0": {
+      title: "Version d'indexation des sources certifiées",
+      summary:
+        "A clôturé le cycle ATS fetch/parser/index avec des modules par source, la couverture du banc de certification, des vagues parser API/HTML, l'indexation par seuil, la reconstruction du jeu public certifié et la parité finale Meili/Postgres."
+    },
+    "1.7.0": {
+      title: "Version qualité parser propre",
+      summary:
+        "A clôturé le cycle parser et qualité des données avec la porte qualité, le banc de certification ATS, des réparations parser, la reconstruction contrôlée du jeu public, la protection continue des sources et le rebuild final Meili."
+    }
+  },
+  es: {
+    "2.0.0": {
+      title: "Cobertura, ingesta ATS y paridad de búsqueda",
+      summary:
+        "Añade recuentos exactos de puestos, cobertura ATS y de empresas en el encabezado de búsqueda, más ingesta ATS y trabajo de parsers por fuente, expansión canary controlada, mayor rendimiento del worker y paridad renovada del índice de búsqueda."
+    },
+    "1.9.3": {
+      title: "Frescura del índice y recuentos públicos",
+      summary:
+        "Mantuvo el recuento público alineado con el índice live, mejoró el movimiento de ordenación, restauró el presupuesto de frescura del worker y documentó el siguiente camino seguro hacia un índice más grande y fresco."
+    },
+    "1.9.2": {
+      title: "Refuerzo de dependencias de búsqueda pública",
+      summary:
+        "Mantuvo activa la actualización de búsqueda pública y resolvió advertencias de dependencias en deploy con overrides transitivos fijados para el build web."
+    },
+    "1.9.1": {
+      title: "Actualización de la experiencia de búsqueda pública",
+      summary:
+        "Limpió la interfaz de búsqueda pública, mantuvo el logo openjobslots, agregó un panel de búsqueda fijo en desktop, filtros móviles, recuentos dinámicos, filtro de frescura de 3 días, ordenación ampliada, sugerencias con chips de intención visibles y un panel compacto de fuentes."
+    },
+    "1.8.0": {
+      title: "Versión de indexación de fuentes certificadas",
+      summary:
+        "Cerró el ciclo ATS de fetch/parser/índice con módulos por fuente, banco de certificación, oleadas de parser API/HTML, indexación por umbral, reconstrucción del dataset público certificado y paridad final Meili/Postgres."
+    },
+    "1.7.0": {
+      title: "Versión de calidad limpia de parsers",
+      summary:
+        "Cerró el ciclo de parser y calidad de datos con la puerta de calidad, el banco de certificación ATS, reparaciones de parsers, reconstrucción controlada del dataset público, protección continua de fuentes y rebuild final de Meili."
+    }
+  }
+};
 const WORLDWIDE_REGION_OPTIONS = [
   { value: "Africa", label: "Africa" },
   { value: "Americas", label: "Americas" },
@@ -1167,6 +1535,70 @@ function interpolatePublicText(template, values = {}) {
 
 function translatedPublicText(t, key, fallback = "", values = {}) {
   return interpolatePublicText(t(key, fallback), values);
+}
+
+function getPublicLocale(languageCode) {
+  return PUBLIC_LOCALE_BY_LANGUAGE_CODE[languageCode] || PUBLIC_LOCALE_BY_LANGUAGE_CODE.en;
+}
+
+function formatPublicReleaseDate(rawDate, languageCode) {
+  const raw = String(rawDate || "").trim();
+  const mayMatch = raw.match(/^May\s+(\d{1,2}),\s*(\d{4})$/i);
+  const date = mayMatch
+    ? new Date(Date.UTC(Number(mayMatch[2]), 4, Number(mayMatch[1]), 12, 0, 0))
+    : new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  try {
+    return new Intl.DateTimeFormat(getPublicLocale(languageCode), {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC"
+    }).format(date);
+  } catch {
+    return raw;
+  }
+}
+
+function getLocalizedReleaseNote(release, languageCode, t) {
+  const translated = PUBLIC_RELEASE_NOTE_TRANSLATIONS[languageCode]?.[release.version];
+  return {
+    ...release,
+    title: translated?.title || (languageCode === "en" ? release.title : t("release.genericTitle", release.title)),
+    summary: translated?.summary || (languageCode === "en" ? release.summary : t("release.genericSummary", release.summary)),
+    dateLabel: formatPublicReleaseDate(release.date, languageCode)
+  };
+}
+
+function getSearchSuggestionTypeLabel(type, t) {
+  const normalizedType = String(type || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  const keyByType = {
+    ats: "suggestion.ats",
+    title: "suggestion.title",
+    company: "suggestion.company",
+    location: "suggestion.location",
+    country: "suggestion.country",
+    region: "suggestion.region",
+    industry: "suggestion.industry",
+    recent: "suggestion.recent",
+    search: "suggestion.search"
+  };
+  const key = keyByType[normalizedType];
+  if (!key) return String(type || "").trim();
+  return t(key, String(type || "").trim());
+}
+
+function getPublicStatsChipLabel(chip, t) {
+  const keyByChip = {
+    "job-slots": "stats.jobSlots",
+    ats: "stats.ats",
+    companies: "stats.companies"
+  };
+  const key = keyByChip[chip?.key];
+  return key ? t(key, chip?.label || "") : chip?.label || "";
 }
 
 function getTranslatedSortOption(option, languageCode) {
@@ -5010,39 +5442,46 @@ export default function App() {
           onPress={() => setReleaseNotesOpen(false)}
           testID="release-notes-backdrop"
           accessibilityRole="button"
-          accessibilityLabel="Close release notes"
+          accessibilityLabel={t("release.closeA11y", "Close release notes")}
         />
         <View style={styles.releaseNotesCard}>
           <View style={styles.releaseNotesHeader}>
             <View style={styles.releaseNotesHeaderCopy}>
-              <Text style={styles.releaseNotesTitle}>Release notes</Text>
+              <Text style={styles.releaseNotesTitle} testID="release-notes-title">
+                {t("release.title", "Release notes")}
+              </Text>
             </View>
             <Pressable
               onPress={() => setReleaseNotesOpen(false)}
               style={({ pressed }) => [styles.releaseNotesCloseButton, pressed ? styles.buttonPressed : null]}
               testID="release-notes-close"
               accessibilityRole="button"
-              accessibilityLabel="Close release notes"
+              accessibilityLabel={t("release.closeA11y", "Close release notes")}
             >
-              <Text style={styles.releaseNotesCloseText}>Close</Text>
+              <Text style={styles.releaseNotesCloseText}>{t("release.close", "Close")}</Text>
             </Pressable>
           </View>
           <ScrollView
             style={styles.releaseNotesScroll}
             contentContainerStyle={styles.releaseNotesScrollContent}
             testID="release-notes-scroll"
-            accessibilityLabel="Release notes history"
+            accessibilityLabel={t("release.historyLabel", "Release notes history")}
           >
-            {PUBLIC_RELEASE_NOTES.map((release) => (
-              <View key={release.version} style={styles.releaseNoteItem}>
-                <View style={styles.releaseNoteHeadingRow}>
-                  <Text style={styles.releaseNoteVersion}>Version {release.version}</Text>
-                  <Text style={styles.releaseNoteDate}>{release.date}</Text>
+            {PUBLIC_RELEASE_NOTES.map((release) => {
+              const localizedRelease = getLocalizedReleaseNote(release, publicLanguageCode, t);
+              return (
+                <View key={release.version} style={styles.releaseNoteItem}>
+                  <View style={styles.releaseNoteHeadingRow}>
+                    <Text style={styles.releaseNoteVersion}>
+                      {translatedPublicText(t, "release.versionLabel", "Version {version}", { version: release.version })}
+                    </Text>
+                    <Text style={styles.releaseNoteDate}>{localizedRelease.dateLabel}</Text>
+                  </View>
+                  <Text style={styles.releaseNoteTitle}>{localizedRelease.title}</Text>
+                  <Text style={styles.releaseNoteSummary}>{localizedRelease.summary}</Text>
                 </View>
-                <Text style={styles.releaseNoteTitle}>{release.title}</Text>
-                <Text style={styles.releaseNoteSummary}>{release.summary}</Text>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
       </View>
@@ -5109,7 +5548,7 @@ export default function App() {
                 returnKeyType="search"
                 blurOnSubmit={false}
                 testID="search-input"
-                accessibilityLabel="Search postings"
+                accessibilityLabel={t("search.label", "Search openings")}
               />
               {compact && String(search || "").trim() ? (
                 <Pressable
@@ -5117,7 +5556,7 @@ export default function App() {
                   style={({ pressed }) => [styles.yahooSearchIconButton, pressed ? styles.yahooSearchIconButtonPressed : null]}
                   testID="postings-search-clear"
                   accessibilityRole="button"
-                  accessibilityLabel="Clear search"
+                  accessibilityLabel={t("search.clear", "Clear")}
                 >
                   <ClearGlyph isDark={isDarkPublicTheme} />
                 </Pressable>
@@ -5128,7 +5567,7 @@ export default function App() {
                   style={({ pressed }) => [styles.yahooSearchSubmitButton, pressed ? styles.yahooSearchSubmitButtonPressed : null]}
                   testID="postings-search-submit"
                   accessibilityRole="button"
-                  accessibilityLabel="Search postings"
+                  accessibilityLabel={t("results.search", "Search")}
                 >
                   <SearchGlyph isDark={isDarkPublicTheme} compact />
                 </Pressable>
@@ -5146,7 +5585,7 @@ export default function App() {
               >
                 {searchSuggestions.map((suggestion, index) => {
                   const label = String(suggestion?.label || suggestion?.value || "").trim();
-                  const hint = String(suggestion?.type || "").trim();
+                  const hint = getSearchSuggestionTypeLabel(suggestion?.type, t);
                   const selected = index === activeSuggestionIndex;
                   return (
                     <Pressable
@@ -5159,7 +5598,7 @@ export default function App() {
                       ]}
                       testID={`search-suggestion-${index}`}
                       accessibilityRole="button"
-                      accessibilityLabel={`Search ${label}`}
+                      accessibilityLabel={translatedPublicText(t, "dropdown.search", "Search {label}", { label })}
                     >
                       <View style={styles.searchSuggestionIconSlot}>
                         <SearchGlyph isDark={isDarkPublicTheme} compact />
@@ -5194,6 +5633,7 @@ export default function App() {
         <View style={styles.publicStatsChipRow} testID="public-stats-chips">
           {publicShellStatsChips.map((chip) => {
             const isJobSlots = chip.key === "job-slots";
+            const translatedLabel = getPublicStatsChipLabel(chip, t);
             return (
               <View
                 key={chip.key}
@@ -5207,13 +5647,13 @@ export default function App() {
                 ]}
                 testID={isJobSlots ? "result-count" : `public-stat-${chip.key}`}
                 accessibilityRole={isJobSlots ? "status" : "text"}
-                accessibilityLabel={`${chip.value} ${chip.label}`}
+                accessibilityLabel={`${chip.value} ${translatedLabel}`}
               >
                 <Text style={[styles.publicStatsChipValue, isJobSlots ? styles.resultCountValueText : null, isDarkPublicTheme ? styles.textInkDark : null]}>
                   {chip.value}
                 </Text>
                 <Text style={[styles.publicStatsChipLabel, isJobSlots ? styles.resultCountUnitText : null, isDarkPublicTheme ? styles.textMutedDark : null]}>
-                  {" "}{chip.label}
+                  {" "}{translatedLabel}
                 </Text>
               </View>
             );
@@ -5271,7 +5711,9 @@ export default function App() {
           ]}
           testID="public-version-button"
           accessibilityRole="button"
-          accessibilityLabel={`Open release notes for version ${PUBLIC_APP_VERSION}`}
+          accessibilityLabel={translatedPublicText(t, "release.openA11y", "Open release notes for version {version}", {
+            version: PUBLIC_APP_VERSION
+          })}
         >
           <Text
             style={[styles.publicVersionLabel, isDarkPublicTheme ? styles.publicVersionLabelDark : null]}
