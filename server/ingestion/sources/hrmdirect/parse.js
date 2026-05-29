@@ -129,7 +129,7 @@ function isHrmDirectPlaceholderTitle(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-  return normalized === "apply today" || normalized === "here";
+  return normalized === "apply today" || normalized === "here" || normalized === "read more";
 }
 
 function extractHrmDirectWorkModeLocationText(value) {
@@ -748,6 +748,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
     const titleCell = extractHrmDirectCellValue(rowHtml, "posTitle");
     const titleLinkMatch = titleCell.match(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)(?:<\/a>|$)/i);
     const href = normalizeHrmDirectHref(titleLinkMatch?.[1] || "");
+    const titleText = cleanHrmDirectText(titleLinkMatch?.[2] || titleCell || "");
+    if (isHrmDirectPlaceholderTitle(titleText)) {
+      rowMatch = rowPattern.exec(source);
+      continue;
+    }
     if (!href) {
       rowMatch = rowPattern.exec(source);
       continue;
@@ -792,6 +797,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
   let groupedAnchorMatch = groupedAnchorPattern.exec(source);
   while (groupedAnchorMatch) {
     const href = normalizeHrmDirectHref(groupedAnchorMatch?.[1] || "");
+    const titleText = cleanHrmDirectText(groupedAnchorMatch?.[2] || "");
+    if (isHrmDirectPlaceholderTitle(titleText)) {
+      groupedAnchorMatch = groupedAnchorPattern.exec(source);
+      continue;
+    }
     let absoluteUrl = "";
     try {
       absoluteUrl = normalizeHrmDirectJobPostingUrl(new URL(href, `${config.baseOrigin}/employment/`).toString());

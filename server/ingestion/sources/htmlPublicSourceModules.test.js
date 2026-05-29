@@ -850,6 +850,64 @@ test("breezy source module enriches list rows from JSON-LD and labeled detail pa
   assert.equal(evaluatePublicPosting(byId["BRZ2004-ambiguous-role"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
+test("breezy source module prefers public JSON locations over ambiguous portal text", async () => {
+  const source = getSourceModule("breezy");
+  const company = {
+    company_name: "Fixture Breezy JSON",
+    ATS_name: "breezy",
+    url_string: "https://fixture-json.breezy.hr/"
+  };
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      const value = String(url || "");
+      if (value === "https://fixture-json.breezy.hr/") {
+        return {
+          html: `<div class="positions">
+            <a href="/p/brz-json-sales-representative"><h2>Sales Representative</h2>
+              <ul class="meta"><li class="location"><span class="polygot">%LABEL_MULTIPLE_LOCATIONS%</span><span> (5) </span></li></ul>
+            </a>
+          </div>`,
+          status: 200,
+          url: value
+        };
+      }
+      if (value === "https://fixture-json.breezy.hr/json") {
+        return {
+          html: JSON.stringify([{
+            id: "brz-json",
+            name: "Sales Representative",
+            url: "https://fixture-json.breezy.hr/p/brz-json-sales-representative",
+            published_date: "2026-05-21T10:00:00.000Z",
+            type: { name: "Full-Time" },
+            location: {
+              city: "Dunkirk",
+              state: { id: "MD", name: "Maryland" },
+              country: { id: "US", name: "United States" },
+              name: "Dunkirk, MD",
+              is_remote: false
+            }
+          }]),
+          status: 200,
+          url: value
+        };
+      }
+      return { html: "", status: 404, url: value };
+    }
+  });
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "brz-json");
+  assert.equal(normalized.location_text, "Dunkirk, MD, United States");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Dunkirk");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.source_evidence.remote_source, "json_api");
+  assert.equal(normalized.source_evidence.route_kind, "breezy_public_json");
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("breezy source module parses card titles outside heading tags", () => {
   const source = getSourceModule("breezy");
   const company = readJson(path.join(__dirname, "breezy", "fixtures", "company.json"));
@@ -1048,6 +1106,55 @@ test("hrmdirect source module enriches title-only rows from deterministic detail
 
   assert.ok(byId.HRM3002.source_failure_reasons.includes(fixture.expected.HRM3002.reason));
   assert.equal(evaluatePublicPosting(byId.HRM3002, { parserVersion: source.parserVersion }).status, "quarantined");
+});
+
+test("hrmdirect source module skips duplicate grouped Read More links", async () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Grouped Read More",
+    ATS_name: "hrmdirect",
+    url_string: "https://groupedreadmore.hrmdirect.com/employment/job-openings.php"
+  };
+  const listUrl = "https://groupedreadmore.hrmdirect.com/employment/job-openings.php?search=true";
+  const detailWithReqLoc = "https://groupedreadmore.hrmdirect.com/employment/job-opening.php?req=HRM3101&req_loc=5001";
+  const detailReqOnly = "https://groupedreadmore.hrmdirect.com/employment/job-opening.php?req=HRM3101";
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      if (url === listUrl) {
+        return {
+          html: `
+            <div class='jobListItem'>
+              <div class='jobListTitle'><h4><a href="job-opening.php?req=HRM3101&req_loc=5001&#job">Messenger</a></h4></div>
+              <div class='jobListLink'><a href="job-opening.php?req=HRM3101&#job">Read More</a></div>
+            </div>
+          `,
+          status: 200,
+          url
+        };
+      }
+      if (url === detailWithReqLoc || url === detailReqOnly) {
+        return {
+          html: `<table class="viewFields">
+            <tr><td class="viewFieldName"><b>Location:</b></td><td class="viewFieldValue">New York, NY<br></td></tr>
+            <tr><td class="viewFieldName"><b>Type of Hire:</b></td><td class="viewFieldValue">Experienced Hires<br></td></tr>
+          </table>`,
+          status: 200,
+          url
+        };
+      }
+      return { html: "", status: 404, url };
+    }
+  });
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "HRM3101");
+  assert.equal(normalized.position_name, "Messenger");
+  assert.equal(normalized.location_text, "New York, NY");
+  assert.equal(normalized.country, "United States");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
 test("hrmdirect source module accepts labeled detail workplace remote evidence", async () => {

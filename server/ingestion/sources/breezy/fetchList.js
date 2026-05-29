@@ -78,6 +78,15 @@ function breezyDetailKey(urlValue) {
   }
 }
 
+function breezyJsonUrl(urlValue) {
+  const parsed = asUrl(urlValue);
+  if (!parsed) return "";
+  parsed.pathname = "/json";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
 function hasExplicitSourceRemote(posting = {}) {
   return ["remote", "hybrid", "onsite"].includes(clean(posting.remote_type).toLowerCase());
 }
@@ -151,7 +160,38 @@ function createFetchList(discover) {
       __listUrl: finalUrl
     });
 
-    if (parsed.length === 0) {
+    const jsonUrl = breezyJsonUrl(finalUrl);
+    let jsonPayload = null;
+    if (jsonUrl) {
+      try {
+        const jsonResponse = await fetchText(jsonUrl, {
+          ...options,
+          target: discovered,
+          sourceLabel: "Breezy JSON",
+          fetchOptions: {
+            ...(options.fetchOptions || {}),
+            headers: {
+              accept: "application/json,text/plain;q=0.8,*/*;q=0.5",
+              ...(options.fetchOptions?.headers || {})
+            }
+          }
+        });
+        jsonPayload = JSON.parse(jsonResponse.text);
+      } catch {
+        jsonPayload = null;
+      }
+    }
+
+    const parsedWithJson = jsonPayload
+      ? parseBreezyPostingsFromHtml(companyName, config, {
+        html: list.text,
+        __listUrl: finalUrl,
+        __json: jsonPayload
+      })
+      : parsed;
+    const sourceParsed = parsedWithJson.length > 0 ? parsedWithJson : parsed;
+
+    if (sourceParsed.length === 0) {
       throw makeSourceFetchError("portal_search_empty", "Breezy public portal returned no parseable postings", {
         url: listUrl
       });
@@ -163,7 +203,7 @@ function createFetchList(discover) {
     const detailStatusByUrl = {};
     const detailFailureByUrl = {};
 
-    for (const posting of prioritizeBreezyDetailCandidates(parsed)) {
+    for (const posting of prioritizeBreezyDetailCandidates(sourceParsed)) {
       if (detailFetches >= detailLimit) break;
       if (!breezyPostingNeedsDetail(posting)) continue;
       const detailUrl = clean(posting.job_posting_url);
@@ -191,6 +231,7 @@ function createFetchList(discover) {
     return {
       html: list.text,
       __listUrl: finalUrl,
+      __json: jsonPayload,
       __detailHtmlByUrl: detailHtmlByUrl,
       __detailStatusByUrl: detailStatusByUrl,
       __detailFailureByUrl: detailFailureByUrl,

@@ -358,6 +358,96 @@ function collectBreezyJsonLdPostings(companyNameForPostings, config, sourceHtml,
   }));
 }
 
+function normalizeBreezyApiLocation(locationValue) {
+  const location = locationValue && typeof locationValue === "object" ? locationValue : {};
+  const countryRaw = cleanBreezyStructuredValue(location.country?.name || location.country?.id || location.country);
+  const country = normalizeCountryName(countryRaw) || countryRaw;
+  const city = breezyLocalityLooksNonCity(location.city, country) ? "" : cleanBreezyStructuredValue(location.city);
+  const state = cleanBreezyStructuredValue(location.state?.id || location.state?.name || location.state);
+  const locationName = cleanBreezyLocationText(location.name);
+  const locationParts = [city, city ? state : "", country].filter(Boolean);
+  const remoteType = location.is_remote === true ? "remote" : location.is_remote === false ? "onsite" : "";
+  return {
+    location: locationParts.length > 0 ? locationParts.join(", ") : locationName,
+    city,
+    state,
+    country,
+    remote_type: remoteType
+  };
+}
+
+function collectBreezyApiPostings(companyNameForPostings, config, apiPayload, listUrl, seenUrls) {
+  const rows = Array.isArray(apiPayload) ? apiPayload : Array.isArray(apiPayload?.positions) ? apiPayload.positions : [];
+  const postings = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const rawUrl = cleanBreezyStructuredValue(row.url);
+    if (!rawUrl) continue;
+    let absoluteUrl = "";
+    try {
+      absoluteUrl = new URL(rawUrl, config.origin || listUrl || "https://example.invalid/").toString();
+    } catch {
+      continue;
+    }
+    if (!absoluteUrl || seenUrls.has(absoluteUrl)) continue;
+
+    const location = normalizeBreezyApiLocation(row.location);
+    const employmentType = cleanBreezyStructuredValue(row.type?.name || row.type);
+    const remoteType = location.remote_type || extractBreezyRemoteTypeFromValue([
+      row.remote_status,
+      row.workplace_type,
+      row.location_type,
+      employmentType,
+      location.location
+    ].filter(Boolean).join(" "));
+    postings.push({
+      company_name: companyNameForPostings,
+      source_job_id: cleanBreezyStructuredValue(row.id) || extractBreezySourceId(absoluteUrl),
+      position_name: cleanBreezyStructuredValue(row.name || row.title) || "Untitled Position",
+      job_posting_url: absoluteUrl,
+      posting_date: cleanBreezyStructuredValue(row.published_date || row.created_at || row.updated_at) || null,
+      location: location.location || null,
+      city: location.city || null,
+      state: location.state || null,
+      country: location.country || null,
+      remote_type: remoteType || null,
+      department: cleanBreezyStructuredValue(row.department?.name || row.department) || null,
+      employment_type: employmentType || null,
+      source_requires_normalized_geo_or_remote: true,
+      source_evidence: {
+        list_url: listUrl,
+        route_kind: "breezy_public_json",
+        title_source: "json_api",
+        title_path: "result[].name",
+        canonical_url_source: "json_api",
+        canonical_url_path: "result[].url",
+        source_job_id_source: "json_api",
+        source_job_id_path: "result[].id",
+        location_source: location.location ? "json_api" : "",
+        location_path: location.location ? "result[].location" : "",
+        city_source: location.city ? "json_api" : "",
+        city_path: location.city ? "result[].location.city" : "",
+        region_source: location.state ? "json_api" : "",
+        region_path: location.state ? "result[].location.state" : "",
+        country_source: location.country ? "json_api" : "",
+        country_path: location.country ? "result[].location.country" : "",
+        remote_source: remoteType ? "json_api" : "",
+        remote_path: remoteType ? "result[].location.is_remote/workplace" : "",
+        posting_date_source: row.published_date ? "json_api" : "",
+        posting_date_path: row.published_date ? "result[].published_date" : "",
+        employment_type_source: employmentType ? "json_api" : "",
+        employment_type_path: employmentType ? "result[].type.name" : ""
+      },
+      source_failure_reasons: []
+    });
+    seenUrls.add(absoluteUrl);
+  }
+  return postings.map((posting) => ({
+    ...posting,
+    source_failure_reasons: breezySourceFailureReasons(posting)
+  }));
+}
+
 function extractBreezyLabeledRemoteType(sourceHtml) {
   const source = String(sourceHtml || "");
   const translated = translateBreezyPolygotLabels(source);
@@ -552,10 +642,13 @@ function parseBreezyPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const payload = pageHtml && typeof pageHtml === "object" && !Array.isArray(pageHtml) ? pageHtml : { html: pageHtml };
   const source = String(payload.html || payload.text || "");
   const listUrl = String(payload.__listUrl || config.list_url || config.origin || "").trim();
+  const apiPayload = payload.__json || payload.json || payload.apiPayload || null;
   const detailHtmlByUrl = payload.__detailHtmlByUrl || payload.detailHtmlByUrl || {};
   const detailStatusByUrl = payload.__detailStatusByUrl || payload.detailStatusByUrl || {};
   const postings = [];
   const seenUrls = new Set();
+
+  postings.push(...collectBreezyApiPostings(companyNameForPostings, config, apiPayload, listUrl, seenUrls));
 
   const linkPattern =
     /<a[^>]*href=["']((?:https?:\/\/[^"'<>]+)?\/p\/[^"'<>]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
