@@ -2,6 +2,7 @@ const { test, expect } = require("@playwright/test");
 
 const apiPort = process.env.OPENJOBSLOTS_E2E_API_PORT || "8877";
 const apiBaseUrl = process.env.OPENJOBSLOTS_API_BASE_URL || `http://127.0.0.1:${apiPort}`;
+const publicBaseUrl = apiBaseUrl.replace(/\/+$/, "");
 const adminToken = process.env.OPENJOBSLOTS_E2E_ADMIN_TOKEN || "openjobslots-e2e-admin-token";
 const adminHeaders = {
   Authorization: `Bearer ${adminToken}`
@@ -36,7 +37,7 @@ test.describe("openjobslots API compatibility", () => {
     expect(html.headers()["x-permitted-cross-domain-policies"]).toBe("none");
     const htmlText = await html.text();
     expect(htmlText).toContain("<title>Frontend Engineer jobs | OpenJobSlots</title>");
-    expect(htmlText).toContain('<link rel="canonical" href="http://127.0.0.1:8877/?q=Frontend%20Engineer" />');
+    expect(htmlText).toContain(`<link rel="canonical" href="${publicBaseUrl}/?q=Frontend%20Engineer" />`);
     expect(htmlText).toContain('"@type":"SearchAction"');
     expect(htmlText).not.toMatch(/postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_|stack trace/i);
 
@@ -47,7 +48,7 @@ test.describe("openjobslots API compatibility", () => {
     const robotsText = await robots.text();
     expect(robotsText).toMatch(/^User-agent: \*/m);
     expect(robotsText).toMatch(/^Disallow: \/postings$/m);
-    expect(robotsText).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:8877\/sitemap\.xml$/m);
+    expect(robotsText).toContain(`Sitemap: ${publicBaseUrl}/sitemap.xml`);
 
     const llms = await request.get(`${apiBaseUrl}/llms.txt`);
     expect(llms.status()).toBe(200);
@@ -55,7 +56,7 @@ test.describe("openjobslots API compatibility", () => {
     expect(llms.headers()["cache-control"]).toContain("s-maxage=3600");
     const llmsText = await llms.text();
     expect(llmsText).toMatch(/^# OpenJobSlots$/m);
-    expect(llmsText).toMatch(/^- \[Search open job slots\]\(http:\/\/127\.0\.0\.1:8877\/en\):/m);
+    expect(llmsText).toContain(`- [Search open job slots](${publicBaseUrl}/en):`);
     expect(llmsText).not.toMatch(/<html|<script|postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_/i);
 
     const sitemap = await request.get(`${apiBaseUrl}/sitemap.xml`, {
@@ -65,10 +66,10 @@ test.describe("openjobslots API compatibility", () => {
     expect(sitemap.headers()["content-type"]).toMatch(/application\/xml/i);
     expect(sitemap.headers()["cache-control"]).toContain("s-maxage=3600");
     const sitemapText = await sitemap.text();
-    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/</loc>");
-    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/en/software-engineer-jobs</loc>");
-    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/tr/uzaktan-calisma-ilanlari</loc>");
-    expect(sitemapText).toContain("<loc>http://127.0.0.1:8877/ats/greenhouse-jobs</loc>");
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/</loc>`);
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/en/software-engineer-jobs</loc>`);
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/tr/uzaktan-calisma-ilanlari</loc>`);
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/ats/greenhouse-jobs</loc>`);
     expect(sitemapText).not.toMatch(/private@example\.com|%40|\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
   });
 
