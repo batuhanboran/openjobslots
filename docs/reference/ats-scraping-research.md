@@ -31,7 +31,7 @@ This document converts external scraping research into the OpenJobSlots ATS sour
 
 | Priority | Target | Type | Recommended action |
 | ---: | --- | --- | --- |
-| 1 | `teamtailor` | existing source method repair | Research a stable endpoint or fixture-backed HTML method, then add source method profile and raw/expected/invalid fixtures. |
+| 1 | `teamtailor` | existing source method repair | Use Teamtailor RSS as the preferred method and keep HTML fixture parsing as a fallback guard. |
 | 2 | `icims` | existing detail evidence repair | Compare list, paged iframe, and bounded detail fetch evidence without weakening parser gates. |
 | 3 | `applitrack` | existing detail evidence repair | Profile `Output.asp` list fetch versus bounded detail fetches and keep detail output as parser evidence. |
 | 4 | `personio` | expansion candidate | Review the public XML feed, then add raw XML and expected normalized fixtures before implementation. |

@@ -22,6 +22,16 @@ function buildHeaders() {
   };
 }
 
+function buildRssHeaders() {
+  return {
+    Accept: "application/rss+xml, text/xml, application/xml;q=0.9, */*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  };
+}
+
 async function payloadToHtml(payload) {
   if (typeof payload === "string") return payload;
   if (typeof payload?.text === "function") return payload.text();
@@ -55,7 +65,8 @@ function withFinalConfig(config, finalUrl, fallbackUrl) {
   return {
     ...config,
     baseOrigin,
-    jobsUrl: value || clean(config?.jobsUrl)
+    jobsUrl: clean(config?.jobsUrl),
+    rssUrl: value || clean(config?.rssUrl)
   };
 }
 
@@ -66,9 +77,54 @@ function createFetchList(dependencies = {}) {
     const context = buildCompanyContext(company);
     const discovered = discover(context);
     const config = discovered?.config || {};
+    const rssUrl = clean(config.rssUrl);
     const jobsUrl = clean(config.jobsUrl || discovered?.list_url);
-    if (!jobsUrl) {
+    if (!rssUrl && !jobsUrl) {
       throw makeSourceFetchError("no_public_jobs_route", "Teamtailor source has no supported jobs route");
+    }
+
+    if (rssUrl) {
+      const rssTarget = {
+        method: "GET",
+        headers: buildRssHeaders()
+      };
+
+      if (typeof options.fetcher === "function") {
+        const payload = await options.fetcher(rssUrl, rssTarget);
+        const status = responseStatus(payload);
+        if (status >= 200 && status < 300) {
+          const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || rssUrl);
+          assertTeamtailorFinalHost(finalUrl, rssUrl);
+          return {
+            rss: await payloadToHtml(payload),
+            __sourceConfig: withFinalConfig(config, finalUrl, rssUrl),
+            __sourceFetchFinalUrl: finalUrl,
+            __sourceFormat: "rss"
+          };
+        }
+        if (status !== 404) {
+          throw makeSourceFetchError("fetch_failed", `Teamtailor RSS request failed (${status})`, {
+            status,
+            url: rssUrl
+          });
+        }
+      } else {
+        const rssRes = await safeFetch(rssUrl, rssTarget);
+        if (rssRes.ok) {
+          const finalUrl = clean(rssRes.url || rssUrl);
+          assertTeamtailorFinalHost(finalUrl, rssUrl);
+          return {
+            rss: await rssRes.text(),
+            __sourceConfig: withFinalConfig(config, finalUrl, rssUrl),
+            __sourceFetchFinalUrl: finalUrl,
+            __sourceFormat: "rss"
+          };
+        }
+        if (rssRes.status !== 404) {
+          const body = await rssRes.text();
+          throw new Error(`Teamtailor RSS request failed (${rssRes.status}): ${body.slice(0, 180)}`);
+        }
+      }
     }
 
     const target = {

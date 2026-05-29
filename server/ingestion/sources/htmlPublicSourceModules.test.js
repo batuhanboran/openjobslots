@@ -256,14 +256,14 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
   const source = getSourceModule("teamtailor");
   assert.ok(source, "expected Teamtailor source module");
   const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));
-  const rawList = readJson(path.join(__dirname, "teamtailor", "fixtures", "list.json"));
+  const rawList = readJson(path.join(__dirname, "teamtailor", "fixtures", "rss.json"));
   const calls = [];
 
   const payload = await source.fetchList(company, {
     fetcher: async (url, target) => {
       calls.push({ url, method: target.method, headers: target.headers });
       return {
-        body: rawList.html,
+        body: rawList.rss,
         status: 200,
         url
       };
@@ -271,10 +271,10 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
   });
 
   assert.deepEqual(calls, [{
-    url: "https://fixture.teamtailor.com/jobs",
+    url: "https://fixture.teamtailor.com/jobs.rss",
     method: "GET",
     headers: {
-      Accept: "text/html,application/xhtml+xml",
+      Accept: "application/rss+xml, text/xml, application/xml;q=0.9, */*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
       "Cache-Control": "no-cache",
       Pragma: "no-cache",
@@ -282,21 +282,26 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
     }
   }]);
   assert.equal(payload.__sourceConfig.subdomainLower, "fixture");
+  assert.equal(payload.__sourceConfig.rssUrl, "https://fixture.teamtailor.com/jobs.rss");
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 2);
+  assert.equal(parsed.length, 3);
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
-  assert.equal(byId.get("5842331-support-engineer").country, "Germany");
-  assert.equal(byId.get("5842331-support-engineer").remote_type, "onsite");
-  assert.equal(source.validatePublic(byId.get("5842331-support-engineer")).status, "accepted");
-  assert.equal(byId.get("5842442-remote-success-manager").remote_type, "remote");
-  assert.equal(source.validatePublic(byId.get("5842442-remote-success-manager")).status, "accepted");
+  assert.equal(byId.get("5842555-rss-support-engineer").country, "Germany");
+  assert.equal(byId.get("5842555-rss-support-engineer").city, "Berlin");
+  assert.equal(byId.get("5842555-rss-support-engineer").remote_type, "onsite");
+  assert.equal(byId.get("5842555-rss-support-engineer").posting_date, "2026-03-20");
+  assert.equal(source.validatePublic(byId.get("5842555-rss-support-engineer")).status, "accepted");
+  assert.equal(byId.get("5842666-rss-remote-success-manager").remote_type, "remote");
+  assert.equal(byId.get("5842777-rss-hybrid-consultant").country, "Sweden");
+  assert.equal(byId.get("5842777-rss-hybrid-consultant").remote_type, "hybrid");
+  assert.equal(source.validatePublic(byId.get("5842777-rss-hybrid-consultant")).status, "accepted");
 
   await assert.rejects(
     () => source.fetchList(company, {
       fetcher: async () => ({
-        body: rawList.html,
+        body: rawList.rss,
         status: 200,
         url: "https://example.com/jobs"
       })

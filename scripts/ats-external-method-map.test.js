@@ -42,7 +42,7 @@ function testBuildExternalMethodMap() {
   const targets = byKey(payload.targets);
   assert.equal(targets.get("teamtailor").target_type, "existing-source-method-repair");
   assert.equal(targets.get("teamtailor").internal_source_module, "server/ingestion/sources/teamtailor");
-  assert.match(targets.get("teamtailor").recommended_action, /stable endpoint/i);
+  assert.match(targets.get("teamtailor").recommended_action, /RSS/i);
 
   assert.equal(targets.get("icims").target_type, "existing-detail-evidence-repair");
   assert.match(targets.get("icims").recommended_action, /detail/i);

@@ -133,8 +133,8 @@
       "external_refs": [
         "kalil0321/ats-scrapers:teamtailor.py"
       ],
-      "current_gap": "Repo certification notes still call for stable raw source certification beyond brittle HTML card parsing.",
-      "recommended_action": "Research a stable endpoint or fixture-backed HTML method, then add source method profile and raw/expected/invalid fixtures.",
+      "current_gap": "Repo certification now has an RSS pilot path plus existing HTML fallback fixtures.",
+      "recommended_action": "Use Teamtailor RSS as the preferred method and keep HTML fixture parsing as a fallback guard.",
       "phases": [
         "phase_1",
         "phase_2",

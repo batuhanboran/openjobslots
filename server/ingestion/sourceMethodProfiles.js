@@ -32,7 +32,7 @@ const METHOD_PROFILES = [
     truth_boundary: "deterministic-parser-fixture",
     detail_evidence_allowed: false,
     methods: [
-      { kind: "direct_or_stable_endpoint_research", role: "preferred-method-research" },
+      { kind: "teamtailor_rss", role: "preferred-method" },
       { kind: "fixture_backed_html", role: "fallback-certification" }
     ]
   },

@@ -25,6 +25,12 @@ function parse(rawPayload, company = {}) {
   const target = discover(company);
   const config = rawPayload?.__sourceConfig || target.config || {};
   const payload = stripInternalPayloadFields(rawPayload);
+  if (payload && typeof payload === "object" && typeof payload.rss === "string") {
+    return parser.parseTeamtailorPostingsFromRss(
+      normalizeCompanyName(company, config.subdomainLower || "teamtailor"),
+      payload.rss
+    );
+  }
   const html = typeof payload === "string" ? payload : String(payload?.html || payload?.body || "");
   return parser.parseTeamtailorPostingsFromHtml(
     normalizeCompanyName(company, config.subdomainLower || "teamtailor"),
@@ -76,7 +82,7 @@ function validatePublic(posting) {
 function rateLimit() {
   return {
     requestsPerMinute: 8,
-    strategy: "teamtailor-jobs-page-per-host-serialized"
+    strategy: "teamtailor-rss-first-per-host-serialized"
   };
 }
 

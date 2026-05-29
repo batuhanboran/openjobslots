@@ -23,7 +23,7 @@ function testTeamtailorProfile() {
   const profile = getSourceMethodProfile("TeamTailor");
   assert.equal(profile.ats_key, "teamtailor");
   assert.equal(profile.truth_boundary, "deterministic-parser-fixture");
-  assert.equal(profile.methods.some((method) => method.kind === "direct_or_stable_endpoint_research"), true);
+  assert.equal(profile.methods.some((method) => method.kind === "teamtailor_rss"), true);
   assert.equal(profile.methods.some((method) => method.kind === "fixture_backed_html"), true);
   assert.equal(profile.phase_targets.includes("phase_2"), true);
 }

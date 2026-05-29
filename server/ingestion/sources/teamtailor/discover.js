@@ -1,4 +1,4 @@
-const TEAMTAILOR_DOCS_URL = "observed Teamtailor public jobs HTML";
+const TEAMTAILOR_DOCS_URL = "observed Teamtailor public jobs RSS and HTML";
 const TEAMTAILOR_SOURCE_FAMILY = "html_detail";
 
 function clean(value) {
@@ -23,16 +23,17 @@ function parseTeamtailorCompany(urlString) {
   const subdomain = clean(host.split(".")[0]);
   if (!subdomain) return null;
 
-  const baseOrigin = `${parsed.protocol}//${parsed.host}`;
-  return {
-    host,
-    subdomain,
-    subdomainLower: subdomain.toLowerCase(),
-    baseOrigin,
-    boardUrl: `${baseOrigin}/jobs`,
-    jobsUrl: `${baseOrigin}/jobs`
-  };
-}
+    const baseOrigin = `${parsed.protocol}//${parsed.host}`;
+    return {
+      host,
+      subdomain,
+      subdomainLower: subdomain.toLowerCase(),
+      baseOrigin,
+      boardUrl: `${baseOrigin}/jobs`,
+      jobsUrl: `${baseOrigin}/jobs`,
+      rssUrl: `${baseOrigin}/jobs.rss`
+    };
+  }
 
 function buildCompanyContext(company = {}) {
   return {
