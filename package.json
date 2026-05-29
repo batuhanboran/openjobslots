@@ -59,7 +59,7 @@
     "export_windows_build": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/export-windows-msi.ps1",
     "test:windows": "jest --config jest.config.windows.js",
     "test:ingestion": "node server/ingestion/run-tests.js",
-    "test:method-experiment": "node --check server/ingestion/methodExperiment.js && node --check server/ingestion/methodExperiment.test.js && node server/ingestion/methodExperiment.test.js && node --check scripts/ats-method-experiment.js",
+    "test:method-experiment": "node --check server/ingestion/sourceMethodProfiles.js && node --check server/ingestion/sourceMethodProfiles.test.js && node server/ingestion/sourceMethodProfiles.test.js && node --check server/ingestion/methodExperiment.js && node --check server/ingestion/methodExperiment.test.js && node server/ingestion/methodExperiment.test.js && node --check scripts/ats-method-experiment.js",
     "test:parsers": "node server/ingestion/run-tests.js",
     "test:e2e:db": "node scripts/test/setup-e2e-db.js",
     "test:api": "playwright test tests/api",

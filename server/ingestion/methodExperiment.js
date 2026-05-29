@@ -23,6 +23,7 @@ const {
   countConfiguredTargets,
   summarizeInventory
 } = require("./netNewEstimator");
+const { getMethodExperimentSources } = require("./sourceMethodProfiles");
 
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
 const DEFAULT_ROW_LIMIT = 10_000;
@@ -31,7 +32,7 @@ const MAX_RUN_OFFSET = 1_000_000;
 const MAX_CONCURRENCY = 4;
 const DEFAULT_DETAIL_SAMPLE_LIMIT = 5;
 const MAX_DETAIL_SAMPLE_LIMIT = 25;
-const ALLOWED_EXPERIMENT_SOURCES = new Set(["applytojob", "breezy"]);
+const ALLOWED_EXPERIMENT_SOURCES = new Set(getMethodExperimentSources());
 
 function nowIso() {
   return new Date().toISOString();

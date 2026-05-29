@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { runMethodExperiment, inspectDetailHtml } = require("./methodExperiment");
+const { ALLOWED_EXPERIMENT_SOURCES, runMethodExperiment, inspectDetailHtml } = require("./methodExperiment");
 
 function makePool(existingRows = []) {
   const queries = [];
@@ -203,6 +203,14 @@ function testDetailInspector() {
   assert.equal(inspected.labeled_location, true);
 }
 
+function testPhaseTwoSourcesAreAllowed() {
+  assert.ok(ALLOWED_EXPERIMENT_SOURCES.has("teamtailor"));
+  assert.ok(ALLOWED_EXPERIMENT_SOURCES.has("icims"));
+  assert.ok(ALLOWED_EXPERIMENT_SOURCES.has("applitrack"));
+  assert.ok(ALLOWED_EXPERIMENT_SOURCES.has("greenhouse"));
+  assert.ok(ALLOWED_EXPERIMENT_SOURCES.has("lever"));
+}
+
 async function main() {
   await testLogsListOnlyMethod();
   await testLogsDetailMethod();
@@ -211,6 +219,7 @@ async function main() {
   await testLogsDuplicateExistingPublic();
   await testDoesNotMutateDb();
   testDetailInspector();
+  testPhaseTwoSourcesAreAllowed();
   console.log("methodExperiment tests passed");
 }
 
