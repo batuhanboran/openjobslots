@@ -264,6 +264,7 @@ async function collectDetailEvidence(sourceUrl, options = {}) {
       sourceUrl,
       extractor: provider,
       config: {
+        ...(result?.config || {}),
         provider,
         max_bytes: Number(options.maxResponseBytes || DEFAULT_MAX_BYTES),
         timeout_ms: Number(options.timeoutMs || DEFAULT_TIMEOUT_MS),

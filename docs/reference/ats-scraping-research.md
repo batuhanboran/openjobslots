@@ -25,7 +25,7 @@ This document converts external scraping research into the OpenJobSlots ATS sour
 3. Phase 3: pilot source hardening.
    Apply the method map to `teamtailor`, `icims`, `applitrack`, and the expansion candidates `personio`, `recruiterbox`, and `workable` only after fixture-backed gates are ready.
 4. Phase 4: external evidence provider sidecar.
-   Add Crawlee, Firecrawl, or Crawl4AI only as optional evidence providers behind source caps, response limits, and deterministic parser fixtures.
+   Add Crawlee, Firecrawl, or Crawl4AI only as optional evidence providers behind source caps, response limits, and deterministic parser fixtures. The repo-side abstraction is `server/ingestion/externalEvidenceProviders.js`; it is disabled by default and requires explicit injected adapters.
 
 ## Priority Targets
 

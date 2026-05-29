@@ -8,6 +8,11 @@ const {
   htmlToEvidenceText,
   selectEvidenceSpans
 } = require("./detailEvidence");
+const {
+  createExternalEvidenceExtractors,
+  getExternalEvidenceProviderProfile,
+  listExternalEvidenceProviderProfiles
+} = require("./externalEvidenceProviders");
 
 function makeResponse(body, options = {}) {
   return {
@@ -108,6 +113,54 @@ test("external providers require explicit allowlist and implementation", async (
     extractors: {}
   });
   assert.equal(unsupported.status, DETAIL_EVIDENCE_STATUS.PROVIDER_UNSUPPORTED);
+});
+
+test("external evidence provider profiles are explicit evidence-only sidecars", () => {
+  const profiles = listExternalEvidenceProviderProfiles();
+  assert.ok(profiles.some((profile) => profile.provider === "firecrawl"));
+  assert.ok(profiles.some((profile) => profile.provider === "crawl4ai"));
+  assert.ok(profiles.some((profile) => profile.provider === "crawlee"));
+
+  const crawlee = getExternalEvidenceProviderProfile("Crawlee");
+  assert.equal(crawlee.provider, "crawlee");
+  assert.equal(crawlee.default_enabled, false);
+  assert.equal(crawlee.truth_boundary, "evidence-only");
+  assert.ok(crawlee.output_fields.includes("markdown"));
+});
+
+test("external evidence extractors require injected adapters and return no parser truth fields", async () => {
+  const extractors = createExternalEvidenceExtractors({
+    adapters: {
+      crawlee: async (sourceUrl) => ({
+        ok: true,
+        finalUrl: `${sourceUrl}?rendered=1`,
+        markdown: "Location: Berlin, Germany\nWorkplace type: Hybrid\nPosted March 20, 2026",
+        text: "Location: Berlin, Germany\nWorkplace type: Hybrid\nPosted March 20, 2026",
+        warnings: ["rendered_sidecar_fixture"]
+      })
+    }
+  });
+
+  const snapshot = await collectDetailEvidence("https://jobs.example.com/1", {
+    enabled: true,
+    provider: "crawlee",
+    allowedProviders: ["local", "crawlee"],
+    env: {},
+    extractors
+  });
+
+  assert.equal(snapshot.ok, true);
+  assert.equal(snapshot.status, DETAIL_EVIDENCE_STATUS.FETCHED);
+  assert.equal(snapshot.extractor, "crawlee");
+  assert.equal(snapshot.final_url, "https://jobs.example.com/1?rendered=1");
+  assert.equal(snapshot.config.evidence_only, true);
+  assert.equal(snapshot.config.external_provider, true);
+  assert.equal(snapshot.country, undefined);
+  assert.equal(snapshot.region, undefined);
+  assert.equal(snapshot.city, undefined);
+  assert.equal(snapshot.remote_type, undefined);
+  assert.equal(snapshot.posting_date, undefined);
+  assert.ok(snapshot.evidence_spans.some((span) => span.kind === "location"));
 });
 
 test("snapshot summary exposes bounded metadata instead of raw parser truth", () => {
