@@ -25,6 +25,7 @@ let meiliSettingsStatus = {
 const DEFAULT_MEILI_TASK_TIMEOUT_MS = 300000;
 const MIN_MEILI_TASK_TIMEOUT_MS = 5000;
 const MAX_MEILI_TASK_TIMEOUT_MS = 1800000;
+const PLACEHOLDER_TITLE_PATTERN = /^(untitled|unknown|n\/?a|not available|job opening|new job|open position|position)$/i;
 
 function inferCountryFromLocation(location) {
   return normalizeCountryFromLocation(location);
@@ -312,7 +313,7 @@ async function upsertMeiliPostings(postings, config = getMeiliConfig()) {
   if (!config.enabled) return { ok: true, skipped: true, count: 0 };
   const documents = (Array.isArray(postings) ? postings : [])
     .map(toMeiliPostingDocument)
-    .filter((item) => /^https?:\/\//i.test(item.canonical_url) && item.title && item.company);
+    .filter((item) => /^https?:\/\//i.test(item.canonical_url) && item.title && item.company && !PLACEHOLDER_TITLE_PATTERN.test(item.title));
   if (documents.length === 0) return { ok: true, count: 0 };
   return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents`, {
     method: "POST",

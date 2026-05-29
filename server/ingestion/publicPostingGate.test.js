@@ -198,6 +198,21 @@ test("public posting gate rejects rows missing required identity fields", () => 
   assert.equal(evaluatePublicPosting(basePosting({ canonical_url: "", job_posting_url: "" })).status, "rejected");
 });
 
+test("public posting gate rejects placeholder titles before indexing", () => {
+  const result = evaluatePublicPosting(basePosting({
+    position_name: "Open Position",
+    location_text: "Austin, TX, United States",
+    country: "United States",
+    region: "North America",
+    city: "Austin",
+    remote_type: "onsite"
+  }));
+
+  assert.equal(result.status, "rejected");
+  assert.ok(result.reason_codes.includes("placeholder_title"));
+  assert.equal(result.retry_detail_refetch_eligible, false);
+});
+
 test("public posting gate normalizes remote aliases and detects useful geo", () => {
   assert.equal(normalizeRemoteType("on-site"), "onsite");
   assert.equal(normalizeRemoteType("n/a"), "unknown");

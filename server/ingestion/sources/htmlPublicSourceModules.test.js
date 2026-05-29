@@ -724,6 +724,36 @@ test("applytojob source module parses generic card links with labeled fields", (
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("applytojob source module parses Resumator table location cells", () => {
+  const source = getSourceModule("applytojob");
+  const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <table class="resumator-job-listings">
+        <tbody>
+          <tr class="resumator-table-row-even">
+            <td class="resumator-job-title-column">
+              <a href="https://fixture.applytojob.com/apply/ATJ5001/1099-Field-Occupancy-Evaluator" class="resumator-job-title-link">1099 Field Occupancy Evaluator</a>
+            </td>
+            <td class="resumator-department-column"><span class="resumator-table-no-department">(none)</span></td>
+            <td class="resumator-job-location-column">Houston, MS</td>
+          </tr>
+        </tbody>
+      </table>
+    `,
+    __listUrl: company.url_string
+  }, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "ATJ5001");
+  assert.equal(normalized.position_name, "1099 Field Occupancy Evaluator");
+  assert.equal(normalized.location_text, "Houston, MS");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Houston");
+  assert.equal(normalized.source_evidence.route_kind, "applytojob_legacy_list_html");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("applytojob source module normalizes source-provided country tokens", () => {
   const source = getSourceModule("applytojob");
   const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));

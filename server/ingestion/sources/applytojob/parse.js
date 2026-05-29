@@ -116,6 +116,19 @@ function extractApplyToJobStructuredLabeledField(cardHtml, labels) {
   return trimApplyToJobLabeledValue(match[1]);
 }
 
+function extractApplyToJobClassCellText(cardHtml, className) {
+  const source = String(cardHtml || "");
+  const escapedClass = escapeApplyToJobRegex(className);
+  const match = source.match(new RegExp(
+    `<td[^>]*class=["'][^"']*\\b${escapedClass}\\b[^"']*["'][^>]*>([\\s\\S]{0,600}?)<\\/td>`,
+    "i"
+  ));
+  if (!match?.[1]) return null;
+  const text = cleanApplyToJobText(match[1]);
+  if (!text || /^\(?none\)?$/i.test(text)) return null;
+  return text;
+}
+
 function extractApplyToJobSourceId(urlValue) {
   try {
     const parsed = new URL(String(urlValue || ""));
@@ -625,6 +638,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     const locationMatch = contextHtml.match(legacyLocationPattern);
     const location =
       (locationMatch?.[1] ? cleanApplyToJobText(locationMatch[1]) : null) ||
+      extractApplyToJobClassCellText(contextHtml, "resumator-job-location-column") ||
       extractApplyToJobIconField(contextHtml, ["fa-map-marker", "fa-map-marker-alt", "fa-location-dot"]) ||
       extractApplyToJobStructuredLabeledField(contextHtml, ["Location", "Job Location", "Office"]);
     const dateMatch = contextHtml.match(legacyDatePattern);
@@ -632,7 +646,9 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
       (dateMatch?.[1] ? cleanApplyToJobText(dateMatch[1]) : null) ||
       extractApplyToJobIconField(contextHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]) ||
       extractApplyToJobStructuredLabeledField(contextHtml, ["Posted", "Date Posted", "Posting Date"]);
-    const department = extractApplyToJobStructuredLabeledField(contextHtml, ["Department", "Category", "Team"]);
+    const department =
+      extractApplyToJobStructuredLabeledField(contextHtml, ["Department", "Category", "Team"]) ||
+      extractApplyToJobClassCellText(contextHtml, "resumator-department-column");
     const employmentType = extractApplyToJobStructuredLabeledField(contextHtml, [
       "Employment Type",
       "Job Type",
@@ -700,11 +716,14 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     const contextHtml = source.slice(contextStart, contextEnd);
     const location =
       extractApplyToJobStructuredLabeledField(contextHtml, ["Location", "Job Location", "Office", "Work Location"]) ||
+      extractApplyToJobClassCellText(contextHtml, "resumator-job-location-column") ||
       extractApplyToJobIconField(contextHtml, ["fa-map-marker", "fa-map-marker-alt", "fa-location-dot"]);
     const postingDate =
       extractApplyToJobStructuredLabeledField(contextHtml, ["Posted", "Date Posted", "Posting Date"]) ||
       extractApplyToJobIconField(contextHtml, ["fa-calendar", "fa-calendar-alt", "fa-clock"]);
-    const department = extractApplyToJobStructuredLabeledField(contextHtml, ["Department", "Category", "Team"]);
+    const department =
+      extractApplyToJobStructuredLabeledField(contextHtml, ["Department", "Category", "Team"]) ||
+      extractApplyToJobClassCellText(contextHtml, "resumator-department-column");
     const employmentType = extractApplyToJobStructuredLabeledField(contextHtml, [
       "Employment Type",
       "Job Type",

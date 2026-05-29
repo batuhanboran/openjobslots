@@ -47,6 +47,7 @@ const AMBIGUOUS_LOCATION_VALUES = new Set([
 ]);
 
 const AMBIGUOUS_COUNTRY_CODES = new Set(["in", "il", "la", "ma", "pa", "pr", "sc"]);
+const PLACEHOLDER_TITLE_PATTERN = /^(untitled|unknown|n\/?a|not available|job opening|new job|open position|position)$/i;
 
 function isBlankLike(value) {
   return BLANK_VALUES.has(asLower(value));
@@ -61,6 +62,10 @@ function normalizeRemoteType(value) {
 
 function getTitle(posting = {}) {
   return asString(posting.title || posting.position_name);
+}
+
+function titleLooksPlaceholder(value) {
+  return PLACEHOLDER_TITLE_PATTERN.test(asString(value));
 }
 
 function getCompany(posting = {}) {
@@ -210,6 +215,7 @@ function evaluatePublicPosting(posting = {}, options = {}) {
   const requiredMissing = [];
 
   if (!evidence.title.present) requiredMissing.push("missing_title");
+  else if (titleLooksPlaceholder(evidence.title.value)) requiredMissing.push("placeholder_title");
   if (!evidence.company.present) requiredMissing.push("missing_company");
   if (!evidence.canonical_url.present) requiredMissing.push("missing_canonical_url");
 
@@ -301,6 +307,7 @@ module.exports = {
   getPublicThresholds,
   hasExplicitRemoteEvidence,
   hasUsefulGeoEvidence,
+  titleLooksPlaceholder,
   normalizeRemoteType,
   validationFromGate
 };

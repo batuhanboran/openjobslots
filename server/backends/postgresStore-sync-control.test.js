@@ -21,7 +21,7 @@ const {
   requestSyncStop,
   upsertPostgresPostings
 } = require("./postgresStore");
-const { searchMeiliPostings, toMeiliPostingDocument } = require("../search/meili");
+const { searchMeiliPostings, toMeiliPostingDocument, upsertMeiliPostings } = require("../search/meili");
 
 function isSourceFacetQuery(sql) {
   return /AS fresh_count/i.test(sql) && /GROUP BY COALESCE\(NULLIF\(btrim\(p\.ats_key\), ''\), 'unknown'\)/i.test(sql);
@@ -1004,6 +1004,30 @@ function testMeiliDocumentsCarryHiddenFlagSafely() {
   assert.equal(toMeiliPostingDocument({ canonical_url: "c", posting_date: "2026-05-07" }).posting_date, "2026-05-07");
 }
 
+async function testMeiliUpsertSkipsPlaceholderTitles() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousFetch = global.fetch;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  global.fetch = async () => {
+    throw new Error("placeholder title must not be sent to Meili");
+  };
+  try {
+    const result = await upsertMeiliPostings([{
+      canonical_url: "https://example.com/jobs/open-position",
+      position_name: "Open Position",
+      company_name: "Demo Co"
+    }]);
+    assert.equal(result.count, 0);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 function testMeiliDocumentsInferMissingSearchFacetsFromLocation() {
   const document = toMeiliPostingDocument({
     canonical_url: "https://example.com/technical-support-turkey",
@@ -1872,6 +1896,7 @@ async function main() {
   await testPublicPostingsCapsLargeLimitAndOffset();
   await testPostgresUpsertRejectsInvalidPostingsBeforeStorage();
   testMeiliDocumentsCarryHiddenFlagSafely();
+  await testMeiliUpsertSkipsPlaceholderTitles();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
   await testMeiliHideNoDateUsesPostingDatePresence();
   await testMeiliSearchRequiresExplicitVisibleFlag();
