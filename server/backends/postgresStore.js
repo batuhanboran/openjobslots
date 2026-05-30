@@ -3037,6 +3037,24 @@ function buildOpenJobSlotsSearchUrl(publicSiteOrigin, item = {}) {
   return `${normalizePublicSiteOrigin(publicSiteOrigin)}/${suffix}`;
 }
 
+function normalizePublicExternalJobUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.href;
+  } catch {
+    return "";
+  }
+}
+
+function buildOpenJobSlotsPostingUrl(publicSiteOrigin, item = {}) {
+  const canonicalUrl = normalizePublicExternalJobUrl(item.canonical_url || item.job_posting_url || item.apply_url);
+  if (!canonicalUrl) return buildOpenJobSlotsSearchUrl(publicSiteOrigin, item);
+  return `${normalizePublicSiteOrigin(publicSiteOrigin)}/postings/open?url=${encodeURIComponent(canonicalUrl)}`;
+}
+
 function mapDailyRedditPostingRow(row = {}, publicSiteOrigin = DEFAULT_PUBLIC_SITE_ORIGIN) {
   const location = sanitizeSocialInlineText(
     row.location_label ||
@@ -3054,7 +3072,10 @@ function mapDailyRedditPostingRow(row = {}, publicSiteOrigin = DEFAULT_PUBLIC_SI
     last_seen_epoch: Number(row.last_seen_epoch || 0),
     ats: sanitizeSocialInlineText(row.ats_key, "")
   };
-  item.openjobslots_url = buildOpenJobSlotsSearchUrl(publicSiteOrigin, item);
+  item.openjobslots_url = buildOpenJobSlotsPostingUrl(publicSiteOrigin, {
+    ...item,
+    canonical_url: row.canonical_url
+  });
   return item;
 }
 

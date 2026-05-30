@@ -20,6 +20,18 @@ function normalizeRedirectPath(value) {
   return raw;
 }
 
+function normalizePublicPostingRedirectUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.length > 2000) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.href;
+  } catch {
+    return "";
+  }
+}
+
 function getCanonicalPublicHostRedirectTarget(req) {
   const method = String(req?.method || "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") return "";
@@ -429,6 +441,51 @@ function registerPublicRoutes(app, context) {
       }
       return sanitizeFrontendValue(await getPostgresDailyRedditPost(postgresPool, options));
     });
+  });
+
+  app.get("/postings/open", async (req, res) => {
+    const requestedUrl = normalizePublicPostingRedirectUrl(req.query.url || "");
+    if (!requestedUrl) {
+      return res.status(400).json({
+        ok: false,
+        error: "valid_url_required"
+      });
+    }
+
+    if (DB_BACKEND !== "postgres" || !postgresPool || typeof postgresPool.query !== "function") {
+      return res.status(404).json({
+        ok: false,
+        error: "posting_not_found"
+      });
+    }
+
+    try {
+      const result = await postgresPool.query(
+        `
+          SELECT canonical_url
+          FROM postings
+          WHERE hidden = false
+            AND canonical_url = $1
+          LIMIT 1;
+        `,
+        [requestedUrl]
+      );
+      const targetUrl = normalizePublicPostingRedirectUrl(result.rows?.[0]?.canonical_url || "");
+      if (!targetUrl) {
+        return res.status(404).json({
+          ok: false,
+          error: "posting_not_found"
+        });
+      }
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=900");
+      return res.redirect(302, targetUrl);
+    } catch (error) {
+      console.warn("[openjobslots] public_posting_redirect_failed", String(error?.message || error).slice(0, 240));
+      return res.status(500).json({
+        ok: false,
+        error: "posting_redirect_failed"
+      });
+    }
   });
 
   app.get("/postings/filter-options", async (req, res) => {

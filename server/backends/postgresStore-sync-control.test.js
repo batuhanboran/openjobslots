@@ -1808,9 +1808,10 @@ async function testDailyRedditPostBuildsSeededReadOnlyMarkdown() {
   assert.equal(result.candidate_count, 42);
   assert.equal(result.item_count, 2);
   assert.equal(result.title, "Remote Jobs Added Today (30/05/2026) - USA");
-  assert.match(result.body, /1\. \[Remote Support Manager\]\(https:\/\/openjobslots\.com\/\?q=Remote%20Support%20Manager%20Fixture%20Co\) - Fixture Co - Remote \(United States\)/);
+  assert.match(result.body, /1\. \[Remote Support Manager\]\(https:\/\/openjobslots\.com\/postings\/open\?url=https%3A%2F%2Fexample\.com%2Fjobs%2F1\) - Fixture Co - Remote \(United States\)/);
   assert.match(result.body, /If you love these find more \[HERE\]\(https:\/\/openjobslots\.com\/\?q=remote\)/);
   assert.equal(result.items[0].source_url, undefined);
+  assert.equal(result.items[0].canonical_url, undefined);
   assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
   assert.equal(calls[1].params[5], "daily-test");
   assert.equal(calls[1].params[6], 10);
