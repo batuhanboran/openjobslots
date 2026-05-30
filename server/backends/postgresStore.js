@@ -44,6 +44,9 @@ const PUBLIC_SOURCE_FACET_FRESH_DAYS = 3;
 const DEFAULT_PUBLIC_POSTINGS_LIMIT = 500;
 const DEFAULT_PUBLIC_POSTINGS_MAX_LIMIT = 500;
 const DEFAULT_PUBLIC_POSTINGS_MAX_OFFSET = 2000;
+const DEFAULT_DAILY_REDDIT_POST_LIMIT = 10;
+const MAX_DAILY_REDDIT_POST_LIMIT = 20;
+const DEFAULT_PUBLIC_SITE_ORIGIN = "https://openjobslots.com";
 const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "relevance", label: "Relevance" },
   { value: "last_seen", label: "Fresh source" },
@@ -2979,6 +2982,168 @@ function boundedIntegerOrNull(value, min = 0, max = 2_000_000) {
   return Math.max(min, Math.min(max, Math.floor(number)));
 }
 
+function normalizeDailyRedditLimit(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return DEFAULT_DAILY_REDDIT_POST_LIMIT;
+  return Math.max(1, Math.min(MAX_DAILY_REDDIT_POST_LIMIT, Math.floor(number)));
+}
+
+function normalizeDailyRedditCountry(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "United States";
+  const normalized = normalizeCountryFilterValue(raw);
+  return normalized || "United States";
+}
+
+function normalizeDailyRedditRemoteTypes(value) {
+  const normalized = String(value || "remote").trim().toLowerCase();
+  if (normalized === "remote_hybrid" || normalized === "remote_or_hybrid") return ["remote", "hybrid"];
+  if (normalized === "hybrid") return ["hybrid"];
+  if (normalized === "any" || normalized === "all") return [];
+  return ["remote"];
+}
+
+function normalizePublicSiteOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return DEFAULT_PUBLIC_SITE_ORIGIN;
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, "");
+  } catch {
+    return raw.replace(/\/+$/, "") || DEFAULT_PUBLIC_SITE_ORIGIN;
+  }
+}
+
+function sanitizeSocialInlineText(value, fallback = "") {
+  return String(value || fallback || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+}
+
+function escapeMarkdownLinkLabel(value, fallback = "Job") {
+  return sanitizeSocialInlineText(value, fallback).replace(/[\[\]]/g, "");
+}
+
+function formatDailyRedditDateLabel(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return String(value || "").trim();
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+function buildOpenJobSlotsSearchUrl(publicSiteOrigin, item = {}) {
+  const query = sanitizeSocialInlineText(`${item.position_name || ""} ${item.company_name || ""}`);
+  const suffix = query ? `?q=${encodeURIComponent(query)}` : "?q=remote";
+  return `${normalizePublicSiteOrigin(publicSiteOrigin)}/${suffix}`;
+}
+
+function mapDailyRedditPostingRow(row = {}, publicSiteOrigin = DEFAULT_PUBLIC_SITE_ORIGIN) {
+  const location = sanitizeSocialInlineText(
+    row.location_label ||
+      row.location_text ||
+      [row.city, row.region, row.country].filter(Boolean).join(", "),
+    "Remote"
+  );
+  const item = {
+    company_name: sanitizeSocialInlineText(row.company_name, "Unknown company"),
+    position_name: sanitizeSocialInlineText(row.position_name, "Open role"),
+    location,
+    remote_type: sanitizeSocialInlineText(row.remote_type, "unknown"),
+    posting_date: row.posting_date || null,
+    first_seen_epoch: Number(row.first_seen_epoch || 0),
+    last_seen_epoch: Number(row.last_seen_epoch || 0),
+    ats: sanitizeSocialInlineText(row.ats_key, "")
+  };
+  item.openjobslots_url = buildOpenJobSlotsSearchUrl(publicSiteOrigin, item);
+  return item;
+}
+
+function buildDailyRedditPostBody(items = [], publicSiteOrigin = DEFAULT_PUBLIC_SITE_ORIGIN) {
+  const lines = [
+    "Job Posts",
+    "",
+    "If a listing is gone, the company may have taken it down. Apply fast!",
+    ""
+  ];
+  items.forEach((item, index) => {
+    lines.push(
+      `${index + 1}. [${escapeMarkdownLinkLabel(item.position_name)}](${item.openjobslots_url}) - ${sanitizeSocialInlineText(item.company_name, "Unknown company")} - ${sanitizeSocialInlineText(item.location, "Remote")}`
+    );
+  });
+  lines.push("", `If you love these find more [HERE](${normalizePublicSiteOrigin(publicSiteOrigin)}/?q=remote)`);
+  return lines.join("\n");
+}
+
+async function getPostgresDailyRedditPost(pool, options = {}) {
+  if (!pool) return { ok: false, error: "postgres_pool_required" };
+  const timezone = normalizeAnalyticsTimezone(options.timezone || "Europe/Istanbul");
+  const date = normalizeAnalyticsDate(options.date || "today", options.now || new Date(), timezone);
+  const limit = normalizeDailyRedditLimit(options.limit);
+  const country = normalizeDailyRedditCountry(options.country);
+  const remoteTypes = normalizeDailyRedditRemoteTypes(options.remote || "remote");
+  const includeAnyRemote = remoteTypes.length === 0;
+  const publicSiteOrigin = normalizePublicSiteOrigin(options.publicSiteUrl || options.publicSiteOrigin);
+  const seed = sanitizeSocialInlineText(
+    options.seed || `daily-reddit:${date}:${country}:${remoteTypes.join("-") || "all"}`,
+    "daily-reddit"
+  );
+  const baseParams = [date, timezone, country, includeAnyRemote, remoteTypes];
+  const whereSql = `
+    p.hidden = false
+    AND COALESCE(p.first_seen_epoch, 0) >= extract(epoch from ($1::date::timestamp AT TIME ZONE $2))
+    AND COALESCE(p.first_seen_epoch, 0) < extract(epoch from (($1::date + interval '1 day')::timestamp AT TIME ZONE $2))
+    AND p.country = $3
+    AND ($4::boolean = true OR p.remote_type = ANY($5::text[]))
+    AND COALESCE(NULLIF(btrim(p.company_name), ''), '') <> ''
+    AND COALESCE(NULLIF(btrim(p.position_name), ''), '') <> ''
+  `;
+  const [countResult, rowResult] = await Promise.all([
+    pool.query(`SELECT COUNT(*)::int AS count FROM postings p WHERE ${whereSql};`, baseParams),
+    pool.query(
+      `
+        SELECT
+          p.company_name,
+          p.position_name,
+          COALESCE(
+            NULLIF(p.location_text, ''),
+            NULLIF(concat_ws(', ', NULLIF(p.city, ''), NULLIF(p.region, ''), NULLIF(p.country, '')), ''),
+            'Remote'
+          ) AS location_label,
+          p.remote_type,
+          p.posting_date,
+          p.first_seen_epoch,
+          p.last_seen_epoch,
+          p.canonical_url,
+          p.ats_key
+        FROM postings p
+        WHERE ${whereSql}
+        ORDER BY md5($6 || ':' || p.canonical_url), p.first_seen_epoch DESC, p.canonical_url ASC
+        LIMIT $7;
+      `,
+      [...baseParams, seed, limit]
+    )
+  ]);
+  const items = (Array.isArray(rowResult.rows) ? rowResult.rows : []).map((row) =>
+    mapDailyRedditPostingRow(row, publicSiteOrigin)
+  );
+  const title = `Remote Jobs Added Today (${formatDailyRedditDateLabel(date)}) - USA`;
+  return {
+    ok: true,
+    read_only: true,
+    date,
+    timezone,
+    country,
+    remote: remoteTypes.length > 0 ? remoteTypes.join(",") : "all",
+    seed,
+    limit,
+    candidate_count: Number(countResult.rows?.[0]?.count || 0),
+    item_count: items.length,
+    title,
+    body: buildDailyRedditPostBody(items, publicSiteOrigin),
+    items
+  };
+}
+
 function countFilterValues(value) {
   if (Array.isArray(value)) return value.filter((item) => String(item || "").trim()).length;
   return parseCsv(value).length;
@@ -3453,6 +3618,7 @@ module.exports = {
   getPostgresParserAdmin,
   getPostgresParserAttentionByAts,
   getPostgresPostingDiagnostics,
+  getPostgresDailyRedditPost,
   getPostgresPublicSearchReport,
   getPostgresQualitySummary,
   getPostgresQuarantineSummary,

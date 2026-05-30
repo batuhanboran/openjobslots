@@ -1,0 +1,188 @@
+{
+  "id": "openjobslotsDailyReddit",
+  "name": "OpenJobSlots Daily Reddit Remote Jobs",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "1c16bb4f-6f6b-4f0f-9ca5-f59ed7b92a51",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const timezone = 'Europe/Istanbul';\nconst subreddit = 'RemoteJobs';\nconst limit = 10;\nconst startHour = 14;\nconst endHour = 23;\nconst windowMinutes = 15;\n\nfunction getZonedParts(date, timeZone) {\n  const parts = new Intl.DateTimeFormat('en-CA', {\n    timeZone,\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false,\n  }).formatToParts(date);\n  return Object.fromEntries(parts.map((part) => [part.type, part.value]));\n}\n\nfunction hash32(value) {\n  let hash = 2166136261;\n  for (const char of String(value)) {\n    hash ^= char.charCodeAt(0);\n    hash = Math.imul(hash, 16777619);\n  }\n  return hash >>> 0;\n}\n\nfunction pad2(value) {\n  return String(value).padStart(2, '0');\n}\n\nconst now = new Date();\nconst parts = getZonedParts(now, timezone);\nconst date = `${parts.year}-${parts.month}-${parts.day}`;\nconst currentMinuteOfDay = Number(parts.hour) * 60 + Number(parts.minute);\nconst staticData = $getWorkflowStaticData('global');\nstaticData.postedDates = staticData.postedDates || {};\n\nif (staticData.postedDates[date]) {\n  return [];\n}\n\nconst firstMinute = startHour * 60;\nconst minuteRange = Math.max(windowMinutes, (endHour - startHour) * 60);\nconst randomOffset = hash32(`openjobslots-reddit-time:${date}:${subreddit}`) % minuteRange;\nconst targetMinuteOfDay = firstMinute + Math.floor(randomOffset / windowMinutes) * windowMinutes;\n\nif (currentMinuteOfDay < targetMinuteOfDay) {\n  return [];\n}\n\nconst targetHour = Math.floor(targetMinuteOfDay / 60);\nconst targetMinute = targetMinuteOfDay % 60;\n\nreturn [{\n  json: {\n    date,\n    timezone,\n    subreddit,\n    limit,\n    seed: `openjobslots-reddit-jobs:${date}:${subreddit}`,\n    targetTime: `${pad2(targetHour)}:${pad2(targetMinute)}`,\n    currentTime: `${pad2(parts.hour)}:${pad2(parts.minute)}`,\n    randomWindow: `${pad2(startHour)}:00-${pad2(endHour)}:00`,\n  },\n}];"
+      },
+      "id": "6cbe63f9-13fb-4fef-a8a5-c8a8c4e0debf",
+      "name": "Daily Random Time Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://openjobslots.com/postings/daily-reddit",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "date",
+              "value": "={{ $json.date }}"
+            },
+            {
+              "name": "timezone",
+              "value": "={{ $json.timezone }}"
+            },
+            {
+              "name": "limit",
+              "value": "={{ $json.limit }}"
+            },
+            {
+              "name": "country",
+              "value": "United States"
+            },
+            {
+              "name": "remote",
+              "value": "remote"
+            },
+            {
+              "name": "seed",
+              "value": "={{ $json.seed }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b7d1d76e-3f19-4a53-8644-e2f5d989c32f",
+      "name": "Fetch Daily Reddit Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nconst gate = $('Daily Random Time Gate').item.json;\n\nif (!payload.ok) {\n  throw new Error(`OpenJobSlots daily Reddit endpoint failed: ${payload.error || 'unknown error'}`);\n}\n\nif (Number(payload.item_count || 0) < Number(gate.limit || 10)) {\n  throw new Error(`Only ${payload.item_count || 0} daily jobs available; expected ${gate.limit || 10}.`);\n}\n\nreturn [{\n  json: {\n    ...payload,\n    subreddit: gate.subreddit,\n    targetTime: gate.targetTime,\n    currentTime: gate.currentTime,\n  },\n}];"
+      },
+      "id": "f7830983-ec14-40d8-b44f-f8208de236d0",
+      "name": "Prepare Reddit Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "subreddit": "={{ $json.subreddit }}",
+        "kind": "self",
+        "title": "={{ $json.title }}",
+        "text": "={{ $json.body }}"
+      },
+      "id": "c409d398-5a09-465b-a9cc-64ddb5562e95",
+      "name": "Post To Reddit",
+      "type": "n8n-nodes-base.reddit",
+      "typeVersion": 1,
+      "position": [
+        180,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepared = $('Prepare Reddit Post').item.json;\nconst reddit = $input.first().json;\nconst staticData = $getWorkflowStaticData('global');\nstaticData.postedDates = staticData.postedDates || {};\nstaticData.postedDates[prepared.date] = {\n  postedAt: new Date().toISOString(),\n  subreddit: prepared.subreddit,\n  title: prepared.title,\n  targetTime: prepared.targetTime,\n  itemCount: prepared.item_count,\n  redditId: reddit?.id || reddit?.name || '',\n};\n\nreturn [{\n  json: {\n    ok: true,\n    date: prepared.date,\n    subreddit: prepared.subreddit,\n    title: prepared.title,\n    itemCount: prepared.item_count,\n    targetTime: prepared.targetTime,\n    reddit,\n  },\n}];"
+      },
+      "id": "68f8932b-dbe3-4311-9fb2-8937995fdf26",
+      "name": "Mark Posted For Today",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Daily Random Time Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Random Time Gate": {
+      "main": [
+        [
+          {
+            "node": "Fetch Daily Reddit Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Daily Reddit Post": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reddit Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reddit Post": {
+      "main": [
+        [
+          {
+            "node": "Post To Reddit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post To Reddit": {
+      "main": [
+        [
+          {
+            "node": "Mark Posted For Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

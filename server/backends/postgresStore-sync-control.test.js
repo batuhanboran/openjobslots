@@ -7,6 +7,7 @@ const {
   getPostgresSyncStatus,
   getPostgresAtsFieldQualityByAts,
   getPostgresParserAttentionByAts,
+  getPostgresDailyRedditPost,
   getPostgresPublicSearchReport,
   getRetentionConfig,
   getRetentionCutoffs,
@@ -1752,6 +1753,69 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
   assert.equal(calls[0].params[17], "North America");
 }
 
+async function testDailyRedditPostBuildsSeededReadOnlyMarkdown() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT COUNT\(\*\)::int AS count FROM postings p/i.test(sql)) {
+        return { rows: [{ count: "42" }] };
+      }
+      if (/ORDER BY md5\(\$6 \|\| ':' \|\| p\.canonical_url\)/i.test(sql)) {
+        return {
+          rows: [
+            {
+              company_name: "Fixture Co",
+              position_name: "Remote Support Manager",
+              location_label: "Remote (United States)",
+              remote_type: "remote",
+              posting_date: "2026-05-30",
+              first_seen_epoch: 1770000000,
+              last_seen_epoch: 1770000300,
+              canonical_url: "https://example.com/jobs/1",
+              ats_key: "fixture"
+            },
+            {
+              company_name: "Second Co",
+              position_name: "Customer Success Lead",
+              location_label: "Austin, TX, United States",
+              remote_type: "remote",
+              posting_date: null,
+              first_seen_epoch: 1770000001,
+              last_seen_epoch: 1770000301,
+              canonical_url: "https://example.com/jobs/2",
+              ats_key: "fixture"
+            }
+          ]
+        };
+      }
+      throw new Error(`Unexpected daily reddit query: ${sql}`);
+    }
+  };
+
+  const result = await getPostgresDailyRedditPost(pool, {
+    date: "2026-05-30",
+    timezone: "Europe/Istanbul",
+    limit: 10,
+    country: "United States",
+    remote: "remote",
+    seed: "daily-test",
+    publicSiteUrl: "https://openjobslots.com"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.read_only, true);
+  assert.equal(result.candidate_count, 42);
+  assert.equal(result.item_count, 2);
+  assert.equal(result.title, "Remote Jobs Added Today (30/05/2026) - USA");
+  assert.match(result.body, /1\. \[Remote Support Manager\]\(https:\/\/openjobslots\.com\/\?q=Remote%20Support%20Manager%20Fixture%20Co\) - Fixture Co - Remote \(United States\)/);
+  assert.match(result.body, /If you love these find more \[HERE\]\(https:\/\/openjobslots\.com\/\?q=remote\)/);
+  assert.equal(result.items[0].source_url, undefined);
+  assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
+  assert.equal(calls[1].params[5], "daily-test");
+  assert.equal(calls[1].params[6], 10);
+}
+
 async function testPublicSearchReportAggregatesTopTermsReadOnly() {
   const calls = [];
   const pool = {
@@ -1918,6 +1982,7 @@ async function main() {
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
   await testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs();
   await testPublicSearchEventInsertIsPrivacyBounded();
+  await testDailyRedditPostBuildsSeededReadOnlyMarkdown();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
   await testPublicSearchReportResolvesTodayInRequestedTimezone();
   console.log("postgres sync-control bigint cast tests passed");

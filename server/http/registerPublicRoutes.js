@@ -99,6 +99,7 @@ function registerPublicRoutes(app, context) {
     getPostgresFilterOptions,
     getPostgresGrowthSummary,
     getPostgresParserAttentionByAts,
+    getPostgresDailyRedditPost,
     getPostgresPublicSearchReport,
     getPostgresSuggestions,
     getPostgresSyncStatus,
@@ -118,6 +119,7 @@ function registerPublicRoutes(app, context) {
     parseCsvParam,
     path,
     postgresPool,
+    publicSiteUrl,
     publicReadCache,
     readMeiliReindexStatus,
     recordPostgresPublicSearchEvent,
@@ -404,6 +406,28 @@ function registerPublicRoutes(app, context) {
       };
     }, {
       afterPayload: (payload, info) => recordPublicSearchEvent(req, res, "suggest", search, payload, options, info)
+    });
+  });
+
+  app.get("/postings/daily-reddit", async (req, res) => {
+    const options = {
+      date: req.query.date || "today",
+      timezone: req.query.timezone || "Europe/Istanbul",
+      limit: Number(req.query.limit || 10),
+      country: req.query.country || "United States",
+      remote: req.query.remote || "remote",
+      seed: req.query.seed || "",
+      publicSiteUrl
+    };
+    return sendCachedPublicJson(req, res, publicReadCache, async () => {
+      if (DB_BACKEND !== "postgres" || typeof getPostgresDailyRedditPost !== "function") {
+        return {
+          ok: false,
+          read_only: true,
+          error: "daily_reddit_post_requires_postgres"
+        };
+      }
+      return sanitizeFrontendValue(await getPostgresDailyRedditPost(postgresPool, options));
     });
   });
 
