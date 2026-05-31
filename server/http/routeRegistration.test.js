@@ -3,6 +3,7 @@ const assert = require("assert");
 const { registerAdminRoutes } = require("./registerAdminRoutes");
 const {
   getCanonicalPublicHostRedirectTarget,
+  isInternalPublicAnalyticsProbe,
   registerPublicRoutes
 } = require("./registerPublicRoutes");
 const { registerUserRoutes } = require("./registerUserRoutes");
@@ -106,6 +107,27 @@ function testCanonicalPublicHostRedirectTarget() {
   assert.equal(getCanonicalPublicHostRedirectTarget(postReq), "");
 }
 
+function testInternalPublicAnalyticsProbeDetection() {
+  assert.equal(isInternalPublicAnalyticsProbe({
+    query: { _validation: "1" },
+    get: () => ""
+  }), true);
+  assert.equal(isInternalPublicAnalyticsProbe({
+    query: {},
+    get(name) {
+      return String(name).toLowerCase() === "user-agent"
+        ? "OpenJobSlots-Codex-Playwright-Validation/1.0"
+        : "";
+    }
+  }), true);
+  assert.equal(isInternalPublicAnalyticsProbe({
+    query: {},
+    get(name) {
+      return String(name).toLowerCase() === "user-agent" ? "Mozilla/5.0" : "";
+    }
+  }), false);
+}
+
 function testAdminRoutes() {
   const { app, routes } = createRecordingApp();
   registerAdminRoutes(app, createContext());
@@ -172,6 +194,7 @@ function testUserRoutes() {
 
 testPublicRoutes();
 testCanonicalPublicHostRedirectTarget();
+testInternalPublicAnalyticsProbeDetection();
 testAdminRoutes();
 testUserRoutes();
 

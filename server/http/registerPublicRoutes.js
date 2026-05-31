@@ -141,6 +141,12 @@ function getPublicPopularSearchCountryScope(req, languageCode) {
   );
 }
 
+function isInternalPublicAnalyticsProbe(req) {
+  if (req?.query?._validation || req?.query?._research) return true;
+  const userAgent = getRequestHeader(req, "user-agent");
+  return /^OpenJobSlots-Codex-/i.test(userAgent);
+}
+
 function registerPublicRoutes(app, context) {
   const {
     ATS_FILTER_OPTION_ITEMS,
@@ -214,6 +220,7 @@ function registerPublicRoutes(app, context) {
 
   function recordPublicSearchEvent(req, res, eventType, search, payload, options = {}, info = {}) {
     if (DB_BACKEND !== "postgres" || typeof recordPostgresPublicSearchEvent !== "function") return;
+    if (isInternalPublicAnalyticsProbe(req)) return;
     const event = {
       eventType,
       search,
@@ -822,5 +829,6 @@ function registerPublicRoutes(app, context) {
 
 module.exports = {
   getCanonicalPublicHostRedirectTarget,
+  isInternalPublicAnalyticsProbe,
   registerPublicRoutes
 };
