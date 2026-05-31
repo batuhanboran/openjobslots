@@ -1,0 +1,8 @@
+{
+  "html": "<a href=\"/jobs/123\">Town Police - Patrol Officer Deadline: June 2026</a>",
+  "__sourceConfig": {
+    "endpoint": "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0",
+    "baseOrigin": "https://www.policeapp.com"
+  },
+  "__sourceFetchFinalUrl": "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0"
+}

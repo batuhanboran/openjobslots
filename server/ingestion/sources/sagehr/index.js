@@ -14,6 +14,12 @@ const ATS_KEY = "sagehr";
 const SOURCE_FAMILY = "html_detail";
 const PARSER_VERSION = "source-sagehr-v1";
 const SAGEHR_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const FIXTURE_PATHS = Object.freeze([
+  `server/ingestion/sources/${ATS_KEY}/fixtures/company.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/list.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/expected-normalized.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/invalid-shapes.json`
+]);
 
 function normalizeCompanyName(company = {}, fallback = "sagehr") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -167,7 +173,8 @@ module.exports = {
     sourceFamily: SOURCE_FAMILY,
     parserVersion: PARSER_VERSION,
     parserConfidence: 0.62,
-    requestsPerMinute: 8
+    requestsPerMinute: 8,
+    fixturePaths: FIXTURE_PATHS
   }),
   atsKey: ATS_KEY,
   key: ATS_KEY,

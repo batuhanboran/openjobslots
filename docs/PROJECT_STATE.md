@@ -75,8 +75,16 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Source contracts now have a separate recovery-readiness layer: recovery-capable modules must expose public gate validation, rate-limit policy, source-quality thresholds, and fixture paths in addition to the base discover/fetch/parse/normalize/validate contract.
 - Unsupported source modules now preserve `unsupported` status in the registry instead of being overwritten by disabled registry metadata. `dayforcehcm` is therefore explicitly blocked from recovery until parser certification exists.
 - `npm.cmd run ats:registry-index` now generates registry status plus recovery readiness for every configured ATS and future candidate. It also records the operational commands for source tests, workbench review, dry-run, inventory scan, net-new estimate, batch plan, preflight, recovery guard, release check, and Meili/Postgres parity check.
-- Current generated readiness: `54/60` configured ATS are ready for read-only recovery. Blockers are `dayforcehcm` (`unsupported`) and `peopleforce`, `policeapp`, `sagehr`, `saphrcloud`, `talexio` (`missing fixture paths`). This is not production recovery success; it is the architecture/readiness index for selecting the next safe source lane.
+- Current generated readiness after fixture-path closure: `59/60` configured ATS are ready for read-only recovery. The only configured ATS blocker is `dayforcehcm` (`unsupported`). This is not production recovery success; it is the architecture/readiness index for selecting the next safe source lane.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker-budget change was run.
+
+## ATS Fixture Path Readiness Closure - June 1, 2026
+
+- The remaining fixture-path blockers were closed without enabling any source or running production writes. `saphrcloud` and `talexio` now expose existing fixture paths through their recovery contracts.
+- `peopleforce`, `policeapp`, and `sagehr` now have source-local company/list/expected-normalized/invalid-shapes fixtures from existing parser characterization evidence. Their valid fixtures pass the base normalized source contract but remain public-gate quarantined: all three lack `source_job_id`; `policeapp` and `sagehr` also lack deterministic geo/remote evidence.
+- The HTML/public fixture tests now keep these quarantined fixtures separate from the accepted-public source loop, preventing readiness from being mistaken for public-row acceptance.
+- Regenerated `docs/reference/ats-registry-targets/` reports recovery readiness counts `{"research-only":30,"ready-for-read-only-recovery":59,"blocked":1}` and `read_only_recovery_ready_count=59`. Only `dayforcehcm` remains blocked.
+- Verification covered source syntax checks, HTML/public, direct, and enterprise source-module tests, source contract tests, registry-index tests, `npm.cmd run ats:registry-index -- --json --no-write`, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker-budget change was run.
 
 ## v2.1.0 Release Update - May 31, 2026
 

@@ -43,15 +43,23 @@ function testBuildRegistryIndex() {
 
   assert.equal(byKey.get("zoho").registry_status, "registry-backed-canary");
   assert.equal(byKey.get("peopleforce").registry_status, "registry-backed-disabled");
-  assert.equal(byKey.get("peopleforce").recovery_readiness.status, "blocked");
-  assert.ok(byKey.get("peopleforce").recovery_readiness.blockers.includes("missing fixture paths"));
+  assert.equal(byKey.get("peopleforce").recovery_readiness.status, "ready-for-read-only-recovery");
+  assert.equal(byKey.get("policeapp").recovery_readiness.status, "ready-for-read-only-recovery");
+  assert.equal(byKey.get("sagehr").recovery_readiness.status, "ready-for-read-only-recovery");
+  assert.equal(byKey.get("saphrcloud").recovery_readiness.status, "ready-for-read-only-recovery");
+  assert.equal(byKey.get("talexio").recovery_readiness.status, "ready-for-read-only-recovery");
 
   assert.equal(byKey.get("personio").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").registry_status, "research-only");
   assert.equal(byKey.get("paycomonline").recovery_readiness.status, "research-only");
-  assert.ok(payload.summary.read_only_recovery_ready_count > 0);
-  assert.ok(payload.summary.recovery_readiness_blockers.some((item) => item.ats_key === "peopleforce"));
+  assert.ok(payload.summary.read_only_recovery_ready_count >= 59);
+  assert.deepEqual(
+    payload.summary.recovery_readiness_blockers
+      .filter((item) => item.status === "blocked")
+      .map((item) => item.ats_key),
+    ["dayforcehcm"]
+  );
 }
 
 function testFamilyTasks() {

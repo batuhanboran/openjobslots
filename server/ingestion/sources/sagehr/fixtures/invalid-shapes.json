@@ -1,0 +1,58 @@
+{
+  "ats_key": "sagehr",
+  "description": "Invalid SageHR source-shape fixtures for source validation and public-gate quarantine.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Sage Fixture Co",
+        "source_job_id": "sage-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://talent.sage.hr/fixture/jobs/sage-missing-title",
+        "location": "Dublin, Ireland",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing canonical URL",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Sage Fixture Co",
+        "source_job_id": "sage-missing-url",
+        "position_name": "Valid Title",
+        "job_posting_url": "",
+        "location": "Dublin, Ireland",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing source id",
+      "expected": "quarantined",
+      "reason": "missing_source_job_id",
+      "posting": {
+        "company_name": "Sage Fixture Co",
+        "source_job_id": "",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://talent.sage.hr/fixture/jobs/valid-title",
+        "location": "Dublin, Ireland",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing location with unknown remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Sage Fixture Co",
+        "source_job_id": "sage-no-location",
+        "position_name": "Valid Title",
+        "job_posting_url": "https://talent.sage.hr/fixture/jobs/sage-no-location",
+        "location": "",
+        "remote_type": "unknown"
+      }
+    }
+  ]
+}

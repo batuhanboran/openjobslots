@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generated_at": "2026-05-31T23:32:16.296Z",
+  "generated_at": "2026-05-31T23:43:20.198Z",
   "summary": {
     "configured_ats_count": 60,
     "future_candidate_count": 30,
@@ -14,10 +14,10 @@
     },
     "recovery_readiness_counts": {
       "research-only": 30,
-      "ready-for-read-only-recovery": 54,
-      "blocked": 6
+      "ready-for-read-only-recovery": 59,
+      "blocked": 1
     },
-    "read_only_recovery_ready_count": 54,
+    "read_only_recovery_ready_count": 59,
     "recovery_readiness_blockers": [
       {
         "ats_key": "dayforcehcm",
@@ -25,46 +25,6 @@
         "status": "blocked",
         "blockers": [
           "unsupported source"
-        ]
-      },
-      {
-        "ats_key": "peopleforce",
-        "registry_status": "registry-backed-disabled",
-        "status": "blocked",
-        "blockers": [
-          "missing fixture paths"
-        ]
-      },
-      {
-        "ats_key": "policeapp",
-        "registry_status": "registry-backed-disabled",
-        "status": "blocked",
-        "blockers": [
-          "missing fixture paths"
-        ]
-      },
-      {
-        "ats_key": "sagehr",
-        "registry_status": "registry-backed-disabled",
-        "status": "blocked",
-        "blockers": [
-          "missing fixture paths"
-        ]
-      },
-      {
-        "ats_key": "saphrcloud",
-        "registry_status": "registry-backed-disabled",
-        "status": "blocked",
-        "blockers": [
-          "missing fixture paths"
-        ]
-      },
-      {
-        "ats_key": "talexio",
-        "registry_status": "registry-backed-disabled",
-        "status": "blocked",
-        "blockers": [
-          "missing fixture paths"
         ]
       }
     ],
@@ -231,7 +191,7 @@
         {
           "ats_key": "saphrcloud",
           "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "blocked",
+          "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/saphrcloud/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
@@ -424,7 +384,7 @@
         {
           "ats_key": "peopleforce",
           "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "blocked",
+          "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/peopleforce/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
@@ -438,7 +398,7 @@
         {
           "ats_key": "sagehr",
           "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "blocked",
+          "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/sagehr/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
@@ -452,7 +412,7 @@
         {
           "ats_key": "talexio",
           "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "blocked",
+          "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/talexio/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         }
@@ -517,7 +477,7 @@
         {
           "ats_key": "policeapp",
           "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "blocked",
+          "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/policeapp/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
@@ -4503,20 +4463,28 @@
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "blocked",
-        "source_contract_ok": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
         "public_gate": true,
         "quality_threshold": true,
         "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/peopleforce/fixtures/company.json",
+            "server/ingestion/sources/peopleforce/fixtures/list.json",
+            "server/ingestion/sources/peopleforce/fixtures/expected-normalized.json",
+            "server/ingestion/sources/peopleforce/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/peopleforce/fixtures/company.json",
+            "server/ingestion/sources/peopleforce/fixtures/list.json",
+            "server/ingestion/sources/peopleforce/fixtures/expected-normalized.json",
+            "server/ingestion/sources/peopleforce/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "missing fixture paths"
-        ],
+        "blockers": [],
         "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
         "required_gate_sequence": [
           "source_test",
@@ -4694,20 +4662,28 @@
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "blocked",
-        "source_contract_ok": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
         "public_gate": true,
         "quality_threshold": true,
         "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/policeapp/fixtures/company.json",
+            "server/ingestion/sources/policeapp/fixtures/list.json",
+            "server/ingestion/sources/policeapp/fixtures/expected-normalized.json",
+            "server/ingestion/sources/policeapp/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/policeapp/fixtures/company.json",
+            "server/ingestion/sources/policeapp/fixtures/list.json",
+            "server/ingestion/sources/policeapp/fixtures/expected-normalized.json",
+            "server/ingestion/sources/policeapp/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "missing fixture paths"
-        ],
+        "blockers": [],
         "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
         "required_gate_sequence": [
           "source_test",
@@ -5131,20 +5107,28 @@
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "blocked",
-        "source_contract_ok": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
         "public_gate": true,
         "quality_threshold": true,
         "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/sagehr/fixtures/company.json",
+            "server/ingestion/sources/sagehr/fixtures/list.json",
+            "server/ingestion/sources/sagehr/fixtures/expected-normalized.json",
+            "server/ingestion/sources/sagehr/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/sagehr/fixtures/company.json",
+            "server/ingestion/sources/sagehr/fixtures/list.json",
+            "server/ingestion/sources/sagehr/fixtures/expected-normalized.json",
+            "server/ingestion/sources/sagehr/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "missing fixture paths"
-        ],
+        "blockers": [],
         "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
         "required_gate_sequence": [
           "source_test",
@@ -5199,20 +5183,28 @@
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "blocked",
-        "source_contract_ok": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
         "public_gate": true,
         "quality_threshold": true,
         "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/saphrcloud/fixtures/company.json",
+            "server/ingestion/sources/saphrcloud/fixtures/list.json",
+            "server/ingestion/sources/saphrcloud/fixtures/expected-normalized.json",
+            "server/ingestion/sources/saphrcloud/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/saphrcloud/fixtures/company.json",
+            "server/ingestion/sources/saphrcloud/fixtures/list.json",
+            "server/ingestion/sources/saphrcloud/fixtures/expected-normalized.json",
+            "server/ingestion/sources/saphrcloud/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "missing fixture paths"
-        ],
+        "blockers": [],
         "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
         "required_gate_sequence": [
           "source_test",
@@ -5885,20 +5877,28 @@
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "blocked",
-        "source_contract_ok": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
         "public_gate": true,
         "quality_threshold": true,
         "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/talexio/fixtures/company.json",
+            "server/ingestion/sources/talexio/fixtures/list.json",
+            "server/ingestion/sources/talexio/fixtures/expected-normalized.json",
+            "server/ingestion/sources/talexio/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/talexio/fixtures/company.json",
+            "server/ingestion/sources/talexio/fixtures/list.json",
+            "server/ingestion/sources/talexio/fixtures/expected-normalized.json",
+            "server/ingestion/sources/talexio/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "missing fixture paths"
-        ],
+        "blockers": [],
         "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
         "required_gate_sequence": [
           "source_test",

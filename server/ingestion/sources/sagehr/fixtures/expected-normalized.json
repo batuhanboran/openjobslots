@@ -1,0 +1,19 @@
+[
+  {
+    "source_job_id": "",
+    "company_name": "Sage Fixture Co",
+    "position_name": "Support Lead",
+    "country": "",
+    "remote_type": "unknown",
+    "job_posting_url": "https://talent.sage.hr/fixture/jobs/123",
+    "parser_confidence": 0.62,
+    "source_evidence": {
+      "list_url": "https://talent.sage.hr/fixture/vacancies",
+      "route_kind": "sagehr_public_vacancies"
+    },
+    "public_gate": {
+      "status": "quarantined",
+      "reason_codes": ["missing_source_job_id", "no_geo_no_remote"]
+    }
+  }
+]

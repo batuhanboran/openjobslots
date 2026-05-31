@@ -14,6 +14,12 @@ const ATS_KEY = "saphrcloud";
 const SOURCE_FAMILY = "enterprise_api";
 const PARSER_VERSION = "source-saphrcloud-v1";
 const SAPHRCLOUD_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const FIXTURE_PATHS = Object.freeze([
+  `server/ingestion/sources/${ATS_KEY}/fixtures/company.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/list.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/expected-normalized.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/invalid-shapes.json`
+]);
 
 function normalizeCompanyName(company = {}, fallback = "saphrcloud") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -189,7 +195,8 @@ const sourceContract = createBasicSourceContract({
   sourceFamily: SOURCE_FAMILY,
   parserVersion: PARSER_VERSION,
   parserConfidence: 0.55,
-  requestsPerMinute: 8
+  requestsPerMinute: 8,
+  fixturePaths: FIXTURE_PATHS
 });
 
 function validate(posting) {

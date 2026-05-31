@@ -34,6 +34,24 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "applytojob"
 ]);
 
+const QUARANTINED_HTML_PUBLIC_SOURCES = Object.freeze([
+  {
+    atsKey: "peopleforce",
+    sourceFamilies: ["html_detail"],
+    reasonCodes: ["missing_source_job_id"]
+  },
+  {
+    atsKey: "policeapp",
+    sourceFamilies: ["html_public_ajax"],
+    reasonCodes: ["missing_source_job_id", "no_geo_no_remote"]
+  },
+  {
+    atsKey: "sagehr",
+    sourceFamilies: ["html_detail"],
+    reasonCodes: ["missing_source_job_id", "no_geo_no_remote"]
+  }
+]);
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
@@ -94,6 +112,87 @@ for (const atsKey of HTML_PUBLIC_SOURCES) {
       const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
       if (item.expected === "rejected") {
         assert.equal(basic.ok, false, `${atsKey} ${item.name} should fail validation`);
+        assert.match(basic.error, new RegExp(item.reason));
+      } else {
+        assert.equal(basic.ok, true, `${atsKey} ${item.name} should pass basic validation`);
+        assert.equal(gate.status, "quarantined", `${atsKey} ${item.name} should be quarantined`);
+        assert.ok(
+          gate.reason_codes.some((reason) => new RegExp(item.reason).test(reason)),
+          `${atsKey} ${item.name} should include ${item.reason}`
+        );
+      }
+    }
+  });
+}
+
+for (const { atsKey, sourceFamilies, reasonCodes } of QUARANTINED_HTML_PUBLIC_SOURCES) {
+  test(`${atsKey} html/public source module parses fixture with quarantined public-gate evidence`, () => {
+    const source = getSourceModule(atsKey);
+    assert.ok(source, `expected source module ${atsKey}`);
+    const sourceDir = path.join(__dirname, atsKey);
+    const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+    const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+    const expectedRows = readJson(path.join(sourceDir, "fixtures", "expected-normalized.json"));
+
+    const discovered = source.discover(company);
+    assert.equal(discovered.ats_key, atsKey);
+    assert.ok(source.parserVersion.startsWith(`source-${atsKey}-v`));
+    assert.ok(sourceFamilies.includes(discovered.source_family));
+    assert.ok(source.rateLimit().requestsPerMinute <= 8);
+    assert.deepEqual(source.fixtures().map((fixturePath) => fixturePath.replace(/\\/g, "/")), [
+      `server/ingestion/sources/${atsKey}/fixtures/company.json`,
+      `server/ingestion/sources/${atsKey}/fixtures/list.json`,
+      `server/ingestion/sources/${atsKey}/fixtures/expected-normalized.json`,
+      `server/ingestion/sources/${atsKey}/fixtures/invalid-shapes.json`
+    ]);
+
+    const parsed = source.parse(rawList, company);
+    assert.equal(parsed.length, expectedRows.length, `${atsKey} parsed fixture count should match`);
+    const normalized = parsed.map((posting) => source.normalize(posting, company));
+
+    for (let index = 0; index < expectedRows.length; index += 1) {
+      const row = normalized[index];
+      const expected = expectedRows[index];
+      assert.equal(source.validate(row).ok, true);
+      assert.equal(row.ats_key, atsKey);
+      assert.equal(row.parser_key, atsKey);
+      assert.equal(row.parser_version, source.parserVersion);
+      assert.ok(row.evidence?.title?.present);
+      assert.ok(row.evidence?.company?.present);
+      assert.ok(row.evidence?.canonical_url?.present);
+      assert.equal(row.source_job_id, expected.source_job_id);
+      assert.equal(row.company_name, expected.company_name);
+      assert.equal(row.position_name, expected.position_name);
+      assert.equal(row.country, expected.country || "");
+      if (Object.prototype.hasOwnProperty.call(expected, "city")) assert.equal(row.city, expected.city);
+      assert.equal(row.remote_type, expected.remote_type || "unknown");
+      assert.equal(row.canonical_url, expected.job_posting_url);
+      assert.equal(row.source_evidence?.list_url, expected.source_evidence.list_url);
+      assert.equal(row.source_evidence?.route_kind, expected.source_evidence.route_kind);
+      assert.equal(row.parser_confidence, expected.parser_confidence);
+      const gate = source.validatePublic(row);
+      assert.equal(gate.status, expected.public_gate.status, `${atsKey} fixture should stay quarantined`);
+      for (const reason of expected.public_gate.reason_codes) {
+        assert.ok(gate.reason_codes.includes(reason), `${atsKey} gate should include ${reason}`);
+      }
+      for (const reason of reasonCodes) {
+        assert.ok(gate.reason_codes.includes(reason), `${atsKey} gate should include ${reason}`);
+      }
+    }
+  });
+
+  test(`${atsKey} html/public source module rejects or quarantines invalid fixture shapes`, () => {
+    const source = getSourceModule(atsKey);
+    const sourceDir = path.join(__dirname, atsKey);
+    const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+    const invalid = readJson(path.join(sourceDir, "fixtures", "invalid-shapes.json"));
+
+    for (const item of invalid.cases) {
+      const normalized = source.normalize(item.posting, company);
+      const basic = source.validate(normalized);
+      const gate = source.validatePublic(normalized);
+      if (item.expected === "rejected") {
+        assert.equal(basic.ok, false, `${atsKey} ${item.name} should fail source validation`);
         assert.match(basic.error, new RegExp(item.reason));
       } else {
         assert.equal(basic.ok, true, `${atsKey} ${item.name} should pass basic validation`);

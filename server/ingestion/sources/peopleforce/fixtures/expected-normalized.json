@@ -1,0 +1,20 @@
+[
+  {
+    "source_job_id": "",
+    "company_name": "Peopleforce Fixture Co",
+    "position_name": "Senior Engineer",
+    "country": "Ukraine",
+    "city": "Kyiv",
+    "remote_type": "onsite",
+    "job_posting_url": "https://fixture.peopleforce.io/careers/v/senior-engineer",
+    "parser_confidence": 0.62,
+    "source_evidence": {
+      "list_url": "https://fixture.peopleforce.io/careers",
+      "route_kind": "peopleforce_public_careers"
+    },
+    "public_gate": {
+      "status": "quarantined",
+      "reason_codes": ["missing_source_job_id"]
+    }
+  }
+]

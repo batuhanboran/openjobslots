@@ -15,6 +15,12 @@ const PARSER_VERSION = "source-policeapp-v1";
 const POLICEAPP_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const POLICEAPP_ENDPOINT =
   "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0";
+const FIXTURE_PATHS = Object.freeze([
+  `server/ingestion/sources/${ATS_KEY}/fixtures/company.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/list.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/expected-normalized.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/invalid-shapes.json`
+]);
 
 function discover() {
   return {
@@ -121,7 +127,8 @@ module.exports = {
     sourceFamily: SOURCE_FAMILY,
     parserVersion: PARSER_VERSION,
     parserConfidence: 0.6,
-    requestsPerMinute: 6
+    requestsPerMinute: 6,
+    fixturePaths: FIXTURE_PATHS
   }),
   atsKey: ATS_KEY,
   key: ATS_KEY,

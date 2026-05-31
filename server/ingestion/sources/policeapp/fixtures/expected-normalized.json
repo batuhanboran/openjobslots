@@ -1,0 +1,19 @@
+[
+  {
+    "source_job_id": "",
+    "company_name": "Town Police",
+    "position_name": "Town Police - Patrol Officer",
+    "country": "",
+    "remote_type": "unknown",
+    "job_posting_url": "https://www.policeapp.com/jobs/123",
+    "parser_confidence": 0.6,
+    "source_evidence": {
+      "list_url": "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0",
+      "route_kind": "policeapp_public_ajax"
+    },
+    "public_gate": {
+      "status": "quarantined",
+      "reason_codes": ["missing_source_job_id", "no_geo_no_remote"]
+    }
+  }
+]

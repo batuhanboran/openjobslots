@@ -1,0 +1,9 @@
+{
+  "html": "<div class=\"title-wrap\"><h1>Sage Fixture Co</h1></div>\n<div class=\"job\">\n  <a class=\"title\" href=\"/fixture/jobs/123\">Support Lead</a>\n  <span>Team</span>\n</div>",
+  "__sourceConfig": {
+    "baseOrigin": "https://talent.sage.hr",
+    "boardUrl": "https://talent.sage.hr/fixture/vacancies",
+    "companySlugLower": "fixture"
+  },
+  "__sourceFetchFinalUrl": "https://talent.sage.hr/fixture/vacancies"
+}

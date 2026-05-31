@@ -16,6 +16,12 @@ const PARSER_VERSION = "source-talexio-v1";
 const TALEXIO_RATE_LIMIT_WAIT_MS = 60 * 1000;
 const MAX_PAGES_PER_COMPANY = 25;
 const PAGE_SIZE = 10;
+const FIXTURE_PATHS = Object.freeze([
+  `server/ingestion/sources/${ATS_KEY}/fixtures/company.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/list.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/expected-normalized.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/invalid-shapes.json`
+]);
 
 function normalizeCompanyName(company = {}, fallback = "talexio") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -204,7 +210,8 @@ const sourceContract = createBasicSourceContract({
   sourceFamily: SOURCE_FAMILY,
   parserVersion: PARSER_VERSION,
   parserConfidence: 0.58,
-  requestsPerMinute: 8
+  requestsPerMinute: 8,
+  fixturePaths: FIXTURE_PATHS
 });
 
 function validate(posting) {
