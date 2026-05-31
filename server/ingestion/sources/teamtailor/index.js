@@ -26,10 +26,19 @@ function parse(rawPayload, company = {}) {
   const config = rawPayload?.__sourceConfig || target.config || {};
   const payload = stripInternalPayloadFields(rawPayload);
   if (payload && typeof payload === "object" && typeof payload.rss === "string") {
-    return parser.parseTeamtailorPostingsFromRss(
-      normalizeCompanyName(company, config.subdomainLower || "teamtailor"),
+    const companyName = normalizeCompanyName(company, config.subdomainLower || "teamtailor");
+    const rssPostings = parser.parseTeamtailorPostingsFromRss(
+      companyName,
       payload.rss
     );
+    const htmlPostings = typeof payload.html === "string"
+      ? parser.parseTeamtailorPostingsFromHtml(
+        companyName,
+        config,
+        payload.html
+      )
+      : [];
+    return parser.mergeTeamtailorRssAndHtmlPostings(rssPostings, htmlPostings);
   }
   const html = typeof payload === "string" ? payload : String(payload?.html || payload?.body || "");
   return parser.parseTeamtailorPostingsFromHtml(

@@ -61,6 +61,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - The payload-drift core now ignores internal `__source*` fetch/request metadata, and BambooHR declares source-local ignored stems for supported `location` / `atsLocation` geo subfields. The public gate still rejects or quarantines rows without useful geo or explicit remote/hybrid evidence.
 - Verification covered payload-drift tests, source registry tests, and direct source-module tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## Teamtailor RSS/HTML Location Fallback - June 1, 2026
+
+- Fresh read-only production evidence still has production at `6660eab`, all services healthy, `331,463` visible job slots, and the known Meili remote-facet drift of `6` onsite vs unknown documents. Throughput remains `hold`; Teamtailor contributed `176` recent source-quality `no_geo_no_remote` events.
+- Teamtailor RSS sometimes returns empty `<tt:locations>` for a job while the public jobs HTML list has a location label for the same canonical URL. The source module now fetches the HTML jobs page only when RSS has empty or absent Teamtailor location blocks.
+- Teamtailor parsing now supports modern `li.w-full` job cards, removes separator-only metadata spans, and merges RSS title/date/remote/source-id with HTML list location/department. City-only HTML locations are country-qualified only when the same RSS payload provides a matching source-backed city-country hint; otherwise the parser leaves country blank.
+- Live read-only parser proof for `estatementgroup.teamtailor.com` recovered a production-quarantined row as `Stockholm, Sweden`, `remote_type=onsite`, `posting_date=2025-11-18`, and public gate `accepted`; a `folketsthlm.teamtailor.com` control probe kept brand-only `Folket` metadata quarantined instead of treating it as geo.
+- Verification covered focused Teamtailor parser tests, full backend/parser tests, API tests, architecture-boundary audit, and whitespace check. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

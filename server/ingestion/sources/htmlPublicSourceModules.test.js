@@ -262,6 +262,13 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
   const payload = await source.fetchList(company, {
     fetcher: async (url, target) => {
       calls.push({ url, method: target.method, headers: target.headers });
+      if (url === "https://fixture.teamtailor.com/jobs") {
+        return {
+          body: rawList.html,
+          status: 200,
+          url
+        };
+      }
       return {
         body: rawList.rss,
         status: 200,
@@ -270,21 +277,35 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
     }
   });
 
-  assert.deepEqual(calls, [{
-    url: "https://fixture.teamtailor.com/jobs.rss",
-    method: "GET",
-    headers: {
-      Accept: "application/rss+xml, text/xml, application/xml;q=0.9, */*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  assert.deepEqual(calls, [
+    {
+      url: "https://fixture.teamtailor.com/jobs.rss",
+      method: "GET",
+      headers: {
+        Accept: "application/rss+xml, text/xml, application/xml;q=0.9, */*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      url: "https://fixture.teamtailor.com/jobs",
+      method: "GET",
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
     }
-  }]);
+  ]);
   assert.equal(payload.__sourceConfig.subdomainLower, "fixture");
   assert.equal(payload.__sourceConfig.rssUrl, "https://fixture.teamtailor.com/jobs.rss");
+  assert.equal(payload.__sourceHtmlFetchFinalUrl, "https://fixture.teamtailor.com/jobs");
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 3);
+  assert.equal(parsed.length, 4);
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
@@ -297,6 +318,11 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
   assert.equal(byId.get("5842777-rss-hybrid-consultant").country, "Sweden");
   assert.equal(byId.get("5842777-rss-hybrid-consultant").remote_type, "hybrid");
   assert.equal(source.validatePublic(byId.get("5842777-rss-hybrid-consultant")).status, "accepted");
+  assert.equal(byId.get("5842888-rss-html-fallback-producer").country, "Sweden");
+  assert.equal(byId.get("5842888-rss-html-fallback-producer").city, "Stockholm");
+  assert.equal(byId.get("5842888-rss-html-fallback-producer").remote_type, "onsite");
+  assert.equal(byId.get("5842888-rss-html-fallback-producer").posting_date, "2026-03-24");
+  assert.equal(source.validatePublic(byId.get("5842888-rss-html-fallback-producer")).status, "accepted");
 
   await assert.rejects(
     () => source.fetchList(company, {
@@ -308,6 +334,47 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
     }),
     /unexpected host/
   );
+});
+
+test("teamtailor RSS/HTML merge keeps unhinted brand labels quarantined", () => {
+  const source = getSourceModule("teamtailor");
+  const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));
+  const payload = {
+    rss: [
+      `<?xml version="1.0" encoding="UTF-8"?>`,
+      `<rss version="2.0" xmlns:tt="https://teamtailor.com/locations"><channel>`,
+      `<item>`,
+      `<title>Brand Label Role</title>`,
+      `<link>https://fixture.teamtailor.com/jobs/5842999-brand-label-role</link>`,
+      `<guid>teamtailor-rss-guid-brand</guid>`,
+      `<remoteStatus>none</remoteStatus>`,
+      `<tt:locations></tt:locations>`,
+      `</item>`,
+      `</channel></rss>`
+    ].join(""),
+    html: [
+      `<ul><li class="w-full">`,
+      `<div class="relative flex">`,
+      `<a class="line-clamp-2 flex" href="https://fixture.teamtailor.com/jobs/5842999-brand-label-role">`,
+      `<span class="absolute inset-0"></span>Brand Label Role</a>`,
+      `<div class="mt-1 text-md"><span>Fixture Teamtailor</span></div>`,
+      `</div>`,
+      `</li></ul>`
+    ].join(""),
+    __sourceConfig: {
+      baseOrigin: "https://fixture.teamtailor.com",
+      jobsUrl: "https://fixture.teamtailor.com/jobs",
+      rssUrl: "https://fixture.teamtailor.com/jobs.rss"
+    }
+  };
+
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.location_text || "", "");
+  assert.equal(normalized.country, "");
+  assert.equal(source.validatePublic(normalized).status, "quarantined");
+  assert.ok(source.validatePublic(normalized).reason_codes.includes("no_geo_no_remote"));
 });
 
 test("jobvite source module fetches jobs HTML with source-local discovery and host guard", async () => {

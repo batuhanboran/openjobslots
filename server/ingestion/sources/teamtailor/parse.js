@@ -10,6 +10,12 @@ function cleanTeamtailorText(value) {
     .trim();
 }
 
+function isTeamtailorSeparator(value) {
+  const cleaned = String(value || "").trim();
+  const markerCode = cleaned.length === 1 ? cleaned.charCodeAt(0) : 0;
+  return cleaned === "&middot;" || markerCode === 183 || markerCode === 8226;
+}
+
 function extractTeamtailorMetaParts(value) {
   const source = String(value || "");
   const parts = [];
@@ -20,7 +26,7 @@ function extractTeamtailorMetaParts(value) {
   while (spanMatch) {
     const cleaned = cleanTeamtailorText(spanMatch[1] || "");
     const normalized = cleaned.toLowerCase();
-    if (cleaned && cleaned !== "·" && cleaned !== "&middot;" && !seen.has(normalized)) {
+    if (cleaned && !isTeamtailorSeparator(cleaned) && !seen.has(normalized)) {
       parts.push(cleaned);
       seen.add(normalized);
     }
@@ -103,17 +109,49 @@ function parseTeamtailorPostingsFromRss(companyNameForPostings, rssXml) {
   return postings;
 }
 
+function firstMatch(source, patterns) {
+  for (const pattern of patterns) {
+    const match = String(source || "").match(pattern);
+    const value = cleanTeamtailorText(match?.[1] || "");
+    if (value) return value;
+  }
+  return "";
+}
+
+function buildRssLocationCountryHints(rssPostings = []) {
+  const hints = new Map();
+  for (const posting of rssPostings) {
+    const location = String(posting?.location || "").trim();
+    const parts = location.split(",").map((part) => part.trim()).filter(Boolean);
+    if (parts.length !== 2) continue;
+    const [city, country] = parts;
+    if (!city || !country) continue;
+    hints.set(city.toLowerCase(), { city, country });
+  }
+  return hints;
+}
+
+function qualifyHtmlLocationFromRssHints(location, hints = new Map()) {
+  const value = String(location || "").trim();
+  if (!value || value.includes("/")) return null;
+  if (value.includes(",")) return value;
+  const hint = hints.get(value.toLowerCase());
+  if (!hint?.country) return null;
+  return `${hint.city || value}, ${hint.country}`;
+}
+
 function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
   const seenUrls = new Set();
   const itemPattern =
-    /<li[^>]*class=["'][^"']*\bblock-grid-item\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+    /<li\b[^>]*>(?=[\s\S]*?<a\b[^>]*href=["'][^"']*\/jobs\/[^"']+["'][^>]*>)([\s\S]*?)<\/li>/gi;
   const hrefPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>/i;
   const titleAttrPattern =
     /<span[^>]*class=["'][^"']*\btext-block-base-link\b[^"']*["'][^>]*\btitle=["']([^"']+)["'][^>]*>/i;
   const titleBodyPattern =
     /<span[^>]*class=["'][^"']*\btext-block-base-link\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i;
+  const anchorBodyPattern = /<a[^>]*href=["'][^"']*\/jobs\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i;
   const metaPattern =
     /<div[^>]*class=["'][^"']*\bmt-1\b[^"']*\btext-md\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
 
@@ -129,7 +167,7 @@ function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtm
     }
 
     const titleFromAttr = cleanTeamtailorText(itemHtml.match(titleAttrPattern)?.[1] || "");
-    const titleFromBody = cleanTeamtailorText(itemHtml.match(titleBodyPattern)?.[1] || "");
+    const titleFromBody = firstMatch(itemHtml, [titleBodyPattern, anchorBodyPattern]);
     const title = titleFromAttr || titleFromBody || "Untitled Position";
 
     const metaRaw = String(itemHtml.match(metaPattern)?.[1] || "");
@@ -153,7 +191,48 @@ function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtm
   return postings;
 }
 
+function mergeTeamtailorRssAndHtmlPostings(rssPostings = [], htmlPostings = []) {
+  const byUrl = new Map();
+  const bySourceId = new Map();
+  const rssLocationCountryHints = buildRssLocationCountryHints(rssPostings);
+  for (const posting of htmlPostings) {
+    const urlKey = String(posting?.job_posting_url || "").trim().toLowerCase();
+    const sourceIdKey = String(posting?.source_job_id || "").trim().toLowerCase();
+    if (urlKey) byUrl.set(urlKey, posting);
+    if (sourceIdKey) bySourceId.set(sourceIdKey, posting);
+  }
+
+  const merged = [];
+  const seenHtmlKeys = new Set();
+  for (const posting of rssPostings) {
+    const urlKey = String(posting?.job_posting_url || "").trim().toLowerCase();
+    const sourceIdKey = String(posting?.source_job_id || "").trim().toLowerCase();
+    const htmlPosting = byUrl.get(urlKey) || bySourceId.get(sourceIdKey);
+    if (htmlPosting) {
+      if (urlKey) seenHtmlKeys.add(urlKey);
+      if (sourceIdKey) seenHtmlKeys.add(sourceIdKey);
+    }
+    merged.push({
+      ...posting,
+      location: posting?.location || qualifyHtmlLocationFromRssHints(htmlPosting?.location, rssLocationCountryHints),
+      department: posting?.department || htmlPosting?.department || null
+    });
+  }
+
+  if (rssPostings.length === 0) {
+    for (const posting of htmlPostings) {
+      const urlKey = String(posting?.job_posting_url || "").trim().toLowerCase();
+      const sourceIdKey = String(posting?.source_job_id || "").trim().toLowerCase();
+      if ((urlKey && seenHtmlKeys.has(urlKey)) || (sourceIdKey && seenHtmlKeys.has(sourceIdKey))) continue;
+      merged.push(posting);
+    }
+  }
+
+  return merged;
+}
+
 module.exports = {
   parseTeamtailorPostingsFromRss,
-  parseTeamtailorPostingsFromHtml
+  parseTeamtailorPostingsFromHtml,
+  mergeTeamtailorRssAndHtmlPostings
 };

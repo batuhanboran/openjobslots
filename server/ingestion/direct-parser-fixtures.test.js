@@ -892,6 +892,30 @@ test("implemented HTML/API parsers preserve source ids from source payloads and 
   assert.equal(teamtailor.country, "Germany");
   assert.equal(teamtailor.industry, "Engineering");
 
+  const teamtailorModern = normalizeParsed(
+    "teamtailor",
+    parseTeamtailorPostingsFromHtml(
+      "Fixture Teamtailor",
+      { baseOrigin: "https://fixture.teamtailor.com" },
+      `
+        <li class="w-full">
+          <div class="relative flex flex-col">
+            <a class="@sm:line-clamp-2 flex" href="https://fixture.teamtailor.com/jobs/5842888-producer">
+              <span class="absolute inset-0"></span>
+              Producer
+            </a>
+            <div class="mt-1 text-md"><span>Creative</span><span>&middot;</span><span>Stockholm</span></div>
+          </div>
+        </li>
+      `
+    )[0],
+    "Fixture Teamtailor"
+  );
+  assert.equal(teamtailorModern.source_job_id, "5842888-producer");
+  assert.equal(teamtailorModern.location_text, "Stockholm");
+  assert.equal(teamtailorModern.country, "");
+  assert.equal(teamtailorModern.industry, "Creative");
+
   const manatal = normalizeParsed(
     "manatal",
     parseManatalPostingsFromApi(

@@ -40,6 +40,41 @@ async function payloadToHtml(payload) {
   return "";
 }
 
+async function fetchOptionalJobsHtml(jobsUrl, options = {}) {
+  const url = clean(jobsUrl);
+  if (!url) return null;
+  const target = {
+    method: "GET",
+    headers: buildHeaders()
+  };
+
+  if (typeof options.fetcher === "function") {
+    const payload = await options.fetcher(url, target);
+    const status = responseStatus(payload);
+    if (status < 200 || status >= 300) return null;
+    const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || url);
+    assertTeamtailorFinalHost(finalUrl, url);
+    return {
+      html: await payloadToHtml(payload),
+      finalUrl
+    };
+  }
+
+  const res = await safeFetch(url, target);
+  if (!res.ok) return null;
+  const finalUrl = clean(res.url || url);
+  assertTeamtailorFinalHost(finalUrl, url);
+  return {
+    html: await res.text(),
+    finalUrl
+  };
+}
+
+function shouldFetchHtmlFallbackForRss(rssText) {
+  const source = String(rssText || "");
+  return /<tt:locations>\s*<\/tt:locations>/i.test(source) || !/<tt:location(?:\s|>)/i.test(source);
+}
+
 function assertTeamtailorFinalHost(finalUrl, fallbackUrl) {
   const value = clean(finalUrl || fallbackUrl);
   try {
@@ -95,10 +130,16 @@ function createFetchList(dependencies = {}) {
         if (status >= 200 && status < 300) {
           const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || rssUrl);
           assertTeamtailorFinalHost(finalUrl, rssUrl);
+          const rss = await payloadToHtml(payload);
+          const optionalHtml = shouldFetchHtmlFallbackForRss(rss)
+            ? await fetchOptionalJobsHtml(jobsUrl, options)
+            : null;
           return {
-            rss: await payloadToHtml(payload),
+            rss,
+            ...(optionalHtml?.html ? { html: optionalHtml.html } : {}),
             __sourceConfig: withFinalConfig(config, finalUrl, rssUrl),
             __sourceFetchFinalUrl: finalUrl,
+            ...(optionalHtml?.finalUrl ? { __sourceHtmlFetchFinalUrl: optionalHtml.finalUrl } : {}),
             __sourceFormat: "rss"
           };
         }
@@ -113,10 +154,16 @@ function createFetchList(dependencies = {}) {
         if (rssRes.ok) {
           const finalUrl = clean(rssRes.url || rssUrl);
           assertTeamtailorFinalHost(finalUrl, rssUrl);
+          const rss = await rssRes.text();
+          const optionalHtml = shouldFetchHtmlFallbackForRss(rss)
+            ? await fetchOptionalJobsHtml(jobsUrl, options)
+            : null;
           return {
-            rss: await rssRes.text(),
+            rss,
+            ...(optionalHtml?.html ? { html: optionalHtml.html } : {}),
             __sourceConfig: withFinalConfig(config, finalUrl, rssUrl),
             __sourceFetchFinalUrl: finalUrl,
+            ...(optionalHtml?.finalUrl ? { __sourceHtmlFetchFinalUrl: optionalHtml.finalUrl } : {}),
             __sourceFormat: "rss"
           };
         }
