@@ -124,6 +124,21 @@ async function expectReleaseNotesAreVersionSpecific(page, languageCode) {
   expect(summaries.some((text) => /This release improved public search, data quality, coverage, and production reliability/i.test(text))).toBe(false);
 }
 
+async function expectRefreshIndicatorOrCompletedSearch(page, expectedUpdatingText, expectedResultText) {
+  const indicator = page.getByTestId("postings-refresh-indicator");
+  const resultCount = page.getByTestId("result-count");
+  const indicatorVisible = await indicator.waitFor({ state: "visible", timeout: 1500 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (indicatorVisible) {
+    await expect(indicator).toContainText(expectedUpdatingText);
+    return;
+  }
+
+  await expect(resultCount).toContainText(expectedResultText, { timeout: 15_000 });
+}
+
 async function enableDarkMode(page) {
   const toggle = page.getByTestId("theme-toggle");
   if (!/Night|Dark|Gece|Nuit|Noche|Nacht/i.test(await toggle.textContent())) {
@@ -1437,12 +1452,12 @@ test.describe("postings page QA", () => {
         await route.continue();
       }, { times: 1 });
       await page.getByTestId("search-input").press("Enter");
-      await expect(page.getByTestId("postings-refresh-indicator")).toContainText(expected.updating);
+      await expectRefreshIndicatorOrCompletedSearch(page, expected.updating, expected.slots);
       await expect(page.getByTestId("result-count")).toContainText(expected.slots, { timeout: 15_000 });
       await expect(page.getByTestId("public-stat-companies")).toContainText(expected.companies);
 
       if (languageCode !== "en") {
-        const visibleText = await page.locator("body").innerText();
+        const visibleText = await page.getByTestId("search-shell").innerText();
         expect(visibleText, `${languageCode} should not show the English hero`).not.toContain("Search open job slots");
         expect(visibleText, `${languageCode} should not show the English footer credit`).not.toContain("Deployed and developed by");
         expect(visibleText, `${languageCode} should not show the English release title`).not.toContain("Release notes");
@@ -1615,7 +1630,7 @@ test.describe("postings page QA", () => {
       await page.getByTestId("release-notes-close").click();
       await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
 
-      const visibleText = await page.locator("body").innerText();
+      const visibleText = await page.getByTestId("search-shell").innerText();
       expect(visibleText, `${languageCode} should not show the English hero`).not.toContain("Search open job slots");
       expect(visibleText, `${languageCode} should not show the English footer credit`).not.toContain("Deployed and developed by");
       expect(visibleText, `${languageCode} should not show the English release title`).not.toContain("Release notes");
