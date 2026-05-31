@@ -42,6 +42,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - The payload-drift guard now reads source-local `payloadShapePolicy.empty_job_list_stems`; ADP declares `jobRequisitions`, and UltiPro declares `opportunities`. Positive source counts still force parser drift, so real shape loss is not masked.
 - Verification covered changed-file syntax checks, payload-drift tests, source registry contract tests, source contract tests, and enterprise source-module tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## TalentReef HiBob Oracle Empty-List Drift Policy - June 1, 2026
+
+- Follow-up production drift evidence showed empty source result arrays for TalentReef `hits.hits`, HiBob `jobAdDetails`, and Oracle `items[].requisitionList`; these accounted for 20, 17, and 3 recent parser-validation events in the freshness snapshot.
+- The payload-drift guard now skips internal `__source*` request counters when checking for positive job counts, but still treats real source count fields such as `hits.total`, `TotalJobsCount`, `totalCount`, and `totalNumber` as blockers to `empty_no_jobs`.
+- TalentReef, HiBob, and Oracle now declare source-local `payloadShapePolicy.empty_job_list_stems` for their real job arrays. Positive source counts with empty arrays still record parser drift.
+- Verification covered changed-file syntax checks, payload-drift tests, registry tests, enterprise source-module tests, and HTML/public source-module tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

@@ -11,6 +11,9 @@ const parserVersion = "source-hibob-v1";
 const parserConfidence = 0.57;
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  empty_job_list_stems: Object.freeze(["jobAdDetails"])
+});
 
 function normalizeCompanyName(company = {}, fallback = "hibob") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -116,6 +119,7 @@ module.exports = {
   status: "disabled",
   parserVersion,
   officialDocs: HIBOB_DOCS_URL,
+  payloadShapePolicy,
   discover,
   fetchList,
   fetchDetail: async () => null,

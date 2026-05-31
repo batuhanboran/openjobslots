@@ -2245,8 +2245,11 @@ function hasPositiveTotalCount(value, depth = 0) {
     return value.some((item) => hasPositiveTotalCount(item, depth + 1));
   }
   for (const [key, raw] of Object.entries(value)) {
+    const rawKey = String(key || "");
+    if (rawKey.startsWith("__")) continue;
     const normalizedKey = String(key || "").toLowerCase();
-    if (/^(totalcount|total_count|totalnumber|total_number|jobcount|job_count|count)$/.test(normalizedKey)) {
+    if (/^(requestcount|request_count)$/.test(normalizedKey)) continue;
+    if (/^(total|totalcount|total_count|totalnumber|total_number|totaljobscount|total_jobs_count|jobcount|job_count|count)$/.test(normalizedKey)) {
       const count = Number(raw);
       if (Number.isFinite(count) && count > 0) return true;
     }

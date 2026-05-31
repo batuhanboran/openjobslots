@@ -322,6 +322,7 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof hibob.parse, "function");
   assert.equal(typeof hibob.normalize, "function");
   assert.equal(typeof hibob.validate, "function");
+  assert.deepEqual(hibob.payloadShapePolicy.empty_job_list_stems, ["jobAdDetails"]);
   assert.deepEqual(validateSourceContract(hibob), { ok: true, failures: [] });
 
   const governmentJobs = getRegistrySourceModule("governmentjobs");
@@ -501,6 +502,7 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof oracle.parse, "function");
   assert.equal(typeof oracle.normalize, "function");
   assert.equal(typeof oracle.validate, "function");
+  assert.deepEqual(oracle.payloadShapePolicy.empty_job_list_stems, ["items[].requisitionList"]);
   assert.deepEqual(validateSourceContract(oracle), { ok: true, failures: [] });
 
   const pinpointHq = getRegistrySourceModule("pinpointhq");
@@ -715,6 +717,7 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof talentreef.parse, "function");
   assert.equal(typeof talentreef.normalize, "function");
   assert.equal(typeof talentreef.validate, "function");
+  assert.deepEqual(talentreef.payloadShapePolicy.empty_job_list_stems, ["hits.hits"]);
   assert.deepEqual(validateSourceContract(talentreef), { ok: true, failures: [] });
 
   const ultipro = getRegistrySourceModule("ultipro");

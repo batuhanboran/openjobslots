@@ -8,6 +8,9 @@ const baseModule = createSourceModule(atsKey);
 const parserVersion = `${baseModule.parserVersion || ORACLE_PARSER_VERSION}`;
 const discover = createDiscover(parserVersion);
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  empty_job_list_stems: Object.freeze(["items[].requisitionList"])
+});
 
 function stripInternalPayloadFields(rawPayload) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
@@ -40,5 +43,6 @@ module.exports = {
   parserVersion,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

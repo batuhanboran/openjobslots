@@ -1743,6 +1743,51 @@ async function testPayloadDriftUsesSourceLocalEmptyJobListStems() {
   assert.equal(calls.length, 0);
 }
 
+async function testPayloadDriftIgnoresInternalRequestCountsForEmptyLists() {
+  const calls = [];
+  const pool = {
+    async query(sql) {
+      calls.push({ sql });
+      throw new Error(`Internal request counters should not prevent empty-list classification: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "talentreef",
+      companyUrl: "https://jobs.jobappnetwork.com/yoshinoya",
+      company: { company_name: "Yoshinoya" },
+      adapter: {
+        payloadShapePolicy: {
+          empty_job_list_stems: ["hits.hits"]
+        }
+      }
+    },
+    {
+      hits: {
+        total: 0,
+        hits: []
+      },
+      __sourceConfig: {
+        requestCount: {
+          aliases: 1,
+          search: 1,
+          total: 2
+        }
+      },
+      __sourceRequest: {
+        searchRequestCount: 1
+      }
+    },
+    "source-talentreef-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.empty_no_jobs, true);
+  assert.equal(calls.length, 0);
+}
+
 async function testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift() {
   const calls = [];
   const pool = {
@@ -1790,6 +1835,67 @@ async function testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift() {
       }
     },
     "source-adp_workforcenow-v1"
+  );
+
+  assert.equal(result.drift, true);
+  assert.ok(calls.some((call) => /FROM source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.some((call) => /INSERT INTO parser_drift_events/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
+}
+
+async function testPayloadDriftKeepsPositiveTotalEmptyHitsAsDrift() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "populated-talentreef",
+            shape_paths: [
+              "hits.hits:array",
+              "hits.hits[]._id:string",
+              "hits.hits[]._source.title:string",
+              "hits.hits[]._source.url:string",
+              "hits.hits[]:object",
+              "hits.total:number",
+              "hits:object"
+            ],
+            observed_count: 18
+          }]
+        };
+      }
+      if (/INSERT INTO parser_drift_events/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Positive-total empty hits should record drift only: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "talentreef",
+      companyUrl: "https://jobs.jobappnetwork.com/broken",
+      company: { company_name: "Broken TalentReef" },
+      adapter: {
+        payloadShapePolicy: {
+          empty_job_list_stems: ["hits.hits"]
+        }
+      }
+    },
+    {
+      hits: {
+        total: 4,
+        hits: []
+      },
+      __sourceConfig: {
+        requestCount: {
+          aliases: 1,
+          search: 1,
+          total: 2
+        }
+      }
+    },
+    "source-talentreef-v1"
   );
 
   assert.equal(result.drift, true);
@@ -2311,7 +2417,9 @@ async function main() {
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
   await testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs();
   await testPayloadDriftUsesSourceLocalEmptyJobListStems();
+  await testPayloadDriftIgnoresInternalRequestCountsForEmptyLists();
   await testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift();
+  await testPayloadDriftKeepsPositiveTotalEmptyHitsAsDrift();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();
