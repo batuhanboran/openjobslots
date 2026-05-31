@@ -36,8 +36,17 @@ function writeOutput(report, options = {}) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const report = await runSourceJob(options, process.env);
-  writeOutput(report, options);
+  try {
+    const report = await runSourceJob(options, process.env);
+    writeOutput(report, options);
+  } catch (error) {
+    if (error?.sourceRunSummary) {
+      writeOutput(error.sourceRunSummary, options);
+      process.exitCode = 1;
+      return;
+    }
+    throw error;
+  }
 }
 
 if (require.main === module) {

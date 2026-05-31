@@ -1,4 +1,6 @@
 const { URL } = require("node:url");
+const fs = require("node:fs");
+const path = require("node:path");
 const { createPostgresPool, ensurePostgresSchema } = require("../backends/postgres");
 const { acquireHeavyJobLock } = require("../backends/heavyJobLock");
 const { upsertPostgresPostings, normalizeAtsKey } = require("../backends/postgresStore");
@@ -13,7 +15,9 @@ const {
   decideDetailEscalation,
   summarizeEvidence
 } = require("./parserEvidence");
+const { SOURCE_STATUSES, validateSourceRecoveryContract } = require("./sourceContracts");
 const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
+const { getRegistrySourceModule } = require("./sourceRegistry");
 const { recordSourceRunPostingChanges, snapshotRows } = require("./sourceRollback");
 
 const DEFAULT_SOURCE_RUN_LIMIT = 25;
@@ -139,13 +143,95 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
 
 function getSafetyGate(options = {}) {
   const applyRequested = Boolean(options.apply);
+  const readinessGate = getRecoveryReadinessGate(options);
   return {
     apply_requested: applyRequested,
-    authorized: applyRequested && Boolean(options.confirmProduction) && Number(options.maxUpdates || 0) > 0,
+    authorized:
+      applyRequested &&
+      Boolean(options.confirmProduction) &&
+      Number(options.maxUpdates || 0) > 0 &&
+      readinessGate.ok,
+    recovery_readiness_gate: readinessGate,
     missing: [
       applyRequested && !options.confirmProduction ? "--confirm-production" : "",
-      applyRequested && Number(options.maxUpdates || 0) <= 0 ? "--max-updates=N" : ""
+      applyRequested && Number(options.maxUpdates || 0) <= 0 ? "--max-updates=N" : "",
+      applyRequested && !readinessGate.ok ? "recovery-readiness-ok" : ""
     ].filter(Boolean)
+  };
+}
+
+function recoveryReadinessRequired(options = {}) {
+  const mode = clean(options.mode || "dry-run", 40);
+  return Boolean(options.apply || mode === "canary" || mode === "apply");
+}
+
+function fixtureEvidence(sourceModule = {}) {
+  const result = {
+    paths: [],
+    present: [],
+    missing: [],
+    errors: []
+  };
+  if (typeof sourceModule?.fixtures !== "function") return result;
+  try {
+    result.paths = sourceModule.fixtures();
+  } catch (error) {
+    result.errors.push(`fixtures failed: ${clean(error?.message || error, 240)}`);
+  }
+  if (!Array.isArray(result.paths)) {
+    result.errors.push("fixtures did not return an array");
+    result.paths = [];
+  }
+  for (const fixturePath of result.paths) {
+    const normalizedPath = String(fixturePath || "").replace(/\\/g, "/");
+    if (!normalizedPath) continue;
+    if (fs.existsSync(path.resolve(normalizedPath))) result.present.push(normalizedPath);
+    else result.missing.push(normalizedPath);
+  }
+  return result;
+}
+
+function evaluateSourceRecoveryReadiness(source) {
+  const atsKey = normalizeAtsKey(source);
+  const sourceModule = atsKey ? getRegistrySourceModule(atsKey) : null;
+  const blockers = [];
+  if (!atsKey) blockers.push("missing source");
+  if (!sourceModule) blockers.push("source module required before recovery");
+
+  const recoveryContract = sourceModule ? validateSourceRecoveryContract(sourceModule) : { ok: false, failures: [] };
+  const fixtures = sourceModule ? fixtureEvidence(sourceModule) : { paths: [], present: [], missing: [], errors: [] };
+  blockers.push(...(recoveryContract.failures || []), ...(fixtures.errors || []));
+  if (fixtures.missing.length > 0) blockers.push(`missing fixture files: ${fixtures.missing.join(", ")}`);
+  if (sourceModule?.status === SOURCE_STATUSES.unsupported) blockers.push("unsupported source");
+
+  return {
+    source: atsKey,
+    ok: blockers.length === 0,
+    status: blockers.length === 0 ? "ready-for-recovery-operation" : "blocked",
+    source_contract_ok: Boolean(recoveryContract.ok),
+    public_gate: typeof sourceModule?.validatePublic === "function",
+    quality_threshold: typeof sourceModule?.qualityThreshold === "function",
+    rate_limit: typeof sourceModule?.rateLimit === "function",
+    fixtures,
+    blockers: Array.from(new Set(blockers))
+  };
+}
+
+function getRecoveryReadinessGate(options = {}) {
+  const required = recoveryReadinessRequired(options);
+  if (!required) {
+    return {
+      required: false,
+      ok: true,
+      status: "not-required",
+      source: normalizeAtsKey(options.source),
+      blockers: []
+    };
+  }
+  const readiness = evaluateSourceRecoveryReadiness(options.source);
+  return {
+    required: true,
+    ...readiness
   };
 }
 
@@ -1053,6 +1139,22 @@ async function runWithLimitedConcurrency(items, worker, options = {}) {
 }
 
 async function runSourceJob(options = parseArgs(), env = process.env) {
+  const summary = buildInitialSummary(options);
+  const safetyGate = getSafetyGate(options);
+  summary.safety_gate = safetyGate;
+  summary.recovery_readiness_gate = safetyGate.recovery_readiness_gate;
+  summary.apply_mode = safetyGate.authorized;
+  summary.statement_timeout_ms = Number(options.statementTimeoutMs || DEFAULT_STATEMENT_TIMEOUT_MS);
+
+  if (summary.recovery_readiness_gate?.required && !summary.recovery_readiness_gate.ok) {
+    summary.ok = false;
+    summary.error_message = `source recovery readiness blocked: ${summary.recovery_readiness_gate.blockers.join(", ")}`;
+    const error = new Error(summary.error_message);
+    error.recoveryReadinessGate = summary.recovery_readiness_gate;
+    error.sourceRunSummary = summary;
+    throw error;
+  }
+
   const poolEnv = {
     ...env,
     POSTGRES_STATEMENT_TIMEOUT_MS: String(options.statementTimeoutMs || DEFAULT_STATEMENT_TIMEOUT_MS),
@@ -1065,11 +1167,6 @@ async function runSourceJob(options = parseArgs(), env = process.env) {
   });
   let lock = null;
   let sourceRunId = 0;
-  const summary = buildInitialSummary(options);
-  const safetyGate = getSafetyGate(options);
-  summary.safety_gate = safetyGate;
-  summary.apply_mode = safetyGate.authorized;
-  summary.statement_timeout_ms = Number(options.statementTimeoutMs || DEFAULT_STATEMENT_TIMEOUT_MS);
 
   try {
     if (!options.pool) {
@@ -1129,9 +1226,11 @@ module.exports = {
   buildQualityGapFlags,
   candidateDetailEvidenceUrl,
   classifySourceCandidateErrorType,
+  evaluateSourceRecoveryReadiness,
   evaluateSourceCandidate,
   getVirtualSourceTarget,
   getVirtualSourceTargetCount,
+  getRecoveryReadinessGate,
   getSafetyGate,
   parseArgs,
   runSourceJob,

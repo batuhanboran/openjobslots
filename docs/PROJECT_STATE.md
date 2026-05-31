@@ -86,6 +86,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Regenerated `docs/reference/ats-registry-targets/` reports recovery readiness counts `{"research-only":30,"ready-for-read-only-recovery":59,"blocked":1}` and `read_only_recovery_ready_count=59`. Only `dayforcehcm` remains blocked.
 - Verification covered source syntax checks, HTML/public, direct, and enterprise source-module tests, source contract tests, registry-index tests, `npm.cmd run ats:registry-index -- --json --no-write`, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker-budget change was run.
 
+## ATS Recovery Operation Guard - June 1, 2026
+
+- `ats:source:canary` and `ats:source:apply` now enforce source recovery readiness before opening the production DB operation path. Dry-runs stay available, but canary/apply operations are blocked for unsupported sources or sources missing the recovery contract/fixture evidence.
+- Apply authorization now requires readiness plus the existing `--confirm-production` and `--max-updates=N` flags. This turns the generated registry-readiness index into a runtime guard instead of a documentation-only checklist.
+- Blocked operations emit JSON when requested. A local proof for `dayforcehcm` canary returned `source_run_id=0`, `fetch_count=0`, `public_write_count=0`, and blocker `unsupported source`.
+- Verification covered `sourceRunner` syntax/tests, registry-index tests, the blocked Dayforce CLI proof, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker-budget change was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

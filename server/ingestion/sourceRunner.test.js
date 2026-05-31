@@ -6,9 +6,12 @@ const {
   buildQualityGapFlags,
   candidateDetailEvidenceUrl,
   classifySourceCandidateErrorType,
+  evaluateSourceRecoveryReadiness,
+  getRecoveryReadinessGate,
   getSafetyGate,
   parseArgs,
   discoverSourceTargets,
+  runSourceJob,
   runWithLimitedConcurrency,
   sourceHost
 } = require("./sourceRunner");
@@ -52,6 +55,44 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(gate.apply_requested, true);
   assert.equal(gate.authorized, true);
   assert.deepEqual(gate.missing, []);
+  assert.equal(gate.recovery_readiness_gate.ok, true);
+});
+
+test("source runner requires recovery readiness for canary and apply operations", async () => {
+  const dryRun = parseArgs(["--mode=dry-run", "--source=dayforcehcm"]);
+  assert.equal(getRecoveryReadinessGate(dryRun).required, false);
+
+  const blockedCanary = parseArgs(["--mode=canary", "--source=dayforcehcm"]);
+  const canaryGate = getRecoveryReadinessGate(blockedCanary);
+  assert.equal(canaryGate.required, true);
+  assert.equal(canaryGate.ok, false);
+  assert.ok(canaryGate.blockers.includes("unsupported source"));
+
+  const blockedApply = parseArgs([
+    "--mode=apply",
+    "--source=dayforcehcm",
+    "--confirm-production",
+    "--max-updates=1"
+  ]);
+  const safetyGate = getSafetyGate(blockedApply);
+  assert.equal(safetyGate.authorized, false);
+  assert.ok(safetyGate.missing.includes("recovery-readiness-ok"));
+
+  const ready = evaluateSourceRecoveryReadiness("greenhouse");
+  assert.equal(ready.ok, true);
+  assert.equal(ready.status, "ready-for-recovery-operation");
+
+  await assert.rejects(
+    () => runSourceJob({
+      ...blockedCanary,
+      pool: {
+        async query() {
+          throw new Error("blocked readiness should not query");
+        }
+      }
+    }),
+    /source recovery readiness blocked/
+  );
 });
 
 test("source runner normalizes hosts for per-host concurrency", () => {
