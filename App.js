@@ -3809,8 +3809,8 @@ function replacePublicSearchUrlQuery(query) {
   }
 }
 
-function getBrowserLanguageCode() {
-  if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_PUBLIC_LANGUAGE;
+function getBrowserLanguageCode(fallback = DEFAULT_PUBLIC_LANGUAGE) {
+  if (Platform.OS !== "web" || typeof window === "undefined") return fallback;
   const candidates = [
     ...(Array.isArray(window.navigator?.languages) ? window.navigator.languages : []),
     window.navigator?.language,
@@ -3820,15 +3820,16 @@ function getBrowserLanguageCode() {
     const languageCode = normalizePublicLanguageCode(candidate);
     if (languageCode) return languageCode;
   }
-  return DEFAULT_PUBLIC_LANGUAGE;
+  return fallback;
 }
 
 function getInitialPublicLanguageCode() {
   return (
     normalizePublicLanguageCode(getPublicSeoRouteHint()?.languageCode) ||
     normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY)) ||
+    getBrowserLanguageCode("") ||
     normalizePublicLanguageCode(readWebCookieValue(PUBLIC_LANGUAGE_HINT_COOKIE)) ||
-    getBrowserLanguageCode()
+    DEFAULT_PUBLIC_LANGUAGE
   );
 }
 
