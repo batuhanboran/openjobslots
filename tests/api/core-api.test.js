@@ -41,6 +41,18 @@ test.describe("openjobslots API compatibility", () => {
     expect(htmlText).toContain('"@type":"SearchAction"');
     expect(htmlText).not.toMatch(/postgres:\/\/|MEILI_|MASTER_KEY|OPENJOBSLOTS_DB_|stack trace/i);
 
+    const cloudflareLanguageHtml = await request.get(`${apiBaseUrl}/`, {
+      headers: {
+        "Accept-Language": "zz-ZZ,zz;q=0.9",
+        "CF-IPCountry": "TR"
+      }
+    });
+    expect(cloudflareLanguageHtml.status()).toBe(200);
+    expect(cloudflareLanguageHtml.headers()["cache-control"]).toContain("private");
+    expect(cloudflareLanguageHtml.headers()["vary"]).toMatch(/Accept-Language/i);
+    expect(cloudflareLanguageHtml.headers()["vary"]).toMatch(/CF-IPCountry/i);
+    expect(cloudflareLanguageHtml.headers()["set-cookie"]).toMatch(/ojs_public_language_hint=tr/i);
+
     const robots = await request.get(`${apiBaseUrl}/robots.txt`);
     expect(robots.status()).toBe(200);
     expect(robots.headers()["content-type"]).toMatch(/text\/plain/i);

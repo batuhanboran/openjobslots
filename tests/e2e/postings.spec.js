@@ -1230,6 +1230,37 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("native browser and Cloudflare language hints open the localized shell", async ({ browser }) => {
+    const portugueseContext = await browser.newContext({ locale: "pt-BR" });
+    const portuguesePage = await portugueseContext.newPage();
+    await portuguesePage.route("**/public/preferences**", (route) => route.abort());
+    await portuguesePage.goto("/");
+    await expect(portuguesePage.getByTestId("search-shell")).toBeVisible();
+    await expect(portuguesePage.getByTestId("language-selector")).toContainText("BR");
+    await expect(portuguesePage.getByText("Buscar vagas abertas")).toBeVisible();
+    await portugueseContext.close();
+
+    const cloudflareContext = await browser.newContext();
+    const cloudflarePage = await cloudflareContext.newPage();
+    await cloudflarePage.route("**/public/preferences**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          default_language: "tr",
+          country: "TR",
+          supported_languages: []
+        })
+      })
+    );
+    await cloudflarePage.goto("/");
+    await expect(cloudflarePage.getByTestId("search-shell")).toBeVisible();
+    await expect(cloudflarePage.getByTestId("language-selector")).toContainText("TR");
+    await expect(cloudflarePage.getByText("A\u00e7\u0131k i\u015f ilanlar\u0131n\u0131 ara")).toBeVisible();
+    await cloudflareContext.close();
+  });
+
   test("SEO landing routes bootstrap localized language and search intent", async ({ page }) => {
     const expectedQuery = "uzaktan \u00e7al\u0131\u015fma ilanlar\u0131";
     let requestedSearch = "";

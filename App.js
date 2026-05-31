@@ -247,6 +247,7 @@ const YAHOO_FONT_STACK = Platform.OS === "web"
   : undefined;
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
+const PUBLIC_LANGUAGE_HINT_COOKIE = "ojs_public_language_hint";
 const VISITED_POSTING_URLS_STORAGE_KEY = "openjobslots.visitedPostingUrls.v1";
 const MAX_VISITED_POSTING_URLS = 1000;
 const DEFAULT_PUBLIC_LANGUAGE = "en";
@@ -3719,6 +3720,20 @@ function writeWebStorageValue(key, value) {
   }
 }
 
+function readWebCookieValue(name) {
+  if (Platform.OS !== "web" || typeof document === "undefined") return "";
+  const target = `${encodeURIComponent(String(name || ""))}=`;
+  try {
+    const cookie = String(document.cookie || "")
+      .split(";")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(target));
+    return cookie ? decodeURIComponent(cookie.slice(target.length)) : "";
+  } catch {
+    return "";
+  }
+}
+
 function normalizeVisitedPostingUrl(value) {
   return String(value || "").trim();
 }
@@ -3796,16 +3811,23 @@ function replacePublicSearchUrlQuery(query) {
 
 function getBrowserLanguageCode() {
   if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_PUBLIC_LANGUAGE;
-  const navigatorLanguage =
-    normalizePublicLanguageCode(window.navigator?.language) ||
-    normalizePublicLanguageCode((window.navigator?.languages || [])[0]);
-  return navigatorLanguage || DEFAULT_PUBLIC_LANGUAGE;
+  const candidates = [
+    ...(Array.isArray(window.navigator?.languages) ? window.navigator.languages : []),
+    window.navigator?.language,
+    window.navigator?.userLanguage
+  ];
+  for (const candidate of candidates) {
+    const languageCode = normalizePublicLanguageCode(candidate);
+    if (languageCode) return languageCode;
+  }
+  return DEFAULT_PUBLIC_LANGUAGE;
 }
 
 function getInitialPublicLanguageCode() {
   return (
     normalizePublicLanguageCode(getPublicSeoRouteHint()?.languageCode) ||
     normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY)) ||
+    normalizePublicLanguageCode(readWebCookieValue(PUBLIC_LANGUAGE_HINT_COOKIE)) ||
     getBrowserLanguageCode()
   );
 }

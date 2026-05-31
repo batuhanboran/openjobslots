@@ -7,6 +7,8 @@ const {
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const PUBLIC_LANGUAGE_HINT_COOKIE = "ojs_public_language_hint";
+const PUBLIC_LANGUAGE_HINT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const PUBLIC_LANGUAGE_COUNTRY_BY_CODE = Object.freeze({
   en: "US",
   tr: "TR",
@@ -108,6 +110,19 @@ function createPublicAnalyticsSessionId() {
 function shouldUseSecureAnalyticsCookie(req) {
   const forwardedProto = String(req.get ? req.get("x-forwarded-proto") : "").toLowerCase();
   return Boolean(req.secure || forwardedProto.split(",").map((item) => item.trim()).includes("https"));
+}
+
+function appendResponseVaryHeader(res, values = []) {
+  const existing = String(res.getHeader?.("Vary") || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const next = new Set(existing);
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (normalized) next.add(normalized);
+  }
+  if (next.size > 0) res.setHeader("Vary", Array.from(next).join(", "));
 }
 
 function getPublicAnalyticsSessionKey(req, res) {
@@ -239,6 +254,26 @@ function registerPublicRoutes(app, context) {
       "Cache-Control",
       `public, max-age=${browserTtl}, s-maxage=${edgeTtl}, stale-while-revalidate=86400`
     );
+  }
+
+  function setPublicLanguageHintCookie(req, res) {
+    if (typeof buildPublicPreferences !== "function" || !res || res.headersSent || typeof res.cookie !== "function") return;
+    const preferences = buildPublicPreferences(req);
+    const nextLanguage = normalizePublicSeoLanguageCode(preferences?.default_language);
+    if (!nextLanguage || nextLanguage === "en") return;
+
+    const cookies = parseCookieHeader(req.get ? req.get("cookie") : req.headers?.cookie);
+    if (String(cookies[PUBLIC_LANGUAGE_HINT_COOKIE] || "").trim() === nextLanguage) return;
+
+    res.cookie(PUBLIC_LANGUAGE_HINT_COOKIE, nextLanguage, {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: shouldUseSecureAnalyticsCookie(req),
+      maxAge: PUBLIC_LANGUAGE_HINT_MAX_AGE_MS,
+      path: "/"
+    });
+    appendResponseVaryHeader(res, ["Accept-Language", "CF-IPCountry"]);
+    res.setHeader("Cache-Control", "private, max-age=60");
   }
 
   app.use((req, res, next) => {
@@ -826,6 +861,7 @@ function registerPublicRoutes(app, context) {
       try {
         const indexHtml = fs.readFileSync(webIndexPath, "utf8");
         setPublicSeoCacheHeaders(res, 60, 300);
+        setPublicLanguageHintCookie(req, res);
         res.type("html").send(renderSeoIndexHtml(indexHtml, req));
       } catch (error) {
         next(error);
