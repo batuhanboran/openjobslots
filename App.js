@@ -7768,8 +7768,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#8EA0FF"
   },
   yahooSearchIconButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -7803,9 +7803,9 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "-45deg" }]
   },
   yahooSearchSubmitButton: {
-    width: 36,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent"
