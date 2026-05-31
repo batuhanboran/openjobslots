@@ -9328,7 +9328,8 @@ const styles = StyleSheet.create({
   },
   resultCountTextMobile: {
     minWidth: 56,
-    paddingHorizontal: 4
+    paddingHorizontal: 5,
+    flexGrow: 1.1
   },
   resultCountValueText: {
     color: YAHOO_COLORS.ink,
@@ -9355,7 +9356,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 1,
     flexWrap: "nowrap",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     gap: 4,
     minWidth: 0
   },
@@ -9393,19 +9394,24 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 4,
     minWidth: 50,
-    minHeight: 44
+    minHeight: 44,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0
   },
   publicStatsChipAts: {
     minWidth: 68
   },
   publicStatsChipAtsMobile: {
-    minWidth: 38
+    minWidth: 40,
+    flexGrow: 0.8
   },
   publicStatsChipCompanies: {
     minWidth: 118
   },
   publicStatsChipCompaniesMobile: {
-    minWidth: 58
+    minWidth: 60,
+    flexGrow: 1.25
   },
   publicStatsChipDark: {
     borderColor: OJS_DARK_COLORS.softBorder,
@@ -9421,8 +9427,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   publicStatsChipValueMobile: {
-    fontSize: 11,
-    lineHeight: 13
+    fontSize: 12,
+    lineHeight: 14
   },
   publicStatsChipLabel: {
     color: YAHOO_COLORS.muted,
@@ -9432,8 +9438,8 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   publicStatsChipLabelMobile: {
-    fontSize: 8,
-    lineHeight: 10,
+    fontSize: 9,
+    lineHeight: 11,
     maxWidth: "100%",
     textAlign: "center"
   },
