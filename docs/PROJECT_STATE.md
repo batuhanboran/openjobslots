@@ -55,6 +55,12 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Freshteam title extraction is now class-based across tag names, and the Freshteam raw fixture includes the observed `<h5 class="job-title">` variant.
 - Live read-only parser proof for `https://dextragroup.freshteam.com/jobs` returned 32 rows and `placeholder_count=0`; no production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## BambooHR Location-Shape Drift Policy - June 1, 2026
+
+- BambooHR residual drift was caused by supported sparse structured geo variants where values moved between `result[].location` and `result[].atsLocation`, while the alternate object contained null city/state/country fields.
+- The payload-drift core now ignores internal `__source*` fetch/request metadata, and BambooHR declares source-local ignored stems for supported `location` / `atsLocation` geo subfields. The public gate still rejects or quarantines rows without useful geo or explicit remote/hybrid evidence.
+- Verification covered payload-drift tests, source registry tests, and direct source-module tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

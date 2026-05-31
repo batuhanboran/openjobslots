@@ -229,6 +229,8 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof bamboohr.parse, "function");
   assert.equal(typeof bamboohr.normalize, "function");
   assert.equal(typeof bamboohr.validate, "function");
+  assert.ok(bamboohr.payloadShapePolicy.ignored_stems.includes("result[].atsLocation.city"));
+  assert.ok(bamboohr.payloadShapePolicy.ignored_stems.includes("result[].location.city"));
   assert.deepEqual(validateSourceContract(bamboohr), { ok: true, failures: [] });
 
   const brassring = getRegistrySourceModule("brassring");

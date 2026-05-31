@@ -1904,6 +1904,82 @@ async function testPayloadDriftKeepsPositiveTotalEmptyHitsAsDrift() {
   assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
 }
 
+async function testPayloadDriftAllowsBambooHrLocationObjectVariants() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "bamboo-location",
+            shape_paths: [
+              "result:array",
+              "result[].id:string",
+              "result[].jobOpeningName:string",
+              "result[].location:object",
+              "result[].location.city:string",
+              "result[].location.state:string",
+              "result[].atsLocation:object",
+              "result[].atsLocation.city:null",
+              "result[].atsLocation.country:null",
+              "result[].atsLocation.state:null",
+              "result[].url:string",
+              "result[]:object"
+            ],
+            observed_count: 30
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`BambooHR location variant should not record drift: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "bamboohr",
+      companyUrl: "https://fixture.bamboohr.com/careers",
+      company: { company_name: "Fixture BambooHR" },
+      adapter: {
+        payloadShapePolicy: {
+          ignored_stems: [
+            "result[].location.city",
+            "result[].location.state",
+            "result[].atsLocation.city",
+            "result[].atsLocation.country",
+            "result[].atsLocation.state"
+          ]
+        }
+      }
+    },
+    {
+      result: [{
+        id: "bhr-valletta",
+        jobOpeningName: "Valletta Operations Analyst",
+        url: "https://fixture.bamboohr.com/careers/bhr-valletta",
+        location: {
+          city: null,
+          state: null
+        },
+        atsLocation: {
+          city: "Valletta",
+          country: "Malta",
+          state: "Malta"
+        }
+      }],
+      __sourceFetchFinalUrl: "https://fixture.bamboohr.com/careers/list"
+    },
+    "source-bamboohr-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.compatible_enrichment_shape, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
   const calls = [];
   const pool = {
@@ -2420,6 +2496,7 @@ async function main() {
   await testPayloadDriftIgnoresInternalRequestCountsForEmptyLists();
   await testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift();
   await testPayloadDriftKeepsPositiveTotalEmptyHitsAsDrift();
+  await testPayloadDriftAllowsBambooHrLocationObjectVariants();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();

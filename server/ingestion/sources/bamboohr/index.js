@@ -7,6 +7,24 @@ const { normalizeCompanyName } = require("./helpers");
 const baseModule = createSourceModule("bamboohr");
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList(discover);
+const payloadShapePolicy = Object.freeze({
+  ignored_stems: Object.freeze([
+    "result[].location.city",
+    "result[].location.state",
+    "result[].location.province",
+    "result[].location.region",
+    "result[].location.country",
+    "result[].location.countryName",
+    "result[].location.countryCode",
+    "result[].atsLocation.city",
+    "result[].atsLocation.state",
+    "result[].atsLocation.province",
+    "result[].atsLocation.region",
+    "result[].atsLocation.country",
+    "result[].atsLocation.countryName",
+    "result[].atsLocation.countryCode"
+  ])
+});
 
 function parse(rawPayload, company = {}) {
   if (rawPayload && Array.isArray(rawPayload.__legacyParsed)) return rawPayload.__legacyParsed;
@@ -27,5 +45,6 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

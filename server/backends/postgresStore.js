@@ -2317,7 +2317,7 @@ function matchesPayloadShapePrefix(stem, prefix) {
 function ignoredPayloadDriftStem(stem, policy = {}) {
   const normalizedStem = String(stem || "");
   if (!normalizedStem) return true;
-  if (normalizedStem === "__sourceConfig" || normalizedStem.startsWith("__sourceConfig.")) return true;
+  if (normalizedStem.startsWith("__source")) return true;
   if (normalizedStem === "__listUrl") return true;
   if (
     normalizedStem === "__detailHtmlByUrl" ||
