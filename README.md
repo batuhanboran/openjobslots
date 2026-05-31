@@ -18,6 +18,7 @@ Read these first:
 - Current state: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
 - Deployment runbook: [docs/reference/deployment.md](docs/reference/deployment.md)
 - QA runbook: [docs/reference/QA_RUNBOOK.md](docs/reference/QA_RUNBOOK.md)
+- Mobile store readiness: [docs/reference/mobile-store-readiness.md](docs/reference/mobile-store-readiness.md)
 
 Detailed references:
 

@@ -3,12 +3,32 @@
     "name": "openjobslots",
     "slug": "openjobslots",
     "version": "2.0.0",
+    "scheme": "openjobslots",
     "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
     "icon": "./ojs-favicon.png",
     "platforms": [
+      "ios",
       "android",
       "web"
     ],
+    "ios": {
+      "bundleIdentifier": "com.openjobslots.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.openjobslots.app",
+      "versionCode": 1,
+      "permissions": [],
+      "adaptiveIcon": {
+        "foregroundImage": "./ojs-favicon.png",
+        "backgroundColor": "#F7FAF7"
+      }
+    },
     "web": {
       "name": "OpenJobSlots | Fresh Job Openings",
       "description": "Find fresh job openings from public employer ATS boards. Search by role, company, location, remote mode, source, and posting freshness with no sign-up.",

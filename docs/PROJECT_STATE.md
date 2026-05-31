@@ -2,6 +2,14 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Mobile Store Readiness Update - May 31, 2026
+
+- Expo configuration now includes iOS and Android store identifiers, a shared `openjobslots` scheme, and EAS build profiles for development, preview, and production.
+- Native iOS/Android builds use `EXPO_PUBLIC_API_BASE_URL=https://openjobslots.com` in EAS profiles and are constrained to the public mobile API surface documented in `docs/reference/mobile-store-readiness.md`.
+- FlyonUI remains outside the native app. It is reserved for a separate web/landing/admin surface because the current Expo app uses React Native `StyleSheet`, not Tailwind DOM components.
+- `App.js` has started the staged public-app extraction by moving the postings filter state model into `src/postingsFilters.js`; future mobile refactors should continue by extracting search screen, filters, posting card, stats chips, API hooks, and shared UI in small behavior-preserving steps.
+- Store publication is not complete until external Apple Developer, Google Play Console, signing, provisioning, listing, screenshots, privacy, and rating tasks are done outside the repo.
+
 ## Runtime Safety Update - May 28, 2026
 
 - Backend runtime defaults now prioritize swap stability over throughput expansion. The Compose defaults are `INGESTION_WORKER_CONCURRENCY=2`, `INGESTION_WORKER_INTERVAL_MS=900000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=6000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=100`, `INGESTION_SOURCE_DAILY_TARGET_BUDGET=500`, and `INGESTION_MAX_TARGETS_PER_RUN=250`.

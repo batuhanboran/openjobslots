@@ -1,13 +1,13 @@
 import { Platform } from "react-native";
+import {
+  isNativeStorePlatform,
+  isPublicMobileApiPath,
+  resolveDefaultApiBaseUrl
+} from "./mobile/publicSurface";
 
-const DEFAULT_API_BASE_URL =
-  Platform.OS === "web"
-    ? ""
-    : Platform.OS === "android"
-      ? "http://10.0.2.2:8787"
-      : "http://localhost:8787";
-
+const DEFAULT_API_BASE_URL = resolveDefaultApiBaseUrl(Platform.OS);
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
+const IS_NATIVE_STORE_SURFACE = isNativeStorePlatform(Platform.OS);
 
 function stripHtml(value) {
   return String(value || "")
@@ -46,11 +46,23 @@ function createHttpError(status, bodyText, path) {
   return error;
 }
 
+function createPublicMobileSurfaceError(path) {
+  const error = new Error("This action is not available in the public mobile app.");
+  error.status = 403;
+  error.path = path;
+  error.isPublicMobileSurfaceError = true;
+  return error;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function request(path, options = {}) {
+  if (IS_NATIVE_STORE_SURFACE && !isPublicMobileApiPath(path)) {
+    throw createPublicMobileSurfaceError(path);
+  }
+
   const method = String(options?.method || "GET").toUpperCase();
   const maxAttempts = method === "GET" ? 3 : 1;
   let lastError = null;

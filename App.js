@@ -49,6 +49,11 @@ import {
   trackPublicFilterChange,
   trackPublicSearch
 } from "./src/publicAnalytics";
+import { isNativeStorePlatform } from "./src/mobile/publicSurface";
+import {
+  createDefaultPostingsFilters,
+  getPostingsFiltersSignature
+} from "./src/postingsFilters";
 import {
   buildPublicStatsChips,
   formatExactNumberLabel
@@ -1346,37 +1351,6 @@ const FRESHNESS_FILTER_OPTIONS = [
   { value: 7, label: "7 days", testId: "freshness-filter-7d" },
   { value: 30, label: "30 days", testId: "freshness-filter-30d" }
 ];
-function createDefaultPostingsFilters() {
-  return {
-    ats: "all",
-    industries: [],
-    regions: [],
-    countries: [],
-    states: [],
-    counties: [],
-    remote: "all",
-    hide_no_date: false,
-    freshness_days: "all",
-    sort_by: "posted_date"
-  };
-}
-
-function getPostingsFiltersSignature(filters = {}) {
-  const normalizeArray = (value) => (Array.isArray(value) ? value.map(String).sort() : []);
-  return JSON.stringify({
-    ats: String(filters.ats || "all"),
-    industries: normalizeArray(filters.industries),
-    regions: normalizeArray(filters.regions),
-    countries: normalizeArray(filters.countries),
-    states: normalizeArray(filters.states),
-    counties: normalizeArray(filters.counties),
-    remote: String(filters.remote || "all"),
-    hide_no_date: Boolean(filters.hide_no_date),
-    freshness_days: String(filters.freshness_days || "all"),
-    sort_by: String(filters.sort_by || "posted_date")
-  });
-}
-
 function countDistinctPostingValues(items, getValue) {
   const values = new Set();
   for (const item of Array.isArray(items) ? items : []) {
@@ -3357,6 +3331,7 @@ function ToggleRow({ label, value, onValueChange }) {
 export default function App() {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktopViewport = Platform.OS === "web" && Number(viewportWidth || 0) >= 768;
+  const isPublicNativeStoreSurface = isNativeStorePlatform(Platform.OS);
   const initialPublicSearchQuery = useMemo(readInitialPublicSearchQuery, []);
   const [activePage, setActivePage] = useState(PAGE_KEYS.POSTINGS);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -3495,6 +3470,7 @@ export default function App() {
     Math.max(1, Math.min(currentSearchExample.length, searchExampleTypeState.length))
   );
   const flushFrontendLogs = useCallback(async () => {
+    if (isPublicNativeStoreSurface) return;
     if (frontendLogFlushInFlightRef.current) return;
     if (frontendLogQueueRef.current.length === 0) return;
 
@@ -3511,7 +3487,7 @@ export default function App() {
     } finally {
       frontendLogFlushInFlightRef.current = false;
     }
-  }, []);
+  }, [isPublicNativeStoreSurface]);
 
   const queueFrontendLog = useCallback(
     (level, eventName, message, context = {}) => {
@@ -3855,9 +3831,14 @@ export default function App() {
   }, [postingsFilters.ats, postingFilterOptions.ats]);
 
   const navigateToPage = useCallback((page) => {
+    if (isPublicNativeStoreSurface && page !== PAGE_KEYS.POSTINGS) {
+      setActivePage(PAGE_KEYS.POSTINGS);
+      setDrawerOpen(false);
+      return;
+    }
     setActivePage(page);
     setDrawerOpen(false);
-  }, []);
+  }, [isPublicNativeStoreSurface]);
 
   const setScrollTopButtonVisible = useCallback((visible) => {
     if (showScrollTopButtonRef.current === visible) return;
@@ -4093,10 +4074,15 @@ export default function App() {
   }, [queueFrontendLog]);
 
   const handleOpenApplicationsPage = useCallback(() => {
+    if (isPublicNativeStoreSurface) {
+      setActivePage(PAGE_KEYS.POSTINGS);
+      setDrawerOpen(false);
+      return;
+    }
     setActivePage(PAGE_KEYS.APPLICATIONS);
     setDrawerOpen(false);
     loadApplications({ silent: false });
-  }, [loadApplications]);
+  }, [isPublicNativeStoreSurface, loadApplications]);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -5053,6 +5039,7 @@ export default function App() {
   }, [hasActivePostingFilters]);
 
   useEffect(() => {
+    if (isPublicNativeStoreSurface) return undefined;
     if (normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY))) return undefined;
     let cancelled = false;
     const loadPublicPreference = async () => {
@@ -5071,7 +5058,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [queueFrontendLog]);
+  }, [isPublicNativeStoreSurface, queueFrontendLog]);
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
@@ -5432,25 +5419,31 @@ export default function App() {
   }, [activePage, loadPostings, loadStatus]);
 
   useEffect(() => {
-    if (activePage !== PAGE_KEYS.APPLICATIONS) return;
+    if (isPublicNativeStoreSurface && activePage !== PAGE_KEYS.POSTINGS) {
+      setActivePage(PAGE_KEYS.POSTINGS);
+    }
+  }, [activePage, isPublicNativeStoreSurface]);
+
+  useEffect(() => {
+    if (isPublicNativeStoreSurface || activePage !== PAGE_KEYS.APPLICATIONS) return;
     loadApplications({ silent: false });
-  }, [activePage, loadApplications]);
+  }, [activePage, isPublicNativeStoreSurface, loadApplications]);
 
   useEffect(() => {
-    if (activePage !== PAGE_KEYS.SETTINGS_APPLICANTEE) return;
+    if (isPublicNativeStoreSurface || activePage !== PAGE_KEYS.SETTINGS_APPLICANTEE) return;
     loadPersonalInformation({ silent: false });
-  }, [activePage, loadPersonalInformation]);
+  }, [activePage, isPublicNativeStoreSurface, loadPersonalInformation]);
 
   useEffect(() => {
-    if (activePage !== PAGE_KEYS.SETTINGS_SYNC) return;
+    if (isPublicNativeStoreSurface || activePage !== PAGE_KEYS.SETTINGS_SYNC) return;
     loadSyncServiceSettings({ silent: false });
     loadBlockedCompanies({ silent: false });
-  }, [activePage, loadBlockedCompanies, loadSyncServiceSettings]);
+  }, [activePage, isPublicNativeStoreSurface, loadBlockedCompanies, loadSyncServiceSettings]);
 
   useEffect(() => {
-    if (activePage !== PAGE_KEYS.SETTINGS_MCP) return;
+    if (isPublicNativeStoreSurface || activePage !== PAGE_KEYS.SETTINGS_MCP) return;
     loadMcpSettings({ silent: false });
-  }, [activePage, loadMcpSettings]);
+  }, [activePage, isPublicNativeStoreSurface, loadMcpSettings]);
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return;
@@ -7053,6 +7046,7 @@ export default function App() {
   );
 
   const renderActivePage = () => {
+    if (isPublicNativeStoreSurface) return renderPostingsPage();
     if (activePage === PAGE_KEYS.APPLICATIONS) return renderApplicationsPage();
     if (activePage === PAGE_KEYS.SETTINGS_APPLICANTEE) return renderApplicanteeSettingsPage();
     if (activePage === PAGE_KEYS.SETTINGS_SYNC) return renderSyncSettingsPage();
@@ -7061,6 +7055,9 @@ export default function App() {
   };
 
   const renderHeaderNav = () => {
+    if (isPublicNativeStoreSurface) {
+      return null;
+    }
     if (activePage === PAGE_KEYS.POSTINGS) {
       return null;
     }
@@ -7136,7 +7133,7 @@ export default function App() {
       ) : null}
       {renderActivePage()}
 
-      {drawerOpen && activePage !== PAGE_KEYS.POSTINGS ? (
+      {drawerOpen && !isPublicNativeStoreSurface && activePage !== PAGE_KEYS.POSTINGS ? (
         <View style={styles.drawerOverlay}>
           <Pressable style={styles.drawerBackdrop} onPress={() => setDrawerOpen(false)} />
           <View style={styles.drawerPanel}>
