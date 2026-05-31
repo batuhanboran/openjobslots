@@ -58,6 +58,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeCountryCodeParam(value) {
+  const country = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(country) ? country : "";
+}
+
+function setPageCountryParam(params, country) {
+  const countryCode = normalizeCountryCodeParam(country);
+  if (countryCode) params.set("page_country", countryCode);
+}
+
 async function request(path, options = {}) {
   if (IS_NATIVE_STORE_SURFACE && !isPublicMobileApiPath(path)) {
     throw createPublicMobileSurfaceError(path);
@@ -110,6 +120,7 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   const remote = String(filters?.remote || "all").trim().toLowerCase();
   const freshnessDays = Number(filters?.freshness_days || 0);
   const sortBy = String(filters?.sort_by || "posted_date").trim().toLowerCase();
+  setPageCountryParam(params, filters?.page_country || filters?.country_scope || filters?.visitor_country);
 
   if (atsArray.length > 0) {
     params.set("ats", atsArray.join(","));
@@ -161,6 +172,7 @@ export function fetchPostingFilterOptions(search = "", filters = {}) {
   const regions = Array.isArray(filters?.regions) ? filters.regions.filter(Boolean) : [];
   const remote = String(filters?.remote || "all").trim().toLowerCase();
   const freshnessDays = Number(filters?.freshness_days || 0);
+  setPageCountryParam(params, filters?.page_country || filters?.country_scope || filters?.visitor_country);
 
   if (query) params.set("search", query);
   if (atsArray.length > 0) params.set("ats", atsArray.join(","));
@@ -177,21 +189,24 @@ export function fetchPostingFilterOptions(search = "", filters = {}) {
   return request(`/postings/filter-options${suffix ? `?${suffix}` : ""}`);
 }
 
-export function fetchSearchSuggestions(search = "", limit = 8) {
+export function fetchSearchSuggestions(search = "", limit = 8, country = "") {
   const params = new URLSearchParams({
     search,
     limit: String(limit),
     _ts: String(Date.now())
   });
+  setPageCountryParam(params, country);
   return request(`/search/suggest?${params.toString()}`);
 }
 
-export function fetchPopularSearches(language = "en", limit = 8) {
+export function fetchPopularSearches(language = "en", limit = 8, country = "") {
   const params = new URLSearchParams({
     language: String(language || "en"),
     limit: String(limit),
     _ts: String(Date.now())
   });
+  const countryCode = normalizeCountryCodeParam(country);
+  if (countryCode) params.set("country", countryCode);
   return request(`/search/popular?${params.toString()}`);
 }
 

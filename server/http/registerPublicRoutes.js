@@ -3,6 +3,13 @@ const { getPublicSeoPopularSearchItems } = require("../../src/publicSeoRoutes");
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const PUBLIC_LANGUAGE_COUNTRY_BY_CODE = Object.freeze({
+  en: "US",
+  tr: "TR",
+  de: "DE",
+  fr: "FR",
+  es: "ES"
+});
 
 function getRequestHeader(req, name) {
   if (req && typeof req.get === "function") return req.get(name) || "";
@@ -30,6 +37,23 @@ function normalizePublicPostingRedirectUrl(value) {
   } catch {
     return "";
   }
+}
+
+function normalizePublicCountryCode(value) {
+  const country = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(country) ? country : "";
+}
+
+function getRequestCountryCode(req) {
+  return normalizePublicCountryCode(
+    getRequestHeader(req, "cf-ipcountry") ||
+      getRequestHeader(req, "x-vercel-ip-country") ||
+      getRequestHeader(req, "x-country-code")
+  );
+}
+
+function getPublicLanguageCountryCode(languageCode) {
+  return PUBLIC_LANGUAGE_COUNTRY_BY_CODE[String(languageCode || "").trim().toLowerCase()] || "";
 }
 
 function getCanonicalPublicHostRedirectTarget(req) {
@@ -85,6 +109,32 @@ function getPublicAnalyticsSessionKey(req, res) {
     .createHash("sha256")
     .update(`openjobslots-public-analytics-v1:${sessionId}`)
     .digest("hex");
+}
+
+function getPublicAnalyticsCountryScope(req, options = {}) {
+  return (
+    normalizePublicCountryCode(
+      options.countryScope ||
+        options.page_country ||
+        options.visitor_country ||
+        req?.query?.country_scope ||
+        req?.query?.page_country ||
+        req?.query?.visitor_country
+    ) || getRequestCountryCode(req)
+  );
+}
+
+function getPublicPopularSearchCountryScope(req, languageCode) {
+  return (
+    normalizePublicCountryCode(
+      req?.query?.country ||
+        req?.query?.country_scope ||
+        req?.query?.page_country ||
+        req?.query?.visitor_country
+    ) ||
+    getPublicLanguageCountryCode(languageCode) ||
+    getRequestCountryCode(req)
+  );
 }
 
 function registerPublicRoutes(app, context) {
@@ -175,6 +225,7 @@ function registerPublicRoutes(app, context) {
       referrer: req.get ? req.get("referer") || req.get("referrer") : "",
       userAgent: req.get ? req.get("user-agent") : "",
       cacheStatus: info.cacheStatus,
+      countryScope: getPublicAnalyticsCountryScope(req, options),
       anonymousSessionKey: getPublicAnalyticsSessionKey(req, res)
     };
     Promise.resolve(recordPostgresPublicSearchEvent(postgresPool, event)).catch((error) => {
@@ -361,23 +412,39 @@ function registerPublicRoutes(app, context) {
   app.get("/search/popular", async (req, res) => {
     const languageCode = String(req.query.language || req.query.lang || "en").trim().toLowerCase();
     const limit = Math.max(1, Math.min(20, Number(req.query.limit || 8)));
+    const countryScope = getPublicPopularSearchCountryScope(req, languageCode);
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       let report = null;
       let topQueries = [];
       let source = "fallback";
+      let countryScopeApplied = false;
 
       if (DB_BACKEND === "postgres" && typeof getPostgresPublicSearchReport === "function") {
         try {
           report = await getPostgresPublicSearchReport(postgresPool, {
             date: req.query.date || "today",
-            limit: 50
+            limit: 50,
+            countryScope
           });
           topQueries = Array.isArray(report?.top_final_posting_searches)
             ? report.top_final_posting_searches
             : Array.isArray(report?.top_terms)
               ? report.top_terms
               : [];
-          if (topQueries.length > 0) source = "analytics";
+          countryScopeApplied = Boolean(report?.country_scope_applied);
+          if (topQueries.length > 0) source = countryScopeApplied ? "analytics_country" : "analytics";
+          if (topQueries.length === 0 && countryScopeApplied) {
+            report = await getPostgresPublicSearchReport(postgresPool, {
+              date: req.query.date || "today",
+              limit: 50
+            });
+            topQueries = Array.isArray(report?.top_final_posting_searches)
+              ? report.top_final_posting_searches
+              : Array.isArray(report?.top_terms)
+                ? report.top_terms
+                : [];
+            if (topQueries.length > 0) source = "analytics_global_fallback";
+          }
         } catch (error) {
           console.warn("[openjobslots public search] popular search analytics fallback:", String(error?.message || error).slice(0, 240));
         }
@@ -389,7 +456,9 @@ function registerPublicRoutes(app, context) {
         items,
         count: items.length,
         source,
-        date: report?.date || null
+        date: report?.date || null,
+        country_scope: countryScope || null,
+        country_scope_applied: source === "analytics_country"
       };
     });
   });

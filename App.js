@@ -96,7 +96,7 @@ const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const SEARCH_SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
-const SEARCH_SUGGESTION_DEBOUNCE_MS = 400;
+const SEARCH_SUGGESTION_DEBOUNCE_MS = 700;
 const SEARCH_SUGGESTION_LIMIT = 4;
 const SEARCH_INTENT_CHIP_LIMIT = 4;
 const SEARCH_SUBMIT_DEDUPE_MS = 2500;
@@ -2274,10 +2274,12 @@ function buildLocalSearchSuggestions(query, limit = 5, context = {}) {
     appendLocalSuggestion(candidates, "industry", option?.value || option?.label, option?.label || option?.value, option?.count);
   });
   (filterOptions.countries || []).forEach((option) => {
-    appendLocalSuggestion(candidates, "country", option?.value || option?.label, option?.label || option?.value, option?.count);
+    const label = option?.label || option?.value;
+    appendLocalSuggestion(candidates, "country", label, label, option?.count);
   });
   (filterOptions.regions || []).forEach((option) => {
-    appendLocalSuggestion(candidates, "region", option?.value || option?.label, option?.label || option?.value, option?.count);
+    const label = option?.label || option?.value;
+    appendLocalSuggestion(candidates, "region", label, label, option?.count);
   });
   (filterOptions.ats || []).forEach((option) => {
     appendLocalSuggestion(candidates, "ATS", option?.value || option?.label, option?.label || option?.value, option?.count);
@@ -3457,6 +3459,8 @@ export default function App() {
   const lastFrontendLogFlushAtRef = useRef(0);
   const syncNoticeTimerRef = useRef(null);
   const autoSearchTimerRef = useRef(null);
+  const searchSuggestionTimerRef = useRef(null);
+  const lastSearchInputAtRef = useRef(0);
   const searchSuggestionCacheRef = useRef(new Map());
   const recentSearchesRef = useRef([]);
   const prefersReducedMotionRef = useRef(false);
@@ -3471,6 +3475,8 @@ export default function App() {
     (key, fallback = "") => translatePublicText(publicLanguageCode, key, fallback),
     [publicLanguageCode]
   );
+  const publicLanguageCountryCode =
+    PUBLIC_LANGUAGE_BY_CODE.get(publicLanguageCode)?.countryCode || PUBLIC_LANGUAGE_OPTIONS[0].countryCode;
   const currentSearchExample =
     SEARCH_PLACEHOLDER_EXAMPLES[searchExampleTypeState.index % SEARCH_PLACEHOLDER_EXAMPLES.length] ||
     SEARCH_PLACEHOLDER_EXAMPLES[0] ||
@@ -3918,7 +3924,10 @@ export default function App() {
     }
     setError("");
     try {
-      const response = await fetchPostings(q, limit, offset, filters);
+      const analyticsFilters = publicLanguageCountryCode
+        ? { ...filters, page_country: publicLanguageCountryCode }
+        : filters;
+      const response = await fetchPostings(q, limit, offset, analyticsFilters);
       if (requestSequence !== postingsRequestSequenceRef.current) {
         return;
       }
@@ -3993,7 +4002,7 @@ export default function App() {
         setLoading(false);
       }
     }
-  }, [queueFrontendLog]);
+  }, [publicLanguageCountryCode, queueFrontendLog]);
 
   const loadPostingFilterOptions = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -4003,7 +4012,10 @@ export default function App() {
       setPostingFilterOptionsLoading(true);
     }
     try {
-      const response = await fetchPostingFilterOptions(q, filters);
+      const analyticsFilters = publicLanguageCountryCode
+        ? { ...filters, page_country: publicLanguageCountryCode }
+        : filters;
+      const response = await fetchPostingFilterOptions(q, analyticsFilters);
       setPostingFilterOptions({
         ats: mergeAtsFilterOptions(response?.ats),
         industries: Array.isArray(response?.industries) ? response.industries : [],
@@ -4023,7 +4035,7 @@ export default function App() {
         setPostingFilterOptionsLoading(false);
       }
     }
-  }, [queueFrontendLog]);
+  }, [publicLanguageCountryCode, queueFrontendLog]);
 
   const loadMorePostings = useCallback(() => {
     if (initializing || loading) return;
@@ -4240,9 +4252,19 @@ export default function App() {
     }
   }, []);
 
+  const cancelPendingSearchSuggestion = useCallback(() => {
+    if (searchSuggestionTimerRef.current) {
+      clearTimeout(searchSuggestionTimerRef.current);
+      searchSuggestionTimerRef.current = null;
+    }
+  }, []);
+
   const submitSearch = useCallback((value = searchRef.current, analytics = {}) => {
     cancelPendingAutoSearch();
+    cancelPendingSearchSuggestion();
     const nextSearch = String(value || "").trim();
+    searchRef.current = nextSearch;
+    lastSearchInputAtRef.current = Date.now();
     const analyticsSource = String(analytics?.source || "search_box").trim() || "search_box";
     const now = Date.now();
     const filters = postingsFiltersRef.current;
@@ -4271,10 +4293,11 @@ export default function App() {
       if (nextSearch) trackPublicSearch(nextSearch, { source: analyticsSource });
       void loadPostings(nextSearch, { filters });
     }
-  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
 
   const clearSearchAndSuggestions = useCallback(() => {
     cancelPendingAutoSearch();
+    cancelPendingSearchSuggestion();
     const defaultFilters = createDefaultPostingsFilters();
     lastSearchSubmitRef.current = {
       value: "",
@@ -4292,12 +4315,13 @@ export default function App() {
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
     void loadPostings("", { filters: defaultFilters });
-  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
 
   const applySearchSuggestionFilter = useCallback((suggestion) => {
     const filterPatch = getSearchSuggestionFilterPatch(suggestion);
     if (!filterPatch) return false;
     cancelPendingAutoSearch();
+    cancelPendingSearchSuggestion();
     const nextFilters = {
       ...postingsFiltersRef.current,
       ...filterPatch
@@ -4319,7 +4343,7 @@ export default function App() {
     trackPublicFilterChange("suggestion");
     void loadPostings(query, { filters: nextFilters });
     return true;
-  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
 
   const selectSearchSuggestion = useCallback((suggestion) => {
     if (applySearchSuggestionFilter(suggestion)) return;
@@ -4330,6 +4354,7 @@ export default function App() {
 
   const handleBrandHome = useCallback(() => {
     cancelPendingAutoSearch();
+    cancelPendingSearchSuggestion();
     const defaultFilters = createDefaultPostingsFilters();
     setActivePage(PAGE_KEYS.POSTINGS);
     setDrawerOpen(false);
@@ -4350,10 +4375,13 @@ export default function App() {
     scrollPostingsToTop();
     void loadPostings("", { filters: defaultFilters });
     setTimeout(() => searchInputRef.current?.focus?.(), 0);
-  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
 
   const handleSearchChange = useCallback((value) => {
+    cancelPendingSearchSuggestion();
     const nextValue = String(value || "");
+    searchRef.current = nextValue;
+    lastSearchInputAtRef.current = Date.now();
     if (suppressedSuggestionQueryRef.current !== nextValue.trim()) {
       suppressedSuggestionQueryRef.current = "";
     }
@@ -4361,7 +4389,7 @@ export default function App() {
       setPostingsResultCoverage(null);
     }
     setSearch(nextValue);
-  }, [showResultsSurface]);
+  }, [cancelPendingSearchSuggestion, showResultsSurface]);
 
   const focusSearch = useCallback(() => {
     setActivePage(PAGE_KEYS.POSTINGS);
@@ -5065,6 +5093,7 @@ export default function App() {
 
   useEffect(() => {
     if (isPublicNativeStoreSurface) return undefined;
+    if (normalizePublicLanguageCode(getPublicSeoRouteHint()?.languageCode)) return undefined;
     if (normalizePublicLanguageCode(readWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY))) return undefined;
     let cancelled = false;
     const loadPublicPreference = async () => {
@@ -5094,14 +5123,17 @@ export default function App() {
     let cancelled = false;
     const loadPopularSearches = async () => {
       try {
-        const response = await fetchPopularSearches(publicLanguageCode, SEO_LANDING_LINK_LIMIT);
+        const response = await fetchPopularSearches(publicLanguageCode, SEO_LANDING_LINK_LIMIT, publicLanguageCountryCode);
         if (cancelled) return;
         const items = Array.isArray(response?.items) ? response.items.slice(0, SEO_LANDING_LINK_LIMIT) : [];
         setPopularSearchItems(items.length > 0 ? items : fallbackItems);
       } catch (e) {
         if (!cancelled) {
           setPopularSearchItems(fallbackItems);
-          queueFrontendLog("warn", "popular_searches_failed", String(e?.message || e), { language: publicLanguageCode });
+          queueFrontendLog("warn", "popular_searches_failed", String(e?.message || e), {
+            language: publicLanguageCode,
+            country: publicLanguageCountryCode
+          });
         }
       }
     };
@@ -5109,7 +5141,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activePage, publicLanguageCode, queueFrontendLog]);
+  }, [activePage, publicLanguageCode, publicLanguageCountryCode, queueFrontendLog]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || !window.matchMedia) return undefined;
@@ -5260,6 +5292,7 @@ export default function App() {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
     const query = String(search || "").trim();
     const cacheKey = normalizeSuggestionQuery(query);
+    cancelPendingSearchSuggestion();
     if (query.length < 2) {
       setSearchSuggestions([]);
       setSearchSuggestionsOpen(false);
@@ -5291,8 +5324,11 @@ export default function App() {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
+        const currentQuery = String(searchRef.current || "").trim();
+        if (currentQuery !== query) return;
+        if (Date.now() - Number(lastSearchInputAtRef.current || 0) < SEARCH_SUGGESTION_DEBOUNCE_MS - 20) return;
         if (suppressedSuggestionQueryRef.current === query) return;
-        const response = await fetchSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT);
+        const response = await fetchSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT, publicLanguageCountryCode);
         if (cancelled) return;
         if (suppressedSuggestionQueryRef.current === query) return;
         const remoteItems = Array.isArray(response?.items) ? response.items.slice(0, SEARCH_SUGGESTION_LIMIT) : [];
@@ -5305,15 +5341,22 @@ export default function App() {
         if (cancelled) return;
         setSearchSuggestions(immediateItems);
         setSearchSuggestionsOpen(immediateItems.length > 0);
-        queueFrontendLog("warn", "search_suggestions_failed", String(e?.message || e), { search: query });
+        queueFrontendLog("warn", "search_suggestions_failed", String(e?.message || e), {
+          search: query,
+          country: publicLanguageCountryCode
+        });
       }
     }, SEARCH_SUGGESTION_DEBOUNCE_MS);
+    searchSuggestionTimerRef.current = timer;
 
     return () => {
       cancelled = true;
+      if (searchSuggestionTimerRef.current === timer) {
+        searchSuggestionTimerRef.current = null;
+      }
       clearTimeout(timer);
     };
-  }, [activePage, queueFrontendLog, search]);
+  }, [activePage, cancelPendingSearchSuggestion, publicLanguageCountryCode, queueFrontendLog, search]);
 
   useEffect(() => () => {
     if (syncNoticeTimerRef.current) {
@@ -5371,6 +5414,17 @@ export default function App() {
     cancelPendingAutoSearch();
     const timer = setTimeout(() => {
       autoSearchTimerRef.current = null;
+      const latestSubmit = lastSearchSubmitRef.current || {};
+      if (
+        String(searchRef.current || "").trim() !== query ||
+        (
+          latestSubmit.value === query &&
+          latestSubmit.filtersSignature === filtersSignature &&
+          Date.now() - Number(latestSubmit.at || 0) < SEARCH_SUBMIT_DEDUPE_MS
+        )
+      ) {
+        return;
+      }
       lastSearchSubmitRef.current = {
         value: query,
         filtersSignature,
@@ -5793,7 +5847,7 @@ export default function App() {
                     isDarkPublicTheme ? styles.textMutedDark : null
                   ]}
                 >
-                  {isDesktopViewport ? " " : ""}{translatedLabel}
+                  {translatedLabel ? ` ${translatedLabel}` : ""}
                 </Text>
               </View>
             );
@@ -9416,10 +9470,10 @@ const styles = StyleSheet.create({
       : {})
   },
   publicStatsChipMobile: {
-    flexDirection: "column",
-    alignItems: "center",
+    flexDirection: "row",
+    alignItems: "baseline",
     justifyContent: "center",
-    gap: 0,
+    gap: 2,
     borderRadius: 10,
     paddingHorizontal: 4,
     paddingTop: 4,

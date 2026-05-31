@@ -3185,6 +3185,11 @@ function normalizeAnalyticsFilterValue(value) {
     .slice(0, 80);
 }
 
+function normalizeAnalyticsCountryCode(value) {
+  const country = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(country) ? country : "";
+}
+
 function serializeAnalyticsFilterValues(value) {
   const items = Array.isArray(value) ? value : parseCsv(value);
   return items
@@ -3245,6 +3250,7 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
     String(event.cacheStatus || "").trim().toUpperCase().slice(0, 12),
     countFilterValues(event.regions),
     normalizeAnonymousSessionKey(event.anonymousSessionKey),
+    normalizeAnalyticsCountryCode(event.countryScope || event.visitorCountry || event.pageCountry),
     serializeAnalyticsFilterValues(event.countries),
     serializeAnalyticsFilterValues(event.regions)
   ];
@@ -3267,10 +3273,11 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
         cache_status,
         region_filter_count,
         anonymous_session_key,
+        country_scope,
         country_filters,
         region_filters
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);
     `,
     values
   );
@@ -3376,17 +3383,33 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
   const date = normalizeAnalyticsDate(options.date, options.now instanceof Date ? options.now : new Date(), timezone);
   const limit = Math.max(1, Math.min(50, Number(options.limit || 15)));
   const where = analyticsDateWhere();
-  const values = [date, timezone];
+  const countryScope = normalizeAnalyticsCountryCode(
+    options.countryScope || options.visitorCountry || options.pageCountry || options.country
+  );
   const columnInfo = await pool.query(`
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'public_search_events'
-        AND column_name = 'country_filters'
-    ) AS has_country_filters;
+    SELECT
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'public_search_events'
+          AND column_name = 'country_filters'
+      ) AS has_country_filters,
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'public_search_events'
+          AND column_name = 'country_scope'
+      ) AS has_country_scope;
   `);
   const hasCountryFilters = Boolean(columnInfo.rows?.[0]?.has_country_filters);
+  const hasCountryScope = Boolean(columnInfo.rows?.[0]?.has_country_scope);
+  const scopedValues = [date, timezone];
+  const countryScopeApplied = Boolean(countryScope && hasCountryScope);
+  const scopedWhere = countryScopeApplied ? `${where}\n          AND country_scope = $3` : where;
+  if (countryScopeApplied) scopedValues.push(countryScope);
+  const limitPlaceholder = `$${scopedValues.length + 1}`;
   const [
     eventCounts,
     eventTotals,
@@ -3407,11 +3430,11 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
       `
         SELECT event_type, COUNT(*)::int AS count
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
         GROUP BY event_type
         ORDER BY count DESC, event_type ASC;
       `,
-      values
+      scopedValues
     ),
     pool.query(
       `
@@ -3419,110 +3442,110 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
           COUNT(*)::int AS total_events,
           COUNT(DISTINCT NULLIF(anonymous_session_key, ''))::int AS anonymous_session_count
         FROM public_search_events
-        WHERE ${where};
+        WHERE ${scopedWhere};
       `,
-      values
+      scopedValues
     ),
     pool.query(
       `
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND query_normalized <> ''
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND event_type = 'postings'
           AND query_normalized <> ''
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND event_type = 'suggest'
           AND query_normalized <> ''
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND event_type = 'filter_options'
           AND query_normalized <> ''
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND query_normalized <> ''
           AND result_count = 0
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND query_normalized <> ''
           AND result_count BETWEEN 1 AND 9
         GROUP BY query_normalized
         ORDER BY count DESC, query_normalized ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT referrer_host, COUNT(*)::int AS count
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND referrer_host <> ''
         GROUP BY referrer_host
         ORDER BY count DESC, referrer_host ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
         SELECT user_agent_family, COUNT(*)::int AS count
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND user_agent_family <> ''
         GROUP BY user_agent_family
         ORDER BY count DESC, user_agent_family ASC
-        LIMIT $3;
+        LIMIT ${limitPlaceholder};
       `,
-      [...values, limit]
+      [...scopedValues, limit]
     ),
     pool.query(
       `
@@ -3535,32 +3558,32 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
           END AS result_bucket,
           COUNT(*)::int AS count
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
         GROUP BY result_bucket
         ORDER BY result_bucket ASC;
       `,
-      values
+      scopedValues
     ),
     pool.query(
       `
         SELECT cache_status, COUNT(*)::int AS count
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
           AND cache_status <> ''
         GROUP BY cache_status
         ORDER BY count DESC, cache_status ASC;
       `,
-      values
+      scopedValues
     ),
     pool.query(
       `
         SELECT COALESCE(NULLIF(remote_filter, ''), 'unknown') AS remote_filter, COUNT(*)::int AS count
         FROM public_search_events
-        WHERE ${where}
+        WHERE ${scopedWhere}
         GROUP BY COALESCE(NULLIF(remote_filter, ''), 'unknown')
         ORDER BY count DESC, remote_filter ASC;
       `,
-      values
+      scopedValues
     ),
     hasCountryFilters
       ? pool.query(
@@ -3568,14 +3591,14 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
           SELECT btrim(country_filter) AS country_filter, COUNT(*)::int AS count
           FROM public_search_events,
             regexp_split_to_table(country_filters, ',') AS country_filter
-          WHERE ${where}
+          WHERE ${scopedWhere}
             AND btrim(country_filters) <> ''
             AND btrim(country_filter) <> ''
           GROUP BY btrim(country_filter)
           ORDER BY count DESC, country_filter ASC
-          LIMIT $3;
+          LIMIT ${limitPlaceholder};
         `,
-        [...values, limit]
+        [...scopedValues, limit]
       )
       : Promise.resolve({ rows: [] })
   ]);
@@ -3598,6 +3621,8 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
     read_only: true,
     date,
     timezone,
+    country_scope: countryScope || "",
+    country_scope_applied: countryScopeApplied,
     total_events: Number(totals.total_events || 0),
     anonymous_session_count: Number(totals.anonymous_session_count || 0),
     event_counts: toCountMap(eventCounts.rows, "event_type"),

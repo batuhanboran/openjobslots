@@ -1730,6 +1730,7 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
     referrer: "https://www.google.com/search?q=openjobslots",
     userAgent: "Mozilla/5.0 Firefox/151.0",
     cacheStatus: "MISS",
+    countryScope: "tr",
     anonymousSessionKey: "a".repeat(64),
     ip: "203.0.113.10"
   });
@@ -1749,8 +1750,9 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
   assert.equal(calls[0].params[11], "www.google.com");
   assert.equal(calls[0].params[12], "Firefox");
   assert.equal(calls[0].params[15], "a".repeat(64));
-  assert.equal(calls[0].params[16], "Turkey,United States");
-  assert.equal(calls[0].params[17], "North America");
+  assert.equal(calls[0].params[16], "TR");
+  assert.equal(calls[0].params[17], "Turkey,United States");
+  assert.equal(calls[0].params[18], "North America");
 }
 
 async function testDailyRedditPostBuildsSeededReadOnlyMarkdown() {
@@ -1826,7 +1828,7 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
         return { rows: [{ event_type: "postings", count: "3" }, { event_type: "suggest", count: "5" }] };
       }
       if (/information_schema\.columns/i.test(sql)) {
-        return { rows: [{ has_country_filters: true }] };
+        return { rows: [{ has_country_filters: true, has_country_scope: true }] };
       }
       if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
         return { rows: [{ total_events: "8", anonymous_session_count: "2" }] };
@@ -1914,6 +1916,37 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
   assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
 }
 
+async function testPublicSearchReportCanScopeByCountry() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/information_schema\.columns/i.test(sql)) {
+        return { rows: [{ has_country_filters: true, has_country_scope: true }] };
+      }
+      if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
+        return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const report = await getPostgresPublicSearchReport(pool, {
+    date: "2026-05-22",
+    timezone: "Europe/Istanbul",
+    limit: 10,
+    countryScope: "tr"
+  });
+
+  const eventQueries = calls.filter((call) => /FROM public_search_events/i.test(call.sql));
+  assert.equal(report.country_scope, "TR");
+  assert.equal(report.country_scope_applied, true);
+  assert.ok(eventQueries.length > 0);
+  assert.ok(eventQueries.every((call) => /country_scope = \$3/i.test(call.sql)));
+  assert.ok(eventQueries.every((call) => call.params[2] === "TR"));
+  assert.ok(eventQueries.filter((call) => /LIMIT \$4/i.test(call.sql)).every((call) => call.params[3] === 10));
+}
+
 async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
   const calls = [];
   const pool = {
@@ -1923,7 +1956,7 @@ async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
         return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
       }
       if (/information_schema\.columns/i.test(sql)) {
-        return { rows: [{ has_country_filters: false }] };
+        return { rows: [{ has_country_filters: false, has_country_scope: false }] };
       }
       return { rows: [] };
     }
@@ -1985,6 +2018,7 @@ async function main() {
   await testPublicSearchEventInsertIsPrivacyBounded();
   await testDailyRedditPostBuildsSeededReadOnlyMarkdown();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
+  await testPublicSearchReportCanScopeByCountry();
   await testPublicSearchReportResolvesTodayInRequestedTimezone();
   console.log("postgres sync-control bigint cast tests passed");
 }
