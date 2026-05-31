@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Switch,
   Text,
   TextInput,
@@ -245,6 +246,10 @@ const OJS_FONT_STACK = Platform.OS === "web"
 const YAHOO_FONT_STACK = Platform.OS === "web"
   ? "'SF Pro Display', 'Geist Sans', 'Helvetica Neue', 'Segoe UI', system-ui, -apple-system, sans-serif"
   : undefined;
+const ACCESSIBILITY_STATUS_PROPS = Platform.OS === "web"
+  ? { accessibilityRole: "status" }
+  : { accessibilityLiveRegion: "polite" };
+const ANDROID_STATUS_BAR_OFFSET = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
 const PUBLIC_LANGUAGE_HINT_COOKIE = "ojs_public_language_hint";
@@ -8167,7 +8172,8 @@ export default function App() {
                   isDarkPublicTheme ? styles.publicStatsChipDark : null
                 ]}
                 testID={isJobSlots ? "result-count" : `public-stat-${chip.key}`}
-                accessibilityRole={isJobSlots ? "status" : "text"}
+                accessibilityRole={isJobSlots ? undefined : "text"}
+                {...(isJobSlots ? ACCESSIBILITY_STATUS_PROPS : null)}
                 accessibilityLabel={`${chip.value} ${translatedLabel}`}
               >
                 <Text
@@ -8414,12 +8420,12 @@ export default function App() {
                 {t("search.shortcut", "Enter to search · Esc to clear")}
               </Text>
               {searchNotice ? (
-                <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
+                <Text style={styles.searchNotice} testID="search-notice" {...ACCESSIBILITY_STATUS_PROPS}>
                   {searchNotice}
                 </Text>
               ) : null}
               {syncNotice ? (
-                <Text style={styles.syncNotice} testID="sync-action-notice" accessibilityRole="status">
+                <Text style={styles.syncNotice} testID="sync-action-notice" {...ACCESSIBILITY_STATUS_PROPS}>
                   {syncNotice}
                 </Text>
               ) : null}
@@ -8690,12 +8696,12 @@ export default function App() {
           testID="results-surface"
         >
           {showPostingsRefreshIndicator ? (
-            <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" accessibilityRole="status">
+            <Text style={styles.postingsRefreshIndicator} testID="postings-refresh-indicator" {...ACCESSIBILITY_STATUS_PROPS}>
               {t("results.updating", "Updating visible results...")}
             </Text>
           ) : null}
           {searchNotice ? (
-            <Text style={styles.searchNotice} testID="search-notice" accessibilityRole="status">
+            <Text style={styles.searchNotice} testID="search-notice" {...ACCESSIBILITY_STATUS_PROPS}>
               {searchNotice}
             </Text>
           ) : null}
@@ -8766,7 +8772,7 @@ export default function App() {
             </View>
           )}
           {!initializing && postings.length > 0 ? (
-            <View style={styles.postingsPagingFooter} testID="postings-pagination-status" accessibilityRole="status">
+            <View style={styles.postingsPagingFooter} testID="postings-pagination-status" {...ACCESSIBILITY_STATUS_PROPS}>
               <Text style={styles.postingsPagingText}>
                 {translatedPublicText(t, "results.showingOf", "Showing {visible} of {total} slots", {
                   visible: formatCompactNumberLabel(postings.length),
@@ -9872,6 +9878,7 @@ const styles = StyleSheet.create({
   },
   yahooSearchPanelResults: {
     ...(Platform.OS === "web" ? { minHeight: "auto" } : {}),
+    ...(ANDROID_STATUS_BAR_OFFSET > 0 ? { paddingTop: ANDROID_STATUS_BAR_OFFSET + 12 } : {}),
     paddingBottom: 14
   },
   searchPanelDark: {
