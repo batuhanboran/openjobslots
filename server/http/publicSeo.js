@@ -32,6 +32,64 @@ function stripOpenJobSlotsTitleSuffix(value) {
   return normalizeInlineText(value).replace(/\s+\|\s+OpenJobSlots\s*$/i, "").trim();
 }
 
+const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
+  en: {
+    relatedLabel: "Related public job search pages",
+    paragraphIntro: ({ heading, description }) =>
+      `${heading} is a crawlable OpenJobSlots landing page for people and search engines that need a stable entry point before the interactive search app loads. ${description}`,
+    paragraphCoverage: ({ searchQuery }) =>
+      `OpenJobSlots focuses on fresh public employer ATS boards and keeps the public surface search-first. This page helps visitors start with ${searchQuery || "job openings"} and then narrow results by role, company, location, country, region, remote mode, source platform, and posting freshness. The app is built around public posting fields only, so search engines see useful page context without exposing admin controls, private diagnostics, parser payloads, or internal infrastructure details.`,
+    paragraphQuality: () =>
+      "The index treats employer links as canonical source evidence and keeps Meilisearch as a derived search layer while Postgres remains the source of truth. Ambiguous source data is not promoted as fake location, date, remote, or company evidence. That means public pages can describe the search intent, the filters, and the source families while the ingestion pipeline continues to validate each posting through parser-backed evidence before it becomes searchable.",
+    paragraphNavigation: () =>
+      "Use the links below to move between localized job-search intents and high-value ATS source pages. They are included as plain HTML in the fallback so crawlers can discover the same curated public routes that appear in the XML sitemap. When JavaScript is available, the interactive interface adds suggestions, filters, result counts, and current posting cards on top of this crawlable foundation."
+  },
+  tr: {
+    relatedLabel: "İlgili herkese açık iş arama sayfaları",
+    paragraphIntro: ({ heading, description }) =>
+      `${heading}, etkileşimli arama uygulaması yüklenmeden önce kullanıcılar ve arama motorları için sabit bir OpenJobSlots giriş sayfasıdır. ${description}`,
+    paragraphCoverage: ({ searchQuery }) =>
+      `OpenJobSlots herkese açık işveren ATS panolarındaki güncel ilanlara odaklanır ve public yüzeyi arama öncelikli tutar. Bu sayfa ziyaretçilerin ${searchQuery || "iş ilanları"} aramasıyla başlamasına, sonra rol, şirket, lokasyon, ülke, bölge, uzaktan çalışma modu, kaynak platform ve ilan tazeliği filtreleriyle sonuçları daraltmasına yardımcı olur. Uygulama yalnızca public ilan alanlarını gösterir; yönetim kontrolleri, özel tanılar, ham parser çıktıları ve dahili altyapı ayrıntıları arama motorlarına açılmaz.`,
+    paragraphQuality: () =>
+      "Dizin, işveren bağlantılarını kanonik kaynak kanıtı olarak korur ve Meilisearch katmanını türetilmiş arama indeksi olarak kullanırken Postgres kaynak gerçekliğini taşır. Belirsiz kaynak verisi sahte lokasyon, tarih, remote durumu veya şirket kanıtı olarak yayınlanmaz. Böylece public sayfalar arama niyetini, filtreleri ve kaynak ailelerini açıklarken ingestion hattı her ilanı parser destekli kanıtla doğrulamaya devam eder.",
+    paragraphNavigation: () =>
+      "Aşağıdaki bağlantılar yerelleştirilmiş iş arama niyetleri ve yüksek değerli ATS kaynak sayfaları arasında geçiş sağlar. Bu bağlantılar düz HTML fallback içinde yer aldığı için crawler'lar XML sitemap içinde bulunan aynı seçilmiş public rotaları keşfedebilir. JavaScript kullanılabildiğinde etkileşimli arayüz bu taranabilir temel üzerine öneriler, filtreler, sonuç sayıları ve güncel ilan kartları ekler."
+  },
+  de: {
+    relatedLabel: "Verwandte öffentliche Jobsuchseiten",
+    paragraphIntro: ({ heading, description }) =>
+      `${heading} ist eine crawlbare OpenJobSlots-Landingpage für Nutzer und Suchmaschinen, die einen stabilen Einstieg benötigen, bevor die interaktive Suche geladen ist. ${description}`,
+    paragraphCoverage: ({ searchQuery }) =>
+      `OpenJobSlots konzentriert sich auf aktuelle öffentliche Arbeitgeber-ATS-Jobbörsen und hält die öffentliche Oberfläche konsequent suchorientiert. Diese Seite hilft Besuchern, mit ${searchQuery || "Stellenangeboten"} zu starten und Ergebnisse anschließend nach Rolle, Unternehmen, Standort, Land, Region, Remote-Modus, Quellplattform und Veröffentlichungsfrische einzugrenzen. Die Anwendung zeigt nur öffentliche Stellendaten, damit Suchmaschinen hilfreichen Kontext erhalten, ohne Administrationsfunktionen, private Diagnosen, Parser-Rohdaten oder interne Infrastrukturdetails zu sehen.`,
+    paragraphQuality: () =>
+      "Der Index behandelt Arbeitgeberlinks als kanonischen Quellnachweis und nutzt Meilisearch als abgeleitete Suchebene, während Postgres die Quelle der Wahrheit bleibt. Mehrdeutige Quelldaten werden nicht als erfundener Standort, erfundenes Datum, Remote-Status oder Unternehmensnachweis veröffentlicht. So können öffentliche Seiten die Suchabsicht, Filter und Quellfamilien erklären, während die Ingestion-Pipeline jede Stelle weiterhin mit parsergestützter Evidenz validiert, bevor sie durchsuchbar wird.",
+    paragraphNavigation: () =>
+      "Die folgenden Links verbinden lokalisierte Suchintentionen mit wichtigen ATS-Quellseiten. Sie stehen als einfaches HTML im Fallback, damit Crawler dieselben kuratierten öffentlichen Routen entdecken können, die auch in der XML-Sitemap stehen. Wenn JavaScript verfügbar ist, ergänzt die interaktive Oberfläche diese crawlbare Basis um Vorschläge, Filter, Ergebniszahlen und aktuelle Stellenkarten."
+  },
+  fr: {
+    relatedLabel: "Pages publiques de recherche d'emploi liées",
+    paragraphIntro: ({ heading, description }) =>
+      `${heading} est une page d'entrée OpenJobSlots explorable par les moteurs et utile aux visiteurs avant le chargement de l'application de recherche interactive. ${description}`,
+    paragraphCoverage: ({ searchQuery }) =>
+      `OpenJobSlots se concentre sur les jobboards ATS publics des employeurs et garde la surface publique orientée recherche. Cette page aide les visiteurs à commencer avec ${searchQuery || "des offres d'emploi"}, puis à affiner les résultats par poste, entreprise, lieu, pays, région, mode remote, plateforme source et fraîcheur de publication. L'application expose uniquement des champs publics de postes; les contrôles d'administration, diagnostics privés, charges brutes de parsing et détails internes d'infrastructure ne sont pas publiés aux moteurs de recherche.`,
+    paragraphQuality: () =>
+      "L'index traite les liens employeur comme des preuves sources canoniques et utilise Meilisearch comme couche de recherche dérivée, tandis que Postgres reste la source de vérité. Les données ambiguës ne sont pas promues comme faux lieu, fausse date, statut remote ou preuve d'entreprise. Les pages publiques peuvent donc expliquer l'intention de recherche, les filtres et les familles de sources pendant que le pipeline d'ingestion valide chaque poste avec une preuve issue du parser avant son indexation.",
+    paragraphNavigation: () =>
+      "Les liens ci-dessous relient les intentions de recherche localisées aux pages de sources ATS importantes. Ils sont présents en HTML simple dans le fallback afin que les crawlers découvrent les mêmes routes publiques sélectionnées que dans le sitemap XML. Lorsque JavaScript est disponible, l'interface interactive ajoute suggestions, filtres, compteurs de résultats et cartes d'offres récentes sur cette base explorable."
+  },
+  es: {
+    relatedLabel: "Páginas públicas relacionadas de búsqueda de empleo",
+    paragraphIntro: ({ heading, description }) =>
+      `${heading} es una página de entrada rastreable de OpenJobSlots para personas y buscadores antes de que cargue la aplicación interactiva de búsqueda. ${description}`,
+    paragraphCoverage: ({ searchQuery }) =>
+      `OpenJobSlots se centra en bolsas ATS públicas de empleadores y mantiene la superficie pública orientada a la búsqueda. Esta página ayuda a empezar con ${searchQuery || "ofertas de empleo"} y después filtrar por rol, empresa, ubicación, país, región, modalidad remota, plataforma de origen y frescura de publicación. La aplicación expone solo campos públicos de las vacantes, por lo que los buscadores reciben contexto útil sin controles administrativos, diagnósticos privados, cargas crudas de parsers ni detalles internos de infraestructura.`,
+    paragraphQuality: () =>
+      "El índice trata los enlaces del empleador como evidencia canónica de origen y usa Meilisearch como capa derivada de búsqueda, mientras Postgres conserva la fuente de verdad. Los datos ambiguos no se publican como ubicación, fecha, estado remoto o empresa inventados. Así, las páginas públicas pueden describir la intención de búsqueda, los filtros y las familias de fuentes mientras el pipeline de ingesta valida cada vacante con evidencia respaldada por parsers antes de hacerla buscable.",
+    paragraphNavigation: () =>
+      "Los enlaces siguientes conectan intenciones de búsqueda localizadas con páginas valiosas de fuentes ATS. Están incluidos como HTML simple en el fallback para que los crawlers descubran las mismas rutas públicas curadas que aparecen en el sitemap XML. Cuando JavaScript está disponible, la interfaz interactiva añade sugerencias, filtros, conteos de resultados y tarjetas de vacantes actuales sobre esta base rastreable."
+  }
+});
+
 function getSeoHeadingFromTitle(value) {
   const normalized = normalizeInlineText(value);
   if (/^OpenJobSlots\s+\|/i.test(normalized)) return "OpenJobSlots";
@@ -48,7 +106,7 @@ function removeExistingSeoTags(html) {
     .replace(/\s*<meta[^>]+property=["'](?:og:title|og:description|og:type|og:url|og:site_name)["'][^>]*>/gi, "")
     .replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/gi, "")
     .replace(/\s*<link[^>]+rel=["']alternate["'][^>]*hreflang=["'][^"']+["'][^>]*>/gi, "")
-    .replace(/\s*<script[^>]+id=["']openjobslots-(?:organization|website)-jsonld["'][^>]*>[\s\S]*?<\/script>/gi, "");
+    .replace(/\s*<script[^>]+id=["']openjobslots-(?:organization|website|webpage|breadcrumb)-jsonld["'][^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
 function stringifyJsonLd(value) {
@@ -138,6 +196,10 @@ function createPublicSeoHelpers(dependencies = {}) {
     };
   }
 
+  function getSeoFallbackCopy(languageCode) {
+    return SEO_FALLBACK_COPY_BY_LANGUAGE[languageCode] || SEO_FALLBACK_COPY_BY_LANGUAGE.en;
+  }
+
   function getPublicSeoAlternateLinks(req) {
     const seoRoute = getSeoRoute(req);
     const requestPath = getRequestPath(req);
@@ -177,7 +239,10 @@ function createPublicSeoHelpers(dependencies = {}) {
   function buildStructuredDataTags(req) {
     const siteOrigin = getPublicSiteOrigin(req);
     const siteUrl = `${siteOrigin}/`;
+    const canonicalUrl = getPublicSiteCanonicalUrl(req);
+    const seoRoute = getSeoRoute(req);
     const seoMeta = getSeoMeta(req);
+    const heading = getSeoHeadingFromTitle(seoMeta.title) || "OpenJobSlots";
     const description = String(seoMeta.description || seoDescription || "").trim();
     const organization = {
       "@context": "https://schema.org",
@@ -204,28 +269,108 @@ function createPublicSeoHelpers(dependencies = {}) {
         "query-input": "required name=search_term_string"
       }
     };
+    const webpage = {
+      "@context": "https://schema.org",
+      "@type": seoRoute ? "CollectionPage" : "WebPage",
+      "@id": `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: heading,
+      description,
+      inLanguage: seoMeta.languageCode || "en",
+      isPartOf: {
+        "@id": website["@id"]
+      },
+      publisher: {
+        "@id": organization["@id"]
+      }
+    };
+    const breadcrumbItems = [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "OpenJobSlots",
+        item: siteUrl
+      }
+    ];
+    if (canonicalUrl !== siteUrl) {
+      breadcrumbItems.push({
+        "@type": "ListItem",
+        position: 2,
+        name: heading,
+        item: canonicalUrl
+      });
+    }
+    const breadcrumb = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "@id": `${canonicalUrl}#breadcrumb`,
+      itemListElement: breadcrumbItems
+    };
+    webpage.breadcrumb = {
+      "@id": breadcrumb["@id"]
+    };
 
     return [
       '<script type="application/ld+json" id="openjobslots-organization-jsonld">' + stringifyJsonLd(organization) + "</script>",
-      '<script type="application/ld+json" id="openjobslots-website-jsonld">' + stringifyJsonLd(website) + "</script>"
+      '<script type="application/ld+json" id="openjobslots-website-jsonld">' + stringifyJsonLd(website) + "</script>",
+      '<script type="application/ld+json" id="openjobslots-webpage-jsonld">' + stringifyJsonLd(webpage) + "</script>",
+      '<script type="application/ld+json" id="openjobslots-breadcrumb-jsonld">' + stringifyJsonLd(breadcrumb) + "</script>"
     ].join("\n    ");
   }
 
   function getStaticSeoFallbackLinks(req) {
     const seoMeta = getSeoMeta(req);
     const languageCode = seoMeta.languageCode || "en";
-    const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
+    const currentPath = getRequestPath(req);
+    const currentLanguageRoutes = PUBLIC_SEO_ROUTES.filter(
       (route) => route.languageCode === languageCode && route.alternateGroup && route.alternateGroup !== "home"
     );
-    const atsRoutes = PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/")).slice(0, 3);
-    return [...localizedRoutes, ...atsRoutes].slice(0, 10);
+    const homeRoutes = PUBLIC_SEO_ROUTES.filter((route) => route.alternateGroup === "home");
+    const atsRoutes = PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/"));
+    const remainingRoutes = PUBLIC_SEO_ROUTES.filter((route) => ![
+      ...currentLanguageRoutes,
+      ...homeRoutes,
+      ...atsRoutes
+    ].some((item) => item.path === route.path));
+    const orderedRoutes = [
+      ...currentLanguageRoutes,
+      ...homeRoutes,
+      ...atsRoutes,
+      ...remainingRoutes
+    ];
+    const seen = new Set();
+    return orderedRoutes.filter((route) => {
+      if (!route?.path || route.path === currentPath || seen.has(route.path)) return false;
+      seen.add(route.path);
+      return true;
+    });
+  }
+
+  function buildStaticSeoFallbackParagraphs(req, heading, description) {
+    const seoMeta = getSeoMeta(req);
+    const seoRoute = getSeoRoute(req);
+    const languageCode = seoMeta.languageCode || "en";
+    const copy = getSeoFallbackCopy(languageCode);
+    const searchQuery = normalizeInlineText(seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
+    const values = { heading, description, searchQuery };
+    return [
+      copy.paragraphIntro(values),
+      copy.paragraphCoverage(values),
+      copy.paragraphQuality(values),
+      copy.paragraphNavigation(values)
+    ].map(normalizeInlineText).filter(Boolean);
   }
 
   function buildStaticSeoFallback(req) {
     const siteOrigin = getPublicSiteOrigin(req);
     const seoMeta = getSeoMeta(req);
+    const languageCode = seoMeta.languageCode || "en";
+    const copy = getSeoFallbackCopy(languageCode);
     const heading = getSeoHeadingFromTitle(seoMeta.title) || "OpenJobSlots";
     const description = normalizeInlineText(seoMeta.description || seoDescription);
+    const paragraphs = buildStaticSeoFallbackParagraphs(req, heading, description)
+      .map((paragraph) => "    <p>" + escapeHtmlAttribute(paragraph) + "</p>")
+      .join("\n");
     const links = getStaticSeoFallbackLinks(req)
       .map((route) => {
         const label = stripOpenJobSlotsTitleSuffix(route.title) || route.searchQuery || route.path;
@@ -243,9 +388,8 @@ function createPublicSeoHelpers(dependencies = {}) {
       "<noscript>",
       '  <main id="openjobslots-seo-fallback">',
       "    <h1>" + escapeHtmlAttribute(heading) + "</h1>",
-      "    <p>" + escapeHtmlAttribute(description) + "</p>",
-      "    <p>OpenJobSlots indexes fresh public employer ATS job openings for role, company, location, remote mode, source, and posting freshness searches. Use the curated public landing pages below to browse common searches while the interactive job search app loads.</p>",
-      '    <nav aria-label="Popular job search pages">',
+      paragraphs,
+      '    <nav aria-label="' + escapeHtmlAttribute(copy.relatedLabel) + '">',
       "      <ul>",
       links,
       "      </ul>",

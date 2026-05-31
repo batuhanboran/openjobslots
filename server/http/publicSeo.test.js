@@ -1,6 +1,7 @@
 const assert = require("assert");
 
 const { createPublicSeoHelpers } = require("./publicSeo");
+const { PUBLIC_SEO_ROUTES } = require("../../src/publicSeoRoutes");
 
 function createRequest(overrides = {}) {
   const headers = {
@@ -57,6 +58,24 @@ function parseJsonLdById(html, id) {
   return JSON.parse(match[1]);
 }
 
+function extractNoscriptText(html) {
+  const match = /<noscript>([\s\S]*?)<\/noscript>/i.exec(String(html || ""));
+  assert.ok(match, "expected static SEO fallback noscript content");
+  return match[1]
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function countWords(value) {
+  return (String(value || "").match(/[A-Za-zÀ-ÿ0-9]+(?:[-'][A-Za-zÀ-ÿ0-9]+)?/g) || []).length;
+}
+
 function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com",
@@ -89,6 +108,17 @@ function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {
     "query-input": "required name=search_term_string"
   });
   assert.ok(!html.includes("\"stale\":true"));
+
+  const webpage = parseJsonLdById(html, "openjobslots-webpage-jsonld");
+  assert.equal(webpage["@context"], "https://schema.org");
+  assert.equal(webpage["@type"], "WebPage");
+  assert.equal(webpage["@id"], "https://openjobslots.com/#webpage");
+  assert.equal(webpage.url, "https://openjobslots.com/");
+  assert.equal(webpage.isPartOf["@id"], "https://openjobslots.com/#website");
+
+  const breadcrumb = parseJsonLdById(html, "openjobslots-breadcrumb-jsonld");
+  assert.equal(breadcrumb["@type"], "BreadcrumbList");
+  assert.equal(breadcrumb.itemListElement.length, 1);
 }
 
 function testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback() {
@@ -107,6 +137,9 @@ function testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback() {
   assert.ok(html.includes("Find fresh job openings from public employer ATS boards."));
   assert.ok(html.includes('href="https://openjobslots.com/en/job-openings"'));
   assert.ok(html.includes('href="https://openjobslots.com/ats/greenhouse-jobs"'));
+  assert.ok(html.includes('href="https://openjobslots.com/ats/workday-jobs"'));
+  assert.ok(html.includes('href="https://openjobslots.com/ats/bamboohr-jobs"'));
+  assert.ok(countWords(extractNoscriptText(html)) >= 200);
   assert.ok(!html.includes("You need to enable JavaScript"));
 }
 
@@ -149,6 +182,10 @@ function testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates() 
 
   const website = parseJsonLdById(html, "openjobslots-website-jsonld");
   assert.equal(website.inLanguage, "tr");
+  const fallbackText = extractNoscriptText(html);
+  assert.ok(countWords(fallbackText) >= 200);
+  assert.ok(fallbackText.includes("crawler"));
+  assert.ok(!fallbackText.includes("OpenJobSlots indexes fresh public employer ATS job openings"));
 }
 
 function testHomeLanguagePagesGetBidirectionalHreflang() {
@@ -198,6 +235,7 @@ function testRobotsAndSitemapStayCrawlSafe() {
   assert.match(robots, /^Disallow: \/postings$/m);
   assert.doesNotMatch(robots, /^Disallow: \/$/m);
   assert.doesNotMatch(robots, /noindex/i);
+  assert.doesNotMatch(robots, /Content-Signal/i);
   assert.match(robots, /^Sitemap: https:\/\/openjobslots\.com\/sitemap\.xml$/m);
 
   assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">/);
@@ -209,6 +247,65 @@ function testRobotsAndSitemapStayCrawlSafe() {
   assert.match(sitemap, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/openjobslots\.com\/en\/remote-job-openings" \/>/);
   assert.doesNotMatch(sitemap, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
   assert.doesNotMatch(sitemap, /\?q=/);
+}
+
+function testRootFallbackLinksEveryCuratedSitemapRoute() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body></body></html>",
+    createRequest()
+  );
+
+  for (const route of PUBLIC_SEO_ROUTES) {
+    assert.ok(
+      html.includes(`href="https://openjobslots.com${route.path}"`),
+      `expected root fallback to link ${route.path}`
+    );
+  }
+}
+
+function testAllCuratedSeoFallbacksClearLowWordCountThreshold() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const indexHtml = "<html><head><title>Old</title></head><body></body></html>";
+  const routes = [{ path: "/" }, ...PUBLIC_SEO_ROUTES];
+
+  for (const route of routes) {
+    const html = renderSeoIndexHtml(indexHtml, createRequest({ path: route.path }));
+    const wordCount = countWords(extractNoscriptText(html));
+    assert.ok(wordCount >= 200, `expected ${route.path} fallback word count >= 200, got ${wordCount}`);
+  }
+}
+
+function testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com"
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body></body></html>",
+    createRequest({ path: "/ats/workday-jobs" })
+  );
+
+  const webpage = parseJsonLdById(html, "openjobslots-webpage-jsonld");
+  assert.equal(webpage["@type"], "CollectionPage");
+  assert.equal(webpage["@id"], "https://openjobslots.com/ats/workday-jobs#webpage");
+  assert.equal(webpage.url, "https://openjobslots.com/ats/workday-jobs");
+  assert.equal(webpage.name, "Workday jobs");
+  assert.deepEqual(webpage.breadcrumb, {
+    "@id": "https://openjobslots.com/ats/workday-jobs#breadcrumb"
+  });
+
+  const breadcrumb = parseJsonLdById(html, "openjobslots-breadcrumb-jsonld");
+  assert.equal(breadcrumb.itemListElement.length, 2);
+  assert.equal(breadcrumb.itemListElement[1].name, "Workday jobs");
+  assert.equal(breadcrumb.itemListElement[1].item, "https://openjobslots.com/ats/workday-jobs");
 }
 
 function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages() {
@@ -248,6 +345,9 @@ testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
 testHomeLanguagePagesGetBidirectionalHreflang();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
+testRootFallbackLinksEveryCuratedSitemapRoute();
+testAllCuratedSeoFallbacksClearLowWordCountThreshold();
+testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData();
 testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages();
 testBuildLlmsTxtUsesPlainMarkdownFormat();
 
