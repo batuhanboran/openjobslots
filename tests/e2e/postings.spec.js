@@ -110,6 +110,20 @@ async function submitSearchAndExpectResults(page, query = "remote jobs") {
   await expect(page.getByText("Refreshing results...")).toHaveCount(0);
 }
 
+async function expectReleaseNotesAreVersionSpecific(page, languageCode) {
+  const topVersions = ["2.0.0", "1.9.3", "1.9.2", "1.9.1", "1.8.0"];
+  const summaries = [];
+  for (const version of topVersions) {
+    const title = page.getByTestId(`release-note-title-${version}`);
+    const summary = page.getByTestId(`release-note-summary-${version}`);
+    await expect(title, `${languageCode} release ${version} title should be visible`).toBeVisible();
+    await expect(summary, `${languageCode} release ${version} summary should be visible`).toBeVisible();
+    summaries.push(String(await summary.textContent()).replace(/\s+/g, " ").trim());
+  }
+  expect(new Set(summaries).size, `${languageCode} release summaries should not repeat one generic fallback`).toBe(summaries.length);
+  expect(summaries.some((text) => /This release improved public search, data quality, coverage, and production reliability/i.test(text))).toBe(false);
+}
+
 async function enableDarkMode(page) {
   const toggle = page.getByTestId("theme-toggle");
   if (!/Night|Dark|Gece|Nuit|Noche|Nacht/i.test(await toggle.textContent())) {
@@ -1349,7 +1363,7 @@ test.describe("postings page QA", () => {
         code: "FR",
         hero: "Rechercher des postes ouverts",
         lead: "Trouvez des offres récentes sur les jobboards ATS publics.",
-        version: `Public v${APP_VERSION}`,
+        version: `Recherche v${APP_VERSION}`,
         credit: "Déployé et développé par",
         updating: "Mise à jour des résultats visibles...",
         suggestionHint: "Titre",
@@ -1410,6 +1424,7 @@ test.describe("postings page QA", () => {
       await expect(page.getByText(expected.releaseVersion)).toBeVisible();
       await expect(page.getByText(expected.releaseHeading)).toBeVisible();
       await expect(page.getByText(expected.releaseSummary)).toBeVisible();
+      await expectReleaseNotesAreVersionSpecific(page, languageCode);
       await page.getByTestId("release-notes-close").click();
       await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
 
@@ -1596,7 +1611,7 @@ test.describe("postings page QA", () => {
       await page.getByTestId("public-version-button").click();
       await expect(page.getByTestId("release-notes-modal")).toBeVisible();
       await expect(page.getByTestId("release-notes-title")).toHaveText(expected.releaseTitle);
-      await expect(page.getByTestId("release-notes-modal").getByText(expected.releaseHeading).first()).toBeVisible();
+      await expectReleaseNotesAreVersionSpecific(page, languageCode);
       await page.getByTestId("release-notes-close").click();
       await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
 
