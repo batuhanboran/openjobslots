@@ -2,6 +2,13 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## v2.1.0 Release Update - May 31, 2026
+
+- Package/public release line is `v2.1.0`.
+- Public release notes now summarize the ATS pipeline and runtime-safety work: source-module dispatch, parser evidence lanes, explicit ATS pipeline safeguards, duplicate read coalescing under load, lower background worker/deploy pressure, and verified Meili/Postgres parity after the repair window.
+- The v2.1.0 release copy intentionally avoids foregrounding SEO, language expansion, public search speed, and mobile/Android work.
+- This release update does not imply production source apply, data backfill, Meili replace reindex, Docker prune, or public-row deletion.
+
 ## Runtime Stability Update - May 31, 2026
 
 - Public read caching now coalesces concurrent same-key misses so repeated `/postings/filter-options` requests wait on one producer instead of starting duplicate Postgres aggregation work.
@@ -159,11 +166,11 @@ Scale posture:
 
 ## Current Version
 
-- Package/public release line: `v2.0.0`.
-- Previous public release tag: `v1.9.3`.
+- Package/public release line: `v2.1.0`.
+- Previous public release tag: `v2.0.0`.
 - Current release branch: `main`.
 - Last verified production checkout before this patch metadata/docs refresh: May 24, 2026 architecture deployment on `main`.
-- Last verified production deployment date: May 27, 2026 v2 prep deployment.
+- Last verified production deployment date: May 31, 2026 v2.1.0 release deployment.
 - Public product name: `openjobslots`.
 - Target public domain: `openjobslots.com`.
 

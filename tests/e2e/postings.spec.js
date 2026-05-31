@@ -111,7 +111,7 @@ async function submitSearchAndExpectResults(page, query = "remote jobs") {
 }
 
 async function expectReleaseNotesAreVersionSpecific(page, languageCode) {
-  const topVersions = ["2.0.0", "1.9.3", "1.9.2", "1.9.1", "1.8.0"];
+  const topVersions = ["2.1.0", "2.0.0", "1.9.3", "1.9.2", "1.9.1"];
   const summaries = [];
   for (const version of topVersions) {
     const title = page.getByTestId(`release-note-title-${version}`);
@@ -201,9 +201,9 @@ async function expectSearchEngineVisualContract(page) {
     await expect(attributionLink).toHaveAttribute("href", "https://batuhanboran.com");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
-    await expect(page.getByText("Version 2.0.0")).toBeVisible();
-    await expect(page.getByText("Coverage, ATS ingestion, and search parity")).toBeVisible();
-    await expect(page.getByText(/Adds exact job-slot counts, ATS and company coverage/i)).toBeVisible();
+    await expect(page.getByText("Version 2.1.0")).toBeVisible();
+    await expect(page.getByText("ATS pipeline and runtime safety")).toBeVisible();
+    await expect(page.getByText(/Strengthens source-module dispatch and parser evidence lanes/i)).toBeVisible();
     await expect(page.getByText("Version 1.6.1")).toBeVisible();
     await expect(page.getByText("Data quality tooling release")).toBeVisible();
     await expect(page.getByText("Version 1.6.0")).toBeVisible();
@@ -1369,9 +1369,9 @@ test.describe("postings page QA", () => {
         companies: "companies",
         releaseTitle: "Release notes",
         releaseClose: "Close",
-        releaseVersion: "Version 2.0.0",
-        releaseHeading: "Coverage, ATS ingestion, and search parity",
-        releaseSummary: /Adds exact job-slot counts, ATS and company coverage/i
+        releaseVersion: "Version 2.1.0",
+        releaseHeading: "ATS pipeline and runtime safety",
+        releaseSummary: /Strengthens source-module dispatch and parser evidence lanes/i
       },
       tr: {
         code: "TR",
@@ -1385,9 +1385,9 @@ test.describe("postings page QA", () => {
         companies: "şirket",
         releaseTitle: "Sürüm notları",
         releaseClose: "Kapat",
-        releaseVersion: "Sürüm 2.0.0",
-        releaseHeading: "Kapsam, ATS alımı ve arama eşitliği",
-        releaseSummary: /Net iş ilanı sayılarını, arama başlığında ATS/i
+        releaseVersion: "Sürüm 2.1.0",
+        releaseHeading: "ATS pipeline ve runtime güvenliği",
+        releaseSummary: /Kaynak modülü yönlendirmesini ve parser kanıt hatlarını/i
       },
       de: {
         code: "DE",
@@ -1401,9 +1401,9 @@ test.describe("postings page QA", () => {
         companies: "Unternehmen",
         releaseTitle: "Versionshinweise",
         releaseClose: "Schließen",
-        releaseVersion: "Version 2.0.0",
-        releaseHeading: "Abdeckung, ATS-Erfassung und Suchparität",
-        releaseSummary: /Fügt genaue Jobslot-Zahlen, ATS- und Unternehmensabdeckung/i
+        releaseVersion: "Version 2.1.0",
+        releaseHeading: "ATS-Pipeline und Laufzeitsicherheit",
+        releaseSummary: /Stärkt Source-Modul-Dispatch und Parser-Evidenzspuren/i
       },
       fr: {
         code: "FR",
@@ -1417,9 +1417,9 @@ test.describe("postings page QA", () => {
         companies: "entreprises",
         releaseTitle: "Notes de version",
         releaseClose: "Fermer",
-        releaseVersion: "Version 2.0.0",
-        releaseHeading: "Couverture, ingestion ATS et parité de recherche",
-        releaseSummary: /Ajoute des comptes exacts d'offres, la couverture ATS et entreprises/i
+        releaseVersion: "Version 2.1.0",
+        releaseHeading: "Pipeline ATS et sécurité d'exécution",
+        releaseSummary: /Renforce la répartition par modules source/i
       },
       es: {
         code: "ES",
@@ -1433,9 +1433,9 @@ test.describe("postings page QA", () => {
         companies: "empresas",
         releaseTitle: "Notas de la versión",
         releaseClose: "Cerrar",
-        releaseVersion: "Versión 2.0.0",
-        releaseHeading: "Cobertura, ingesta ATS y paridad de búsqueda",
-        releaseSummary: /Añade recuentos exactos de puestos, cobertura ATS y de empresas/i
+        releaseVersion: "Versión 2.1.0",
+        releaseHeading: "Pipeline ATS y seguridad en ejecución",
+        releaseSummary: /Refuerza el despacho por módulos de fuente/i
       }
     };
 

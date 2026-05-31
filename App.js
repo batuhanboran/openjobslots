@@ -3081,6 +3081,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "2.1.0",
+    date: "May 31, 2026",
+    title: "ATS pipeline and runtime safety",
+    summary:
+      "Strengthens source-module dispatch and parser evidence lanes, keeps ATS pipeline safeguards explicit, coalesces duplicate read work under load, lowers background worker and deploy pressure, and keeps Meili/Postgres parity verified after the repair window."
+  },
+  {
     version: "2.0.0",
     date: "May 27, 2026",
     title: "Coverage, ATS ingestion, and search parity",
@@ -3335,6 +3342,11 @@ const PUBLIC_RELEASE_NOTES = [
 ];
 const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
   tr: {
+    "2.1.0": {
+      title: "ATS pipeline ve runtime güvenliği",
+      summary:
+        "Kaynak modülü yönlendirmesini ve parser kanıt hatlarını güçlendirir, ATS pipeline korumalarını açık tutar, yük altında yinelenen okuma işlerini birleştirir, arka plan worker ve deploy baskısını düşürür, onarım penceresinden sonra Meili/Postgres eşitliğini doğrulanmış tutar."
+    },
     "2.0.0": {
       title: "Kapsam, ATS alımı ve arama eşitliği",
       summary:
@@ -3367,6 +3379,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   de: {
+    "2.1.0": {
+      title: "ATS-Pipeline und Laufzeitsicherheit",
+      summary:
+        "Stärkt Source-Modul-Dispatch und Parser-Evidenzspuren, hält ATS-Pipeline-Schutzmaßnahmen explizit, bündelt doppelte Lesevorgänge unter Last, senkt Worker- und Deploy-Druck im Hintergrund und hält die Meili/Postgres-Parität nach dem Reparaturfenster verifiziert."
+    },
     "2.0.0": {
       title: "Abdeckung, ATS-Erfassung und Suchparität",
       summary:
@@ -3399,6 +3416,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   fr: {
+    "2.1.0": {
+      title: "Pipeline ATS et sécurité d'exécution",
+      summary:
+        "Renforce la répartition par modules source et les pistes de preuve des parsers, garde explicites les garde-fous du pipeline ATS, regroupe les lectures dupliquées sous charge, réduit la pression des workers et des déploiements en arrière-plan, et maintient la parité Meili/Postgres vérifiée après la fenêtre de réparation."
+    },
     "2.0.0": {
       title: "Couverture, ingestion ATS et parité de recherche",
       summary:
@@ -3431,6 +3453,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   es: {
+    "2.1.0": {
+      title: "Pipeline ATS y seguridad en ejecución",
+      summary:
+        "Refuerza el despacho por módulos de fuente y las líneas de evidencia de parsers, mantiene explícitas las protecciones del pipeline ATS, agrupa lecturas duplicadas bajo carga, reduce la presión de workers y despliegues en segundo plano, y mantiene verificada la paridad Meili/Postgres tras la ventana de reparación."
+    },
     "2.0.0": {
       title: "Cobertura, ingesta ATS y paridad de búsqueda",
       summary:
@@ -3463,6 +3490,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-BR": {
+    "2.1.0": {
+      title: "Pipeline ATS e segurança de runtime",
+      summary:
+        "Fortalece o despacho por módulos de fonte e as trilhas de evidência dos parsers, mantém explícitas as proteções do pipeline ATS, consolida leituras duplicadas sob carga, reduz a pressão de workers e deploys em segundo plano e mantém a paridade Meili/Postgres verificada após a janela de reparo."
+    },
     "2.0.0": {
       title: "Cobertura, ingestão ATS e paridade de busca",
       summary:
@@ -3495,6 +3527,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-PT": {
+    "2.1.0": {
+      title: "Pipeline ATS e segurança de runtime",
+      summary:
+        "Reforça o despacho por módulos de fonte e os trilhos de evidência dos parsers, mantém explícitas as proteções do pipeline ATS, consolida leituras duplicadas sob carga, reduz a pressão de workers e deploys em segundo plano e mantém a paridade Meili/Postgres verificada após a janela de reparação."
+    },
     "2.0.0": {
       title: "Cobertura, ingestão ATS e paridade da pesquisa",
       summary:
@@ -3527,6 +3564,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   it: {
+    "2.1.0": {
+      title: "Pipeline ATS e sicurezza runtime",
+      summary:
+        "Rafforza il dispatch dei moduli sorgente e le tracce di evidenza dei parser, mantiene esplicite le protezioni della pipeline ATS, accorpa le letture duplicate sotto carico, riduce la pressione di worker e deploy in background e mantiene verificata la parità Meili/Postgres dopo la finestra di riparazione."
+    },
     "2.0.0": {
       title: "Copertura, ingestione ATS e parità di ricerca",
       summary:
@@ -3559,6 +3601,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   nl: {
+    "2.1.0": {
+      title: "ATS-pipeline en runtimeveiligheid",
+      summary:
+        "Versterkt bronmodule-dispatch en parserevidentie, houdt ATS-pipelinebeveiligingen expliciet, bundelt dubbele leeswerkzaamheden onder belasting, verlaagt achtergronddruk van workers en deploys en houdt Meili/Postgres-pariteit na de herstelperiode geverifieerd."
+    },
     "2.0.0": {
       title: "Dekking, ATS-inname en zoekpariteit",
       summary:
@@ -3591,6 +3638,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   pl: {
+    "2.1.0": {
+      title: "Pipeline ATS i bezpieczeństwo runtime",
+      summary:
+        "Wzmacnia dispatch modułów źródłowych i ścieżki dowodowe parserów, utrzymuje jawne zabezpieczenia pipeline'u ATS, scala zdublowane odczyty pod obciążeniem, zmniejsza presję workerów i deployów w tle oraz utrzymuje zweryfikowany parytet Meili/Postgres po oknie naprawczym."
+    },
     "2.0.0": {
       title: "Pokrycie, pobieranie ATS i parytet wyszukiwania",
       summary:
@@ -3620,6 +3672,76 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
       title: "Wersja czystej jakości parserów",
       summary:
         "Zamknęła cykl jakości parserów i danych przez quality gate, ATS workbench, naprawy parserów, kontrolowaną odbudowę publicznego datasetu, ciągłą ochronę źródeł i końcowy rebuild Meili."
+    }
+  },
+  ja: {
+    "2.1.0": {
+      title: "ATSパイプラインとランタイム安全性",
+      summary:
+        "ソースモジュールのディスパッチとパーサー証拠レーンを強化し、ATSパイプラインの保護を明示したまま、負荷時の重複読み取りをまとめ、バックグラウンドのworkerとデプロイ負荷を下げ、修復期間後もMeili/Postgresの整合性を検証済みに保ちます。"
+    }
+  },
+  ko: {
+    "2.1.0": {
+      title: "ATS 파이프라인과 런타임 안전성",
+      summary:
+        "소스 모듈 디스패치와 파서 증거 레인을 강화하고, ATS 파이프라인 보호 장치를 명확히 유지하며, 부하 상황의 중복 읽기 작업을 합치고, 백그라운드 worker와 배포 압력을 낮추며, 복구 기간 이후에도 Meili/Postgres 정합성을 검증된 상태로 유지합니다."
+    }
+  },
+  "zh-CN": {
+    "2.1.0": {
+      title: "ATS 管道与运行时安全",
+      summary:
+        "强化源模块调度和解析器证据链，保持 ATS 管道保护明确，在负载下合并重复读取，降低后台 worker 与部署压力，并在修复窗口后保持 Meili/Postgres 一致性已验证。"
+    }
+  },
+  hi: {
+    "2.1.0": {
+      title: "ATS pipeline और runtime सुरक्षा",
+      summary:
+        "Source-module dispatch और parser evidence lanes को मजबूत करता है, ATS pipeline guards को स्पष्ट रखता है, load में duplicate read work को coalesce करता है, background worker और deploy pressure घटाता है, और repair window के बाद Meili/Postgres parity verified रखता है।"
+    }
+  },
+  ar: {
+    "2.1.0": {
+      title: "مسار ATS وأمان وقت التشغيل",
+      summary:
+        "يعزز توجيه وحدات المصادر ومسارات أدلة parsers، ويبقي حمايات مسار ATS واضحة، ويدمج قراءات مكررة تحت الضغط، ويخفض ضغط workers والنشر في الخلفية، ويحافظ على تحقق توافق Meili/Postgres بعد نافذة الإصلاح."
+    }
+  },
+  id: {
+    "2.1.0": {
+      title: "Pipeline ATS dan keamanan runtime",
+      summary:
+        "Memperkuat dispatch modul sumber dan jalur bukti parser, menjaga guard pipeline ATS tetap eksplisit, menggabungkan pekerjaan baca duplikat saat beban tinggi, menurunkan tekanan worker dan deploy latar belakang, serta menjaga paritas Meili/Postgres tetap terverifikasi setelah jendela perbaikan."
+    }
+  },
+  sv: {
+    "2.1.0": {
+      title: "ATS-pipeline och runtime-säkerhet",
+      summary:
+        "Stärker dispatch för källmoduler och parserbevis, håller skydden i ATS-pipelinen tydliga, slår ihop dubbla läsjobb under belastning, minskar bakgrundstrycket från workers och deployer och håller Meili/Postgres-paritet verifierad efter reparationsfönstret."
+    }
+  },
+  da: {
+    "2.1.0": {
+      title: "ATS-pipeline og runtime-sikkerhed",
+      summary:
+        "Styrker dispatch for kildemoduler og parserbeviser, holder ATS-pipeline-beskyttelser eksplicitte, samler duplikeret læsearbejde under belastning, sænker baggrundspres fra workers og deploys og holder Meili/Postgres-paritet verificeret efter reparationsvinduet."
+    }
+  },
+  no: {
+    "2.1.0": {
+      title: "ATS-pipeline og runtime-sikkerhet",
+      summary:
+        "Styrker dispatch for kildemoduler og parserbevis, holder ATS-pipeline-vern tydelig, samler dupliserte lesejobber under belastning, senker bakgrunnspress fra workers og deployer og holder Meili/Postgres-paritet verifisert etter reparasjonsvinduet."
+    }
+  },
+  fi: {
+    "2.1.0": {
+      title: "ATS-putki ja runtime-turvallisuus",
+      summary:
+        "Vahvistaa lähdemoduulien dispatchia ja parserien todistepolkuja, pitää ATS-putken suojaukset selkeinä, yhdistää kuorman alla päällekkäiset lukutyöt, vähentää taustalla toimivien workerien ja deployiden painetta sekä pitää Meili/Postgres-pariteetin varmennettuna korjausikkunan jälkeen."
     }
   }
 };
