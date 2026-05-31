@@ -377,35 +377,228 @@ const PUBLIC_SEO_ATS_PAGES = Object.freeze([
     searchQuery: "greenhouse jobs",
     canonicalSearchQuery: "greenhouse",
     title: "Greenhouse jobs | OpenJobSlots",
-    description: "Search fresh public Greenhouse job openings indexed by OpenJobSlots."
+    description: "Search fresh public Greenhouse job openings indexed by OpenJobSlots.",
+    contentParagraphs: [
+      "Greenhouse jobs often live on employer career pages before they are copied into broad job boards. OpenJobSlots uses public Greenhouse posting pages as source evidence, keeps the employer apply URL as the canonical destination, and lets job seekers search those openings alongside other ATS-backed sources.",
+      "Use this page when you want a Greenhouse-focused entry point without depending on one employer board at a time. It is built for public job discovery, not partnership claims, scraping private systems, or exposing internal diagnostics."
+    ],
+    faqItems: [
+      {
+        question: "Is OpenJobSlots affiliated with Greenhouse?",
+        answer: "No. This page is an independent search entry for public employer job postings that use Greenhouse-style public boards."
+      },
+      {
+        question: "Why search Greenhouse jobs here?",
+        answer: "OpenJobSlots can connect Greenhouse postings with role, company, location, remote-mode, source, and freshness filters across the wider public ATS index."
+      }
+    ]
   },
   {
     path: "/ats/lever-jobs",
     searchQuery: "lever jobs",
     canonicalSearchQuery: "lever",
     title: "Lever jobs | OpenJobSlots",
-    description: "Search fresh public Lever job openings indexed by OpenJobSlots."
+    description: "Search fresh public Lever job openings indexed by OpenJobSlots.",
+    contentParagraphs: [
+      "Lever job posts are frequently hosted on public employer career pages and jobs.lever.co style URLs. OpenJobSlots treats the public employer posting as the source of truth and links users back to the original apply page instead of replacing the employer workflow.",
+      "This page is designed as an independent search entry for people searching across many Lever-backed companies at once. It also gives crawlers a stable explanation of how Lever source intent fits into the broader OpenJobSlots public job index."
+    ],
+    faqItems: [
+      {
+        question: "What does jobs.lever.co mean?",
+        answer: "It usually indicates a public employer job page powered by Lever. OpenJobSlots indexes public posting fields and keeps the employer apply link canonical."
+      },
+      {
+        question: "Are Lever jobs private listings?",
+        answer: "No. OpenJobSlots only uses public employer postings and does not claim access to private or internal Lever data."
+      }
+    ]
   },
   {
     path: "/ats/ashby-jobs",
     searchQuery: "ashby jobs",
     canonicalSearchQuery: "ashby",
     title: "Ashby jobs | OpenJobSlots",
-    description: "Search fresh public Ashby job openings indexed by OpenJobSlots."
+    description: "Search fresh public Ashby job openings indexed by OpenJobSlots.",
+    contentParagraphs: [
+      "Ashby boards are common with fast-growing teams, startups, and modern hiring workflows. OpenJobSlots gives Ashby jobs a public search entry that can be discovered by role, company, location, remote mode, source, and freshness.",
+      "The goal is direct employer discovery. OpenJobSlots does not invent missing posting data, and it keeps ambiguous source evidence conservative while parser-backed coverage improves."
+    ],
+    faqItems: [
+      {
+        question: "Can I search Ashby jobs by role?",
+        answer: "Yes. Use the interactive search page after this landing page loads to filter Ashby-backed postings by role, company, location, remote mode, and freshness."
+      },
+      {
+        question: "Does OpenJobSlots change the apply flow?",
+        answer: "No. Employer apply links remain the canonical destination for each public Ashby posting."
+      }
+    ]
   },
   {
     path: "/ats/workday-jobs",
     searchQuery: "workday jobs",
     canonicalSearchQuery: "workday",
     title: "Workday jobs | OpenJobSlots",
-    description: "Search fresh public Workday job openings indexed by OpenJobSlots."
+    description: "Search fresh public Workday job openings indexed by OpenJobSlots.",
+    contentParagraphs: [
+      "Workday jobs are a high-demand source intent because many large employers publish openings through Workday candidate experience pages. OpenJobSlots presents this as a public search entry and avoids claiming official access or partnership.",
+      "Workday source coverage should stay conservative: public fields are indexed when source evidence is clear, while uncertain location, date, remote, or source-id data is not promoted into fake public values."
+    ],
+    faqItems: [
+      {
+        question: "Are Workday jobs official employer postings?",
+        answer: "OpenJobSlots links back to public employer apply pages. The employer page remains the canonical source for the posting."
+      },
+      {
+        question: "Why is Workday search harder than smaller ATS sources?",
+        answer: "Large employers, regional variants, and candidate-experience routes make source evidence important. OpenJobSlots keeps the public page conservative while indexing clear public posting data."
+      }
+    ]
   },
   {
     path: "/ats/bamboohr-jobs",
     searchQuery: "bamboohr jobs",
     canonicalSearchQuery: "bamboohr",
     title: "BambooHR jobs | OpenJobSlots",
-    description: "Search fresh public BambooHR job openings indexed by OpenJobSlots."
+    description: "Search fresh public BambooHR job openings indexed by OpenJobSlots.",
+    contentParagraphs: [
+      "BambooHR job openings are often published by smaller and mid-sized employers that may not get broad distribution on larger job boards. OpenJobSlots uses public BambooHR career pages as part of a wider direct-employer search surface.",
+      "This route gives users and crawlers a stable page for BambooHR source intent while preserving the OpenJobSlots quality rule: public source evidence first, no invented data, and direct employer apply links kept canonical."
+    ],
+    faqItems: [
+      {
+        question: "Can BambooHR openings be searched with other ATS jobs?",
+        answer: "Yes. OpenJobSlots combines BambooHR-backed public postings with other supported public ATS sources in one searchable interface."
+      },
+      {
+        question: "Does this page list private BambooHR data?",
+        answer: "No. It is limited to public employer job postings and public-safe posting fields."
+      }
+    ]
+  }
+]);
+
+const PUBLIC_SEO_CONTENT_PAGES = Object.freeze([
+  {
+    path: "/en/ats-job-boards",
+    languageCode: "en",
+    searchQuery: "ats jobs",
+    canonicalSearchQuery: "ats jobs",
+    searchIntent: "ats-job-boards",
+    contentCluster: "source-education",
+    title: "ATS job boards | OpenJobSlots",
+    description: "Find jobs from public ATS job boards and employer career pages, including Greenhouse, Lever, Ashby, Workday, BambooHR, and more.",
+    contentParagraphs: [
+      "ATS job boards are the public hiring pages employers use to publish openings before candidates apply. Instead of treating every job board repost as equal, OpenJobSlots focuses on public employer ATS sources where the original apply link, source platform, location, remote mode, and freshness can be tied back to source evidence.",
+      "This page is the educational hub for ATS-backed job search. It connects broad ATS jobs intent with specific public source pages such as Greenhouse, Lever, Ashby, Workday, and BambooHR, giving crawlers and users a clearer path than a generic remote-jobs page."
+    ],
+    faqItems: [
+      {
+        question: "What is an ATS job board?",
+        answer: "It is a public employer hiring page powered by an applicant tracking system. OpenJobSlots indexes public posting fields from those pages and links users back to the employer apply flow."
+      },
+      {
+        question: "Why use ATS job boards for search?",
+        answer: "They are closer to the employer source than reposted listings, so they can be better for freshness, direct apply links, and canonical posting evidence."
+      }
+    ]
+  },
+  {
+    path: "/en/company-career-page-jobs",
+    languageCode: "en",
+    searchQuery: "company career pages jobs",
+    canonicalSearchQuery: "company career pages jobs",
+    searchIntent: "company-career-page-jobs",
+    contentCluster: "direct-employer",
+    title: "Company career page jobs | OpenJobSlots",
+    description: "Search fresh jobs from public company career pages and employer ATS boards with direct apply links.",
+    contentParagraphs: [
+      "Company career page jobs are often the cleanest version of a posting because they come from the employer page that owns the apply flow. OpenJobSlots makes those public postings searchable across companies, roles, sources, remote modes, and locations without hiding the original employer destination.",
+      "This is the long-tail SEO surface competitors often win with company pages. OpenJobSlots should compete by emphasizing public employer source evidence, canonical apply URLs, freshness, and broad ATS coverage instead of creating thin company pages before inventory is deep enough."
+    ],
+    faqItems: [
+      {
+        question: "Are company career page jobs different from job-board reposts?",
+        answer: "Often yes. The company career page is closer to the employer source and usually contains the canonical apply destination."
+      },
+      {
+        question: "Will OpenJobSlots create company pages for every employer?",
+        answer: "Only when public posting inventory and canonical company data are strong enough. Thin company pages should stay out of the sitemap."
+      }
+    ]
+  },
+  {
+    path: "/en/direct-apply-jobs",
+    languageCode: "en",
+    searchQuery: "direct apply jobs",
+    canonicalSearchQuery: "direct apply jobs",
+    searchIntent: "direct-apply-jobs",
+    contentCluster: "direct-employer",
+    title: "Direct apply jobs | OpenJobSlots",
+    description: "Find direct apply jobs from public employer career pages and ATS boards, with canonical links back to the source posting.",
+    contentParagraphs: [
+      "Direct apply jobs are openings where the useful destination is the employer's own apply page, not a copied listing several layers away from the source. OpenJobSlots is built around that idea: discover the public posting, normalize public-safe fields, and send candidates back to the canonical employer apply URL.",
+      "This page should become a backlink asset because it explains the product difference in plain language. The promise is not exclusive access; the promise is fresher public employer discovery, better source transparency, and a cleaner path from search result to original apply flow."
+    ],
+    faqItems: [
+      {
+        question: "What does direct apply mean?",
+        answer: "It means the job result points back to the employer's own public apply page or ATS posting instead of making the candidate apply through a third-party repost."
+      },
+      {
+        question: "Does OpenJobSlots guarantee every result is still open?",
+        answer: "No job search product can guarantee that after an employer changes a posting, but OpenJobSlots prioritizes public source freshness and canonical employer links."
+      }
+    ]
+  },
+  {
+    path: "/en/hidden-jobs",
+    languageCode: "en",
+    searchQuery: "hidden jobs",
+    canonicalSearchQuery: "hidden jobs",
+    searchIntent: "hidden-jobs",
+    contentCluster: "direct-employer",
+    title: "Hidden jobs from public employer career pages | OpenJobSlots",
+    description: "Find hidden jobs in the practical sense: public employer career-page openings that may not be easy to discover on broad job boards yet.",
+    contentParagraphs: [
+      "Hidden jobs should not mean private, leaked, or internal roles. For OpenJobSlots, the phrase means public employer career-page openings that are easy to miss because they live across thousands of ATS boards, company pages, regional portals, and source-specific routes.",
+      "Hidden Jobs and similar competitors prove that the positioning has search demand. OpenJobSlots can be stronger by pairing the phrase with transparent source rules: public pages only, canonical employer apply links, conservative parser evidence, and no claim of exclusive or non-public access."
+    ],
+    faqItems: [
+      {
+        question: "Are these hidden jobs private?",
+        answer: "No. OpenJobSlots only indexes public employer postings. Hidden means hard to discover across scattered career pages, not private or leaked."
+      },
+      {
+        question: "Why can public jobs be hard to find?",
+        answer: "Many employers publish openings on separate ATS boards or company pages before those jobs appear consistently across broad aggregators."
+      }
+    ]
+  },
+  {
+    path: "/en/jobs-not-on-linkedin",
+    languageCode: "en",
+    searchQuery: "jobs not on linkedin",
+    canonicalSearchQuery: "jobs not on linkedin",
+    searchIntent: "jobs-not-on-linkedin",
+    contentCluster: "direct-employer",
+    title: "Jobs not on LinkedIn | OpenJobSlots",
+    description: "Search public employer career-page jobs that may not be visible on LinkedIn or broad reposting sites yet.",
+    contentParagraphs: [
+      "Jobs not on LinkedIn is a real search intent, but the page needs careful wording. OpenJobSlots should not promise that a posting is absent from LinkedIn; it should explain that many public employer ATS postings can be discovered directly from company career pages before or outside broad reposting channels.",
+      "This page gives OpenJobSlots a defensible content angle against large boards: source-first discovery, direct employer apply links, and structured public search across many ATS families. It should link into ATS job boards, direct apply jobs, hidden jobs, and role pages so crawlers see the full topic cluster."
+    ],
+    faqItems: [
+      {
+        question: "Can OpenJobSlots prove a job is not on LinkedIn?",
+        answer: "No. The safer claim is that OpenJobSlots searches public employer career pages and ATS boards directly, including openings candidates may not find on broad reposting sites."
+      },
+      {
+        question: "Why search beyond LinkedIn?",
+        answer: "Employer career pages can expose fresh, direct-apply postings with source context before a role is broadly redistributed."
+      }
+    ]
   }
 ]);
 
@@ -426,6 +619,12 @@ const PUBLIC_SEO_ROUTES = Object.freeze([
       priority: "0.8"
     }))
   ),
+  ...PUBLIC_SEO_CONTENT_PAGES.map((page) => ({
+    ...page,
+    canonicalSearchQuery: page.canonicalSearchQuery || page.searchQuery,
+    changefreq: "weekly",
+    priority: "0.75"
+  })),
   ...PUBLIC_SEO_ATS_PAGES.map((page) => ({
     ...page,
     languageCode: "en",
@@ -542,10 +741,17 @@ function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_
   const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
     (route) => route.languageCode === normalizedLanguageCode && route.alternateGroup && route.alternateGroup !== "home"
   );
-  const atsRoutes = normalizedLanguageCode === "en"
-    ? PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/")).slice(0, 3)
+  const supplementalRoutes = normalizedLanguageCode === "en"
+    ? PUBLIC_SEO_ROUTES.filter((route) => route.contentCluster || String(route.path || "").startsWith("/ats/"))
     : [];
-  return [...localizedRoutes, ...atsRoutes].slice(0, Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT))));
+  const seen = new Set();
+  return [...localizedRoutes, ...supplementalRoutes]
+    .filter((route) => {
+      if (!route?.path || seen.has(route.path)) return false;
+      seen.add(route.path);
+      return true;
+    })
+    .slice(0, Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT))));
 }
 
 function getPublicSeoHomePathForLanguage(languageCode) {

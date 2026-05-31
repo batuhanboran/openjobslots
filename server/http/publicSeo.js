@@ -276,6 +276,21 @@ function createPublicSeoHelpers(dependencies = {}) {
     return SEO_FALLBACK_COPY_BY_LANGUAGE[languageCode] || SEO_FALLBACK_COPY_BY_LANGUAGE.en;
   }
 
+  function getRouteSpecificSeoParagraphs(seoRoute) {
+    return (Array.isArray(seoRoute?.contentParagraphs) ? seoRoute.contentParagraphs : [])
+      .map(normalizeInlineText)
+      .filter(Boolean);
+  }
+
+  function getRouteSpecificSeoFaqItems(seoRoute) {
+    return (Array.isArray(seoRoute?.faqItems) ? seoRoute.faqItems : [])
+      .map((item) => ({
+        question: normalizeInlineText(item?.question || ""),
+        answer: normalizeInlineText(item?.answer || "")
+      }))
+      .filter((item) => item.question && item.answer);
+  }
+
   function getPublicSeoAlternateLinks(req) {
     const seoRoute = getSeoRoute(req);
     const requestPath = getRequestPath(req);
@@ -403,13 +418,18 @@ function createPublicSeoHelpers(dependencies = {}) {
     );
     const homeRoutes = PUBLIC_SEO_ROUTES.filter((route) => route.alternateGroup === "home");
     const atsRoutes = PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/"));
+    const contentRoutes = PUBLIC_SEO_ROUTES.filter(
+      (route) => route.languageCode === languageCode && route.contentCluster
+    );
     const remainingRoutes = PUBLIC_SEO_ROUTES.filter((route) => ![
       ...currentLanguageRoutes,
       ...homeRoutes,
-      ...atsRoutes
+      ...atsRoutes,
+      ...contentRoutes
     ].some((item) => item.path === route.path));
     const orderedRoutes = [
       ...currentLanguageRoutes,
+      ...contentRoutes,
       ...homeRoutes,
       ...atsRoutes,
       ...remainingRoutes
@@ -431,6 +451,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     const values = { heading, description, searchQuery };
     return [
       copy.paragraphIntro(values),
+      ...getRouteSpecificSeoParagraphs(seoRoute),
       copy.paragraphCoverage(values),
       copy.paragraphQuality(values),
       copy.paragraphNavigation(values)
@@ -444,7 +465,9 @@ function createPublicSeoHelpers(dependencies = {}) {
     const copy = getSeoFallbackCopy(languageCode);
     const searchQuery = normalizeInlineText(seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
     const values = { heading, description, searchQuery };
-    const items = typeof copy.faqItems === "function" ? copy.faqItems(values) : SEO_FALLBACK_COPY_BY_LANGUAGE.en.faqItems(values);
+    const routeItems = getRouteSpecificSeoFaqItems(seoRoute);
+    const genericItems = typeof copy.faqItems === "function" ? copy.faqItems(values) : SEO_FALLBACK_COPY_BY_LANGUAGE.en.faqItems(values);
+    const items = [...routeItems, ...(Array.isArray(genericItems) ? genericItems : [])];
     return (Array.isArray(items) ? items : [])
       .map((item) => ({
         question: normalizeInlineText(item?.question || ""),
@@ -657,7 +680,17 @@ function createPublicSeoHelpers(dependencies = {}) {
       "/en/remote-job-openings",
       "/en/software-engineer-jobs",
       "/en/product-manager-jobs",
-      "/en/technical-support-engineer-jobs"
+      "/en/technical-support-engineer-jobs",
+      "/en/data-analyst-jobs",
+      "/en/customer-success-manager-jobs",
+      "/en/devops-engineer-jobs"
+    ];
+    const contentPaths = [
+      "/en/ats-job-boards",
+      "/en/company-career-page-jobs",
+      "/en/direct-apply-jobs",
+      "/en/hidden-jobs",
+      "/en/jobs-not-on-linkedin"
     ];
     const atsRoutes = PUBLIC_SEO_ROUTES.filter((route) => String(route.path || "").startsWith("/ats/"));
 
@@ -668,6 +701,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     }
 
     const coreLinks = corePaths.map((routePath) => byPath.get(routePath)).filter(Boolean).map(markdownRoute);
+    const contentLinks = contentPaths.map((routePath) => byPath.get(routePath)).filter(Boolean).map(markdownRoute);
     const atsLinks = atsRoutes.map(markdownRoute);
 
     return [
@@ -680,6 +714,10 @@ function createPublicSeoHelpers(dependencies = {}) {
       "## Core pages",
       "",
       ...coreLinks,
+      "",
+      "## Source-first content pages",
+      "",
+      ...contentLinks,
       "",
       "## ATS source pages",
       "",

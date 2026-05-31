@@ -79,6 +79,34 @@ test("SEO landing catalog includes Semrush-seeded role intents", () => {
   ]);
 });
 
+test("SEO landing catalog includes direct employer and hidden-jobs content intents", () => {
+  assert.equal(getPublicSeoRouteHintByPath("/en/ats-job-boards").canonicalSearchQuery, "ats jobs");
+  assert.equal(getPublicSeoRouteHintByPath("/en/company-career-page-jobs").canonicalSearchQuery, "company career pages jobs");
+  assert.equal(getPublicSeoRouteHintByPath("/en/direct-apply-jobs").canonicalSearchQuery, "direct apply jobs");
+  assert.equal(getPublicSeoRouteHintByPath("/en/hidden-jobs").canonicalSearchQuery, "hidden jobs");
+  assert.equal(getPublicSeoRouteHintByPath("/en/jobs-not-on-linkedin").canonicalSearchQuery, "jobs not on linkedin");
+
+  const items = getPublicSeoPopularSearchItems("en", [
+    { query: "hidden jobs", count: 20 },
+    { query: "jobs not on linkedin", count: 18 },
+    { query: "ats jobs", count: 16 },
+    { query: "direct apply jobs", count: 14 }
+  ], 4);
+
+  assert.deepEqual(items.map((item) => item.path), [
+    "/en/hidden-jobs",
+    "/en/jobs-not-on-linkedin",
+    "/en/ats-job-boards",
+    "/en/direct-apply-jobs"
+  ]);
+  assert.deepEqual(items.map((item) => item.searchQuery), [
+    "hidden jobs",
+    "jobs not on linkedin",
+    "ats jobs",
+    "direct apply jobs"
+  ]);
+});
+
 test("country research fallbacks preserve scoped queries for supported markets", () => {
   for (const countryCode of ["US", "GB", "TR", "DE", "FR", "ES"]) {
     const queries = getPublicSeoCountryFallbackQueries(countryCode, countryCode === "TR" ? "tr" : "en", 6);

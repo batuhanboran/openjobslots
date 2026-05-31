@@ -184,6 +184,50 @@ function testRenderSeoIndexHtmlAddsCrawlerVisibleSemanticContent() {
   assert.ok(countWords(extractStaticSeoContentText(html)) >= 200);
 }
 
+function testRouteSpecificContentPagesExplainDirectEmployerSearch() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body><div id=\"root\"></div></body></html>",
+    createRequest({ path: "/en/jobs-not-on-linkedin" })
+  );
+  const staticText = extractStaticSeoContentText(html);
+  const fallbackText = extractNoscriptText(html);
+
+  assert.ok(html.includes("<title>Jobs not on LinkedIn | OpenJobSlots</title>"));
+  assert.ok(html.includes('href="https://openjobslots.com/en/ats-job-boards"'));
+  assert.ok(html.includes('href="https://openjobslots.com/en/direct-apply-jobs"'));
+  assert.ok(html.includes('href="https://openjobslots.com/en/hidden-jobs"'));
+  assert.ok(staticText.includes("OpenJobSlots should not promise that a posting is absent from LinkedIn"));
+  assert.ok(staticText.includes("source-first discovery"));
+  assert.ok(staticText.includes("Can OpenJobSlots prove a job is not on LinkedIn?"));
+  assert.ok(fallbackText.includes("public employer career pages and ATS boards directly"));
+  assert.ok(!staticText.includes("private, leaked, or internal roles"));
+  assert.ok(countWords(staticText) >= 260);
+}
+
+function testAtsPagesExposeSourceSpecificCopyWithoutPartnershipClaims() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body><div id=\"root\"></div></body></html>",
+    createRequest({ path: "/ats/lever-jobs" })
+  );
+  const staticText = extractStaticSeoContentText(html);
+
+  assert.ok(staticText.includes("jobs.lever.co"));
+  assert.ok(staticText.includes("independent search entry"));
+  assert.ok(staticText.includes("No. OpenJobSlots only uses public employer postings"));
+  assert.ok(!staticText.includes("official partner"));
+  assert.ok(countWords(staticText) >= 260);
+}
+
 function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com",
@@ -378,6 +422,10 @@ function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages() {
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/data-analyst-jobs<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/customer-success-manager-jobs<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/devops-engineer-jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/ats-job-boards<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/direct-apply-jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/hidden-jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/jobs-not-on-linkedin<\/loc>/);
   assert.doesNotMatch(sitemap, /private@example\.com/);
   assert.doesNotMatch(sitemap, /%40/);
 }
@@ -392,7 +440,9 @@ function testBuildLlmsTxtUsesPlainMarkdownFormat() {
   assert.match(llms, /^# OpenJobSlots$/m);
   assert.match(llms, /^> Find fresh job openings from public employer ATS boards\.$/m);
   assert.match(llms, /^## Core pages$/m);
+  assert.match(llms, /^## Source-first content pages$/m);
   assert.match(llms, /^- \[Search open job slots\]\(https:\/\/openjobslots\.com\/en\):/m);
+  assert.match(llms, /^- \[Direct apply jobs\]\(https:\/\/openjobslots\.com\/en\/direct-apply-jobs\):/m);
   assert.match(llms, /^- \[Greenhouse jobs\]\(https:\/\/openjobslots\.com\/ats\/greenhouse-jobs\):/m);
   assert.doesNotMatch(llms, /<html|<script|<meta|<\/a>/i);
 }
@@ -401,6 +451,8 @@ testRenderSeoIndexHtmlReplacesMetadata();
 testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
 testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback();
 testRenderSeoIndexHtmlAddsCrawlerVisibleSemanticContent();
+testRouteSpecificContentPagesExplainDirectEmployerSearch();
+testAtsPagesExposeSourceSpecificCopyWithoutPartnershipClaims();
 testSearchQueryPagesGetSpecificMetadataAndCanonical();
 testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
 testHomeLanguagePagesGetBidirectionalHreflang();
