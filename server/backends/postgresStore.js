@@ -2984,6 +2984,8 @@ function normalizePublicSearchEventType(value) {
 }
 
 function boundedIntegerOrNull(value, min = 0, max = 2_000_000) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
   return Math.max(min, Math.min(max, Math.floor(number)));
@@ -3536,6 +3538,7 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
         WHERE ${scopedWhere}
+          AND event_type = 'postings'
           AND query_normalized <> ''
           AND result_count = 0
         GROUP BY query_normalized
@@ -3549,6 +3552,7 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         SELECT query_normalized, COUNT(*)::int AS count, MIN(created_at) AS first_seen_at, MAX(created_at) AS last_seen_at
         FROM public_search_events
         WHERE ${scopedWhere}
+          AND event_type = 'postings'
           AND query_normalized <> ''
           AND result_count BETWEEN 1 AND 9
         GROUP BY query_normalized
@@ -3593,6 +3597,7 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
           COUNT(*)::int AS count
         FROM public_search_events
         WHERE ${scopedWhere}
+          AND event_type = 'postings'
         GROUP BY result_bucket
         ORDER BY result_bucket ASC;
       `,

@@ -5908,6 +5908,7 @@ export default function App() {
   const postingsRequestSequenceRef = useRef(0);
   const postingsRef = useRef([]);
   const postingFilterOptionsRef = useRef(postingFilterOptions);
+  const didRunInitialPostingFilterOptionsEffectRef = useRef(false);
   const postingsHasMoreRef = useRef(false);
   const postingsNextOffsetRef = useRef(0);
   const postingsLoadingMoreRef = useRef(false);
@@ -8007,6 +8008,10 @@ export default function App() {
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return;
+    if (!didRunInitialPostingFilterOptionsEffectRef.current) {
+      didRunInitialPostingFilterOptionsEffectRef.current = true;
+      return;
+    }
     loadPostingFilterOptions();
   }, [activePage, loadPostingFilterOptions]);
 

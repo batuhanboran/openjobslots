@@ -1972,11 +1972,91 @@ test.describe("postings page QA", () => {
   });
 
   test("public query URLs open directly into result mode for SEO search actions", async ({ page }) => {
-    await page.goto("/?q=QA%20Greenhouse");
+    const query = "Technical Support Engineer";
+    const postingItem = {
+      id: 7801,
+      company_name: "QA Direct Query",
+      position_name: "Technical Support Engineer",
+      job_posting_url: "https://jobs.example.test/direct-query",
+      location: "Remote - United States",
+      posting_date: "2026-05-31",
+      last_seen_epoch: 1780262400,
+      ats: "ashby"
+    };
+    const requestedPostings = [];
+    const requestedFilterOptions = [];
+
+    await page.route("**/sync/status**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          running: false,
+          status: "idle",
+          job_slot_count: 331463,
+          posting_count: 331463,
+          configured_ats_count: 62,
+          visible_company_count: 16600,
+          company_count: 40860,
+          ingestion_worker: {
+            latest_status: "idle"
+          }
+        })
+      });
+    });
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/postings/filter-options")) {
+        requestedFilterOptions.push(url.searchParams.get("search") || "");
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ats: [{ value: "ashby", label: "Ashby", enabled: true, count: 1 }],
+            industries: [],
+            regions: [],
+            countries: [],
+            states: [],
+            counties: [],
+            sort_options: []
+          })
+        });
+        return;
+      }
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      requestedPostings.push(url.searchParams.get("search") || "");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [postingItem],
+          count: 1,
+          count_exact: true,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          source_facets: [{ value: "ashby", label: "Ashby", count: 1 }],
+          filters: {
+            search: url.searchParams.get("search") || "",
+            sort_by: "posted_date",
+            freshness_days: "all"
+          },
+          has_more: false,
+          next_offset: null
+        })
+      });
+    });
+
+    await page.goto(`/en?q=${encodeURIComponent(query)}`);
     await expect(page.getByTestId("app-logo")).toContainText("openjobslots", { timeout: 15_000 });
-    await expect(page.getByTestId("search-input")).toHaveValue("QA Greenhouse", { timeout: 5000 });
+    await expect(page.getByTestId("search-input")).toHaveValue(query, { timeout: 5000 });
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("posting-card").first()).toContainText(/QA Greenhouse|Turkish/i);
+    await expect(page.getByTestId("posting-card").first()).toContainText("Technical Support Engineer");
+    await expect.poll(() => requestedPostings).toEqual([query]);
+    await expect.poll(() => requestedFilterOptions).toEqual([query]);
     await expect(page.getByTestId("public-footer-meta")).toHaveCount(0);
     await expectNoRawErrors(page);
   });

@@ -98,6 +98,20 @@ function formatResultBuckets(counts = {}) {
   ].join(", ");
 }
 
+function calculateZeroResultRate(report = {}) {
+  const counts = report.result_count_distribution || {};
+  const knownResultCount =
+    Number(counts.zero_result || 0) +
+    Number(counts.low_result || 0) +
+    Number(counts.normal_result || 0);
+  if (knownResultCount > 0) {
+    return Number(counts.zero_result || 0) / knownResultCount;
+  }
+  return Number(report.total_events || 0) > 0
+    ? Number(counts.zero_result || 0) / Number(report.total_events || 0)
+    : null;
+}
+
 function formatDateInTimezone(now, timezone) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -437,9 +451,7 @@ function formatCloudflareTrafficText(traffic = {}) {
 
 function buildAnalyticsEmailText(report) {
   const resultCounts = report.result_count_distribution || {};
-  const zeroRate = Number(report.total_events || 0) > 0
-    ? Number(resultCounts.zero_result || 0) / Number(report.total_events || 0)
-    : null;
+  const zeroRate = calculateZeroResultRate(report);
   const topFinalSearches = report.top_final_posting_searches || [];
   const topDisplayedQueries = topFinalSearches.length > 0
     ? topFinalSearches
@@ -494,9 +506,7 @@ function listItems(items = [], key = "query") {
 
 function buildAnalyticsEmailHtml(report) {
   const resultCounts = report.result_count_distribution || {};
-  const zeroRate = Number(report.total_events || 0) > 0
-    ? Number(resultCounts.zero_result || 0) / Number(report.total_events || 0)
-    : null;
+  const zeroRate = calculateZeroResultRate(report);
   const topFinalSearches = report.top_final_posting_searches || [];
   const topDisplayedQueries = topFinalSearches.length > 0
     ? topFinalSearches
@@ -626,6 +636,7 @@ module.exports = {
   buildAnalyticsEmailMessage,
   createSampleAnalyticsReport,
   fetchCloudflareTrafficSummary,
+  calculateZeroResultRate,
   parseArgs,
   readCloudflareConfig,
   readEmailConfig,

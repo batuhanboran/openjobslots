@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 
 const {
   buildAnalyticsEmailMessage,
+  calculateZeroResultRate,
   createSampleAnalyticsReport,
   fetchCloudflareTrafficSummary,
   parseArgs,
@@ -71,6 +72,29 @@ function testBuildAnalyticsEmailMessage() {
   assert.doesNotMatch(message.text, /secret/);
 }
 
+function testZeroResultRateUsesKnownResultBuckets() {
+  const report = createSampleAnalyticsReport({
+    date: "2026-05-22",
+    timezone: "Europe/Istanbul"
+  });
+  report.total_events = 2000;
+  report.result_count_distribution = {
+    zero_result: 10,
+    low_result: 90,
+    normal_result: 900,
+    unknown_result: 1000
+  };
+
+  const message = buildAnalyticsEmailMessage(report, {
+    to: "maintainer@example.com",
+    from: "reports@openjobslots.com"
+  });
+
+  assert.equal(calculateZeroResultRate(report), 0.01);
+  assert.match(message.text, /Zero-result rate: 1\.0% \(10 zero-result searches\)/);
+  assert.match(message.html, /Zero-result rate<\/div><div[^>]*>1\.0%/);
+}
+
 async function testFetchCloudflareTrafficSummaryUsesReadOnlyGraphql() {
   const calls = [];
   const summary = await fetchCloudflareTrafficSummary(
@@ -122,6 +146,7 @@ async function main() {
   testParseArgsDefaultsToDryRunFalseAndIstanbul();
   testReadEmailConfigUsesSafeDefaultRecipient();
   testBuildAnalyticsEmailMessage();
+  testZeroResultRateUsesKnownResultBuckets();
   await testFetchCloudflareTrafficSummaryUsesReadOnlyGraphql();
   console.log("email-daily-analytics tests passed");
 }

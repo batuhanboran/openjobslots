@@ -1757,6 +1757,32 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
   assert.equal(calls[0].params[19], "tr");
 }
 
+async function testPublicSearchEventKeepsMissingResultCountsUnknown() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      return { rows: [] };
+    }
+  };
+
+  const result = await recordPostgresPublicSearchEvent(pool, {
+    eventType: "filter_options",
+    search: "remote",
+    resultCount: null,
+    resultItems: null,
+    cacheStatus: "HIT"
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].params[0], "filter_options");
+  assert.equal(calls[0].params[1], "remote");
+  assert.equal(calls[0].params[2], "remote");
+  assert.equal(calls[0].params[3], null);
+  assert.equal(calls[0].params[4], null);
+}
+
 async function testDailyRedditPostBuildsSeededReadOnlyMarkdown() {
   const calls = [];
   const pool = {
@@ -1915,6 +1941,12 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
   assert.equal(report.remote_filter_counts.remote, 4);
   assert.equal(report.remote_filter_counts.all, 3);
   assert.equal(report.remote_filter_counts.hybrid, 0);
+  const zeroGapQuery = calls.find((call) => /result_count\s*=\s*0/i.test(call.sql));
+  const lowGapQuery = calls.find((call) => /result_count BETWEEN 1 AND 9/i.test(call.sql));
+  const bucketQuery = calls.find((call) => /AS result_bucket/i.test(call.sql));
+  assert.match(zeroGapQuery.sql, /event_type = 'postings'/i);
+  assert.match(lowGapQuery.sql, /event_type = 'postings'/i);
+  assert.match(bucketQuery.sql, /event_type = 'postings'/i);
   assert.ok(calls.every((call) => /^\s*SELECT/i.test(call.sql)));
 }
 
@@ -2054,6 +2086,7 @@ async function main() {
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
   await testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs();
   await testPublicSearchEventInsertIsPrivacyBounded();
+  await testPublicSearchEventKeepsMissingResultCountsUnknown();
   await testDailyRedditPostBuildsSeededReadOnlyMarkdown();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
   await testPublicSearchReportCanScopeByCountry();
