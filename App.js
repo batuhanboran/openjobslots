@@ -3143,7 +3143,7 @@ function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLangua
         accessibilityLabel={t("language.label", "Language")}
         accessibilityState={{ expanded: menuOpen }}
       >
-        <CountryBall language={selectedLanguage} selected size={compact ? 28 : 30} />
+        <CountryBall language={selectedLanguage} selected size={compact ? 22 : 30} />
         <Text style={[styles.languageSelectorCode, compact ? styles.languageSelectorCodeCompact : null]}>{selectedLanguage.shortLabel}</Text>
       </Pressable>
       {menuOpen ? (
@@ -3195,7 +3195,7 @@ function ThemeToggle({ themeMode, onToggleTheme, t, compact = false }) {
     >
       <View style={[styles.themeIconButton, compact ? styles.themeIconButtonCompact : null, isDark ? styles.themeIconButtonDark : null]}>
         <View style={[styles.themeIconCore, compact ? styles.themeIconCoreCompact : null, isDark ? styles.themeIconCoreDark : null]}>
-          {isDark ? <View style={styles.themeIconMoonCutout} /> : null}
+          {isDark ? <View style={[styles.themeIconMoonCutout, compact ? styles.themeIconMoonCutoutCompact : null]} /> : null}
         </View>
       </View>
       <Text style={[styles.themeToggleText, compact ? styles.themeToggleTextCompact : null, isDark ? styles.themeToggleTextDark : null]}>
@@ -3435,7 +3435,7 @@ export default function App() {
     filtersSignature: getPostingsFiltersSignature(createDefaultPostingsFilters()),
     at: Date.now()
   });
-  const suppressedSuggestionQueryRef = useRef("");
+  const suppressedSuggestionQueryRef = useRef(initialPublicSearchQuery);
   const postingsFiltersRef = useRef(postingsFilters);
   const autoSyncInFlightRef = useRef(false);
   const statusPollInFlightRef = useRef(false);
@@ -5754,6 +5754,7 @@ export default function App() {
                   {chip.value}
                 </Text>
                 <Text
+                  numberOfLines={1}
                   style={[
                     styles.publicStatsChipLabel,
                     isJobSlots ? styles.resultCountUnitText : null,
@@ -5761,7 +5762,7 @@ export default function App() {
                     isDarkPublicTheme ? styles.textMutedDark : null
                   ]}
                 >
-                  {" "}{translatedLabel}
+                  {isDesktopViewport ? " " : ""}{translatedLabel}
                 </Text>
               </View>
             );
@@ -5904,17 +5905,19 @@ export default function App() {
               {brandMark}
             </View>
           ) : null}
-          {renderPublicStatsChips()}
-          <View style={[styles.resultsUtilityControls, !isDesktopViewport ? styles.resultsUtilityControlsMobile : null]}>
-            <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} compact={!isDesktopViewport} />
-            <LanguageSelector
-              languageCode={publicLanguageCode}
-              menuOpen={languageMenuOpen}
-              onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
-              onSelectLanguage={selectPublicLanguage}
-              t={t}
-              compact={!isDesktopViewport}
-            />
+          <View style={[styles.resultsMetricsRow, !isDesktopViewport ? styles.resultsMetricsRowMobile : null]} testID="results-metrics-row">
+            {renderPublicStatsChips()}
+            <View style={[styles.resultsUtilityControls, !isDesktopViewport ? styles.resultsUtilityControlsMobile : null]}>
+              <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} compact={!isDesktopViewport} />
+              <LanguageSelector
+                languageCode={publicLanguageCode}
+                menuOpen={languageMenuOpen}
+                onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
+                onSelectLanguage={selectPublicLanguage}
+                t={t}
+                compact={!isDesktopViewport}
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -8964,12 +8967,29 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 20
   },
-  resultsUtilityControlsMobile: {
+  resultsMetricsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 12,
+    flexWrap: "nowrap",
+    flexShrink: 0,
+    minWidth: 0
+  },
+  resultsMetricsRowMobile: {
     width: "100%",
+    maxWidth: "100%",
+    justifyContent: "flex-start",
+    gap: 5,
+    flexShrink: 1
+  },
+  resultsUtilityControlsMobile: {
+    width: "auto",
     minWidth: 0,
     flexWrap: "nowrap",
     justifyContent: "flex-start",
-    gap: 8
+    flexShrink: 0,
+    gap: 5
   },
   languageSelectorWrap: {
     position: "relative",
@@ -8977,9 +8997,9 @@ const styles = StyleSheet.create({
     elevation: 10
   },
   languageSelectorWrapCompact: {
-    width: 168,
+    width: 50,
     flexShrink: 0,
-    alignItems: "flex-start"
+    alignItems: "flex-end"
   },
   languageSelectorButton: {
     minHeight: 44,
@@ -9003,9 +9023,9 @@ const styles = StyleSheet.create({
       : {})
   },
   languageSelectorButtonCompact: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 5,
     paddingVertical: 5,
-    gap: 6
+    gap: 4
   },
   languageSelectorButtonOpen: {
     borderColor: OJS_COLORS.focus,
@@ -9021,8 +9041,8 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   languageSelectorCodeCompact: {
-    fontSize: 12,
-    lineHeight: 14
+    fontSize: 10,
+    lineHeight: 12
   },
   languageOptions: {
     position: "absolute",
@@ -9188,9 +9208,9 @@ const styles = StyleSheet.create({
   },
   themeToggleCompact: {
     minHeight: 44,
-    paddingHorizontal: 8,
+    paddingHorizontal: 5,
     paddingVertical: 5,
-    gap: 6
+    gap: 4
   },
   themeToggleDark: {
     borderColor: OJS_DARK_COLORS.border,
@@ -9249,8 +9269,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   themeIconButtonCompact: {
-    width: 26,
-    height: 26
+    width: 20,
+    height: 20
   },
   themeIconButtonDark: {
     backgroundColor: "#221B32"
@@ -9264,8 +9284,9 @@ const styles = StyleSheet.create({
     borderColor: "#FFF6D7"
   },
   themeIconCoreCompact: {
-    width: 14,
-    height: 14
+    width: 11,
+    height: 11,
+    borderWidth: 2
   },
   themeIconCoreDark: {
     position: "relative",
@@ -9281,6 +9302,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#221B32"
   },
+  themeIconMoonCutoutCompact: {
+    right: -3,
+    top: -2,
+    width: 9,
+    height: 9
+  },
   themeToggleText: {
     color: YAHOO_COLORS.ink,
     fontFamily: YAHOO_FONT_STACK,
@@ -9289,8 +9316,8 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   themeToggleTextCompact: {
-    fontSize: 12,
-    lineHeight: 15
+    fontSize: 10,
+    lineHeight: 12
   },
   themeToggleTextDark: {
     color: OJS_DARK_COLORS.ink
@@ -9300,8 +9327,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   resultCountTextMobile: {
-    minWidth: 104,
-    paddingHorizontal: 10
+    minWidth: 56,
+    paddingHorizontal: 4
   },
   resultCountValueText: {
     color: YAHOO_COLORS.ink,
@@ -9324,10 +9351,13 @@ const styles = StyleSheet.create({
     maxWidth: "100%"
   },
   publicStatsChipRowMobile: {
-    width: "100%",
+    width: "auto",
+    flexGrow: 1,
+    flexShrink: 1,
     flexWrap: "nowrap",
     justifyContent: "flex-start",
-    gap: 6
+    gap: 4,
+    minWidth: 0
   },
   publicStatsChip: {
     overflow: "hidden",
@@ -9354,25 +9384,28 @@ const styles = StyleSheet.create({
       : {})
   },
   publicStatsChipMobile: {
-    gap: 3,
-    borderRadius: 11,
-    paddingHorizontal: 8,
-    paddingTop: 7,
-    paddingBottom: 8,
-    minWidth: 60,
-    minHeight: 40
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 4,
+    minWidth: 50,
+    minHeight: 44
   },
   publicStatsChipAts: {
     minWidth: 68
   },
   publicStatsChipAtsMobile: {
-    minWidth: 58
+    minWidth: 38
   },
   publicStatsChipCompanies: {
     minWidth: 118
   },
   publicStatsChipCompaniesMobile: {
-    minWidth: 102
+    minWidth: 58
   },
   publicStatsChipDark: {
     borderColor: OJS_DARK_COLORS.softBorder,
@@ -9388,8 +9421,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   publicStatsChipValueMobile: {
-    fontSize: 14,
-    lineHeight: 18
+    fontSize: 11,
+    lineHeight: 13
   },
   publicStatsChipLabel: {
     color: YAHOO_COLORS.muted,
@@ -9399,8 +9432,10 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   publicStatsChipLabelMobile: {
-    fontSize: 10,
-    lineHeight: 14
+    fontSize: 8,
+    lineHeight: 10,
+    maxWidth: "100%",
+    textAlign: "center"
   },
   yahooStatsChip: {
     borderColor: YAHOO_COLORS.border,

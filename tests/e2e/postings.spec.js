@@ -412,6 +412,50 @@ async function expectMobileTapTarget(page, testId) {
     .toBeGreaterThanOrEqual(44);
 }
 
+async function expectMobileResultsMetricsSingleRow(page) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width >= 768) return;
+  const metrics = await page.evaluate(() => {
+    const box = (testId) => {
+      const el = document.querySelector(`[data-testid="${testId}"]`);
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        right: rect.right,
+        bottom: rect.bottom
+      };
+    };
+    const row = box("results-metrics-row");
+    const stats = box("public-stats-chips");
+    const theme = box("theme-toggle");
+    const language = box("language-selector");
+    const boxes = [stats, theme, language].filter(Boolean);
+    return {
+      row,
+      stats,
+      theme,
+      language,
+      sameRow: boxes.length === 3 && Math.max(...boxes.map((item) => item.y)) - Math.min(...boxes.map((item) => item.y)) <= 2,
+      rowContainsAll:
+        Boolean(row && stats && theme && language) &&
+        stats.x >= row.x - 1 &&
+        language.right <= row.right + 1 &&
+        theme.height >= 44 &&
+        language.height >= 44,
+      rootWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth
+    };
+  });
+
+  expect(metrics.sameRow, `metrics controls should stay on one row: ${JSON.stringify(metrics)}`).toBe(true);
+  expect(metrics.rowContainsAll, `metrics row should contain stats, theme, and language controls: ${JSON.stringify(metrics)}`).toBe(true);
+  expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+}
+
 async function expectScrollTopButtonWorks(page) {
   await expect(page.getByTestId("postings-scroll-top-button")).toHaveCount(0);
   await page.getByTestId("postings-page-scroll").hover();
@@ -1117,6 +1161,29 @@ test.describe("postings page QA", () => {
     await expect(turkishRemoteLink).toContainText(/uzaktan/i);
   });
 
+  test("popular search links open results without autocomplete suggestions", async ({ page }) => {
+    const suggestionCalls = [];
+    page.on("request", (request) => {
+      const requestUrl = new URL(request.url());
+      if (requestUrl.pathname.endsWith("/search/suggest")) {
+        suggestionCalls.push(`${requestUrl.pathname}${requestUrl.search}`);
+      }
+    });
+
+    await openJobSlots(page);
+    const popularLink = page.locator('a[href="/en/remote-job-openings"]').first();
+    await expect(popularLink).toBeVisible();
+    await Promise.all([
+      page.waitForURL(/\/en\/remote-job-openings/),
+      popularLink.click()
+    ]);
+    await expect(page.getByTestId("search-input")).toHaveValue("remote job openings");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(700);
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    expect(suggestionCalls).toEqual([]);
+  });
+
   test("public localization covers home, results, suggestions, footer, and release notes in every language", async ({ page }) => {
     test.setTimeout(120_000);
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
@@ -1486,6 +1553,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
+    await expectMobileResultsMetricsSingleRow(page);
     await expectNoHorizontalOverflow(page);
   });
 
