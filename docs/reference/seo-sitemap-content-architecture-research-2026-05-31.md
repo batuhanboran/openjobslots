@@ -259,6 +259,24 @@ The first implementation target should be Phase 1 plus a small Phase 2 pilot:
 
 This is the safest first move because it improves crawl architecture without opening a large thin-content or stale-job surface.
 
+## Implementation Checkpoint - ATS Source Sitemap Pilot
+
+The first implementation target is now represented in repo code:
+
+- `/sitemap.xml` should become a sitemap index instead of one flat URL set.
+- `/sitemaps/static.xml` should carry root, localized home, localized role/search-intent pages, and source-education content pages.
+- `/sitemaps/ats-sources.xml` should carry ATS/source pages only.
+- The ATS source catalog should expand beyond the first five strategic pages to a broader source-backed pilot set, including Greenhouse, Lever, Ashby, Workday, BambooHR, ApplyToJob, Breezy, iCIMS, HRMDirect, Recruitee, Teamtailor, Jobvite, Rippling, Zoho Recruit, ApplicantPro, AppliTrack, Freshteam, UKG Pro, ADP, Paylocity, CareerPlug, Pinpoint, JOIN, Manatal, isolved Hire, Taleo, Dayforce, HiBob, ApplicantAI, BrassRing, Hirebridge, PageUp, TalentLyft, TalentReef, The Applicant Manager, CareersPage, Oracle Recruiting, Sage HR, Loxo, PeopleForce, Getro, Eightfold, and CareerPuck.
+
+The next implementation targets should stay ordered:
+
+1. Role pages: generate from a controlled role taxonomy and Semrush-backed search demand. Keep these separate from arbitrary user queries.
+2. Role + location pages: add only when inventory passes threshold, using clean canonical URLs rather than query-string filters.
+3. Company pages: add only after stable company slugs and active posting thresholds are available.
+4. Job detail pages: add last, with lifecycle handling and `JobPosting` structured data only on single-job pages.
+
+Do not jump directly to job detail pages before company and source-backed field quality are ready.
+
 ## Sources
 
 - Google Search Central sitemap documentation: https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview

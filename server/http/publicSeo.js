@@ -997,7 +997,7 @@ function createPublicSeoHelpers(dependencies = {}) {
       "",
       "## Optional",
       "",
-      `- [Sitemap](${siteOrigin}/sitemap.xml): XML sitemap for curated public landing pages.`,
+      `- [Sitemap](${siteOrigin}/sitemap.xml): XML sitemap index for curated public landing pages and ATS source pages.`,
       `- [Robots policy](${siteOrigin}/robots.txt): Crawl policy for public and internal routes.`,
       ""
     ].join("\n");
