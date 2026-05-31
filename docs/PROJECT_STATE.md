@@ -49,6 +49,12 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - TalentReef, HiBob, and Oracle now declare source-local `payloadShapePolicy.empty_job_list_stems` for their real job arrays. Positive source counts with empty arrays still record parser drift.
 - Verification covered changed-file syntax checks, payload-drift tests, registry tests, enterprise source-module tests, and HTML/public source-module tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## Freshteam Title-Tag Parser Checkpoint - June 1, 2026
+
+- Freshteam parser attention was concentrated on `dextragroup.freshteam.com/jobs`, with 32 recent `placeholder position_name` validation errors. The public source HTML uses `<h5 class="job-title">...`, while the parser only accepted `<div class="job-title">...`.
+- Freshteam title extraction is now class-based across tag names, and the Freshteam raw fixture includes the observed `<h5 class="job-title">` variant.
+- Live read-only parser proof for `https://dextragroup.freshteam.com/jobs` returned 32 rows and `placeholder_count=0`; no production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

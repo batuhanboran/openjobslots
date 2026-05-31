@@ -16,7 +16,7 @@ function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml
 
   const cardPattern =
     /<a[^>]*href=["'](\/jobs\/[^"'#?]+(?:\/[^"'#?]+)?)["'][^>]*class=["'][^"']*\bheading\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
-  const titlePattern = /<div[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
+  const titlePattern = /<[^>]*class=["'][^"']*\bjob-title\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i;
   const locationInfoPattern = /<div[^>]*class=["'][^"']*\blocation-info\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
   const locationAttrPattern = /\bdata-portal-location=["']([^"']*)["']/i;
   const remoteAttrPattern = /\bdata-portal-remote-location=(true|false)\b/i;
