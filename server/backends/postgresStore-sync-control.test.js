@@ -1706,6 +1706,98 @@ async function testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs() {
   assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
 }
 
+async function testPayloadDriftUsesSourceLocalEmptyJobListStems() {
+  const calls = [];
+  const pool = {
+    async query(sql) {
+      calls.push({ sql });
+      throw new Error(`Source-local empty job list should not touch payload shape storage: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "adp_workforcenow",
+      companyUrl: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=empty",
+      company: { company_name: "Empty ADP" },
+      adapter: {
+        payloadShapePolicy: {
+          empty_job_list_stems: ["jobRequisitions"]
+        }
+      }
+    },
+    {
+      meta: { totalNumber: 0 },
+      jobRequisitions: [],
+      __sourceConfig: {
+        boardUrl: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=empty",
+        jobRequisitionsUrl: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/job-requisitions"
+      }
+    },
+    "source-adp_workforcenow-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.empty_no_jobs, true);
+  assert.equal(calls.length, 0);
+}
+
+async function testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "populated-adp",
+            shape_paths: [
+              "jobRequisitions:array",
+              "jobRequisitions[].itemID:string",
+              "jobRequisitions[].requisitionTitle:string",
+              "jobRequisitions[]:object",
+              "meta.totalNumber:number",
+              "meta:object"
+            ],
+            observed_count: 24
+          }]
+        };
+      }
+      if (/INSERT INTO parser_drift_events/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Positive-count empty job list should record drift only: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "adp_workforcenow",
+      companyUrl: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=broken",
+      company: { company_name: "Broken ADP" },
+      adapter: {
+        payloadShapePolicy: {
+          empty_job_list_stems: ["jobRequisitions"]
+        }
+      }
+    },
+    {
+      meta: { totalNumber: 3 },
+      jobRequisitions: [],
+      __sourceConfig: {
+        boardUrl: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=broken",
+        jobRequisitionsUrl: "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/job-requisitions"
+      }
+    },
+    "source-adp_workforcenow-v1"
+  );
+
+  assert.equal(result.drift, true);
+  assert.ok(calls.some((call) => /FROM source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.some((call) => /INSERT INTO parser_drift_events/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
+}
+
 async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
   const calls = [];
   const pool = {
@@ -2218,6 +2310,8 @@ async function main() {
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
   await testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs();
+  await testPayloadDriftUsesSourceLocalEmptyJobListStems();
+  await testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();

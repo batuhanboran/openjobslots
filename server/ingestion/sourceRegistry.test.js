@@ -161,6 +161,7 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof adpWorkforcenow.parse, "function");
   assert.equal(typeof adpWorkforcenow.normalize, "function");
   assert.equal(typeof adpWorkforcenow.validate, "function");
+  assert.deepEqual(adpWorkforcenow.payloadShapePolicy.empty_job_list_stems, ["jobRequisitions"]);
   assert.deepEqual(validateSourceContract(adpWorkforcenow), { ok: true, failures: [] });
 
   const applicantPro = getRegistrySourceModule("applicantpro");
@@ -725,6 +726,7 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof ultipro.parse, "function");
   assert.equal(typeof ultipro.normalize, "function");
   assert.equal(typeof ultipro.validate, "function");
+  assert.deepEqual(ultipro.payloadShapePolicy.empty_job_list_stems, ["opportunities"]);
   assert.deepEqual(validateSourceContract(ultipro), { ok: true, failures: [] });
 
   const workday = getRegistrySourceModule("workday");

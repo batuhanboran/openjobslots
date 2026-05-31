@@ -5,6 +5,9 @@ const { createFetchList } = require("./fetchList");
 
 const atsKey = "adp_workforcenow";
 const baseModule = createSourceModule(atsKey);
+const payloadShapePolicy = Object.freeze({
+  empty_job_list_stems: Object.freeze(["jobRequisitions"])
+});
 
 function clean(value) {
   return String(value || "").trim();
@@ -45,5 +48,6 @@ module.exports = {
   key: atsKey,
   family: baseModule.family,
   status: baseModule.status,
-  parserVersion: baseModule.parserVersion
+  parserVersion: baseModule.parserVersion,
+  payloadShapePolicy
 };

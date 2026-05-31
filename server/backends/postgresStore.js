@@ -2224,8 +2224,12 @@ function emptyArrayPathStem(path) {
   return match ? match[1] : "";
 }
 
-function isJobListArrayStem(stem) {
+function isJobListArrayStem(stem, policy = {}) {
   const leaf = String(stem || "").split(".").pop().toLowerCase();
+  const normalizedPolicy = normalizePayloadShapePolicy(policy);
+  if (normalizedPolicy.emptyJobListStems.some((configured) => matchesPayloadShapePrefix(stem, configured))) {
+    return true;
+  }
   return /^(jobs?|postings?|positions?|openings?|offers?|result|items|records)$/.test(leaf);
 }
 
@@ -2242,7 +2246,7 @@ function hasPositiveTotalCount(value, depth = 0) {
   }
   for (const [key, raw] of Object.entries(value)) {
     const normalizedKey = String(key || "").toLowerCase();
-    if (/^(totalcount|total_count|jobcount|job_count|count)$/.test(normalizedKey)) {
+    if (/^(totalcount|total_count|totalnumber|total_number|jobcount|job_count|count)$/.test(normalizedKey)) {
       const count = Number(raw);
       if (Number.isFinite(count) && count > 0) return true;
     }
@@ -2251,12 +2255,12 @@ function hasPositiveTotalCount(value, depth = 0) {
   return false;
 }
 
-function isExplicitEmptyJobListPayload(raw, observedPaths = []) {
+function isExplicitEmptyJobListPayload(raw, observedPaths = [], policy = {}) {
   if (hasPositiveTotalCount(raw)) return false;
   const paths = Array.isArray(observedPaths) ? observedPaths : [];
   const emptyJobListStems = paths
     .map(emptyArrayPathStem)
-    .filter((stem) => stem && isJobListArrayStem(stem));
+    .filter((stem) => stem && isJobListArrayStem(stem, policy));
   return emptyJobListStems.some((stem) => !hasPopulatedArrayItemShape(paths, stem));
 }
 
@@ -2291,7 +2295,11 @@ function normalizePayloadShapePolicy(policy = {}) {
     ...(Array.isArray(source.ignored_stems) ? source.ignored_stems : []),
     ...(Array.isArray(source.ignoredStems) ? source.ignoredStems : [])
   ].map((item) => String(item || "").trim()).filter(Boolean);
-  return { optionalPrefixes, ignoredStems };
+  const emptyJobListStems = [
+    ...(Array.isArray(source.empty_job_list_stems) ? source.empty_job_list_stems : []),
+    ...(Array.isArray(source.emptyJobListStems) ? source.emptyJobListStems : [])
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+  return { optionalPrefixes, ignoredStems, emptyJobListStems };
 }
 
 function matchesPayloadShapePrefix(stem, prefix) {
@@ -2359,7 +2367,7 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
   if (observedPaths.length === 0) {
     return { drift: false, skipped_empty_shape: true, observed };
   }
-  if (isExplicitEmptyJobListPayload(raw, observedPaths)) {
+  if (isExplicitEmptyJobListPayload(raw, observedPaths, payloadShapePolicy)) {
     return { drift: false, empty_no_jobs: true, observed };
   }
   const existing = await pool.query(

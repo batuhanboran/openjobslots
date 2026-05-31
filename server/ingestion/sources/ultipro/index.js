@@ -6,6 +6,9 @@ const { createFetchList } = require("./fetchList");
 const baseModule = createSourceModule("ultipro");
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  empty_job_list_stems: Object.freeze(["opportunities"])
+});
 
 function normalizeCompanyName(company = {}, fallback = "ultipro") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -28,5 +31,6 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

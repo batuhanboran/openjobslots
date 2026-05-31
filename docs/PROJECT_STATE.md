@@ -35,6 +35,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - The Breezy source module now declares `/json` as optional payload-shape enrichment, while the generic guard handles shared source-config/detail-map metadata. Missing core HTML still records parser drift.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## ADP And UltiPro Empty-List Drift Policy - June 1, 2026
+
+- Fresh read-only production checks kept production at `6660eab`, all four runtime services running, `331,463` visible job slots, and the known Meili remote-facet drift of `6` onsite vs unknown documents. Throughput remains `hold`.
+- Drift samples showed ADP `jobRequisitions[]:empty` and UltiPro `opportunities[]:empty` source payloads being compared with populated baselines. With zero source counts, these are empty-board outcomes, not parser shape regressions.
+- The payload-drift guard now reads source-local `payloadShapePolicy.empty_job_list_stems`; ADP declares `jobRequisitions`, and UltiPro declares `opportunities`. Positive source counts still force parser drift, so real shape loss is not masked.
+- Verification covered changed-file syntax checks, payload-drift tests, source registry contract tests, source contract tests, and enterprise source-module tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.
