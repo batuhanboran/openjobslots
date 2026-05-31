@@ -854,7 +854,8 @@ function createPublicSeoHelpers(dependencies = {}) {
       .filter((route) => String(route.path || "").startsWith("/ats/"))
       .slice(0, 8);
     const secondaryLinks = links.slice(12, 24);
-    const footerLinks = sourceLinks.length > 0 ? sourceLinks : secondaryLinks;
+    const localizedFooterLinks = secondaryLinks.length > 0 ? secondaryLinks : primaryLinks.slice(-4);
+    const footerLinks = sourceLinks.length > 0 ? sourceLinks : localizedFooterLinks;
     const footerLabel = sourceLinks.length > 0 ? "OpenJobSlots ATS source pages" : copy.relatedLabel;
     const footerHeading = sourceLinks.length > 0 ? "ATS source job pages" : copy.relatedLabel;
     const sourceFooter = footerLinks.length === 0

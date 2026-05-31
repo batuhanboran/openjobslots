@@ -376,6 +376,7 @@ function testLocalizedStaticFallbackLinksStayWithinLanguageCluster() {
   assert.doesNotMatch(staticHtml, /href="https:\/\/openjobslots\.com\/ats\//);
   assert.doesNotMatch(staticHtml, /href="https:\/\/openjobslots\.com\/en\//);
   assert.doesNotMatch(staticHtml, /ATS source job pages/);
+  assert.match(staticHtml, /<footer/);
   assert.ok(countWords(staticText) >= 200);
 }
 
