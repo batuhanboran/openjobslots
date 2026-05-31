@@ -8968,7 +8968,7 @@ const styles = StyleSheet.create({
     width: "100%",
     minWidth: 0,
     flexWrap: "nowrap",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     gap: 8
   },
   languageSelectorWrap: {
@@ -8977,7 +8977,9 @@ const styles = StyleSheet.create({
     elevation: 10
   },
   languageSelectorWrapCompact: {
-    flexShrink: 0
+    width: 168,
+    flexShrink: 0,
+    alignItems: "flex-start"
   },
   languageSelectorButton: {
     minHeight: 44,
