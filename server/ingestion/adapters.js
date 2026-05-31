@@ -1,8 +1,10 @@
 const {
-  ATS_FILTER_OPTION_ITEMS,
-  collectPostingsForCompany,
-  normalizeAtsFilterValue
+  collectPostingsForCompany
 } = require("../index");
+const {
+  ATS_FILTER_OPTION_ITEMS,
+  normalizeAtsFilterValue
+} = require("./atsFilters");
 const { UNSUPPORTED_ATS, getAdapterMetadata } = require("./adapter-metadata");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("./posting");
 const { getSourceModule } = require("./sources");

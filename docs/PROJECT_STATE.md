@@ -2,6 +2,18 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## ATS Architecture & Recovery v2 Baseline - June 1, 2026
+
+- Read-only production baseline was collected from `proxmox-lxc100` / `public-services`; production `/root/OpenJobSlots` is at `6660eab`, while local `main` baseline started one commit ahead at `1fde5ec`.
+- Public health: `331,463` visible job slots, `40,860` companies, `29,767` sync-enabled companies, `37` visible ATS, and `98,115` rows seen in 24h. Source state split is `13` full-enabled, `31` canary, `8` quarantine-only, `10` disabled, and `44` worker-auto-eligible ATS.
+- Latest sync status was idle. Worker run `999` completed with errors: `56/59` target success, `1,316` postings stored, `7` rejected, queue depth about `22.7k`, and public status parser attention `430`.
+- Production data quality: `331,463` visible rows; missing country `21,115` (`6.37%`), missing any normalized geo `44,016` (`13.28%`), weak/unknown remote `9,300` (`2.81%`), and missing-all-geo plus weak/unknown remote `95` (`0.03%`).
+- Source freshness posture is `hold`, not scale-up: `29,463` due targets, `5,433` processed in 24h, `90.82%` target success, `18,333` new rows, `0` new public no-geo/no-remote rows, but `384` unresolved parser-attention events plus `389` parser-bug failures, `1,217` source-quality failures, `117` empty-no-jobs failures, `7` auth failures, and `7` unknown failures.
+- Immediate source recovery order from the live evidence is `zoho`, `hrmdirect`, `breezy`, `teamtailor`, `adp_workforcenow`, `bamboohr`, `ultipro`, `rippling`, and `applytojob`. Keep fixes source-local with raw fixtures, parser evidence, public gate evidence, and before/after quality proof.
+- Search parity is not clean. `check-search-parity --api-base-url=https://openjobslots.com --limit=10` failed all 12 default cases. `search:reindex:check` showed document counts aligned (`331,457` Postgres-indexable and `331,457` Meili documents, no missing/extra docs), but returned `ok=false` because remote facets drift by `6` onsite vs unknown documents. Replace reindex or targeted repair still needs explicit approval.
+- Architecture boundary is improved but not finished. ATS filter options and legacy host aliases now live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js` and `server/ingestion/worker.js` consuming that module. `audit:architecture-boundary` passes with `server/index.js` at `2698/3000` lines. The remaining warning is legacy dynamic sqlite sync bootstrap URLs and the USAJobs endpoint constant in `server/index.js`.
+- This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

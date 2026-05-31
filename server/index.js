@@ -8,6 +8,14 @@ const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
 const { getAdapterMetadata, isAtsEnabledByDefault } = require("./ingestion/adapter-metadata");
+const {
+  ATS_FILTER_LABEL_BY_VALUE,
+  ATS_FILTER_OPTION_ITEMS,
+  ATS_FILTER_OPTIONS,
+  SYNC_DEFAULT_ENABLED_ATS,
+  normalizeAtsFilterValue,
+  normalizeAtsFilters
+} = require("./ingestion/atsFilters");
 const { inferAtsFromJobPostingUrl } = require("./ingestion/atsUrlInference");
 const {
   isPlaceholderCompanyName,
@@ -446,74 +454,6 @@ const APPLICATION_STATUS_OPTIONS = new Set([
   "denied"
 ]);
 const MCP_REMOTE_OPTIONS = new Set(["all", "remote", "hybrid", "non_remote"]);
-const ATS_FILTER_OPTION_ITEMS = Object.freeze([
-  { value: "workday", label: "Workday" },
-  { value: "ashby", label: "Ashby" },
-  { value: "greenhouse", label: "Greenhouse" },
-  { value: "lever", label: "Lever" },
-  { value: "jobvite", label: "Jobvite" },
-  { value: "applicantpro", label: "ApplicantPro" },
-  { value: "applytojob", label: "ApplyToJob" },
-  { value: "theapplicantmanager", label: "The Applicant Manager" },
-  { value: "breezy", label: "BreezyHR" },
-  { value: "icims", label: "iCIMS" },
-  { value: "zoho", label: "Zoho Recruit" },
-  { value: "applicantai", label: "ApplicantAI" },
-  { value: "gem", label: "Gem" },
-  { value: "jobaps", label: "JobAps" },
-  { value: "join", label: "JOIN" },
-  { value: "talentreef", label: "TalentReef" },
-  { value: "careerplug", label: "CareerPlug" },
-  { value: "bamboohr", label: "BambooHR" },
-  { value: "adp_myjobs", label: "ADP MyJobs" },
-  { value: "adp_workforcenow", label: "ADP Workforce Now" },
-  { value: "oracle", label: "Oracle" },
-  { value: "paylocity", label: "Paylocity" },
-  { value: "eightfold", label: "Eightfold" },
-  { value: "manatal", label: "Manatal" },
-  { value: "careerspage", label: "CareersPage" },
-  { value: "dayforcehcm", label: "Dayforce", enabledByDefault: false },
-  { value: "pageup", label: "PageUp" },
-  { value: "hirebridge", label: "Hirebridge" },
-  { value: "brassring", label: "BrassRing" },
-  { value: "applitrack", label: "Applitrack" },
-  { value: "hibob", label: "HiBob" },
-  { value: "isolvisolvedhire", label: "isolvedhire" },
-  { value: "teamtailor", label: "Teamtailor" },
-  { value: "freshteam", label: "Freshteam" },
-  { value: "sagehr", label: "SageHR" },
-  { value: "loxo", label: "Loxo" },
-  { value: "peopleforce", label: "PeopleForce" },
-  { value: "simplicant", label: "Simplicant" },
-  { value: "pinpointhq", label: "PinpointHQ" },
-  { value: "recruitcrm", label: "RecruitCRM" },
-  { value: "rippling", label: "Rippling" },
-  { value: "careerpuck", label: "CareerPuck" },
-  { value: "fountain", label: "Fountain" },
-  { value: "getro", label: "Getro" },
-  { value: "governmentjobs", label: "GovernmentJobs" },
-  { value: "smartrecruiters", label: "SmartRecruiters" },
-  { value: "policeapp", label: "PoliceApp" },
-  { value: "usajobs", label: "USAJobs" },
-  { value: "k12jobspot", label: "K12JobSpot" },
-  { value: "schoolspring", label: "SchoolSpring" },
-  { value: "calcareers", label: "CalCareers" },
-  { value: "calopps", label: "CalOpps" },
-  { value: "statejobsny", label: "StateJobsNY" },
-  { value: "hrmdirect", label: "HRMDirect" },
-  { value: "talentlyft", label: "Talentlyft" },
-  { value: "talexio", label: "Talexio" },
-  { value: "saphrcloud", label: "SAP HR Cloud" },
-  { value: "recruitee", label: "Recruitee" },
-  { value: "ultipro", label: "UltiPro" },
-  { value: "taleo", label: "Taleo" }
-]);
-const ATS_FILTER_OPTIONS = new Set(ATS_FILTER_OPTION_ITEMS.map((item) => item.value));
-const SYNC_DEFAULT_ENABLED_ATS = Object.freeze(
-  ATS_FILTER_OPTION_ITEMS
-    .filter((item) => item.enabledByDefault !== false && isAtsEnabledByDefault(item.value))
-    .map((item) => item.value)
-);
 const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "relevance", label: "Relevance" },
   { value: "last_seen", label: "Fresh source" },
@@ -523,7 +463,6 @@ const POSTING_SORT_OPTION_ITEMS = Object.freeze([
 ]);
 const POSTING_SORT_OPTIONS = new Set(POSTING_SORT_OPTION_ITEMS.map((option) => option.value));
 const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
-const ATS_FILTER_LABEL_BY_VALUE = new Map(ATS_FILTER_OPTION_ITEMS.map((item) => [item.value, item.label]));
 const PUBLIC_SOURCE_FACET_LIMIT = 8;
 const PUBLIC_SOURCE_FACET_FRESH_DAYS = 3;
 const MCP_SETTINGS_DEFAULTS = {
@@ -1440,260 +1379,6 @@ function normalizeRemoteFilter(value) {
     .toLowerCase();
   if (normalized === "remote" || normalized === "hybrid" || normalized === "non_remote") return normalized;
   return "all";
-}
-
-function normalizeAtsFilterValue(value) {
-  const normalized = normalizeLikeText(value);
-  if (normalized === "ashbyhq") return "ashby";
-  if (normalized === "greenhouseio" || normalized === "greenhouse.io") return "greenhouse";
-  if (normalized === "leverco" || normalized === "lever.co") return "lever";
-  if (normalized === "recruiteecom" || normalized === "recruitee.com") return "recruitee";
-  if (normalized === "ukg") return "ultipro";
-  if (normalized === "taleonet" || normalized === "taleo.net") return "taleo";
-  if (normalized === "jobvitecom" || normalized === "jobvite.com") return "jobvite";
-  if (normalized === "applicantprocom" || normalized === "applicantpro.com") return "applicantpro";
-  if (normalized === "hibob.com" || normalized === "hibobcom" || normalized === "hibob" || normalized === "careers.hibob.com" || normalized === "careershibobcom") {
-    return "hibob";
-  }
-  if (
-    normalized === "isolvisolvedhire" ||
-    normalized === "isolvedhire" ||
-    normalized === "isolvedhire.com" ||
-    normalized === "isolvedhirecom"
-  ) {
-    return "isolvisolvedhire";
-  }
-  if (normalized === "applytojobcom" || normalized === "applytojob.com") return "applytojob";
-  if (normalized === "icimscom" || normalized === "icims.com") return "icims";
-  if (normalized === "theapplicantmanagercom" || normalized === "theapplicantmanager.com") {
-    return "theapplicantmanager";
-  }
-  if (normalized === "breezyhr" || normalized === "breezy.hr" || normalized === "breezyhrcom") {
-    return "breezy";
-  }
-  if (normalized === "zohorecruit" || normalized === "zohorecruit.com" || normalized === "zohorecruitcom") {
-    return "zoho";
-  }
-  if (normalized === "applicantai.com" || normalized === "applicantaicom") {
-    return "applicantai";
-  }
-  if (normalized === "bamboohr.com" || normalized === "bamboohrcom") {
-    return "bamboohr";
-  }
-  if (normalized === "careerplug.com" || normalized === "careerplugcom") {
-    return "careerplug";
-  }
-  if (
-    normalized === "manatal.com" ||
-    normalized === "manatalcom" ||
-    normalized === "careers-page.com" ||
-    normalized === "careerspagecom"
-  ) {
-    return "manatal";
-  }
-  if (normalized === "careerpuck.com" || normalized === "careerpuckcom") {
-    return "careerpuck";
-  }
-  if (normalized === "dayforcehcm" || normalized === "dayforce" || normalized === "dayforcehcm.com" || normalized === "dayforcehcmcom") {
-    return "dayforcehcm";
-  }
-  if (normalized === "fountain.com" || normalized === "fountaincom") {
-    return "fountain";
-  }
-  if (normalized === "getro.com" || normalized === "getrocom") {
-    return "getro";
-  }
-  if (normalized === "governmentjobs.com" || normalized === "governmentjobscom" || normalized === "governmentjobs") {
-    return "governmentjobs";
-  }
-  if (
-    normalized === "smartrecruiters.com" ||
-    normalized === "smartrecruiterscom" ||
-    normalized === "jobs.smartrecruiters.com" ||
-    normalized === "jobssmartrecruiterscom" ||
-    normalized === "smartrecruiters"
-  ) {
-    return "smartrecruiters";
-  }
-  if (normalized === "policeapp" || normalized === "policeapp.com" || normalized === "policeappcom" || normalized === "www.policeapp.com" || normalized === "wwwpoliceappcom") {
-    return "policeapp";
-  }
-  if (normalized === "usajobs" || normalized === "usajobs.gov" || normalized === "usajobsgov" || normalized === "www.usajobs.gov" || normalized === "wwwusajobsgov") {
-    return "usajobs";
-  }
-  if (normalized === "k12jobspot" || normalized === "k12jobspot.com" || normalized === "k12jobspotcom" || normalized === "www.k12jobspot.com" || normalized === "wwwk12jobspotcom" || normalized === "api.k12jobspot.com" || normalized === "apik12jobspotcom") {
-    return "k12jobspot";
-  }
-  if (normalized === "schoolspring" || normalized === "schoolspring.com" || normalized === "schoolspringcom" || normalized === "api.schoolspring.com" || normalized === "apischoolspringcom" || normalized === "www.schoolspring.com" || normalized === "wwwschoolspringcom") {
-    return "schoolspring";
-  }
-  if (
-    normalized === "calcareers" ||
-    normalized === "calcareers.ca.gov" ||
-    normalized === "calcareerscagov" ||
-    normalized === "www.calcareers.ca.gov" ||
-    normalized === "wwwcalcareerscagov"
-  ) {
-    return "calcareers";
-  }
-  if (
-    normalized === "calopps" ||
-    normalized === "calopps.org" ||
-    normalized === "caloppsorg" ||
-    normalized === "www.calopps.org" ||
-    normalized === "wwwcaloppsorg"
-  ) {
-    return "calopps";
-  }
-  if (
-    normalized === "statejobsny" ||
-    normalized === "statejobsny.com" ||
-    normalized === "statejobsnycom" ||
-    normalized === "www.statejobsny.com" ||
-    normalized === "wwwstatejobsnycom"
-  ) {
-    return "statejobsny";
-  }
-  if (normalized === "hrmdirect.com" || normalized === "hrmdirectcom") {
-    return "hrmdirect";
-  }
-  if (normalized === "talentlyft.com" || normalized === "talentlyftcom") {
-    return "talentlyft";
-  }
-  if (normalized === "talexio.com" || normalized === "talexiocom") {
-    return "talexio";
-  }
-  if (normalized === "teamtailor.com" || normalized === "teamtailorcom") {
-    return "teamtailor";
-  }
-  if (normalized === "freshteam.com" || normalized === "freshteamcom") {
-    return "freshteam";
-  }
-  if (
-    normalized === "sagehr" ||
-    normalized === "sage.hr" ||
-    normalized === "talent.sage.hr" ||
-    normalized === "talentsagehr"
-  ) {
-    return "sagehr";
-  }
-  if (normalized === "loxo.co" || normalized === "loxoco" || normalized === "app.loxo.co" || normalized === "apploxoco") {
-    return "loxo";
-  }
-  if (normalized === "peopleforce.io" || normalized === "peopleforceio") {
-    return "peopleforce";
-  }
-  if (normalized === "simplicant.com" || normalized === "simplicantcom") {
-    return "simplicant";
-  }
-  if (normalized === "pinpointhq.com" || normalized === "pinpointhqcom") {
-    return "pinpointhq";
-  }
-  if (normalized === "recruitcrm.io" || normalized === "recruitcrmiocom" || normalized === "recruitcrmio") {
-    return "recruitcrm";
-  }
-  if (normalized === "rippling.com" || normalized === "ripplingcom" || normalized === "ats.rippling.com" || normalized === "atsripplingcom" || normalized === "rippling") {
-    return "rippling";
-  }
-  if (normalized === "jobs.gem.com" || normalized === "gem.com" || normalized === "gemcom") {
-    return "gem";
-  }
-  if (normalized === "jobapscloud.com" || normalized === "jobapscloudcom") {
-    return "jobaps";
-  }
-  if (normalized === "join.com" || normalized === "joincom") {
-    return "join";
-  }
-  if (
-    normalized === "jobappnetwork.com" ||
-    normalized === "jobappnetworkcom" ||
-    normalized === "apply.jobappnetwork.com" ||
-    normalized === "applyjobappnetworkcom"
-  ) {
-    return "talentreef";
-  }
-  if (
-    normalized === "saphrcloud" ||
-    normalized === "saphrcloud.com" ||
-    normalized === "saphrcloudcom" ||
-    normalized === "jobs.hr.cloud.sap" ||
-    normalized === "jobshrcloudsap"
-  ) {
-    return "saphrcloud";
-  }
-  if (normalized === "adp_myjobs" || normalized === "adpmyjobs") {
-    return "adp_myjobs";
-  }
-  if (
-    normalized === "adp_workforcenow" ||
-    normalized === "adpworkforcenow" ||
-    normalized === "workforcenow.adp.com" ||
-    normalized === "workforcenowadpcom"
-  ) {
-    return "adp_workforcenow";
-  }
-  if (normalized === "careerspage" || normalized === "careerspage.io" || normalized === "careerspageio") {
-    return "careerspage";
-  }
-  if (
-    normalized === "paylocity" ||
-    normalized === "paylocity.com" ||
-    normalized === "paylocitycom" ||
-    normalized === "recruiting.paylocity.com" ||
-    normalized === "recruitingpaylocitycom"
-  ) {
-    return "paylocity";
-  }
-  if (normalized === "eightfold" || normalized === "eightfold.ai" || normalized === "eightfoldai") {
-    return "eightfold";
-  }
-  if (
-    normalized === "pageup" ||
-    normalized === "pageuppeople" ||
-    normalized === "pageuppeople.com" ||
-    normalized === "pageuppeoplecom" ||
-    normalized === "careers.pageuppeople.com" ||
-    normalized === "careerspageuppeoplecom"
-  ) {
-    return "pageup";
-  }
-  if (
-    normalized === "oracle" ||
-    normalized === "oraclecloud" ||
-    normalized === "oraclecloud.com" ||
-    normalized === "oraclecloudcom"
-  ) {
-    return "oracle";
-  }
-  if (
-    normalized === "hirebridge" ||
-    normalized === "hirebridge.com" ||
-    normalized === "hirebridgecom" ||
-    normalized === "recruit.hirebridge.com" ||
-    normalized === "recruithirebridgecom"
-  ) {
-    return "hirebridge";
-  }
-  if (
-    normalized === "brassring" ||
-    normalized === "brassring.com" ||
-    normalized === "brassringcom" ||
-    normalized === "sjobs.brassring.com" ||
-    normalized === "sjobsbrassringcom"
-  ) {
-    return "brassring";
-  }
-  if (normalized === "applitrack.com" || normalized === "applitrackcom" || normalized === "applitrack") {
-    return "applitrack";
-  }
-  return normalized;
-}
-
-function normalizeAtsFilters(value) {
-  const items = normalizeStringArray(Array.isArray(value) ? value : [value])
-    .map((item) => normalizeAtsFilterValue(item))
-    .filter((item) => ATS_FILTER_OPTIONS.has(item));
-  return Array.from(new Set(items));
 }
 
 function normalizePostingSort(value) {

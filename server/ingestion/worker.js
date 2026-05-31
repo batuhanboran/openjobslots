@@ -1,12 +1,14 @@
 const {
-  ATS_FILTER_OPTION_ITEMS,
   getCompaniesForSync,
   getDb,
   initDb,
-  normalizeAtsFilterValue,
   nowEpochSeconds,
   upsertPostings
 } = require("../index");
+const {
+  ATS_FILTER_OPTION_ITEMS,
+  normalizeAtsFilterValue
+} = require("./atsFilters");
 const { getAdapterForCompany } = require("./adapters");
 const { hashPayload, writePostingCache } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
