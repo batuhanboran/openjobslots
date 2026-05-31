@@ -1240,30 +1240,31 @@ test.describe("postings page QA", () => {
     await openJobSlots(page);
 
     await expect(page.getByTestId("seo-landing-links")).toBeVisible();
-    const englishPopularOrRouteLink = page.locator('a[href="/en/remote-job-openings"], a[href="/en?q=US%20jobs"]').first();
+    const englishPopularOrRouteLink = page.locator('a[href="/en/remote-job-openings"], a[href="/en?q=remote%20jobs%20US"]').first();
     await expect(englishPopularOrRouteLink).toBeVisible();
-    await expect(englishPopularOrRouteLink).toHaveAttribute("href", /\/en(?:\/remote-job-openings|\?q=US%20jobs)/);
+    await expect(englishPopularOrRouteLink).toHaveAttribute("href", /\/en(?:\/remote-job-openings|\?q=remote%20jobs%20US)/);
 
     await page.getByTestId("language-selector").click();
     await page.getByTestId("language-option-tr").click();
 
-    const turkishPopularOrRouteLink = page.locator('a[href="/tr/uzaktan-calisma-ilanlari"], a[href="/tr?q=Turkiye%20jobs"]').first();
+    const turkishPopularOrRouteLink = page.locator('a[href="/tr/uzaktan-calisma-ilanlari"], a[href="/tr?q=remote%20Turkiye"]').first();
     await expect(turkishPopularOrRouteLink).toBeVisible();
-    await expect(turkishPopularOrRouteLink).toHaveAttribute("href", /\/tr(?:\/uzaktan-calisma-ilanlari|\?q=Turkiye%20jobs)/);
+    await expect(turkishPopularOrRouteLink).toHaveAttribute("href", /\/tr(?:\/uzaktan-calisma-ilanlari|\?q=remote%20Turkiye)/);
   });
 
   test("popular search labels follow selected language while keeping result-safe query links", async ({ page }) => {
     await openJobSlots(page);
 
     await page.getByTestId("language-selector").click();
-    await page.getByTestId("language-option-fr").click();
+    await page.getByTestId("language-option-es").click();
 
-    await expect(page.getByTestId("language-selector")).toContainText("FR");
-    const frenchPopularLink = page.locator('a[href="/fr?q=France%20jobs"]').first();
-    await expect(frenchPopularLink).toBeVisible({ timeout: 15_000 });
-    await expect(frenchPopularLink).toContainText("Emplois en France");
-    await expect(page.getByTestId("seo-landing-links")).toContainText("Emplois \u00e0 distance en France");
-    await expect(page.getByTestId("seo-landing-links")).not.toContainText(/France Jobs|Remote France|Engineer France|Software France/);
+    await expect(page.getByTestId("language-selector")).toContainText("ES");
+    const spanishPopularLink = page.locator('a[href="/es?q=remote%20Spain"]').first();
+    await expect(spanishPopularLink).toBeVisible({ timeout: 15_000 });
+    await expect(spanishPopularLink).toContainText("Trabajos remotos en Espa\u00f1a");
+    await expect(page.getByTestId("seo-landing-links")).toContainText("Empleo en Madrid");
+    await expect(page.getByTestId("seo-landing-links")).toContainText("Ingeniero de software en Espa\u00f1a");
+    await expect(page.getByTestId("seo-landing-links")).not.toContainText(/Empleos en Espa\u00f1a|Empleos de ingeniero en Espa\u00f1a|Software engineer en Espa\u00f1a|Data analyst en Espa\u00f1a|Product manager en Espa\u00f1a|France Jobs|Remote France/);
   });
 
   test("popular search links open results without autocomplete suggestions", async ({ page }) => {
@@ -1276,14 +1277,14 @@ test.describe("postings page QA", () => {
     });
 
     await openJobSlots(page);
-    const popularLink = page.locator('a[href="/en?q=US%20jobs"]').first();
+    const popularLink = page.locator('a[href="/en?q=remote%20jobs%20US"]').first();
     await expect(popularLink).toBeVisible();
-    await expect(popularLink).toContainText(/US jobs/i);
+    await expect(popularLink).toContainText(/Remote jobs US/i);
     await Promise.all([
-      page.waitForURL(/\/en\?q=US%20jobs/),
+      page.waitForURL(/\/en\?q=remote%20jobs%20US/),
       popularLink.click()
     ]);
-    await expect(page.getByTestId("search-input")).toHaveValue("US jobs");
+    await expect(page.getByTestId("search-input")).toHaveValue("remote jobs US");
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
     await page.waitForTimeout(700);
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);

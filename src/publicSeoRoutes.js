@@ -1031,214 +1031,214 @@ const PUBLIC_SEO_PRIMARY_LANGUAGE_FALLBACKS = new Map([
 
 const PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS = Object.freeze({
   US: [
-    "US jobs",
-    "remote jobs US",
-    "software engineer US",
-    "data analyst US",
-    "product manager US",
-    "technical support US",
-    "customer success US",
-    "devops engineer US"
+    { query: "remote jobs US" },
+    { query: "software engineer US" },
+    { query: "data analyst US" },
+    { query: "customer support US" },
+    { query: "product manager US" },
+    { query: "sales jobs US" },
+    { query: "marketing jobs US" },
+    { query: "internship US" }
   ],
   GB: [
-    "UK jobs",
-    "remote jobs UK",
-    "software engineer UK",
-    "data analyst UK",
-    "product manager UK",
-    "technical support UK",
-    "customer success UK",
-    "devops engineer UK"
+    { query: "remote jobs UK" },
+    { query: "London jobs", labels: { en: "London jobs" } },
+    { query: "software engineer UK" },
+    { query: "data analyst UK" },
+    { query: "customer support UK" },
+    { query: "product manager UK" },
+    { query: "sales jobs UK" },
+    { query: "marketing jobs UK" }
   ],
   TR: [
-    "Turkiye jobs",
-    "remote Turkiye",
-    "Turkey engineer",
-    "Turkey software",
-    "Istanbul jobs",
-    "product manager Turkey",
-    "customer success Turkey",
-    "data analyst Turkey"
+    { query: "remote Turkiye", labels: { tr: "Uzaktan i\u015f ilanlar\u0131" } },
+    { query: "Istanbul jobs", labels: { tr: "\u0130stanbul i\u015f ilanlar\u0131" } },
+    { query: "Ankara jobs", labels: { tr: "Ankara i\u015f ilanlar\u0131" } },
+    { query: "Turkey software", labels: { tr: "Yaz\u0131l\u0131m i\u015f ilanlar\u0131" } },
+    { query: "data analyst Turkey", labels: { tr: "Veri analisti ilanlar\u0131" } },
+    { query: "customer support Turkey", labels: { tr: "M\u00fc\u015fteri destek ilanlar\u0131" } },
+    { query: "product manager Turkey", labels: { tr: "\u00dcr\u00fcn y\u00f6neticisi ilanlar\u0131" } },
+    { query: "sales Turkey", labels: { tr: "Sat\u0131\u015f ilanlar\u0131" } }
   ],
   DE: [
-    "Germany jobs",
-    "remote Germany",
-    "engineer Germany",
-    "software Germany",
-    "developer Germany",
-    "product manager Germany",
-    "data analyst Germany",
-    "devops engineer Germany"
+    { query: "remote Germany", labels: { de: "Remote-Jobs Deutschland" } },
+    { query: "Berlin jobs", labels: { de: "Jobs in Berlin" } },
+    { query: "Munich jobs", labels: { de: "Jobs in M\u00fcnchen" } },
+    { query: "software engineer Germany", labels: { de: "Softwareentwickler-Jobs" } },
+    { query: "data analyst Germany", labels: { de: "Datenanalyst-Jobs" } },
+    { query: "customer support Germany", labels: { de: "Kundensupport-Jobs" } },
+    { query: "product manager Germany", labels: { de: "Produktmanager-Jobs" } },
+    { query: "marketing Germany", labels: { de: "Marketing-Jobs" } }
   ],
   FR: [
-    "France jobs",
-    "remote France",
-    "engineer France",
-    "software France",
-    "developer France",
-    "product manager France",
-    "data analyst France",
-    "devops engineer France"
+    { query: "remote France", labels: { fr: "Emplois \u00e0 distance" } },
+    { query: "Paris jobs", labels: { fr: "Emplois \u00e0 Paris" } },
+    { query: "Lyon jobs", labels: { fr: "Emplois \u00e0 Lyon" } },
+    { query: "software engineer France", labels: { fr: "Emplois ing\u00e9nieur logiciel" } },
+    { query: "data analyst France", labels: { fr: "Emplois analyste de donn\u00e9es" } },
+    { query: "customer support France", labels: { fr: "Emplois support client" } },
+    { query: "product manager France", labels: { fr: "Emplois chef de produit" } },
+    { query: "marketing France", labels: { fr: "Emplois marketing" } }
   ],
   ES: [
-    "Spain jobs",
-    "remote Spain",
-    "engineer Spain",
-    "software Spain",
-    "developer Spain",
-    "product manager Spain",
-    "data analyst Spain",
-    "devops engineer Spain"
+    { query: "remote Spain", labels: { es: "Trabajos remotos en Espa\u00f1a" } },
+    { query: "Madrid jobs", labels: { es: "Empleo en Madrid" } },
+    { query: "Barcelona jobs", labels: { es: "Empleo en Barcelona" } },
+    { query: "software engineer Spain", labels: { es: "Ingeniero de software en Espa\u00f1a" } },
+    { query: "data analyst Spain", labels: { es: "Analista de datos en Espa\u00f1a" } },
+    { query: "customer support Spain", labels: { es: "Atenci\u00f3n al cliente en Espa\u00f1a" } },
+    { query: "product manager Spain", labels: { es: "Gerente de producto en Espa\u00f1a" } },
+    { query: "intern Spain", labels: { es: "Pr\u00e1cticas en Espa\u00f1a" } }
   ],
   BR: [
-    "Brazil jobs",
-    "remote Brazil",
-    "software Brazil",
-    "engineer Brazil",
-    "developer Brazil",
-    "product manager Brazil",
-    "data analyst Brazil",
-    "devops engineer Brazil"
+    { query: "remote Brazil", labels: { "pt-BR": "Vagas remotas" } },
+    { query: "Sao Paulo jobs", labels: { "pt-BR": "Vagas em S\u00e3o Paulo" } },
+    { query: "Rio de Janeiro jobs", labels: { "pt-BR": "Vagas no Rio de Janeiro" } },
+    { query: "software engineer Brazil", labels: { "pt-BR": "Engenheiro de software" } },
+    { query: "data analyst Brazil", labels: { "pt-BR": "Analista de dados" } },
+    { query: "customer support Brazil", labels: { "pt-BR": "Atendimento ao cliente" } },
+    { query: "product manager Brazil", labels: { "pt-BR": "Gerente de produto" } },
+    { query: "marketing Brazil", labels: { "pt-BR": "Vagas de marketing" } }
   ],
   PT: [
-    "Portugal jobs",
-    "remote Portugal",
-    "software Portugal",
-    "engineer Portugal",
-    "developer Portugal",
-    "product manager Portugal",
-    "data analyst Portugal",
-    "devops engineer Portugal"
+    { query: "remote Portugal", labels: { "pt-PT": "Empregos remotos" } },
+    { query: "Lisbon jobs", labels: { "pt-PT": "Empregos em Lisboa" } },
+    { query: "Porto jobs", labels: { "pt-PT": "Empregos no Porto" } },
+    { query: "software engineer Portugal", labels: { "pt-PT": "Engenheiro de software" } },
+    { query: "data analyst Portugal", labels: { "pt-PT": "Analista de dados" } },
+    { query: "customer support Portugal", labels: { "pt-PT": "Apoio ao cliente" } },
+    { query: "product manager Portugal", labels: { "pt-PT": "Gestor de produto" } },
+    { query: "marketing Portugal", labels: { "pt-PT": "Empregos de marketing" } }
   ],
   IT: [
-    "Italy jobs",
-    "remote Italy",
-    "software Italy",
-    "engineer Italy",
-    "developer Italy",
-    "product manager Italy",
-    "data analyst Italy",
-    "devops engineer Italy"
+    { query: "remote Italy", labels: { it: "Lavoro da remoto" } },
+    { query: "Milan jobs", labels: { it: "Offerte a Milano" } },
+    { query: "Rome jobs", labels: { it: "Offerte a Roma" } },
+    { query: "software engineer Italy", labels: { it: "Ingegnere software" } },
+    { query: "data analyst Italy", labels: { it: "Analista dati" } },
+    { query: "customer support Italy", labels: { it: "Assistenza clienti" } },
+    { query: "product manager Italy", labels: { it: "Responsabile prodotto" } },
+    { query: "marketing Italy", labels: { it: "Marketing" } }
   ],
   NL: [
-    "Netherlands jobs",
-    "remote Netherlands",
-    "software Netherlands",
-    "engineer Netherlands",
-    "developer Netherlands",
-    "product manager Netherlands",
-    "data analyst Netherlands",
-    "devops engineer Netherlands"
+    { query: "remote Netherlands", labels: { nl: "Remote vacatures" } },
+    { query: "Amsterdam jobs", labels: { nl: "Vacatures Amsterdam" } },
+    { query: "Rotterdam jobs", labels: { nl: "Vacatures Rotterdam" } },
+    { query: "software engineer Netherlands", labels: { nl: "Softwareontwikkelaar vacatures" } },
+    { query: "data analyst Netherlands", labels: { nl: "Data-analist vacatures" } },
+    { query: "customer support Netherlands", labels: { nl: "Klantenservice vacatures" } },
+    { query: "product manager Netherlands", labels: { nl: "Productmanager vacatures" } },
+    { query: "marketing Netherlands", labels: { nl: "Marketing vacatures" } }
   ],
   PL: [
-    "Poland jobs",
-    "remote Poland",
-    "software Poland",
-    "engineer Poland",
-    "developer Poland",
-    "product manager Poland",
-    "data analyst Poland",
-    "devops engineer Poland"
+    { query: "remote Poland", labels: { pl: "Praca zdalna" } },
+    { query: "Warsaw jobs", labels: { pl: "Praca Warszawa" } },
+    { query: "Krakow jobs", labels: { pl: "Praca Krak\u00f3w" } },
+    { query: "software engineer Poland", labels: { pl: "Programista" } },
+    { query: "data analyst Poland", labels: { pl: "Analityk danych" } },
+    { query: "customer support Poland", labels: { pl: "Obs\u0142uga klienta" } },
+    { query: "product manager Poland", labels: { pl: "Mened\u017cer produktu" } },
+    { query: "marketing Poland", labels: { pl: "Marketing pracy" } }
   ],
   JP: [
-    "Japan",
-    "Tokyo",
-    "Japanese",
-    "Osaka",
-    "Kyoto",
-    "Japan remote",
-    "Tokyo engineer",
-    "Japan software"
+    { query: "remote Japan", labels: { ja: "\u30ea\u30e2\u30fc\u30c8\u6c42\u4eba" } },
+    { query: "Tokyo jobs", labels: { ja: "\u6771\u4eac\u306e\u6c42\u4eba" } },
+    { query: "Osaka jobs", labels: { ja: "\u5927\u962a\u306e\u6c42\u4eba" } },
+    { query: "software engineer Japan", labels: { ja: "\u30bd\u30d5\u30c8\u30a6\u30a7\u30a2\u30a8\u30f3\u30b8\u30cb\u30a2\u6c42\u4eba" } },
+    { query: "data analyst Japan", labels: { ja: "\u30c7\u30fc\u30bf\u30a2\u30ca\u30ea\u30b9\u30c8\u6c42\u4eba" } },
+    { query: "customer support Japan", labels: { ja: "\u30ab\u30b9\u30bf\u30de\u30fc\u30b5\u30dd\u30fc\u30c8\u6c42\u4eba" } },
+    { query: "product manager Japan", labels: { ja: "\u30d7\u30ed\u30c0\u30af\u30c8\u30de\u30cd\u30fc\u30b8\u30e3\u30fc\u6c42\u4eba" } },
+    { query: "english speaking Japan", labels: { ja: "\u82f1\u8a9e\u3092\u4f7f\u3046\u6c42\u4eba" } }
   ],
   KR: [
-    "Korea",
-    "South Korea",
-    "Seoul",
-    "Korean",
-    "Seoul engineer",
-    "Korea software",
-    "Seoul software",
-    "Korea remote"
+    { query: "remote Korea", labels: { ko: "\uc6d0\uaca9 \ucc44\uc6a9" } },
+    { query: "Seoul jobs", labels: { ko: "\uc11c\uc6b8 \ucc44\uc6a9" } },
+    { query: "software engineer Korea", labels: { ko: "\uc18c\ud504\ud2b8\uc6e8\uc5b4 \uc5d4\uc9c0\ub2c8\uc5b4 \ucc44\uc6a9" } },
+    { query: "data analyst Korea", labels: { ko: "\ub370\uc774\ud130 \uc560\ub110\ub9ac\uc2a4\ud2b8 \ucc44\uc6a9" } },
+    { query: "customer support Korea", labels: { ko: "\uace0\uac1d \uc9c0\uc6d0 \ucc44\uc6a9" } },
+    { query: "product manager Korea", labels: { ko: "\ud504\ub85c\ub355\ud2b8 \ub9e4\ub2c8\uc800 \ucc44\uc6a9" } },
+    { query: "marketing Korea", labels: { ko: "\ub9c8\ucf00\ud305 \ucc44\uc6a9" } },
+    { query: "startup Korea", labels: { ko: "\uc2a4\ud0c0\ud2b8\uc5c5 \ucc44\uc6a9" } }
   ],
   CN: [
-    "China",
-    "Shanghai",
-    "Beijing",
-    "Chinese",
-    "Hong Kong",
-    "China software",
-    "Shanghai engineer",
-    "China remote"
+    { query: "remote China", labels: { "zh-CN": "\u8fdc\u7a0b\u804c\u4f4d" } },
+    { query: "Shanghai jobs", labels: { "zh-CN": "\u4e0a\u6d77\u804c\u4f4d" } },
+    { query: "Beijing jobs", labels: { "zh-CN": "\u5317\u4eac\u804c\u4f4d" } },
+    { query: "software engineer China", labels: { "zh-CN": "\u8f6f\u4ef6\u5de5\u7a0b\u5e08\u804c\u4f4d" } },
+    { query: "data analyst China", labels: { "zh-CN": "\u6570\u636e\u5206\u6790\u5e08\u804c\u4f4d" } },
+    { query: "customer support China", labels: { "zh-CN": "\u5ba2\u6237\u652f\u6301\u804c\u4f4d" } },
+    { query: "product manager China", labels: { "zh-CN": "\u4ea7\u54c1\u7ecf\u7406\u804c\u4f4d" } },
+    { query: "Hong Kong jobs", labels: { "zh-CN": "\u9999\u6e2f\u804c\u4f4d" } }
   ],
   IN: [
-    "India",
-    "Bangalore",
-    "Bengaluru",
-    "Delhi",
-    "Mumbai",
-    "Hyderabad",
-    "India software",
-    "India engineer"
+    { query: "remote India", labels: { hi: "\u0930\u093f\u092e\u094b\u091f \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902" } },
+    { query: "Bangalore jobs", labels: { hi: "\u092c\u0948\u0902\u0917\u0932\u094b\u0930 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902" } },
+    { query: "Delhi jobs", labels: { hi: "\u0926\u093f\u0932\u094d\u0932\u0940 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902" } },
+    { query: "Mumbai jobs", labels: { hi: "\u092e\u0941\u0902\u092c\u0908 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902" } },
+    { query: "software engineer India", labels: { hi: "\u0938\u0949\u092b\u094d\u091f\u0935\u0947\u092f\u0930 \u0907\u0902\u091c\u0940\u0928\u093f\u092f\u0930" } },
+    { query: "data analyst India", labels: { hi: "\u0921\u0947\u091f\u093e \u090f\u0928\u093e\u0932\u093f\u0938\u094d\u091f" } },
+    { query: "customer support India", labels: { hi: "\u0915\u0938\u094d\u091f\u092e\u0930 \u0938\u092a\u094b\u0930\u094d\u091f" } },
+    { query: "product manager India", labels: { hi: "\u092a\u094d\u0930\u094b\u0921\u0915\u094d\u091f \u092e\u0948\u0928\u0947\u091c\u0930" } }
   ],
   AE: [
-    "UAE",
-    "Dubai",
-    "Abu Dhabi",
-    "United Arab Emirates",
-    "Emirates",
-    "Dubai software",
-    "Dubai engineer",
-    "Dubai remote"
+    { query: "remote Dubai", labels: { ar: "\u0648\u0638\u0627\u0626\u0641 \u0639\u0646 \u0628\u0639\u062f" } },
+    { query: "Dubai jobs", labels: { ar: "\u0648\u0638\u0627\u0626\u0641 \u062f\u0628\u064a" } },
+    { query: "Abu Dhabi jobs", labels: { ar: "\u0648\u0638\u0627\u0626\u0641 \u0623\u0628\u0648 \u0638\u0628\u064a" } },
+    { query: "software engineer Dubai", labels: { ar: "\u0645\u0647\u0646\u062f\u0633 \u0628\u0631\u0645\u062c\u064a\u0627\u062a" } },
+    { query: "data analyst Dubai", labels: { ar: "\u0645\u062d\u0644\u0644 \u0628\u064a\u0627\u0646\u0627\u062a" } },
+    { query: "customer support Dubai", labels: { ar: "\u062f\u0639\u0645 \u0627\u0644\u0639\u0645\u0644\u0627\u0621" } },
+    { query: "product manager Dubai", labels: { ar: "\u0645\u062f\u064a\u0631 \u0645\u0646\u062a\u062c" } },
+    { query: "sales Dubai", labels: { ar: "\u0645\u0628\u064a\u0639\u0627\u062a" } }
   ],
   ID: [
-    "Indonesia",
-    "Jakarta",
-    "Bali",
-    "Indonesian",
-    "Indonesia software",
-    "Jakarta engineer",
-    "Indonesia remote",
-    "Indonesia product manager"
+    { query: "remote Indonesia", labels: { id: "Lowongan remote" } },
+    { query: "Jakarta jobs", labels: { id: "Lowongan Jakarta" } },
+    { query: "Bali jobs", labels: { id: "Lowongan Bali" } },
+    { query: "software engineer Indonesia", labels: { id: "Insinyur software" } },
+    { query: "data analyst Indonesia", labels: { id: "Analis data" } },
+    { query: "customer support Indonesia", labels: { id: "Layanan pelanggan" } },
+    { query: "product manager Indonesia", labels: { id: "Manajer produk" } },
+    { query: "marketing Indonesia", labels: { id: "Lowongan pemasaran" } }
   ],
   SE: [
-    "Sweden",
-    "Stockholm",
-    "Gothenburg",
-    "Swedish",
-    "Malmo",
-    "Sweden software",
-    "Stockholm engineer",
-    "Sweden remote"
+    { query: "remote Sweden", labels: { sv: "Remotejobb" } },
+    { query: "Stockholm jobs", labels: { sv: "Jobb i Stockholm" } },
+    { query: "Gothenburg jobs", labels: { sv: "Jobb i G\u00f6teborg" } },
+    { query: "software engineer Sweden", labels: { sv: "Mjukvaruingenj\u00f6r" } },
+    { query: "data analyst Sweden", labels: { sv: "Dataanalytiker" } },
+    { query: "customer support Sweden", labels: { sv: "Kundsupport" } },
+    { query: "product manager Sweden", labels: { sv: "Produktchef" } },
+    { query: "marketing Sweden", labels: { sv: "Marknadsf\u00f6ringsjobb" } }
   ],
   DK: [
-    "Denmark",
-    "Copenhagen",
-    "Danish",
-    "Aarhus",
-    "Denmark software",
-    "Copenhagen engineer",
-    "Denmark remote",
-    "Denmark product manager"
+    { query: "remote Denmark", labels: { da: "Remote job" } },
+    { query: "Copenhagen jobs", labels: { da: "Job i K\u00f8benhavn" } },
+    { query: "Aarhus jobs", labels: { da: "Job i Aarhus" } },
+    { query: "software engineer Denmark", labels: { da: "Softwareingeni\u00f8r" } },
+    { query: "data analyst Denmark", labels: { da: "Dataanalytiker" } },
+    { query: "customer support Denmark", labels: { da: "Kundesupport" } },
+    { query: "product manager Denmark", labels: { da: "Produktchef" } },
+    { query: "marketing Denmark", labels: { da: "Marketingjob" } }
   ],
   NO: [
-    "Norway",
-    "Oslo",
-    "Norwegian",
-    "Bergen",
-    "Norway software",
-    "Oslo engineer",
-    "Norway remote",
-    "Norway product manager"
+    { query: "remote Norway", labels: { no: "Remotejobber" } },
+    { query: "Oslo jobs", labels: { no: "Jobber i Oslo" } },
+    { query: "Bergen jobs", labels: { no: "Jobber i Bergen" } },
+    { query: "software engineer Norway", labels: { no: "Programvareingeni\u00f8r" } },
+    { query: "data analyst Norway", labels: { no: "Dataanalytiker" } },
+    { query: "customer support Norway", labels: { no: "Kundest\u00f8tte" } },
+    { query: "product manager Norway", labels: { no: "Produktsjef" } },
+    { query: "marketing Norway", labels: { no: "Markedsf\u00f8ringsjobber" } }
   ],
   FI: [
-    "Finland",
-    "Helsinki",
-    "Finnish",
-    "Espoo",
-    "Finland software",
-    "Helsinki engineer",
-    "Finland remote",
-    "Finland product manager"
+    { query: "remote Finland", labels: { fi: "Et\u00e4ty\u00f6paikat" } },
+    { query: "Helsinki jobs", labels: { fi: "Ty\u00f6paikat Helsingiss\u00e4" } },
+    { query: "Espoo jobs", labels: { fi: "Ty\u00f6paikat Espoossa" } },
+    { query: "software engineer Finland", labels: { fi: "Ohjelmistoinsin\u00f6\u00f6ri" } },
+    { query: "data analyst Finland", labels: { fi: "Data-analyytikko" } },
+    { query: "customer support Finland", labels: { fi: "Asiakastuki" } },
+    { query: "product manager Finland", labels: { fi: "Tuotep\u00e4\u00e4llikk\u00f6" } },
+    { query: "marketing Finland", labels: { fi: "Markkinointity\u00f6t" } }
   ]
 });
 
@@ -1963,24 +1963,39 @@ function normalizePublicSeoCountryCode(value) {
   return /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
 }
 
+function getPublicSeoFallbackEntryLabel(entry, languageCode) {
+  if (!entry || typeof entry !== "object") return "";
+  const labels = entry.labels && typeof entry.labels === "object" ? entry.labels : {};
+  const normalizedLanguageCode = normalizePublicSeoLanguageCode(languageCode);
+  return String(
+    labels[normalizedLanguageCode] ||
+      labels[normalizedLanguageCode.split("-")[0]] ||
+      ""
+  ).replace(/\s+/g, " ").trim();
+}
+
 function getPublicSeoCountryFallbackQueries(countryCode, languageCode, limit = SEO_LANDING_LINK_LIMIT) {
   const normalizedCountryCode = normalizePublicSeoCountryCode(countryCode);
-  const queries = PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS[normalizedCountryCode] || [];
+  const fallbackEntries = PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS[normalizedCountryCode] || [];
   const boundedLimit = Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT)));
   const normalizedLanguageCode = normalizePublicSeoLanguageCode(languageCode);
-  return queries.slice(0, boundedLimit).map((query, index) => ({
-    query,
-    label: getPublicSeoLocalizedPopularQueryLabel(query, {
+  return fallbackEntries.slice(0, boundedLimit).map((entry, index) => {
+    const query = String(typeof entry === "string" ? entry : entry?.query || entry?.searchQuery || "").replace(/\s+/g, " ").trim();
+    const label = getPublicSeoFallbackEntryLabel(entry, normalizedLanguageCode) || getPublicSeoLocalizedPopularQueryLabel(query, {
       languageCode: normalizedLanguageCode,
       countryCode: normalizedCountryCode
-    }),
-    searchQuery: query,
-    count: Math.max(1, 1000 - index),
-    countryCode: normalizedCountryCode,
-    languageCode: normalizedLanguageCode,
-    source: "research_country_fallback",
-    trustedPopularFallback: true
-  }));
+    });
+    return {
+      query,
+      label,
+      searchQuery: query,
+      count: Math.max(1, 1000 - index),
+      countryCode: normalizedCountryCode,
+      languageCode: normalizedLanguageCode,
+      source: "research_country_fallback",
+      trustedPopularFallback: true
+    };
+  }).filter((item) => item.query);
 }
 
 function buildPublicSeoIntentByQueryKey() {

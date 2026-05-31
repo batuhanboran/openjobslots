@@ -287,15 +287,19 @@ test.describe("openjobslots API compatibility", () => {
     expect(popularPayload.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          path: "/es?q=Spain%20jobs",
-          searchQuery: "Spain jobs"
+          path: "/es?q=remote%20Spain",
+          label: "Trabajos remotos en Espa\u00f1a",
+          searchQuery: "remote Spain"
         }),
         expect.objectContaining({
-          path: "/es?q=remote%20Spain",
-          searchQuery: "remote Spain"
+          path: "/es?q=Madrid%20jobs",
+          label: "Empleo en Madrid",
+          searchQuery: "Madrid jobs"
         })
       ])
     );
+    expect(popularPayload.items.some((item) => item.label === "Empleos en Espa\u00f1a")).toBe(false);
+    expect(popularPayload.items.some((item) => /Software engineer en Espa\u00f1a|Data analyst en Espa\u00f1a|Product manager en Espa\u00f1a/.test(item.label))).toBe(false);
 
     const countryPopular = await request.get(`${apiBaseUrl}/search/popular`, {
       params: {
@@ -314,9 +318,9 @@ test.describe("openjobslots API compatibility", () => {
       })
     );
     expect(countryPopularPayload.items.map((item) => item.searchQuery)).toEqual([
-      "Turkiye jobs",
       "remote Turkiye",
-      "Turkey engineer",
+      "Istanbul jobs",
+      "Ankara jobs",
       "Turkey software"
     ]);
 
@@ -337,12 +341,12 @@ test.describe("openjobslots API compatibility", () => {
       })
     );
     expect(brazilPopularPayload.items.map((item) => item.searchQuery)).toEqual([
-      "Brazil jobs",
       "remote Brazil",
-      "software Brazil",
-      "engineer Brazil"
+      "Sao Paulo jobs",
+      "Rio de Janeiro jobs",
+      "software engineer Brazil"
     ]);
-    expect(brazilPopularPayload.items[0].path).toBe("/pt-br?q=Brazil%20jobs");
+    expect(brazilPopularPayload.items[0].path).toBe("/pt-br?q=remote%20Brazil");
 
     const frenchPopular = await request.get(`${apiBaseUrl}/search/popular`, {
       params: {
@@ -361,18 +365,18 @@ test.describe("openjobslots API compatibility", () => {
       })
     );
     expect(frenchPopularPayload.items.map((item) => item.searchQuery)).toEqual([
-      "France jobs",
       "remote France",
-      "engineer France",
-      "software France"
+      "Paris jobs",
+      "Lyon jobs",
+      "software engineer France"
     ]);
     expect(frenchPopularPayload.items.map((item) => item.label)).toEqual([
-      "Emplois en France",
-      "Emplois \u00e0 distance en France",
-      "Emplois ing\u00e9nieur en France",
-      "Emplois logiciel en France"
+      "Emplois \u00e0 distance",
+      "Emplois \u00e0 Paris",
+      "Emplois \u00e0 Lyon",
+      "Emplois ing\u00e9nieur logiciel"
     ]);
-    expect(frenchPopularPayload.items[0].path).toBe("/fr?q=France%20jobs");
+    expect(frenchPopularPayload.items[0].path).toBe("/fr?q=remote%20France");
     expect(frenchPopularPayload.items.some((item) => /France Jobs|Remote France|Engineer France|Software France/.test(item.label))).toBe(false);
   });
 

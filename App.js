@@ -59,6 +59,7 @@ import {
   formatExactNumberLabel
 } from "./src/publicStatsCore";
 import {
+  getPublicSeoCountryFallbackQueries,
   getPublicSeoPopularSearchItems,
   getPublicSeoRouteLabel,
   getPublicSeoRouteHintByPath
@@ -5115,9 +5116,11 @@ export default function App() {
     }
     setError("");
     try {
-      const analyticsFilters = publicLanguageCountryCode
-        ? { ...filters, page_country: publicLanguageCountryCode }
-        : filters;
+      const analyticsFilters = {
+        ...filters,
+        page_language: publicLanguageCode,
+        ...(publicLanguageCountryCode ? { page_country: publicLanguageCountryCode } : {})
+      };
       const response = await fetchPostings(q, limit, offset, analyticsFilters);
       if (requestSequence !== postingsRequestSequenceRef.current) {
         return;
@@ -5193,7 +5196,7 @@ export default function App() {
         setLoading(false);
       }
     }
-  }, [publicLanguageCountryCode, queueFrontendLog]);
+  }, [publicLanguageCode, publicLanguageCountryCode, queueFrontendLog]);
 
   const loadPostingFilterOptions = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
@@ -5203,9 +5206,11 @@ export default function App() {
       setPostingFilterOptionsLoading(true);
     }
     try {
-      const analyticsFilters = publicLanguageCountryCode
-        ? { ...filters, page_country: publicLanguageCountryCode }
-        : filters;
+      const analyticsFilters = {
+        ...filters,
+        page_language: publicLanguageCode,
+        ...(publicLanguageCountryCode ? { page_country: publicLanguageCountryCode } : {})
+      };
       const response = await fetchPostingFilterOptions(q, analyticsFilters);
       setPostingFilterOptions({
         ats: mergeAtsFilterOptions(response?.ats),
@@ -5226,7 +5231,7 @@ export default function App() {
         setPostingFilterOptionsLoading(false);
       }
     }
-  }, [publicLanguageCountryCode, queueFrontendLog]);
+  }, [publicLanguageCode, publicLanguageCountryCode, queueFrontendLog]);
 
   const loadMorePostings = useCallback(() => {
     if (initializing || loading) return;
@@ -6307,7 +6312,13 @@ export default function App() {
 
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
-    const fallbackItems = getPublicSeoPopularSearchItems(publicLanguageCode, [], SEO_LANDING_LINK_LIMIT);
+    const fallbackQueryCounts = publicLanguageCountryCode
+      ? getPublicSeoCountryFallbackQueries(publicLanguageCountryCode, publicLanguageCode, SEO_LANDING_LINK_LIMIT)
+      : [];
+    const fallbackItems = getPublicSeoPopularSearchItems(publicLanguageCode, fallbackQueryCounts, SEO_LANDING_LINK_LIMIT, {
+      trustedQueryCounts: fallbackQueryCounts.length > 0,
+      countryCode: publicLanguageCountryCode
+    });
     setPopularSearchItems(fallbackItems);
     if (Platform.OS !== "web") return undefined;
 
@@ -6482,7 +6493,7 @@ export default function App() {
   useEffect(() => {
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
     const query = String(search || "").trim();
-    const cacheKey = normalizeSuggestionQuery(query);
+    const cacheKey = `${publicLanguageCode}:${publicLanguageCountryCode}:${normalizeSuggestionQuery(query)}`;
     cancelPendingSearchSuggestion();
     if (query.length < 2) {
       setSearchSuggestions([]);
@@ -6519,7 +6530,7 @@ export default function App() {
         if (currentQuery !== query) return;
         if (Date.now() - Number(lastSearchInputAtRef.current || 0) < SEARCH_SUGGESTION_DEBOUNCE_MS - 20) return;
         if (suppressedSuggestionQueryRef.current === query) return;
-        const response = await fetchSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT, publicLanguageCountryCode);
+        const response = await fetchSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT, publicLanguageCountryCode, publicLanguageCode);
         if (cancelled) return;
         if (suppressedSuggestionQueryRef.current === query) return;
         const remoteItems = Array.isArray(response?.items) ? response.items.slice(0, SEARCH_SUGGESTION_LIMIT) : [];
@@ -6547,7 +6558,7 @@ export default function App() {
       }
       clearTimeout(timer);
     };
-  }, [activePage, cancelPendingSearchSuggestion, publicLanguageCountryCode, queueFrontendLog, search]);
+  }, [activePage, cancelPendingSearchSuggestion, publicLanguageCode, publicLanguageCountryCode, queueFrontendLog, search]);
 
   useEffect(() => () => {
     if (syncNoticeTimerRef.current) {

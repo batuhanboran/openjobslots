@@ -476,6 +476,7 @@ async function ensurePostgresSchema(pool) {
       cache_status TEXT NOT NULL DEFAULT '',
       anonymous_session_key TEXT NOT NULL DEFAULT '',
       country_scope TEXT NOT NULL DEFAULT '',
+      language_code TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -487,6 +488,8 @@ async function ensurePostgresSchema(pool) {
       ADD COLUMN IF NOT EXISTS region_filters TEXT NOT NULL DEFAULT '';
     ALTER TABLE IF EXISTS public_search_events
       ADD COLUMN IF NOT EXISTS country_scope TEXT NOT NULL DEFAULT '';
+    ALTER TABLE IF EXISTS public_search_events
+      ADD COLUMN IF NOT EXISTS language_code TEXT NOT NULL DEFAULT '';
 
     CREATE INDEX IF NOT EXISTS idx_public_search_events_created
       ON public_search_events(created_at DESC);
@@ -501,6 +504,9 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_public_search_events_country_scope_created
       ON public_search_events(country_scope, created_at DESC)
       WHERE country_scope <> '';
+    CREATE INDEX IF NOT EXISTS idx_public_search_events_language_code_created
+      ON public_search_events(language_code, created_at DESC)
+      WHERE language_code <> '';
 
     CREATE TABLE IF NOT EXISTS ats_rate_limits (
       rate_limit_key TEXT PRIMARY KEY,

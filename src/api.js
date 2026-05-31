@@ -68,6 +68,21 @@ function setPageCountryParam(params, country) {
   if (countryCode) params.set("page_country", countryCode);
 }
 
+function normalizeLanguageCodeParam(value) {
+  const raw = String(value || "").trim().replace(/_/g, "-");
+  if (!raw) return "";
+  const parts = raw.split("-").filter(Boolean);
+  const primary = String(parts[0] || "").toLowerCase();
+  if (!/^[a-z]{2,3}$/.test(primary)) return "";
+  const region = String(parts[1] || "").toUpperCase();
+  return region && /^[A-Z]{2}$/.test(region) ? `${primary}-${region}` : primary;
+}
+
+function setPageLanguageParam(params, language) {
+  const languageCode = normalizeLanguageCodeParam(language);
+  if (languageCode) params.set("page_language", languageCode);
+}
+
 async function request(path, options = {}) {
   if (IS_NATIVE_STORE_SURFACE && !isPublicMobileApiPath(path)) {
     throw createPublicMobileSurfaceError(path);
@@ -121,6 +136,7 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
   const freshnessDays = Number(filters?.freshness_days || 0);
   const sortBy = String(filters?.sort_by || "posted_date").trim().toLowerCase();
   setPageCountryParam(params, filters?.page_country || filters?.country_scope || filters?.visitor_country);
+  setPageLanguageParam(params, filters?.page_language || filters?.language || filters?.languageCode);
 
   if (atsArray.length > 0) {
     params.set("ats", atsArray.join(","));
@@ -173,6 +189,7 @@ export function fetchPostingFilterOptions(search = "", filters = {}) {
   const remote = String(filters?.remote || "all").trim().toLowerCase();
   const freshnessDays = Number(filters?.freshness_days || 0);
   setPageCountryParam(params, filters?.page_country || filters?.country_scope || filters?.visitor_country);
+  setPageLanguageParam(params, filters?.page_language || filters?.language || filters?.languageCode);
 
   if (query) params.set("search", query);
   if (atsArray.length > 0) params.set("ats", atsArray.join(","));
@@ -189,13 +206,14 @@ export function fetchPostingFilterOptions(search = "", filters = {}) {
   return request(`/postings/filter-options${suffix ? `?${suffix}` : ""}`);
 }
 
-export function fetchSearchSuggestions(search = "", limit = 8, country = "") {
+export function fetchSearchSuggestions(search = "", limit = 8, country = "", language = "") {
   const params = new URLSearchParams({
     search,
     limit: String(limit),
     _ts: String(Date.now())
   });
   setPageCountryParam(params, country);
+  setPageLanguageParam(params, language);
   return request(`/search/suggest?${params.toString()}`);
 }
 

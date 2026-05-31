@@ -3190,6 +3190,18 @@ function normalizeAnalyticsCountryCode(value) {
   return /^[A-Z]{2}$/.test(country) ? country : "";
 }
 
+function normalizeAnalyticsLanguageCode(value) {
+  const raw = String(value || "")
+    .trim()
+    .replace(/_/g, "-");
+  if (!raw) return "";
+  const parts = raw.split("-").filter(Boolean);
+  const primary = String(parts[0] || "").toLowerCase();
+  if (!/^[a-z]{2,3}$/.test(primary)) return "";
+  const region = String(parts[1] || "").toUpperCase();
+  return region && /^[A-Z]{2}$/.test(region) ? `${primary}-${region}` : primary;
+}
+
 function serializeAnalyticsFilterValues(value) {
   const items = Array.isArray(value) ? value : parseCsv(value);
   return items
@@ -3252,7 +3264,8 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
     normalizeAnonymousSessionKey(event.anonymousSessionKey),
     normalizeAnalyticsCountryCode(event.countryScope || event.visitorCountry || event.pageCountry),
     serializeAnalyticsFilterValues(event.countries),
-    serializeAnalyticsFilterValues(event.regions)
+    serializeAnalyticsFilterValues(event.regions),
+    normalizeAnalyticsLanguageCode(event.languageCode || event.pageLanguage || event.language || event.page_language)
   ];
   await pool.query(
     `
@@ -3275,9 +3288,10 @@ async function recordPostgresPublicSearchEvent(pool, event = {}) {
         anonymous_session_key,
         country_scope,
         country_filters,
-        region_filters
+        region_filters,
+        language_code
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20);
     `,
     values
   );
@@ -3386,6 +3400,9 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
   const countryScope = normalizeAnalyticsCountryCode(
     options.countryScope || options.visitorCountry || options.pageCountry || options.country
   );
+  const languageCode = normalizeAnalyticsLanguageCode(
+    options.languageCode || options.pageLanguage || options.language || options.page_language
+  );
   const columnInfo = await pool.query(`
     SELECT
       EXISTS (
@@ -3401,14 +3418,31 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
         WHERE table_schema = 'public'
           AND table_name = 'public_search_events'
           AND column_name = 'country_scope'
-      ) AS has_country_scope;
+      ) AS has_country_scope,
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'public_search_events'
+          AND column_name = 'language_code'
+      ) AS has_language_code;
   `);
   const hasCountryFilters = Boolean(columnInfo.rows?.[0]?.has_country_filters);
   const hasCountryScope = Boolean(columnInfo.rows?.[0]?.has_country_scope);
+  const hasLanguageCode = Boolean(columnInfo.rows?.[0]?.has_language_code);
   const scopedValues = [date, timezone];
   const countryScopeApplied = Boolean(countryScope && hasCountryScope);
-  const scopedWhere = countryScopeApplied ? `${where}\n          AND country_scope = $3` : where;
-  if (countryScopeApplied) scopedValues.push(countryScope);
+  const languageScopeApplied = Boolean(languageCode && hasLanguageCode);
+  const scopedWhereParts = [where];
+  if (countryScopeApplied) {
+    scopedValues.push(countryScope);
+    scopedWhereParts.push(`country_scope = $${scopedValues.length}`);
+  }
+  if (languageScopeApplied) {
+    scopedValues.push(languageCode);
+    scopedWhereParts.push(`language_code = $${scopedValues.length}`);
+  }
+  const scopedWhere = scopedWhereParts.join("\n          AND ");
   const limitPlaceholder = `$${scopedValues.length + 1}`;
   const [
     eventCounts,
@@ -3623,6 +3657,8 @@ async function getPostgresPublicSearchReport(pool, options = {}) {
     timezone,
     country_scope: countryScope || "",
     country_scope_applied: countryScopeApplied,
+    language_code: languageCode || "",
+    language_scope_applied: languageScopeApplied,
     total_events: Number(totals.total_events || 0),
     anonymous_session_count: Number(totals.anonymous_session_count || 0),
     event_counts: toCountMap(eventCounts.rows, "event_type"),

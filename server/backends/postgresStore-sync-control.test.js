@@ -1731,6 +1731,7 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
     userAgent: "Mozilla/5.0 Firefox/151.0",
     cacheStatus: "MISS",
     countryScope: "tr",
+    pageLanguage: "tr",
     anonymousSessionKey: "a".repeat(64),
     ip: "203.0.113.10"
   });
@@ -1753,6 +1754,7 @@ async function testPublicSearchEventInsertIsPrivacyBounded() {
   assert.equal(calls[0].params[16], "TR");
   assert.equal(calls[0].params[17], "Turkey,United States");
   assert.equal(calls[0].params[18], "North America");
+  assert.equal(calls[0].params[19], "tr");
 }
 
 async function testDailyRedditPostBuildsSeededReadOnlyMarkdown() {
@@ -1828,7 +1830,7 @@ async function testPublicSearchReportAggregatesTopTermsReadOnly() {
         return { rows: [{ event_type: "postings", count: "3" }, { event_type: "suggest", count: "5" }] };
       }
       if (/information_schema\.columns/i.test(sql)) {
-        return { rows: [{ has_country_filters: true, has_country_scope: true }] };
+        return { rows: [{ has_country_filters: true, has_country_scope: true, has_language_code: true }] };
       }
       if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
         return { rows: [{ total_events: "8", anonymous_session_count: "2" }] };
@@ -1922,7 +1924,7 @@ async function testPublicSearchReportCanScopeByCountry() {
     async query(sql, params = []) {
       calls.push({ sql, params });
       if (/information_schema\.columns/i.test(sql)) {
-        return { rows: [{ has_country_filters: true, has_country_scope: true }] };
+        return { rows: [{ has_country_filters: true, has_country_scope: true, has_language_code: true }] };
       }
       if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
         return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
@@ -1947,6 +1949,42 @@ async function testPublicSearchReportCanScopeByCountry() {
   assert.ok(eventQueries.filter((call) => /LIMIT \$4/i.test(call.sql)).every((call) => call.params[3] === 10));
 }
 
+async function testPublicSearchReportCanScopeByLanguage() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/information_schema\.columns/i.test(sql)) {
+        return { rows: [{ has_country_filters: true, has_country_scope: true, has_language_code: true }] };
+      }
+      if (/COUNT\(\*\)::int AS total_events/i.test(sql)) {
+        return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const report = await getPostgresPublicSearchReport(pool, {
+    date: "2026-05-22",
+    timezone: "Europe/Istanbul",
+    limit: 10,
+    countryScope: "es",
+    languageCode: "es"
+  });
+
+  const eventQueries = calls.filter((call) => /FROM public_search_events/i.test(call.sql));
+  assert.equal(report.country_scope, "ES");
+  assert.equal(report.country_scope_applied, true);
+  assert.equal(report.language_code, "es");
+  assert.equal(report.language_scope_applied, true);
+  assert.ok(eventQueries.length > 0);
+  assert.ok(eventQueries.every((call) => /country_scope = \$3/i.test(call.sql)));
+  assert.ok(eventQueries.every((call) => /language_code = \$4/i.test(call.sql)));
+  assert.ok(eventQueries.every((call) => call.params[2] === "ES"));
+  assert.ok(eventQueries.every((call) => call.params[3] === "es"));
+  assert.ok(eventQueries.filter((call) => /LIMIT \$5/i.test(call.sql)).every((call) => call.params[4] === 10));
+}
+
 async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
   const calls = [];
   const pool = {
@@ -1956,7 +1994,7 @@ async function testPublicSearchReportResolvesTodayInRequestedTimezone() {
         return { rows: [{ total_events: "0", anonymous_session_count: "0" }] };
       }
       if (/information_schema\.columns/i.test(sql)) {
-        return { rows: [{ has_country_filters: false, has_country_scope: false }] };
+        return { rows: [{ has_country_filters: false, has_country_scope: false, has_language_code: false }] };
       }
       return { rows: [] };
     }
@@ -2019,6 +2057,7 @@ async function main() {
   await testDailyRedditPostBuildsSeededReadOnlyMarkdown();
   await testPublicSearchReportAggregatesTopTermsReadOnly();
   await testPublicSearchReportCanScopeByCountry();
+  await testPublicSearchReportCanScopeByLanguage();
   await testPublicSearchReportResolvesTodayInRequestedTimezone();
   console.log("postgres sync-control bigint cast tests passed");
 }

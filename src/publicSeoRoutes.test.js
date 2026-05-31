@@ -200,11 +200,24 @@ test("country research fallbacks preserve scoped queries for supported markets",
 
   assert.deepEqual(
     getPublicSeoCountryFallbackQueries("TR", "tr", 4).map((item) => item.query),
-    ["Turkiye jobs", "remote Turkiye", "Turkey engineer", "Turkey software"]
+    ["remote Turkiye", "Istanbul jobs", "Ankara jobs", "Turkey software"]
   );
   assert.deepEqual(
     getPublicSeoCountryFallbackQueries("BR", "pt-br", 4).map((item) => item.query),
-    ["Brazil jobs", "remote Brazil", "software Brazil", "engineer Brazil"]
+    ["remote Brazil", "Sao Paulo jobs", "Rio de Janeiro jobs", "software engineer Brazil"]
+  );
+  assert.deepEqual(
+    getPublicSeoCountryFallbackQueries("ES", "es", 8).map((item) => item.label),
+    [
+      "Trabajos remotos en Espa\u00f1a",
+      "Empleo en Madrid",
+      "Empleo en Barcelona",
+      "Ingeniero de software en Espa\u00f1a",
+      "Analista de datos en Espa\u00f1a",
+      "Atenci\u00f3n al cliente en Espa\u00f1a",
+      "Gerente de producto en Espa\u00f1a",
+      "Pr\u00e1cticas en Espa\u00f1a"
+    ]
   );
 });
 
@@ -217,19 +230,19 @@ test("popular SEO searches can render trusted country fallback queries", () => {
   );
 
   assert.deepEqual(turkishItems.map((item) => item.path), [
-    "/tr?q=Turkiye%20jobs",
     "/tr?q=remote%20Turkiye",
-    "/tr?q=Turkey%20engineer"
+    "/tr?q=Istanbul%20jobs",
+    "/tr?q=Ankara%20jobs"
   ]);
   assert.deepEqual(turkishItems.map((item) => item.searchQuery), [
-    "Turkiye jobs",
     "remote Turkiye",
-    "Turkey engineer"
+    "Istanbul jobs",
+    "Ankara jobs"
   ]);
   assert.deepEqual(turkishItems.map((item) => item.label), [
-    "T\u00fcrkiye i\u015f ilanlar\u0131",
-    "T\u00fcrkiye uzaktan i\u015f ilanlar\u0131",
-    "T\u00fcrkiye m\u00fchendis ilanlar\u0131"
+    "Uzaktan i\u015f ilanlar\u0131",
+    "\u0130stanbul i\u015f ilanlar\u0131",
+    "Ankara i\u015f ilanlar\u0131"
   ]);
 
   const britishItems = getPublicSeoPopularSearchItems(
@@ -238,7 +251,7 @@ test("popular SEO searches can render trusted country fallback queries", () => {
     2,
     { trustedQueryCounts: true }
   );
-  assert.deepEqual(britishItems.map((item) => item.searchQuery), ["UK jobs", "remote jobs UK"]);
+  assert.deepEqual(britishItems.map((item) => item.searchQuery), ["remote jobs UK", "London jobs"]);
 });
 
 test("popular SEO country fallback query labels follow the selected language pack", () => {
@@ -255,22 +268,22 @@ test("popular SEO country fallback query labels follow the selected language pac
   );
 
   assert.deepEqual(frenchItems.map((item) => item.searchQuery), [
-    "France jobs",
     "remote France",
-    "engineer France",
-    "software France"
+    "Paris jobs",
+    "Lyon jobs",
+    "software engineer France"
   ]);
   assert.deepEqual(frenchItems.map((item) => item.path), [
-    "/fr?q=France%20jobs",
     "/fr?q=remote%20France",
-    "/fr?q=engineer%20France",
-    "/fr?q=software%20France"
+    "/fr?q=Paris%20jobs",
+    "/fr?q=Lyon%20jobs",
+    "/fr?q=software%20engineer%20France"
   ]);
   assert.deepEqual(frenchItems.map((item) => item.label), [
-    "Emplois en France",
-    "Emplois \u00e0 distance en France",
-    "Emplois ing\u00e9nieur en France",
-    "Emplois logiciel en France"
+    "Emplois \u00e0 distance",
+    "Emplois \u00e0 Paris",
+    "Emplois \u00e0 Lyon",
+    "Emplois ing\u00e9nieur logiciel"
   ]);
   assert.ok(!frenchItems.some((item) => /France Jobs|Remote France|Engineer France|Software France/.test(item.label)));
 
@@ -280,11 +293,11 @@ test("popular SEO country fallback query labels follow the selected language pac
     4,
     { trustedQueryCounts: true, countryCode: "JP" }
   );
-  assert.deepEqual(japaneseItems.map((item) => item.searchQuery), ["Japan", "Tokyo", "Japanese", "Osaka"]);
+  assert.deepEqual(japaneseItems.map((item) => item.searchQuery), ["remote Japan", "Tokyo jobs", "Osaka jobs", "software engineer Japan"]);
   assert.deepEqual(japaneseItems.map((item) => item.label), [
-    "\u65e5\u672c\u306e\u6c42\u4eba",
+    "\u30ea\u30e2\u30fc\u30c8\u6c42\u4eba",
     "\u6771\u4eac\u306e\u6c42\u4eba",
-    "\u65e5\u672c\u306e\u6c42\u4eba",
-    "\u5927\u962a\u306e\u6c42\u4eba"
+    "\u5927\u962a\u306e\u6c42\u4eba",
+    "\u30bd\u30d5\u30c8\u30a6\u30a7\u30a2\u30a8\u30f3\u30b8\u30cb\u30a2\u6c42\u4eba"
   ]);
 });

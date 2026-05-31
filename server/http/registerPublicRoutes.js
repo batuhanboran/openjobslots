@@ -144,6 +144,18 @@ function getPublicAnalyticsCountryScope(req, options = {}) {
   );
 }
 
+function getPublicAnalyticsLanguageScope(req, options = {}) {
+  return normalizePublicSeoLanguageCode(
+    options.page_language ||
+      options.language ||
+      options.languageCode ||
+      req?.query?.page_language ||
+      req?.query?.language ||
+      req?.query?.lang ||
+      ""
+  );
+}
+
 function getPublicPopularSearchCountryScope(req, languageCode) {
   return (
     normalizePublicCountryCode(
@@ -254,6 +266,7 @@ function registerPublicRoutes(app, context) {
       userAgent: req.get ? req.get("user-agent") : "",
       cacheStatus: info.cacheStatus,
       countryScope: getPublicAnalyticsCountryScope(req, options),
+      pageLanguage: getPublicAnalyticsLanguageScope(req, options),
       anonymousSessionKey: getPublicAnalyticsSessionKey(req, res)
     };
     Promise.resolve(recordPostgresPublicSearchEvent(postgresPool, event)).catch((error) => {
@@ -453,7 +466,8 @@ function registerPublicRoutes(app, context) {
           report = await getPostgresPublicSearchReport(postgresPool, {
             date: req.query.date || "today",
             limit: 50,
-            countryScope
+            countryScope,
+            languageCode
           });
           topQueries = Array.isArray(report?.top_final_posting_searches)
             ? report.top_final_posting_searches
@@ -477,7 +491,8 @@ function registerPublicRoutes(app, context) {
             } else {
               report = await getPostgresPublicSearchReport(postgresPool, {
                 date: req.query.date || "today",
-                limit: 50
+                limit: 50,
+                languageCode
               });
               topQueries = Array.isArray(report?.top_final_posting_searches)
                 ? report.top_final_posting_searches
