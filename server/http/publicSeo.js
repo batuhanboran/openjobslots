@@ -472,6 +472,23 @@ function sanitizeSearchQuery(value) {
   return normalized.slice(0, 80);
 }
 
+function getRequestSearchQuery(req) {
+  const directQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
+  if (directQuery) return directQuery;
+  const rawUrl = String(req?.originalUrl || req?.url || "");
+  if (!rawUrl.includes("?")) return "";
+  try {
+    const params = new URL(rawUrl, "https://openjobslots.local").searchParams;
+    return sanitizeSearchQuery(params.get("q") || params.get("search") || "");
+  } catch {
+    return "";
+  }
+}
+
+function isSearchQueryPage(req) {
+  return Boolean(getRequestSearchQuery(req));
+}
+
 function getRequestPath(req) {
   return normalizePublicSeoPath(req?.path || req?.originalUrl || req?.url || "/");
 }
@@ -507,7 +524,7 @@ function createPublicSeoHelpers(dependencies = {}) {
   function getPublicSiteCanonicalUrl(req) {
     const seoRoute = getSeoRoute(req);
     if (seoRoute) return `${getPublicSiteOrigin(req)}${seoRoute.path}`;
-    const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
+    const searchQuery = getRequestSearchQuery(req);
     if (!searchQuery) return `${getPublicSiteOrigin(req)}/`;
     return `${getPublicSiteOrigin(req)}/?q=${encodeURIComponent(searchQuery)}`;
   }
@@ -527,7 +544,7 @@ function createPublicSeoHelpers(dependencies = {}) {
         languageCode: seoRoute.languageCode || "en"
       };
     }
-    const searchQuery = sanitizeSearchQuery(req?.query?.q || req?.query?.search || "");
+    const searchQuery = getRequestSearchQuery(req);
     if (!searchQuery) {
       return {
         title: String(seoTitle || "OpenJobSlots").trim(),
@@ -564,6 +581,7 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   function getPublicSeoAlternateLinks(req) {
+    if (isSearchQueryPage(req)) return [];
     const seoRoute = getSeoRoute(req);
     const requestPath = getRequestPath(req);
     const alternateGroup = seoRoute?.alternateGroup || (requestPath === "/" ? "home" : "");
@@ -605,6 +623,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     const canonicalUrl = getPublicSiteCanonicalUrl(req);
     const seoRoute = getSeoRoute(req);
     const seoMeta = getSeoMeta(req);
+    const queryPage = isSearchQueryPage(req);
     const heading = getSeoHeadingFromTitle(seoMeta.title) || "OpenJobSlots";
     const description = String(seoMeta.description || seoDescription || "").trim();
     const organization = {
@@ -634,7 +653,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     };
     const webpage = {
       "@context": "https://schema.org",
-      "@type": seoRoute ? "CollectionPage" : "WebPage",
+      "@type": seoRoute && !queryPage ? "CollectionPage" : "WebPage",
       "@id": `${canonicalUrl}#webpage`,
       url: canonicalUrl,
       name: heading,
@@ -685,6 +704,17 @@ function createPublicSeoHelpers(dependencies = {}) {
     const seoMeta = getSeoMeta(req);
     const languageCode = seoMeta.languageCode || "en";
     const currentPath = getRequestPath(req);
+    const isLocalizedPage = languageCode !== "en" && currentPath !== "/";
+    if (isLocalizedPage) {
+      const seenLocalized = new Set();
+      return PUBLIC_SEO_ROUTES
+        .filter((route) => route.languageCode === languageCode)
+        .filter((route) => {
+          if (!route?.path || route.path === currentPath || seenLocalized.has(route.path)) return false;
+          seenLocalized.add(route.path);
+          return true;
+        });
+    }
     const currentLanguageRoutes = PUBLIC_SEO_ROUTES.filter(
       (route) => route.languageCode === languageCode && route.alternateGroup && route.alternateGroup !== "home"
     );
@@ -767,11 +797,13 @@ function createPublicSeoHelpers(dependencies = {}) {
     const links = getStaticSeoFallbackLinks(req)
       .map((route) => {
         const label = stripOpenJobSlotsTitleSuffix(route.title) || route.searchQuery || route.path;
+        const summary = normalizeInlineText(route.description || "");
         return [
           "        <li>",
           '<a href="' + escapeHtmlAttribute(`${siteOrigin}${route.path}`) + '">',
           escapeHtmlAttribute(label),
           "</a>",
+          summary ? '<span> ' + escapeHtmlAttribute(summary) + "</span>" : "",
           "</li>"
         ].join("");
       })
@@ -813,6 +845,16 @@ function createPublicSeoHelpers(dependencies = {}) {
     const sourceLinks = links
       .filter((route) => String(route.path || "").startsWith("/ats/"))
       .slice(0, 8);
+    const sourceFooter = sourceLinks.length === 0
+      ? []
+      : [
+        '  <footer class="openjobslots-seo-footer" aria-label="OpenJobSlots ATS source pages">',
+        "    <h3>ATS source job pages</h3>",
+        "    <ul>",
+        htmlLinkList(sourceLinks),
+        "    </ul>",
+        "  </footer>"
+      ];
 
     function htmlLinkList(routes) {
       return routes
@@ -856,12 +898,7 @@ function createPublicSeoHelpers(dependencies = {}) {
       ]),
       "    </dl>",
       "  </section>",
-      '  <footer class="openjobslots-seo-footer" aria-label="OpenJobSlots ATS source pages">',
-      "    <h3>ATS source job pages</h3>",
-      "    <ul>",
-      htmlLinkList(sourceLinks),
-      "    </ul>",
-      "  </footer>",
+      ...sourceFooter,
       "</main>"
     ].join("\n");
   }
@@ -901,6 +938,7 @@ function createPublicSeoHelpers(dependencies = {}) {
   function renderSeoIndexHtml(indexHtml, req) {
     const canonicalUrl = getPublicSiteCanonicalUrl(req);
     const seoMeta = getSeoMeta(req);
+    const robotsContent = isSearchQueryPage(req) ? "noindex, follow" : "index, follow";
     const title = escapeHtmlAttribute(seoMeta.title);
     const description = escapeHtmlAttribute(seoMeta.description);
     const canonical = escapeHtmlAttribute(canonicalUrl);
@@ -911,7 +949,7 @@ function createPublicSeoHelpers(dependencies = {}) {
       '<meta name="description" content="' + description + '" />',
       '<link rel="canonical" href="' + canonical + '" />',
       alternateTags,
-      '<meta name="robots" content="index, follow" />',
+      '<meta name="robots" content="' + escapeHtmlAttribute(robotsContent) + '" />',
       '<meta property="og:type" content="website" />',
       '<meta property="og:site_name" content="OpenJobSlots" />',
       '<meta property="og:title" content="' + title + '" />',

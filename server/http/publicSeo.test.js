@@ -86,6 +86,12 @@ function extractStaticSeoContentText(html) {
     .trim();
 }
 
+function extractStaticSeoContentHtml(html) {
+  const match = /<main[^>]+id=["']openjobslots-static-seo-content["'][^>]*>([\s\S]*?)<\/main>/i.exec(String(html || ""));
+  assert.ok(match, "expected crawlable static SEO content");
+  return match[1];
+}
+
 function countWords(value) {
   const text = String(value || "");
   const cjkCharacters = (text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) || []).length;
@@ -248,8 +254,32 @@ function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
 
   assert.ok(html.includes("<title>Frontend Engineer jobs | OpenJobSlots</title>"));
   assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/?q=Frontend%20Engineer" />'));
+  assert.ok(html.includes('<meta name="robots" content="noindex, follow" />'));
   assert.ok(html.includes("Search fresh Frontend Engineer job slots from public employer ATS boards."));
   assert.ok(html.includes('<meta property="og:url" content="https://openjobslots.com/?q=Frontend%20Engineer" />'));
+  assert.doesNotMatch(html, /<link rel="alternate"/i);
+
+  const webpage = parseJsonLdById(html, "openjobslots-webpage-jsonld");
+  assert.equal(webpage["@type"], "WebPage");
+}
+
+function testCuratedPathSearchQueryPagesStayOutOfHreflangClusters() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body></body></html>",
+    createRequest({ path: "/en", originalUrl: "/en?q=technical%20support%20US", query: { q: "technical support US" } })
+  );
+
+  assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/en" />'));
+  assert.ok(html.includes('<meta name="robots" content="noindex, follow" />'));
+  assert.doesNotMatch(html, /<link rel="alternate"/i);
+
+  const webpage = parseJsonLdById(html, "openjobslots-webpage-jsonld");
+  assert.equal(webpage["@type"], "WebPage");
 }
 
 function testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates() {
@@ -297,6 +327,26 @@ function testHomeLanguagePagesGetBidirectionalHreflang() {
   assert.ok(html.includes('<link rel="alternate" hreflang="de" href="https://openjobslots.com/de" />'));
   assert.ok(html.includes('<link rel="alternate" hreflang="fr" href="https://openjobslots.com/fr" />'));
   assert.ok(html.includes('<link rel="alternate" hreflang="es" href="https://openjobslots.com/es" />'));
+}
+
+function testLocalizedStaticFallbackLinksStayWithinLanguageCluster() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body><div id=\"root\"></div></body></html>",
+    createRequest({ path: "/pl/data-analyst-jobs" })
+  );
+  const staticHtml = extractStaticSeoContentHtml(html);
+  const staticText = extractStaticSeoContentText(html);
+
+  assert.match(staticHtml, /href="https:\/\/openjobslots\.com\/pl\/devops-engineer-jobs"/);
+  assert.doesNotMatch(staticHtml, /href="https:\/\/openjobslots\.com\/ats\//);
+  assert.doesNotMatch(staticHtml, /href="https:\/\/openjobslots\.com\/en\//);
+  assert.doesNotMatch(staticHtml, /ATS source job pages/);
+  assert.ok(countWords(staticText) >= 200);
 }
 
 function testRobotsAndSitemapUseConfiguredPublicOrigin() {
@@ -483,8 +533,10 @@ testRenderSeoIndexHtmlAddsCrawlerVisibleSemanticContent();
 testRouteSpecificContentPagesExplainDirectEmployerSearch();
 testAtsPagesExposeSourceSpecificCopyWithoutPartnershipClaims();
 testSearchQueryPagesGetSpecificMetadataAndCanonical();
+testCuratedPathSearchQueryPagesStayOutOfHreflangClusters();
 testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
 testHomeLanguagePagesGetBidirectionalHreflang();
+testLocalizedStaticFallbackLinksStayWithinLanguageCluster();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
 testRootFallbackLinksEveryCuratedSitemapRoute();
