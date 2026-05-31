@@ -361,6 +361,42 @@ function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_
   return [...localizedRoutes, ...atsRoutes].slice(0, Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT))));
 }
 
+function getPublicSeoHomePathForLanguage(languageCode) {
+  const normalizedLanguageCode = ["en", "tr", "de", "fr", "es"].includes(languageCode) ? languageCode : "en";
+  return PUBLIC_SEO_HOME_PAGES.find((page) => page.languageCode === normalizedLanguageCode)?.path || "/en";
+}
+
+function getPublicSeoQueryLandingPath(languageCode, query) {
+  const normalizedQuery = String(query || "").replace(/\s+/g, " ").trim();
+  if (!normalizedQuery) return getPublicSeoHomePathForLanguage(languageCode);
+  return `${getPublicSeoHomePathForLanguage(languageCode)}?q=${encodeURIComponent(normalizedQuery)}`;
+}
+
+function getPublicSeoPopularQueryLabel(query) {
+  const acronyms = new Set(["ai", "api", "qa", "ui", "uk", "us", "usa", "ux"]);
+  return String(query || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (acronyms.has(lower)) return lower.toUpperCase();
+      return lower.slice(0, 1).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
+function isPublicSeoPopularQueryCandidate(query) {
+  const normalized = normalizePublicSeoQueryKey(query);
+  if (normalized.length < 2 || normalized.length > 64) return false;
+  if (/^\d+$/.test(normalized)) return false;
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length === 0 || words.length > 4) return false;
+  if (words.some((word) => word.length > 24)) return false;
+  if (/\b(?:inc|llc|ltd|corp|corporation|holdings|gmbh|plc|bv|oy|ag)\b/.test(normalized)) return false;
+  return true;
+}
+
 function buildPublicSeoIntentByQueryKey() {
   const byQuery = new Map();
   for (const route of PUBLIC_SEO_ROUTES) {
@@ -380,30 +416,49 @@ function getPublicSeoPopularSearchItems(languageCode, queryCounts = [], limit = 
   const routes = getPublicSeoLandingRoutesForLanguage(languageCode, 20);
   const routeByIntent = new Map(routes.map((route) => [String(route.searchIntent || "").trim(), route]));
   const countByIntent = new Map();
+  const countByQuery = new Map();
 
   for (const item of Array.isArray(queryCounts) ? queryCounts : []) {
     const query = item?.query || item?.query_normalized || item?.searchQuery || item?.value || "";
-    const intent = PUBLIC_SEO_INTENT_BY_QUERY_KEY.get(normalizePublicSeoQueryKey(query));
-    if (!intent || !routeByIntent.has(intent)) continue;
-    countByIntent.set(intent, Number(countByIntent.get(intent) || 0) + Math.max(0, Number(item?.count || 0)));
+    const queryKey = normalizePublicSeoQueryKey(query);
+    const count = Math.max(0, Number(item?.count || 0));
+    if (!queryKey || count <= 0) continue;
+    const intent = PUBLIC_SEO_INTENT_BY_QUERY_KEY.get(queryKey);
+    if (intent && routeByIntent.has(intent)) {
+      countByIntent.set(intent, Number(countByIntent.get(intent) || 0) + count);
+      continue;
+    }
+    if (isPublicSeoPopularQueryCandidate(queryKey)) {
+      countByQuery.set(queryKey, Number(countByQuery.get(queryKey) || 0) + count);
+    }
   }
 
   const rankedRoutes = [...countByIntent.entries()]
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .map(([intent, count]) => ({ route: routeByIntent.get(intent), count }));
-  const seenPaths = new Set(rankedRoutes.map((item) => item.route?.path).filter(Boolean));
+    .map(([intent, count]) => ({ type: "route", route: routeByIntent.get(intent), count }));
+  const rankedQueryLinks = [...countByQuery.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([query, count]) => ({
+      type: "query",
+      query,
+      count,
+      path: getPublicSeoQueryLandingPath(languageCode, query)
+    }));
+  const rankedItems = [...rankedRoutes, ...rankedQueryLinks]
+    .sort((left, right) => right.count - left.count || String(left.route?.path || left.path).localeCompare(String(right.route?.path || right.path)));
+  const seenPaths = new Set(rankedItems.map((item) => item.route?.path || item.path).filter(Boolean));
   const fallbackRoutes = routes
     .filter((route) => !seenPaths.has(route.path))
-    .map((route) => ({ route, count: 0 }));
+    .map((route) => ({ type: "route", route, count: 0 }));
 
-  return [...rankedRoutes, ...fallbackRoutes]
+  return [...rankedItems, ...fallbackRoutes]
     .slice(0, Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT))))
-    .map(({ route, count }) => ({
-      path: route.path,
-      label: getPublicSeoRouteLabel(route),
-      searchIntent: route.searchIntent || "",
-      searchQuery: getPublicSeoCanonicalSearchQuery(route),
-      localizedSearchQuery: String(route.searchQuery || "").trim(),
+    .map(({ type, route, path, query, count }) => ({
+      path: type === "query" ? path : route.path,
+      label: type === "query" ? getPublicSeoPopularQueryLabel(query) : getPublicSeoRouteLabel(route),
+      searchIntent: type === "query" ? `query:${query}` : route.searchIntent || "",
+      searchQuery: type === "query" ? query : getPublicSeoCanonicalSearchQuery(route),
+      localizedSearchQuery: type === "query" ? query : String(route.searchQuery || "").trim(),
       count
     }));
 }

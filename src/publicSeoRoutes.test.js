@@ -33,3 +33,29 @@ test("popular SEO searches order localized landing links by canonical analytics 
   ]);
   assert.match(items[0].label, /Empleos Software Engineer/);
 });
+
+test("popular SEO searches include short live queries before static fallbacks", () => {
+  const items = getPublicSeoPopularSearchItems("en", [
+    { query: "remote", count: 61 },
+    { query: "software", count: 26 },
+    { query: "remote engineer", count: 13 },
+    { query: "drone operator raptor maps inc", count: 12 },
+    { query: "technical support engineer", count: 7 }
+  ], 5);
+
+  assert.deepEqual(items.map((item) => item.path), [
+    "/en/remote-job-openings",
+    "/en?q=software",
+    "/en?q=remote%20engineer",
+    "/en/technical-support-engineer-jobs",
+    "/en/job-openings"
+  ]);
+  assert.deepEqual(items.map((item) => item.searchQuery), [
+    "remote",
+    "software",
+    "remote engineer",
+    "technical support engineer",
+    "job openings"
+  ]);
+  assert.equal(items[1].label, "Software");
+});
