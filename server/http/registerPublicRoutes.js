@@ -1,5 +1,8 @@
 const crypto = require("crypto");
-const { getPublicSeoPopularSearchItems } = require("../../src/publicSeoRoutes");
+const {
+  getPublicSeoCountryFallbackQueries,
+  getPublicSeoPopularSearchItems
+} = require("../../src/publicSeoRoutes");
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -10,6 +13,7 @@ const PUBLIC_LANGUAGE_COUNTRY_BY_CODE = Object.freeze({
   fr: "FR",
   es: "ES"
 });
+const PUBLIC_POPULAR_COUNTRY_ANALYTICS_MIN_QUERIES = 4;
 
 function getRequestHeader(req, name) {
   if (req && typeof req.get === "function") return req.get(name) || "";
@@ -418,6 +422,7 @@ function registerPublicRoutes(app, context) {
       let topQueries = [];
       let source = "fallback";
       let countryScopeApplied = false;
+      let useTrustedPopularQueries = false;
 
       if (DB_BACKEND === "postgres" && typeof getPostgresPublicSearchReport === "function") {
         try {
@@ -432,25 +437,48 @@ function registerPublicRoutes(app, context) {
               ? report.top_terms
               : [];
           countryScopeApplied = Boolean(report?.country_scope_applied);
+          if (
+            countryScopeApplied &&
+            topQueries.length > 0 &&
+            topQueries.length < Math.min(limit, PUBLIC_POPULAR_COUNTRY_ANALYTICS_MIN_QUERIES)
+          ) {
+            topQueries = [];
+          }
           if (topQueries.length > 0) source = countryScopeApplied ? "analytics_country" : "analytics";
           if (topQueries.length === 0 && countryScopeApplied) {
-            report = await getPostgresPublicSearchReport(postgresPool, {
-              date: req.query.date || "today",
-              limit: 50
-            });
-            topQueries = Array.isArray(report?.top_final_posting_searches)
-              ? report.top_final_posting_searches
-              : Array.isArray(report?.top_terms)
-                ? report.top_terms
-                : [];
-            if (topQueries.length > 0) source = "analytics_global_fallback";
+            topQueries = getPublicSeoCountryFallbackQueries(countryScope, languageCode, 50);
+            if (topQueries.length > 0) {
+              source = "research_country_fallback";
+              useTrustedPopularQueries = true;
+            } else {
+              report = await getPostgresPublicSearchReport(postgresPool, {
+                date: req.query.date || "today",
+                limit: 50
+              });
+              topQueries = Array.isArray(report?.top_final_posting_searches)
+                ? report.top_final_posting_searches
+                : Array.isArray(report?.top_terms)
+                  ? report.top_terms
+                  : [];
+              if (topQueries.length > 0) source = "analytics_global_fallback";
+            }
           }
         } catch (error) {
           console.warn("[openjobslots public search] popular search analytics fallback:", String(error?.message || error).slice(0, 240));
         }
       }
+      if (topQueries.length === 0 && countryScope) {
+        topQueries = getPublicSeoCountryFallbackQueries(countryScope, languageCode, 50);
+        if (topQueries.length > 0) {
+          source = "research_country_fallback";
+          countryScopeApplied = true;
+          useTrustedPopularQueries = true;
+        }
+      }
 
-      const items = getPublicSeoPopularSearchItems(languageCode, topQueries, limit);
+      const items = getPublicSeoPopularSearchItems(languageCode, topQueries, limit, {
+        trustedQueryCounts: useTrustedPopularQueries
+      });
       return {
         ok: true,
         items,
@@ -458,7 +486,8 @@ function registerPublicRoutes(app, context) {
         source,
         date: report?.date || null,
         country_scope: countryScope || null,
-        country_scope_applied: source === "analytics_country"
+        country_scope_applied: source === "analytics_country" || source === "research_country_fallback",
+        country_scope_source: source
       };
     });
   });

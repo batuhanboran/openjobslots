@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const {
   getPublicSeoCanonicalSearchQuery,
+  getPublicSeoCountryFallbackQueries,
   getPublicSeoPopularSearchItems,
   getPublicSeoRouteHintByPath
 } = require("./publicSeoRoutes");
@@ -76,4 +77,48 @@ test("SEO landing catalog includes Semrush-seeded role intents", () => {
     "/en/data-analyst-jobs",
     "/en/devops-engineer-jobs"
   ]);
+});
+
+test("country research fallbacks preserve scoped queries for supported markets", () => {
+  for (const countryCode of ["US", "GB", "TR", "DE", "FR", "ES"]) {
+    const queries = getPublicSeoCountryFallbackQueries(countryCode, countryCode === "TR" ? "tr" : "en", 6);
+    assert.equal(queries.length, 6);
+    assert.ok(queries.every((item) => item.countryCode === countryCode));
+    assert.ok(queries.every((item) => item.source === "research_country_fallback"));
+    assert.ok(queries.every((item) => item.trustedPopularFallback === true));
+    assert.ok(queries.every((item) => Number(item.count) > 0));
+  }
+
+  assert.deepEqual(
+    getPublicSeoCountryFallbackQueries("TR", "tr", 4).map((item) => item.query),
+    ["Turkiye jobs", "remote Turkiye", "Turkey engineer", "Turkey software"]
+  );
+});
+
+test("popular SEO searches can render trusted country fallback queries", () => {
+  const turkishItems = getPublicSeoPopularSearchItems(
+    "tr",
+    getPublicSeoCountryFallbackQueries("TR", "tr", 3),
+    3,
+    { trustedQueryCounts: true }
+  );
+
+  assert.deepEqual(turkishItems.map((item) => item.path), [
+    "/tr?q=Turkiye%20jobs",
+    "/tr?q=remote%20Turkiye",
+    "/tr?q=Turkey%20engineer"
+  ]);
+  assert.deepEqual(turkishItems.map((item) => item.searchQuery), [
+    "Turkiye jobs",
+    "remote Turkiye",
+    "Turkey engineer"
+  ]);
+
+  const britishItems = getPublicSeoPopularSearchItems(
+    "en",
+    getPublicSeoCountryFallbackQueries("GB", "en", 2),
+    2,
+    { trustedQueryCounts: true }
+  );
+  assert.deepEqual(britishItems.map((item) => item.searchQuery), ["UK jobs", "remote jobs UK"]);
 });

@@ -246,18 +246,48 @@ test.describe("openjobslots API compatibility", () => {
     });
     expect(popular.ok()).toBeTruthy();
     const popularPayload = await popular.json();
+    expect(popularPayload).toEqual(
+      expect.objectContaining({
+        source: "research_country_fallback",
+        country_scope: "ES",
+        country_scope_applied: true
+      })
+    );
     expect(popularPayload.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          path: "/es/empleos-software-engineer",
-          searchQuery: "software engineer"
+          path: "/es?q=Spain%20jobs",
+          searchQuery: "Spain jobs"
         }),
         expect.objectContaining({
-          path: "/es/trabajos-remotos",
-          searchQuery: "remote"
+          path: "/es?q=remote%20Spain",
+          searchQuery: "remote Spain"
         })
       ])
     );
+
+    const countryPopular = await request.get(`${apiBaseUrl}/search/popular`, {
+      params: {
+        language: "tr",
+        country: "TR",
+        limit: "4"
+      }
+    });
+    expect(countryPopular.ok()).toBeTruthy();
+    const countryPopularPayload = await countryPopular.json();
+    expect(countryPopularPayload).toEqual(
+      expect.objectContaining({
+        source: "research_country_fallback",
+        country_scope: "TR",
+        country_scope_applied: true
+      })
+    );
+    expect(countryPopularPayload.items.map((item) => item.searchQuery)).toEqual([
+      "Turkiye jobs",
+      "remote Turkiye",
+      "Turkey engineer",
+      "Turkey software"
+    ]);
   });
 
   test("postings expose exact count metadata plus read-only freshness and sort params", async ({ request }) => {

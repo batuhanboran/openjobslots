@@ -1262,13 +1262,14 @@ test.describe("postings page QA", () => {
     });
 
     await openJobSlots(page);
-    const popularLink = page.locator('a[href="/en/remote-job-openings"]').first();
+    const popularLink = page.locator('a[href="/en?q=US%20jobs"]').first();
     await expect(popularLink).toBeVisible();
+    await expect(popularLink).toContainText(/US jobs/i);
     await Promise.all([
-      page.waitForURL(/\/en\/remote-job-openings/),
+      page.waitForURL(/\/en\?q=US%20jobs/),
       popularLink.click()
     ]);
-    await expect(page.getByTestId("search-input")).toHaveValue("remote job openings");
+    await expect(page.getByTestId("search-input")).toHaveValue("US jobs");
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
     await page.waitForTimeout(700);
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);

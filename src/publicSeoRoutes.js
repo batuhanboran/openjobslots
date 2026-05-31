@@ -443,6 +443,70 @@ const PUBLIC_SEO_ALTERNATE_GROUPS = new Map([
 ]);
 
 const SEO_LANDING_LINK_LIMIT = 8;
+const PUBLIC_SEO_SUPPORTED_LANGUAGES = new Set(["en", "tr", "de", "fr", "es"]);
+
+const PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS = Object.freeze({
+  US: [
+    "US jobs",
+    "remote jobs US",
+    "software engineer US",
+    "data analyst US",
+    "product manager US",
+    "technical support US",
+    "customer success US",
+    "devops engineer US"
+  ],
+  GB: [
+    "UK jobs",
+    "remote jobs UK",
+    "software engineer UK",
+    "data analyst UK",
+    "product manager UK",
+    "technical support UK",
+    "customer success UK",
+    "devops engineer UK"
+  ],
+  TR: [
+    "Turkiye jobs",
+    "remote Turkiye",
+    "Turkey engineer",
+    "Turkey software",
+    "Istanbul jobs",
+    "product manager Turkey",
+    "customer success Turkey",
+    "data analyst Turkey"
+  ],
+  DE: [
+    "Germany jobs",
+    "remote Germany",
+    "engineer Germany",
+    "software Germany",
+    "developer Germany",
+    "product manager Germany",
+    "data analyst Germany",
+    "devops engineer Germany"
+  ],
+  FR: [
+    "France jobs",
+    "remote France",
+    "engineer France",
+    "software France",
+    "developer France",
+    "product manager France",
+    "data analyst France",
+    "devops engineer France"
+  ],
+  ES: [
+    "Spain jobs",
+    "remote Spain",
+    "engineer Spain",
+    "software Spain",
+    "developer Spain",
+    "product manager Spain",
+    "data analyst Spain",
+    "devops engineer Spain"
+  ]
+});
 
 function normalizePublicSeoQueryKey(value) {
   return String(value || "")
@@ -474,7 +538,7 @@ function getPublicSeoRouteLabel(route) {
 }
 
 function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_LINK_LIMIT) {
-  const normalizedLanguageCode = ["en", "tr", "de", "fr", "es"].includes(languageCode) ? languageCode : "en";
+  const normalizedLanguageCode = PUBLIC_SEO_SUPPORTED_LANGUAGES.has(languageCode) ? languageCode : "en";
   const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
     (route) => route.languageCode === normalizedLanguageCode && route.alternateGroup && route.alternateGroup !== "home"
   );
@@ -485,7 +549,7 @@ function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_
 }
 
 function getPublicSeoHomePathForLanguage(languageCode) {
-  const normalizedLanguageCode = ["en", "tr", "de", "fr", "es"].includes(languageCode) ? languageCode : "en";
+  const normalizedLanguageCode = PUBLIC_SEO_SUPPORTED_LANGUAGES.has(languageCode) ? languageCode : "en";
   return PUBLIC_SEO_HOME_PAGES.find((page) => page.languageCode === normalizedLanguageCode)?.path || "/en";
 }
 
@@ -520,6 +584,26 @@ function isPublicSeoPopularQueryCandidate(query) {
   return true;
 }
 
+function normalizePublicSeoCountryCode(value) {
+  const countryCode = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
+}
+
+function getPublicSeoCountryFallbackQueries(countryCode, languageCode, limit = SEO_LANDING_LINK_LIMIT) {
+  const normalizedCountryCode = normalizePublicSeoCountryCode(countryCode);
+  const queries = PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS[normalizedCountryCode] || [];
+  const boundedLimit = Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT)));
+  return queries.slice(0, boundedLimit).map((query, index) => ({
+    query,
+    searchQuery: query,
+    count: Math.max(1, 1000 - index),
+    countryCode: normalizedCountryCode,
+    languageCode: PUBLIC_SEO_SUPPORTED_LANGUAGES.has(languageCode) ? languageCode : "en",
+    source: "research_country_fallback",
+    trustedPopularFallback: true
+  }));
+}
+
 function buildPublicSeoIntentByQueryKey() {
   const byQuery = new Map();
   for (const route of PUBLIC_SEO_ROUTES) {
@@ -535,14 +619,16 @@ function buildPublicSeoIntentByQueryKey() {
 
 const PUBLIC_SEO_INTENT_BY_QUERY_KEY = buildPublicSeoIntentByQueryKey();
 
-function getPublicSeoPopularSearchItems(languageCode, queryCounts = [], limit = SEO_LANDING_LINK_LIMIT) {
+function getPublicSeoPopularSearchItems(languageCode, queryCounts = [], limit = SEO_LANDING_LINK_LIMIT, options = {}) {
   const routes = getPublicSeoLandingRoutesForLanguage(languageCode, 20);
   const routeByIntent = new Map(routes.map((route) => [String(route.searchIntent || "").trim(), route]));
   const countByIntent = new Map();
   const countByQuery = new Map();
+  const trustProvidedQueries = Boolean(options.trustedQueryCounts);
 
   for (const item of Array.isArray(queryCounts) ? queryCounts : []) {
     const query = item?.query || item?.query_normalized || item?.searchQuery || item?.value || "";
+    const cleanedQuery = String(query || "").replace(/\s+/g, " ").trim();
     const queryKey = normalizePublicSeoQueryKey(query);
     const count = Math.max(0, Number(item?.count || 0));
     if (!queryKey || count <= 0) continue;
@@ -551,17 +637,21 @@ function getPublicSeoPopularSearchItems(languageCode, queryCounts = [], limit = 
       countByIntent.set(intent, Number(countByIntent.get(intent) || 0) + count);
       continue;
     }
-    if (isPublicSeoPopularQueryCandidate(queryKey)) {
-      countByQuery.set(queryKey, Number(countByQuery.get(queryKey) || 0) + count);
+    if (trustProvidedQueries || item?.trustedPopularFallback || isPublicSeoPopularQueryCandidate(queryKey)) {
+      const existing = countByQuery.get(queryKey);
+      countByQuery.set(queryKey, {
+        query: trustProvidedQueries || item?.trustedPopularFallback ? cleanedQuery || queryKey : queryKey,
+        count: Number(existing?.count || 0) + count
+      });
     }
   }
 
   const rankedRoutes = [...countByIntent.entries()]
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .map(([intent, count]) => ({ type: "route", route: routeByIntent.get(intent), count }));
-  const rankedQueryLinks = [...countByQuery.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .map(([query, count]) => ({
+  const rankedQueryLinks = [...countByQuery.values()]
+    .sort((left, right) => right.count - left.count || left.query.localeCompare(right.query))
+    .map(({ query, count }) => ({
       type: "query",
       query,
       count,
@@ -599,6 +689,7 @@ module.exports = {
   PUBLIC_SEO_ROUTES,
   getPublicSeoCanonicalSearchQuery,
   getPublicSeoAlternateGroupPages,
+  getPublicSeoCountryFallbackQueries,
   getPublicSeoLandingRoutesForLanguage,
   getPublicSeoPopularSearchItems,
   getPublicSeoRouteLabel,
