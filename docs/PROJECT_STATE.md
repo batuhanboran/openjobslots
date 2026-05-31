@@ -14,6 +14,20 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and `npm.cmd run test:backend` covers the new boundary tests.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## Zoho Read-Only Recovery Wave - June 1, 2026
+
+- Fresh production checks kept production at `6660eab` with all four runtime services running. Public health still reports `331,463` visible job slots. `search:reindex:check -- --json` still has Postgres/Meili count parity (`331,457`/`331,457`) but remains `ok=false` because remote facets drift by `6` onsite vs unknown.
+- Zoho is the current first source target from live evidence: `463` source-quality failures in 24h, `686` new missing-any-geo rows, `64` new weak/unknown remote rows, and `0` new public no-geo/no-remote rows.
+- Zoho production quality baseline: `14,561` visible rows, `2,516` missing-any-geo (`17.28%`), `235` weak/unknown remote (`1.61%`), and `1` missing-all-geo plus weak/unknown remote row.
+- Read-only reports:
+  - Inventory: `/root/OpenJobSlots/reports/zoho-v2-readonly-inventory-small-20260531T221402Z.json`.
+  - Net-new estimate: `/root/OpenJobSlots/reports/zoho-v2-readonly-estimate-small-20260531T221544Z.json`.
+  - Batch plan: `/root/OpenJobSlots/reports/zoho-v2-readonly-plan-small-20260531T221901Z.json`.
+- The scanned Zoho window covered `25/1,751` targets, parsed `70` rows, found `57` clean candidates, only `4` net-new clean public candidates, and `52` already-public duplicates. Candidate pool remains unproven and low-confidence; this is not a 5k apply candidate.
+- The only guard-safe selected tenant in the small plan is `zenfreed.zohorecruit.com` with `4` clean net-new rows and predicted guard `pass`. Rows from tenants such as `gotocme` and `basecodetech` without deterministic geo or explicit remote evidence remain no-geo/no-remote quarantines.
+- `server/ingestion/inventoryScanner.js` now enforces remaining `--max-fetches` before choosing a scan window, so long ATS inventory scans cannot exceed the requested fetch cap inside one oversized page. This supports safer future inventory/resume work for Zoho and other slow sources.
+- No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run in this read-only wave.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

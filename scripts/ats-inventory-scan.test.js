@@ -130,4 +130,17 @@ test("unproven pool reports false when configured targets remain", async () => {
   assert.equal(report.unscanned_targets, 903);
 });
 
+test("max fetches caps the current window instead of only stopping after an oversized page", async () => {
+  const { report, offsets } = await runMockScan(
+    ["--source=zoho", "--company-limit=200", "--row-limit=10000", "--max-fetches=25"],
+    200
+  );
+  assert.deepEqual(offsets, [0]);
+  assert.equal(report.scanned_targets, 25);
+  assert.equal(report.next_offset, 25);
+  assert.equal(report.stop_reason, "max_fetches_reached");
+  assert.equal(report.unscanned_targets, 175);
+  assert.equal(report.windows[0].requested_limit, 25);
+});
+
 console.log("ats inventory scan tests passed");

@@ -414,7 +414,11 @@ async function runInventoryScan(options = parseInventoryArgs(), env = process.en
         await sleep(Number(options.delayMs || 0) + jitter);
       }
       const remainingCompanies = Math.max(0, scanEndOffset - nextOffset);
-      const pageLimit = Math.min(Number(options.pageSize || MAX_RUN_LIMIT), remainingCompanies, MAX_RUN_LIMIT);
+      const remainingFetches = Math.max(
+        1,
+        Number(options.maxFetches || DEFAULT_MAX_FETCHES) - Number(report.scanned_targets || 0)
+      );
+      const pageLimit = Math.min(Number(options.pageSize || MAX_RUN_LIMIT), remainingCompanies, remainingFetches, MAX_RUN_LIMIT);
       const discoveredTargets = await discoverTargets(pool, {
         ...options,
         source,
