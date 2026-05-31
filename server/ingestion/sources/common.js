@@ -675,6 +675,9 @@ const SOURCE_SPECS = Object.freeze({
   breezy: {
     sourceFamily: "html_detail",
     confidence: 0.75,
+    payloadShapePolicy: Object.freeze({
+      optional_enrichment_prefixes: Object.freeze(["__json"])
+    }),
     parser: (companyName, config, payload) => parseBreezyPostingsFromHtml(companyName, config, payload),
     officialDocs: "observed Breezy public portal HTML",
     discover(company) {
@@ -857,6 +860,7 @@ function createSourceModule(atsKey) {
     atsKey: key,
     key,
     parserVersion,
+    payloadShapePolicy: spec.payloadShapePolicy || Object.freeze({}),
     discover,
     fetchList,
     fetchDetail,

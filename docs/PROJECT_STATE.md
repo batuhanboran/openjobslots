@@ -32,7 +32,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 - Fresh read-only production checks kept production at `6660eab`, all four runtime services running, `331,463` visible job slots, and Meili/Postgres count parity with the known `6` document remote facet drift. Throughput remains `hold`.
 - Breezy has `168` unresolved 24h parser validation events from payload-shape drift. Direct Postgres samples showed sparse one-target drift events such as `payload shape similarity 0.1607 below 0.55`.
-- The local guard now treats Breezy optional `/json` payload paths, source-config metadata, and variable detail maps as enrichment-only when the core HTML payload shape remains present. Missing core HTML still records parser drift.
+- The Breezy source module now declares `/json` as optional payload-shape enrichment, while the generic guard handles shared source-config/detail-map metadata. Missing core HTML still records parser drift.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
 ## v2.1.0 Release Update - May 31, 2026

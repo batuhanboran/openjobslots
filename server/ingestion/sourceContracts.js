@@ -44,6 +44,12 @@ function validateSourceContract(sourceModule = {}) {
   if (sourceModule.fetchDetail !== undefined && typeof sourceModule.fetchDetail !== "function") {
     failures.push("invalid fetchDetail");
   }
+  if (
+    sourceModule.payloadShapePolicy !== undefined &&
+    (!sourceModule.payloadShapePolicy || typeof sourceModule.payloadShapePolicy !== "object" || Array.isArray(sourceModule.payloadShapePolicy))
+  ) {
+    failures.push("invalid payloadShapePolicy");
+  }
 
   return {
     ok: failures.length === 0,

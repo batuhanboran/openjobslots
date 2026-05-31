@@ -1739,7 +1739,16 @@ async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
 
   const result = await checkAndRecordPostgresPayloadDrift(
     pool,
-    { atsKey: "breezy", companyUrl: "https://weassist-io.breezy.hr/", company: { company_name: "WeAssist" } },
+    {
+      atsKey: "breezy",
+      companyUrl: "https://weassist-io.breezy.hr/",
+      company: { company_name: "WeAssist" },
+      adapter: {
+        payloadShapePolicy: {
+          optional_enrichment_prefixes: ["__json"]
+        }
+      }
+    },
     {
       html: "<a href=\"/p/brz1\"><h2>Support Specialist</h2></a>",
       __listUrl: "https://weassist-io.breezy.hr/",
@@ -1809,7 +1818,16 @@ async function testPayloadDriftStillFlagsBreezyMissingHtmlCore() {
 
   const result = await checkAndRecordPostgresPayloadDrift(
     pool,
-    { atsKey: "breezy", companyUrl: "https://broken.breezy.hr/", company: { company_name: "Broken" } },
+    {
+      atsKey: "breezy",
+      companyUrl: "https://broken.breezy.hr/",
+      company: { company_name: "Broken" },
+      adapter: {
+        payloadShapePolicy: {
+          optional_enrichment_prefixes: ["__json"]
+        }
+      }
+    },
     {
       __json: [{ id: "brz1", name: "Support Specialist" }],
       __sourceConfig: { origin: "https://broken.breezy.hr" }
