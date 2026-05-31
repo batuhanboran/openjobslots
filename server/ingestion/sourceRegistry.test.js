@@ -279,6 +279,13 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof careerpuck.validate, "function");
   assert.deepEqual(validateSourceContract(careerpuck), { ok: true, failures: [] });
 
+  const dayforceHcm = getRegistrySourceModule("dayforcehcm");
+  assert.equal(dayforceHcm.atsKey, "dayforcehcm");
+  assert.equal(dayforceHcm.family, SOURCE_FAMILIES.enterpriseDirect);
+  assert.equal(dayforceHcm.status, SOURCE_STATUSES.unsupported);
+  assert.equal(dayforceHcm.collectWhenDisabled, false);
+  assert.deepEqual(validateSourceContract(dayforceHcm), { ok: true, failures: [] });
+
   const eightfold = getRegistrySourceModule("eightfold");
   assert.equal(eightfold.atsKey, "eightfold");
   assert.equal(eightfold.family, SOURCE_FAMILIES.enterpriseDirect);

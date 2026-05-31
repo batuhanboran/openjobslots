@@ -453,12 +453,18 @@ function withContractMetadata(atsKey, sourceModule) {
     });
   }
 
+  const status = sourceModule.status === SOURCE_STATUSES.unsupported
+    ? SOURCE_STATUSES.unsupported
+    : metadata.status;
+
   return {
     ...sourceModule,
     atsKey: key,
     family: metadata.family,
-    status: metadata.status,
-    collectWhenDisabled: metadata.collectWhenDisabled !== false
+    status,
+    collectWhenDisabled: status === SOURCE_STATUSES.unsupported
+      ? false
+      : metadata.collectWhenDisabled !== false
   };
 }
 

@@ -11,8 +11,15 @@ const {
   UNSUPPORTED_ATS,
   VENDOR_SPECIFIC
 } = require("../server/ingestion/adapter-metadata");
-const { SOURCE_FAMILIES } = require("../server/ingestion/sourceContracts");
-const { isRegistryPilotSource } = require("../server/ingestion/sourceRegistry");
+const {
+  SOURCE_FAMILIES,
+  SOURCE_STATUSES,
+  validateSourceRecoveryContract
+} = require("../server/ingestion/sourceContracts");
+const {
+  getRegistrySourceModule,
+  isRegistryPilotSource
+} = require("../server/ingestion/sourceRegistry");
 const { buildWorkbench } = require("./ats-workbench");
 
 const DEFAULT_OUTPUT_DIR = path.join("docs", "reference", "ats-registry-targets");
@@ -150,10 +157,23 @@ function sourceTestScript(family) {
   return FAMILY_TARGETS.find((item) => item.family === family)?.test_script || "npm.cmd run test:backend";
 }
 
+function sourceModuleStatus(atsKey) {
+  if (!isRegistryPilotSource(atsKey)) return "";
+  return getRegistrySourceModule(atsKey)?.status || "";
+}
+
 function registryStatusFor(source) {
   const atsKey = String(source.ats_key || "").trim().toLowerCase();
   if (UNSUPPORTED_ATS.has(atsKey) || source.current_status === "unsupported") return "unsupported";
-  if (isRegistryPilotSource(atsKey)) return "pilot-enabled";
+  if (isRegistryPilotSource(atsKey)) {
+    const status = sourceModuleStatus(atsKey);
+    if (status === SOURCE_STATUSES.unsupported) return "unsupported";
+    if (status === SOURCE_STATUSES.enabled) return "registry-backed-enabled";
+    if (status === SOURCE_STATUSES.canary) return "registry-backed-canary";
+    if (status === SOURCE_STATUSES.quarantine) return "registry-backed-quarantine";
+    if (status === SOURCE_STATUSES.disabled) return "registry-backed-disabled";
+    return "registry-backed";
+  }
   if (source.source_module?.present) return "module-ready";
   return "needs-source-module";
 }
@@ -164,6 +184,13 @@ function scriptsForTarget(atsKey, family, future = false) {
       workbench: "not available until configured as an ATS adapter",
       source_test: "not available until source module exists",
       dry_run: "not available until adapter and source target exist",
+      inventory_scan: "not available until adapter and source target exist",
+      estimate_net_new: "not available until adapter and source target exist",
+      plan_batches: "not available until adapter and source target exist",
+      recovery_preflight: "not available until adapter and source target exist",
+      recovery_guard: "not available until adapter and source target exist",
+      release_check: "not available until recovery guard reports exist",
+      parity_check: "npm.cmd run search:reindex:check -- --json --sample-limit=25",
       registry_check: "node scripts/ats-registry-index.test.js"
     };
   }
@@ -171,13 +198,111 @@ function scriptsForTarget(atsKey, family, future = false) {
     workbench: `npm.cmd run ats:workbench -- --source=${atsKey} --json`,
     source_test: sourceTestScript(family),
     dry_run: `npm.cmd run ats:source:dry-run -- --source=${atsKey} --limit=10 --json`,
+    inventory_scan: `npm.cmd run ats:inventory:scan -- --source=${atsKey} --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>`,
+    estimate_net_new: `npm.cmd run ats:estimate-net-new -- --source=${atsKey} --limit=<safe_limit> --company-limit=<safe_company_limit> --json`,
+    plan_batches: `npm.cmd run ats:plan-batches -- --source=${atsKey} --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>`,
+    recovery_preflight: "npm.cmd run ats:recovery:preflight -- --json --system-report=<system_report> --expected-commit=<sha> --backup-path=<backup>",
+    recovery_guard: "npm.cmd run ats:recovery:guard -- --json --before=<before> --after=<after> --source-report=<report> --meili-check=<meili_check> --ingestion-status=<ingestion_status> --service-stats=<service_stats>",
+    release_check: "npm.cmd run release:ats-recovery:check -- --json --guard-report=<guard> --source-report=<report> --meili-check=<meili_check> --preflight-report=<preflight>",
+    parity_check: "npm.cmd run search:reindex:check -- --json --sample-limit=25",
     registry_check: "node server/ingestion/sourceRegistry.test.js"
   };
 }
 
+function fixtureEvidence(sourceModule) {
+  const result = {
+    paths: [],
+    present: [],
+    missing: [],
+    errors: []
+  };
+  if (typeof sourceModule?.fixtures !== "function") return result;
+  try {
+    result.paths = sourceModule.fixtures();
+  } catch (error) {
+    result.errors.push(String(error?.message || error));
+  }
+  if (!Array.isArray(result.paths)) {
+    result.errors.push("fixtures did not return an array");
+    result.paths = [];
+  }
+  for (const fixturePath of result.paths) {
+    const normalizedPath = String(fixturePath || "").replace(/\\/g, "/");
+    if (!normalizedPath) continue;
+    if (fs.existsSync(path.resolve(normalizedPath))) result.present.push(normalizedPath);
+    else result.missing.push(normalizedPath);
+  }
+  return result;
+}
+
+function recoveryReadinessForTarget(atsKey, registryStatus, future = false) {
+  if (future) {
+    return {
+      status: "research-only",
+      source_contract_ok: false,
+      public_gate: false,
+      quality_threshold: false,
+      rate_limit: false,
+      fixtures: { paths: [], present: [], missing: [], errors: [] },
+      blockers: ["adapter metadata and source module required before recovery"],
+      required_gate_sequence: []
+    };
+  }
+
+  const sourceModule = isRegistryPilotSource(atsKey) ? getRegistrySourceModule(atsKey) : null;
+  if (!sourceModule) {
+    return {
+      status: "blocked-no-source-module",
+      source_contract_ok: false,
+      public_gate: false,
+      quality_threshold: false,
+      rate_limit: false,
+      fixtures: { paths: [], present: [], missing: [], errors: [] },
+      blockers: ["source module required before recovery"],
+      required_gate_sequence: []
+    };
+  }
+
+  const recoveryContract = validateSourceRecoveryContract(sourceModule);
+  const fixtures = fixtureEvidence(sourceModule);
+  const blockers = [...recoveryContract.failures, ...fixtures.errors];
+  if (fixtures.missing.length > 0) blockers.push(`missing fixture files: ${fixtures.missing.join(", ")}`);
+  if (registryStatus === "unsupported") blockers.push("unsupported source");
+
+  return {
+    status: blockers.length === 0 ? "ready-for-read-only-recovery" : "blocked",
+    source_contract_ok: recoveryContract.ok,
+    public_gate: typeof sourceModule.validatePublic === "function",
+    quality_threshold: typeof sourceModule.qualityThreshold === "function",
+    rate_limit: typeof sourceModule.rateLimit === "function",
+    fixtures,
+    blockers,
+    production_write_policy: "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
+    required_gate_sequence: [
+      "source_test",
+      "workbench",
+      "dry_run",
+      "inventory_scan",
+      "estimate_net_new",
+      "plan_batches",
+      "recovery_preflight",
+      "source_canary_or_apply_after_explicit_approval",
+      "recovery_guard",
+      "parity_check",
+      "release_check"
+    ]
+  };
+}
+
 function nextActionFor(source, family, registryStatus) {
-  if (registryStatus === "pilot-enabled") {
-    return "Keep registry dispatch enabled; use this ATS as the contract reference while expanding the family.";
+  if (registryStatus === "registry-backed-enabled") {
+    return "Keep registry dispatch enabled; use read-only inventory, net-new estimate, batch planning, recovery guard, and parity checks before any approved write.";
+  }
+  if (registryStatus === "registry-backed-canary" || registryStatus === "registry-backed-quarantine") {
+    return "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.";
+  }
+  if (registryStatus === "registry-backed-disabled") {
+    return "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first.";
   }
   if (registryStatus === "unsupported") {
     return "Do not run live sync; add raw fixtures, parser certification, and source module before registry enablement.";
@@ -195,6 +320,7 @@ function configuredTargetFromSource(source) {
   const atsKey = String(source.ats_key || "").trim().toLowerCase();
   const family = findFamilyForAts(atsKey);
   const registryStatus = registryStatusFor(source);
+  const scripts = scriptsForTarget(atsKey, family);
   return {
     ats_key: atsKey,
     display_name: source.display_name || atsKey,
@@ -208,7 +334,8 @@ function configuredTargetFromSource(source) {
       fixtures_dir: source.source_module?.fixtures_dir || ""
     },
     quality: source.production_quality || {},
-    scripts: scriptsForTarget(atsKey, family),
+    scripts,
+    recovery_readiness: recoveryReadinessForTarget(atsKey, registryStatus),
     next_action: nextActionFor(source, family, registryStatus),
     work_packet: `docs/reference/ats-workbench/sources/${atsKey}.json`
   };
@@ -229,6 +356,7 @@ function futureTargetFromCandidate(candidate) {
     },
     quality: {},
     scripts: scriptsForTarget(candidate.ats_key, SOURCE_FAMILIES.futureCandidate, true),
+    recovery_readiness: recoveryReadinessForTarget(candidate.ats_key, "research-only", true),
     next_action: "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
     work_packet: "",
     docs_url: candidate.docs_url,
@@ -248,11 +376,14 @@ function buildFamilies(targets) {
       .filter((target) => target.family === family.family)
       .sort((a, b) => {
         const statusOrder = {
-          "pilot-enabled": 0,
-          "module-ready": 1,
-          "needs-source-module": 2,
-          unsupported: 3,
-          "research-only": 4
+          "registry-backed-enabled": 0,
+          "registry-backed-canary": 1,
+          "registry-backed-quarantine": 2,
+          "registry-backed-disabled": 3,
+          "module-ready": 4,
+          "needs-source-module": 5,
+          unsupported: 6,
+          "research-only": 7
         };
         return Number(statusOrder[a.registry_status] ?? 9) - Number(statusOrder[b.registry_status] ?? 9) ||
           a.ats_key.localeCompare(b.ats_key);
@@ -260,6 +391,7 @@ function buildFamilies(targets) {
       .map((target) => ({
         ats_key: target.ats_key,
         registry_status: target.registry_status,
+        recovery_readiness: target.recovery_readiness.status,
         source_module: target.source_module.path || "",
         next_action: target.next_action
       }))
@@ -269,22 +401,33 @@ function buildFamilies(targets) {
 function buildSummary(targets) {
   const counts = {};
   const familyCounts = {};
+  const readinessCounts = {};
   for (const target of targets) {
     counts[target.registry_status] = Number(counts[target.registry_status] || 0) + 1;
     familyCounts[target.family] = Number(familyCounts[target.family] || 0) + 1;
+    readinessCounts[target.recovery_readiness?.status || "unknown"] = Number(readinessCounts[target.recovery_readiness?.status || "unknown"] || 0) + 1;
   }
+  const configuredTargets = targets.filter((target) => target.current_status !== "future-candidate");
   return {
-    configured_ats_count: targets.filter((target) => target.current_status !== "future-candidate").length,
+    configured_ats_count: configuredTargets.length,
     future_candidate_count: targets.filter((target) => target.current_status === "future-candidate").length,
     registry_status_counts: counts,
+    recovery_readiness_counts: readinessCounts,
+    read_only_recovery_ready_count: configuredTargets.filter((target) => target.recovery_readiness?.status === "ready-for-read-only-recovery").length,
+    recovery_readiness_blockers: configuredTargets
+      .filter((target) => target.recovery_readiness?.status !== "ready-for-read-only-recovery")
+      .map((target) => ({
+        ats_key: target.ats_key,
+        registry_status: target.registry_status,
+        status: target.recovery_readiness?.status || "unknown",
+        blockers: target.recovery_readiness?.blockers || []
+      })),
     family_counts: familyCounts,
     next_execution_order: [
-      "greenhouse and icims stay as pilot references",
-      "direct-json-stable module-ready sources",
-      "enterprise-direct fixture-backed sources",
-      "embedded-or-semi-structured high-volume debt sources",
-      "public-sector-education dynamic sources",
-      "brittle-high-risk canary-only sources",
+      "registry-backed enabled sources with ready recovery contracts",
+      "registry-backed canary or quarantine sources with read-only inventory first",
+      "registry-backed disabled sources after fixture and canary evidence",
+      "unsupported source modules after parser certification exists",
       "future-candidate research packets"
     ]
   };
@@ -319,7 +462,7 @@ function buildRegistryIndex(options = {}) {
 
 function markdownForTarget(target) {
   return [
-    `| \`${target.ats_key}\` | ${target.registry_status} | ${target.source_module.path ? `\`${target.source_module.path}\`` : ""} | ${target.next_action} | \`${target.scripts.workbench}\` |`
+    `| \`${target.ats_key}\` | ${target.registry_status} | ${target.recovery_readiness.status} | ${target.source_module.path ? `\`${target.source_module.path}\`` : ""} | ${target.next_action} | \`${target.scripts.workbench}\` |`
   ].join("");
 }
 
@@ -332,6 +475,7 @@ function toMarkdown(payload) {
     `- Configured ATS: ${payload.summary.configured_ats_count}`,
     `- Future candidates: ${payload.summary.future_candidate_count}`,
     `- Registry status counts: ${JSON.stringify(payload.summary.registry_status_counts)}`,
+    `- Recovery readiness counts: ${JSON.stringify(payload.summary.recovery_readiness_counts)}`,
     "",
     "## Execution Order",
     "",
@@ -346,8 +490,8 @@ function toMarkdown(payload) {
     lines.push(family.objective, "");
     lines.push(`Family script: \`${family.next_family_script}\``);
     lines.push(`Test script: \`${family.test_script}\``, "");
-    lines.push("| ATS | Registry status | Source module | Next action | Workbench script |");
-    lines.push("| --- | --- | --- | --- | --- |");
+    lines.push("| ATS | Registry status | Recovery readiness | Source module | Next action | Workbench script |");
+    lines.push("| --- | --- | --- | --- | --- | --- |");
     for (const target of targets) lines.push(markdownForTarget(target));
     lines.push("");
   }

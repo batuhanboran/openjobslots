@@ -69,6 +69,15 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only parser proof for `estatementgroup.teamtailor.com` recovered a production-quarantined row as `Stockholm, Sweden`, `remote_type=onsite`, `posting_date=2025-11-18`, and public gate `accepted`; a `folketsthlm.teamtailor.com` control probe kept brand-only `Folket` metadata quarantined instead of treating it as geo.
 - Verification covered focused Teamtailor parser tests, full backend/parser tests, API tests, architecture-boundary audit, and whitespace check. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## ATS Recovery Readiness Index - June 1, 2026
+
+- Fresh read-only production checks kept production at `6660eab`, all services running, `331,463` visible job slots, and the known Meili remote-facet drift of `6` onsite vs unknown. Throughput remains `hold`; source freshness still reports `384` unresolved parser-attention events, `389` parser-bug failures, and `1,217` source-quality failures.
+- Source contracts now have a separate recovery-readiness layer: recovery-capable modules must expose public gate validation, rate-limit policy, source-quality thresholds, and fixture paths in addition to the base discover/fetch/parse/normalize/validate contract.
+- Unsupported source modules now preserve `unsupported` status in the registry instead of being overwritten by disabled registry metadata. `dayforcehcm` is therefore explicitly blocked from recovery until parser certification exists.
+- `npm.cmd run ats:registry-index` now generates registry status plus recovery readiness for every configured ATS and future candidate. It also records the operational commands for source tests, workbench review, dry-run, inventory scan, net-new estimate, batch plan, preflight, recovery guard, release check, and Meili/Postgres parity check.
+- Current generated readiness: `54/60` configured ATS are ready for read-only recovery. Blockers are `dayforcehcm` (`unsupported`) and `peopleforce`, `policeapp`, `sagehr`, `saphrcloud`, `talexio` (`missing fixture paths`). This is not production recovery success; it is the architecture/readiness index for selecting the next safe source lane.
+- No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker-budget change was run.
+
 ## v2.1.0 Release Update - May 31, 2026
 
 - Package/public release line is `v2.1.0`.

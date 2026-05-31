@@ -24,6 +24,13 @@ const REQUIRED_SOURCE_FUNCTIONS = Object.freeze([
   "validate"
 ]);
 
+const RECOVERY_SOURCE_FUNCTIONS = Object.freeze([
+  "validatePublic",
+  "rateLimit",
+  "qualityThreshold",
+  "fixtures"
+]);
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -57,6 +64,42 @@ function validateSourceContract(sourceModule = {}) {
   };
 }
 
+function validateSourceRecoveryContract(sourceModule = {}) {
+  const base = validateSourceContract(sourceModule);
+  const failures = [...base.failures];
+  const status = clean(sourceModule.status);
+
+  if (status === SOURCE_STATUSES.unsupported) {
+    return {
+      ok: failures.length === 0,
+      failures,
+      unsupported: true
+    };
+  }
+
+  for (const name of RECOVERY_SOURCE_FUNCTIONS) {
+    if (typeof sourceModule[name] !== "function") failures.push(`missing ${name}`);
+  }
+
+  if (typeof sourceModule.fixtures === "function") {
+    let fixturePaths = [];
+    try {
+      fixturePaths = sourceModule.fixtures();
+    } catch (error) {
+      failures.push(`fixtures failed: ${clean(error?.message || error)}`);
+    }
+    if (!Array.isArray(fixturePaths) || fixturePaths.length === 0) {
+      failures.push("missing fixture paths");
+    }
+  }
+
+  return {
+    ok: failures.length === 0,
+    failures,
+    unsupported: false
+  };
+}
+
 function createUnsupportedSourceModule(atsKey, options = {}) {
   const key = clean(atsKey).toLowerCase();
   const reason = clean(options.reason || "unsupported source");
@@ -82,9 +125,11 @@ function createUnsupportedSourceModule(atsKey, options = {}) {
 }
 
 module.exports = {
+  RECOVERY_SOURCE_FUNCTIONS,
   REQUIRED_SOURCE_FUNCTIONS,
   SOURCE_FAMILIES,
   SOURCE_STATUSES,
   createUnsupportedSourceModule,
-  validateSourceContract
+  validateSourceContract,
+  validateSourceRecoveryContract
 };

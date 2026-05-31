@@ -24,20 +24,34 @@ function testBuildRegistryIndex() {
 
   const byKey = new Map(payload.targets.map((target) => [target.ats_key, target]));
   assert.equal(byKey.get("greenhouse").family, "direct-json-stable");
-  assert.equal(byKey.get("greenhouse").registry_status, "pilot-enabled");
+  assert.equal(byKey.get("greenhouse").registry_status, "registry-backed-enabled");
   assert.equal(byKey.get("greenhouse").source_module.path, "server/ingestion/sources/greenhouse/index.js");
+  assert.equal(byKey.get("greenhouse").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.equal(byKey.get("greenhouse").scripts.workbench, "npm.cmd run ats:workbench -- --source=greenhouse --json");
   assert.equal(byKey.get("greenhouse").scripts.dry_run, "npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=10 --json");
+  assert.ok(byKey.get("greenhouse").scripts.inventory_scan.includes("ats:inventory:scan"));
+  assert.ok(byKey.get("greenhouse").scripts.recovery_guard.includes("ats:recovery:guard"));
+  assert.ok(byKey.get("greenhouse").scripts.parity_check.includes("search:reindex:check"));
 
   assert.equal(byKey.get("icims").family, "embedded-or-semi-structured");
-  assert.equal(byKey.get("icims").registry_status, "pilot-enabled");
+  assert.equal(byKey.get("icims").registry_status, "registry-backed-enabled");
 
   assert.equal(byKey.get("dayforcehcm").family, "enterprise-direct");
   assert.equal(byKey.get("dayforcehcm").registry_status, "unsupported");
+  assert.equal(byKey.get("dayforcehcm").recovery_readiness.status, "blocked");
+  assert.ok(byKey.get("dayforcehcm").recovery_readiness.blockers.includes("unsupported source"));
+
+  assert.equal(byKey.get("zoho").registry_status, "registry-backed-canary");
+  assert.equal(byKey.get("peopleforce").registry_status, "registry-backed-disabled");
+  assert.equal(byKey.get("peopleforce").recovery_readiness.status, "blocked");
+  assert.ok(byKey.get("peopleforce").recovery_readiness.blockers.includes("missing fixture paths"));
 
   assert.equal(byKey.get("personio").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").registry_status, "research-only");
+  assert.equal(byKey.get("paycomonline").recovery_readiness.status, "research-only");
+  assert.ok(payload.summary.read_only_recovery_ready_count > 0);
+  assert.ok(payload.summary.recovery_readiness_blockers.some((item) => item.ats_key === "peopleforce"));
 }
 
 function testFamilyTasks() {
