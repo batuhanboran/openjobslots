@@ -399,6 +399,7 @@ module.exports = {
   familyThresholds,
   getSourceSyncPolicy,
   isCertifiedSource,
+  normalizeShapePathsForDrift,
   readThresholds,
   shapeSimilarity,
   sourceFamilyFromTier,

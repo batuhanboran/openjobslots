@@ -2281,8 +2281,57 @@ function shouldReplaceEmptyArrayBaseline(baselinePaths = [], observedPaths = [])
   return false;
 }
 
+function ignoredPayloadDriftStem(stem, atsKey) {
+  const normalizedStem = String(stem || "");
+  if (!normalizedStem) return true;
+  if (normalizedStem === "__sourceConfig" || normalizedStem.startsWith("__sourceConfig.")) return true;
+  if (normalizedStem === "__listUrl") return true;
+  if (
+    normalizedStem === "__detailHtmlByUrl" ||
+    normalizedStem === "detailHtmlByUrl" ||
+    normalizedStem === "__detailStatusByUrl" ||
+    normalizedStem === "detailStatusByUrl" ||
+    normalizedStem === "__detailFailureByUrl" ||
+    normalizedStem === "detailFailureByUrl" ||
+    normalizedStem.startsWith("__detailHtmlByUrl.") ||
+    normalizedStem.startsWith("detailHtmlByUrl.") ||
+    normalizedStem.startsWith("__detailStatusByUrl.") ||
+    normalizedStem.startsWith("detailStatusByUrl.") ||
+    normalizedStem.startsWith("__detailFailureByUrl.") ||
+    normalizedStem.startsWith("detailFailureByUrl.")
+  ) {
+    return true;
+  }
+  if (String(atsKey || "").trim().toLowerCase() === "breezy" &&
+      (
+        normalizedStem === "__json" ||
+        normalizedStem.startsWith("__json.") ||
+        normalizedStem.startsWith("__json[]")
+      )) {
+    return true;
+  }
+  return false;
+}
+
+function corePayloadDriftPaths(paths = [], atsKey, normalizeShapePathsForDrift) {
+  return Array.from(new Set(normalizeShapePathsForDrift(paths).filter((path) => {
+    const source = String(path || "");
+    const typeSeparator = source.lastIndexOf(":");
+    const stem = typeSeparator > 0 ? source.slice(0, typeSeparator) : source;
+    return !ignoredPayloadDriftStem(stem, atsKey);
+  }))).sort();
+}
+
+function payloadShapesHaveSameCore(baselinePaths = [], observedPaths = [], atsKey, normalizeShapePathsForDrift) {
+  const baselineCore = corePayloadDriftPaths(baselinePaths, atsKey, normalizeShapePathsForDrift);
+  const observedCore = corePayloadDriftPaths(observedPaths, atsKey, normalizeShapePathsForDrift);
+  if (baselineCore.length === 0 || observedCore.length === 0) return false;
+  if (baselineCore.length !== observedCore.length) return false;
+  return baselineCore.every((path, index) => path === observedCore[index]);
+}
+
 async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersion, options = {}) {
-  const { analyzePayloadShape, detectParserDrift } = require("../ingestion/sourceQualityPolicy");
+  const { analyzePayloadShape, detectParserDrift, normalizeShapePathsForDrift } = require("../ingestion/sourceQualityPolicy");
   const atsKey = String(target?.atsKey || "").trim();
   const version = String(parserVersion || "unknown");
   const observed = analyzePayloadShape(raw);
@@ -2341,6 +2390,18 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
       [atsKey, version, observed.shape_hash, JSON.stringify(observed.shape_paths)]
     );
     return { drift: false, baseline_replaced: true, empty_array_baseline_replaced: true, observed, baseline };
+  }
+  if (payloadShapesHaveSameCore(baselinePaths, observedPaths, atsKey, normalizeShapePathsForDrift)) {
+    await pool.query(
+      `
+        UPDATE source_payload_shapes
+        SET observed_count = observed_count + 1,
+            last_seen_at = now()
+        WHERE ats_key = $1 AND parser_version = $2;
+      `,
+      [atsKey, version]
+    );
+    return { drift: false, compatible_enrichment_shape: true, observed, baseline };
   }
   const drift = detectParserDrift(
     {

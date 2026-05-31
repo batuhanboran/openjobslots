@@ -1706,6 +1706,121 @@ async function testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs() {
   assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
 }
 
+async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "breezy-html-detail",
+            shape_paths: [
+              "__detailFailureByUrl:object",
+              "__detailHtmlByUrl:object",
+              "__detailHtmlByUrl.https://axion-spine-neurosurgery.breezy.hr/p/05831866d454-surgery-center-front-desk-coordinator:string",
+              "__detailStatusByUrl:object",
+              "__detailStatusByUrl.https://axion-spine-neurosurgery.breezy.hr/p/05831866d454-surgery-center-front-desk-coordinator:number",
+              "__listUrl:string",
+              "__sourceConfig.detail_fetch_count:number",
+              "__sourceConfig.list_url:string",
+              "__sourceConfig.origin:string",
+              "__sourceConfig:object",
+              "html:string"
+            ],
+            observed_count: 2747
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Breezy optional JSON/detail variant should not record drift: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    { atsKey: "breezy", companyUrl: "https://weassist-io.breezy.hr/", company: { company_name: "WeAssist" } },
+    {
+      html: "<a href=\"/p/brz1\"><h2>Support Specialist</h2></a>",
+      __listUrl: "https://weassist-io.breezy.hr/",
+      __json: [{
+        id: "brz1",
+        name: "Support Specialist",
+        url: "https://weassist-io.breezy.hr/p/brz1",
+        published_date: "2026-05-31",
+        location: {
+          name: "Remote",
+          is_remote: true,
+          country: { id: "US", name: "United States" },
+          remote_details: { label: "Remote", value: "remote" }
+        },
+        locations: [{
+          id: "loc1",
+          name: "Remote",
+          is_remote: true,
+          country: { id: "US", name: "United States" },
+          remote_details: { label: "Remote", value: "remote" }
+        }]
+      }],
+      __detailHtmlByUrl: {},
+      __detailStatusByUrl: {},
+      __detailFailureByUrl: {},
+      __sourceConfig: {
+        origin: "https://weassist-io.breezy.hr",
+        list_url: "https://weassist-io.breezy.hr/",
+        detail_fetch_count: 0,
+        host: "weassist-io.breezy.hr",
+        portalUrl: "https://weassist-io.breezy.hr/",
+        subdomain: "weassist-io",
+        subdomainLower: "weassist-io"
+      }
+    },
+    "source-breezy-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.compatible_enrichment_shape, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
+async function testPayloadDriftStillFlagsBreezyMissingHtmlCore() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "breezy-html",
+            shape_paths: [
+              "__sourceConfig.origin:string",
+              "__sourceConfig:object",
+              "html:string"
+            ],
+            observed_count: 12
+          }]
+        };
+      }
+      if (/INSERT INTO parser_drift_events/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected Breezy drift query: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    { atsKey: "breezy", companyUrl: "https://broken.breezy.hr/", company: { company_name: "Broken" } },
+    {
+      __json: [{ id: "brz1", name: "Support Specialist" }],
+      __sourceConfig: { origin: "https://broken.breezy.hr" }
+    },
+    "source-breezy-v1"
+  );
+
+  assert.equal(result.drift, true);
+  assert.ok(calls.some((call) => /INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPublicSearchEventInsertIsPrivacyBounded() {
   const calls = [];
   const pool = {
@@ -2085,6 +2200,8 @@ async function main() {
   await testPayloadDriftReplacesEmptyBaselineWithFirstInformativeShape();
   await testPayloadDriftReplacesEmptyArrayBaselineWithPopulatedShape();
   await testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs();
+  await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
+  await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();
   await testPublicSearchEventKeepsMissingResultCountsUnknown();
   await testDailyRedditPostBuildsSeededReadOnlyMarkdown();
