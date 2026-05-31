@@ -1252,6 +1252,20 @@ test.describe("postings page QA", () => {
     await expect(turkishPopularOrRouteLink).toHaveAttribute("href", /\/tr(?:\/uzaktan-calisma-ilanlari|\?q=Turkiye%20jobs)/);
   });
 
+  test("popular search labels follow selected language while keeping result-safe query links", async ({ page }) => {
+    await openJobSlots(page);
+
+    await page.getByTestId("language-selector").click();
+    await page.getByTestId("language-option-fr").click();
+
+    await expect(page.getByTestId("language-selector")).toContainText("FR");
+    const frenchPopularLink = page.locator('a[href="/fr?q=France%20jobs"]').first();
+    await expect(frenchPopularLink).toBeVisible({ timeout: 15_000 });
+    await expect(frenchPopularLink).toContainText("Emplois en France");
+    await expect(page.getByTestId("seo-landing-links")).toContainText("Emplois \u00e0 distance en France");
+    await expect(page.getByTestId("seo-landing-links")).not.toContainText(/France Jobs|Remote France|Engineer France|Software France/);
+  });
+
   test("popular search links open results without autocomplete suggestions", async ({ page }) => {
     const suggestionCalls = [];
     page.on("request", (request) => {

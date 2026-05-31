@@ -1018,23 +1018,44 @@ function createPublicSeoHelpers(dependencies = {}) {
     ].join("\n") + "\n";
   }
 
-  function buildSitemapXml(req) {
+  const PUBLIC_SEO_SITEMAP_SECTIONS = Object.freeze([
+    {
+      key: "static",
+      path: "/sitemaps/static.xml",
+      routes: (siteOrigin) => [
+        {
+          loc: `${siteOrigin}/`,
+          changefreq: "daily",
+          priority: "1.0",
+          alternateGroup: "home"
+        },
+        ...PUBLIC_SEO_ROUTES
+          .filter((route) => route.sitemapSection !== "ats-sources")
+          .map((route) => ({
+            loc: `${siteOrigin}${route.path}`,
+            changefreq: route.changefreq || "daily",
+            priority: route.priority || "0.8",
+            alternateGroup: route.alternateGroup || ""
+          }))
+      ]
+    },
+    {
+      key: "ats-sources",
+      path: "/sitemaps/ats-sources.xml",
+      routes: (siteOrigin) => PUBLIC_SEO_ROUTES
+        .filter((route) => route.sitemapSection === "ats-sources")
+        .map((route) => ({
+          loc: `${siteOrigin}${route.path}`,
+          changefreq: route.changefreq || "daily",
+          priority: route.priority || "0.7",
+          alternateGroup: route.alternateGroup || ""
+        }))
+    }
+  ]);
+
+  function buildSitemapUrlsetXml(req, routes) {
     const siteOrigin = getPublicSiteOrigin(req);
-    const urls = [
-      {
-        loc: `${siteOrigin}/`,
-        changefreq: "daily",
-        priority: "1.0",
-        alternateGroup: "home"
-      },
-      ...PUBLIC_SEO_ROUTES.map((route) => ({
-        loc: `${siteOrigin}${route.path}`,
-        changefreq: route.changefreq || "daily",
-        priority: route.priority || "0.8",
-        alternateGroup: route.alternateGroup || ""
-      }))
-    ];
-    const urlEntries = urls.map((item) => {
+    const urlEntries = routes.map((item) => {
       const alternateEntries = getPublicSeoAlternateLinksForGroup(siteOrigin, item.alternateGroup)
         .map((alternate) =>
           `    <xhtml:link rel="alternate" hreflang="${escapeHtmlAttribute(alternate.hreflang)}" href="${escapeHtmlAttribute(alternate.href)}" />`
@@ -1057,9 +1078,43 @@ function createPublicSeoHelpers(dependencies = {}) {
     ].join("\n") + "\n";
   }
 
+  function buildSitemapIndexXml(req) {
+    const siteOrigin = getPublicSiteOrigin(req);
+    const entries = PUBLIC_SEO_SITEMAP_SECTIONS.map((section) => [
+      "  <sitemap>",
+      `    <loc>${escapeHtmlAttribute(`${siteOrigin}${section.path}`)}</loc>`,
+      "  </sitemap>"
+    ].join("\n"));
+    return [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...entries,
+      "</sitemapindex>"
+    ].join("\n") + "\n";
+  }
+
+  function getPublicSeoSitemapSection(sectionPathOrKey) {
+    const value = String(sectionPathOrKey || "").split("?")[0].split("#")[0].trim();
+    return PUBLIC_SEO_SITEMAP_SECTIONS.find(
+      (section) => section.key === value || section.path === value
+    ) || null;
+  }
+
+  function buildSitemapSectionXml(req, sectionPathOrKey) {
+    const section = getPublicSeoSitemapSection(sectionPathOrKey);
+    if (!section) return "";
+    return buildSitemapUrlsetXml(req, section.routes(getPublicSiteOrigin(req)));
+  }
+
+  function buildSitemapXml(req) {
+    return buildSitemapIndexXml(req);
+  }
+
   return {
     buildLlmsTxt,
     buildRobotsTxt,
+    buildSitemapIndexXml,
+    buildSitemapSectionXml,
     buildSitemapXml,
     buildStructuredDataTags,
     getPublicSearchLandingUrl,

@@ -175,6 +175,7 @@ function registerPublicRoutes(app, context) {
     buildPublicPreferences,
     buildLlmsTxt,
     buildRobotsTxt,
+    buildSitemapSectionXml,
     buildSitemapXml,
     createEmptyGrowthSummary,
     db,
@@ -500,7 +501,8 @@ function registerPublicRoutes(app, context) {
       }
 
       const items = getPublicSeoPopularSearchItems(languageCode, topQueries, limit, {
-        trustedQueryCounts: useTrustedPopularQueries
+        trustedQueryCounts: useTrustedPopularQueries,
+        countryCode: countryScope
       });
       return {
         ok: true,
@@ -827,6 +829,12 @@ function registerPublicRoutes(app, context) {
     app.get("/sitemap.xml", (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("application/xml").send(buildSitemapXml(req));
+    });
+    app.get(["/sitemaps/static.xml", "/sitemaps/ats-sources.xml"], (req, res, next) => {
+      const xml = buildSitemapSectionXml(req, req.path);
+      if (!xml) return next();
+      setPublicSeoCacheHeaders(res, 300, 3600);
+      return res.type("application/xml").send(xml);
     });
     app.use(express.static(webDistPath, {
       extensions: ["html"],

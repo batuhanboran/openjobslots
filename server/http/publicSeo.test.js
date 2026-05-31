@@ -300,24 +300,34 @@ function testHomeLanguagePagesGetBidirectionalHreflang() {
 }
 
 function testRobotsAndSitemapUseConfiguredPublicOrigin() {
-  const { buildRobotsTxt, buildSitemapXml } = createSeoHelpers({
+  const { buildRobotsTxt, buildSitemapSectionXml, buildSitemapXml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
   });
   const req = createRequest();
+  const sitemapIndex = buildSitemapXml(req);
+  const staticSitemap = buildSitemapSectionXml(req, "/sitemaps/static.xml");
+  const atsSitemap = buildSitemapSectionXml(req, "/sitemaps/ats-sources.xml");
 
   assert.ok(buildRobotsTxt(req).includes("Sitemap: https://openjobslots.com/sitemap.xml"));
-  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/</loc>"));
-  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/tr/is-ilanlari</loc>"));
-  assert.ok(buildSitemapXml(req).includes("<loc>https://openjobslots.com/en/remote-job-openings</loc>"));
+  assert.ok(sitemapIndex.includes("<loc>https://openjobslots.com/sitemaps/static.xml</loc>"));
+  assert.ok(sitemapIndex.includes("<loc>https://openjobslots.com/sitemaps/ats-sources.xml</loc>"));
+  assert.ok(staticSitemap.includes("<loc>https://openjobslots.com/</loc>"));
+  assert.ok(staticSitemap.includes("<loc>https://openjobslots.com/tr/is-ilanlari</loc>"));
+  assert.ok(staticSitemap.includes("<loc>https://openjobslots.com/en/remote-job-openings</loc>"));
+  assert.ok(atsSitemap.includes("<loc>https://openjobslots.com/ats/greenhouse-jobs</loc>"));
+  assert.ok(atsSitemap.includes("<loc>https://openjobslots.com/ats/icims-jobs</loc>"));
 }
 
 function testRobotsAndSitemapStayCrawlSafe() {
-  const { buildRobotsTxt, buildSitemapXml } = createSeoHelpers({
+  const { buildRobotsTxt, buildSitemapSectionXml, buildSitemapXml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
   });
   const req = createRequest();
   const robots = buildRobotsTxt(req);
-  const sitemap = buildSitemapXml(req);
+  const sitemapIndex = buildSitemapXml(req);
+  const staticSitemap = buildSitemapSectionXml(req, "/sitemaps/static.xml");
+  const atsSitemap = buildSitemapSectionXml(req, "/sitemaps/ats-sources.xml");
+  const combinedSitemaps = [sitemapIndex, staticSitemap, atsSitemap].join("\n");
 
   assert.match(robots, /^User-agent: \*/m);
   assert.match(robots, /^Allow: \/$/m);
@@ -330,15 +340,21 @@ function testRobotsAndSitemapStayCrawlSafe() {
   assert.doesNotMatch(robots, /Content-Signal/i);
   assert.match(robots, /^Sitemap: https:\/\/openjobslots\.com\/sitemap\.xml$/m);
 
-  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/tr\/yazilim-muhendisi-is-ilanlari<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/ats\/greenhouse-jobs<\/loc>/);
-  assert.match(sitemap, /xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
-  assert.match(sitemap, /<xhtml:link rel="alternate" hreflang="tr" href="https:\/\/openjobslots\.com\/tr\/uzaktan-calisma-ilanlari" \/>/);
-  assert.match(sitemap, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/openjobslots\.com\/en\/remote-job-openings" \/>/);
-  assert.doesNotMatch(sitemap, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
-  assert.doesNotMatch(sitemap, /\?q=/);
+  assert.match(sitemapIndex, /<sitemapindex xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  assert.match(sitemapIndex, /<loc>https:\/\/openjobslots\.com\/sitemaps\/static\.xml<\/loc>/);
+  assert.match(sitemapIndex, /<loc>https:\/\/openjobslots\.com\/sitemaps\/ats-sources\.xml<\/loc>/);
+  assert.match(staticSitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9" xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml">/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/tr\/yazilim-muhendisi-is-ilanlari<\/loc>/);
+  assert.match(staticSitemap, /xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
+  assert.match(staticSitemap, /<xhtml:link rel="alternate" hreflang="tr" href="https:\/\/openjobslots\.com\/tr\/uzaktan-calisma-ilanlari" \/>/);
+  assert.match(staticSitemap, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/openjobslots\.com\/en\/remote-job-openings" \/>/);
+  assert.match(atsSitemap, /<loc>https:\/\/openjobslots\.com\/ats\/greenhouse-jobs<\/loc>/);
+  assert.match(atsSitemap, /<loc>https:\/\/openjobslots\.com\/ats\/icims-jobs<\/loc>/);
+  assert.doesNotMatch(staticSitemap, /\/ats\//);
+  assert.doesNotMatch(atsSitemap, /<loc>https:\/\/openjobslots\.com\/en\//);
+  assert.doesNotMatch(combinedSitemaps, /\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
+  assert.doesNotMatch(combinedSitemaps, /\?q=/);
 }
 
 function testRootFallbackLinksEveryCuratedSitemapRoute() {
@@ -417,24 +433,30 @@ function testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData() {
 }
 
 function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages() {
-  const { buildSitemapXml } = createSeoHelpers({
+  const { buildSitemapSectionXml, buildSitemapXml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
   });
-  const sitemap = buildSitemapXml(createRequest({ query: { q: "private@example.com" } }));
-  const locMatches = sitemap.match(/<loc>/g) || [];
+  const req = createRequest({ query: { q: "private@example.com" } });
+  const sitemapIndex = buildSitemapXml(req);
+  const staticSitemap = buildSitemapSectionXml(req, "/sitemaps/static.xml");
+  const atsSitemap = buildSitemapSectionXml(req, "/sitemaps/ats-sources.xml");
+  const combinedSitemaps = [sitemapIndex, staticSitemap, atsSitemap].join("\n");
+  const locMatches = (staticSitemap.match(/<loc>/g) || []).length + (atsSitemap.match(/<loc>/g) || []).length;
 
-  assert.equal(locMatches.length, PUBLIC_SEO_ROUTES.length + 1);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/product-manager-jobs<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/data-analyst-jobs<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/customer-success-manager-jobs<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/devops-engineer-jobs<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/ats-job-boards<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/direct-apply-jobs<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/hidden-jobs<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/jobs-not-on-linkedin<\/loc>/);
-  assert.doesNotMatch(sitemap, /private@example\.com/);
-  assert.doesNotMatch(sitemap, /%40/);
+  assert.equal(locMatches, PUBLIC_SEO_ROUTES.length + 1);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/product-manager-jobs<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/data-analyst-jobs<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/customer-success-manager-jobs<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/devops-engineer-jobs<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/ats-job-boards<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/direct-apply-jobs<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/hidden-jobs<\/loc>/);
+  assert.match(staticSitemap, /<loc>https:\/\/openjobslots\.com\/en\/jobs-not-on-linkedin<\/loc>/);
+  assert.match(atsSitemap, /<loc>https:\/\/openjobslots\.com\/ats\/breezy-jobs<\/loc>/);
+  assert.match(atsSitemap, /<loc>https:\/\/openjobslots\.com\/ats\/paylocity-jobs<\/loc>/);
+  assert.doesNotMatch(combinedSitemaps, /private@example\.com/);
+  assert.doesNotMatch(combinedSitemaps, /%40/);
 }
 
 function testBuildLlmsTxtUsesPlainMarkdownFormat() {

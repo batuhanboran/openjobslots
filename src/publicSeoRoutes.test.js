@@ -2,10 +2,12 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  PUBLIC_SEO_ATS_PAGES,
   PUBLIC_SEO_ROUTES,
   getPublicSeoCanonicalSearchQuery,
   getPublicSeoCountryFallbackQueries,
   getPublicSeoLandingRoutesForLanguage,
+  getPublicSeoLocalizedPopularQueryLabel,
   getPublicSeoPopularSearchItems,
   getPublicSeoRouteHintByPath,
   normalizePublicSeoLanguageCode
@@ -133,13 +135,22 @@ test("SEO landing catalog includes direct employer and hidden-jobs content inten
   ]);
 });
 
+test("ATS source SEO catalog expands beyond the initial five strategic pages", () => {
+  assert.ok(PUBLIC_SEO_ATS_PAGES.length >= 40);
+  assert.equal(getPublicSeoRouteHintByPath("/ats/icims-jobs").canonicalSearchQuery, "icims");
+  assert.equal(getPublicSeoRouteHintByPath("/ats/breezy-jobs").canonicalSearchQuery, "breezy");
+  assert.equal(getPublicSeoRouteHintByPath("/ats/paylocity-jobs").canonicalSearchQuery, "paylocity");
+  assert.equal(getPublicSeoRouteHintByPath("/ats/adp-workforce-now-jobs").atsSourceKey, "adpworkforcenow");
+  assert.ok(PUBLIC_SEO_ATS_PAGES.every((route) => String(route.path || "").startsWith("/ats/")));
+});
+
 test("SEO route catalog exposes every public language in home, landing, and hreflang groups", () => {
   const homeRoutes = PUBLIC_SEO_ROUTES.filter((route) => route.alternateGroup === "home");
   assert.deepEqual(homeRoutes.map((route) => route.languageCode), EXPECTED_PUBLIC_LANGUAGE_CODES);
 
   for (const languageCode of EXPECTED_PUBLIC_LANGUAGE_CODES) {
     const landingRoutes = getPublicSeoLandingRoutesForLanguage(languageCode, 20);
-    assert.equal(landingRoutes.length, languageCode === "en" ? 18 : 8);
+    assert.equal(landingRoutes.length, languageCode === "en" ? 20 : 8);
     assert.ok(landingRoutes.some((route) => route.searchIntent === "software-engineer"));
     assert.ok(landingRoutes.every((route) => route.languageCode === languageCode || String(route.path).startsWith("/ats/")));
   }
@@ -181,6 +192,7 @@ test("country research fallbacks preserve scoped queries for supported markets",
     assert.equal(queries.length, 6);
     assert.ok(queries.every((item) => item.countryCode === countryCode));
     assert.ok(queries.every((item) => item.languageCode === languageCode));
+    assert.ok(queries.every((item) => typeof item.label === "string" && item.label.length > 0));
     assert.ok(queries.every((item) => item.source === "research_country_fallback"));
     assert.ok(queries.every((item) => item.trustedPopularFallback === true));
     assert.ok(queries.every((item) => Number(item.count) > 0));
@@ -214,6 +226,11 @@ test("popular SEO searches can render trusted country fallback queries", () => {
     "remote Turkiye",
     "Turkey engineer"
   ]);
+  assert.deepEqual(turkishItems.map((item) => item.label), [
+    "T\u00fcrkiye i\u015f ilanlar\u0131",
+    "T\u00fcrkiye uzaktan i\u015f ilanlar\u0131",
+    "T\u00fcrkiye m\u00fchendis ilanlar\u0131"
+  ]);
 
   const britishItems = getPublicSeoPopularSearchItems(
     "en",
@@ -222,4 +239,52 @@ test("popular SEO searches can render trusted country fallback queries", () => {
     { trustedQueryCounts: true }
   );
   assert.deepEqual(britishItems.map((item) => item.searchQuery), ["UK jobs", "remote jobs UK"]);
+});
+
+test("popular SEO country fallback query labels follow the selected language pack", () => {
+  assert.equal(
+    getPublicSeoLocalizedPopularQueryLabel("remote France", { languageCode: "fr", countryCode: "FR" }),
+    "Emplois \u00e0 distance en France"
+  );
+
+  const frenchItems = getPublicSeoPopularSearchItems(
+    "fr",
+    getPublicSeoCountryFallbackQueries("FR", "fr", 4),
+    4,
+    { trustedQueryCounts: true, countryCode: "FR" }
+  );
+
+  assert.deepEqual(frenchItems.map((item) => item.searchQuery), [
+    "France jobs",
+    "remote France",
+    "engineer France",
+    "software France"
+  ]);
+  assert.deepEqual(frenchItems.map((item) => item.path), [
+    "/fr?q=France%20jobs",
+    "/fr?q=remote%20France",
+    "/fr?q=engineer%20France",
+    "/fr?q=software%20France"
+  ]);
+  assert.deepEqual(frenchItems.map((item) => item.label), [
+    "Emplois en France",
+    "Emplois \u00e0 distance en France",
+    "Emplois ing\u00e9nieur en France",
+    "Emplois logiciel en France"
+  ]);
+  assert.ok(!frenchItems.some((item) => /France Jobs|Remote France|Engineer France|Software France/.test(item.label)));
+
+  const japaneseItems = getPublicSeoPopularSearchItems(
+    "ja",
+    getPublicSeoCountryFallbackQueries("JP", "ja", 4),
+    4,
+    { trustedQueryCounts: true, countryCode: "JP" }
+  );
+  assert.deepEqual(japaneseItems.map((item) => item.searchQuery), ["Japan", "Tokyo", "Japanese", "Osaka"]);
+  assert.deepEqual(japaneseItems.map((item) => item.label), [
+    "\u65e5\u672c\u306e\u6c42\u4eba",
+    "\u6771\u4eac\u306e\u6c42\u4eba",
+    "\u65e5\u672c\u306e\u6c42\u4eba",
+    "\u5927\u962a\u306e\u6c42\u4eba"
+  ]);
 });

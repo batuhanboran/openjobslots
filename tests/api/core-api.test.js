@@ -66,13 +66,30 @@ test.describe("openjobslots API compatibility", () => {
     expect(sitemap.headers()["content-type"]).toMatch(/application\/xml/i);
     expect(sitemap.headers()["cache-control"]).toContain("s-maxage=3600");
     const sitemapText = await sitemap.text();
-    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/</loc>`);
-    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/en/software-engineer-jobs</loc>`);
-    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/tr/uzaktan-calisma-ilanlari</loc>`);
-    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/pt-br/software-engineer-jobs</loc>`);
-    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/zh-cn/job-openings</loc>`);
-    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/ats/greenhouse-jobs</loc>`);
-    expect(sitemapText).not.toMatch(/private@example\.com|%40|\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
+    expect(sitemapText).toContain("<sitemapindex");
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/sitemaps/static.xml</loc>`);
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/sitemaps/ats-sources.xml</loc>`);
+
+    const staticSitemap = await request.get(`${apiBaseUrl}/sitemaps/static.xml`);
+    expect(staticSitemap.status()).toBe(200);
+    expect(staticSitemap.headers()["content-type"]).toMatch(/application\/xml/i);
+    const staticSitemapText = await staticSitemap.text();
+    expect(staticSitemapText).toContain(`<loc>${publicBaseUrl}/</loc>`);
+    expect(staticSitemapText).toContain(`<loc>${publicBaseUrl}/en/software-engineer-jobs</loc>`);
+    expect(staticSitemapText).toContain(`<loc>${publicBaseUrl}/tr/uzaktan-calisma-ilanlari</loc>`);
+    expect(staticSitemapText).toContain(`<loc>${publicBaseUrl}/pt-br/software-engineer-jobs</loc>`);
+    expect(staticSitemapText).toContain(`<loc>${publicBaseUrl}/zh-cn/job-openings</loc>`);
+    expect(staticSitemapText).not.toContain("/ats/");
+
+    const atsSitemap = await request.get(`${apiBaseUrl}/sitemaps/ats-sources.xml`);
+    expect(atsSitemap.status()).toBe(200);
+    expect(atsSitemap.headers()["content-type"]).toMatch(/application\/xml/i);
+    const atsSitemapText = await atsSitemap.text();
+    expect(atsSitemapText).toContain(`<loc>${publicBaseUrl}/ats/greenhouse-jobs</loc>`);
+    expect(atsSitemapText).toContain(`<loc>${publicBaseUrl}/ats/icims-jobs</loc>`);
+    expect(atsSitemapText).toContain(`<loc>${publicBaseUrl}/ats/paylocity-jobs</loc>`);
+    expect(atsSitemapText).not.toContain(`${publicBaseUrl}/en/`);
+    expect([sitemapText, staticSitemapText, atsSitemapText].join("\n")).not.toMatch(/private@example\.com|%40|\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
   });
 
   test("health and status endpoints respond with JSON", async ({ request }) => {
@@ -326,6 +343,37 @@ test.describe("openjobslots API compatibility", () => {
       "engineer Brazil"
     ]);
     expect(brazilPopularPayload.items[0].path).toBe("/pt-br?q=Brazil%20jobs");
+
+    const frenchPopular = await request.get(`${apiBaseUrl}/search/popular`, {
+      params: {
+        language: "fr",
+        country: "FR",
+        limit: "4"
+      }
+    });
+    expect(frenchPopular.ok()).toBeTruthy();
+    const frenchPopularPayload = await frenchPopular.json();
+    expect(frenchPopularPayload).toEqual(
+      expect.objectContaining({
+        source: "research_country_fallback",
+        country_scope: "FR",
+        country_scope_applied: true
+      })
+    );
+    expect(frenchPopularPayload.items.map((item) => item.searchQuery)).toEqual([
+      "France jobs",
+      "remote France",
+      "engineer France",
+      "software France"
+    ]);
+    expect(frenchPopularPayload.items.map((item) => item.label)).toEqual([
+      "Emplois en France",
+      "Emplois \u00e0 distance en France",
+      "Emplois ing\u00e9nieur en France",
+      "Emplois logiciel en France"
+    ]);
+    expect(frenchPopularPayload.items[0].path).toBe("/fr?q=France%20jobs");
+    expect(frenchPopularPayload.items.some((item) => /France Jobs|Remote France|Engineer France|Software France/.test(item.label))).toBe(false);
   });
 
   test("postings expose exact count metadata plus read-only freshness and sort params", async ({ request }) => {

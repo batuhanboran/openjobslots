@@ -830,6 +830,7 @@ function normalizeOrigin(value) {
 const {
   buildLlmsTxt,
   buildRobotsTxt,
+  buildSitemapSectionXml,
   buildSitemapXml,
   renderSeoIndexHtml
 } = createPublicSeoHelpers({
@@ -2989,6 +2990,7 @@ function createServer() {
     buildPublicPreferences,
     buildLlmsTxt,
     buildRobotsTxt,
+    buildSitemapSectionXml,
     buildSitemapXml,
     createApplication,
     createEmptyGrowthSummary,

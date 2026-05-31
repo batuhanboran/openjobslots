@@ -83,7 +83,9 @@ function testPublicRoutes() {
     "GET /index.html",
     "GET /robots.txt",
     "GET /llms.txt",
-    "GET /sitemap.xml"
+    "GET /sitemap.xml",
+    "GET /sitemaps/static.xml",
+    "GET /sitemaps/ats-sources.xml"
   ]);
 }
 
