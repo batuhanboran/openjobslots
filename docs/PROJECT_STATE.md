@@ -2,6 +2,14 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Search Latency And Index Parity Update - May 31, 2026
+
+- Production direct search latency was reduced by fixing Meili hydration so Postgres no longer reapplies free-text search filters after Meili has already selected candidate canonical URLs. Postgres hydration still keeps public visibility, geo/location, country, remote, source, date, and safety guards.
+- The live failure mode was `hydration_underfill` followed by expensive Postgres fallback. Cold origin probes before the fix included `software=12.697s`, `remote engineer=8.387s`, `engineer Turkey remote=7.668s`, `Director United States=4.260s`, and `turkiye=3.368s`.
+- After deploy, cache-busted origin probes were `software=0.057536s`, `remote jobs=0.051057s`, `Director United States=0.043805s`, `remote engineer=0.051005s`, `turkiye=0.065760s`, and `engineer Turkey remote=0.082838s`, exceeding the one-tenth target for the measured direct searches.
+- Meili/Postgres parity was repaired without a full replace swap after broad temp-index reindex attempts hit Meili memory/connectivity pressure. The repair inserted `45` missing documents, deleted `1` stale extra document, scanned `321,684` documents, and repaired `199` stale field documents.
+- Final production parity check: `search:reindex:check -- --json --sample-limit=100` returned `ok=true`, `postgres_indexable_count=321773`, `meili_document_count=321773`, `count_delta=0`, no remote facet delta, no extra Meili documents, and no missing Meili documents. Worker and deploy timer were restored after repair.
+
 ## Mobile Store Readiness Update - May 31, 2026
 
 - Expo configuration now includes iOS and Android store identifiers, a shared `openjobslots` scheme, and EAS build profiles for development, preview, and production.
