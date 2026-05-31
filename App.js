@@ -3126,14 +3126,15 @@ function CountryBall({ language, selected = false, size = 30 }) {
   );
 }
 
-function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLanguage, t }) {
+function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLanguage, t, compact = false }) {
   const selectedLanguage = PUBLIC_LANGUAGE_BY_CODE.get(languageCode) || PUBLIC_LANGUAGE_BY_CODE.get(DEFAULT_PUBLIC_LANGUAGE);
   return (
-    <View style={styles.languageSelectorWrap}>
+    <View style={[styles.languageSelectorWrap, compact ? styles.languageSelectorWrapCompact : null]}>
       <Pressable
         onPress={onToggleMenu}
         style={({ pressed }) => [
           styles.languageSelectorButton,
+          compact ? styles.languageSelectorButtonCompact : null,
           menuOpen ? styles.languageSelectorButtonOpen : null,
           pressed ? styles.languageSelectorButtonPressed : null
         ]}
@@ -3142,11 +3143,11 @@ function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLangua
         accessibilityLabel={t("language.label", "Language")}
         accessibilityState={{ expanded: menuOpen }}
       >
-        <CountryBall language={selectedLanguage} selected size={30} />
-        <Text style={styles.languageSelectorCode}>{selectedLanguage.shortLabel}</Text>
+        <CountryBall language={selectedLanguage} selected size={compact ? 28 : 30} />
+        <Text style={[styles.languageSelectorCode, compact ? styles.languageSelectorCodeCompact : null]}>{selectedLanguage.shortLabel}</Text>
       </Pressable>
       {menuOpen ? (
-        <View style={styles.languageOptions} testID="language-options">
+        <View style={[styles.languageOptions, compact ? styles.languageOptionsCompact : null]} testID="language-options">
           {PUBLIC_LANGUAGE_OPTIONS.map((language) => {
             const selected = language.code === selectedLanguage.code;
             return (
@@ -3177,22 +3178,27 @@ function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLangua
   );
 }
 
-function ThemeToggle({ themeMode, onToggleTheme, t }) {
+function ThemeToggle({ themeMode, onToggleTheme, t, compact = false }) {
   const isDark = themeMode === "dark";
   return (
     <Pressable
       onPress={onToggleTheme}
-      style={({ pressed }) => [styles.themeToggle, isDark ? styles.themeToggleDark : null, pressed ? styles.themeTogglePressed : null]}
+      style={({ pressed }) => [
+        styles.themeToggle,
+        compact ? styles.themeToggleCompact : null,
+        isDark ? styles.themeToggleDark : null,
+        pressed ? styles.themeTogglePressed : null
+      ]}
       testID="theme-toggle"
       accessibilityRole="button"
       accessibilityLabel={isDark ? t("theme.night", "Night") : t("theme.day", "Day")}
     >
-      <View style={[styles.themeIconButton, isDark ? styles.themeIconButtonDark : null]}>
-        <View style={[styles.themeIconCore, isDark ? styles.themeIconCoreDark : null]}>
+      <View style={[styles.themeIconButton, compact ? styles.themeIconButtonCompact : null, isDark ? styles.themeIconButtonDark : null]}>
+        <View style={[styles.themeIconCore, compact ? styles.themeIconCoreCompact : null, isDark ? styles.themeIconCoreDark : null]}>
           {isDark ? <View style={styles.themeIconMoonCutout} /> : null}
         </View>
       </View>
-      <Text style={[styles.themeToggleText, isDark ? styles.themeToggleTextDark : null]}>
+      <Text style={[styles.themeToggleText, compact ? styles.themeToggleTextCompact : null, isDark ? styles.themeToggleTextDark : null]}>
         {isDark ? t("theme.night", "Night") : t("theme.day", "Day")}
       </Text>
     </Pressable>
@@ -5714,7 +5720,7 @@ export default function App() {
       if (!showResultsSurface) return null;
       if (publicShellStatsChips.length === 0) return null;
       return (
-        <View style={styles.publicStatsChipRow} testID="public-stats-chips">
+        <View style={[styles.publicStatsChipRow, !isDesktopViewport ? styles.publicStatsChipRowMobile : null]} testID="public-stats-chips">
           {publicShellStatsChips.map((chip) => {
             const isJobSlots = chip.key === "job-slots";
             const translatedLabel = getPublicStatsChipLabel(chip, t);
@@ -5723,9 +5729,13 @@ export default function App() {
                 key={chip.key}
                 style={[
                   styles.publicStatsChip,
+                  !isDesktopViewport ? styles.publicStatsChipMobile : null,
                   isJobSlots ? styles.resultCountText : null,
+                  isJobSlots && !isDesktopViewport ? styles.resultCountTextMobile : null,
                   chip.key === "ats" ? styles.publicStatsChipAts : null,
+                  chip.key === "ats" && !isDesktopViewport ? styles.publicStatsChipAtsMobile : null,
                   chip.key === "companies" ? styles.publicStatsChipCompanies : null,
+                  chip.key === "companies" && !isDesktopViewport ? styles.publicStatsChipCompaniesMobile : null,
                   styles.yahooStatsChip,
                   isDarkPublicTheme ? styles.publicStatsChipDark : null
                 ]}
@@ -5733,10 +5743,24 @@ export default function App() {
                 accessibilityRole={isJobSlots ? "status" : "text"}
                 accessibilityLabel={`${chip.value} ${translatedLabel}`}
               >
-                <Text style={[styles.publicStatsChipValue, isJobSlots ? styles.resultCountValueText : null, isDarkPublicTheme ? styles.textInkDark : null]}>
+                <Text
+                  style={[
+                    styles.publicStatsChipValue,
+                    isJobSlots ? styles.resultCountValueText : null,
+                    !isDesktopViewport ? styles.publicStatsChipValueMobile : null,
+                    isDarkPublicTheme ? styles.textInkDark : null
+                  ]}
+                >
                   {chip.value}
                 </Text>
-                <Text style={[styles.publicStatsChipLabel, isJobSlots ? styles.resultCountUnitText : null, isDarkPublicTheme ? styles.textMutedDark : null]}>
+                <Text
+                  style={[
+                    styles.publicStatsChipLabel,
+                    isJobSlots ? styles.resultCountUnitText : null,
+                    !isDesktopViewport ? styles.publicStatsChipLabelMobile : null,
+                    isDarkPublicTheme ? styles.textMutedDark : null
+                  ]}
+                >
                   {" "}{translatedLabel}
                 </Text>
               </View>
@@ -5875,16 +5899,21 @@ export default function App() {
             !isDesktopViewport ? styles.yahooTopActionsMobile : null
           ]}
         >
-          {showResultsSurface ? <View style={styles.yahooResultsBrandSlot}>{brandMark}</View> : null}
+          {showResultsSurface ? (
+            <View style={[styles.yahooResultsBrandSlot, !isDesktopViewport ? styles.yahooResultsBrandSlotMobile : null]}>
+              {brandMark}
+            </View>
+          ) : null}
           {renderPublicStatsChips()}
-          <View style={styles.resultsUtilityControls}>
-            <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} />
+          <View style={[styles.resultsUtilityControls, !isDesktopViewport ? styles.resultsUtilityControlsMobile : null]}>
+            <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} compact={!isDesktopViewport} />
             <LanguageSelector
               languageCode={publicLanguageCode}
               menuOpen={languageMenuOpen}
               onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
               onSelectLanguage={selectPublicLanguage}
               t={t}
+              compact={!isDesktopViewport}
             />
           </View>
         </View>
@@ -7509,11 +7538,15 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     justifyContent: "flex-start",
-    alignItems: "center",
-    flexWrap: "wrap"
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 10
   },
   yahooResultsBrandSlot: {
     flexShrink: 0
+  },
+  yahooResultsBrandSlotMobile: {
+    width: "100%"
   },
   yahooResultsSearchTop: {
     flexGrow: 0,
@@ -8931,10 +8964,20 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 20
   },
+  resultsUtilityControlsMobile: {
+    width: "100%",
+    minWidth: 0,
+    flexWrap: "nowrap",
+    justifyContent: "flex-end",
+    gap: 8
+  },
   languageSelectorWrap: {
     position: "relative",
     zIndex: 80,
     elevation: 10
+  },
+  languageSelectorWrapCompact: {
+    flexShrink: 0
   },
   languageSelectorButton: {
     minHeight: 44,
@@ -8957,6 +9000,11 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  languageSelectorButtonCompact: {
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    gap: 6
+  },
   languageSelectorButtonOpen: {
     borderColor: OJS_COLORS.focus,
     backgroundColor: OJS_COLORS.accentSoft
@@ -8969,6 +9017,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 15,
     fontWeight: "900"
+  },
+  languageSelectorCodeCompact: {
+    fontSize: 12,
+    lineHeight: 14
   },
   languageOptions: {
     position: "absolute",
@@ -8990,6 +9042,10 @@ const styles = StyleSheet.create({
           animationTimingFunction: "cubic-bezier(0.2, 0, 0, 1)"
         }
       : {})
+  },
+  languageOptionsCompact: {
+    top: 48,
+    minWidth: 168
   },
   languageOption: {
     minHeight: 44,
@@ -9128,6 +9184,12 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  themeToggleCompact: {
+    minHeight: 44,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 6
+  },
   themeToggleDark: {
     borderColor: OJS_DARK_COLORS.border,
     backgroundColor: OJS_DARK_COLORS.surface
@@ -9184,6 +9246,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  themeIconButtonCompact: {
+    width: 26,
+    height: 26
+  },
   themeIconButtonDark: {
     backgroundColor: "#221B32"
   },
@@ -9194,6 +9260,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5C96B",
     borderWidth: 3,
     borderColor: "#FFF6D7"
+  },
+  themeIconCoreCompact: {
+    width: 14,
+    height: 14
   },
   themeIconCoreDark: {
     position: "relative",
@@ -9216,12 +9286,20 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "700"
   },
+  themeToggleTextCompact: {
+    fontSize: 12,
+    lineHeight: 15
+  },
   themeToggleTextDark: {
     color: OJS_DARK_COLORS.ink
   },
   resultCountText: {
     minWidth: 116,
     paddingHorizontal: 14
+  },
+  resultCountTextMobile: {
+    minWidth: 104,
+    paddingHorizontal: 10
   },
   resultCountValueText: {
     color: YAHOO_COLORS.ink,
@@ -9242,6 +9320,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 8,
     maxWidth: "100%"
+  },
+  publicStatsChipRowMobile: {
+    width: "100%",
+    flexWrap: "nowrap",
+    justifyContent: "flex-start",
+    gap: 6
   },
   publicStatsChip: {
     overflow: "hidden",
@@ -9267,11 +9351,26 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  publicStatsChipMobile: {
+    gap: 3,
+    borderRadius: 11,
+    paddingHorizontal: 8,
+    paddingTop: 7,
+    paddingBottom: 8,
+    minWidth: 60,
+    minHeight: 40
+  },
   publicStatsChipAts: {
     minWidth: 68
   },
+  publicStatsChipAtsMobile: {
+    minWidth: 58
+  },
   publicStatsChipCompanies: {
     minWidth: 118
+  },
+  publicStatsChipCompaniesMobile: {
+    minWidth: 102
   },
   publicStatsChipDark: {
     borderColor: OJS_DARK_COLORS.softBorder,
@@ -9286,12 +9385,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "800"
   },
+  publicStatsChipValueMobile: {
+    fontSize: 14,
+    lineHeight: 18
+  },
   publicStatsChipLabel: {
     color: YAHOO_COLORS.muted,
     fontFamily: YAHOO_FONT_STACK,
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "600"
+  },
+  publicStatsChipLabelMobile: {
+    fontSize: 10,
+    lineHeight: 14
   },
   yahooStatsChip: {
     borderColor: YAHOO_COLORS.border,
