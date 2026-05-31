@@ -59,3 +59,21 @@ test("popular SEO searches include short live queries before static fallbacks", 
   ]);
   assert.equal(items[1].label, "Software");
 });
+
+test("SEO landing catalog includes Semrush-seeded role intents", () => {
+  assert.equal(getPublicSeoRouteHintByPath("/en/data-analyst-jobs").canonicalSearchQuery, "data analyst");
+  assert.equal(getPublicSeoRouteHintByPath("/en/customer-success-manager-jobs").canonicalSearchQuery, "customer success manager");
+  assert.equal(getPublicSeoRouteHintByPath("/en/devops-engineer-jobs").canonicalSearchQuery, "devops engineer");
+
+  const items = getPublicSeoPopularSearchItems("en", [
+    { query: "customer success manager", count: 18 },
+    { query: "data analyst", count: 16 },
+    { query: "devops engineer", count: 12 }
+  ], 3);
+
+  assert.deepEqual(items.map((item) => item.path), [
+    "/en/customer-success-manager-jobs",
+    "/en/data-analyst-jobs",
+    "/en/devops-engineer-jobs"
+  ]);
+});

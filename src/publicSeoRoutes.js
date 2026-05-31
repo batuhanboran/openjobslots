@@ -245,6 +245,129 @@ const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
         description: "Busca empleos Technical Support Engineer recientes en bolsas ATS públicas."
       }
     ]
+  },
+  {
+    key: "data-analyst",
+    canonicalSearchQuery: "data analyst",
+    pages: [
+      {
+        languageCode: "en",
+        path: "/en/data-analyst-jobs",
+        searchQuery: "data analyst jobs",
+        title: "Data analyst jobs | OpenJobSlots",
+        description: "Search fresh data analyst jobs from public ATS boards by company, location, remote mode, source, and posting freshness."
+      },
+      {
+        languageCode: "tr",
+        path: "/tr/data-analyst-is-ilanlari",
+        searchQuery: "data analyst iş ilanları",
+        title: "Data analyst iş ilanları | OpenJobSlots",
+        description: "Güncel data analyst iş ilanlarını açık ATS kaynaklarından şirket, lokasyon, remote mod ve ilan tazeliğine göre ara."
+      },
+      {
+        languageCode: "de",
+        path: "/de/data-analyst-jobs",
+        searchQuery: "data analyst jobs",
+        title: "Data Analyst Jobs | OpenJobSlots",
+        description: "Finde aktuelle Data Analyst Jobs aus öffentlichen ATS-Jobbörsen nach Unternehmen, Standort, Remote-Modus und Aktualität."
+      },
+      {
+        languageCode: "fr",
+        path: "/fr/emplois-data-analyst",
+        searchQuery: "emplois data analyst",
+        title: "Emplois Data Analyst | OpenJobSlots",
+        description: "Recherchez des emplois Data Analyst récents sur des jobboards ATS publics par entreprise, lieu, mode remote et fraîcheur."
+      },
+      {
+        languageCode: "es",
+        path: "/es/empleos-data-analyst",
+        searchQuery: "empleos data analyst",
+        title: "Empleos Data Analyst | OpenJobSlots",
+        description: "Busca empleos Data Analyst recientes en bolsas ATS públicas por empresa, ubicación, modalidad remota y frescura."
+      }
+    ]
+  },
+  {
+    key: "customer-success",
+    canonicalSearchQuery: "customer success manager",
+    pages: [
+      {
+        languageCode: "en",
+        path: "/en/customer-success-manager-jobs",
+        searchQuery: "customer success manager jobs",
+        title: "Customer success manager jobs | OpenJobSlots",
+        description: "Search fresh customer success manager jobs from public ATS boards, including remote, hybrid, and local openings."
+      },
+      {
+        languageCode: "tr",
+        path: "/tr/customer-success-manager-is-ilanlari",
+        searchQuery: "customer success manager iş ilanları",
+        title: "Customer success manager iş ilanları | OpenJobSlots",
+        description: "Güncel customer success manager iş ilanlarını açık ATS kaynaklarından remote, hibrit ve yerel seçeneklerle ara."
+      },
+      {
+        languageCode: "de",
+        path: "/de/customer-success-manager-jobs",
+        searchQuery: "customer success manager jobs",
+        title: "Customer Success Manager Jobs | OpenJobSlots",
+        description: "Finde aktuelle Customer Success Manager Jobs aus öffentlichen ATS-Jobbörsen, inklusive Remote-, Hybrid- und lokalen Rollen."
+      },
+      {
+        languageCode: "fr",
+        path: "/fr/emplois-customer-success-manager",
+        searchQuery: "emplois customer success manager",
+        title: "Emplois Customer Success Manager | OpenJobSlots",
+        description: "Recherchez des emplois Customer Success Manager récents sur des jobboards ATS publics, avec filtres remote, hybride et lieu."
+      },
+      {
+        languageCode: "es",
+        path: "/es/empleos-customer-success-manager",
+        searchQuery: "empleos customer success manager",
+        title: "Empleos Customer Success Manager | OpenJobSlots",
+        description: "Busca empleos Customer Success Manager recientes en bolsas ATS públicas con filtros de remoto, híbrido y ubicación."
+      }
+    ]
+  },
+  {
+    key: "devops-engineer",
+    canonicalSearchQuery: "devops engineer",
+    pages: [
+      {
+        languageCode: "en",
+        path: "/en/devops-engineer-jobs",
+        searchQuery: "devops engineer jobs",
+        title: "DevOps engineer jobs | OpenJobSlots",
+        description: "Search fresh DevOps engineer jobs from public ATS boards by cloud, platform, infrastructure, remote mode, and freshness."
+      },
+      {
+        languageCode: "tr",
+        path: "/tr/devops-engineer-is-ilanlari",
+        searchQuery: "devops engineer iş ilanları",
+        title: "DevOps engineer iş ilanları | OpenJobSlots",
+        description: "Güncel DevOps engineer iş ilanlarını açık ATS kaynaklarından cloud, platform, altyapı, remote mod ve tazelikle ara."
+      },
+      {
+        languageCode: "de",
+        path: "/de/devops-engineer-jobs",
+        searchQuery: "devops engineer jobs",
+        title: "DevOps Engineer Jobs | OpenJobSlots",
+        description: "Finde aktuelle DevOps Engineer Jobs aus öffentlichen ATS-Jobbörsen nach Cloud, Plattform, Infrastruktur und Remote-Modus."
+      },
+      {
+        languageCode: "fr",
+        path: "/fr/emplois-devops-engineer",
+        searchQuery: "emplois devops engineer",
+        title: "Emplois DevOps Engineer | OpenJobSlots",
+        description: "Recherchez des emplois DevOps Engineer récents sur des jobboards ATS publics par cloud, plateforme, infrastructure et remote."
+      },
+      {
+        languageCode: "es",
+        path: "/es/empleos-devops-engineer",
+        searchQuery: "empleos devops engineer",
+        title: "Empleos DevOps Engineer | OpenJobSlots",
+        description: "Busca empleos DevOps Engineer recientes en bolsas ATS públicas por cloud, plataforma, infraestructura y modalidad remota."
+      }
+    ]
   }
 ]);
 

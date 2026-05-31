@@ -72,6 +72,20 @@ function extractNoscriptText(html) {
     .trim();
 }
 
+function extractStaticSeoContentText(html) {
+  const match = /<main[^>]+id=["']openjobslots-static-seo-content["'][^>]*>([\s\S]*?)<\/main>/i.exec(String(html || ""));
+  assert.ok(match, "expected crawlable static SEO content");
+  return match[1]
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function countWords(value) {
   return (String(value || "").match(/[A-Za-zÀ-ÿ0-9]+(?:[-'][A-Za-zÀ-ÿ0-9]+)?/g) || []).length;
 }
@@ -141,6 +155,33 @@ function testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback() {
   assert.ok(html.includes('href="https://openjobslots.com/ats/bamboohr-jobs"'));
   assert.ok(countWords(extractNoscriptText(html)) >= 200);
   assert.ok(!html.includes("You need to enable JavaScript"));
+}
+
+function testRenderSeoIndexHtmlAddsCrawlerVisibleSemanticContent() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body><div id=\"root\"></div></body></html>",
+    createRequest({ path: "/en/software-engineer-jobs" })
+  );
+
+  assert.ok(html.includes('id="openjobslots-static-seo-style"'));
+  assert.ok(html.includes('id="openjobslots-static-seo-content"'));
+  assert.ok(html.includes("<section"));
+  assert.ok(html.includes("<article"));
+  assert.ok(html.includes("<aside"));
+  assert.ok(html.includes("<footer"));
+  assert.ok(html.includes("<dl>"));
+  assert.ok(html.includes("Search FAQ"));
+  assert.ok(html.includes("Where do the listings come from?"));
+  assert.ok(html.includes("<nav>"));
+  assert.ok(html.includes('href="https://openjobslots.com/ats/workday-jobs"'));
+  assert.ok(html.includes('href="https://openjobslots.com/ats/bamboohr-jobs"'));
+  assert.ok(!html.includes('rel="nofollow"'));
+  assert.ok(countWords(extractStaticSeoContentText(html)) >= 200);
 }
 
 function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
@@ -284,6 +325,22 @@ function testAllCuratedSeoFallbacksClearLowWordCountThreshold() {
   }
 }
 
+function testAllCuratedSeoPagesExposeCrawlerVisibleWordCount() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const indexHtml = "<html><head><title>Old</title></head><body><div id=\"root\"></div></body></html>";
+  const routes = [{ path: "/" }, ...PUBLIC_SEO_ROUTES];
+
+  for (const route of routes) {
+    const html = renderSeoIndexHtml(indexHtml, createRequest({ path: route.path }));
+    const wordCount = countWords(extractStaticSeoContentText(html));
+    assert.ok(wordCount >= 200, `expected ${route.path} static SEO word count >= 200, got ${wordCount}`);
+  }
+}
+
 function testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
@@ -315,9 +372,12 @@ function testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages() {
   const sitemap = buildSitemapXml(createRequest({ query: { q: "private@example.com" } }));
   const locMatches = sitemap.match(/<loc>/g) || [];
 
-  assert.equal(locMatches.length, 36);
+  assert.equal(locMatches.length, PUBLIC_SEO_ROUTES.length + 1);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/product-manager-jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/data-analyst-jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/customer-success-manager-jobs<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/openjobslots\.com\/en\/devops-engineer-jobs<\/loc>/);
   assert.doesNotMatch(sitemap, /private@example\.com/);
   assert.doesNotMatch(sitemap, /%40/);
 }
@@ -340,6 +400,7 @@ function testBuildLlmsTxtUsesPlainMarkdownFormat() {
 testRenderSeoIndexHtmlReplacesMetadata();
 testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd();
 testRenderSeoIndexHtmlAddsStaticNoscriptSeoFallback();
+testRenderSeoIndexHtmlAddsCrawlerVisibleSemanticContent();
 testSearchQueryPagesGetSpecificMetadataAndCanonical();
 testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
 testHomeLanguagePagesGetBidirectionalHreflang();
@@ -347,6 +408,7 @@ testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();
 testRootFallbackLinksEveryCuratedSitemapRoute();
 testAllCuratedSeoFallbacksClearLowWordCountThreshold();
+testAllCuratedSeoPagesExposeCrawlerVisibleWordCount();
 testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData();
 testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages();
 testBuildLlmsTxtUsesPlainMarkdownFormat();

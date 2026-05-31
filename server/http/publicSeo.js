@@ -42,7 +42,22 @@ const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     paragraphQuality: () =>
       "The index treats employer links as canonical source evidence and keeps Meilisearch as a derived search layer while Postgres remains the source of truth. Ambiguous source data is not promoted as fake location, date, remote, or company evidence. That means public pages can describe the search intent, the filters, and the source families while the ingestion pipeline continues to validate each posting through parser-backed evidence before it becomes searchable.",
     paragraphNavigation: () =>
-      "Use the links below to move between localized job-search intents and high-value ATS source pages. They are included as plain HTML in the fallback so crawlers can discover the same curated public routes that appear in the XML sitemap. When JavaScript is available, the interactive interface adds suggestions, filters, result counts, and current posting cards on top of this crawlable foundation."
+      "Use the links below to move between localized job-search intents and high-value ATS source pages. They are included as plain HTML in the fallback so crawlers can discover the same curated public routes that appear in the XML sitemap. When JavaScript is available, the interactive interface adds suggestions, filters, result counts, and current posting cards on top of this crawlable foundation.",
+    faqLabel: "Search FAQ",
+    faqItems: ({ searchQuery }) => [
+      {
+        question: `What can I find on this ${searchQuery || "job search"} page?`,
+        answer: `This page is a stable entry point for searching fresh ${searchQuery || "job openings"} across public employer ATS boards. Results can be narrowed inside the app by title, company, location, country, region, remote mode, source platform, and posting freshness.`
+      },
+      {
+        question: "Where do the listings come from?",
+        answer: "OpenJobSlots indexes public employer career pages and ATS boards, then normalizes public posting fields into one searchable schema. Employer job links remain the canonical source for each posting."
+      },
+      {
+        question: "How does OpenJobSlots handle uncertain source data?",
+        answer: "Unclear location, date, remote, or source-id evidence is not promoted as a fake public value. Ambiguous postings stay conservative while parser-backed evidence continues to improve search quality."
+      }
+    ]
   },
   tr: {
     relatedLabel: "İlgili herkese açık iş arama sayfaları",
@@ -53,7 +68,22 @@ const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     paragraphQuality: () =>
       "Dizin, işveren bağlantılarını kanonik kaynak kanıtı olarak korur ve Meilisearch katmanını türetilmiş arama indeksi olarak kullanırken Postgres kaynak gerçekliğini taşır. Belirsiz kaynak verisi sahte lokasyon, tarih, remote durumu veya şirket kanıtı olarak yayınlanmaz. Böylece public sayfalar arama niyetini, filtreleri ve kaynak ailelerini açıklarken ingestion hattı her ilanı parser destekli kanıtla doğrulamaya devam eder.",
     paragraphNavigation: () =>
-      "Aşağıdaki bağlantılar yerelleştirilmiş iş arama niyetleri ve yüksek değerli ATS kaynak sayfaları arasında geçiş sağlar. Bu bağlantılar düz HTML fallback içinde yer aldığı için crawler'lar XML sitemap içinde bulunan aynı seçilmiş public rotaları keşfedebilir. JavaScript kullanılabildiğinde etkileşimli arayüz bu taranabilir temel üzerine öneriler, filtreler, sonuç sayıları ve güncel ilan kartları ekler."
+      "Aşağıdaki bağlantılar yerelleştirilmiş iş arama niyetleri ve yüksek değerli ATS kaynak sayfaları arasında geçiş sağlar. Bu bağlantılar düz HTML fallback içinde yer aldığı için crawler'lar XML sitemap içinde bulunan aynı seçilmiş public rotaları keşfedebilir. JavaScript kullanılabildiğinde etkileşimli arayüz bu taranabilir temel üzerine öneriler, filtreler, sonuç sayıları ve güncel ilan kartları ekler.",
+    faqLabel: "Arama soruları",
+    faqItems: ({ searchQuery }) => [
+      {
+        question: `Bu ${searchQuery || "iş arama"} sayfasında ne bulabilirim?`,
+        answer: `Bu sayfa, açık işveren ATS panolarındaki güncel ${searchQuery || "iş ilanları"} için sabit bir arama girişidir. Uygulamada sonuçlar title, şirket, lokasyon, ülke, bölge, remote mod, kaynak platform ve ilan tazeliğine göre daraltılabilir.`
+      },
+      {
+        question: "İlanlar nereden geliyor?",
+        answer: "OpenJobSlots herkese açık işveren kariyer sayfalarını ve ATS panolarını indeksler, sonra public ilan alanlarını tek bir aranabilir şemaya normalize eder. Her ilan için işveren bağlantısı kanonik kaynak olarak kalır."
+      },
+      {
+        question: "Belirsiz kaynak verisi nasıl ele alınır?",
+        answer: "Belirsiz lokasyon, tarih, remote veya source-id kanıtı sahte public değer olarak yayınlanmaz. Ambiguous ilanlar konservatif tutulur; parser destekli kanıt arttıkça arama kalitesi iyileştirilir."
+      }
+    ]
   },
   de: {
     relatedLabel: "Verwandte öffentliche Jobsuchseiten",
@@ -64,7 +94,22 @@ const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     paragraphQuality: () =>
       "Der Index behandelt Arbeitgeberlinks als kanonischen Quellnachweis und nutzt Meilisearch als abgeleitete Suchebene, während Postgres die Quelle der Wahrheit bleibt. Mehrdeutige Quelldaten werden nicht als erfundener Standort, erfundenes Datum, Remote-Status oder Unternehmensnachweis veröffentlicht. So können öffentliche Seiten die Suchabsicht, Filter und Quellfamilien erklären, während die Ingestion-Pipeline jede Stelle weiterhin mit parsergestützter Evidenz validiert, bevor sie durchsuchbar wird.",
     paragraphNavigation: () =>
-      "Die folgenden Links verbinden lokalisierte Suchintentionen mit wichtigen ATS-Quellseiten. Sie stehen als einfaches HTML im Fallback, damit Crawler dieselben kuratierten öffentlichen Routen entdecken können, die auch in der XML-Sitemap stehen. Wenn JavaScript verfügbar ist, ergänzt die interaktive Oberfläche diese crawlbare Basis um Vorschläge, Filter, Ergebniszahlen und aktuelle Stellenkarten."
+      "Die folgenden Links verbinden lokalisierte Suchintentionen mit wichtigen ATS-Quellseiten. Sie stehen als einfaches HTML im Fallback, damit Crawler dieselben kuratierten öffentlichen Routen entdecken können, die auch in der XML-Sitemap stehen. Wenn JavaScript verfügbar ist, ergänzt die interaktive Oberfläche diese crawlbare Basis um Vorschläge, Filter, Ergebniszahlen und aktuelle Stellenkarten.",
+    faqLabel: "Suchfragen",
+    faqItems: ({ searchQuery }) => [
+      {
+        question: `Was finde ich auf dieser Seite für ${searchQuery || "Jobsuche"}?`,
+        answer: `Diese Seite ist ein stabiler Einstieg für aktuelle ${searchQuery || "Stellenangebote"} aus öffentlichen Arbeitgeber-ATS-Jobbörsen. In der App lassen sich Ergebnisse nach Rolle, Unternehmen, Standort, Land, Region, Remote-Modus, Quellplattform und Veröffentlichungsfrische filtern.`
+      },
+      {
+        question: "Woher stammen die Stellenanzeigen?",
+        answer: "OpenJobSlots indexiert öffentliche Arbeitgeber-Karriereseiten und ATS-Jobbörsen und normalisiert öffentliche Stellendaten in ein gemeinsames Suchschema. Arbeitgeberlinks bleiben die kanonische Quelle jeder Anzeige."
+      },
+      {
+        question: "Wie geht OpenJobSlots mit unsicheren Quelldaten um?",
+        answer: "Unklare Standort-, Datums-, Remote- oder Source-ID-Daten werden nicht als erfundene öffentliche Werte veröffentlicht. Mehrdeutige Anzeigen bleiben konservativ, bis parsergestützte Evidenz die Suchqualität verbessert."
+      }
+    ]
   },
   fr: {
     relatedLabel: "Pages publiques de recherche d'emploi liées",
@@ -75,7 +120,22 @@ const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     paragraphQuality: () =>
       "L'index traite les liens employeur comme des preuves sources canoniques et utilise Meilisearch comme couche de recherche dérivée, tandis que Postgres reste la source de vérité. Les données ambiguës ne sont pas promues comme faux lieu, fausse date, statut remote ou preuve d'entreprise. Les pages publiques peuvent donc expliquer l'intention de recherche, les filtres et les familles de sources pendant que le pipeline d'ingestion valide chaque poste avec une preuve issue du parser avant son indexation.",
     paragraphNavigation: () =>
-      "Les liens ci-dessous relient les intentions de recherche localisées aux pages de sources ATS importantes. Ils sont présents en HTML simple dans le fallback afin que les crawlers découvrent les mêmes routes publiques sélectionnées que dans le sitemap XML. Lorsque JavaScript est disponible, l'interface interactive ajoute suggestions, filtres, compteurs de résultats et cartes d'offres récentes sur cette base explorable."
+      "Les liens ci-dessous relient les intentions de recherche localisées aux pages de sources ATS importantes. Ils sont présents en HTML simple dans le fallback afin que les crawlers découvrent les mêmes routes publiques sélectionnées que dans le sitemap XML. Lorsque JavaScript est disponible, l'interface interactive ajoute suggestions, filtres, compteurs de résultats et cartes d'offres récentes sur cette base explorable.",
+    faqLabel: "Questions de recherche",
+    faqItems: ({ searchQuery }) => [
+      {
+        question: `Que trouver sur cette page ${searchQuery || "de recherche d'emploi"} ?`,
+        answer: `Cette page sert d'entrée stable pour rechercher des ${searchQuery || "offres d'emploi"} récentes issues de jobboards ATS publics d'employeurs. Dans l'application, les résultats peuvent être filtrés par poste, entreprise, lieu, pays, région, mode remote, plateforme source et fraîcheur de publication.`
+      },
+      {
+        question: "D'où viennent les offres ?",
+        answer: "OpenJobSlots indexe des pages carrières publiques d'employeurs et des jobboards ATS, puis normalise les champs publics dans un schéma de recherche commun. Les liens employeur restent la source canonique de chaque offre."
+      },
+      {
+        question: "Comment les données sources incertaines sont-elles traitées ?",
+        answer: "Les lieux, dates, statuts remote ou identifiants source incertains ne sont pas publiés comme valeurs inventées. Les offres ambiguës restent conservatrices pendant que la preuve issue des parsers améliore la qualité de recherche."
+      }
+    ]
   },
   es: {
     relatedLabel: "Páginas públicas relacionadas de búsqueda de empleo",
@@ -86,7 +146,22 @@ const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     paragraphQuality: () =>
       "El índice trata los enlaces del empleador como evidencia canónica de origen y usa Meilisearch como capa derivada de búsqueda, mientras Postgres conserva la fuente de verdad. Los datos ambiguos no se publican como ubicación, fecha, estado remoto o empresa inventados. Así, las páginas públicas pueden describir la intención de búsqueda, los filtros y las familias de fuentes mientras el pipeline de ingesta valida cada vacante con evidencia respaldada por parsers antes de hacerla buscable.",
     paragraphNavigation: () =>
-      "Los enlaces siguientes conectan intenciones de búsqueda localizadas con páginas valiosas de fuentes ATS. Están incluidos como HTML simple en el fallback para que los crawlers descubran las mismas rutas públicas curadas que aparecen en el sitemap XML. Cuando JavaScript está disponible, la interfaz interactiva añade sugerencias, filtros, conteos de resultados y tarjetas de vacantes actuales sobre esta base rastreable."
+      "Los enlaces siguientes conectan intenciones de búsqueda localizadas con páginas valiosas de fuentes ATS. Están incluidos como HTML simple en el fallback para que los crawlers descubran las mismas rutas públicas curadas que aparecen en el sitemap XML. Cuando JavaScript está disponible, la interfaz interactiva añade sugerencias, filtros, conteos de resultados y tarjetas de vacantes actuales sobre esta base rastreable.",
+    faqLabel: "Preguntas de búsqueda",
+    faqItems: ({ searchQuery }) => [
+      {
+        question: `¿Qué puedo encontrar en esta página de ${searchQuery || "búsqueda de empleo"}?`,
+        answer: `Esta página es una entrada estable para buscar ${searchQuery || "ofertas de empleo"} recientes en bolsas ATS públicas de empleadores. En la aplicación, los resultados se pueden filtrar por rol, empresa, ubicación, país, región, modalidad remota, plataforma fuente y frescura de publicación.`
+      },
+      {
+        question: "¿De dónde salen las ofertas?",
+        answer: "OpenJobSlots indexa páginas públicas de carreras de empleadores y bolsas ATS, y normaliza los campos públicos en un esquema de búsqueda común. Los enlaces del empleador siguen siendo la fuente canónica de cada oferta."
+      },
+      {
+        question: "¿Cómo se tratan los datos inciertos?",
+        answer: "Los datos ambiguos de ubicación, fecha, modalidad remota o source-id no se publican como valores inventados. Las ofertas ambiguas se mantienen conservadoras mientras la evidencia de parsers mejora la calidad de búsqueda."
+      }
+    ]
   }
 });
 
@@ -106,6 +181,7 @@ function removeExistingSeoTags(html) {
     .replace(/\s*<meta[^>]+property=["'](?:og:title|og:description|og:type|og:url|og:site_name)["'][^>]*>/gi, "")
     .replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/gi, "")
     .replace(/\s*<link[^>]+rel=["']alternate["'][^>]*hreflang=["'][^"']+["'][^>]*>/gi, "")
+    .replace(/\s*<style[^>]+id=["']openjobslots-static-seo-style["'][^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/\s*<script[^>]+id=["']openjobslots-(?:organization|website|webpage|breadcrumb)-jsonld["'][^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
@@ -361,6 +437,22 @@ function createPublicSeoHelpers(dependencies = {}) {
     ].map(normalizeInlineText).filter(Boolean);
   }
 
+  function buildStaticSeoFaqItems(req, heading, description) {
+    const seoMeta = getSeoMeta(req);
+    const seoRoute = getSeoRoute(req);
+    const languageCode = seoMeta.languageCode || "en";
+    const copy = getSeoFallbackCopy(languageCode);
+    const searchQuery = normalizeInlineText(seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
+    const values = { heading, description, searchQuery };
+    const items = typeof copy.faqItems === "function" ? copy.faqItems(values) : SEO_FALLBACK_COPY_BY_LANGUAGE.en.faqItems(values);
+    return (Array.isArray(items) ? items : [])
+      .map((item) => ({
+        question: normalizeInlineText(item?.question || ""),
+        answer: normalizeInlineText(item?.answer || "")
+      }))
+      .filter((item) => item.question && item.answer);
+  }
+
   function buildStaticSeoFallback(req) {
     const siteOrigin = getPublicSiteOrigin(req);
     const seoMeta = getSeoMeta(req);
@@ -370,6 +462,12 @@ function createPublicSeoHelpers(dependencies = {}) {
     const description = normalizeInlineText(seoMeta.description || seoDescription);
     const paragraphs = buildStaticSeoFallbackParagraphs(req, heading, description)
       .map((paragraph) => "    <p>" + escapeHtmlAttribute(paragraph) + "</p>")
+      .join("\n");
+    const faqItems = buildStaticSeoFaqItems(req, heading, description)
+      .map((item) => [
+        "      <dt>" + escapeHtmlAttribute(item.question) + "</dt>",
+        "      <dd>" + escapeHtmlAttribute(item.answer) + "</dd>"
+      ].join("\n"))
       .join("\n");
     const links = getStaticSeoFallbackLinks(req)
       .map((route) => {
@@ -394,9 +492,94 @@ function createPublicSeoHelpers(dependencies = {}) {
       links,
       "      </ul>",
       "    </nav>",
+      '    <section aria-label="' + escapeHtmlAttribute(copy.faqLabel || "Search FAQ") + '">',
+      "      <h2>" + escapeHtmlAttribute(copy.faqLabel || "Search FAQ") + "</h2>",
+      "      <dl>",
+      faqItems,
+      "      </dl>",
+      "    </section>",
       "  </main>",
       "</noscript>"
     ].join("\n");
+  }
+
+  function buildStaticSeoContent(req) {
+    const siteOrigin = getPublicSiteOrigin(req);
+    const seoMeta = getSeoMeta(req);
+    const languageCode = seoMeta.languageCode || "en";
+    const copy = getSeoFallbackCopy(languageCode);
+    const heading = getSeoHeadingFromTitle(seoMeta.title) || "OpenJobSlots";
+    const description = normalizeInlineText(seoMeta.description || seoDescription);
+    const searchLabel = stripOpenJobSlotsTitleSuffix(heading) || heading;
+    const paragraphs = buildStaticSeoFallbackParagraphs(req, heading, description);
+    const faqItems = buildStaticSeoFaqItems(req, heading, description);
+    const links = getStaticSeoFallbackLinks(req);
+    const primaryLinks = links.slice(0, 12);
+    const sourceLinks = links
+      .filter((route) => String(route.path || "").startsWith("/ats/"))
+      .slice(0, 8);
+
+    function htmlLinkList(routes) {
+      return routes
+        .map((route) => {
+          const label = stripOpenJobSlotsTitleSuffix(route.title) || route.searchQuery || route.path;
+          const summary = normalizeInlineText(route.description || "");
+          return [
+            "            <li>",
+            '<a href="' + escapeHtmlAttribute(`${siteOrigin}${route.path}`) + '">',
+            escapeHtmlAttribute(label),
+            "</a>",
+            summary ? '<span> ' + escapeHtmlAttribute(summary) + "</span>" : "",
+            "</li>"
+          ].join("");
+        })
+        .join("\n");
+    }
+
+    return [
+      '<main id="openjobslots-static-seo-content" aria-label="' + escapeHtmlAttribute(`${searchLabel} search context`) + '">',
+      '  <section class="openjobslots-seo-band" aria-labelledby="openjobslots-static-seo-heading">',
+      '    <article class="openjobslots-seo-copy">',
+      '      <h2 id="openjobslots-static-seo-heading">' + escapeHtmlAttribute(heading) + "</h2>",
+      ...paragraphs.map((paragraph) => "      <p>" + escapeHtmlAttribute(paragraph) + "</p>"),
+      "    </article>",
+      '    <aside class="openjobslots-seo-aside" aria-label="' + escapeHtmlAttribute(copy.relatedLabel) + '">',
+      "      <h3>" + escapeHtmlAttribute(copy.relatedLabel) + "</h3>",
+      "      <nav>",
+      "        <ul>",
+      htmlLinkList(primaryLinks),
+      "        </ul>",
+      "      </nav>",
+      "    </aside>",
+      "  </section>",
+      '  <section class="openjobslots-seo-faq" aria-labelledby="openjobslots-static-seo-faq-heading">',
+      '    <h3 id="openjobslots-static-seo-faq-heading">' + escapeHtmlAttribute(copy.faqLabel || "Search FAQ") + "</h3>",
+      "    <dl>",
+      ...faqItems.flatMap((item) => [
+        "      <dt>" + escapeHtmlAttribute(item.question) + "</dt>",
+        "      <dd>" + escapeHtmlAttribute(item.answer) + "</dd>"
+      ]),
+      "    </dl>",
+      "  </section>",
+      '  <footer class="openjobslots-seo-footer" aria-label="OpenJobSlots ATS source pages">',
+      "    <h3>ATS source job pages</h3>",
+      "    <ul>",
+      htmlLinkList(sourceLinks),
+      "    </ul>",
+      "  </footer>",
+      "</main>"
+    ].join("\n");
+  }
+
+  function replaceStaticSeoContent(html, req) {
+    const content = buildStaticSeoContent(req);
+    if (/<main\b[^>]+id=["']openjobslots-static-seo-content["'][\s\S]*?<\/main>/i.test(html)) {
+      return html.replace(/<main\b[^>]+id=["']openjobslots-static-seo-content["'][\s\S]*?<\/main>/i, content);
+    }
+    if (/<\/body>/i.test(html)) {
+      return html.replace(/<\/body>/i, `    ${content}\n</body>`);
+    }
+    return html;
   }
 
   function replaceStaticSeoFallback(html, req) {
@@ -429,6 +612,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     const alternateTags = buildAlternateLanguageLinkTags(req);
     const analyticsTags = buildPublicWebAnalyticsHeadTags(readPublicWebAnalyticsConfig());
     const tags = [
+      '<style id="openjobslots-static-seo-style">#openjobslots-static-seo-content{max-width:1120px;margin:40px auto 56px;padding:0 24px;color:#334155;font:15px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#openjobslots-static-seo-content h2,#openjobslots-static-seo-content h3{color:#0f172a;letter-spacing:0;margin:0 0 12px}#openjobslots-static-seo-content h2{font-size:24px;line-height:1.25}#openjobslots-static-seo-content h3{font-size:16px;line-height:1.3}#openjobslots-static-seo-content p{margin:0 0 12px}.openjobslots-seo-band{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:32px}.openjobslots-seo-aside,.openjobslots-seo-faq,.openjobslots-seo-footer{border-top:1px solid #e2e8f0;padding-top:16px}.openjobslots-seo-faq,.openjobslots-seo-footer{margin-top:24px}.openjobslots-seo-faq dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:0}.openjobslots-seo-faq dt{color:#0f172a;font-weight:700;margin:0 0 4px}.openjobslots-seo-faq dd{margin:0;color:#475569}.openjobslots-seo-aside ul,.openjobslots-seo-footer ul{display:grid;gap:8px;list-style:none;margin:0;padding:0}.openjobslots-seo-footer ul{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}.openjobslots-seo-aside a,.openjobslots-seo-footer a{color:#0369a1;font-weight:650;text-decoration:none}.openjobslots-seo-aside a:hover,.openjobslots-seo-footer a:hover{text-decoration:underline}.openjobslots-seo-aside span,.openjobslots-seo-footer span{display:block;color:#64748b;font-size:13px;line-height:1.45}@media(max-width:760px){#openjobslots-static-seo-content{margin:28px auto 40px;padding:0 18px}.openjobslots-seo-band,.openjobslots-seo-faq dl{grid-template-columns:1fr;gap:20px}}</style>',
       '<meta name="description" content="' + description + '" />',
       '<link rel="canonical" href="' + canonical + '" />',
       alternateTags,
@@ -454,6 +638,7 @@ function createPublicSeoHelpers(dependencies = {}) {
     let html = setHtmlLanguage(stripPublicWebAnalyticsHeadTags(removeExistingSeoTags(indexHtml)), seoMeta.languageCode || "en")
       .replace(/<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
     html = replaceStaticSeoFallback(html, req);
+    html = replaceStaticSeoContent(html, req);
     if (!/<\/head>/i.test(html)) return html;
     const analyticsBlock = managedAnalyticsTags ? `\n    ${managedAnalyticsTags}` : "";
     return html.replace(
