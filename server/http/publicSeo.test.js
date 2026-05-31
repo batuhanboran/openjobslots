@@ -87,7 +87,14 @@ function extractStaticSeoContentText(html) {
 }
 
 function countWords(value) {
-  return (String(value || "").match(/[A-Za-zÀ-ÿ0-9]+(?:[-'][A-Za-zÀ-ÿ0-9]+)?/g) || []).length;
+  const text = String(value || "");
+  const cjkCharacters = (text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) || []).length;
+  const words = (
+    text
+      .replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, " ")
+      .match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)?/gu) || []
+  ).length;
+  return words + Math.ceil(cjkCharacters / 2);
 }
 
 function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {

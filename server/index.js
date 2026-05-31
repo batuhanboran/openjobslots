@@ -128,9 +128,34 @@ const PUBLIC_SUPPORTED_LANGUAGES = Object.freeze([
   { code: "tr", label: "Turkish", native_label: "Türkçe", country_code: "TR" },
   { code: "de", label: "German", native_label: "Deutsch", country_code: "DE" },
   { code: "fr", label: "French", native_label: "Français", country_code: "FR" },
-  { code: "es", label: "Spanish", native_label: "Español", country_code: "ES" }
+  { code: "es", label: "Spanish", native_label: "Español", country_code: "ES" },
+  { code: "pt-BR", label: "Portuguese (Brazil)", native_label: "Português (BR)", country_code: "BR" },
+  { code: "pt-PT", label: "Portuguese (Portugal)", native_label: "Português (PT)", country_code: "PT" },
+  { code: "it", label: "Italian", native_label: "Italiano", country_code: "IT" },
+  { code: "nl", label: "Dutch", native_label: "Nederlands", country_code: "NL" },
+  { code: "pl", label: "Polish", native_label: "Polski", country_code: "PL" },
+  { code: "ja", label: "Japanese", native_label: "日本語", country_code: "JP" },
+  { code: "ko", label: "Korean", native_label: "한국어", country_code: "KR" },
+  { code: "zh-CN", label: "Chinese (Simplified)", native_label: "简体中文", country_code: "CN" },
+  { code: "hi", label: "Hindi", native_label: "हिन्दी", country_code: "IN" },
+  { code: "ar", label: "Arabic", native_label: "العربية", country_code: "AE" },
+  { code: "id", label: "Indonesian", native_label: "Bahasa Indonesia", country_code: "ID" },
+  { code: "sv", label: "Swedish", native_label: "Svenska", country_code: "SE" },
+  { code: "da", label: "Danish", native_label: "Dansk", country_code: "DK" },
+  { code: "no", label: "Norwegian", native_label: "Norsk", country_code: "NO" },
+  { code: "fi", label: "Finnish", native_label: "Suomi", country_code: "FI" }
 ]);
 const PUBLIC_SUPPORTED_LANGUAGE_CODES = new Set(PUBLIC_SUPPORTED_LANGUAGES.map((language) => language.code));
+const PUBLIC_SUPPORTED_LANGUAGE_BY_NORMALIZED_CODE = new Map(
+  PUBLIC_SUPPORTED_LANGUAGES.map((language) => [String(language.code).toLowerCase(), language.code])
+);
+const PUBLIC_SUPPORTED_LANGUAGE_PRIMARY_FALLBACKS = new Map([
+  ["pt", "pt-BR"],
+  ["zh", "zh-CN"],
+  ...PUBLIC_SUPPORTED_LANGUAGES
+    .filter((language) => !String(language.code).includes("-"))
+    .map((language) => [String(language.code).toLowerCase(), language.code])
+]);
 const PUBLIC_COUNTRY_LANGUAGE_FALLBACKS = Object.freeze({
   AT: "de",
   CH: "de",
@@ -149,7 +174,22 @@ const PUBLIC_COUNTRY_LANGUAGE_FALLBACKS = Object.freeze({
   AU: "en",
   NZ: "en",
   US: "en",
-  TR: "tr"
+  TR: "tr",
+  BR: "pt-BR",
+  PT: "pt-PT",
+  IT: "it",
+  NL: "nl",
+  PL: "pl",
+  JP: "ja",
+  KR: "ko",
+  CN: "zh-CN",
+  IN: "hi",
+  AE: "ar",
+  ID: "id",
+  SE: "sv",
+  DK: "da",
+  NO: "no",
+  FI: "fi"
 });
 const BACKEND_DATA_ROOT = path.dirname(DB_PATH);
 const BACKEND_LOG_DIRECTORY_PATH = path.join(BACKEND_DATA_ROOT, "logs");
@@ -972,8 +1012,10 @@ function normalizePublicLanguageCode(value) {
     .toLowerCase()
     .replace(/_/g, "-");
   if (!normalized) return "";
+  const exact = PUBLIC_SUPPORTED_LANGUAGE_BY_NORMALIZED_CODE.get(normalized);
+  if (exact) return exact;
   const primary = normalized.split("-")[0];
-  return PUBLIC_SUPPORTED_LANGUAGE_CODES.has(primary) ? primary : "";
+  return PUBLIC_SUPPORTED_LANGUAGE_PRIMARY_FALLBACKS.get(primary) || "";
 }
 
 function parseAcceptLanguagePreferences(value) {

@@ -2,11 +2,37 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  PUBLIC_SEO_ROUTES,
   getPublicSeoCanonicalSearchQuery,
   getPublicSeoCountryFallbackQueries,
+  getPublicSeoLandingRoutesForLanguage,
   getPublicSeoPopularSearchItems,
-  getPublicSeoRouteHintByPath
+  getPublicSeoRouteHintByPath,
+  normalizePublicSeoLanguageCode
 } = require("./publicSeoRoutes");
+
+const EXPECTED_PUBLIC_LANGUAGE_CODES = [
+  "en",
+  "tr",
+  "de",
+  "fr",
+  "es",
+  "pt-BR",
+  "pt-PT",
+  "it",
+  "nl",
+  "pl",
+  "ja",
+  "ko",
+  "zh-CN",
+  "hi",
+  "ar",
+  "id",
+  "sv",
+  "da",
+  "no",
+  "fi"
+];
 
 test("SEO route hints keep localized labels but expose canonical indexed search", () => {
   const spanishSoftwareEngineer = getPublicSeoRouteHintByPath("/es/empleos-software-engineer");
@@ -107,11 +133,54 @@ test("SEO landing catalog includes direct employer and hidden-jobs content inten
   ]);
 });
 
+test("SEO route catalog exposes every public language in home, landing, and hreflang groups", () => {
+  const homeRoutes = PUBLIC_SEO_ROUTES.filter((route) => route.alternateGroup === "home");
+  assert.deepEqual(homeRoutes.map((route) => route.languageCode), EXPECTED_PUBLIC_LANGUAGE_CODES);
+
+  for (const languageCode of EXPECTED_PUBLIC_LANGUAGE_CODES) {
+    const landingRoutes = getPublicSeoLandingRoutesForLanguage(languageCode, 20);
+    assert.equal(landingRoutes.length, languageCode === "en" ? 18 : 8);
+    assert.ok(landingRoutes.some((route) => route.searchIntent === "software-engineer"));
+    assert.ok(landingRoutes.every((route) => route.languageCode === languageCode || String(route.path).startsWith("/ats/")));
+  }
+
+  assert.equal(normalizePublicSeoLanguageCode("pt-BR"), "pt-BR");
+  assert.equal(normalizePublicSeoLanguageCode("pt-br"), "pt-BR");
+  assert.equal(normalizePublicSeoLanguageCode("pt"), "pt-BR");
+  assert.equal(normalizePublicSeoLanguageCode("zh-Hans-CN"), "zh-CN");
+  assert.equal(getPublicSeoRouteHintByPath("/pt-br/software-engineer-jobs").languageCode, "pt-BR");
+  assert.equal(getPublicSeoRouteHintByPath("/zh-cn/job-openings").languageCode, "zh-CN");
+});
+
 test("country research fallbacks preserve scoped queries for supported markets", () => {
-  for (const countryCode of ["US", "GB", "TR", "DE", "FR", "ES"]) {
-    const queries = getPublicSeoCountryFallbackQueries(countryCode, countryCode === "TR" ? "tr" : "en", 6);
+  const countryLanguagePairs = [
+    ["US", "en"],
+    ["GB", "en"],
+    ["TR", "tr"],
+    ["DE", "de"],
+    ["FR", "fr"],
+    ["ES", "es"],
+    ["BR", "pt-BR"],
+    ["PT", "pt-PT"],
+    ["IT", "it"],
+    ["NL", "nl"],
+    ["PL", "pl"],
+    ["JP", "ja"],
+    ["KR", "ko"],
+    ["CN", "zh-CN"],
+    ["IN", "hi"],
+    ["AE", "ar"],
+    ["ID", "id"],
+    ["SE", "sv"],
+    ["DK", "da"],
+    ["NO", "no"],
+    ["FI", "fi"]
+  ];
+  for (const [countryCode, languageCode] of countryLanguagePairs) {
+    const queries = getPublicSeoCountryFallbackQueries(countryCode, languageCode, 6);
     assert.equal(queries.length, 6);
     assert.ok(queries.every((item) => item.countryCode === countryCode));
+    assert.ok(queries.every((item) => item.languageCode === languageCode));
     assert.ok(queries.every((item) => item.source === "research_country_fallback"));
     assert.ok(queries.every((item) => item.trustedPopularFallback === true));
     assert.ok(queries.every((item) => Number(item.count) > 0));
@@ -120,6 +189,10 @@ test("country research fallbacks preserve scoped queries for supported markets",
   assert.deepEqual(
     getPublicSeoCountryFallbackQueries("TR", "tr", 4).map((item) => item.query),
     ["Turkiye jobs", "remote Turkiye", "Turkey engineer", "Turkey software"]
+  );
+  assert.deepEqual(
+    getPublicSeoCountryFallbackQueries("BR", "pt-br", 4).map((item) => item.query),
+    ["Brazil jobs", "remote Brazil", "software Brazil", "engineer Brazil"]
   );
 });
 

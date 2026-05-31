@@ -165,6 +165,276 @@ const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
   }
 });
 
+function createAdditionalSeoFallbackCopy(copy) {
+  return {
+    relatedLabel: copy.relatedLabel,
+    paragraphIntro: ({ heading, description }) =>
+      `${heading} ${copy.intro} ${description}`,
+    paragraphCoverage: ({ searchQuery }) =>
+      `${copy.coverageStart} ${searchQuery || copy.defaultSearch}. ${copy.coverageDetail}`,
+    paragraphQuality: () => copy.quality,
+    paragraphNavigation: () => copy.navigation,
+    faqLabel: copy.faqLabel,
+    faqItems: ({ searchQuery }) => [
+      {
+        question: copy.faqWhat.replace("{search}", searchQuery || copy.defaultSearch),
+        answer: copy.faqWhatAnswer.replace("{search}", searchQuery || copy.defaultSearch)
+      },
+      {
+        question: copy.faqSources,
+        answer: copy.faqSourcesAnswer
+      },
+      {
+        question: copy.faqQuality,
+        answer: copy.faqQualityAnswer
+      }
+    ]
+  };
+}
+
+const SEO_ADDITIONAL_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
+  "pt-BR": createAdditionalSeoFallbackCopy({
+    relatedLabel: "Páginas públicas relacionadas de busca de vagas",
+    intro: "é uma página rastreável da OpenJobSlots para pessoas e buscadores antes do app interativo carregar.",
+    coverageStart: "A OpenJobSlots ajuda a começar por",
+    defaultSearch: "vagas abertas",
+    coverageDetail: "Depois o visitante pode filtrar por cargo, empresa, localidade, país, região, modo remoto, plataforma de origem e atualidade da publicação, sempre usando campos públicos de vagas.",
+    quality: "O índice mantém os links do empregador como fonte canônica e usa Meilisearch como camada derivada, enquanto Postgres permanece como fonte de verdade. Dados ambíguos não são publicados como localização, data, empresa ou modo remoto inventado.",
+    navigation: "Os links abaixo conectam intenções de busca localizadas e páginas de fontes ATS importantes em HTML simples para crawler e usuário. Com JavaScript ativo, a interface adiciona sugestões, filtros, contagens e cards atuais.",
+    faqLabel: "Perguntas de busca",
+    faqWhat: "O que encontro nesta página de {search}?",
+    faqWhatAnswer: "Esta é uma entrada estável para buscar {search} em quadros ATS públicos de empregadores e refinar por título, empresa, localidade, país, região, modo remoto e atualidade.",
+    faqSources: "De onde vêm as vagas?",
+    faqSourcesAnswer: "A OpenJobSlots indexa páginas públicas de carreira e quadros ATS públicos, normalizando campos públicos em um esquema pesquisável.",
+    faqQuality: "Como dados incertos são tratados?",
+    faqQualityAnswer: "Evidência incerta de localidade, data, remoto ou source-id fica conservadora até haver prova de parser suficiente."
+  }),
+  "pt-PT": createAdditionalSeoFallbackCopy({
+    relatedLabel: "Páginas públicas relacionadas de pesquisa de vagas",
+    intro: "é uma página rastreável da OpenJobSlots para visitantes e motores de busca antes da aplicação interativa carregar.",
+    coverageStart: "A OpenJobSlots ajuda a começar por",
+    defaultSearch: "vagas abertas",
+    coverageDetail: "Depois é possível filtrar por cargo, empresa, localidade, país, região, modo remoto, plataforma de origem e atualidade da publicação, usando apenas campos públicos.",
+    quality: "O índice mantém os links do empregador como fonte canónica e usa Meilisearch como camada derivada, enquanto Postgres continua a fonte de verdade. Dados ambíguos não são publicados como localização, data, empresa ou modo remoto inventado.",
+    navigation: "Os links abaixo ligam intenções localizadas e páginas ATS importantes em HTML simples para crawlers e utilizadores. Com JavaScript, a interface adiciona sugestões, filtros, contagens e cartões atuais.",
+    faqLabel: "Perguntas de pesquisa",
+    faqWhat: "O que encontro nesta página de {search}?",
+    faqWhatAnswer: "Esta é uma entrada estável para pesquisar {search} em quadros ATS públicos e refinar por título, empresa, localidade, país, região, modo remoto e atualidade.",
+    faqSources: "De onde vêm as vagas?",
+    faqSourcesAnswer: "A OpenJobSlots indexa páginas públicas de carreira e quadros ATS públicos, normalizando campos públicos num esquema pesquisável.",
+    faqQuality: "Como são tratados dados incertos?",
+    faqQualityAnswer: "Evidência incerta de localidade, data, remoto ou source-id fica conservadora até haver prova de parser suficiente."
+  }),
+  it: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Pagine pubbliche correlate per la ricerca lavoro",
+    intro: "è una pagina OpenJobSlots indicizzabile per utenti e motori di ricerca prima del caricamento dell'app interattiva.",
+    coverageStart: "OpenJobSlots aiuta a iniziare con",
+    defaultSearch: "offerte di lavoro",
+    coverageDetail: "Poi si possono filtrare i risultati per ruolo, azienda, località, paese, regione, modalità remota, piattaforma di origine e freschezza della pubblicazione, usando solo campi pubblici.",
+    quality: "L'indice mantiene i link del datore di lavoro come fonte canonica e usa Meilisearch come livello derivato, mentre Postgres resta la fonte di verità. I dati ambigui non diventano posizione, data, azienda o modalità remota inventata.",
+    navigation: "I link sotto collegano intenti localizzati e pagine ATS importanti in HTML semplice per crawler e utenti. Con JavaScript l'interfaccia aggiunge suggerimenti, filtri, conteggi e schede aggiornate.",
+    faqLabel: "Domande sulla ricerca",
+    faqWhat: "Cosa trovo in questa pagina per {search}?",
+    faqWhatAnswer: "È un punto di ingresso stabile per cercare {search} su job board ATS pubblici e filtrare per titolo, azienda, località, paese, regione, remote mode e freschezza.",
+    faqSources: "Da dove arrivano le offerte?",
+    faqSourcesAnswer: "OpenJobSlots indicizza pagine carriere pubbliche e job board ATS pubblici, normalizzando campi pubblici in uno schema ricercabile.",
+    faqQuality: "Come vengono trattati i dati incerti?",
+    faqQualityAnswer: "Evidenze incerte su località, data, remote o source-id restano conservative finché il parser non fornisce prova sufficiente."
+  }),
+  nl: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Gerelateerde publieke vacaturezoekpagina's",
+    intro: "is een crawlbare OpenJobSlots-pagina voor bezoekers en zoekmachines voordat de interactieve app laadt.",
+    coverageStart: "OpenJobSlots helpt starten met",
+    defaultSearch: "openstaande vacatures",
+    coverageDetail: "Daarna kunnen resultaten worden verfijnd op titel, bedrijf, locatie, land, regio, remote-modus, bronplatform en actualiteit, met alleen publieke vacaturevelden.",
+    quality: "De index bewaart werkgeverslinks als canonieke bron en gebruikt Meilisearch als afgeleide zoeklaag, terwijl Postgres de bron van waarheid blijft. Ambigue data wordt niet gepubliceerd als verzonnen locatie, datum, bedrijf of remote-status.",
+    navigation: "De links hieronder verbinden gelokaliseerde zoekintenties en belangrijke ATS-bronpagina's in eenvoudige HTML. Met JavaScript voegt de interface suggesties, filters, aantallen en actuele kaarten toe.",
+    faqLabel: "Zoekvragen",
+    faqWhat: "Wat vind ik op deze pagina voor {search}?",
+    faqWhatAnswer: "Dit is een stabiele ingang om {search} op publieke ATS-boards te zoeken en te verfijnen op titel, bedrijf, locatie, land, regio, remote mode en actualiteit.",
+    faqSources: "Waar komen de vacatures vandaan?",
+    faqSourcesAnswer: "OpenJobSlots indexeert publieke carrièrepagina's en publieke ATS-boards en normaliseert publieke velden naar één doorzoekbaar schema.",
+    faqQuality: "Hoe gaat OpenJobSlots om met onzekere data?",
+    faqQualityAnswer: "Onzekere locatie-, datum-, remote- of source-id-bewijzen blijven conservatief totdat parserbewijs voldoende is."
+  }),
+  pl: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Powiązane publiczne strony wyszukiwania pracy",
+    intro: "to indeksowalna strona OpenJobSlots dla użytkowników i wyszukiwarek przed załadowaniem interaktywnej aplikacji.",
+    coverageStart: "OpenJobSlots pomaga zacząć od",
+    defaultSearch: "ofert pracy",
+    coverageDetail: "Następnie wyniki można zawęzić według stanowiska, firmy, lokalizacji, kraju, regionu, trybu zdalnego, platformy źródłowej i świeżości publikacji, używając tylko publicznych pól.",
+    quality: "Indeks traktuje linki pracodawców jako kanoniczne źródło i używa Meilisearch jako warstwy pochodnej, a Postgres pozostaje źródłem prawdy. Dane niepewne nie są publikowane jako wymyślona lokalizacja, data, firma ani tryb pracy.",
+    navigation: "Linki poniżej łączą lokalne intencje wyszukiwania i ważne strony ATS w prostym HTML. Gdy działa JavaScript, interfejs dodaje sugestie, filtry, liczniki i aktualne karty.",
+    faqLabel: "Pytania o wyszukiwanie",
+    faqWhat: "Co znajdę na stronie {search}?",
+    faqWhatAnswer: "To stabilne wejście do wyszukiwania {search} na publicznych tablicach ATS i filtrowania według stanowiska, firmy, lokalizacji, kraju, regionu, trybu zdalnego i świeżości.",
+    faqSources: "Skąd pochodzą oferty?",
+    faqSourcesAnswer: "OpenJobSlots indeksuje publiczne strony karier i publiczne tablice ATS, normalizując publiczne pola do jednego schematu.",
+    faqQuality: "Jak traktowane są niepewne dane?",
+    faqQualityAnswer: "Niepewna lokalizacja, data, remote lub source-id pozostają konserwatywne do czasu wystarczających dowodów parsera."
+  }),
+  ja: createAdditionalSeoFallbackCopy({
+    relatedLabel: "関連する公開求人検索ページ",
+    intro: "は、インタラクティブな検索アプリが読み込まれる前に使える OpenJobSlots のクロール可能な入口です。",
+    coverageStart: "OpenJobSlots は次の検索から始められます:",
+    defaultSearch: "公開求人",
+    coverageDetail: "その後、職種、会社、地域、国、リージョン、リモート条件、ソースプラットフォーム、掲載の新しさで結果を絞り込めます。公開求人フィールドだけを使います。",
+    quality: "インデックスは雇用主リンクを正規ソースとして扱い、Meilisearch を派生検索レイヤーとして使い、Postgres を真実のソースにします。不明確なデータを架空の場所、日付、会社、リモート状態として公開しません。",
+    navigation: "下のリンクは、ローカライズされた検索意図と重要な ATS ソースページをシンプルな HTML でつなぎます。JavaScript が使える場合、UI は提案、フィルター、件数、最新カードを追加します。",
+    faqLabel: "検索 FAQ",
+    faqWhat: "{search} ページでは何が見つかりますか?",
+    faqWhatAnswer: "公開 ATS ボードの {search} を安定して検索し、職種、会社、地域、国、リモート条件、新しさで絞り込む入口です。",
+    faqSources: "求人はどこから来ますか?",
+    faqSourcesAnswer: "OpenJobSlots は公開キャリアページと公開 ATS ボードをインデックスし、公開フィールドを検索スキーマに正規化します。",
+    faqQuality: "不確実なデータはどう扱いますか?",
+    faqQualityAnswer: "場所、日付、リモート、source-id が不確実な場合、parser の証拠が十分になるまで保守的に扱います。"
+  }),
+  ko: createAdditionalSeoFallbackCopy({
+    relatedLabel: "관련 공개 채용 검색 페이지",
+    intro: "는 인터랙티브 검색 앱이 로드되기 전에 사람과 검색 엔진이 사용할 수 있는 OpenJobSlots 진입점입니다.",
+    coverageStart: "OpenJobSlots는 다음 검색으로 시작할 수 있습니다:",
+    defaultSearch: "공개 채용 공고",
+    coverageDetail: "이후 직무, 회사, 위치, 국가, 지역, 원격 방식, 출처 플랫폼, 게시 신선도로 결과를 좁힐 수 있으며 공개 채용 필드만 사용합니다.",
+    quality: "인덱스는 고용주 링크를 정식 출처로 유지하고 Meilisearch를 파생 검색 계층으로 사용하며 Postgres를 source of truth로 둡니다. 불명확한 데이터는 가짜 위치, 날짜, 회사 또는 원격 상태로 공개하지 않습니다.",
+    navigation: "아래 링크는 현지화된 검색 의도와 주요 ATS 출처 페이지를 단순 HTML로 연결합니다. JavaScript가 있으면 UI가 제안, 필터, 개수, 최신 카드를 추가합니다.",
+    faqLabel: "검색 FAQ",
+    faqWhat: "{search} 페이지에서 무엇을 찾을 수 있나요?",
+    faqWhatAnswer: "공개 ATS 보드의 {search}를 안정적으로 검색하고 직무, 회사, 위치, 국가, 원격 방식, 최신순으로 좁히는 진입점입니다.",
+    faqSources: "공고는 어디에서 오나요?",
+    faqSourcesAnswer: "OpenJobSlots는 공개 커리어 페이지와 공개 ATS 보드를 인덱싱하고 공개 필드를 하나의 검색 스키마로 정규화합니다.",
+    faqQuality: "불확실한 데이터는 어떻게 처리하나요?",
+    faqQualityAnswer: "위치, 날짜, 원격, source-id 증거가 불확실하면 parser 증거가 충분해질 때까지 보수적으로 유지합니다."
+  }),
+  "zh-CN": createAdditionalSeoFallbackCopy({
+    relatedLabel: "相关公开职位搜索页面",
+    intro: "是 OpenJobSlots 的可抓取入口，供用户和搜索引擎在交互式搜索应用加载前使用。",
+    coverageStart: "OpenJobSlots 可以从以下搜索开始:",
+    defaultSearch: "开放职位",
+    coverageDetail: "之后可按职位、公司、地点、国家、地区、远程方式、来源平台和发布时间新鲜度筛选结果，并且只使用公开职位字段。",
+    quality: "索引将雇主链接保留为规范来源，Meilisearch 是派生搜索层，Postgres 仍是事实来源。不明确数据不会被发布为虚构地点、日期、公司或远程状态。",
+    navigation: "下面的链接用简单 HTML 连接本地化搜索意图和重要 ATS 来源页面。启用 JavaScript 后，界面会添加建议、筛选、数量和最新职位卡片。",
+    faqLabel: "搜索 FAQ",
+    faqWhat: "这个 {search} 页面可以找到什么?",
+    faqWhatAnswer: "这是搜索公开 ATS 招聘板中 {search} 的稳定入口，并可按职位、公司、地点、国家、远程方式和新鲜度筛选。",
+    faqSources: "职位来自哪里?",
+    faqSourcesAnswer: "OpenJobSlots 索引公开职业页面和公开 ATS 招聘板，并将公开字段规范化到一个可搜索 schema。",
+    faqQuality: "不确定数据如何处理?",
+    faqQualityAnswer: "地点、日期、远程或 source-id 证据不确定时，会保持保守，直到 parser 证据足够。"
+  }),
+  hi: createAdditionalSeoFallbackCopy({
+    relatedLabel: "संबंधित public job search pages",
+    intro: "OpenJobSlots का crawlable entry point है, जो interactive search app load होने से पहले users और search engines के लिए काम करता है.",
+    coverageStart: "OpenJobSlots शुरुआत करने में मदद करता है:",
+    defaultSearch: "open jobs",
+    coverageDetail: "इसके बाद results को title, company, location, country, region, remote mode, source platform और posting freshness से refine किया जा सकता है, और सिर्फ public posting fields का उपयोग होता है.",
+    quality: "Index employer links को canonical source evidence रखता है, Meilisearch को derived search layer की तरह चलाता है, और Postgres source of truth रहता है. Ambiguous data को fake location, date, company या remote value की तरह publish नहीं किया जाता.",
+    navigation: "नीचे links localized search intents और important ATS source pages को plain HTML में जोड़ते हैं. JavaScript उपलब्ध होने पर interface suggestions, filters, counts और current posting cards जोड़ता है.",
+    faqLabel: "Search FAQ",
+    faqWhat: "{search} page पर क्या मिलेगा?",
+    faqWhatAnswer: "यह public ATS boards में {search} खोजने और title, company, location, country, remote mode और freshness से refine करने का stable entry point है.",
+    faqSources: "Listings कहां से आते हैं?",
+    faqSourcesAnswer: "OpenJobSlots public career pages और public ATS boards index करता है, फिर public fields को searchable schema में normalize करता है.",
+    faqQuality: "Uncertain data कैसे handle होता है?",
+    faqQualityAnswer: "Location, date, remote या source-id evidence unclear हो तो parser proof पर्याप्त होने तक value conservative रहती है."
+  }),
+  ar: createAdditionalSeoFallbackCopy({
+    relatedLabel: "صفحات بحث وظائف عامة ذات صلة",
+    intro: "هي صفحة OpenJobSlots قابلة للزحف للزوار ومحركات البحث قبل تحميل تطبيق البحث التفاعلي.",
+    coverageStart: "تساعد OpenJobSlots على البدء بـ",
+    defaultSearch: "الوظائف المفتوحة",
+    coverageDetail: "بعد ذلك يمكن تضييق النتائج حسب المسمى والشركة والموقع والدولة والمنطقة ونمط العمل عن بعد ومنصة المصدر وحداثة النشر، باستخدام حقول عامة فقط.",
+    quality: "يحافظ الفهرس على روابط صاحب العمل كمصدر قانوني ويستخدم Meilisearch كطبقة بحث مشتقة بينما يبقى Postgres مصدر الحقيقة. البيانات غير الواضحة لا تنشر كموقع أو تاريخ أو شركة أو حالة عمل عن بعد مخترعة.",
+    navigation: "الروابط أدناه تصل نوايا البحث المحلية وصفحات ATS المهمة عبر HTML بسيط. عند توفر JavaScript تضيف الواجهة الاقتراحات والفلاتر والعدادات وبطاقات الوظائف الحالية.",
+    faqLabel: "أسئلة البحث",
+    faqWhat: "ماذا أجد في صفحة {search}؟",
+    faqWhatAnswer: "هذه نقطة دخول مستقرة للبحث عن {search} في لوحات ATS العامة والتصفية حسب المسمى والشركة والموقع والدولة والعمل عن بعد والحداثة.",
+    faqSources: "من أين تأتي الوظائف؟",
+    faqSourcesAnswer: "تفهرس OpenJobSlots صفحات وظائف عامة ولوحات ATS عامة، ثم توحد الحقول العامة في schema قابل للبحث.",
+    faqQuality: "كيف يتم التعامل مع البيانات غير المؤكدة؟",
+    faqQualityAnswer: "إذا كان دليل الموقع أو التاريخ أو العمل عن بعد أو source-id غير واضح، يبقى محافظا حتى يتوفر دليل parser كاف."
+  }),
+  id: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Halaman pencarian lowongan publik terkait",
+    intro: "adalah halaman OpenJobSlots yang dapat dirayapi untuk pengguna dan mesin pencari sebelum aplikasi interaktif dimuat.",
+    coverageStart: "OpenJobSlots membantu memulai dengan",
+    defaultSearch: "lowongan terbuka",
+    coverageDetail: "Setelah itu hasil dapat difilter berdasarkan jabatan, perusahaan, lokasi, negara, wilayah, mode remote, platform sumber, dan kesegaran posting, hanya memakai field publik.",
+    quality: "Indeks mempertahankan link pemberi kerja sebagai sumber kanonis dan memakai Meilisearch sebagai lapisan pencarian turunan, sementara Postgres tetap menjadi source of truth. Data ambigu tidak diterbitkan sebagai lokasi, tanggal, perusahaan, atau remote status palsu.",
+    navigation: "Link di bawah menghubungkan intent lokal dan halaman sumber ATS penting dalam HTML sederhana. Saat JavaScript tersedia, antarmuka menambah saran, filter, hitungan, dan kartu lowongan terbaru.",
+    faqLabel: "FAQ pencarian",
+    faqWhat: "Apa yang ada di halaman {search} ini?",
+    faqWhatAnswer: "Ini adalah titik masuk stabil untuk mencari {search} di papan ATS publik dan memfilter berdasarkan jabatan, perusahaan, lokasi, negara, remote mode, dan kesegaran.",
+    faqSources: "Dari mana lowongan berasal?",
+    faqSourcesAnswer: "OpenJobSlots mengindeks halaman karier publik dan papan ATS publik, lalu menormalkan field publik ke schema yang dapat dicari.",
+    faqQuality: "Bagaimana data yang tidak pasti ditangani?",
+    faqQualityAnswer: "Bukti lokasi, tanggal, remote, atau source-id yang tidak jelas tetap konservatif sampai bukti parser cukup."
+  }),
+  sv: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Relaterade publika jobbsöksidor",
+    intro: "är en crawlbar OpenJobSlots-sida för besökare och sökmotorer innan den interaktiva appen laddas.",
+    coverageStart: "OpenJobSlots hjälper dig börja med",
+    defaultSearch: "öppna jobb",
+    coverageDetail: "Därefter kan resultat filtreras efter titel, företag, plats, land, region, remote-läge, källplattform och publiceringsfräschör, med endast publika jobbfält.",
+    quality: "Indexet behåller arbetsgivarlänkar som kanonisk källa och använder Meilisearch som härledd söklager, medan Postgres är source of truth. Oklar data publiceras inte som påhittad plats, datum, företag eller remote-status.",
+    navigation: "Länkarna nedan kopplar lokala sökintentioner och viktiga ATS-källsidor i enkel HTML. Med JavaScript lägger gränssnittet till förslag, filter, antal och aktuella jobbkort.",
+    faqLabel: "Sökfrågor",
+    faqWhat: "Vad finns på sidan för {search}?",
+    faqWhatAnswer: "Detta är en stabil ingång för att söka {search} på publika ATS-tavlor och filtrera efter titel, företag, plats, land, remote-läge och fräschör.",
+    faqSources: "Varifrån kommer jobben?",
+    faqSourcesAnswer: "OpenJobSlots indexerar publika karriärsidor och publika ATS-tavlor och normaliserar publika fält till ett sökbart schema.",
+    faqQuality: "Hur hanteras osäker data?",
+    faqQualityAnswer: "Osäker plats, datum, remote eller source-id hålls konservativ tills parserbevis räcker."
+  }),
+  da: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Relaterede offentlige jobsøgningssider",
+    intro: "er en crawlbar OpenJobSlots-side for brugere og søgemaskiner før den interaktive app indlæses.",
+    coverageStart: "OpenJobSlots hjælper med at starte med",
+    defaultSearch: "ledige job",
+    coverageDetail: "Derefter kan resultater filtreres efter titel, virksomhed, sted, land, region, remote-form, kildeplatform og friskhed, kun med offentlige jobfelter.",
+    quality: "Indekset bevarer arbejdsgiverlinks som kanonisk kilde og bruger Meilisearch som afledt søgelag, mens Postgres er source of truth. Usikre data publiceres ikke som opfundet sted, dato, virksomhed eller remote-status.",
+    navigation: "Links nedenfor forbinder lokale søgeintentioner og vigtige ATS-kildesider i enkel HTML. Med JavaScript tilføjer grænsefladen forslag, filtre, tællinger og aktuelle jobkort.",
+    faqLabel: "Søgespørgsmål",
+    faqWhat: "Hvad findes på siden for {search}?",
+    faqWhatAnswer: "Det er en stabil indgang til at søge {search} på offentlige ATS-boards og filtrere efter titel, virksomhed, sted, land, remote-form og friskhed.",
+    faqSources: "Hvor kommer jobbene fra?",
+    faqSourcesAnswer: "OpenJobSlots indekserer offentlige karrieresider og ATS-boards og normaliserer offentlige felter til et søgbart schema.",
+    faqQuality: "Hvordan håndteres usikre data?",
+    faqQualityAnswer: "Usikker lokation, dato, remote eller source-id holdes konservativt, indtil parserbevis er tilstrækkeligt."
+  }),
+  no: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Relaterte offentlige jobbsøksider",
+    intro: "er en crawlbar OpenJobSlots-side for brukere og søkemotorer før den interaktive appen lastes.",
+    coverageStart: "OpenJobSlots hjelper deg å starte med",
+    defaultSearch: "åpne jobber",
+    coverageDetail: "Deretter kan resultater filtreres etter tittel, selskap, sted, land, region, remote-form, kildeplattform og ferskhet, bare med offentlige jobbfelt.",
+    quality: "Indeksen beholder arbeidsgiverlenker som kanonisk kilde og bruker Meilisearch som avledet søkelag, mens Postgres er source of truth. Uklar data publiseres ikke som oppdiktet sted, dato, selskap eller remote-status.",
+    navigation: "Lenkene under kobler lokale søkeintensjoner og viktige ATS-kildesider i enkel HTML. Med JavaScript legger grensesnittet til forslag, filtre, tellinger og aktuelle jobbkort.",
+    faqLabel: "Søkespørsmål",
+    faqWhat: "Hva finnes på siden for {search}?",
+    faqWhatAnswer: "Dette er en stabil inngang for å søke {search} på offentlige ATS-tavler og filtrere etter tittel, selskap, sted, land, remote-form og ferskhet.",
+    faqSources: "Hvor kommer jobbene fra?",
+    faqSourcesAnswer: "OpenJobSlots indekserer offentlige karrieresider og offentlige ATS-tavler og normaliserer offentlige felter til et søkbart schema.",
+    faqQuality: "Hvordan håndteres usikker data?",
+    faqQualityAnswer: "Usikker lokasjon, dato, remote eller source-id holdes konservativt til parserbevis er nok."
+  }),
+  fi: createAdditionalSeoFallbackCopy({
+    relatedLabel: "Aiheeseen liittyvät julkiset työnhakusivut",
+    intro: "on indeksoitava OpenJobSlots-sivu käyttäjille ja hakukoneille ennen interaktiivisen sovelluksen latautumista.",
+    coverageStart: "OpenJobSlots auttaa aloittamaan haulla",
+    defaultSearch: "avoimet työpaikat",
+    coverageDetail: "Sen jälkeen tuloksia voi rajata nimikkeen, yrityksen, sijainnin, maan, alueen, etätyömuodon, lähdealustan ja julkaisun tuoreuden mukaan, käyttäen vain julkisia kenttiä.",
+    quality: "Indeksi säilyttää työnantajalinkit kanonisena lähteenä ja käyttää Meilisearchia johdettuna hakukerroksena, kun Postgres on source of truth. Epäselvää dataa ei julkaista keksittynä sijaintina, päivänä, yrityksenä tai etätyötilana.",
+    navigation: "Alla olevat linkit yhdistävät paikalliset hakuaikeet ja tärkeät ATS-lähdesivut yksinkertaisessa HTML:ssä. JavaScript lisää käyttöliittymään ehdotukset, suodattimet, määrät ja ajantasaiset kortit.",
+    faqLabel: "Hakukysymykset",
+    faqWhat: "Mitä {search} -sivulta löytyy?",
+    faqWhatAnswer: "Se on vakaa aloituspaikka hakea {search} julkisilta ATS-sivuilta ja rajata nimikkeen, yrityksen, sijainnin, maan, etätyön ja tuoreuden mukaan.",
+    faqSources: "Mistä työpaikat tulevat?",
+    faqSourcesAnswer: "OpenJobSlots indeksoi julkisia urasivuja ja ATS-sivuja ja normalisoi julkiset kentät haettavaan schemaan.",
+    faqQuality: "Miten epävarmaa dataa käsitellään?",
+    faqQualityAnswer: "Epävarma sijainti, päivämäärä, etätyö tai source-id pidetään konservatiivisena, kunnes parser-todiste riittää."
+  })
+});
+
 function getSeoHeadingFromTitle(value) {
   const normalized = normalizeInlineText(value);
   if (/^OpenJobSlots\s+\|/i.test(normalized)) return "OpenJobSlots";
@@ -273,7 +543,9 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   function getSeoFallbackCopy(languageCode) {
-    return SEO_FALLBACK_COPY_BY_LANGUAGE[languageCode] || SEO_FALLBACK_COPY_BY_LANGUAGE.en;
+    return SEO_FALLBACK_COPY_BY_LANGUAGE[languageCode] ||
+      SEO_ADDITIONAL_FALLBACK_COPY_BY_LANGUAGE[languageCode] ||
+      SEO_FALLBACK_COPY_BY_LANGUAGE.en;
   }
 
   function getRouteSpecificSeoParagraphs(seoRoute) {

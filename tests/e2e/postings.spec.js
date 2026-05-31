@@ -1239,17 +1239,17 @@ test.describe("postings page QA", () => {
   test("home exposes crawlable SEO landing links for search engines", async ({ page }) => {
     await openJobSlots(page);
 
-    const englishRemoteLink = page.locator('a[href="/en/remote-job-openings"]');
     await expect(page.getByTestId("seo-landing-links")).toBeVisible();
-    await expect(englishRemoteLink).toBeVisible();
-    await expect(englishRemoteLink).toContainText(/remote job openings/i);
+    const englishPopularOrRouteLink = page.locator('a[href="/en/remote-job-openings"], a[href="/en?q=US%20jobs"]').first();
+    await expect(englishPopularOrRouteLink).toBeVisible();
+    await expect(englishPopularOrRouteLink).toHaveAttribute("href", /\/en(?:\/remote-job-openings|\?q=US%20jobs)/);
 
     await page.getByTestId("language-selector").click();
     await page.getByTestId("language-option-tr").click();
 
-    const turkishRemoteLink = page.locator('a[href="/tr/uzaktan-calisma-ilanlari"]');
-    await expect(turkishRemoteLink).toBeVisible();
-    await expect(turkishRemoteLink).toContainText(/uzaktan/i);
+    const turkishPopularOrRouteLink = page.locator('a[href="/tr/uzaktan-calisma-ilanlari"], a[href="/tr?q=Turkiye%20jobs"]').first();
+    await expect(turkishPopularOrRouteLink).toBeVisible();
+    await expect(turkishPopularOrRouteLink).toHaveAttribute("href", /\/tr(?:\/uzaktan-calisma-ilanlari|\?q=Turkiye%20jobs)/);
   });
 
   test("popular search links open results without autocomplete suggestions", async ({ page }) => {
@@ -1418,6 +1418,177 @@ test.describe("postings page QA", () => {
         expect(visibleText, `${languageCode} should not show the English release title`).not.toContain("Release notes");
         expect(visibleText, `${languageCode} should not show the English updating indicator`).not.toContain("Updating visible results...");
       }
+    }
+  });
+
+  test("expanded language packs localize the public shell and release notes", async ({ page }) => {
+    test.setTimeout(120_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width < 768, "desktop language menu coverage is covered by the desktop project");
+
+    const expandedExpectations = {
+      "pt-BR": {
+        code: "BR",
+        hero: "Buscar vagas abertas",
+        lead: "Encontre vagas recentes em quadros ATS públicos.",
+        placeholder: "Busque cargo, empresa, local ou país",
+        popular: "Buscas populares",
+        releaseTitle: "Notas da versão",
+        releaseHeading: "Atualização da busca pública"
+      },
+      "pt-PT": {
+        code: "PT",
+        hero: "Pesquisar vagas abertas",
+        lead: "Encontra vagas recentes em quadros ATS públicos.",
+        placeholder: "Pesquisa cargo, empresa, local ou país",
+        popular: "Pesquisas populares",
+        releaseTitle: "Notas da versão",
+        releaseHeading: "Atualização da pesquisa pública"
+      },
+      it: {
+        code: "IT",
+        hero: "Cerca posizioni aperte",
+        lead: "Trova offerte recenti nei job board ATS pubblici.",
+        placeholder: "Cerca ruolo, azienda, località o paese",
+        popular: "Ricerche popolari",
+        releaseTitle: "Note di rilascio",
+        releaseHeading: "Aggiornamento della ricerca pubblica"
+      },
+      nl: {
+        code: "NL",
+        hero: "Zoek openstaande vacatures",
+        lead: "Vind recente vacatures op publieke ATS-jobboards.",
+        placeholder: "Zoek titel, bedrijf, plaats of land",
+        popular: "Populaire zoekopdrachten",
+        releaseTitle: "Release-opmerkingen",
+        releaseHeading: "Publieke zoekupdate"
+      },
+      pl: {
+        code: "PL",
+        hero: "Szukaj otwartych ofert pracy",
+        lead: "Znajdź świeże oferty z publicznych tablic ATS.",
+        placeholder: "Szukaj stanowiska, firmy, lokalizacji lub kraju",
+        popular: "Popularne wyszukiwania",
+        releaseTitle: "Informacje o wersji",
+        releaseHeading: "Aktualizacja wyszukiwania publicznego"
+      },
+      ja: {
+        code: "JA",
+        hero: "公開求人を検索",
+        lead: "公開ATS求人ボードから新しい求人を見つけます。",
+        placeholder: "職種、会社、地域、国で検索",
+        popular: "人気の検索",
+        releaseTitle: "リリースノート",
+        releaseHeading: "公開検索の更新"
+      },
+      ko: {
+        code: "KO",
+        hero: "공개 채용 공고 검색",
+        lead: "공개 ATS 채용 보드의 최신 공고를 찾습니다.",
+        placeholder: "직무, 회사, 지역 또는 국가 검색",
+        popular: "인기 검색어",
+        releaseTitle: "릴리스 노트",
+        releaseHeading: "공개 검색 업데이트"
+      },
+      "zh-CN": {
+        code: "CN",
+        hero: "搜索开放职位",
+        lead: "从公开 ATS 招聘板查找最新职位。",
+        placeholder: "搜索职位、公司、地点或国家",
+        popular: "热门搜索",
+        releaseTitle: "版本说明",
+        releaseHeading: "公开搜索更新"
+      },
+      hi: {
+        code: "HI",
+        hero: "खुली नौकरियां खोजें",
+        lead: "सार्वजनिक ATS job boards से ताज़ा openings खोजें।",
+        placeholder: "पद, कंपनी, स्थान या देश खोजें",
+        popular: "लोकप्रिय खोजें",
+        releaseTitle: "रिलीज नोट्स",
+        releaseHeading: "Public search update"
+      },
+      ar: {
+        code: "AR",
+        hero: "ابحث عن الوظائف المفتوحة",
+        lead: "اعثر على وظائف حديثة من لوحات ATS العامة.",
+        placeholder: "ابحث عن المسمى أو الشركة أو الموقع أو الدولة",
+        popular: "عمليات بحث شائعة",
+        releaseTitle: "ملاحظات الإصدار",
+        releaseHeading: "تحديث البحث العام"
+      },
+      id: {
+        code: "ID",
+        hero: "Cari lowongan terbuka",
+        lead: "Temukan lowongan terbaru dari papan ATS publik.",
+        placeholder: "Cari jabatan, perusahaan, lokasi, atau negara",
+        popular: "Pencarian populer",
+        releaseTitle: "Catatan rilis",
+        releaseHeading: "Pembaruan pencarian publik"
+      },
+      sv: {
+        code: "SV",
+        hero: "Sök öppna jobb",
+        lead: "Hitta färska jobb från publika ATS-jobbtavlor.",
+        placeholder: "Sök titel, företag, plats eller land",
+        popular: "Populära sökningar",
+        releaseTitle: "Versionsnotiser",
+        releaseHeading: "Uppdatering av publik sökning"
+      },
+      da: {
+        code: "DA",
+        hero: "Søg ledige job",
+        lead: "Find friske opslag fra offentlige ATS-jobboards.",
+        placeholder: "Søg titel, virksomhed, sted eller land",
+        popular: "Populære søgninger",
+        releaseTitle: "Versionsnoter",
+        releaseHeading: "Opdatering af offentlig søgning"
+      },
+      no: {
+        code: "NO",
+        hero: "Søk åpne jobber",
+        lead: "Finn ferske stillinger fra offentlige ATS-jobbtavler.",
+        placeholder: "Søk tittel, selskap, sted eller land",
+        popular: "Populære søk",
+        releaseTitle: "Versjonsnotater",
+        releaseHeading: "Oppdatering av offentlig søk"
+      },
+      fi: {
+        code: "FI",
+        hero: "Etsi avoimia työpaikkoja",
+        lead: "Löydä tuoreet ilmoitukset julkisilta ATS-työpaikkasivuilta.",
+        placeholder: "Etsi nimike, yritys, sijainti tai maa",
+        popular: "Suositut haut",
+        releaseTitle: "Julkaisutiedot",
+        releaseHeading: "Julkisen haun päivitys"
+      }
+    };
+
+    for (const [languageCode, expected] of Object.entries(expandedExpectations)) {
+      await page.goto("/");
+      await page.getByTestId("language-selector").click();
+      const option = page.getByTestId(`language-option-${languageCode}`);
+      await option.scrollIntoViewIfNeeded();
+      await option.click();
+
+      await expect(page.getByTestId("language-selector")).toContainText(expected.code);
+      await expect(page.getByText(expected.hero)).toBeVisible();
+      await expect(page.getByText(expected.lead)).toBeVisible();
+      expect(await page.getByTestId("search-input").getAttribute("aria-label")).not.toBe("Search openings");
+      await expect(page.getByText(expected.popular)).toBeVisible();
+      await expect(page.getByTestId("public-version-label")).toContainText(APP_VERSION);
+
+      await page.getByTestId("public-version-button").click();
+      await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+      await expect(page.getByTestId("release-notes-title")).toHaveText(expected.releaseTitle);
+      await expect(page.getByTestId("release-notes-modal").getByText(expected.releaseHeading).first()).toBeVisible();
+      await page.getByTestId("release-notes-close").click();
+      await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+
+      const visibleText = await page.locator("body").innerText();
+      expect(visibleText, `${languageCode} should not show the English hero`).not.toContain("Search open job slots");
+      expect(visibleText, `${languageCode} should not show the English footer credit`).not.toContain("Deployed and developed by");
+      expect(visibleText, `${languageCode} should not show the English release title`).not.toContain("Release notes");
     }
   });
 

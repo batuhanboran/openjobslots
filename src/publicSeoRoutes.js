@@ -7,7 +7,7 @@ function normalizePublicSeoPath(value) {
   return normalized.toLowerCase() || "/";
 }
 
-const PUBLIC_SEO_HOME_PAGES = Object.freeze([
+const PUBLIC_SEO_BASE_HOME_PAGES = Object.freeze([
   {
     languageCode: "en",
     path: "/en",
@@ -40,7 +40,275 @@ const PUBLIC_SEO_HOME_PAGES = Object.freeze([
   }
 ]);
 
-const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
+const PUBLIC_SEO_ADDITIONAL_LANGUAGE_CONFIGS = Object.freeze([
+  {
+    languageCode: "pt-BR",
+    pathPrefix: "pt-br",
+    homeTitle: "Buscar vagas abertas | OpenJobSlots",
+    homeDescription: "Encontre vagas recentes em quadros ATS públicos por cargo, empresa, local, modo remoto e atualidade.",
+    landingDescription: "Pesquise vagas recentes em quadros ATS públicos por empresa, localidade, modo remoto e atualidade.",
+    landingLabels: {
+      "job-search": "Vagas abertas",
+      remote: "Vagas remotas",
+      "software-engineer": "Vagas de software engineer",
+      "product-manager": "Vagas de product manager",
+      "technical-support": "Vagas de suporte técnico",
+      "data-analyst": "Vagas de data analyst",
+      "customer-success": "Vagas de customer success manager",
+      "devops-engineer": "Vagas de DevOps engineer"
+    }
+  },
+  {
+    languageCode: "pt-PT",
+    pathPrefix: "pt-pt",
+    homeTitle: "Pesquisar vagas abertas | OpenJobSlots",
+    homeDescription: "Encontra vagas recentes em quadros ATS públicos por cargo, empresa, local, modo remoto e atualidade.",
+    landingDescription: "Pesquisa vagas recentes em quadros ATS públicos por empresa, localidade, modo remoto e atualidade.",
+    landingLabels: {
+      "job-search": "Vagas abertas",
+      remote: "Vagas remotas",
+      "software-engineer": "Vagas de software engineer",
+      "product-manager": "Vagas de product manager",
+      "technical-support": "Vagas de suporte técnico",
+      "data-analyst": "Vagas de data analyst",
+      "customer-success": "Vagas de customer success manager",
+      "devops-engineer": "Vagas de DevOps engineer"
+    }
+  },
+  {
+    languageCode: "it",
+    pathPrefix: "it",
+    homeTitle: "Cerca posizioni aperte | OpenJobSlots",
+    homeDescription: "Trova offerte recenti nei job board ATS pubblici per ruolo, azienda, località, modalità remota e freschezza.",
+    landingDescription: "Cerca offerte recenti nei job board ATS pubblici per azienda, località, modalità remota e freschezza.",
+    landingLabels: {
+      "job-search": "Offerte di lavoro",
+      remote: "Lavori remoti",
+      "software-engineer": "Lavori software engineer",
+      "product-manager": "Lavori product manager",
+      "technical-support": "Lavori technical support",
+      "data-analyst": "Lavori data analyst",
+      "customer-success": "Lavori customer success manager",
+      "devops-engineer": "Lavori DevOps engineer"
+    }
+  },
+  {
+    languageCode: "nl",
+    pathPrefix: "nl",
+    homeTitle: "Zoek openstaande vacatures | OpenJobSlots",
+    homeDescription: "Vind recente vacatures op publieke ATS-jobboards op titel, bedrijf, locatie, remote-modus en actualiteit.",
+    landingDescription: "Zoek recente vacatures op publieke ATS-jobboards op bedrijf, locatie, remote-modus en actualiteit.",
+    landingLabels: {
+      "job-search": "Openstaande vacatures",
+      remote: "Remote vacatures",
+      "software-engineer": "Software engineer vacatures",
+      "product-manager": "Product manager vacatures",
+      "technical-support": "Technical support vacatures",
+      "data-analyst": "Data analyst vacatures",
+      "customer-success": "Customer success manager vacatures",
+      "devops-engineer": "DevOps engineer vacatures"
+    }
+  },
+  {
+    languageCode: "pl",
+    pathPrefix: "pl",
+    homeTitle: "Szukaj otwartych ofert pracy | OpenJobSlots",
+    homeDescription: "Znajdź świeże oferty z publicznych tablic ATS według stanowiska, firmy, lokalizacji, trybu zdalnego i daty.",
+    landingDescription: "Szukaj świeżych ofert z publicznych tablic ATS według firmy, lokalizacji, trybu zdalnego i daty.",
+    landingLabels: {
+      "job-search": "Oferty pracy",
+      remote: "Praca zdalna",
+      "software-engineer": "Oferty software engineer",
+      "product-manager": "Oferty product manager",
+      "technical-support": "Oferty technical support",
+      "data-analyst": "Oferty data analyst",
+      "customer-success": "Oferty customer success manager",
+      "devops-engineer": "Oferty DevOps engineer"
+    }
+  },
+  {
+    languageCode: "ja",
+    pathPrefix: "ja",
+    homeTitle: "公開求人を検索 | OpenJobSlots",
+    homeDescription: "公開ATS求人ボードから職種、会社、地域、リモート条件、新しさで求人を検索します。",
+    landingDescription: "公開ATS求人ボードから会社、地域、リモート条件、新しさで求人を検索します。",
+    landingLabels: {
+      "job-search": "公開求人",
+      remote: "リモート求人",
+      "software-engineer": "Software engineer 求人",
+      "product-manager": "Product manager 求人",
+      "technical-support": "Technical support 求人",
+      "data-analyst": "Data analyst 求人",
+      "customer-success": "Customer success manager 求人",
+      "devops-engineer": "DevOps engineer 求人"
+    }
+  },
+  {
+    languageCode: "ko",
+    pathPrefix: "ko",
+    homeTitle: "공개 채용 공고 검색 | OpenJobSlots",
+    homeDescription: "공개 ATS 채용 보드에서 직무, 회사, 위치, 원격 조건, 최신순으로 공고를 찾습니다.",
+    landingDescription: "공개 ATS 채용 보드에서 회사, 위치, 원격 조건, 최신순으로 공고를 검색합니다.",
+    landingLabels: {
+      "job-search": "공개 채용 공고",
+      remote: "원격 채용 공고",
+      "software-engineer": "Software engineer 채용",
+      "product-manager": "Product manager 채용",
+      "technical-support": "Technical support 채용",
+      "data-analyst": "Data analyst 채용",
+      "customer-success": "Customer success manager 채용",
+      "devops-engineer": "DevOps engineer 채용"
+    }
+  },
+  {
+    languageCode: "zh-CN",
+    pathPrefix: "zh-cn",
+    homeTitle: "搜索开放职位 | OpenJobSlots",
+    homeDescription: "从公开 ATS 招聘板按职位、公司、地点、远程方式和新鲜度搜索最新职位。",
+    landingDescription: "从公开 ATS 招聘板按公司、地点、远程方式和新鲜度搜索最新职位。",
+    landingLabels: {
+      "job-search": "开放职位",
+      remote: "远程职位",
+      "software-engineer": "Software engineer 职位",
+      "product-manager": "Product manager 职位",
+      "technical-support": "Technical support 职位",
+      "data-analyst": "Data analyst 职位",
+      "customer-success": "Customer success manager 职位",
+      "devops-engineer": "DevOps engineer 职位"
+    }
+  },
+  {
+    languageCode: "hi",
+    pathPrefix: "hi",
+    homeTitle: "खुली नौकरियां खोजें | OpenJobSlots",
+    homeDescription: "सार्वजनिक ATS job boards से पद, कंपनी, स्थान, remote mode और freshness के आधार पर jobs खोजें।",
+    landingDescription: "सार्वजनिक ATS job boards से कंपनी, स्थान, remote mode और freshness के आधार पर jobs खोजें।",
+    landingLabels: {
+      "job-search": "खुली नौकरियां",
+      remote: "remote jobs",
+      "software-engineer": "software engineer jobs",
+      "product-manager": "product manager jobs",
+      "technical-support": "technical support jobs",
+      "data-analyst": "data analyst jobs",
+      "customer-success": "customer success manager jobs",
+      "devops-engineer": "DevOps engineer jobs"
+    }
+  },
+  {
+    languageCode: "ar",
+    pathPrefix: "ar",
+    homeTitle: "ابحث عن الوظائف المفتوحة | OpenJobSlots",
+    homeDescription: "ابحث في لوحات ATS العامة حسب المسمى والشركة والموقع والعمل عن بعد والحداثة.",
+    landingDescription: "ابحث في لوحات ATS العامة حسب الشركة والموقع والعمل عن بعد والحداثة.",
+    landingLabels: {
+      "job-search": "وظائف مفتوحة",
+      remote: "وظائف عن بعد",
+      "software-engineer": "وظائف software engineer",
+      "product-manager": "وظائف product manager",
+      "technical-support": "وظائف technical support",
+      "data-analyst": "وظائف data analyst",
+      "customer-success": "وظائف customer success manager",
+      "devops-engineer": "وظائف DevOps engineer"
+    }
+  },
+  {
+    languageCode: "id",
+    pathPrefix: "id",
+    homeTitle: "Cari lowongan terbuka | OpenJobSlots",
+    homeDescription: "Temukan lowongan terbaru dari papan ATS publik berdasarkan jabatan, perusahaan, lokasi, mode remote, dan kesegaran.",
+    landingDescription: "Cari lowongan terbaru dari papan ATS publik berdasarkan perusahaan, lokasi, mode remote, dan kesegaran.",
+    landingLabels: {
+      "job-search": "Lowongan terbuka",
+      remote: "Lowongan remote",
+      "software-engineer": "Lowongan software engineer",
+      "product-manager": "Lowongan product manager",
+      "technical-support": "Lowongan technical support",
+      "data-analyst": "Lowongan data analyst",
+      "customer-success": "Lowongan customer success manager",
+      "devops-engineer": "Lowongan DevOps engineer"
+    }
+  },
+  {
+    languageCode: "sv",
+    pathPrefix: "sv",
+    homeTitle: "Sök öppna jobb | OpenJobSlots",
+    homeDescription: "Hitta färska jobb från publika ATS-jobbtavlor efter titel, företag, plats, remote-läge och aktualitet.",
+    landingDescription: "Sök färska jobb från publika ATS-jobbtavlor efter företag, plats, remote-läge och aktualitet.",
+    landingLabels: {
+      "job-search": "Öppna jobb",
+      remote: "Remotejobb",
+      "software-engineer": "Software engineer jobb",
+      "product-manager": "Product manager jobb",
+      "technical-support": "Technical support jobb",
+      "data-analyst": "Data analyst jobb",
+      "customer-success": "Customer success manager jobb",
+      "devops-engineer": "DevOps engineer jobb"
+    }
+  },
+  {
+    languageCode: "da",
+    pathPrefix: "da",
+    homeTitle: "Søg ledige job | OpenJobSlots",
+    homeDescription: "Find friske job fra offentlige ATS-jobboards efter titel, virksomhed, sted, remote-form og friskhed.",
+    landingDescription: "Søg friske job fra offentlige ATS-jobboards efter virksomhed, sted, remote-form og friskhed.",
+    landingLabels: {
+      "job-search": "Ledige job",
+      remote: "Remote job",
+      "software-engineer": "Software engineer job",
+      "product-manager": "Product manager job",
+      "technical-support": "Technical support job",
+      "data-analyst": "Data analyst job",
+      "customer-success": "Customer success manager job",
+      "devops-engineer": "DevOps engineer job"
+    }
+  },
+  {
+    languageCode: "no",
+    pathPrefix: "no",
+    homeTitle: "Søk åpne jobber | OpenJobSlots",
+    homeDescription: "Finn ferske stillinger fra offentlige ATS-jobbtavler etter tittel, selskap, sted, remote-form og ferskhet.",
+    landingDescription: "Søk ferske stillinger fra offentlige ATS-jobbtavler etter selskap, sted, remote-form og ferskhet.",
+    landingLabels: {
+      "job-search": "Åpne jobber",
+      remote: "Remote jobber",
+      "software-engineer": "Software engineer jobber",
+      "product-manager": "Product manager jobber",
+      "technical-support": "Technical support jobber",
+      "data-analyst": "Data analyst jobber",
+      "customer-success": "Customer success manager jobber",
+      "devops-engineer": "DevOps engineer jobber"
+    }
+  },
+  {
+    languageCode: "fi",
+    pathPrefix: "fi",
+    homeTitle: "Etsi avoimia työpaikkoja | OpenJobSlots",
+    homeDescription: "Löydä tuoreet ilmoitukset julkisilta ATS-työpaikkasivuilta nimikkeen, yrityksen, sijainnin, etätyön ja tuoreuden mukaan.",
+    landingDescription: "Etsi tuoreita työpaikkoja julkisilta ATS-sivuilta yrityksen, sijainnin, etätyön ja tuoreuden mukaan.",
+    landingLabels: {
+      "job-search": "Avoimet työpaikat",
+      remote: "Etätyöpaikat",
+      "software-engineer": "Software engineer työpaikat",
+      "product-manager": "Product manager työpaikat",
+      "technical-support": "Technical support työpaikat",
+      "data-analyst": "Data analyst työpaikat",
+      "customer-success": "Customer success manager työpaikat",
+      "devops-engineer": "DevOps engineer työpaikat"
+    }
+  }
+]);
+
+const PUBLIC_SEO_HOME_PAGES = Object.freeze([
+  ...PUBLIC_SEO_BASE_HOME_PAGES,
+  ...PUBLIC_SEO_ADDITIONAL_LANGUAGE_CONFIGS.map((config) => ({
+    languageCode: config.languageCode,
+    path: `/${config.pathPrefix}`,
+    title: config.homeTitle,
+    description: config.homeDescription
+  }))
+]);
+
+const PUBLIC_SEO_BASE_LANDING_GROUPS = Object.freeze([
   {
     key: "job-search",
     canonicalSearchQuery: "job openings",
@@ -371,6 +639,40 @@ const PUBLIC_SEO_LANDING_GROUPS = Object.freeze([
   }
 ]);
 
+const PUBLIC_SEO_GENERATED_LANDING_SLUG_BY_KEY = Object.freeze({
+  "job-search": "job-openings",
+  remote: "remote-job-openings",
+  "software-engineer": "software-engineer-jobs",
+  "product-manager": "product-manager-jobs",
+  "technical-support": "technical-support-engineer-jobs",
+  "data-analyst": "data-analyst-jobs",
+  "customer-success": "customer-success-manager-jobs",
+  "devops-engineer": "devops-engineer-jobs"
+});
+
+function buildAdditionalSeoLandingPage(group, config) {
+  const slug = PUBLIC_SEO_GENERATED_LANDING_SLUG_BY_KEY[group.key] || String(group.key || "jobs").replace(/[^a-z0-9]+/gi, "-");
+  const label = config.landingLabels?.[group.key] || group.canonicalSearchQuery || group.key;
+  return {
+    languageCode: config.languageCode,
+    path: `/${config.pathPrefix}/${slug}`,
+    searchQuery: group.canonicalSearchQuery || label,
+    canonicalSearchQuery: group.canonicalSearchQuery || label,
+    title: `${label} | OpenJobSlots`,
+    description: `${label}: ${config.landingDescription}`
+  };
+}
+
+const PUBLIC_SEO_LANDING_GROUPS = Object.freeze(
+  PUBLIC_SEO_BASE_LANDING_GROUPS.map((group) => ({
+    ...group,
+    pages: [
+      ...group.pages,
+      ...PUBLIC_SEO_ADDITIONAL_LANGUAGE_CONFIGS.map((config) => buildAdditionalSeoLandingPage(group, config))
+    ]
+  }))
+);
+
 const PUBLIC_SEO_ATS_PAGES = Object.freeze([
   {
     path: "/ats/greenhouse-jobs",
@@ -642,7 +944,17 @@ const PUBLIC_SEO_ALTERNATE_GROUPS = new Map([
 ]);
 
 const SEO_LANDING_LINK_LIMIT = 8;
-const PUBLIC_SEO_SUPPORTED_LANGUAGES = new Set(["en", "tr", "de", "fr", "es"]);
+const PUBLIC_SEO_SUPPORTED_LANGUAGES = new Set(PUBLIC_SEO_HOME_PAGES.map((page) => page.languageCode));
+const PUBLIC_SEO_LANGUAGE_CODE_BY_NORMALIZED = new Map(
+  PUBLIC_SEO_HOME_PAGES.map((page) => [String(page.languageCode || "").toLowerCase(), page.languageCode])
+);
+const PUBLIC_SEO_PRIMARY_LANGUAGE_FALLBACKS = new Map([
+  ["pt", "pt-BR"],
+  ["zh", "zh-CN"],
+  ...PUBLIC_SEO_HOME_PAGES
+    .filter((page) => !String(page.languageCode || "").includes("-"))
+    .map((page) => [String(page.languageCode || "").toLowerCase(), page.languageCode])
+]);
 
 const PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS = Object.freeze({
   US: [
@@ -704,6 +1016,156 @@ const PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS = Object.freeze({
     "product manager Spain",
     "data analyst Spain",
     "devops engineer Spain"
+  ],
+  BR: [
+    "Brazil jobs",
+    "remote Brazil",
+    "software Brazil",
+    "engineer Brazil",
+    "developer Brazil",
+    "product manager Brazil",
+    "data analyst Brazil",
+    "devops engineer Brazil"
+  ],
+  PT: [
+    "Portugal jobs",
+    "remote Portugal",
+    "software Portugal",
+    "engineer Portugal",
+    "developer Portugal",
+    "product manager Portugal",
+    "data analyst Portugal",
+    "devops engineer Portugal"
+  ],
+  IT: [
+    "Italy jobs",
+    "remote Italy",
+    "software Italy",
+    "engineer Italy",
+    "developer Italy",
+    "product manager Italy",
+    "data analyst Italy",
+    "devops engineer Italy"
+  ],
+  NL: [
+    "Netherlands jobs",
+    "remote Netherlands",
+    "software Netherlands",
+    "engineer Netherlands",
+    "developer Netherlands",
+    "product manager Netherlands",
+    "data analyst Netherlands",
+    "devops engineer Netherlands"
+  ],
+  PL: [
+    "Poland jobs",
+    "remote Poland",
+    "software Poland",
+    "engineer Poland",
+    "developer Poland",
+    "product manager Poland",
+    "data analyst Poland",
+    "devops engineer Poland"
+  ],
+  JP: [
+    "Japan",
+    "Tokyo",
+    "Japanese",
+    "Osaka",
+    "Kyoto",
+    "Japan remote",
+    "Tokyo engineer",
+    "Japan software"
+  ],
+  KR: [
+    "Korea",
+    "South Korea",
+    "Seoul",
+    "Korean",
+    "Seoul engineer",
+    "Korea software",
+    "Seoul software",
+    "Korea remote"
+  ],
+  CN: [
+    "China",
+    "Shanghai",
+    "Beijing",
+    "Chinese",
+    "Hong Kong",
+    "China software",
+    "Shanghai engineer",
+    "China remote"
+  ],
+  IN: [
+    "India",
+    "Bangalore",
+    "Bengaluru",
+    "Delhi",
+    "Mumbai",
+    "Hyderabad",
+    "India software",
+    "India engineer"
+  ],
+  AE: [
+    "UAE",
+    "Dubai",
+    "Abu Dhabi",
+    "United Arab Emirates",
+    "Emirates",
+    "Dubai software",
+    "Dubai engineer",
+    "Dubai remote"
+  ],
+  ID: [
+    "Indonesia",
+    "Jakarta",
+    "Bali",
+    "Indonesian",
+    "Indonesia software",
+    "Jakarta engineer",
+    "Indonesia remote",
+    "Indonesia product manager"
+  ],
+  SE: [
+    "Sweden",
+    "Stockholm",
+    "Gothenburg",
+    "Swedish",
+    "Malmo",
+    "Sweden software",
+    "Stockholm engineer",
+    "Sweden remote"
+  ],
+  DK: [
+    "Denmark",
+    "Copenhagen",
+    "Danish",
+    "Aarhus",
+    "Denmark software",
+    "Copenhagen engineer",
+    "Denmark remote",
+    "Denmark product manager"
+  ],
+  NO: [
+    "Norway",
+    "Oslo",
+    "Norwegian",
+    "Bergen",
+    "Norway software",
+    "Oslo engineer",
+    "Norway remote",
+    "Norway product manager"
+  ],
+  FI: [
+    "Finland",
+    "Helsinki",
+    "Finnish",
+    "Espoo",
+    "Finland software",
+    "Helsinki engineer",
+    "Finland remote",
+    "Finland product manager"
   ]
 });
 
@@ -736,8 +1198,20 @@ function getPublicSeoRouteLabel(route) {
   return stripOpenJobSlotsTitleSuffix(route?.title) || String(route?.searchQuery || route?.path || "").trim();
 }
 
+function normalizePublicSeoLanguageCode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+  if (!normalized) return "en";
+  const exact = PUBLIC_SEO_LANGUAGE_CODE_BY_NORMALIZED.get(normalized);
+  if (exact) return exact;
+  const primary = normalized.split("-")[0];
+  return PUBLIC_SEO_PRIMARY_LANGUAGE_FALLBACKS.get(primary) || "en";
+}
+
 function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_LINK_LIMIT) {
-  const normalizedLanguageCode = PUBLIC_SEO_SUPPORTED_LANGUAGES.has(languageCode) ? languageCode : "en";
+  const normalizedLanguageCode = normalizePublicSeoLanguageCode(languageCode);
   const localizedRoutes = PUBLIC_SEO_ROUTES.filter(
     (route) => route.languageCode === normalizedLanguageCode && route.alternateGroup && route.alternateGroup !== "home"
   );
@@ -755,7 +1229,7 @@ function getPublicSeoLandingRoutesForLanguage(languageCode, limit = SEO_LANDING_
 }
 
 function getPublicSeoHomePathForLanguage(languageCode) {
-  const normalizedLanguageCode = PUBLIC_SEO_SUPPORTED_LANGUAGES.has(languageCode) ? languageCode : "en";
+  const normalizedLanguageCode = normalizePublicSeoLanguageCode(languageCode);
   return PUBLIC_SEO_HOME_PAGES.find((page) => page.languageCode === normalizedLanguageCode)?.path || "/en";
 }
 
@@ -766,7 +1240,7 @@ function getPublicSeoQueryLandingPath(languageCode, query) {
 }
 
 function getPublicSeoPopularQueryLabel(query) {
-  const acronyms = new Set(["ai", "api", "qa", "ui", "uk", "us", "usa", "ux"]);
+  const acronyms = new Set(["ai", "api", "qa", "ui", "uae", "uk", "us", "usa", "ux"]);
   return String(query || "")
     .replace(/\s+/g, " ")
     .trim()
@@ -799,12 +1273,13 @@ function getPublicSeoCountryFallbackQueries(countryCode, languageCode, limit = S
   const normalizedCountryCode = normalizePublicSeoCountryCode(countryCode);
   const queries = PUBLIC_SEO_COUNTRY_POPULAR_FALLBACKS[normalizedCountryCode] || [];
   const boundedLimit = Math.max(1, Math.min(20, Number(limit || SEO_LANDING_LINK_LIMIT)));
+  const normalizedLanguageCode = normalizePublicSeoLanguageCode(languageCode);
   return queries.slice(0, boundedLimit).map((query, index) => ({
     query,
     searchQuery: query,
     count: Math.max(1, 1000 - index),
     countryCode: normalizedCountryCode,
-    languageCode: PUBLIC_SEO_SUPPORTED_LANGUAGES.has(languageCode) ? languageCode : "en",
+    languageCode: normalizedLanguageCode,
     source: "research_country_fallback",
     trustedPopularFallback: true
   }));
@@ -900,6 +1375,7 @@ module.exports = {
   getPublicSeoPopularSearchItems,
   getPublicSeoRouteLabel,
   getPublicSeoRouteHintByPath,
+  normalizePublicSeoLanguageCode,
   normalizePublicSeoPath,
   normalizePublicSeoQueryKey
 };

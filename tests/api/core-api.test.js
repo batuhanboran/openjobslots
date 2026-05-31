@@ -69,6 +69,8 @@ test.describe("openjobslots API compatibility", () => {
     expect(sitemapText).toContain(`<loc>${publicBaseUrl}/</loc>`);
     expect(sitemapText).toContain(`<loc>${publicBaseUrl}/en/software-engineer-jobs</loc>`);
     expect(sitemapText).toContain(`<loc>${publicBaseUrl}/tr/uzaktan-calisma-ilanlari</loc>`);
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/pt-br/software-engineer-jobs</loc>`);
+    expect(sitemapText).toContain(`<loc>${publicBaseUrl}/zh-cn/job-openings</loc>`);
     expect(sitemapText).toContain(`<loc>${publicBaseUrl}/ats/greenhouse-jobs</loc>`);
     expect(sitemapText).not.toMatch(/private@example\.com|%40|\/postings|\/applications|\/settings|\/ingestion|\/mcp|\/frontend/);
   });
@@ -117,15 +119,27 @@ test.describe("openjobslots API compatibility", () => {
         country: "DE",
         supported_languages: expect.arrayContaining([
           expect.objectContaining({ code: "en" }),
-          expect.objectContaining({ code: "tr" })
+          expect.objectContaining({ code: "tr" }),
+          expect.objectContaining({ code: "pt-BR" }),
+          expect.objectContaining({ code: "ja" }),
+          expect.objectContaining({ code: "fi" })
         ])
       })
     );
     expect(JSON.stringify(preferencePayload)).not.toMatch(/ip|address|cf-|accept-language|cookie|postgres:\/\/|MEILI_|MASTER_KEY/i);
 
-    const countryFallback = await request.get(`${apiBaseUrl}/public/preferences`, {
+    const browserLanguagePreference = await request.get(`${apiBaseUrl}/public/preferences`, {
       headers: {
         "Accept-Language": "ja-JP,ja;q=0.9",
+        "CF-IPCountry": "TR"
+      }
+    });
+    expect(browserLanguagePreference.ok()).toBeTruthy();
+    expect(await browserLanguagePreference.json()).toEqual(expect.objectContaining({ default_language: "ja", country: "TR" }));
+
+    const countryFallback = await request.get(`${apiBaseUrl}/public/preferences`, {
+      headers: {
+        "Accept-Language": "zz-ZZ,zz;q=0.9",
         "CF-IPCountry": "TR"
       }
     });
@@ -288,6 +302,30 @@ test.describe("openjobslots API compatibility", () => {
       "Turkey engineer",
       "Turkey software"
     ]);
+
+    const brazilPopular = await request.get(`${apiBaseUrl}/search/popular`, {
+      params: {
+        language: "pt-BR",
+        country: "BR",
+        limit: "4"
+      }
+    });
+    expect(brazilPopular.ok()).toBeTruthy();
+    const brazilPopularPayload = await brazilPopular.json();
+    expect(brazilPopularPayload).toEqual(
+      expect.objectContaining({
+        source: "research_country_fallback",
+        country_scope: "BR",
+        country_scope_applied: true
+      })
+    );
+    expect(brazilPopularPayload.items.map((item) => item.searchQuery)).toEqual([
+      "Brazil jobs",
+      "remote Brazil",
+      "software Brazil",
+      "engineer Brazil"
+    ]);
+    expect(brazilPopularPayload.items[0].path).toBe("/pt-br?q=Brazil%20jobs");
   });
 
   test("postings expose exact count metadata plus read-only freshness and sort params", async ({ request }) => {

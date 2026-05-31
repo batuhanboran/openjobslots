@@ -1,7 +1,8 @@
 const crypto = require("crypto");
 const {
   getPublicSeoCountryFallbackQueries,
-  getPublicSeoPopularSearchItems
+  getPublicSeoPopularSearchItems,
+  normalizePublicSeoLanguageCode
 } = require("../../src/publicSeoRoutes");
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
@@ -11,7 +12,22 @@ const PUBLIC_LANGUAGE_COUNTRY_BY_CODE = Object.freeze({
   tr: "TR",
   de: "DE",
   fr: "FR",
-  es: "ES"
+  es: "ES",
+  "pt-br": "BR",
+  "pt-pt": "PT",
+  it: "IT",
+  nl: "NL",
+  pl: "PL",
+  ja: "JP",
+  ko: "KR",
+  "zh-cn": "CN",
+  hi: "IN",
+  ar: "AE",
+  id: "ID",
+  sv: "SE",
+  da: "DK",
+  no: "NO",
+  fi: "FI"
 });
 const PUBLIC_POPULAR_COUNTRY_ANALYTICS_MIN_QUERIES = 4;
 
@@ -421,7 +437,7 @@ function registerPublicRoutes(app, context) {
   });
 
   app.get("/search/popular", async (req, res) => {
-    const languageCode = String(req.query.language || req.query.lang || "en").trim().toLowerCase();
+    const languageCode = normalizePublicSeoLanguageCode(req.query.language || req.query.lang || "en");
     const limit = Math.max(1, Math.min(20, Number(req.query.limit || 8)));
     const countryScope = getPublicPopularSearchCountryScope(req, languageCode);
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
