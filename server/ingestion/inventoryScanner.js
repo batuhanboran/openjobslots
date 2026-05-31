@@ -4,6 +4,7 @@ const { createPostgresPool } = require("../backends/postgres");
 const { acquireHeavyJobLock } = require("../backends/heavyJobLock");
 const { normalizeAtsKey } = require("../backends/postgresStore");
 const {
+  DEFAULT_SOURCE_TIMEOUT_MS,
   countConfiguredTargets,
   createEmptyClassificationCounts,
   runNetNewEstimate,
@@ -93,6 +94,12 @@ function parseInventoryArgs(argv = process.argv.slice(2), env = process.env) {
       1000,
       120_000
     ),
+    sourceTimeoutMs: asInt(
+      env.OPENJOBSLOTS_ATS_INVENTORY_SOURCE_TIMEOUT_MS,
+      DEFAULT_SOURCE_TIMEOUT_MS,
+      1000,
+      3_600_000
+    ),
     maxRuntimeMs: asInt(env.OPENJOBSLOTS_ATS_INVENTORY_MAX_RUNTIME_MS, DEFAULT_MAX_RUNTIME_MS, 1000, MAX_RUNTIME_MS),
     maxFetches: asInt(env.OPENJOBSLOTS_ATS_INVENTORY_MAX_FETCHES, DEFAULT_MAX_FETCHES, 1, MAX_FETCHES),
     hostCap: asInt(env.OPENJOBSLOTS_ATS_INVENTORY_HOST_CAP, 0, 0, MAX_COMPANY_LIMIT),
@@ -138,6 +145,8 @@ function parseInventoryArgs(argv = process.argv.slice(2), env = process.env) {
       options.hostConcurrency = asInt(arg.slice("--host-concurrency=".length), options.hostConcurrency, 1, 4);
     } else if (arg.startsWith("--statement-timeout-ms=")) {
       options.statementTimeoutMs = asInt(arg.slice("--statement-timeout-ms=".length), options.statementTimeoutMs, 1000, 120_000);
+    } else if (arg.startsWith("--source-timeout-ms=")) {
+      options.sourceTimeoutMs = asInt(arg.slice("--source-timeout-ms=".length), options.sourceTimeoutMs, 1000, 3_600_000);
     } else if (arg.startsWith("--max-runtime-ms=")) {
       options.maxRuntimeMs = asInt(arg.slice("--max-runtime-ms=".length), options.maxRuntimeMs, 1000, MAX_RUNTIME_MS);
     } else if (arg.startsWith("--max-fetches=")) {

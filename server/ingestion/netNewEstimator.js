@@ -1032,6 +1032,7 @@ function writeEstimatorOutput(report, outputPath) {
 }
 
 module.exports = {
+  DEFAULT_SOURCE_TIMEOUT_MS,
   ESTIMATE_CLASSIFICATIONS,
   buildExistingLookup,
   candidateQualityRisk,

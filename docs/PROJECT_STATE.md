@@ -25,7 +25,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
   - Batch plan: `/root/OpenJobSlots/reports/zoho-v2-readonly-plan-small-20260531T221901Z.json`.
 - The scanned Zoho window covered `25/1,751` targets, parsed `70` rows, found `57` clean candidates, only `4` net-new clean public candidates, and `52` already-public duplicates. Candidate pool remains unproven and low-confidence; this is not a 5k apply candidate.
 - The only guard-safe selected tenant in the small plan is `zenfreed.zohorecruit.com` with `4` clean net-new rows and predicted guard `pass`. Rows from tenants such as `gotocme` and `basecodetech` without deterministic geo or explicit remote evidence remain no-geo/no-remote quarantines.
-- `server/ingestion/inventoryScanner.js` now enforces remaining `--max-fetches` before choosing a scan window, so long ATS inventory scans cannot exceed the requested fetch cap inside one oversized page. This supports safer future inventory/resume work for Zoho and other slow sources.
+- `server/ingestion/inventoryScanner.js` now enforces remaining `--max-fetches` before choosing a scan window and forwards `--source-timeout-ms` / `OPENJOBSLOTS_ATS_INVENTORY_SOURCE_TIMEOUT_MS` into each net-new estimate window. This supports safer future inventory/resume work for Zoho and other slow sources.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run in this read-only wave.
 
 ## v2.1.0 Release Update - May 31, 2026

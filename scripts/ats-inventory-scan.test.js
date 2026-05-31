@@ -143,4 +143,19 @@ test("max fetches caps the current window instead of only stopping after an over
   assert.equal(report.windows[0].requested_limit, 25);
 });
 
+test("source timeout option is forwarded to each estimate window", async () => {
+  let observedTimeout = 0;
+  await runMockScan(
+    ["--source=zoho", "--company-limit=25", "--row-limit=10000", "--source-timeout-ms=90000"],
+    25,
+    {
+      estimateWindow: async (windowOptions) => {
+        observedTimeout = windowOptions.sourceTimeoutMs;
+        return makeWindowReport(windowOptions);
+      }
+    }
+  );
+  assert.equal(observedTimeout, 90000);
+});
+
 console.log("ats inventory scan tests passed");

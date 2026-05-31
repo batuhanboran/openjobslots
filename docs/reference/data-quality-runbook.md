@@ -104,10 +104,12 @@ Each count also has a matching percentage field ending in `_pct`. Grouped output
 Before any ATS recovery canary/apply or 5k target selection, scan source inventory and estimate actual net-new public row gain:
 
 ```powershell
-npm.cmd run ats:inventory:scan -- --source=hrmdirect --company-limit=1500 --row-limit=20000 --json --output=C:\tmp\hrmdirect-inventory.json
+npm.cmd run ats:inventory:scan -- --source=hrmdirect --company-limit=1500 --row-limit=20000 --source-timeout-ms=180000 --json --output=C:\tmp\hrmdirect-inventory.json
 ```
 
 The inventory scanner is read-only. It pages source targets beyond the source-runner 1,000 target cap, writes an optional checkpoint, resumes by offset, and uses the same source-runner fetch/parse/normalize/public-gate path as the estimator. Use it when a 5k selection depends on target coverage.
+
+For slow or high-volume sources, keep every scan bounded with `--max-fetches`, `--max-runtime-ms`, and `--source-timeout-ms`. `--max-fetches` caps each scan window before fetches start, and `--source-timeout-ms` is forwarded into the net-new estimator used by each inventory window.
 
 Key fields:
 
