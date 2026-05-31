@@ -2,9 +2,9 @@
 Description=Poll GitHub and deploy OpenJobSlots when main changes
 
 [Timer]
-OnBootSec=90s
-OnUnitActiveSec=60s
-RandomizedDelaySec=15s
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60s
 Persistent=true
 Unit=openjobslots-deploy.service
 

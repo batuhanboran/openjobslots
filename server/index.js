@@ -117,8 +117,8 @@ const RATE_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.OPENJOBSLOTS_RATE
 const PUBLIC_RATE_LIMIT_MAX = Math.max(10, Number(process.env.OPENJOBSLOTS_PUBLIC_RATE_LIMIT_MAX || 300));
 const CONTROL_RATE_LIMIT_MAX = Math.max(5, Number(process.env.OPENJOBSLOTS_CONTROL_RATE_LIMIT_MAX || 60));
 const FRONTEND_LOG_RATE_LIMIT_MAX = Math.max(5, Number(process.env.OPENJOBSLOTS_FRONTEND_LOG_RATE_LIMIT_MAX || 60));
-const PUBLIC_READ_CACHE_TTL_MS = Math.max(0, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS || 5_000));
-const PUBLIC_READ_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_MAX_ENTRIES || 250));
+const PUBLIC_READ_CACHE_TTL_MS = Math.max(0, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS || 120_000));
+const PUBLIC_READ_CACHE_MAX_ENTRIES = Math.max(10, Number(process.env.OPENJOBSLOTS_PUBLIC_READ_CACHE_MAX_ENTRIES || 750));
 const PUBLIC_SITE_URL = String(process.env.OPENJOBSLOTS_PUBLIC_SITE_URL || "").trim();
 const SEO_SITE_TITLE = "OpenJobSlots | Fresh Job Openings";
 const SEO_SITE_DESCRIPTION =
@@ -891,6 +891,7 @@ const {
 
 function createTtlJsonCache({ ttlMs, maxEntries }) {
   const entries = new Map();
+  const pending = new Map();
   const resolvedTtlMs = Math.max(0, Number(ttlMs || 0));
   const resolvedMaxEntries = Math.max(1, Number(maxEntries || 1));
 
@@ -903,6 +904,7 @@ function createTtlJsonCache({ ttlMs, maxEntries }) {
   return {
     clear() {
       entries.clear();
+      pending.clear();
     },
     get(key) {
       if (resolvedTtlMs <= 0) return null;
@@ -928,6 +930,17 @@ function createTtlJsonCache({ ttlMs, maxEntries }) {
         payload,
         expiresAt: now + resolvedTtlMs
       });
+    },
+    getPending(key) {
+      return pending.get(key) || null;
+    },
+    setPending(key, promise) {
+      if (!promise || typeof promise.then !== "function") return;
+      pending.set(key, promise);
+    },
+    deletePending(key, promise) {
+      if (promise && pending.get(key) !== promise) return;
+      pending.delete(key);
     }
   };
 }
@@ -950,17 +963,30 @@ function callPublicJsonPayloadHook(hook, req, payload, info) {
 
 async function sendCachedPublicJson(req, res, cache, producer, options = {}) {
   const key = getPublicReadCacheKey(req);
-  const cached = cache.get(key);
+  const cached = typeof cache?.get === "function" ? cache.get(key) : null;
   if (cached) {
     res.setHeader("X-OpenJobSlots-Cache", "HIT");
     callPublicJsonPayloadHook(options.afterPayload, req, cached, { cacheStatus: "HIT" });
     return res.json(cached);
   }
-  const payload = await producer();
-  cache.set(key, payload);
-  res.setHeader("X-OpenJobSlots-Cache", "MISS");
-  callPublicJsonPayloadHook(options.afterPayload, req, payload, { cacheStatus: "MISS" });
-  return res.json(payload);
+  const inFlight = typeof cache?.getPending === "function" ? cache.getPending(key) : null;
+  if (inFlight) {
+    const payload = await inFlight;
+    res.setHeader("X-OpenJobSlots-Cache", "HIT");
+    callPublicJsonPayloadHook(options.afterPayload, req, payload, { cacheStatus: "HIT" });
+    return res.json(payload);
+  }
+  const pendingPayload = Promise.resolve().then(() => producer());
+  if (typeof cache?.setPending === "function") cache.setPending(key, pendingPayload);
+  try {
+    const payload = await pendingPayload;
+    if (typeof cache?.set === "function") cache.set(key, payload);
+    res.setHeader("X-OpenJobSlots-Cache", "MISS");
+    callPublicJsonPayloadHook(options.afterPayload, req, payload, { cacheStatus: "MISS" });
+    return res.json(payload);
+  } finally {
+    if (typeof cache?.deletePending === "function") cache.deletePending(key, pendingPayload);
+  }
 }
 
 function ensureFrontendLogDirectory() {
@@ -3152,6 +3178,7 @@ module.exports = {
   DB_PATH,
   collectPostingsForCompany,
   createServer,
+  createTtlJsonCache,
   getCompaniesForSync,
   getCounts,
   getDb,
@@ -3164,6 +3191,7 @@ module.exports = {
   normalizeSyncEnabledAts,
   nowEpochSeconds,
   runWorkdaySync,
+  sendCachedPublicJson,
   upsertPostings
 };
 

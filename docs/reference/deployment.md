@@ -4,7 +4,7 @@ Production source of truth is the private GitHub repository:
 
 `https://github.com/batuhanboran/openjobslots`
 
-The production host runs `/root/OpenJobSlots` and deploys from `main` using a systemd timer. The timer checks GitHub every minute, rebuilds the Docker Compose stack only when `main` changes, and preserves runtime data in `.env`, `data/`, and `.deploy-backups/`.
+The production host runs `/root/OpenJobSlots` and deploys from `main` using a systemd timer. The timer checks GitHub every 15 minutes, rebuilds the Docker Compose stack only when `main` changes, and preserves runtime data in `.env`, `data/`, and `.deploy-backups/`.
 
 ## production Services
 
@@ -41,6 +41,15 @@ curl -fsS "http://127.0.0.1:8081/postings?search=Director%20United%20States&limi
 curl -fsS "http://127.0.0.1:8081/postings?search=t%C3%BCrkiye&limit=5"
 ```
 
+After changing the repo timer unit, apply it on production before expecting the new cadence to take effect:
+
+```bash
+install -m 0644 /root/OpenJobSlots/deploy/systemd/openjobslots-deploy.timer /etc/systemd/system/openjobslots-deploy.timer
+systemctl daemon-reload
+systemctl restart openjobslots-deploy.timer
+systemctl list-timers openjobslots-deploy.timer --no-pager --all
+```
+
 Search correctness checks are part of deployment verification. Service health alone does not prove that Postgres, Meilisearch, and hydration agree. See [Search Quality Runbook](./search-quality-runbook.md).
 
 ## Worker Sync Budget
@@ -48,11 +57,11 @@ Search correctness checks are part of deployment verification. Service health al
 The worker keeps manual sync controls available, but automatic Postgres syncs are budgeted so idle due-target pressure does not turn into continuous fetch/write load.
 
 - `OPENJOBSLOTS_AUTO_SYNC`: set to `0` to disable automatic sync scheduling. Manual sync requests still work.
-- `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `900000` ms.
-- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `6000`; set to `0` for a reversible pause of automatic sync work.
-- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `100`.
-- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `500`.
-- `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose defaults to `250`; manual requested syncs may continue across runs until due targets drain.
+- `INGESTION_WORKER_INTERVAL_MS`: minimum delay between automatic budget checks. Compose defaults to `1800000` ms.
+- `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET`: maximum company targets automatic sync may start per UTC day. Compose defaults to `3000`; set to `0` for a reversible pause of automatic sync work.
+- `INGESTION_AUTO_SYNC_TARGETS_PER_RUN`: maximum automatic targets per run. Compose defaults to `50`.
+- `INGESTION_SOURCE_DAILY_TARGET_BUDGET`: maximum successful automatic targets per ATS per UTC day. Compose defaults to `250`.
+- `INGESTION_MAX_TARGETS_PER_RUN`: hard per-run ceiling for worker runs. Compose defaults to `125`; manual requested syncs may continue across runs until due targets drain.
 - `INGESTION_WORKER_CONCURRENCY`: concurrent worker target processors. Compose defaults to `2`; per-host concurrency remains serialized by default.
 - `INGESTION_ADAPTIVE_SELECTION_LOOKBACK_HOURS`: recent success/failure and error-signal window for adaptive ATS source caps. Compose defaults to `24`.
 - `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY`: HRMDirect detail-page cap per company. Compose defaults to `35` so large sparse HRMDirect boards cannot stall an automatic worker run; raise only during targeted HRMDirect recovery windows.
@@ -74,6 +83,8 @@ Compose sets memory and swap ceilings for the four production services. Defaults
 App and worker Node heaps are separately bounded with `OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB=384` and `OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB=512`. Keep `memswap_limit` equal to `mem_limit` unless you intentionally want a service to use host swap.
 
 Public `/postings` requests are also clamped before query execution with `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT=500` and `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET=2000`. Responses include `page_capped=true` when a caller asks beyond those bounds.
+
+Public read responses use a short in-process TTL cache with same-key in-flight request coalescing. Compose defaults are `OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS=120000` and `OPENJOBSLOTS_PUBLIC_READ_CACHE_MAX_ENTRIES=750`. This is intentionally long enough to keep expensive `/postings/filter-options` cache misses from fanning out into parallel Postgres aggregation bursts while still keeping public filter and status data fresh within a small operational window.
 
 ## Container DNS
 

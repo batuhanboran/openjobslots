@@ -47,10 +47,10 @@ function nonNegativeNumber(value, fallback) {
   return number;
 }
 
-const WORKER_INTERVAL_MS = positiveNumber(process.env.INGESTION_WORKER_INTERVAL_MS, 10 * 60 * 1000);
+const WORKER_INTERVAL_MS = positiveNumber(process.env.INGESTION_WORKER_INTERVAL_MS, 30 * 60 * 1000);
 const WORKER_POLL_MS = positiveNumber(process.env.INGESTION_WORKER_POLL_MS, 5000);
-const WORKER_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_WORKER_CONCURRENCY, 4)));
-const MAX_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_MAX_TARGETS_PER_RUN, 2000)));
+const WORKER_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_WORKER_CONCURRENCY, 2)));
+const MAX_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_MAX_TARGETS_PER_RUN, 125)));
 const RUN_ONCE = String(process.env.INGESTION_RUN_ONCE || "").trim() === "1";
 const AUTO_SYNC_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_AUTO_SYNC ?? "1").trim().toLowerCase()

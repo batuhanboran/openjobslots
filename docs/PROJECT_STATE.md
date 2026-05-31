@@ -2,6 +2,14 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Runtime Stability Update - May 31, 2026
+
+- Public read caching now coalesces concurrent same-key misses so repeated `/postings/filter-options` requests wait on one producer instead of starting duplicate Postgres aggregation work.
+- Compose defaults now use `OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS=120000` and `OPENJOBSLOTS_PUBLIC_READ_CACHE_MAX_ENTRIES=750` to reduce cache-miss pressure on expensive public filter/read endpoints.
+- Worker defaults are back in a lower-throughput stability posture: interval `1800000` ms, automatic daily target budget `3000`, targets/run `50`, source daily budget `250`, and hard per-run ceiling `125`.
+- The systemd deploy timer default now checks every `15min` with `60s` jitter instead of every minute, reducing GitHub polling and Docker build/recreate overlap on small hosts.
+- This is runtime stabilization only: no production data backfill, source apply, Meili replace reindex, Docker prune, or public-row deletion is implied.
+
 ## Search Typing Request Control Update - May 31, 2026
 
 - Public search typing now limits remote autocomplete to debounced query changes instead of sending a request per normal keystroke. Cached suggestion responses are reused for five minutes and no longer refetched just because result or filter-option state changed.

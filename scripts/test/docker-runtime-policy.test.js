@@ -36,12 +36,15 @@ for (const serviceName of [
 
 const appBlock = serviceBlock("openjobslots-app");
 assertContains(appBlock, "NODE_OPTIONS=--max-old-space-size=${OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB:-384}");
+assertContains(appBlock, "OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS=${OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS:-120000}");
 
 const workerBlock = serviceBlock("openjobslots-worker");
 assertContains(workerBlock, "INGESTION_WORKER_CONCURRENCY=${INGESTION_WORKER_CONCURRENCY:-2}");
-assertContains(workerBlock, "INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=${INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET:-6000}");
-assertContains(workerBlock, "INGESTION_AUTO_SYNC_TARGETS_PER_RUN=${INGESTION_AUTO_SYNC_TARGETS_PER_RUN:-100}");
-assertContains(workerBlock, "INGESTION_SOURCE_DAILY_TARGET_BUDGET=${INGESTION_SOURCE_DAILY_TARGET_BUDGET:-500}");
+assertContains(workerBlock, "INGESTION_WORKER_INTERVAL_MS=${INGESTION_WORKER_INTERVAL_MS:-1800000}");
+assertContains(workerBlock, "INGESTION_MAX_TARGETS_PER_RUN=${INGESTION_MAX_TARGETS_PER_RUN:-125}");
+assertContains(workerBlock, "INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=${INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET:-3000}");
+assertContains(workerBlock, "INGESTION_AUTO_SYNC_TARGETS_PER_RUN=${INGESTION_AUTO_SYNC_TARGETS_PER_RUN:-50}");
+assertContains(workerBlock, "INGESTION_SOURCE_DAILY_TARGET_BUDGET=${INGESTION_SOURCE_DAILY_TARGET_BUDGET:-250}");
 assertContains(workerBlock, "NODE_OPTIONS=--max-old-space-size=${OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB:-512}");
 
 console.log("docker runtime policy tests passed");
