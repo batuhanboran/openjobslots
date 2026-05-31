@@ -277,6 +277,16 @@ function normalizeStringArray(value) {
     .filter(Boolean);
 }
 
+function parseStringArrayInput(value) {
+  if (Array.isArray(value)) return normalizeStringArray(value);
+  try {
+    const parsed = JSON.parse(String(value || "[]"));
+    return normalizeStringArray(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return [];
+  }
+}
+
 function normalizeAtsFilterValue(value) {
   const normalized = normalizeLikeText(value);
   return ATS_FILTER_ALIASES.get(normalized) || normalized;
@@ -289,11 +299,23 @@ function normalizeAtsFilters(value) {
   return Array.from(new Set(items));
 }
 
+function normalizeSyncEnabledAts(value, fallbackValue = SYNC_DEFAULT_ENABLED_ATS) {
+  const activeOnly = (items) => items.filter((item) => isAtsEnabledByDefault(item));
+  const fallback = activeOnly(normalizeAtsFilters(Array.isArray(fallbackValue) ? fallbackValue : SYNC_DEFAULT_ENABLED_ATS));
+  const requested = normalizeAtsFilters(Array.isArray(value) ? value : parseStringArrayInput(value));
+  const normalized = activeOnly(requested);
+  if (normalized.length > 0) return normalized;
+  if (requested.length > 0) return [];
+  if (fallback.length > 0) return fallback;
+  return Array.from(SYNC_DEFAULT_ENABLED_ATS);
+}
+
 module.exports = {
   ATS_FILTER_LABEL_BY_VALUE,
   ATS_FILTER_OPTION_ITEMS,
   ATS_FILTER_OPTIONS,
   SYNC_DEFAULT_ENABLED_ATS,
   normalizeAtsFilterValue,
-  normalizeAtsFilters
+  normalizeAtsFilters,
+  normalizeSyncEnabledAts
 };

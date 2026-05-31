@@ -6,7 +6,8 @@ const {
   ATS_FILTER_OPTIONS,
   SYNC_DEFAULT_ENABLED_ATS,
   normalizeAtsFilterValue,
-  normalizeAtsFilters
+  normalizeAtsFilters,
+  normalizeSyncEnabledAts
 } = require("./atsFilters");
 
 test("configured ATS filter options stay in the exported lookup set", () => {
@@ -34,4 +35,6 @@ test("normalizeAtsFilters dedupes configured canonical keys and ignores unsuppor
 test("default sync ATS excludes sources that are not enabled by default", () => {
   assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("dayforcehcm"), false);
   assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("greenhouse"), true);
+  assert.equal(normalizeSyncEnabledAts(["dayforcehcm"]).length, 0);
+  assert.deepEqual(normalizeSyncEnabledAts("[\"greenhouse.io\",\"lever.co\"]"), ["greenhouse", "lever"]);
 });

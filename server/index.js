@@ -7,15 +7,20 @@ const { promisify } = require("util");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const { ensureIngestionTables, seedAtsSources } = require("./ingestion/schema");
-const { getAdapterMetadata, isAtsEnabledByDefault } = require("./ingestion/adapter-metadata");
+const { getAdapterMetadata } = require("./ingestion/adapter-metadata");
 const {
   ATS_FILTER_LABEL_BY_VALUE,
   ATS_FILTER_OPTION_ITEMS,
   ATS_FILTER_OPTIONS,
   SYNC_DEFAULT_ENABLED_ATS,
   normalizeAtsFilterValue,
-  normalizeAtsFilters
+  normalizeAtsFilters,
+  normalizeSyncEnabledAts
 } = require("./ingestion/atsFilters");
+const {
+  buildLegacySqliteSyncTargets,
+  getDynamicSyncEstimatedCompanyCount
+} = require("./ingestion/legacySyncTargets");
 const { inferAtsFromJobPostingUrl } = require("./ingestion/atsUrlInference");
 const {
   isPlaceholderCompanyName,
@@ -219,17 +224,6 @@ const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const POSTING_VISIBLE_RETENTION_DAYS = Math.max(1, Number(process.env.OPENJOBSLOTS_POSTING_HOT_DAYS || 30));
 const POSTING_TTL_SECONDS = Number(process.env.POSTING_TTL_SECONDS || POSTING_VISIBLE_RETENTION_DAYS * 24 * 60 * 60);
 const SYNC_POSTING_FLUSH_BATCH_SIZE = Number(process.env.SYNC_POSTING_FLUSH_BATCH_SIZE || 200);
-const USAJOBS_SEARCH_API_URL = "https://data.usajobs.gov/api/Search";
-const GOVERNMENTJOBS_ESTIMATED_COMPANY_COUNT = 2400;
-const SMARTRECRUITERS_ESTIMATED_COMPANY_COUNT = 4000;
-const POLICEAPP_ESTIMATED_COMPANY_COUNT = 1166;
-const USAJOBS_ESTIMATED_COMPANY_COUNT = 26;
-const K12JOBSPOT_ESTIMATED_COMPANY_COUNT = 13000;
-const SCHOOLSPRING_ESTIMATED_COMPANY_COUNT = 16287;
-const CALCAREERS_ESTIMATED_COMPANY_COUNT = 297;
-const CALOPPS_ESTIMATED_COMPANY_COUNT = 254;
-const STATEJOBSNY_ESTIMATED_COMPANY_COUNT = 165;
-const SMARTRECRUITERS_INSERT_EVERY_N_TARGETS = 10;
 const execFileAsync = promisify(execFile);
 let db;
 let postgresPool = null;
@@ -1587,17 +1581,6 @@ function normalizeAtsRequestQueueConcurrency(value, fallbackValue = ATS_REQUEST_
   return Math.max(MIN_ATS_REQUEST_QUEUE_CONCURRENCY, Math.min(MAX_ATS_REQUEST_QUEUE_CONCURRENCY, parsed));
 }
 
-function normalizeSyncEnabledAts(value, fallbackValue = SYNC_DEFAULT_ENABLED_ATS) {
-  const activeOnly = (items) => items.filter((item) => isAtsEnabledByDefault(item));
-  const fallback = activeOnly(normalizeAtsFilters(Array.isArray(fallbackValue) ? fallbackValue : SYNC_DEFAULT_ENABLED_ATS));
-  const requested = normalizeAtsFilters(Array.isArray(value) ? value : parseJsonArray(value));
-  const normalized = activeOnly(requested);
-  if (normalized.length > 0) return normalized;
-  if (requested.length > 0) return [];
-  if (fallback.length > 0) return fallback;
-  return Array.from(SYNC_DEFAULT_ENABLED_ATS);
-}
-
 function normalizeSyncServiceSettingsInput(value = {}, fallback = SYNC_SERVICE_SETTINGS_DEFAULTS) {
   const source = value && typeof value === "object" ? value : {};
   const fallbackConcurrency = normalizeAtsRequestQueueConcurrency(fallback?.ats_request_queue_concurrency);
@@ -1809,33 +1792,7 @@ async function getSyncScopeStats() {
       syncEnabledCompanyCount += 1;
     }
   }
-  if (enabledAts.has("governmentjobs")) {
-    syncEnabledCompanyCount += GOVERNMENTJOBS_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("smartrecruiters")) {
-    syncEnabledCompanyCount += SMARTRECRUITERS_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("policeapp")) {
-    syncEnabledCompanyCount += POLICEAPP_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("usajobs")) {
-    syncEnabledCompanyCount += USAJOBS_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("k12jobspot")) {
-    syncEnabledCompanyCount += K12JOBSPOT_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("schoolspring")) {
-    syncEnabledCompanyCount += SCHOOLSPRING_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("calcareers")) {
-    syncEnabledCompanyCount += CALCAREERS_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("calopps")) {
-    syncEnabledCompanyCount += CALOPPS_ESTIMATED_COMPANY_COUNT;
-  }
-  if (enabledAts.has("statejobsny")) {
-    syncEnabledCompanyCount += STATEJOBSNY_ESTIMATED_COMPANY_COUNT;
-  }
+  syncEnabledCompanyCount += getDynamicSyncEstimatedCompanyCount(enabledAts);
 
   return {
     sync_enabled_company_count: syncEnabledCompanyCount,
@@ -2053,113 +2010,7 @@ async function runWorkdaySyncInternal() {
     const companies = await getCompaniesForSync();
     const enabledAts = new Set(normalizeSyncEnabledAts(Array.from(syncEnabledAts)));
     const shuffledCompanies = shuffleArrayInPlace([...companies]);
-    const syncTargets = [];
-    let smartRecruitersInserted = false;
-    let companyInsertionsSinceSmartRecruiters = 0;
-    for (const company of shuffledCompanies) {
-      syncTargets.push(company);
-      companyInsertionsSinceSmartRecruiters += 1;
-
-      if (
-        enabledAts.has("smartrecruiters") &&
-        companyInsertionsSinceSmartRecruiters >= SMARTRECRUITERS_INSERT_EVERY_N_TARGETS
-      ) {
-        syncTargets.push({
-          id: null,
-          company_name: "SmartRecruiters (dynamic)",
-          url_string: "https://jobs.smartrecruiters.com/sr-jobs/search",
-          ATS_name: "smartrecruiters"
-        });
-        smartRecruitersInserted = true;
-        companyInsertionsSinceSmartRecruiters = 0;
-      }
-    }
-
-    if (enabledAts.has("smartrecruiters") && companyInsertionsSinceSmartRecruiters > 0) {
-      syncTargets.push({
-        id: null,
-        company_name: "SmartRecruiters (dynamic)",
-        url_string: "https://jobs.smartrecruiters.com/sr-jobs/search",
-        ATS_name: "smartrecruiters"
-      });
-      smartRecruitersInserted = true;
-    }
-
-    if (enabledAts.has("smartrecruiters") && !smartRecruitersInserted) {
-      syncTargets.push({
-        id: null,
-        company_name: "SmartRecruiters (dynamic)",
-        url_string: "https://jobs.smartrecruiters.com/sr-jobs/search",
-        ATS_name: "smartrecruiters"
-      });
-    }
-
-    if (enabledAts.has("governmentjobs")) {
-      syncTargets.push({
-        id: null,
-        company_name: "GovernmentJobs (dynamic)",
-        url_string: "https://www.governmentjobs.com/jobs",
-        ATS_name: "governmentjobs"
-      });
-    }
-    if (enabledAts.has("policeapp")) {
-      syncTargets.push({
-        id: null,
-        company_name: "PoliceApp (dynamic)",
-        url_string:
-          "https://www.policeapp.com/jobs/urlrewrite_jobpostings/jobResultsAjax.ashx?j=0&r=50&s=0&p=0",
-        ATS_name: "policeapp"
-      });
-    }
-    if (enabledAts.has("usajobs")) {
-      syncTargets.push({
-        id: null,
-        company_name: "USAJobs (dynamic)",
-        url_string: USAJOBS_SEARCH_API_URL,
-        ATS_name: "usajobs"
-      });
-    }
-    if (enabledAts.has("k12jobspot")) {
-      syncTargets.push({
-        id: null,
-        company_name: "K12JobSpot (dynamic)",
-        url_string: "https://api.k12jobspot.com/api/Jobs/Search",
-        ATS_name: "k12jobspot"
-      });
-    }
-    if (enabledAts.has("schoolspring")) {
-      syncTargets.push({
-        id: null,
-        company_name: "SchoolSpring (dynamic)",
-        url_string:
-          "https://api.schoolspring.com/api/Jobs/GetPagedJobsWithSearch?domainName=&keyword=&location=&category=&gradelevel=&jobtype=&organization=&swLat=&swLon=&neLat=&neLon=&page=1&size=25&sortDateAscending=false",
-        ATS_name: "schoolspring"
-      });
-    }
-    if (enabledAts.has("calcareers")) {
-      syncTargets.push({
-        id: null,
-        company_name: "CalCareers (dynamic)",
-        url_string: "https://calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx",
-        ATS_name: "calcareers"
-      });
-    }
-    if (enabledAts.has("calopps")) {
-      syncTargets.push({
-        id: null,
-        company_name: "CalOpps (dynamic)",
-        url_string: "https://www.calopps.org/job-search-list",
-        ATS_name: "calopps"
-      });
-    }
-    if (enabledAts.has("statejobsny")) {
-      syncTargets.push({
-        id: null,
-        company_name: "StateJobsNY (dynamic)",
-        url_string: "https://www.statejobsny.com/public/vacancyTable.cfm",
-        ATS_name: "statejobsny"
-      });
-    }
+    const syncTargets = buildLegacySqliteSyncTargets(shuffledCompanies, enabledAts);
 
     syncStatus.progress.total = syncTargets.length;
     let totalPruned = await pruneExpiredPostings(syncReferenceEpoch);
