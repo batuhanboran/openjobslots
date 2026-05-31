@@ -2,6 +2,12 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Search Typing Request Control Update - May 31, 2026
+
+- Public search typing now limits remote autocomplete to debounced query changes instead of sending a request per normal keystroke. Cached suggestion responses are reused for five minutes and no longer refetched just because result or filter-option state changed.
+- Manual Enter submit cancels pending auto-search work, and automatic search records its query/filter signature so Enter does not duplicate an already-submitted search.
+- New Playwright coverage verifies the request budget: slow typing `software` sends one `/search/suggest`, one `/postings`, and one `/postings/filter-options`; fast typing plus Enter sends one `/postings` with no stale auto-search follow-up.
+
 ## Search Latency And Index Parity Update - May 31, 2026
 
 - Production direct search latency was reduced by fixing Meili hydration so Postgres no longer reapplies free-text search filters after Meili has already selected candidate canonical URLs. Postgres hydration still keeps public visibility, geo/location, country, remote, source, date, and safety guards.

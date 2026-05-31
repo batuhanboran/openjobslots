@@ -96,9 +96,11 @@ const DEFAULT_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MIN_ATS_REQUEST_QUEUE_CONCURRENCY = 1;
 const MAX_ATS_REQUEST_QUEUE_CONCURRENCY = 20;
 const SEARCH_SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
-const SEARCH_SUGGESTION_DEBOUNCE_MS = 90;
+const SEARCH_SUGGESTION_DEBOUNCE_MS = 400;
 const SEARCH_SUGGESTION_LIMIT = 4;
 const SEARCH_INTENT_CHIP_LIMIT = 4;
+const SEARCH_SUBMIT_DEDUPE_MS = 2500;
+const AUTO_SEARCH_DEBOUNCE_MS = 1800;
 
 function readPublicCountOverride(key) {
   const value = typeof process !== "undefined" ? process?.env?.[key] : undefined;
@@ -3444,6 +3446,7 @@ export default function App() {
   const wasSyncRunningRef = useRef(false);
   const postingsRequestSequenceRef = useRef(0);
   const postingsRef = useRef([]);
+  const postingFilterOptionsRef = useRef(postingFilterOptions);
   const postingsHasMoreRef = useRef(false);
   const postingsNextOffsetRef = useRef(0);
   const postingsLoadingMoreRef = useRef(false);
@@ -3453,6 +3456,7 @@ export default function App() {
   const frontendLogFlushInFlightRef = useRef(false);
   const lastFrontendLogFlushAtRef = useRef(0);
   const syncNoticeTimerRef = useRef(null);
+  const autoSearchTimerRef = useRef(null);
   const searchSuggestionCacheRef = useRef(new Map());
   const recentSearchesRef = useRef([]);
   const prefersReducedMotionRef = useRef(false);
@@ -4229,7 +4233,15 @@ export default function App() {
     }
   }, [loadStatus, syncActionState, syncing]);
 
+  const cancelPendingAutoSearch = useCallback(() => {
+    if (autoSearchTimerRef.current) {
+      clearTimeout(autoSearchTimerRef.current);
+      autoSearchTimerRef.current = null;
+    }
+  }, []);
+
   const submitSearch = useCallback((value = searchRef.current, analytics = {}) => {
+    cancelPendingAutoSearch();
     const nextSearch = String(value || "").trim();
     const analyticsSource = String(analytics?.source || "search_box").trim() || "search_box";
     const now = Date.now();
@@ -4239,7 +4251,7 @@ export default function App() {
     const duplicateSubmit =
       lastSubmit.value === nextSearch &&
       lastSubmit.filtersSignature === filtersSignature &&
-      now - lastSubmit.at < 250;
+      now - lastSubmit.at < SEARCH_SUBMIT_DEDUPE_MS;
     lastSearchSubmitRef.current = { value: nextSearch, filtersSignature, at: now };
     suppressedSuggestionQueryRef.current = nextSearch;
     if (nextSearch) {
@@ -4259,9 +4271,10 @@ export default function App() {
       if (nextSearch) trackPublicSearch(nextSearch, { source: analyticsSource });
       void loadPostings(nextSearch, { filters });
     }
-  }, [loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
 
   const clearSearchAndSuggestions = useCallback(() => {
+    cancelPendingAutoSearch();
     const defaultFilters = createDefaultPostingsFilters();
     lastSearchSubmitRef.current = {
       value: "",
@@ -4279,11 +4292,12 @@ export default function App() {
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
     void loadPostings("", { filters: defaultFilters });
-  }, [loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
 
   const applySearchSuggestionFilter = useCallback((suggestion) => {
     const filterPatch = getSearchSuggestionFilterPatch(suggestion);
     if (!filterPatch) return false;
+    cancelPendingAutoSearch();
     const nextFilters = {
       ...postingsFiltersRef.current,
       ...filterPatch
@@ -4305,7 +4319,7 @@ export default function App() {
     trackPublicFilterChange("suggestion");
     void loadPostings(query, { filters: nextFilters });
     return true;
-  }, [loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
 
   const selectSearchSuggestion = useCallback((suggestion) => {
     if (applySearchSuggestionFilter(suggestion)) return;
@@ -4315,6 +4329,7 @@ export default function App() {
   }, [applySearchSuggestionFilter, submitSearch]);
 
   const handleBrandHome = useCallback(() => {
+    cancelPendingAutoSearch();
     const defaultFilters = createDefaultPostingsFilters();
     setActivePage(PAGE_KEYS.POSTINGS);
     setDrawerOpen(false);
@@ -4335,7 +4350,7 @@ export default function App() {
     scrollPostingsToTop();
     void loadPostings("", { filters: defaultFilters });
     setTimeout(() => searchInputRef.current?.focus?.(), 0);
-  }, [loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, loadPostings, scrollPostingsToTop]);
 
   const handleSearchChange = useCallback((value) => {
     const nextValue = String(value || "");
@@ -5027,6 +5042,10 @@ export default function App() {
   }, [postingsFilters]);
 
   useEffect(() => {
+    postingFilterOptionsRef.current = postingFilterOptions;
+  }, [postingFilterOptions]);
+
+  useEffect(() => {
     postingsRef.current = postings;
   }, [postings]);
 
@@ -5254,21 +5273,20 @@ export default function App() {
     }
 
     const cached = searchSuggestionCacheRef.current.get(cacheKey);
-    const cachedItems =
-      cached && Date.now() - Number(cached.at || 0) < SEARCH_SUGGESTION_CACHE_TTL_MS
-        ? Array.isArray(cached.items)
-          ? cached.items
-          : []
-        : [];
+    const cacheFresh = cached && Date.now() - Number(cached.at || 0) < SEARCH_SUGGESTION_CACHE_TTL_MS;
+    const cachedItems = cacheFresh && Array.isArray(cached.items) ? cached.items : [];
     const localItems = buildLocalSearchSuggestions(query, SEARCH_SUGGESTION_LIMIT, {
-      postingFilterOptions,
-      postings,
+      postingFilterOptions: postingFilterOptionsRef.current,
+      postings: postingsRef.current,
       recentSearches: recentSearchesRef.current
     });
     const immediateItems = mergeSearchSuggestions(cachedItems, localItems).slice(0, SEARCH_SUGGESTION_LIMIT);
     setSearchSuggestions(immediateItems);
     setSearchSuggestionsOpen(immediateItems.length > 0);
     setActiveSuggestionIndex(-1);
+    if (cacheFresh) {
+      return undefined;
+    }
 
     let cancelled = false;
     const timer = setTimeout(async () => {
@@ -5295,7 +5313,7 @@ export default function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activePage, postingFilterOptions, postings, queueFrontendLog, search]);
+  }, [activePage, queueFrontendLog, search]);
 
   useEffect(() => () => {
     if (syncNoticeTimerRef.current) {
@@ -5350,12 +5368,25 @@ export default function App() {
     ) {
       return undefined;
     }
+    cancelPendingAutoSearch();
     const timer = setTimeout(() => {
-      loadPostings(search, { filters: postingsFilters });
-      loadPostingFilterOptions({ search, filters: postingsFilters, silent: true });
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, [search, postingsFilters, loadPostings, loadPostingFilterOptions]);
+      autoSearchTimerRef.current = null;
+      lastSearchSubmitRef.current = {
+        value: query,
+        filtersSignature,
+        at: Date.now()
+      };
+      loadPostings(query, { filters: postingsFilters });
+      loadPostingFilterOptions({ search: query, filters: postingsFilters, silent: true });
+    }, AUTO_SEARCH_DEBOUNCE_MS);
+    autoSearchTimerRef.current = timer;
+    return () => {
+      if (autoSearchTimerRef.current === timer) {
+        autoSearchTimerRef.current = null;
+      }
+      clearTimeout(timer);
+    };
+  }, [cancelPendingAutoSearch, search, postingsFilters, loadPostings, loadPostingFilterOptions]);
 
   useEffect(() => {
     if (activePage === PAGE_KEYS.POSTINGS || !syncSettings.autoSyncEnabled) return undefined;

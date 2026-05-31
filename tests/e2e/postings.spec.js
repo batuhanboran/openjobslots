@@ -899,6 +899,97 @@ async function installNoResultsRoute(page, searchValue = "__openjobslots_empty_p
   });
 }
 
+async function installSearchRequestThrottleRoutes(page) {
+  const calls = {
+    postings: [],
+    filterOptions: [],
+    suggestions: []
+  };
+
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/search/suggest")) {
+      const search = url.searchParams.get("search") || "";
+      calls.suggestions.push(search);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          count: search ? 1 : 0,
+          items: search ? [{ type: "search", value: search, label: search }] : []
+        })
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/postings/filter-options")) {
+      calls.filterOptions.push(url.searchParams.get("search") || "");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          ats: [],
+          industries: [],
+          regions: [],
+          countries: [],
+          states: [],
+          counties: [],
+          sort_options: []
+        })
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/postings")) {
+      calls.postings.push(url.searchParams.get("search") || "");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          count: 0,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          source_facets: [],
+          items: []
+        })
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/sync/status")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          status: "idle",
+          running: false,
+          posting_count: 0,
+          job_slot_count: 0,
+          configured_ats_count: 0,
+          visible_ats_count: 0,
+          visible_company_count: 0,
+          ingestion_worker: { latest_status: "idle" }
+        })
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/search/popular")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, count: 0, items: [] })
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  return calls;
+}
+
 test.describe("postings page QA", () => {
   test("public first load and reload do not call protected routes or show raw auth errors", async ({ page }) => {
     const protectedRouteCalls = installProtectedPublicRouteRecorder(page);
@@ -2001,6 +2092,41 @@ test.describe("postings page QA", () => {
 
     await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
     await expect(page.getByText("zzzxqv nohit")).toHaveCount(0);
+  });
+
+  test("typing a search term debounces autocomplete and auto-search API calls", async ({ page }) => {
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 250 });
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual(["software"]);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+    expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(1);
+  });
+
+  test("pressing Enter cancels pending auto-search instead of duplicating result requests", async ({ page }) => {
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+    expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
   });
 
   test("keyboard shortcuts and brand home keep search fast", async ({ page }) => {
