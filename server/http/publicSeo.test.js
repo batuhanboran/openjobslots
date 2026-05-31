@@ -92,6 +92,11 @@ function extractStaticSeoContentHtml(html) {
   return match[1];
 }
 
+function extractSitemapUrlEntry(sitemapXml, loc) {
+  return (String(sitemapXml || "").match(/<url>[\s\S]*?<\/url>/g) || [])
+    .find((entry) => entry.includes(`<loc>${loc}</loc>`)) || "";
+}
+
 function countWords(value) {
   const text = String(value || "");
   const cjkCharacters = (text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) || []).length;
@@ -329,6 +334,31 @@ function testHomeLanguagePagesGetBidirectionalHreflang() {
   assert.ok(html.includes('<link rel="alternate" hreflang="es" href="https://openjobslots.com/es" />'));
 }
 
+function testAdditionalLanguagePagesSkipHreflangUntilContentIsReliable() {
+  const { buildSitemapSectionXml, renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const html = renderSeoIndexHtml(
+    "<html><head><title>Old</title></head><body></body></html>",
+    createRequest({ path: "/pl/data-analyst-jobs" })
+  );
+  const staticSitemap = buildSitemapSectionXml(createRequest(), "/sitemaps/static.xml");
+  const plEntry = extractSitemapUrlEntry(staticSitemap, "https://openjobslots.com/pl/data-analyst-jobs");
+  const enEntry = extractSitemapUrlEntry(staticSitemap, "https://openjobslots.com/en/data-analyst-jobs");
+
+  assert.ok(plEntry, "expected Polish route to remain in the sitemap");
+  assert.ok(enEntry, "expected English route to remain in the sitemap");
+  assert.doesNotMatch(html, /<link rel="alternate"/i);
+  assert.doesNotMatch(plEntry, /xhtml:link/i);
+  assert.match(enEntry, /hreflang="en"/);
+  assert.match(enEntry, /hreflang="tr"/);
+  assert.match(enEntry, /hreflang="de"/);
+  assert.match(enEntry, /hreflang="fr"/);
+  assert.match(enEntry, /hreflang="es"/);
+}
+
 function testLocalizedStaticFallbackLinksStayWithinLanguageCluster() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com",
@@ -536,6 +566,7 @@ testSearchQueryPagesGetSpecificMetadataAndCanonical();
 testCuratedPathSearchQueryPagesStayOutOfHreflangClusters();
 testLocalizedSeoLandingPagesGetLanguageSpecificMetadataAndAlternates();
 testHomeLanguagePagesGetBidirectionalHreflang();
+testAdditionalLanguagePagesSkipHreflangUntilContentIsReliable();
 testLocalizedStaticFallbackLinksStayWithinLanguageCluster();
 testRobotsAndSitemapUseConfiguredPublicOrigin();
 testRobotsAndSitemapStayCrawlSafe();

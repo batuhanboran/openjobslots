@@ -32,6 +32,12 @@ function stripOpenJobSlotsTitleSuffix(value) {
   return normalizeInlineText(value).replace(/\s+\|\s+OpenJobSlots\s*$/i, "").trim();
 }
 
+const RELIABLE_HREFLANG_LANGUAGE_CODES = new Set(["en", "tr", "de", "fr", "es"]);
+
+function isReliableHreflangLanguage(languageCode) {
+  return RELIABLE_HREFLANG_LANGUAGE_CODES.has(String(languageCode || "").trim());
+}
+
 const SEO_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
   en: {
     relatedLabel: "Related public job search pages",
@@ -583,13 +589,15 @@ function createPublicSeoHelpers(dependencies = {}) {
   function getPublicSeoAlternateLinks(req) {
     if (isSearchQueryPage(req)) return [];
     const seoRoute = getSeoRoute(req);
+    if (seoRoute && !isReliableHreflangLanguage(seoRoute.languageCode)) return [];
     const requestPath = getRequestPath(req);
     const alternateGroup = seoRoute?.alternateGroup || (requestPath === "/" ? "home" : "");
     return getPublicSeoAlternateLinksForGroup(getPublicSiteOrigin(req), alternateGroup);
   }
 
   function getPublicSeoAlternateLinksForGroup(siteOrigin, alternateGroup) {
-    const groupPages = getPublicSeoAlternateGroupPages(alternateGroup);
+    const groupPages = getPublicSeoAlternateGroupPages(alternateGroup)
+      .filter((page) => isReliableHreflangLanguage(page.languageCode));
     if (groupPages.length === 0) return [];
     const links = groupPages.map((page) => ({
       hreflang: page.languageCode,
@@ -845,13 +853,17 @@ function createPublicSeoHelpers(dependencies = {}) {
     const sourceLinks = links
       .filter((route) => String(route.path || "").startsWith("/ats/"))
       .slice(0, 8);
-    const sourceFooter = sourceLinks.length === 0
+    const secondaryLinks = links.slice(12, 24);
+    const footerLinks = sourceLinks.length > 0 ? sourceLinks : secondaryLinks;
+    const footerLabel = sourceLinks.length > 0 ? "OpenJobSlots ATS source pages" : copy.relatedLabel;
+    const footerHeading = sourceLinks.length > 0 ? "ATS source job pages" : copy.relatedLabel;
+    const sourceFooter = footerLinks.length === 0
       ? []
       : [
-        '  <footer class="openjobslots-seo-footer" aria-label="OpenJobSlots ATS source pages">',
-        "    <h3>ATS source job pages</h3>",
+        '  <footer class="openjobslots-seo-footer" aria-label="' + escapeHtmlAttribute(footerLabel) + '">',
+        "    <h3>" + escapeHtmlAttribute(footerHeading) + "</h3>",
         "    <ul>",
-        htmlLinkList(sourceLinks),
+        htmlLinkList(footerLinks),
         "    </ul>",
         "  </footer>"
       ];
@@ -877,7 +889,9 @@ function createPublicSeoHelpers(dependencies = {}) {
       '<main id="openjobslots-static-seo-content" aria-label="' + escapeHtmlAttribute(`${searchLabel} search context`) + '">',
       '  <section class="openjobslots-seo-band" aria-labelledby="openjobslots-static-seo-heading">',
       '    <article class="openjobslots-seo-copy">',
+      '      <header class="openjobslots-seo-header">',
       '      <h2 id="openjobslots-static-seo-heading">' + escapeHtmlAttribute(heading) + "</h2>",
+      "      </header>",
       ...paragraphs.map((paragraph) => "      <p>" + escapeHtmlAttribute(paragraph) + "</p>"),
       "    </article>",
       '    <aside class="openjobslots-seo-aside" aria-label="' + escapeHtmlAttribute(copy.relatedLabel) + '">',
@@ -1065,7 +1079,8 @@ function createPublicSeoHelpers(dependencies = {}) {
           loc: `${siteOrigin}/`,
           changefreq: "daily",
           priority: "1.0",
-          alternateGroup: "home"
+          alternateGroup: "home",
+          languageCode: ""
         },
         ...PUBLIC_SEO_ROUTES
           .filter((route) => route.sitemapSection !== "ats-sources")
@@ -1073,7 +1088,8 @@ function createPublicSeoHelpers(dependencies = {}) {
             loc: `${siteOrigin}${route.path}`,
             changefreq: route.changefreq || "daily",
             priority: route.priority || "0.8",
-            alternateGroup: route.alternateGroup || ""
+            alternateGroup: route.alternateGroup || "",
+            languageCode: route.languageCode || ""
           }))
       ]
     },
@@ -1086,7 +1102,8 @@ function createPublicSeoHelpers(dependencies = {}) {
           loc: `${siteOrigin}${route.path}`,
           changefreq: route.changefreq || "daily",
           priority: route.priority || "0.7",
-          alternateGroup: route.alternateGroup || ""
+          alternateGroup: route.alternateGroup || "",
+          languageCode: route.languageCode || ""
         }))
     }
   ]);
@@ -1094,7 +1111,8 @@ function createPublicSeoHelpers(dependencies = {}) {
   function buildSitemapUrlsetXml(req, routes) {
     const siteOrigin = getPublicSiteOrigin(req);
     const urlEntries = routes.map((item) => {
-      const alternateEntries = getPublicSeoAlternateLinksForGroup(siteOrigin, item.alternateGroup)
+      const shouldEmitAlternateEntries = !item.languageCode || isReliableHreflangLanguage(item.languageCode);
+      const alternateEntries = (shouldEmitAlternateEntries ? getPublicSeoAlternateLinksForGroup(siteOrigin, item.alternateGroup) : [])
         .map((alternate) =>
           `    <xhtml:link rel="alternate" hreflang="${escapeHtmlAttribute(alternate.hreflang)}" href="${escapeHtmlAttribute(alternate.href)}" />`
         );
