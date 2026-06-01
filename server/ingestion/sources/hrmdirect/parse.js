@@ -351,7 +351,7 @@ function hrmDirectDetailLocationRuleName(value) {
 
 function extractHrmDirectDetailRemoteTag(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
-  const match = text.match(/(?:^|[\s.;,()[\]{}])#LI[-_\s]?(Remote|Hybrid)\b/i);
+  const match = text.match(/(?:^|[\s.;,()[\]{}])#LI\s*(?:[-_]\s*)?(Remote|Hybrid)\b/i);
   if (!match?.[1]) return "";
   return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
 }
@@ -389,10 +389,11 @@ function extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml) {
 function extractHrmDirectDetailBodyExplicitRemoteSentenceType(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
   const match = text.match(
-    /\b(?:This|The)\s+(?:position|role|job|opportunity)\s+(?:is|will\s+be)\s+(?:a\s+)?(?:full[-\s]?time,?\s*)?(?:fully\s+)?(remote|hybrid)\b/i
+    /\b(?:(?:This|The)\s+(?:position|role|job|opportunity)\s+(?:is|will\s+be)\s+(?:a\s+)?(?:full[-\s]?time,?\s*)?(?:fully\s+)?(remote|hybrid)|(?:This|The)\s+is\s+a\s+(remote|hybrid)\s+(?:position|role|job|opportunity))\b/i
   );
-  if (!match?.[1]) return "";
-  return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+  const value = match?.[1] || match?.[2] || "";
+  if (!value) return "";
+  return String(value).toLowerCase() === "hybrid" ? "hybrid" : "remote";
 }
 
 function extractHrmDirectDetailBodyAddressLocation(detailHtml) {

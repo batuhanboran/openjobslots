@@ -43,6 +43,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `pp-la`: accepted rows improved from `13/24` to `24/24`, covering `Van Nuys`, `Burbank`, `Compton`, `East Los Angeles`, `Long Beach Central`, `Koreatown`, `Santa Monica`, `Huntington Park`, and `Lakewood` with United States country evidence from `[].categories.location`.
 - Verification covered focused Lever tests, live parser proof, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `npm.cmd run ats:workbench -- --source=lever --json --no-write`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## HRMDirect Explicit Remote Detail Sentence - June 1, 2026
+
+- Fresh read-only production evidence kept HRMDirect as a high-volume source-quality lane, but live re-parsing showed only a narrow parser gap on deterministic remote evidence.
+- HRMDirect now accepts spaced structured detail tags such as `#LI - Remote` and exact body sentences such as `This is a remote position/role/job/opportunity` as explicit remote evidence. It still does not infer from title-only remote text, tenant names, blank structured location rows, or broad body prose.
+- Live read-only proof on `timelycare`: accepted rows improved from `20/30` to `29/30`. The `wsps` sample stayed `0/6` accepted because its structured fields remain blank and only title/body-region prose is available.
+- Verification covered HRMDirect syntax checks, focused html/public source tests, and live parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplyToJob Country-Scope And Placeholder Hardening - June 1, 2026
 
 - Fresh read-only production evidence kept ApplyToJob as a large remaining surface: `51,370` visible rows, `9,122` missing-any-normalized-geo rows, `1,438` weak/unknown remote rows, `7,173` parser errors, and `3,571` rejections. Recent ApplyToJob parser-validation pressure was dominated by `no_geo_no_remote`, `ambiguous_location`, and combined `ambiguous_location, no_geo_no_remote` rows.
