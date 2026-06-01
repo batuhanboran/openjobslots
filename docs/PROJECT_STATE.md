@@ -23,6 +23,15 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof: Motive parsed `41` rows with `41` accepted and `0` missing geo; Natera parsed `198` rows with `198` accepted and `0` missing geo. Concrete city rows such as `San Francisco, CA` and `Washington D.C` no longer inherit office-level remote evidence.
 - Verification covered Greenhouse syntax checks, focused direct source-module tests, live read-only parser proof, `npm.cmd run test:parsers`, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## Jobvite Detail JSON-LD Evidence - June 1, 2026
+
+- Jobvite production quality baseline for this local lane: `9,200` visible rows, `1,162` missing country/region rows, `1,093` weak/unknown remote rows, and `9,200` missing posting dates.
+- Jobvite now fetches bounded per-job detail pages after the list HTML and extracts JSON-LD `datePosted`, `employmentType`, and structured `jobLocation.address` city/country/region evidence. The merge keeps list Remote/Hybrid prefixes when detail JSON-LD only supplies geo/date.
+- Correctness guards: Australian state labels no longer normalize as United Kingdom when detail country evidence says Australia, and numeric labels such as `2 Locations` are quarantined unless detail JSON-LD supplies structured geo.
+- Fixture/test coverage includes Turkey, remote country-only, Australia/New South Wales, and multi-location US detail examples, plus a numeric multi-location quarantine assertion.
+- Live read-only parser proof with a 25-detail budget per company: NinjaOne `86/86` accepted with `25` dates and weak remote `1 -> 0`; Pathways `201` parsed with `170` accepted, `25` dates, missing country/region `68 -> 43`, weak remote `56 -> 31`; Sumitomo Electric `250` parsed with `241` accepted and `21` dates; IPS `153` parsed with `149` accepted, `25` dates, missing country/region `29 -> 4`, weak remote `32 -> 7`.
+- This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change.
+
 ## Ashby Structured Postal Address Checkpoint - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,515` visible job slots. Meili/Postgres document counts were still aligned at `331,509` each, with the known `22` document remote-facet drift still unresolved. No Meili repair or replace reindex was run.
@@ -342,7 +351,7 @@ Scale posture:
 - `100k` visible indexed rows is reachable only through parser/source cleanup plus disabled-source certification, not by lowering quality thresholds.
 - `1k` fresh jobs/day is the worker budget target, but current observed run health is below that target: recent runs processed `125` targets with `64` successes, `61` failures, `852` upserts, and `113` rejected candidates.
 - The all-source estimator currently takes too long for interactive runs even with low per-source limits. Convert it to a background/report workflow before relying on it for daily planning.
-- `jobvite` and `eightfold` are the closest disabled-source expansion candidates after full inventory and fixture certification.
+- `jobvite` and `eightfold` are the closest disabled-source expansion candidates. Jobvite now has detail JSON-LD fixture coverage, but still needs full inventory, net-new estimate, and bounded canary before public expansion.
 - `hirebridge`, `jobaps`, and `teamtailor` stay blocked until geo/remote risk drops.
 - Public-board sources with zero configured targets need source-runner virtual target support before safe estimates are meaningful.
 

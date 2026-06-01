@@ -1,5 +1,6 @@
 const { safeFetch } = require("../../safeFetch");
 const { buildCompanyContext, clean, createDiscover, parseJobviteCompany, supportedJobviteHost } = require("./discover");
+const { parseJobvitePostingsFromHtml } = require("./parse");
 
 function makeSourceFetchError(reason, message, details = {}) {
   const error = new Error(message);
@@ -28,6 +29,42 @@ async function payloadToHtml(payload) {
   if (typeof payload?.body === "string") return payload.body;
   if (typeof payload?.html === "string") return payload.html;
   return "";
+}
+
+async function fetchJobviteHtml(url, target, options = {}) {
+  if (typeof options.fetcher === "function") {
+    const payload = await options.fetcher(url, target);
+    const status = responseStatus(payload);
+    if (status < 200 || status >= 300) {
+      throw makeSourceFetchError("fetch_failed", `Jobvite page request failed (${status})`, {
+        status,
+        url
+      });
+    }
+    const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || url);
+    assertJobviteFinalHost(finalUrl, url);
+    return {
+      html: await payloadToHtml(payload),
+      finalUrl,
+      status
+    };
+  }
+
+  const response = await safeFetch(url, target);
+  if (!response.ok) {
+    const body = await response.text();
+    throw makeSourceFetchError("fetch_failed", `Jobvite page request failed (${response.status}): ${body.slice(0, 180)}`, {
+      status: response.status,
+      url: response.url || url
+    });
+  }
+  const finalUrl = clean(response.url || url);
+  assertJobviteFinalHost(finalUrl, url);
+  return {
+    html: await response.text(),
+    finalUrl,
+    status: response.status
+  };
 }
 
 function assertJobviteFinalHost(finalUrl, fallbackUrl) {
@@ -59,6 +96,48 @@ function withFinalConfig(config, finalUrl, fallbackUrl) {
   };
 }
 
+function jobviteDetailKey(urlValue) {
+  try {
+    const parsed = new URL(clean(urlValue));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function jobviteLocationLooksAmbiguous(location) {
+  return /^\s*(?:\d+\s+locations?|multiple locations?|various locations?|all locations?)\s*$/i.test(clean(location));
+}
+
+function jobviteLocationHasAustraliaState(location) {
+  return /\b(new south wales|queensland|victoria|western australia|south australia|tasmania|australian capital territory|northern territory|nsw|qld|vic|wa|sa|tas|act|nt)\b/i.test(clean(location));
+}
+
+function jobvitePostingNeedsDetail(posting = {}) {
+  const sourceLocation = posting.source_list_location || posting.location;
+  return !clean(posting.posting_date) ||
+    jobviteLocationLooksAmbiguous(sourceLocation) ||
+    jobviteLocationHasAustraliaState(sourceLocation);
+}
+
+function jobviteDetailPriorityScore(posting = {}) {
+  let score = 0;
+  const sourceLocation = posting.source_list_location || posting.location;
+  if (jobviteLocationLooksAmbiguous(sourceLocation)) score += 100;
+  if (jobviteLocationHasAustraliaState(sourceLocation)) score += 80;
+  if (!clean(sourceLocation)) score += 40;
+  if (!clean(posting.posting_date)) score += 5;
+  return score;
+}
+
+function prioritizeJobviteDetailCandidates(postings = []) {
+  return (Array.isArray(postings) ? postings : [])
+    .map((posting, index) => ({ posting, index, score: jobviteDetailPriorityScore(posting) }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((item) => item.posting);
+}
+
 function createFetchList(dependencies = {}) {
   const discover = typeof dependencies.discover === "function" ? dependencies.discover : createDiscover();
 
@@ -80,42 +159,44 @@ function createFetchList(dependencies = {}) {
       headers: buildHeaders()
     };
 
-    if (typeof options.fetcher === "function") {
-      const payload = await options.fetcher(jobsUrl, target);
-      const status = responseStatus(payload);
-      if (status < 200 || status >= 300) {
-        throw makeSourceFetchError("fetch_failed", `Jobvite page request failed (${status})`, {
-          status,
-          url: jobsUrl
-        });
+    const list = await fetchJobviteHtml(jobsUrl, target, options);
+    const finalUrl = list.finalUrl || jobsUrl;
+    const finalConfig = withFinalConfig(config, finalUrl, jobsUrl);
+    const companyName = clean(context.company_name || finalConfig.companySlugLower || finalConfig.companySlug || "jobvite");
+    const preliminary = parseJobvitePostingsFromHtml(companyName, finalConfig, { html: list.html });
+    const detailLimit = Math.max(0, Math.min(75, Number(process.env.OPENJOBSLOTS_JOBVITE_DETAIL_FETCH_LIMIT_PER_COMPANY || 25)));
+    let detailFetches = 0;
+    const detailHtmlByUrl = {};
+
+    for (const posting of prioritizeJobviteDetailCandidates(preliminary)) {
+      if (detailFetches >= detailLimit) break;
+      if (!jobvitePostingNeedsDetail(posting)) continue;
+      const detailUrl = clean(posting.job_posting_url);
+      if (!detailUrl) continue;
+      try {
+        const detail = await fetchJobviteHtml(detailUrl, target, options);
+        detailFetches += 1;
+        const key = jobviteDetailKey(detailUrl);
+        detailHtmlByUrl[detailUrl] = detail.html;
+        detailHtmlByUrl[key] = detail.html;
+      } catch {
+        detailFetches += 1;
       }
-      const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || jobsUrl);
-      assertJobviteFinalHost(finalUrl, jobsUrl);
-      return {
-        html: await payloadToHtml(payload),
-        __sourceConfig: withFinalConfig(config, finalUrl, jobsUrl),
-        __sourceFetchFinalUrl: finalUrl
-      };
     }
 
-    const response = await safeFetch(jobsUrl, target);
-    if (!response.ok) {
-      const body = await response.text();
-      throw makeSourceFetchError("fetch_failed", `Jobvite page request failed (${response.status}): ${body.slice(0, 180)}`, {
-        status: response.status,
-        url: response.url || jobsUrl
-      });
-    }
-    const finalUrl = clean(response.url || jobsUrl);
-    assertJobviteFinalHost(finalUrl, jobsUrl);
     return {
-      html: await response.text(),
-      __sourceConfig: withFinalConfig(config, finalUrl, jobsUrl),
+      html: list.html,
+      __detailHtmlByUrl: detailHtmlByUrl,
+      __sourceConfig: {
+        ...finalConfig,
+        detail_fetch_count: detailFetches
+      },
       __sourceFetchFinalUrl: finalUrl
     };
   };
 }
 
 module.exports = {
+  jobvitePostingNeedsDetail,
   createFetchList
 };

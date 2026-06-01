@@ -307,6 +307,13 @@ test("freshteam source module fetches jobs HTML with source-local discovery and 
   const payload = await source.fetchList(company, {
     fetcher: async (url, target) => {
       calls.push({ url, method: target.method, headers: target.headers });
+      if (rawList.__detailHtmlByUrl?.[url]) {
+        return {
+          body: rawList.__detailHtmlByUrl[url],
+          status: 200,
+          url
+        };
+      }
       return {
         body: rawList.html,
         status: 200,
@@ -486,8 +493,9 @@ test("jobvite source module fetches jobs HTML with source-local discovery and ho
   const payload = await source.fetchList(company, {
     fetcher: async (url, target) => {
       calls.push({ url, method: target.method, headers: target.headers });
+      const detailHtml = rawList.__detailHtmlByUrl?.[url];
       return {
-        body: rawList.html,
+        body: detailHtml || rawList.html,
         status: 200,
         url
       };
@@ -504,19 +512,71 @@ test("jobvite source module fetches jobs HTML with source-local discovery and ho
       Pragma: "no-cache",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
+  }, {
+    url: "https://jobs.jobvite.com/fixture/job/oMULTIxfw6",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }, {
+    url: "https://jobs.jobvite.com/fixture/job/oAUSxfw7",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }, {
+    url: "https://jobs.jobvite.com/fixture/job/oABCxfw9",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }, {
+    url: "https://jobs.jobvite.com/fixture/job/oDEFxfw8",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
   }]);
   assert.equal(payload.__sourceConfig.companySlugLower, "fixture");
+  assert.equal(payload.__sourceConfig.detail_fetch_count, 4);
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 2);
+  assert.equal(parsed.length, 4);
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
   assert.equal(byId.get("oABCxfw9").country, "Turkey");
   assert.equal(byId.get("oABCxfw9").city, "Istanbul");
   assert.equal(byId.get("oABCxfw9").remote_type, "onsite");
+  assert.equal(byId.get("oABCxfw9").posting_date, "2026-05-01");
   assert.equal(source.validatePublic(byId.get("oABCxfw9")).status, "accepted");
   assert.equal(byId.get("oDEFxfw8").remote_type, "remote");
+  assert.equal(byId.get("oDEFxfw8").country, "United States");
+  assert.equal(byId.get("oDEFxfw8").posting_date, "2026-05-02");
   assert.equal(source.validatePublic(byId.get("oDEFxfw8")).status, "accepted");
+  assert.equal(byId.get("oAUSxfw7").country, "Australia");
+  assert.equal(byId.get("oAUSxfw7").city, "Sydney");
+  assert.equal(byId.get("oAUSxfw7").evidence.country.evidence_path, "script[type='application/ld+json'].jobLocation[].address.addressCountry");
+  assert.equal(source.validatePublic(byId.get("oAUSxfw7")).status, "accepted");
+  assert.equal(byId.get("oMULTIxfw6").location_text, "Tacoma, Washington, United States / Lakewood, Washington, United States");
+  assert.equal(byId.get("oMULTIxfw6").country, "United States");
+  assert.equal(byId.get("oMULTIxfw6").city, "Tacoma");
+  assert.equal(source.validatePublic(byId.get("oMULTIxfw6")).status, "accepted");
 
   await assert.rejects(
     () => source.fetchList(company, {
@@ -528,6 +588,36 @@ test("jobvite source module fetches jobs HTML with source-local discovery and ho
     }),
     /unexpected host/
   );
+});
+
+test("jobvite source module does not publish numeric multi-location labels as geo", () => {
+  const source = getSourceModule("jobvite");
+  const company = readJson(path.join(__dirname, "jobvite", "fixtures", "company.json"));
+  const payload = {
+    html: "<h3>Operations</h3><table class=\"jv-job-list\"><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oAMBIGzfw1\">Ambiguous Role</a></td><td class=\"jv-job-list-location\">2 Locations</td></tr><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oREMOTEzfw2\">Remote Role</a></td><td class=\"jv-job-list-location\">Remote, 18 Locations</td></tr></table>",
+    __detailHtmlByUrl: {
+      "https://jobs.jobvite.com/fixture/job/oAMBIGzfw1": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Ambiguous Role\",\"datePosted\":\"2026-05-04\"}</script>",
+      "https://jobs.jobvite.com/fixture/job/oREMOTEzfw2": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Remote Role\",\"datePosted\":\"2026-05-05\"}</script>"
+    },
+    __sourceConfig: {
+      baseOrigin: "https://jobs.jobvite.com",
+      companySlugLower: "fixture"
+    }
+  };
+
+  const normalized = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.ok(!byId.get("oAMBIGzfw1").location_text);
+  assert.equal(byId.get("oAMBIGzfw1").posting_date, "2026-05-04");
+  const ambiguousGate = source.validatePublic(byId.get("oAMBIGzfw1"));
+  assert.equal(ambiguousGate.status, "quarantined");
+  assert.ok(ambiguousGate.reason_codes.includes("no_geo_no_remote"));
+
+  assert.equal(byId.get("oREMOTEzfw2").location_text, "Remote");
+  assert.equal(byId.get("oREMOTEzfw2").remote_type, "remote");
+  assert.equal(byId.get("oREMOTEzfw2").posting_date, "2026-05-05");
+  assert.equal(source.validatePublic(byId.get("oREMOTEzfw2")).status, "accepted");
 });
 
 test("join source module fetches Next.js company page with source-local host guard", async () => {
