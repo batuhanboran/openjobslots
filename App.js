@@ -3898,24 +3898,35 @@ function readPositiveInteger(value) {
 
 function buildFrontendResultCoverage(response = {}, items = [], sourceFacets = [], totalCount = 0) {
   const jobSlotCount = Math.max(0, Math.floor(Number(totalCount || items.length || 0)));
+  const loadedItemCount = Array.isArray(items) ? items.length : 0;
+  const allVisibleItemsLoaded = jobSlotCount <= loadedItemCount;
+  const countExact = response?.count_exact !== false || allVisibleItemsLoaded;
+  const approximateJobSlotCount = !countExact && jobSlotCount > 0;
   const sourceFacetCount = Array.isArray(sourceFacets) ? sourceFacets.filter((item) => Number(item?.count || 0) > 0).length : 0;
-  const responseAtsCount =
-    readPositiveInteger(response?.visible_ats_count) ??
-    readPositiveInteger(response?.configured_ats_count) ??
-    readPositiveInteger(response?.ats_count);
+  const responseAtsCount = readPositiveInteger(response?.visible_ats_count) ?? readPositiveInteger(response?.ats_count);
   const responseCompanyCount =
     readPositiveInteger(response?.visible_company_count) ??
     readPositiveInteger(response?.company_count);
-  const atsCount = responseAtsCount ?? (sourceFacetCount || countDistinctPostingValues(items, (item) => item?.ats));
-  const companyCount = responseCompanyCount ?? countDistinctPostingValues(items, (item) => item?.company_name);
+  const atsCount =
+    responseAtsCount ??
+    (countExact && sourceFacetCount ? sourceFacetCount : null) ??
+    (allVisibleItemsLoaded ? countDistinctPostingValues(items, (item) => item?.ats) : 0);
+  const companyCount = responseCompanyCount ?? (allVisibleItemsLoaded ? countDistinctPostingValues(items, (item) => item?.company_name) : 0);
+  const omitAtsCount = responseAtsCount === null && !countExact && !allVisibleItemsLoaded;
+  const omitCompanyCount = responseCompanyCount === null && !allVisibleItemsLoaded;
   return {
     posting_count: jobSlotCount,
     job_slot_count: jobSlotCount,
+    job_slot_count_label: approximateJobSlotCount ? `${formatExactNumberLabel(jobSlotCount)}+` : undefined,
+    job_slot_count_approximate: approximateJobSlotCount,
+    count_exact: countExact,
     configured_ats_count: atsCount,
     configured_enabled_ats_count: atsCount,
     visible_ats_count: atsCount,
+    omit_ats_count: omitAtsCount,
     company_count: companyCount,
-    visible_company_count: companyCount
+    visible_company_count: companyCount,
+    omit_company_count: omitCompanyCount
   };
 }
 
@@ -8305,6 +8316,7 @@ export default function App() {
     const suppressPublicStatsChips = showResultsSurface && (!resultStateMatchesCurrentSearch || suggestionsVisible);
     const publicShellStatsChips =
       resultStatsLoading || suppressPublicStatsChips || !publicStatsSource ? [] : buildPublicStatsChips(publicStatsSource);
+    const resultTotalCountLabel = resultStatsSource?.job_slot_count_label || formatCompactNumberLabel(resultTotalCount);
     const showPostingsRefreshIndicator = !initializing && (loading || resultsAwaitingFreshResponse);
     const showPostingsEmptyState =
       !initializing && !loading && !error && !resultsAwaitingFreshResponse && postings.length === 0;
@@ -9106,7 +9118,7 @@ export default function App() {
               <Text style={styles.postingsPagingText}>
                 {translatedPublicText(t, "results.showingOf", "Showing {visible} of {total} slots", {
                   visible: formatCompactNumberLabel(postings.length),
-                  total: formatCompactNumberLabel(Math.max(postingsTotalCount, postings.length))
+                  total: resultTotalCountLabel
                 })}
               </Text>
               <View style={styles.postingsPagingStateRow}>

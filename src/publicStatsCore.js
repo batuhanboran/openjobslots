@@ -19,23 +19,28 @@ function firstPositiveNumber(...values) {
 
 function buildPublicStatsChips(status = {}) {
   const source = status || {};
-  return [
+  const chips = [
     {
       key: "job-slots",
-      value: formatExactNumberLabel(firstPositiveNumber(source.job_slot_count, source.posting_count)),
+      value: source.job_slot_count_label || formatExactNumberLabel(firstPositiveNumber(source.job_slot_count, source.posting_count)),
       label: "job slots"
-    },
-    {
+    }
+  ];
+  if (!source.omit_ats_count) {
+    chips.push({
       key: "ats",
       value: formatExactNumberLabel(firstPositiveNumber(source.configured_ats_count, source.visible_ats_count, source.configured_enabled_ats_count)),
       label: "ATS"
-    },
-    {
+    });
+  }
+  if (!source.omit_company_count) {
+    chips.push({
       key: "companies",
       value: formatExactNumberLabel(firstPositiveNumber(source.visible_company_count, source.company_count)),
       label: "companies"
-    }
-  ];
+    });
+  }
+  return chips;
 }
 
 module.exports = {

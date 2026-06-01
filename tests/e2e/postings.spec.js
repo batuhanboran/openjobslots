@@ -1171,6 +1171,93 @@ test.describe("postings page QA", () => {
     await expectStatsChipsAligned(page);
   });
 
+  test("approximate capped search stats do not present incomplete facet totals as exact", async ({ page }) => {
+    await page.route("**/sync/status**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          status: "idle",
+          running: false,
+          posting_count: 157355,
+          job_slot_count: 157355,
+          configured_ats_count: 62,
+          configured_enabled_ats_count: 57,
+          visible_ats_count: 18,
+          visible_company_count: 8076,
+          ingestion_worker: { latest_status: "idle" }
+        })
+      });
+    });
+    await page.route("**/search/suggest**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, count: 0, items: [] })
+      });
+    });
+    await page.route("**/search/popular**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, count: 0, items: [] })
+      });
+    });
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            {
+              id: 6501,
+              company_name: "Capped Result One",
+              position_name: "Technical Support Engineer",
+              job_posting_url: "https://jobs.example.test/capped-one",
+              location: "Remote",
+              posting_date: "2026-05-20",
+              last_seen_epoch: 1778889600,
+              ats: "greenhouse"
+            },
+            {
+              id: 6502,
+              company_name: "Capped Result Two",
+              position_name: "Technical Support Analyst",
+              job_posting_url: "https://jobs.example.test/capped-two",
+              location: "London",
+              posting_date: "2026-05-21",
+              last_seen_epoch: 1778976000,
+              ats: "lever"
+            }
+          ],
+          count: 1000,
+          count_exact: false,
+          has_more: true,
+          next_offset: 2,
+          source_facets: [
+            { value: "greenhouse", count: 700 },
+            { value: "lever", count: 300 }
+          ]
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await page.getByTestId("search-input").fill("Technical");
+    await page.getByTestId("search-input").press("Enter");
+    await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("result-count")).toContainText(/1,000\+\s+job slots/i);
+    await expect(page.getByTestId("public-stat-ats")).toHaveCount(0);
+    await expect(page.getByTestId("public-stat-companies")).toHaveCount(0);
+    await expect(page.getByTestId("postings-pagination-status")).toContainText(/1,000\+/);
+  });
+
   test("marks opened posting results with a visited link color", async ({ page }) => {
     const postingUrl = "https://jobs.example.test/visited-posting";
     await page.addInitScript(() => {
