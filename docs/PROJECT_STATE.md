@@ -39,6 +39,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof with detail fetch disabled showed source-local geo improvement without extra requests: `sumitomo-electric` missing geo `108 -> 30`, `longos` `30 -> 1`, `longos-internal` `32 -> 1`, `salsa` `28 -> 1`, and `ovt` `19 -> 5`. With a bounded `75` detail budget, current `sumitomo-electric` missing geo was `6`, while `salsa` and `ovt` parsed with `0` missing geo/date on current live rows.
 - Verification covered Jobvite syntax checks, generic HTML/public source-module tests, fixture coverage for JSON-LD region-country hints and list-location country hints, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## CareerPlug Source-Local Dashed Location Evidence - June 1, 2026
+
+- Fresh read-only production baseline for this lane had CareerPlug at `8,153` visible rows, `169` missing country/region rows, `0` missing-all-geo rows, `170` weak/unknown remote rows, and `3,328` missing posting dates. Top affected boards included `hcaoa-careers`, `goldscareers`, `thrifty-white-pharmacy`, `orangetheory-fitness-affiliates`, `culligan-careers`, `grand-canyon-resort-corp`, and `ram-jack-careers`.
+- CareerPlug list HTML exposes deterministic `.job-location` labels. The parser now handles source-local dashed variants such as `City-ST`, `City-ST-ZIP Hybrid - US`, `PR-City-ZIP`, `City-ON-postal`, `AB-City-postal`, and `OK-City-ZIP Hybrid-US`, emitting city/state/country plus remote evidence from the same labeled field.
+- No tenant, title, body, company-name, or board-name inference was added. Labels without enough source-local country evidence, such as `Grand Canyon West (GCW)`, remain countryless/unknown remote.
+- Live read-only proof with `maxCareerplugDetailFetches: 0`: the top 10 sampled boards parsed/accepted `276/276` rows. Nine boards had `0` missing country/region and `0` weak remote; the only remaining gap was `grand-canyon-resort-corp` with `20` rows carrying local site labels but no country/work-mode evidence.
+- Verification covered CareerPlug syntax checks, expanded CareerPlug raw/expected fixtures, generic HTML/public source-module tests with evidence assertions, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.

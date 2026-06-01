@@ -868,6 +868,52 @@ test("careerplug source module enriches list rows from deterministic detail JSON
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("careerplug source module preserves source-local dashed list location evidence", () => {
+  const source = getSourceModule("careerplug");
+  const sourceDir = path.join(__dirname, "careerplug");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId["3001"].location_text, "Huntersville, NC, United States");
+  assert.equal(byId["3001"].country, "United States");
+  assert.equal(byId["3001"].city, "Huntersville");
+  assert.equal(byId["3001"].remote_type, "onsite");
+  assert.equal(byId["3001"].source_evidence.location_path, ".job-location");
+  assert.equal(byId["3001"].source_evidence.location_rule_name, "careerplug_us_city_state_location");
+  assert.equal(byId["3001"].source_evidence.remote_rule_name, "careerplug_structured_physical_location");
+
+  assert.equal(byId["3002"].location_text, "Maple Grove, MN, United States");
+  assert.equal(byId["3002"].remote_type, "hybrid");
+  assert.equal(byId["3002"].source_evidence.remote_path, ".job-location");
+  assert.equal(byId["3002"].source_evidence.remote_rule_name, "careerplug_labeled_location_work_mode");
+
+  assert.equal(byId["3003"].location_text, "San Juan, PR, Puerto Rico");
+  assert.equal(byId["3003"].country, "Puerto Rico");
+  assert.equal(byId["3003"].source_evidence.country_rule_name, "careerplug_pr_city_zip_location");
+
+  assert.equal(byId["3004"].location_text, "Etobicoke, ON, Canada");
+  assert.equal(byId["3004"].country, "Canada");
+  assert.equal(byId["3004"].source_evidence.country_rule_name, "careerplug_canada_city_province_location");
+
+  assert.equal(byId["3005"].location_text, "Ada, OK, United States");
+  assert.equal(byId["3005"].city, "Ada");
+  assert.equal(byId["3005"].remote_type, "hybrid");
+  assert.equal(byId["3005"].source_evidence.location_rule_name, "careerplug_state_city_zip_location");
+  assert.equal(byId["3005"].source_evidence.remote_rule_name, "careerplug_labeled_location_work_mode");
+
+  assert.equal(byId["3006"].location_text, "Edmonton, AB, Canada");
+  assert.equal(byId["3006"].city, "Edmonton");
+  assert.equal(byId["3006"].country, "Canada");
+  assert.equal(byId["3006"].source_evidence.location_rule_name, "careerplug_province_city_postal_location");
+
+  for (const id of ["3001", "3002", "3003", "3004", "3005", "3006"]) {
+    assert.equal(evaluatePublicPosting(byId[id], { parserVersion: source.parserVersion }).status, "accepted");
+  }
+});
+
 test("applitrack source module enriches Output.asp rows from deterministic detail pages", async () => {
   const source = getSourceModule("applitrack");
   const sourceDir = path.join(__dirname, "applitrack");

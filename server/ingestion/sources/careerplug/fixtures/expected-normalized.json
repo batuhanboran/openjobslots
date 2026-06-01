@@ -14,5 +14,59 @@
     "position_name": "Remote Support Representative",
     "remote_type": "remote",
     "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "3001",
+    "company_name": "Fixture CareerPlug",
+    "position_name": "Personal Care Assistant",
+    "country": "United States",
+    "city": "Huntersville",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "3002",
+    "company_name": "Fixture CareerPlug",
+    "position_name": "Fitness Studio Manager",
+    "country": "United States",
+    "city": "Maple Grove",
+    "remote_type": "hybrid",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "3003",
+    "company_name": "Fixture CareerPlug",
+    "position_name": "San Juan Service Lead",
+    "country": "Puerto Rico",
+    "city": "San Juan",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "3004",
+    "company_name": "Fixture CareerPlug",
+    "position_name": "Pharmacy Associate",
+    "country": "Canada",
+    "city": "Etobicoke",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "3005",
+    "company_name": "Fixture CareerPlug",
+    "position_name": "Business Development Engineer",
+    "country": "United States",
+    "city": "Ada",
+    "remote_type": "hybrid",
+    "parser_confidence": 0.75
+  },
+  {
+    "source_job_id": "3006",
+    "company_name": "Fixture CareerPlug",
+    "position_name": "Delivery Driver",
+    "country": "Canada",
+    "city": "Edmonton",
+    "remote_type": "onsite",
+    "parser_confidence": 0.75
   }
 ]

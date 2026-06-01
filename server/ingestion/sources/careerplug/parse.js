@@ -13,6 +13,10 @@ const CAREERPLUG_US_STATE_CODES = new Set([
   "WY"
 ]);
 
+const CAREERPLUG_CANADA_PROVINCE_CODES = new Set([
+  "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"
+]);
+
 function cleanCareerplugText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
@@ -27,28 +31,111 @@ function normalizeCareerplugMeta(value) {
     .trim();
 }
 
+function careerplugLocationWorkMode(value) {
+  return String(value || "").match(/\b(hybrid|remote)\b\s*-?\s*(?:US|USA|United States|CA|Canada)?\s*$/i)?.[1]?.toLowerCase() || "";
+}
+
+function stripCareerplugLocationWorkModeSuffix(value) {
+  return String(value || "")
+    .replace(/\s+\b(?:hybrid|remote)\b\s*-?\s*(?:US|USA|United States|CA|Canada)?\s*$/i, "")
+    .trim();
+}
+
 function normalizeCareerplugStateCityZipLocation(value) {
   const raw = normalizeCareerplugMeta(value);
-  const match = raw.match(/^([A-Z]{2})-(.+?)(?:-(\d{5}(?:-\d{4})?))?$/i);
+  const remoteType = careerplugLocationWorkMode(raw);
+  const withoutRemoteSuffix = stripCareerplugLocationWorkModeSuffix(raw);
+  const match = withoutRemoteSuffix.match(/^([A-Z]{2})-(.+?)(?:-([A-Z]\d[A-Z]\s?\d[A-Z]\d|\d{5}(?:-\d{4})?))?$/i);
   const state = String(match?.[1] || "").toUpperCase();
   const city = cleanCareerplugText(match?.[2] || "").replace(/\s*-\s*/g, "-").trim();
-  if (!state || !city || !CAREERPLUG_US_STATE_CODES.has(state)) return null;
+  const country = CAREERPLUG_CANADA_PROVINCE_CODES.has(state) ? "Canada" : "United States";
+  if (!state || !city || (!CAREERPLUG_US_STATE_CODES.has(state) && !CAREERPLUG_CANADA_PROVINCE_CODES.has(state))) return null;
   if (/^\d+$/.test(city)) return null;
+  const ruleName = country === "Canada" ? "careerplug_province_city_postal_location" : "careerplug_state_city_zip_location";
   return {
-    location: `${city}, ${state}, United States`,
+    location: `${city}, ${state}, ${country}`,
     city,
     state,
-    country: "United States",
+    country,
+    remote_type: remoteType || "onsite",
+    workplace_type: remoteType || "onsite",
     evidence: {
       location_source: "labeled_html",
       location_path: ".job-location",
-      location_rule_name: "careerplug_state_city_zip_location",
+      location_rule_name: ruleName,
       city_source: "labeled_html",
       city_path: ".job-location",
-      city_rule_name: "careerplug_state_city_zip_location",
+      city_rule_name: ruleName,
+      region_source: "labeled_html",
+      region_path: ".job-location",
+      region_rule_name: ruleName,
       country_source: "labeled_html",
       country_path: ".job-location",
-      country_rule_name: "careerplug_state_city_zip_location"
+      country_rule_name: ruleName,
+      remote_source: "labeled_html",
+      remote_path: ".job-location",
+      remote_rule_name: remoteType ? "careerplug_labeled_location_work_mode" : "careerplug_structured_physical_location"
+    }
+  };
+}
+
+function normalizeCareerplugDashedLocation(value) {
+  const raw = normalizeCareerplugMeta(value);
+  if (!raw || raw === "-") return null;
+  const remoteType = careerplugLocationWorkMode(raw);
+  const withoutRemoteSuffix = stripCareerplugLocationWorkModeSuffix(raw);
+  const parts = withoutRemoteSuffix.split("-").map((part) => cleanCareerplugText(part)).filter(Boolean);
+  if (parts.length < 2) return null;
+
+  let country = "";
+  let city = "";
+  let state = "";
+  let ruleName = "";
+  if (parts[0].toUpperCase() === "PR" && parts[1]) {
+    country = "Puerto Rico";
+    city = parts[1];
+    state = "PR";
+    ruleName = "careerplug_pr_city_zip_location";
+  } else {
+    const stateIndex = parts.findIndex((part, index) => {
+      if (index === 0) return false;
+      const code = part.toUpperCase();
+      return CAREERPLUG_US_STATE_CODES.has(code) || CAREERPLUG_CANADA_PROVINCE_CODES.has(code);
+    });
+    if (stateIndex <= 0) return null;
+    state = parts[stateIndex].toUpperCase();
+    country = CAREERPLUG_CANADA_PROVINCE_CODES.has(state) ? "Canada" : "United States";
+    city = parts.slice(0, stateIndex).join("-").trim();
+    ruleName = country === "Canada" ? "careerplug_canada_city_province_location" : "careerplug_us_city_state_location";
+  }
+
+  if (!city || /^\d+$/.test(city)) return null;
+  const cityForField = /\/|\bcount(?:y|ies)\b/i.test(city) ? "" : city;
+  const location = [cityForField || city, state, country].filter(Boolean).join(", ");
+
+  return {
+    location,
+    city: cityForField,
+    state,
+    country,
+    remote_type: remoteType || "onsite",
+    workplace_type: remoteType || "onsite",
+    evidence: {
+      location_source: "labeled_html",
+      location_path: ".job-location",
+      location_rule_name: ruleName,
+      city_source: cityForField ? "labeled_html" : "",
+      city_path: cityForField ? ".job-location" : "",
+      city_rule_name: cityForField ? ruleName : "",
+      region_source: "labeled_html",
+      region_path: ".job-location",
+      region_rule_name: ruleName,
+      country_source: "labeled_html",
+      country_path: ".job-location",
+      country_rule_name: ruleName,
+      remote_source: "labeled_html",
+      remote_path: ".job-location",
+      remote_rule_name: remoteType ? "careerplug_labeled_location_work_mode" : "careerplug_structured_physical_location"
     }
   };
 }
@@ -61,6 +148,8 @@ function careerplugListLocationFields(value) {
   };
   const structured = normalizeCareerplugStateCityZipLocation(normalized);
   if (structured) return structured;
+  const dashed = normalizeCareerplugDashedLocation(normalized);
+  if (dashed) return dashed;
   return {
     location: normalized,
     evidence: {
@@ -285,6 +374,8 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
       city: locationFields.city || null,
       state: locationFields.state || null,
       country: locationFields.country || null,
+      remote_type: locationFields.remote_type || null,
+      workplace_type: locationFields.workplace_type || null,
       employment_type: jobType || null,
       source_evidence: {
         route_kind: "careerplug_jobs_html",
