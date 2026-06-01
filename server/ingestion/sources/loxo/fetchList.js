@@ -7,8 +7,11 @@ const {
   parseLoxoCompany,
   supportedLoxoHost
 } = require("./discover");
+const { parseLoxoPostingsFromHtml } = require("./parse");
 
 const LOXO_RATE_LIMIT_WAIT_MS = 5 * 1000;
+const LOXO_DEFAULT_DETAIL_LIMIT = 10;
+const LOXO_DEFAULT_DETAIL_DELAY_MS = 150;
 
 function makeSourceFetchError(reason, message, details = {}) {
   const error = new Error(message);
@@ -39,6 +42,30 @@ async function payloadToHtml(payload) {
   return "";
 }
 
+function loxoDetailLimit(options = {}) {
+  const value = Number(
+    options.maxLoxoDetailFetches ??
+    process.env.OPENJOBSLOTS_LOXO_DETAIL_LIMIT ??
+    LOXO_DEFAULT_DETAIL_LIMIT
+  );
+  if (!Number.isFinite(value)) return LOXO_DEFAULT_DETAIL_LIMIT;
+  return Math.max(0, Math.min(100, Math.floor(value)));
+}
+
+function loxoDetailDelayMs(options = {}) {
+  const value = Number(
+    options.loxoDetailDelayMs ??
+    process.env.OPENJOBSLOTS_LOXO_DETAIL_DELAY_MS ??
+    LOXO_DEFAULT_DETAIL_DELAY_MS
+  );
+  if (!Number.isFinite(value)) return LOXO_DEFAULT_DETAIL_DELAY_MS;
+  return Math.max(0, Math.min(5000, Math.floor(value)));
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function assertLoxoFinalHost(finalUrl, fallbackUrl) {
   const value = clean(finalUrl || fallbackUrl);
   try {
@@ -50,6 +77,28 @@ function assertLoxoFinalHost(finalUrl, fallbackUrl) {
   throw makeSourceFetchError("unexpected_redirect_host", `Loxo URL redirected to unexpected host: ${value}`, {
     url: value
   });
+}
+
+async function fetchLoxoPage(url, target, options = {}) {
+  if (typeof options.fetcher === "function") {
+    const payload = await options.fetcher(url, target);
+    return {
+      html: await payloadToHtml(payload),
+      status: responseStatus(payload),
+      finalUrl: clean(payload?.url || payload?.__sourceFetchFinalUrl || url)
+    };
+  }
+
+  const response = await safeFetch(url, target);
+  return {
+    html: await response.text(),
+    status: Number(response.status || 200),
+    finalUrl: clean(response.url || url)
+  };
+}
+
+function shouldFetchLoxoDetail(posting) {
+  return Boolean(posting?.job_posting_url && !clean(posting?.location));
 }
 
 function withFinalConfig(config, finalUrl, fallbackUrl) {
@@ -92,44 +141,47 @@ function createFetchList(dependencies = {}) {
       rateLimitMs: LOXO_RATE_LIMIT_WAIT_MS
     };
 
-    if (typeof options.fetcher === "function") {
-      const payload = await options.fetcher(boardUrl, target);
-      const status = responseStatus(payload);
-      if (status < 200 || status >= 300) {
-        throw makeSourceFetchError("fetch_failed", `Loxo page request failed (${status})`, {
-          status,
-          url: boardUrl
-        });
-      }
-      const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || boardUrl);
-      assertLoxoFinalHost(finalUrl, boardUrl);
-      return {
-        html: await payloadToHtml(payload),
-        __sourceConfig: withFinalConfig(config, finalUrl, boardUrl),
-        __sourceFetchFinalUrl: finalUrl,
-        __sourceRequest: {
-          boardUrl,
-          rateLimitMs: LOXO_RATE_LIMIT_WAIT_MS
-        }
-      };
-    }
-
-    const response = await safeFetch(boardUrl, target);
-    if (!response.ok) {
-      const body = await response.text();
-      throw makeSourceFetchError("fetch_failed", `Loxo page request failed (${response.status}): ${body.slice(0, 180)}`, {
-        status: response.status,
-        url: response.url || boardUrl
+    const list = await fetchLoxoPage(boardUrl, target, options);
+    if (list.status < 200 || list.status >= 300) {
+      throw makeSourceFetchError("fetch_failed", `Loxo page request failed (${list.status}): ${list.html.slice(0, 180)}`, {
+        status: list.status,
+        url: list.finalUrl || boardUrl
       });
     }
-    const finalUrl = clean(response.url || boardUrl);
+    const finalUrl = clean(list.finalUrl || boardUrl);
     assertLoxoFinalHost(finalUrl, boardUrl);
+    const finalConfig = withFinalConfig(config, finalUrl, boardUrl);
+    const companyName = clean(context.company_name || finalConfig.companySlugLower || "loxo");
+    const listPostings = parseLoxoPostingsFromHtml(companyName, finalConfig, list.html);
+    const maxDetails = loxoDetailLimit(options);
+    const detailDelayMs = typeof options.fetcher === "function" ? 0 : loxoDetailDelayMs(options);
+    const detailHtmlByUrl = {};
+    let detailFetches = 0;
+
+    for (const posting of listPostings) {
+      if (!shouldFetchLoxoDetail(posting) || detailFetches >= maxDetails) continue;
+      detailFetches += 1;
+      try {
+        if (detailFetches > 1 && detailDelayMs > 0) await delay(detailDelayMs);
+        const detail = await fetchLoxoPage(posting.job_posting_url, target, options);
+        if (detail.status < 200 || detail.status >= 300) continue;
+        assertLoxoFinalHost(detail.finalUrl, posting.job_posting_url);
+        detailHtmlByUrl[posting.job_posting_url] = detail.html;
+      } catch {
+        // Detail pages are best-effort evidence; keep the list row conservative.
+      }
+    }
+
     return {
-      html: await response.text(),
-      __sourceConfig: withFinalConfig(config, finalUrl, boardUrl),
+      html: list.html,
+      __detailHtmlByUrl: detailHtmlByUrl,
+      detail_fetch_count: detailFetches,
+      __sourceConfig: finalConfig,
       __sourceFetchFinalUrl: finalUrl,
       __sourceRequest: {
         boardUrl,
+        detailFetchCount: detailFetches,
+        detailLimit: maxDetails,
         rateLimitMs: LOXO_RATE_LIMIT_WAIT_MS
       }
     };
@@ -138,5 +190,6 @@ function createFetchList(dependencies = {}) {
 
 module.exports = {
   LOXO_RATE_LIMIT_WAIT_MS,
+  loxoDetailLimit,
   createFetchList
 };

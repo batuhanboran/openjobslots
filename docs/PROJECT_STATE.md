@@ -29,6 +29,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `prep-academy-tutors`: current local parser accepted `200/200` rows with `0` state-scope city rows and `0` multi-city city rows. The sampled `Maryland, US` row now normalizes to `United States` with blank city.
 - Verification covered focused Breezy tests, live read-only parser probes, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, `npm.cmd run ats:workbench -- --source=breezy --json --no-write`, `git diff --check`, and changed-file secret scans. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Loxo Bounded Detail Location Evidence - June 1, 2026
+
+- Fresh read-only production evidence had Loxo at `83` recent `no_geo_no_remote` parser-validation rows. Top failing targets included `Vertical-Recruitment` and `Top-Tier-Talent-Group`; Loxo remains high missing-normalized-geo risk.
+- The Loxo parser now performs a bounded detail pass for rows whose list `job-location` is blank, capped at `10` detail pages per target by default. It accepts only strict detail `strong:Location` evidence for country or explicit remote; unlabeled body prose, titles, company names, and tenant names remain unused.
+- Live read-only proof on `Vertical-Recruitment`: accepted rows improved from `507/538` to `510/538`, fixing labeled `South Manchester`, `Any UK office`, and `Remote | Type: Full-time` rows. `Top-Tier-Talent-Group` stayed `66/68` accepted because its remaining gaps lacked strict detail location labels.
+- Verification covered Loxo syntax checks, focused tests, html/public source tests, live parser probes, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `npm.cmd run ats:workbench -- --source=loxo --json --no-write`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplyToJob Country-Scope And Placeholder Hardening - June 1, 2026
 
 - Fresh read-only production evidence kept ApplyToJob as a large remaining surface: `51,370` visible rows, `9,122` missing-any-normalized-geo rows, `1,438` weak/unknown remote rows, `7,173` parser errors, and `3,571` rejections. Recent ApplyToJob parser-validation pressure was dominated by `no_geo_no_remote`, `ambiguous_location`, and combined `ambiguous_location, no_geo_no_remote` rows.

@@ -24,7 +24,8 @@ function parse(rawPayload, company = {}) {
   const payload = stripInternalPayloadFields(rawPayload);
   const html = typeof payload === "string" ? payload : String(payload?.html || payload?.body || "");
   const companyName = normalizeCompanyName(company, config.companySlugLower || "loxo");
-  const postings = parser.parseLoxoPostingsFromHtml(companyName, config, html);
+  const detailHtmlByUrl = rawPayload?.__detailHtmlByUrl || rawPayload?.detailHtmlByUrl || {};
+  const postings = parser.parseLoxoPostingsFromHtml(companyName, config, html, { detailHtmlByUrl });
   const listUrl = clean(rawPayload?.__sourceFetchFinalUrl || config.boardUrl || target.list_url);
 
   return postings.map((posting) => ({

@@ -47,6 +47,7 @@ test("loxo fetchList succeeds with injected fetcher and exposes source request m
   assert.equal(raw.__sourceConfig.baseOrigin, "https://app.loxo.co");
   assert.equal(raw.__sourceRequest.rateLimitMs, LOXO_RATE_LIMIT_WAIT_MS);
   assert.equal(raw.__sourceRequest.boardUrl, "https://app.loxo.co/fixtureco");
+  assert.equal(raw.detail_fetch_count, 0);
 });
 
 test("loxo fetchList throws no_public_jobs_route for missing route", async () => {
@@ -127,6 +128,59 @@ test("loxo parser maps source-local region codes without global token inference"
   assert.equal(normalized["be-bru"].city, "Bruxelles");
   assert.equal(normalized["be-bru"].source_evidence.country_rule_name, "loxo_list_region_country_code");
   assert.equal(normalized["fr-city"].source_evidence.country_rule_name, "loxo_list_city_country_hint");
+});
+
+test("loxo parser uses bounded detail Location labels when list location is blank", async () => {
+  const company = readJson("company.json");
+  const listHtml = `
+    <div class='jobs-listing-card'>
+      <a class='job-title' href='/job/blank-city'>Intermediate Electrical Engineer</a>
+      <div class='job-date'>2026-05-30</div>
+    </div></div>
+    <div class='data-cell'><div class='job-location'></div></div>
+    <div class='jobs-listing-card'>
+      <a class='job-title' href='/job/remote-role'>Senior Revit MEP Technician</a>
+    </div></div>
+    <div class='data-cell'><div class='job-location'></div></div>
+    <div class='jobs-listing-card'>
+      <a class='job-title' href='/job/no-label'>Construction Manager</a>
+    </div></div>
+    <div class='data-cell'><div class='job-location'></div></div>
+  `;
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      if (url === "https://app.loxo.co/fixtureco") {
+        return { status: 200, url, body: listHtml };
+      }
+      if (url.endsWith("/job/blank-city")) {
+        return { status: 200, url, body: "<p><strong>Location:</strong> South Manchester</p>" };
+      }
+      if (url.endsWith("/job/remote-role")) {
+        return { status: 200, url, body: "<p><strong>Location: Remote | Type: Full-time</strong></p>" };
+      }
+      return { status: 200, url, body: "<p>No labeled location here</p>" };
+    }
+  });
+
+  assert.equal(raw.detail_fetch_count, 3);
+  const parsed = source.parse(raw, company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.equal(normalized["blank-city"].location_text, "South Manchester");
+  assert.equal(normalized["blank-city"].country, "United Kingdom");
+  assert.equal(normalized["blank-city"].city, "South Manchester");
+  assert.equal(normalized["blank-city"].source_evidence.country_rule_name, "loxo_list_city_country_hint");
+  assert.equal(source.validatePublic(normalized["blank-city"]).status, "accepted");
+
+  assert.equal(normalized["remote-role"].location_text, "Remote");
+  assert.equal(normalized["remote-role"].remote_type, "remote");
+  assert.equal(source.validatePublic(normalized["remote-role"]).status, "accepted");
+
+  assert.equal(normalized["no-label"].location_text, null);
+  assert.equal(source.validatePublic(normalized["no-label"]).status, "quarantined");
 });
 
 test("loxo parse preserves __legacyParsed payloads", () => {
