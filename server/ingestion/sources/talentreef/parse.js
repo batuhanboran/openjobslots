@@ -94,12 +94,14 @@ function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, confi
     const sourceJobId =
       String(source?.jobId || source?.id || hit?._id || "").trim() ||
       extractSourceIdFromPostingUrl(postingUrl, "talentreef");
+    const title = String(source?.title || source?.positionType || "").trim();
+    if (!title) continue;
 
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: sourceJobId,
       id: sourceJobId || undefined,
-      position_name: String(source?.title || source?.positionType || "").trim() || "Untitled Position",
+      position_name: title,
       job_posting_url: postingUrl,
       posting_date: postingDate,
       location: location || null,

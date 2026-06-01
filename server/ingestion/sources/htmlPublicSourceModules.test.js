@@ -126,6 +126,47 @@ for (const atsKey of HTML_PUBLIC_SOURCES) {
   });
 }
 
+for (const atsKey of ["hibob", "talentreef"]) {
+  test(`${atsKey} html/public source module treats empty boards and malformed source rows conservatively`, () => {
+    const source = getSourceModule(atsKey);
+    const sourceDir = path.join(__dirname, atsKey, "fixtures");
+    const route = readJson(path.join(sourceDir, "route-detection.json"));
+    const malformed = readJson(path.join(sourceDir, "malformed-list-shapes.json"));
+    const missingGeo = readJson(path.join(sourceDir, "missing-geo-list.json"));
+    const company = {
+      company_name: route.company_name,
+      ATS_name: atsKey,
+      url_string: route.board_url
+    };
+
+    const discovered = source.discover(company);
+    assert.equal(discovered.list_url, route.expected.list_url);
+    assert.deepEqual(source.payloadShapePolicy.empty_job_list_stems, route.expected.empty_job_list_stems);
+    if (atsKey === "hibob") {
+      assert.equal(discovered.config.companySubdomainLower, route.expected.company_subdomain);
+    } else {
+      assert.equal(discovered.config.companyNameLower, route.expected.company_name_lower);
+    }
+    assert.equal(source.parse(route.empty_payload, company).length, route.expected.parsed_count);
+
+    for (const item of malformed.cases) {
+      assert.equal(
+        source.parse(item.payload, company).length,
+        item.expected_parsed_count,
+        `${atsKey} ${item.name} should not produce parser rows`
+      );
+    }
+
+    const parsed = source.parse(missingGeo.payload, company);
+    assert.equal(parsed.length, 1);
+    const normalized = source.normalize(parsed[0], company);
+    assert.equal(normalized.source_job_id, missingGeo.expected.source_job_id);
+    const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
+    assert.equal(gate.status, missingGeo.expected.public_gate_status);
+    assert.ok(gate.reason_codes.includes(missingGeo.expected.reason_code));
+  });
+}
+
 for (const { atsKey, sourceFamilies, reasonCodes } of QUARANTINED_HTML_PUBLIC_SOURCES) {
   test(`${atsKey} html/public source module parses fixture with quarantined public-gate evidence`, () => {
     const source = getSourceModule(atsKey);

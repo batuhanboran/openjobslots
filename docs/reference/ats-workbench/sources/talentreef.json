@@ -24,6 +24,9 @@
       "server/ingestion/sources/talentreef/fixtures/fetch-list.json",
       "server/ingestion/sources/talentreef/fixtures/invalid-shapes.json",
       "server/ingestion/sources/talentreef/fixtures/list.json",
+      "server/ingestion/sources/talentreef/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/talentreef/fixtures/missing-geo-list.json",
+      "server/ingestion/sources/talentreef/fixtures/route-detection.json",
       "server/ingestion/sources/talentreef/talentreef.local.test.js"
     ],
     "present": [
@@ -32,6 +35,9 @@
       "server/ingestion/sources/talentreef/fixtures/fetch-list.json",
       "server/ingestion/sources/talentreef/fixtures/invalid-shapes.json",
       "server/ingestion/sources/talentreef/fixtures/list.json",
+      "server/ingestion/sources/talentreef/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/talentreef/fixtures/missing-geo-list.json",
+      "server/ingestion/sources/talentreef/fixtures/route-detection.json",
       "server/ingestion/sources/talentreef/talentreef.local.test.js"
     ],
     "missing": []
@@ -53,7 +59,11 @@
   "public_enabled": false,
   "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
-    "known_failure_modes": [],
+    "known_failure_modes": [
+      "empty hits.hits arrays are valid no-job boards, not parser drift",
+      "search hits without source titles are skipped instead of inventing placeholder titles",
+      "rows without list geo or explicit remote evidence stay quarantined"
+    ],
     "parser_attention_count_24h": 0,
     "rejected_count": 0,
     "quarantined_count": 0,
@@ -85,6 +95,6 @@
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
+  "next_action": "run bounded canary planning after deploy; keep empty-board and malformed-row handling source-local before detail-refetch certification",
   "certification_blockers": "high missing normalized geo"
 }

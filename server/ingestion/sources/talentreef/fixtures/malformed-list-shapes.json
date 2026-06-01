@@ -1,0 +1,68 @@
+{
+  "ats_key": "talentreef",
+  "description": "Malformed or unsupported TalentReef search payloads must not produce public rows.",
+  "cases": [
+    {
+      "name": "missing hits array",
+      "payload": {
+        "hits": {
+          "total": 1
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "non-array hits",
+      "payload": {
+        "hits": {
+          "hits": {
+            "_id": "tr-non-array"
+          }
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing source url",
+      "payload": {
+        "hits": {
+          "hits": [
+            {
+              "_id": "TR-missing-url",
+              "_source": {
+                "jobId": "TR-missing-url",
+                "title": "Missing URL",
+                "address": {
+                  "city": "Istanbul"
+                },
+                "stateOrProvinceFull": "Turkey"
+              }
+            }
+          ]
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing title",
+      "payload": {
+        "hits": {
+          "hits": [
+            {
+              "_id": "TR-missing-title",
+              "_source": {
+                "jobId": "TR-missing-title",
+                "url": "https://apply.jobappnetwork.com/fixture/jobs/TR-missing-title",
+                "address": {
+                  "city": "Istanbul"
+                },
+                "stateOrProvinceFull": "Turkey"
+              }
+            }
+          ]
+        }
+      },
+      "expected_parsed_count": 0
+    }
+  ]
+}

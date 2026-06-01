@@ -1,0 +1,53 @@
+{
+  "ats_key": "hibob",
+  "description": "Malformed or unsupported HiBob job-ad payloads must not produce public rows.",
+  "cases": [
+    {
+      "name": "missing jobAdDetails array",
+      "payload": {
+        "filterGroups": {
+          "departments": []
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "non-array jobAdDetails",
+      "payload": {
+        "jobAdDetails": {
+          "id": "hb-non-array",
+          "title": "Unsupported Shape"
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing source id",
+      "payload": {
+        "jobAdDetails": [
+          {
+            "title": "Missing Identity",
+            "jobUrl": "https://fixture.careers.hibob.com/job/hb-missing-id",
+            "site": "Istanbul, Turkey",
+            "country": "Turkey"
+          }
+        ]
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing title",
+      "payload": {
+        "jobAdDetails": [
+          {
+            "id": "hb-missing-title",
+            "jobUrl": "https://fixture.careers.hibob.com/job/hb-missing-title",
+            "site": "Istanbul, Turkey",
+            "country": "Turkey"
+          }
+        ]
+      },
+      "expected_parsed_count": 0
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "ats_key": "talentreef",
+  "description": "TalentReef rows without list geo or explicit remote evidence must stay out of public accepted rows.",
+  "payload": {
+    "hits": {
+      "hits": [
+        {
+          "_id": "TR-no-geo",
+          "_source": {
+            "jobId": "TR-no-geo",
+            "title": "Restaurant Support Specialist",
+            "url": "https://apply.jobappnetwork.com/fixture/jobs/TR-no-geo"
+          }
+        }
+      ]
+    }
+  },
+  "expected": {
+    "source_job_id": "TR-no-geo",
+    "public_gate_status": "quarantined",
+    "reason_code": "no_geo_no_remote"
+  }
+}

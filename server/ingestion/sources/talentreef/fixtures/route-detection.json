@@ -1,0 +1,20 @@
+{
+  "ats_key": "talentreef",
+  "company_name": "Fixture TalentReef Empty Board",
+  "board_url": "https://apply.jobappnetwork.com/rtg",
+  "search_api_url": "https://prod-kong.internal.talentreef.com/apply/proxy-es/search-en-us/posting/_search",
+  "empty_payload": {
+    "hits": {
+      "total": 0,
+      "hits": []
+    }
+  },
+  "expected": {
+    "company_name_lower": "rtg",
+    "list_url": "https://apply.jobappnetwork.com/rtg",
+    "empty_job_list_stems": [
+      "hits.hits"
+    ],
+    "parsed_count": 0
+  }
+}

@@ -23,6 +23,9 @@
       "server/ingestion/sources/hibob/fixtures/expected-normalized.json",
       "server/ingestion/sources/hibob/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hibob/fixtures/list.json",
+      "server/ingestion/sources/hibob/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/hibob/fixtures/missing-geo-list.json",
+      "server/ingestion/sources/hibob/fixtures/route-detection.json",
       "server/ingestion/sources/hibob/hibob.local.test.js"
     ],
     "present": [
@@ -30,6 +33,9 @@
       "server/ingestion/sources/hibob/fixtures/expected-normalized.json",
       "server/ingestion/sources/hibob/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hibob/fixtures/list.json",
+      "server/ingestion/sources/hibob/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/hibob/fixtures/missing-geo-list.json",
+      "server/ingestion/sources/hibob/fixtures/route-detection.json",
       "server/ingestion/sources/hibob/hibob.local.test.js"
     ],
     "missing": []
@@ -51,7 +57,11 @@
   "public_enabled": false,
   "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
-    "known_failure_modes": [],
+    "known_failure_modes": [
+      "empty jobAdDetails arrays are valid no-job boards, not parser drift",
+      "job-ad rows without source titles are skipped instead of inventing placeholder titles",
+      "rows without list geo or explicit remote evidence stay quarantined"
+    ],
     "parser_attention_count_24h": 0,
     "rejected_count": 0,
     "quarantined_count": 0,
@@ -83,6 +93,6 @@
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "monitor with parser stats and live field-quality audit",
+  "next_action": "run bounded canary planning after deploy; keep empty-board and malformed-row handling source-local",
   "certification_blockers": "none"
 }

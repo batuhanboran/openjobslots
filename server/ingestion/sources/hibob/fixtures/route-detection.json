@@ -1,0 +1,22 @@
+{
+  "ats_key": "hibob",
+  "company_name": "Fixture HiBob Empty Board",
+  "board_url": "https://evenergy.careers.hibob.com/jobs",
+  "api_url": "https://evenergy.careers.hibob.com/api/job-ad",
+  "empty_payload": {
+    "filterGroups": {
+      "departments": [],
+      "sites": [],
+      "workspaceTypes": []
+    },
+    "jobAdDetails": []
+  },
+  "expected": {
+    "company_subdomain": "evenergy",
+    "list_url": "https://evenergy.careers.hibob.com/api/job-ad",
+    "empty_job_list_stems": [
+      "jobAdDetails"
+    ],
+    "parsed_count": 0
+  }
+}

@@ -57,7 +57,8 @@ function parseHibobPostingsFromApi(companyName, config, responseJson) {
     const urlValue = postingUrl || `${config.baseOrigin}/job/${jobId}`;
     if (!urlValue || seenUrls.has(urlValue)) continue;
 
-    const title = cleanText(item.title) || "Untitled Position";
+    const title = cleanText(item.title);
+    if (!title) continue;
     const location = cleanText(item.site) || cleanText(item.country) || null;
     const country = extractCountry(item, location);
     const city = extractCityFromSite(item.site, country);
