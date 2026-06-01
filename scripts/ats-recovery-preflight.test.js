@@ -82,4 +82,20 @@ test("preflight fails when backup path is missing", () => {
   assert.ok(result.failures.some((failure) => failure.code === "backup_path_missing"));
 });
 
+test("preflight fails when backup file is missing", () => {
+  const result = evaluatePreflight(report({ backup_file_exists: false, backup_size_bytes: null }), {
+    expectedCommit: "abcdef1234567890"
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "backup_file_missing"));
+});
+
+test("preflight fails when backup file is empty", () => {
+  const result = evaluatePreflight(report({ backup_file_exists: true, backup_size_bytes: 0 }), {
+    expectedCommit: "abcdef1234567890"
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "backup_file_empty"));
+});
+
 console.log("ats recovery preflight tests passed");

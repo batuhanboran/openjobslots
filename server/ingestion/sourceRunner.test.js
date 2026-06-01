@@ -10,6 +10,7 @@ const {
   candidateDetailEvidenceUrl,
   classifySourceCandidateErrorType,
   evaluatePlannedBatchGate,
+  evaluatePreflightReportGate,
   evaluateSourceRecoveryReadiness,
   getRecoveryReadinessGate,
   getSafetyGate,
@@ -59,6 +60,37 @@ function writePlannedBatchReport(report = plannedBatchReport()) {
   return filePath;
 }
 
+function preflightReport(overrides = {}) {
+  return {
+    ok: true,
+    unsafe: false,
+    checks: {
+      production_checkout_commit: "abcdef1234567890",
+      expected_commit: "abcdef1234567890",
+      worker_state: "stopped",
+      worker_isolated: false,
+      autodeploy_timer_state: "inactive",
+      autodeploy_recovery_safe: false,
+      heavy_job_active: false,
+      long_running_postgres_queries: 0,
+      meili_postgres_delta: 0,
+      backup_path: "/root/OpenJobSlots/backups/postgres-openjobslots-pre-greenhouse-recovery.dump",
+      backup_parent_exists: true,
+      backup_file_exists: true,
+      backup_size_bytes: 1024
+    },
+    failures: [],
+    ...overrides
+  };
+}
+
+function writePreflightReport(report = preflightReport()) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openjobslots-preflight-"));
+  const filePath = path.join(dir, "preflight.json");
+  fs.writeFileSync(filePath, `${JSON.stringify(report, null, 2)}\n`);
+  return filePath;
+}
+
 test("source runner apply requires explicit production safety flags", () => {
   const dryRun = parseArgs(["--source=greenhouse", "--limit=5"]);
   assert.equal(dryRun.source, "greenhouse");
@@ -94,6 +126,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--worker-isolated",
     "--max-updates=N",
     "--planned-batch=<report>",
+    "--preflight-report=<report>",
     "--predicted-guard-result=pass"
   ]);
 
@@ -103,7 +136,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--confirm-production",
     "--backup-confirmed",
     "--worker-isolated",
-    "--max-updates=25"
+    "--max-updates=25",
+    `--preflight-report=${writePreflightReport()}`
   ]);
   const missingPlanGate = getSafetyGate(missingPlan);
   assert.equal(missingPlanGate.authorized, false);
@@ -112,6 +146,7 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(missingPlanGate.predicted_guard_ok, false);
   assert.ok(missingPlanGate.missing.includes("--planned-batch=<report>"));
   assert.ok(missingPlanGate.missing.includes("--predicted-guard-result=pass"));
+  assert.ok(!missingPlanGate.missing.includes("--preflight-report=<report>"));
 
   const canaryMissingSafety = parseArgs(["--mode=canary", "--source=greenhouse"]);
   const canaryMissingSafetyGate = getSafetyGate(canaryMissingSafety);
@@ -125,6 +160,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--backup-confirmed",
     "--worker-isolated",
     "--planned-batch=<report>",
+    "--preflight-report=<report>",
     "--predicted-guard-result=pass"
   ]);
 
@@ -136,6 +172,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport()}`,
+    `--preflight-report=${writePreflightReport()}`,
     "--predicted-guard-result=fail"
   ]);
   const failedPredictionGate = getSafetyGate(failedPrediction);
@@ -153,6 +190,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--worker-isolated",
     "--max-updates=25",
     "--planned-batch=reports/greenhouse-plan.json",
+    `--preflight-report=${writePreflightReport()}`,
     "--predicted-guard-result=pass"
   ]);
   const missingReportFileGate = getSafetyGate(missingReportFile);
@@ -168,6 +206,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport(plannedBatchReport({ source: "lever" }))}`,
+    `--preflight-report=${writePreflightReport()}`,
     "--predicted-guard-result=pass"
   ]);
   const sourceMismatchGate = getSafetyGate(sourceMismatch);
@@ -188,6 +227,7 @@ test("source runner apply requires explicit production safety flags", () => {
         fail_reasons: ["insufficient_guard_safe_tenant_rows"]
       }
     }))}`,
+    `--preflight-report=${writePreflightReport()}`,
     "--predicted-guard-result=pass"
   ]);
   const failedReportPredictionGate = getSafetyGate(failedReportPrediction);
@@ -204,6 +244,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport()}`,
+    `--preflight-report=${writePreflightReport()}`,
     "--predicted-guard-result=pass"
   ]);
   const gate = getSafetyGate(authorized);
@@ -218,6 +259,12 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(gate.planned_batch_report_source, "greenhouse");
   assert.equal(gate.planned_batch_report_selected_tenant_count, 1);
   assert.equal(gate.planned_batch_report_selected_gain, 25);
+  assert.equal(gate.preflight_report_ok, true);
+  assert.equal(gate.preflight_production_checkout_commit, "abcdef1234567890");
+  assert.equal(gate.preflight_expected_commit, "abcdef1234567890");
+  assert.equal(gate.preflight_backup_size_bytes, 1024);
+  assert.equal(gate.preflight_long_running_postgres_queries, 0);
+  assert.equal(gate.preflight_meili_postgres_delta, 0);
   assert.equal(gate.predicted_guard_ok, true);
 
   const canary = getSafetyGate({
@@ -228,9 +275,11 @@ test("source runner apply requires explicit production safety flags", () => {
       "--backup-confirmed",
       "--worker-isolated",
       "--planned-batch=inline",
+      "--preflight-report=inline",
       "--predicted-guard-result=pass"
     ]),
-    plannedBatchReport: plannedBatchReport()
+    plannedBatchReport: plannedBatchReport(),
+    preflightReportPayload: preflightReport()
   });
   assert.equal(canary.canary_requested, true);
   assert.equal(canary.apply_requested, false);
@@ -252,6 +301,84 @@ test("source runner validates inline planned batch reports for unit callers", ()
   assert.equal(gate.predicted_guard_result, "pass");
 });
 
+test("source runner validates preflight reports for source operations", () => {
+  const gate = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightReportPayload: preflightReport()
+  });
+  assert.equal(gate.ok, true);
+  assert.equal(gate.status, "pass");
+  assert.equal(gate.source_type, "inline");
+  assert.equal(gate.backup_file_exists, true);
+  assert.equal(gate.backup_size_bytes, 1024);
+  assert.equal(gate.production_checkout_commit, "abcdef1234567890");
+  assert.equal(gate.expected_commit, "abcdef1234567890");
+  assert.equal(gate.long_running_postgres_queries, 0);
+  assert.equal(gate.meili_postgres_delta, 0);
+
+  const missingBackup = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightReportPayload: preflightReport({
+      checks: {
+        ...preflightReport().checks,
+        backup_file_exists: false,
+        backup_size_bytes: null
+      }
+    })
+  });
+  assert.equal(missingBackup.ok, false);
+  assert.ok(missingBackup.failures.includes("preflight_backup_file_missing"));
+  assert.ok(missingBackup.failures.includes("preflight_backup_file_empty"));
+
+  const missingCommit = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightReportPayload: preflightReport({
+      checks: {
+        ...preflightReport().checks,
+        production_checkout_commit: ""
+      }
+    })
+  });
+  assert.equal(missingCommit.ok, false);
+  assert.ok(missingCommit.failures.includes("preflight_production_commit_missing"));
+
+  const mismatchedCommit = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightReportPayload: preflightReport({
+      checks: {
+        ...preflightReport().checks,
+        production_checkout_commit: "different-prod-sha"
+      }
+    })
+  });
+  assert.equal(mismatchedCommit.ok, false);
+  assert.ok(mismatchedCommit.failures.includes("preflight_production_commit_mismatch"));
+
+  const undocumentedSearchState = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightReportPayload: preflightReport({
+      checks: {
+        ...preflightReport().checks,
+        long_running_postgres_queries: null,
+        meili_postgres_delta: null
+      }
+    })
+  });
+  assert.equal(undocumentedSearchState.ok, false);
+  assert.ok(undocumentedSearchState.failures.includes("preflight_long_running_queries_missing"));
+  assert.ok(undocumentedSearchState.failures.includes("preflight_meili_postgres_delta_nonzero"));
+});
+
 test("source runner scopes authorized writes to selected planned-batch targets", () => {
   const gate = getSafetyGate({
     ...parseArgs([
@@ -263,9 +390,11 @@ test("source runner scopes authorized writes to selected planned-batch targets",
       "--worker-isolated",
       "--max-updates=25",
       "--planned-batch=inline",
+      "--preflight-report=inline",
       "--predicted-guard-result=pass"
     ]),
-    plannedBatchReport: plannedBatchReport()
+    plannedBatchReport: plannedBatchReport(),
+    preflightReportPayload: preflightReport()
   });
   const scoped = scopeTargetsToPlannedBatch([
     {
@@ -309,9 +438,11 @@ test("source runner uses exact target URL before shared-host fallback", () => {
       "--worker-isolated",
       "--max-updates=25",
       "--planned-batch=inline",
+      "--preflight-report=inline",
       "--predicted-guard-result=pass"
     ]),
-    plannedBatchReport: report
+    plannedBatchReport: report,
+    preflightReportPayload: preflightReport()
   });
   const scoped = scopeTargetsToPlannedBatch([
     {
@@ -341,9 +472,11 @@ test("source runner blocks authorized writes when planned batch matches no disco
       "--worker-isolated",
       "--max-updates=25",
       "--planned-batch=inline",
+      "--preflight-report=inline",
       "--predicted-guard-result=pass"
     ]),
     plannedBatchReport: plannedBatchReport(),
+    preflightReportPayload: preflightReport(),
     pool: {
       async query(sql) {
         if (/FROM companies c/i.test(sql)) {
@@ -379,9 +512,11 @@ test("source runner blocks canary operations when planned batch matches no disco
       "--backup-confirmed",
       "--worker-isolated",
       "--planned-batch=inline",
+      "--preflight-report=inline",
       "--predicted-guard-result=pass"
     ]),
     plannedBatchReport: plannedBatchReport(),
+    preflightReportPayload: preflightReport(),
     pool: {
       async query(sql) {
         if (/FROM companies c/i.test(sql)) {
@@ -427,7 +562,7 @@ test("source runner requires recovery readiness for canary and apply operations"
         }
       }
     }),
-    /source operation safety blocked: --confirm-production, --backup-confirmed, --worker-isolated, --planned-batch=<report>, --predicted-guard-result=pass/
+    /source operation safety blocked: --confirm-production, --backup-confirmed, --worker-isolated, --planned-batch=<report>, --preflight-report=<report>, --predicted-guard-result=pass/
   );
 
   const blockedCanary = parseArgs(["--mode=canary", "--source=not_configured_ats"]);
@@ -444,6 +579,7 @@ test("source runner requires recovery readiness for canary and apply operations"
     "--worker-isolated",
     "--max-updates=1",
     "--planned-batch=reports/not-configured-plan.json",
+    `--preflight-report=${writePreflightReport()}`,
     "--predicted-guard-result=pass"
   ]);
   const safetyGate = getSafetyGate(blockedApply);

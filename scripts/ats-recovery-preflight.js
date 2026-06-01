@@ -76,6 +76,19 @@ function currentCommit() {
 function collectLocalSystemReport(options = {}) {
   const timer = runOptional("systemctl", ["is-active", "openjobslots-deploy.timer"]);
   const dockerPs = runOptional("docker", ["compose", "ps", "--format", "json"]);
+  const backupPath = options.backupPath || "";
+  let backupFileExists = false;
+  let backupSizeBytes = null;
+  if (backupPath) {
+    try {
+      const stat = fs.statSync(backupPath);
+      backupFileExists = stat.isFile();
+      backupSizeBytes = stat.size;
+    } catch (_) {
+      backupFileExists = false;
+      backupSizeBytes = null;
+    }
+  }
   let workerState = "unknown";
   if (dockerPs.ok && dockerPs.stdout) {
     const rows = dockerPs.stdout
@@ -101,8 +114,10 @@ function collectLocalSystemReport(options = {}) {
     heavy_job_active: null,
     long_running_postgres_queries: null,
     meili_postgres_delta: null,
-    backup_path: options.backupPath,
-    backup_parent_exists: options.backupPath ? fs.existsSync(path.dirname(options.backupPath)) : false,
+    backup_path: backupPath,
+    backup_parent_exists: backupPath ? fs.existsSync(path.dirname(backupPath)) : false,
+    backup_file_exists: backupFileExists,
+    backup_size_bytes: backupSizeBytes,
     collection_warnings: [
       ...(timer.ok ? [] : [{ code: "systemctl_unavailable", message: timer.stderr }]),
       ...(dockerPs.ok ? [] : [{ code: "docker_compose_unavailable", message: dockerPs.stderr }])
@@ -161,6 +176,32 @@ function backupParentExists(report = {}, options = {}) {
 
 function backupPathValue(report = {}, options = {}) {
   return report.backup_path || options.backupPath || "";
+}
+
+function backupFileExists(report = {}, options = {}) {
+  if (typeof report.backup_file_exists === "boolean") return report.backup_file_exists;
+  if (typeof report.backup_exists === "boolean") return report.backup_exists;
+  if (typeof report.backup?.exists === "boolean") return report.backup.exists;
+  const backupPath = backupPathValue(report, options);
+  if (!backupPath) return false;
+  try {
+    return fs.statSync(backupPath).isFile();
+  } catch (_) {
+    return false;
+  }
+}
+
+function backupSizeBytes(report = {}, options = {}) {
+  const value = report.backup_size_bytes ?? report.backup_bytes ?? report.backup?.size_bytes;
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) return parsed;
+  const backupPath = backupPathValue(report, options);
+  if (!backupPath) return null;
+  try {
+    return fs.statSync(backupPath).size;
+  } catch (_) {
+    return null;
+  }
 }
 
 function evaluatePreflight(input = {}, options = {}) {
@@ -236,12 +277,18 @@ function evaluatePreflight(input = {}, options = {}) {
   const backupPath = backupPathValue(report, options);
   checks.backup_path = backupPath || null;
   checks.backup_parent_exists = backupParentExists(report, options);
+  checks.backup_file_exists = backupFileExists(report, options);
+  checks.backup_size_bytes = backupSizeBytes(report, options);
   if (!backupPath) {
     failures.push({ code: "backup_path_missing", message: "backup path for the future write must be documented" });
   } else if (!/[/\\]backups[/\\]/.test(backupPath)) {
     failures.push({ code: "backup_path_not_under_backups", message: "backup path must be under a backups directory", path: backupPath });
   } else if (!checks.backup_parent_exists) {
     failures.push({ code: "backup_parent_missing", message: "backup parent directory does not exist", path: path.dirname(backupPath) });
+  } else if (!checks.backup_file_exists) {
+    failures.push({ code: "backup_file_missing", message: "backup file must exist before recovery writes", path: backupPath });
+  } else if (!Number.isFinite(checks.backup_size_bytes) || checks.backup_size_bytes <= 0) {
+    failures.push({ code: "backup_file_empty", message: "backup file must be non-empty before recovery writes", path: backupPath });
   }
 
   for (const warning of report.collection_warnings || []) warnings.push(warning);
@@ -268,7 +315,9 @@ function selfTestReport() {
     long_running_postgres_queries: 0,
     meili_postgres_delta: 0,
     backup_path: "/root/OpenJobSlots/backups/postgres-openjobslots-pre-lever-recovery-PENDING.dump",
-    backup_parent_exists: true
+    backup_parent_exists: true,
+    backup_file_exists: true,
+    backup_size_bytes: 1024
   };
 }
 

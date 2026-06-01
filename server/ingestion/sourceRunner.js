@@ -124,6 +124,51 @@ function readPlannedBatchReport(options = {}, plannedBatchPath = "") {
   }
 }
 
+function readPreflightReport(options = {}, preflightReportPath = "") {
+  if (options.preflightReportPayload && typeof options.preflightReportPayload === "object" && !Array.isArray(options.preflightReportPayload)) {
+    return {
+      ok: true,
+      source_type: "inline",
+      report: options.preflightReportPayload
+    };
+  }
+  if (!preflightReportPath) {
+    return {
+      ok: false,
+      source_type: "",
+      status: "missing-path",
+      failures: ["preflight_report_path_missing"]
+    };
+  }
+  const resolvedPath = path.resolve(preflightReportPath);
+  try {
+    const parsed = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {
+        ok: false,
+        source_type: "file",
+        path: resolvedPath,
+        status: "invalid-json-shape",
+        failures: ["preflight_report_must_be_object"]
+      };
+    }
+    return {
+      ok: true,
+      source_type: "file",
+      path: resolvedPath,
+      report: parsed
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      source_type: "file",
+      path: resolvedPath,
+      status: "unreadable",
+      failures: [`preflight_report_unreadable: ${clean(error?.message || error, 240)}`]
+    };
+  }
+}
+
 function firstMeaningful(...values) {
   for (const value of values) {
     if (value === undefined || value === null) continue;
@@ -131,6 +176,28 @@ function firstMeaningful(...values) {
     return value;
   }
   return undefined;
+}
+
+function preflightWorkerSafe(checks = {}, report = {}) {
+  if (checks.worker_isolated === true || report.worker_isolated === true || report.worker?.isolated === true) return true;
+  const state = clean(firstMeaningful(checks.worker_state, report.worker_state, report.worker?.state) || "", 80).toLowerCase();
+  return ["stopped", "exited", "paused", "not_running", "not running", "disabled", "inactive", "dead"].includes(state);
+}
+
+function preflightAutodeploySafe(checks = {}, report = {}) {
+  if (checks.autodeploy_recovery_safe === true || report.autodeploy_recovery_safe === true || report.autodeploy?.recovery_safe === true) return true;
+  const state = clean(firstMeaningful(checks.autodeploy_timer_state, report.autodeploy_timer_state, report.autodeploy?.timer_state) || "", 80).toLowerCase();
+  return ["inactive", "disabled", "stopped", "not_found", "not-found", "failed", "dead"].includes(state);
+}
+
+function preflightNumber(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim().length === 0) continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 function normalizeScopeValue(value, max = 2000) {
@@ -344,6 +411,76 @@ function evaluatePlannedBatchGate(options = {}) {
   };
 }
 
+function evaluatePreflightReportGate(options = {}) {
+  const productionOperationRequested = sourceProductionOperationRequested(options);
+  const preflightReport = clean(options.preflightReport || "", 2000);
+  if (!productionOperationRequested) {
+    return {
+      required: false,
+      ok: true,
+      status: "not-required",
+      path: preflightReport,
+      source_type: "",
+      failures: []
+    };
+  }
+
+  const loaded = readPreflightReport(options, preflightReport);
+  const failures = [...(loaded.failures || [])];
+  const report = loaded.report || null;
+  const checks = report?.checks && typeof report.checks === "object" && !Array.isArray(report.checks)
+    ? report.checks
+    : {};
+  const backupPath = clean(firstMeaningful(checks.backup_path, report?.backup_path) || "", 2000);
+  const backupFileExists = firstMeaningful(checks.backup_file_exists, report?.backup_file_exists, report?.backup_exists, report?.backup?.exists);
+  const backupSizeBytes = preflightNumber(checks.backup_size_bytes, report?.backup_size_bytes, report?.backup_bytes, report?.backup?.size_bytes);
+  const productionCommit = clean(firstMeaningful(checks.production_checkout_commit, report?.production_checkout_commit, report?.checkout_commit, report?.git?.commit) || "", 120);
+  const expectedCommit = clean(firstMeaningful(checks.expected_commit, report?.expected_commit) || "", 120);
+  const longRunningQueries = preflightNumber(checks.long_running_postgres_queries, report?.long_running_postgres_queries, report?.postgres?.long_running_queries);
+  const meiliDelta = preflightNumber(checks.meili_postgres_delta, report?.meili_postgres_delta, report?.meili?.postgres_delta);
+  const heavyJobActive = firstMeaningful(checks.heavy_job_active, report?.heavy_job_active, report?.heavy_job?.active);
+  const failuresPresent = Array.isArray(report?.failures) && report.failures.length > 0;
+
+  if (!loaded.ok) {
+    // readPreflightReport already recorded the failure.
+  } else {
+    if (report?.ok !== true || report?.unsafe === true) failures.push("preflight_report_not_safe");
+    if (failuresPresent) failures.push("preflight_report_failures_present");
+    if (!productionCommit) failures.push("preflight_production_commit_missing");
+    if (!expectedCommit) failures.push("preflight_expected_commit_missing");
+    if (productionCommit && expectedCommit && productionCommit !== expectedCommit) failures.push("preflight_production_commit_mismatch");
+    if (longRunningQueries === null) failures.push("preflight_long_running_queries_missing");
+    else if (longRunningQueries > 0) failures.push("preflight_long_running_queries_active");
+    if (!backupPath) failures.push("preflight_backup_path_missing");
+    else if (!/[/\\]backups[/\\]/.test(backupPath)) failures.push("preflight_backup_path_not_under_backups");
+    if (backupFileExists !== true) failures.push("preflight_backup_file_missing");
+    if (backupSizeBytes === null || backupSizeBytes <= 0) failures.push("preflight_backup_file_empty");
+    if (!preflightWorkerSafe(checks, report)) failures.push("preflight_worker_not_isolated");
+    if (!preflightAutodeploySafe(checks, report)) failures.push("preflight_autodeploy_timer_unsafe");
+    if (heavyJobActive !== false) failures.push("preflight_heavy_job_lock_not_clear");
+    if (meiliDelta !== 0) failures.push("preflight_meili_postgres_delta_nonzero");
+  }
+
+  return {
+    required: true,
+    ok: failures.length === 0,
+    status: failures.length === 0 ? "pass" : "blocked",
+    path: preflightReport,
+    resolved_path: loaded.path || "",
+    source_type: loaded.source_type || "",
+    failures: Array.from(new Set(failures)),
+    production_checkout_commit: productionCommit,
+    expected_commit: expectedCommit,
+    backup_path: backupPath,
+    backup_file_exists: backupFileExists === true,
+    backup_size_bytes: backupSizeBytes,
+    long_running_postgres_queries: longRunningQueries,
+    worker_safe: report ? preflightWorkerSafe(checks, report) : false,
+    heavy_job_active: heavyJobActive === true ? true : heavyJobActive === false ? false : null,
+    meili_postgres_delta: meiliDelta
+  };
+}
+
 function postingSourceFailureReasons(posting = {}) {
   const values = Array.isArray(posting?.source_failure_reasons)
     ? posting.source_failure_reasons
@@ -379,6 +516,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     output: String(env.OPENJOBSLOTS_ATS_SOURCE_OUTPUT || "").trim(),
     includeDisabled: asBool(env.OPENJOBSLOTS_ATS_SOURCE_INCLUDE_DISABLED),
     plannedBatch: String(env.OPENJOBSLOTS_ATS_SOURCE_PLANNED_BATCH || "").trim(),
+    preflightReport: String(env.OPENJOBSLOTS_ATS_SOURCE_PREFLIGHT_REPORT || "").trim(),
     predictedGuardResult: String(env.OPENJOBSLOTS_ATS_SOURCE_PREDICTED_GUARD_RESULT || "").trim(),
     detailEvidence: asBool(env.OPENJOBSLOTS_DETAIL_EVIDENCE),
     detailEvidenceProvider: String(env.OPENJOBSLOTS_DETAIL_EVIDENCE_PROVIDER || "local").trim().toLowerCase(),
@@ -404,6 +542,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     else if (arg.startsWith("--max-updates=")) options.maxUpdates = asInt(arg.slice("--max-updates=".length), options.maxUpdates, 0, 100_000);
     else if (arg.startsWith("--output=")) options.output = String(arg.slice("--output=".length)).trim();
     else if (arg.startsWith("--planned-batch=")) options.plannedBatch = String(arg.slice("--planned-batch=".length)).trim();
+    else if (arg.startsWith("--preflight-report=")) options.preflightReport = String(arg.slice("--preflight-report=".length)).trim();
     else if (arg.startsWith("--predicted-guard-result=")) options.predictedGuardResult = String(arg.slice("--predicted-guard-result=".length)).trim();
     else if (arg === "--detail-evidence") options.detailEvidence = true;
     else if (arg === "--no-detail-evidence") options.detailEvidence = false;
@@ -423,8 +562,10 @@ function getSafetyGate(options = {}) {
   const productionOperationRequested = sourceProductionOperationRequested(options);
   const readinessGate = getRecoveryReadinessGate(options);
   const plannedBatch = clean(options.plannedBatch || "", 2000);
+  const preflightReport = clean(options.preflightReport || "", 2000);
   const predictedGuardResult = clean(options.predictedGuardResult || "", 80).toLowerCase();
   const plannedBatchGate = evaluatePlannedBatchGate(options);
+  const preflightReportGate = evaluatePreflightReportGate(options);
   const predictedGuardOk = predictedGuardPassed(predictedGuardResult) && plannedBatchGate.predicted_guard_ok;
   const operationAuthorized =
     productionOperationRequested &&
@@ -435,6 +576,8 @@ function getSafetyGate(options = {}) {
     readinessGate.ok &&
     plannedBatch.length > 0 &&
     plannedBatchGate.ok &&
+    preflightReport.length > 0 &&
+    preflightReportGate.ok &&
     predictedGuardOk;
   return {
     apply_requested: applyRequested,
@@ -456,6 +599,18 @@ function getSafetyGate(options = {}) {
     planned_batch_report_failures: plannedBatchGate.failures,
     planned_batch_predicted_guard_result: plannedBatchGate.predicted_guard_result,
     planned_batch_selected_tenants: plannedBatchGate.selected_tenants || [],
+    preflight_report_required: productionOperationRequested,
+    preflight_report_present: !productionOperationRequested || preflightReport.length > 0,
+    preflight_report_ok: !productionOperationRequested || preflightReportGate.ok,
+    preflight_report_status: preflightReportGate.status,
+    preflight_report_source_type: preflightReportGate.source_type,
+    preflight_report_failures: preflightReportGate.failures,
+    preflight_production_checkout_commit: preflightReportGate.production_checkout_commit || "",
+    preflight_expected_commit: preflightReportGate.expected_commit || "",
+    preflight_backup_path: preflightReportGate.backup_path || "",
+    preflight_backup_size_bytes: preflightReportGate.backup_size_bytes,
+    preflight_long_running_postgres_queries: preflightReportGate.long_running_postgres_queries,
+    preflight_meili_postgres_delta: preflightReportGate.meili_postgres_delta,
     predicted_guard_result: predictedGuardResult || "",
     predicted_guard_ok: !productionOperationRequested || predictedGuardOk,
     recovery_readiness_gate: readinessGate,
@@ -467,6 +622,8 @@ function getSafetyGate(options = {}) {
       productionOperationRequested && !readinessGate.ok ? "recovery-readiness-ok" : "",
       productionOperationRequested && plannedBatch.length <= 0 ? "--planned-batch=<report>" : "",
       productionOperationRequested && plannedBatch.length > 0 && !plannedBatchGate.ok ? "planned-batch-report-valid" : "",
+      productionOperationRequested && preflightReport.length <= 0 ? "--preflight-report=<report>" : "",
+      productionOperationRequested && preflightReport.length > 0 && !preflightReportGate.ok ? "preflight-report-valid" : "",
       productionOperationRequested && !predictedGuardOk ? "--predicted-guard-result=pass" : ""
     ].filter(Boolean)
   };
@@ -1570,6 +1727,7 @@ module.exports = {
   candidateDetailEvidenceUrl,
   classifySourceCandidateErrorType,
   evaluatePlannedBatchGate,
+  evaluatePreflightReportGate,
   evaluateSourceRecoveryReadiness,
   evaluateSourceCandidate,
   getVirtualSourceTarget,

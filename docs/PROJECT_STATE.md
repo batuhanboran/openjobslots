@@ -4,8 +4,9 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## ATS Source Write Operational Safety Gate - June 1, 2026
 
-- `server/ingestion/sourceRunner.js` now refuses source-run canary/apply operation authorization unless the request includes `--confirm-production`, `--backup-confirmed`, `--worker-isolated`, a passing recovery-readiness gate, a valid source-matched `--planned-batch=<report>`, and `--predicted-guard-result=pass`. Apply writes additionally require `--max-updates=N`; `--worker-paused` is accepted as an alias for worker isolation.
-- Safety gate output records `canary_requested`, `production_operation_requested`, `operation_authorized`, `backup_confirmed`, and `worker_isolated`, and missing proof is reported explicitly as `--backup-confirmed` / `--worker-isolated`.
+- `scripts/ats-recovery-preflight.js` now requires backup file proof, not just a documented backup path: the preflight report must show `backup_file_exists=true` and `backup_size_bytes>0`.
+- `server/ingestion/sourceRunner.js` now refuses source-run canary/apply operation authorization unless the request includes `--confirm-production`, `--backup-confirmed`, `--worker-isolated`, a passing recovery-readiness gate, a valid source-matched `--planned-batch=<report>`, a passing `--preflight-report=<report>`, and `--predicted-guard-result=pass`. Apply writes additionally require `--max-updates=N`; `--worker-paused` is accepted as an alias for worker isolation.
+- Safety gate output records `canary_requested`, `production_operation_requested`, `operation_authorized`, `backup_confirmed`, `worker_isolated`, preflight report status/failures, preflight production/expected commit, backup path/size, long-running Postgres query count, and preflight Meili/Postgres delta. Missing proof is reported explicitly as `--backup-confirmed`, `--worker-isolated`, `--preflight-report=<report>`, or `preflight-report-valid`.
 - Verification covered `node --check server\ingestion\sourceRunner.js`, `node server\ingestion\sourceRunner.test.js`, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, `npm.cmd run release:ats-recovery:check -- --self-test --json`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, cleanup, or worker-budget change was run.
 
 ## ATS Architecture & Recovery v2 Baseline - June 1, 2026
@@ -119,7 +120,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## ATS Source Write Batch-Plan Safety Gate - June 1, 2026
 
-- `server/ingestion/sourceRunner.js` now refuses source-run canary/apply operation authorization unless the request includes `--planned-batch=<report>` and `--predicted-guard-result=pass` in addition to `--confirm-production`, `--backup-confirmed`, `--worker-isolated`, and a passing recovery-readiness gate. Apply writes additionally require `--max-updates=N`.
+- `server/ingestion/sourceRunner.js` now refuses source-run canary/apply operation authorization unless the request includes `--planned-batch=<report>`, `--preflight-report=<report>`, and `--predicted-guard-result=pass` in addition to `--confirm-production`, `--backup-confirmed`, `--worker-isolated`, and a passing recovery-readiness gate. Apply writes additionally require `--max-updates=N`.
 - The planned-batch gate now reads and validates the report JSON instead of trusting a non-empty path string. The report must be readable, `read_only`, `mode="tenant-batch-plan"`, source-matched to the requested ATS, and include a selected plan with selected tenants, positive selected gain, zero selected no-geo/no-remote candidates, and a passing report-level predicted guard.
 - Authorized source-run canary/apply operations are now scoped to selected tenant targets from the validated batch report. Out-of-plan discovered targets are skipped before fetch/write work, and a command that discovers no selected target is blocked before creating a source run.
 - The source-run summary exposes `planned_batch_required`, `planned_batch_present`, `planned_batch_report_ok`, `planned_batch_report_failures`, `planned_batch_report_selected_tenant_count`, `planned_batch_report_selected_gain`, `planned_batch_predicted_guard_result`, `planned_batch_target_scope`, `predicted_guard_result`, and `predicted_guard_ok`, so failed write attempts show whether the missing proof is CLI flags, recovery readiness, unreadable batch proof, source mismatch, failed predicted guard, or a target-scope mismatch.
@@ -1129,7 +1130,7 @@ npm.cmd run audit:data-quality -- --by-source --by-parser
 npm.cmd run audit:ats-quality
 npm.cmd run ats:workbench
 npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=25 --json
-npm.cmd run ats:source:canary -- --source=greenhouse --limit=25 --confirm-production --backup-confirmed --worker-isolated --planned-batch=reports/greenhouse-plan.json --predicted-guard-result=pass --json
+npm.cmd run ats:source:canary -- --source=greenhouse --limit=25 --confirm-production --backup-confirmed --worker-isolated --planned-batch=reports/greenhouse-plan.json --preflight-report=reports/greenhouse-preflight.json --predicted-guard-result=pass --json
 ```
 
 Use production apply commands only inside a scoped ATS recovery task after the fresh baseline, dry-run/canary evidence, heavy-job lock check, and before/after acceptance criteria are ready.
