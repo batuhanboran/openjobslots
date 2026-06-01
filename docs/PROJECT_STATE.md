@@ -100,6 +100,15 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on the top 30 BambooHR missing-country/region tenants: the production top-list baseline had `987` missing-country/region rows; the local parser accepted `1,465` live rows, reduced missing country/region to `457`, recovered `511` rows through admin-region evidence, and kept weak remote at `0`. Example tenant deltas: `lanesgroup` `221 -> 37`, `htmniseko` `37 -> 0`, `atlashotels` `42 -> 3`, `emedgroup` `41 -> 5`.
 - BambooHR dates remain source-omitted in sampled public list JSON, so this checkpoint intentionally does not invent posting dates. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Zoho Explicit Country Alias Evidence - June 1, 2026
+
+- Fresh read-only production baseline: Zoho had `14,561` visible rows, `1,860` missing country/region rows, `235` weak/unknown remote rows, and `4,991` missing posting dates. Posting cache had `14,561` valid rows and `1,918` quarantined rows.
+- Live Zoho hidden JSON showed explicit `Country` payload values not covered by shared country normalization, including `Ghana`, `Costa Rica`, `Sri Lanka`, `Suriname`, `Papua New Guinea`, `Uganda`, `Zimbabwe`, `Cote D'Ivoire (Ivory Coast)`, `Botswana`, `Mauritania`, `Brunei Darussalam`, `Macao`, and `Saint Kitts and Nevis`.
+- Shared normalization now covers those real country aliases and region buckets; Zoho parser behavior stays source-local and continues to use explicit hidden payload fields rather than title/body inference.
+- Tests now cover the shared aliases and a Zoho hidden-payload fixture for `Ghana -> EMEA`, `Costa Rica -> LATAM`, and `Sri Lanka -> APAC`.
+- Live read-only proof on the top 30 Zoho missing-country/region tenants: the production top-list baseline had `1,236` missing-country/region rows; the local parser parsed `1,634` current live rows, accepted `1,577`, reduced missing country/region to `283`, and preserved `978` source posting dates. Example tenant deltas: `peopleandpartnersgroup` `93 -> 0`, `ubuntuimpact` `89 -> 0`, `dunnandbraxton` `61 -> 0`, `royalinstitute` `66 -> 0`, `pacificmanpower` `50 -> 0`, `gigmile` `72 -> 1`.
+- Remaining top-list gaps are mostly explicit remote/no-location rows or tenants whose source payload does not expose a country. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplicantPro ISO3 And Workplace Evidence - June 1, 2026
 
 - Fresh read-only production checks kept production at `6660eab`; public health reported `331,515` visible job slots, and `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,509`/`331,509`) with the known `22` document remote-facet drift.

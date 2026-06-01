@@ -1140,6 +1140,53 @@ test("zoho source module parses registry HTML payload wrappers", () => {
   assert.equal(parsed[0].company_name, "Fixture Zoho");
 });
 
+test("zoho source module normalizes explicit country payload tokens", () => {
+  const { source, company } = zohoFixtureContext();
+  const jobs = [
+    {
+      id: "476000000001006",
+      Posting_Title: "Ghana Operations Lead",
+      City: "Accra",
+      State: "Greater Accra",
+      Country: "Ghana",
+      Date_Opened: "2026-05-20"
+    },
+    {
+      id: "476000000001007",
+      Posting_Title: "Costa Rica Support Analyst",
+      City: "San Rafael",
+      State: "Alajuela",
+      Country: "Costa Rica",
+      Date_Opened: "2026-05-21"
+    },
+    {
+      id: "476000000001008",
+      Posting_Title: "Sri Lanka Admissions Officer",
+      City: "Havelock Town",
+      State: "Western Province",
+      Country: "Sri Lanka",
+      Date_Opened: "2026-05-22"
+    }
+  ];
+  const parsed = source.parse(
+    `<input id="meta" value='{"list_url":"https://fixtureco.zohorecruit.com/jobs/Careers"}'>` +
+      `<input id="jobs" value='${JSON.stringify(jobs)}'>`,
+    company
+  );
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  assert.equal(byId.get("476000000001006").country, "Ghana");
+  assert.equal(byId.get("476000000001006").region, "EMEA");
+  assert.equal(byId.get("476000000001007").country, "Costa Rica");
+  assert.equal(byId.get("476000000001007").region, "LATAM");
+  assert.equal(byId.get("476000000001008").country, "Sri Lanka");
+  assert.equal(byId.get("476000000001008").region, "APAC");
+  assert.equal(source.validatePublic(byId.get("476000000001006")).status, "accepted");
+  assert.equal(source.validatePublic(byId.get("476000000001007")).status, "accepted");
+  assert.equal(source.validatePublic(byId.get("476000000001008")).status, "accepted");
+});
+
 test("zoho source module ignores malformed hidden JSON and rows without source ids", () => {
   const { source, company } = zohoFixtureContext();
 
