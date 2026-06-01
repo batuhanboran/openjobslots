@@ -2336,7 +2336,9 @@ function ignoredPayloadDriftStem(stem, policy = {}) {
     return true;
   }
   const normalizedPolicy = normalizePayloadShapePolicy(policy);
-  if (normalizedPolicy.ignoredStems.includes(normalizedStem)) return true;
+  if (normalizedPolicy.ignoredStems.some((stem) => matchesPayloadShapePrefix(normalizedStem, stem))) {
+    return true;
+  }
   if (normalizedPolicy.optionalPrefixes.some((prefix) => matchesPayloadShapePrefix(normalizedStem, prefix))) {
     return true;
   }

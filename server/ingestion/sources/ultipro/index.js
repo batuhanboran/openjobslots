@@ -7,7 +7,8 @@ const baseModule = createSourceModule("ultipro");
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
 const payloadShapePolicy = Object.freeze({
-  empty_job_list_stems: Object.freeze(["opportunities"])
+  empty_job_list_stems: Object.freeze(["opportunities"]),
+  ignored_stems: Object.freeze(["locations"])
 });
 
 function normalizeCompanyName(company = {}, fallback = "ultipro") {

@@ -1980,6 +1980,77 @@ async function testPayloadDriftAllowsBambooHrLocationObjectVariants() {
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPayloadDriftAllowsUltiProLocationFacetVariants() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "ultipro-location-facet",
+            shape_paths: [
+              "locations:array",
+              "locations[]:object",
+              "locations[].LocalizedName:string",
+              "locations[].PhysicalLocation:object",
+              "locations[].PhysicalLocation.CityName:string",
+              "locations[].PhysicalLocation.CountryName:string",
+              "opportunities:array",
+              "opportunities[].Id:string",
+              "opportunities[].Locations:array",
+              "opportunities[].Locations[].Address:object",
+              "opportunities[].Locations[]:object",
+              "opportunities[].PostedDate:string",
+              "opportunities[].Title:string",
+              "opportunities[]:object",
+              "totalCount:number"
+            ],
+            observed_count: 43
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`UltiPro top-level location facet variant should not record drift: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "ultipro",
+      companyUrl: "https://recruiting.ultipro.com/ACME1000",
+      company: { company_name: "Fixture UltiPro" },
+      adapter: {
+        payloadShapePolicy: {
+          ignored_stems: ["locations"]
+        }
+      }
+    },
+    {
+      locations: [],
+      opportunities: [{
+        Id: "OPP-BOLIVIA",
+        Title: "Chief of Party",
+        PostedDate: "2026-05-29T18:34:15.988Z",
+        Locations: [{
+          Address: {
+            City: "La Paz",
+            Country: { Name: "Bolivia" }
+          }
+        }]
+      }],
+      totalCount: 1
+    },
+    "source-ultipro-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.compatible_enrichment_shape, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPayloadDriftAllowsHrmDirectOptionalRssEnrichment() {
   const calls = [];
   const pool = {
@@ -2566,6 +2637,7 @@ async function main() {
   await testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift();
   await testPayloadDriftKeepsPositiveTotalEmptyHitsAsDrift();
   await testPayloadDriftAllowsBambooHrLocationObjectVariants();
+  await testPayloadDriftAllowsUltiProLocationFacetVariants();
   await testPayloadDriftAllowsHrmDirectOptionalRssEnrichment();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();

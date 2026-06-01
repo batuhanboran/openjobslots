@@ -745,6 +745,7 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof ultipro.normalize, "function");
   assert.equal(typeof ultipro.validate, "function");
   assert.deepEqual(ultipro.payloadShapePolicy.empty_job_list_stems, ["opportunities"]);
+  assert.ok(ultipro.payloadShapePolicy.ignored_stems.includes("locations"));
   assert.deepEqual(validateSourceContract(ultipro), { ok: true, failures: [] });
 
   const workday = getRegistrySourceModule("workday");

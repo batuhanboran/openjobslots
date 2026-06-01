@@ -8,5 +8,24 @@
     "remote_type": "onsite",
     "posting_date": "2026-05-08",
     "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "OPP-REMOTE-US",
+    "company_name": "Fixture UltiPro",
+    "position_name": "Remote Billing Specialist",
+    "country": "United States",
+    "remote_type": "remote",
+    "posting_date": "2026-05-19T16:29:48.637Z",
+    "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "OPP-BOLIVIA",
+    "company_name": "Fixture UltiPro",
+    "position_name": "Chief of Party",
+    "country": "Bolivia",
+    "city": "La Paz",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-29T18:34:15.988Z",
+    "parser_confidence": 0.55
   }
 ]

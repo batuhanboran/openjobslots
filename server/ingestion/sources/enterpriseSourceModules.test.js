@@ -664,6 +664,29 @@ test("ultipro source module fetches LoadSearchResults with source-local POST met
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("ultipro source module preserves remote-country and international country evidence", () => {
+  const source = getSourceModule("ultipro");
+  const company = readJson(path.join(__dirname, "ultipro", "fixtures", "company.json"));
+  const rawList = readJson(path.join(__dirname, "ultipro", "fixtures", "list.json"));
+  const rows = source.parse(rawList, company).map((posting) => source.normalize(posting, company));
+  const byId = new Map(rows.map((row) => [row.source_job_id, row]));
+
+  const remote = byId.get("OPP-REMOTE-US");
+  assert.equal(remote.location_text, "Remote, United States");
+  assert.equal(remote.country, "United States");
+  assert.equal(remote.region, "North America");
+  assert.equal(remote.remote_type, "remote");
+  assert.equal(source.validatePublic(remote).status, "accepted");
+
+  const bolivia = byId.get("OPP-BOLIVIA");
+  assert.equal(bolivia.location_text, "La Paz, Bolivia");
+  assert.equal(bolivia.city, "La Paz");
+  assert.equal(bolivia.country, "Bolivia");
+  assert.equal(bolivia.region, "LATAM");
+  assert.equal(bolivia.remote_type, "onsite");
+  assert.equal(source.validatePublic(bolivia).status, "accepted");
+});
+
 test("icims source module follows wrapper iframe and enriches from public detail", async () => {
   const source = getSourceModule("icims");
   const sourceDir = path.join(__dirname, "icims");

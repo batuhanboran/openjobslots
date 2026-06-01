@@ -17,6 +17,48 @@
           }
         }
       ]
+    },
+    {
+      "Id": "OPP-REMOTE-US",
+      "Title": "Remote Billing Specialist",
+      "PostedDate": "2026-05-19T16:29:48.637Z",
+      "JobLocationType": 2,
+      "JobCategoryName": "Non-Clinical",
+      "Locations": [
+        {
+          "LocalizedName": "Remote",
+          "LocalizedDescription": null,
+          "Address": {
+            "City": null,
+            "State": null,
+            "Country": {
+              "Code": "USA",
+              "Name": "United States"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Id": "OPP-BOLIVIA",
+      "Title": "Chief of Party",
+      "PostedDate": "2026-05-29T18:34:15.988Z",
+      "JobLocationType": 1,
+      "JobCategoryName": "Programs",
+      "Locations": [
+        {
+          "LocalizedName": "Bolivia",
+          "LocalizedDescription": null,
+          "Address": {
+            "City": "La Paz",
+            "State": null,
+            "Country": {
+              "Code": "BOL",
+              "Name": "Bolivia"
+            }
+          }
+        }
+      ]
     }
   ]
 }
