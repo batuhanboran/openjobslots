@@ -3,6 +3,48 @@
 const { normalizeCountryFromLocation, normalizeCountryName } = require("../../posting");
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 
+const RECRUITCRM_LOCATION_COUNTRY_HINTS = Object.freeze({
+  ahmednagar: "India",
+  angers: "France",
+  beziers: "France",
+  bhopal: "India",
+  "bogota capital district municipality": "Colombia",
+  "boulogne billancourt": "France",
+  "buenos aires": "Argentina",
+  calais: "France",
+  cabanatuan: "Philippines",
+  "cape town": "South Africa",
+  cergy: "France",
+  courbevoie: "France",
+  grenoble: "France",
+  johannesburg: "South Africa",
+  kolhapur: "India",
+  "kuala lumpur": "Malaysia",
+  "le mans": "France",
+  "levallois perret": "France",
+  makati: "Philippines",
+  malaysian: "Malaysia",
+  metz: "France",
+  "metro manila": "Philippines",
+  "new delhi": "India",
+  penang: "Malaysia",
+  "petaling jaya": "Malaysia",
+  poitiers: "France",
+  sarcelles: "France",
+  "shah alam": "Malaysia",
+  toulon: "France",
+  yorkshire: "United Kingdom"
+});
+
+function normalizeRecruitCrmLookupText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function parseUrl(urlString) {
   if (!urlString) return null;
   try {
@@ -101,6 +143,59 @@ function extractRecruitCrmLocationParts(item = {}) {
   };
 }
 
+function recruitCrmCountryEvidenceFromParts(parts = {}, formattedLocation = "") {
+  const explicitCountry = normalizeCountryName(parts.country) || normalizeCountryFromLocation(parts.country);
+  if (explicitCountry) {
+    return {
+      country: explicitCountry,
+      country_path: "country",
+      country_rule_name: "recruitcrm_structured_country"
+    };
+  }
+
+  const structuredCandidates = [
+    ["city", parts.city],
+    ["locality", parts.locality],
+    ["state", parts.state]
+  ];
+  for (const [path, value] of structuredCandidates) {
+    const country = RECRUITCRM_LOCATION_COUNTRY_HINTS[normalizeRecruitCrmLookupText(value)] || "";
+    if (country) {
+      return {
+        country,
+        country_path: path,
+        country_rule_name: "recruitcrm_structured_city_country_hint"
+      };
+    }
+  }
+
+  for (const [path, value] of structuredCandidates) {
+    const country = normalizeCountryName(value) || normalizeCountryFromLocation(value);
+    if (country) {
+      return {
+        country,
+        country_path: path,
+        country_rule_name: "recruitcrm_structured_country_label"
+      };
+    }
+  }
+
+  const locationCountry = normalizeCountryFromLocation(formattedLocation);
+  if (locationCountry) {
+    return {
+      country: locationCountry,
+      country_path: "location_text",
+      country_rule_name: "recruitcrm_structured_location_text"
+    };
+  }
+
+  return {
+    country: "",
+    country_path: "",
+    country_rule_name: ""
+  };
+}
+
 function normalizeRecruitCrmJobUrl(config = {}, itemUrlRaw, slug) {
   const publicJobsUrl = String(config.publicJobsUrl || "").replace(/\/+$/, "");
   const rawUrl = String(itemUrlRaw || "").trim();
@@ -191,6 +286,7 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
     const sourceLocality = locationParts.locality;
     const sourcePostalCode = locationParts.postalCode;
     const formattedLocation = formatRecruitCrmLocation(item);
+    const countryEvidence = recruitCrmCountryEvidenceFromParts(locationParts, formattedLocation);
     const hasStructuredGeo = Boolean(sourceCity || sourceLocality || sourceState || sourceCountry || sourcePostalCode);
     const sourceFailureReasons = [];
     if (remoteType === "onsite" && !hasStructuredGeo && !formattedLocation) {
@@ -211,10 +307,7 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
       location: remoteType === "remote" ? "Remote" : formattedLocation,
       city: sourceCity || null,
       state: sourceState || null,
-      country: normalizeCountryName(sourceCountry) ||
-        normalizeCountryFromLocation(sourceCountry) ||
-        normalizeCountryFromLocation(formattedLocation) ||
-        null,
+      country: countryEvidence.country || null,
       remote_type: remoteType || null,
       employment_type: String(item?.employment_type || item?.job_type || item?.jobType || "").trim() || null,
       department: String(item?.department?.name || item?.department || item?.team?.name || item?.team || "").trim() || null,
@@ -222,6 +315,11 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
         route_kind: "recruitcrm_jobs_api",
         location_source: formattedLocation ? "list_api" : "",
         location_path: formattedLocation ? "location/job_location/city/state/country" : "",
+        country_source: countryEvidence.country ? "list_api" : "",
+        country_path: countryEvidence.country_path,
+        country_rule_name: countryEvidence.country_rule_name,
+        city_source: sourceCity ? "list_api" : "",
+        city_path: sourceCity ? "city" : "",
         remote_source: remoteType ? "list_api" : "",
         remote_path: remoteType ? "remote/workplace_type" : "",
         posting_date_source: postingDate ? "list_api" : "",

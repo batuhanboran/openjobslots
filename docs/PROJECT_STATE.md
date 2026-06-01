@@ -14,6 +14,15 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and `npm.cmd run test:backend` covers the new boundary tests.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## RecruitCRM Source-Local City Country Evidence - June 1, 2026
+
+- Fresh read-only production baseline for this lane had RecruitCRM at `522` visible rows, `475` missing country/region rows, `10` weak/unknown remote rows, and `522` missing posting dates. Top missing-country boards included `somewhere`, `Talentbank_1_jobs`, `rcrm`, `TLNT_Group_jobs`, `talentsource`, `Ensitech_Careers`, and `Golabs_Tech_jobs`.
+- Fresh production health during this lane kept `/root/OpenJobSlots` at `6660eab` with app/worker/Postgres/Meili running and public health at `331,640` visible job slots. `search:reindex:check -- --json --sample-limit=25` had Postgres/Meili count parity (`331,653`/`331,653`) but remained `ok=false` because remote facets drifted by `40` onsite vs unknown documents. No Meili repair or replace reindex was run.
+- RecruitCRM public API payloads expose structured `city`, `locality`, `postalcode`, and `remote` fields. The parser now maps only source-local deterministic city/country hints observed in those API fields, including Malaysia, Philippines, South Africa, Colombia, Argentina, India, France, and UK labels.
+- No tenant/title/body inference was added. Broad or ambiguous values such as `Remote`, `Global`, `LATAM`, `Somewhere`, `San José`, `San Pedro`, and title-only country hints remain unresolved. `remote=2` stays `unknown` until the source semantics are proven. Posting dates remain null because sampled payloads did not expose a date field.
+- Live read-only proof: `Talentbank_1_jobs` accepted missing country/region improved `45 -> 0`; `rcrm` improved `37 -> 1`; `talentsource` improved `21 -> 9`; `somewhere` improved `253 -> 206` on current live accepted rows.
+- Verification covered RecruitCRM syntax checks, direct source-module fixture tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.

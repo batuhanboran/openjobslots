@@ -35,5 +35,44 @@
     "remote_type": "hybrid",
     "industry": "Delivery",
     "is_remote": true
+  },
+  {
+    "ats_key": "recruitcrm",
+    "company_name": "Fixture RecruitCRM",
+    "position_name": "Malaysia Events Coordinator",
+    "source_job_id": "rc-malaysia-city",
+    "job_posting_url": "https://recruitcrm.io/jobs/fixtureco/malaysia-events-coordinator",
+    "country": "Malaysia",
+    "region": "APAC",
+    "city": "Kuala Lumpur",
+    "remote_type": "onsite",
+    "industry": "Events",
+    "is_remote": false
+  },
+  {
+    "ats_key": "recruitcrm",
+    "company_name": "Fixture RecruitCRM",
+    "position_name": "Payroll Operations Specialist",
+    "source_job_id": "rc-philippines-city",
+    "job_posting_url": "https://recruitcrm.io/jobs/fixtureco/payroll-operations-specialist",
+    "country": "Philippines",
+    "region": "APAC",
+    "city": "Makati",
+    "remote_type": "unknown",
+    "industry": "Operations",
+    "is_remote": false
+  },
+  {
+    "ats_key": "recruitcrm",
+    "company_name": "Fixture RecruitCRM",
+    "position_name": "Remote Sales Representative",
+    "source_job_id": "rc-south-africa-remote-city",
+    "job_posting_url": "https://recruitcrm.io/jobs/fixtureco/remote-sales-representative",
+    "country": "South Africa",
+    "region": "EMEA",
+    "city": "Johannesburg",
+    "remote_type": "remote",
+    "industry": "Sales",
+    "is_remote": true
   }
 ]

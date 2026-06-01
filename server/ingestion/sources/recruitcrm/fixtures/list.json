@@ -35,6 +35,36 @@
         "department": {
           "name": "Delivery"
         }
+      },
+      {
+        "id": "rc-malaysia-city",
+        "name": "Malaysia Events Coordinator",
+        "slug": "malaysia-events-coordinator",
+        "remote": "0",
+        "city": "Kuala Lumpur",
+        "locality": "Malaysian",
+        "employment_type": "Full time",
+        "department": "Events"
+      },
+      {
+        "id": "rc-philippines-city",
+        "name": "Payroll Operations Specialist",
+        "slug": "payroll-operations-specialist",
+        "remote": "",
+        "city": "Makati",
+        "locality": "Metro Manila",
+        "employment_type": "Contract",
+        "department": "Operations"
+      },
+      {
+        "id": "rc-south-africa-remote-city",
+        "name": "Remote Sales Representative",
+        "slug": "remote-sales-representative",
+        "remote": "1",
+        "city": "Johannesburg",
+        "postalcode": "2001",
+        "employment_type": "Full time",
+        "department": "Sales"
       }
     ]
   }

@@ -1426,6 +1426,39 @@ test("recruitcrm source module preserves nested and string location evidence", (
   assert.equal(source.validatePublic(stringLocation).status, "accepted");
 });
 
+test("recruitcrm source module maps source-local structured city country hints", () => {
+  const { source, company } = recruitCrmFixtureContext();
+  const rawList = readJson(path.join(__dirname, "recruitcrm", "fixtures", "list.json"));
+  const normalized = source.parse(rawList, company).map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const malaysia = byId.get("rc-malaysia-city");
+  assert.equal(malaysia.country, "Malaysia");
+  assert.equal(malaysia.region, "APAC");
+  assert.equal(malaysia.city, "Kuala Lumpur");
+  assert.equal(malaysia.remote_type, "onsite");
+  assert.equal(malaysia.source_evidence.country_source, "list_api");
+  assert.equal(malaysia.source_evidence.country_path, "city");
+  assert.equal(malaysia.source_evidence.country_rule_name, "recruitcrm_structured_city_country_hint");
+  assert.equal(source.validatePublic(malaysia).status, "accepted");
+
+  const philippines = byId.get("rc-philippines-city");
+  assert.equal(philippines.country, "Philippines");
+  assert.equal(philippines.region, "APAC");
+  assert.equal(philippines.city, "Makati");
+  assert.equal(philippines.remote_type, "unknown");
+  assert.equal(philippines.source_evidence.country_path, "city");
+  assert.equal(source.validatePublic(philippines).status, "accepted");
+
+  const southAfrica = byId.get("rc-south-africa-remote-city");
+  assert.equal(southAfrica.country, "South Africa");
+  assert.equal(southAfrica.region, "EMEA");
+  assert.equal(southAfrica.city, "Johannesburg");
+  assert.equal(southAfrica.remote_type, "remote");
+  assert.equal(southAfrica.source_evidence.country_rule_name, "recruitcrm_structured_city_country_hint");
+  assert.equal(source.validatePublic(southAfrica).status, "accepted");
+});
+
 test("recruitcrm source module quarantines malformed or unsupported raw list shapes", () => {
   const { source, company } = recruitCrmFixtureContext();
   const malformed = readJson(path.join(__dirname, "recruitcrm", "fixtures", "malformed-list-shapes.json"));
