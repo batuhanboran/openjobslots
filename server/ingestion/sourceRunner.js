@@ -367,6 +367,8 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     ),
     apply: asBool(env.OPENJOBSLOTS_ATS_SOURCE_APPLY),
     confirmProduction: asBool(env.OPENJOBSLOTS_ATS_SOURCE_CONFIRM_PRODUCTION),
+    backupConfirmed: asBool(env.OPENJOBSLOTS_ATS_SOURCE_BACKUP_CONFIRMED),
+    workerIsolated: asBool(env.OPENJOBSLOTS_ATS_SOURCE_WORKER_ISOLATED) || asBool(env.OPENJOBSLOTS_ATS_SOURCE_WORKER_PAUSED),
     maxUpdates: asInt(env.OPENJOBSLOTS_ATS_SOURCE_MAX_UPDATES, 0, 0, 100_000),
     json: asBool(env.OPENJOBSLOTS_ATS_SOURCE_JSON),
     output: String(env.OPENJOBSLOTS_ATS_SOURCE_OUTPUT || "").trim(),
@@ -381,6 +383,8 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
   for (const arg of argv) {
     if (arg === "--apply") options.apply = true;
     else if (arg === "--confirm-production") options.confirmProduction = true;
+    else if (arg === "--backup-confirmed") options.backupConfirmed = true;
+    else if (arg === "--worker-isolated" || arg === "--worker-paused") options.workerIsolated = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--include-disabled") options.includeDisabled = true;
     else if (arg.startsWith("--mode=")) options.mode = String(arg.slice("--mode=".length)).trim().toLowerCase();
@@ -419,12 +423,16 @@ function getSafetyGate(options = {}) {
     authorized:
       applyRequested &&
       Boolean(options.confirmProduction) &&
+      Boolean(options.backupConfirmed) &&
+      Boolean(options.workerIsolated) &&
       Number(options.maxUpdates || 0) > 0 &&
       readinessGate.ok &&
       plannedBatch.length > 0 &&
       plannedBatchGate.ok &&
       predictedGuardOk,
     planned_batch_required: applyRequested,
+    backup_confirmed: Boolean(options.backupConfirmed),
+    worker_isolated: Boolean(options.workerIsolated),
     planned_batch_present: !applyRequested || plannedBatch.length > 0,
     planned_batch_report_ok: !applyRequested || plannedBatchGate.ok,
     planned_batch_report_status: plannedBatchGate.status,
@@ -441,6 +449,8 @@ function getSafetyGate(options = {}) {
     recovery_readiness_gate: readinessGate,
     missing: [
       applyRequested && !options.confirmProduction ? "--confirm-production" : "",
+      applyRequested && !options.backupConfirmed ? "--backup-confirmed" : "",
+      applyRequested && !options.workerIsolated ? "--worker-isolated" : "",
       applyRequested && Number(options.maxUpdates || 0) <= 0 ? "--max-updates=N" : "",
       applyRequested && !readinessGate.ok ? "recovery-readiness-ok" : "",
       applyRequested && plannedBatch.length <= 0 ? "--planned-batch=<report>" : "",

@@ -68,6 +68,10 @@ test("source runner apply requires explicit production safety flags", () => {
   const companyLimitAlias = parseArgs(["--source=icims", "--company-limit=7"]);
   assert.equal(companyLimitAlias.limit, 7);
 
+  const workerPausedAlias = parseArgs(["--source=greenhouse", "--apply", "--backup-confirmed", "--worker-paused"]);
+  assert.equal(workerPausedAlias.backupConfirmed, true);
+  assert.equal(workerPausedAlias.workerIsolated, true);
+
   const detailEvidence = parseArgs([
     "--source=icims",
     "--detail-evidence",
@@ -86,6 +90,8 @@ test("source runner apply requires explicit production safety flags", () => {
   const missingMaxGate = getSafetyGate(missingMax);
   assert.equal(missingMaxGate.authorized, false);
   assert.deepEqual(missingMaxGate.missing, [
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=N",
     "--planned-batch=<report>",
     "--predicted-guard-result=pass"
@@ -95,6 +101,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--mode=apply",
     "--source=greenhouse",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=25"
   ]);
   const missingPlanGate = getSafetyGate(missingPlan);
@@ -109,6 +117,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--mode=apply",
     "--source=greenhouse",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport()}`,
     "--predicted-guard-result=fail"
@@ -124,6 +134,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--mode=apply",
     "--source=greenhouse",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=25",
     "--planned-batch=reports/greenhouse-plan.json",
     "--predicted-guard-result=pass"
@@ -137,6 +149,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--mode=apply",
     "--source=greenhouse",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport(plannedBatchReport({ source: "lever" }))}`,
     "--predicted-guard-result=pass"
@@ -149,6 +163,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--mode=apply",
     "--source=greenhouse",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport(plannedBatchReport({
       selected_plan: {
@@ -169,6 +185,8 @@ test("source runner apply requires explicit production safety flags", () => {
     "--source=greenhouse",
     "--apply",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=25",
     `--planned-batch=${writePlannedBatchReport()}`,
     "--predicted-guard-result=pass"
@@ -178,6 +196,8 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(gate.authorized, true);
   assert.deepEqual(gate.missing, []);
   assert.equal(gate.recovery_readiness_gate.ok, true);
+  assert.equal(gate.backup_confirmed, true);
+  assert.equal(gate.worker_isolated, true);
   assert.equal(gate.planned_batch_present, true);
   assert.equal(gate.planned_batch_report_ok, true);
   assert.equal(gate.planned_batch_report_source, "greenhouse");
@@ -206,6 +226,8 @@ test("source runner scopes authorized writes to selected planned-batch targets",
       "--source=greenhouse",
       "--apply",
       "--confirm-production",
+      "--backup-confirmed",
+      "--worker-isolated",
       "--max-updates=25",
       "--planned-batch=inline",
       "--predicted-guard-result=pass"
@@ -250,6 +272,8 @@ test("source runner uses exact target URL before shared-host fallback", () => {
       "--source=greenhouse",
       "--apply",
       "--confirm-production",
+      "--backup-confirmed",
+      "--worker-isolated",
       "--max-updates=25",
       "--planned-batch=inline",
       "--predicted-guard-result=pass"
@@ -280,6 +304,8 @@ test("source runner blocks authorized writes when planned batch matches no disco
       "--source=greenhouse",
       "--apply",
       "--confirm-production",
+      "--backup-confirmed",
+      "--worker-isolated",
       "--max-updates=25",
       "--planned-batch=inline",
       "--predicted-guard-result=pass"
@@ -331,6 +357,8 @@ test("source runner requires recovery readiness for canary and apply operations"
     "--mode=apply",
     "--source=not_configured_ats",
     "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
     "--max-updates=1",
     "--planned-batch=reports/not-configured-plan.json",
     "--predicted-guard-result=pass"

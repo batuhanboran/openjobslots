@@ -30,10 +30,10 @@ Use the source runner for source-specific parser repair, not ad hoc fetch loops:
 ```powershell
 npm.cmd run ats:source:dry-run -- --source=<ats> --limit=25 --json
 npm.cmd run ats:source:canary -- --source=<ats> --limit=25 --json
-npm.cmd run ats:source:apply -- --source=<ats> --apply --confirm-production --max-updates=100 --json
+npm.cmd run ats:source:apply -- --source=<ats> --apply --confirm-production --backup-confirmed --worker-isolated --max-updates=100 --planned-batch=<report> --predicted-guard-result=pass --json
 ```
 
-The runner acquires the global heavy-job lock, uses bounded Postgres statement timeouts, serializes fetches per host, records canary/apply metrics in `ats_source_runs`, and refuses writes without explicit production flags. Dry-run mode does not write public postings.
+The runner acquires the global heavy-job lock, uses bounded Postgres statement timeouts, serializes fetches per host, records canary/apply metrics in `ats_source_runs`, and refuses writes without explicit production flags, backup confirmation, worker isolation proof, recovery readiness, a validated tenant batch plan, and a passing predicted guard. `--worker-paused` is accepted as an alias for `--worker-isolated`. Dry-run mode does not write public postings.
 
 ## Cache Freshness Rules
 

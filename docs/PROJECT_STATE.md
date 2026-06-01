@@ -2,6 +2,12 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## ATS Source Write Operational Safety Gate - June 1, 2026
+
+- `server/ingestion/sourceRunner.js` now refuses source-run write authorization unless an apply/canary request includes `--confirm-production`, `--backup-confirmed`, `--worker-isolated`, `--max-updates=N`, a passing recovery-readiness gate, a valid source-matched `--planned-batch=<report>`, and `--predicted-guard-result=pass`. `--worker-paused` is accepted as an alias for worker isolation.
+- Safety gate output records `backup_confirmed` and `worker_isolated`, and missing proof is reported explicitly as `--backup-confirmed` / `--worker-isolated`.
+- Verification covered `node --check server\ingestion\sourceRunner.js`, `node server\ingestion\sourceRunner.test.js`, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, `npm.cmd run release:ats-recovery:check -- --self-test --json`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, cleanup, or worker-budget change was run.
+
 ## ATS Architecture & Recovery v2 Baseline - June 1, 2026
 
 - Read-only production baseline was refreshed from `proxmox-lxc100` / `public-services`; production `/root/OpenJobSlots` is at `6660eab`, while local `main` is ahead with source-local parser ownership and v2 architecture guard commits.
@@ -113,7 +119,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## ATS Source Write Batch-Plan Safety Gate - June 1, 2026
 
-- `server/ingestion/sourceRunner.js` now refuses source-run write authorization unless an apply/canary write request includes `--planned-batch=<report>` and `--predicted-guard-result=pass` in addition to `--confirm-production`, `--max-updates=N`, and a passing recovery-readiness gate.
+- `server/ingestion/sourceRunner.js` now refuses source-run write authorization unless an apply/canary write request includes `--planned-batch=<report>` and `--predicted-guard-result=pass` in addition to `--confirm-production`, `--backup-confirmed`, `--worker-isolated`, `--max-updates=N`, and a passing recovery-readiness gate.
 - The planned-batch gate now reads and validates the report JSON instead of trusting a non-empty path string. The report must be readable, `read_only`, `mode="tenant-batch-plan"`, source-matched to the requested ATS, and include a selected plan with selected tenants, positive selected gain, zero selected no-geo/no-remote candidates, and a passing report-level predicted guard.
 - Authorized source-run writes are now scoped to selected tenant targets from the validated batch report. Out-of-plan discovered targets are skipped before fetch/write work, and a write command that discovers no selected target is blocked before creating a source run.
 - The source-run summary exposes `planned_batch_required`, `planned_batch_present`, `planned_batch_report_ok`, `planned_batch_report_failures`, `planned_batch_report_selected_tenant_count`, `planned_batch_report_selected_gain`, `planned_batch_predicted_guard_result`, `planned_batch_target_scope`, `predicted_guard_result`, and `predicted_guard_ok`, so failed write attempts show whether the missing proof is CLI flags, recovery readiness, unreadable batch proof, source mismatch, failed predicted guard, or a target-scope mismatch.
