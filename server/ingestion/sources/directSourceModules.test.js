@@ -404,6 +404,23 @@ test("rippling source module fetches paginated board API with source-local disco
   assert.equal(hybrid.remote_type, "hybrid");
   assert.equal(source.validatePublic(hybrid).status, "accepted");
 
+  const fixtureRows = source.parse(listFixture, company).map((posting) => source.normalize(posting, company));
+  const structured = fixtureRows.find((posting) => posting.source_job_id === "rip-structured-3");
+  assert.ok(structured, "expected structured Rippling location fixture row");
+  assert.equal(structured.location_text, "San Antonio, Texas, United States");
+  assert.equal(structured.city, "San Antonio");
+  assert.equal(structured.country, "United States");
+  assert.equal(structured.remote_type, "remote");
+  assert.equal(source.validatePublic(structured).status, "accepted");
+
+  const remoteState = fixtureRows.find((posting) => posting.source_job_id === "rip-remote-state-4");
+  assert.ok(remoteState, "expected structured Rippling remote-state fixture row");
+  assert.equal(remoteState.location_text, "TX, United States");
+  assert.equal(remoteState.city, "");
+  assert.equal(remoteState.country, "United States");
+  assert.equal(remoteState.remote_type, "remote");
+  assert.equal(source.validatePublic(remoteState).status, "accepted");
+
   await assert.rejects(
     () => source.fetchList(company, {
       fetcher: async () => ({

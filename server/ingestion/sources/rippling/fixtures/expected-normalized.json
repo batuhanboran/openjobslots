@@ -14,5 +14,21 @@
     "country": "United Kingdom",
     "remote_type": "hybrid",
     "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-hybrid-2"
+  },
+  {
+    "source_job_id": "rip-structured-3",
+    "company_name": "Fixture Rippling Co",
+    "position_name": "Field Operations Manager",
+    "country": "United States",
+    "remote_type": "remote",
+    "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-structured-3"
+  },
+  {
+    "source_job_id": "rip-remote-state-4",
+    "company_name": "Fixture Rippling Co",
+    "position_name": "Remote Sales Architect",
+    "country": "United States",
+    "remote_type": "remote",
+    "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-remote-state-4"
   }
 ]

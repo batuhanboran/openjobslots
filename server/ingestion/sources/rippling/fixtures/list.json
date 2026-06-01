@@ -34,6 +34,44 @@
       "employmentType": "Full-time",
       "workplaceType": "Hybrid",
       "language": "en"
+    },
+    {
+      "id": "rip-structured-3",
+      "name": "Field Operations Manager",
+      "url": "https://ats.rippling.com/fixtureco/jobs/rip-structured-3",
+      "locations": [
+        {
+          "name": "FixtureCo Careers",
+          "city": "San Antonio",
+          "state": "Texas",
+          "country": "United States",
+          "countryCode": "US",
+          "workplaceType": "REMOTE"
+        }
+      ],
+      "department": {
+        "name": "Operations"
+      },
+      "language": "en-US"
+    },
+    {
+      "id": "rip-remote-state-4",
+      "name": "Remote Sales Architect",
+      "url": "https://ats.rippling.com/fixtureco/jobs/rip-remote-state-4",
+      "locations": [
+        {
+          "name": "Remote (TX, US)",
+          "city": null,
+          "state": "TX",
+          "country": "United States",
+          "countryCode": "US",
+          "workplaceType": "REMOTE"
+        }
+      ],
+      "department": {
+        "name": "Sales"
+      },
+      "language": "en-US"
     }
   ],
   "totalPages": 1
