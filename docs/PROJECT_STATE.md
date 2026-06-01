@@ -29,6 +29,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `fastsigns-11603`: current local parser moved the page to `1/1` parsed and public-gate accepted, emitting source job id `3255261`, `Austin, TX, United States`, `onsite`, and `Full Time` with `careerplug_detail_html` evidence.
 - Verification covered CareerPlug syntax checks and the generic HTML/public source-module test suite with the new fixture. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Paylocity Country-Scope Broad Location - June 1, 2026
+
+- Fresh read-only cache evidence had Paylocity broad labels such as `Various Locations`, `Various Metro Locations`, and `Various Locations Across the U.S.` quarantined even when `Jobs[].JobLocation.Country` supplied `USA`.
+- Paylocity now collapses those labels to country-scope `United States` only when city/state are blank and source country evidence is present. The raw broad label stays in `source_evidence.location_raw`; no city, state, tenant, or title inference was added.
+- Live read-only proof moved two current `NORTHSTAR-BEHAVIORAL-HEALTH-NETWORK-LLC` rows and one `Empire-Marketing-Strategies` row to public-gate accepted country-scope rows while preserving concrete Paylocity city rows unchanged.
+- Verification covered Paylocity syntax checks, enterprise source-module tests with the new fixture, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

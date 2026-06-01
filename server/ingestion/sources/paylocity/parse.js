@@ -9,6 +9,13 @@ function cleanPaylocityText(value) {
     .trim();
 }
 
+function isPaylocityBroadLocationLabel(value) {
+  const text = cleanPaylocityText(value)
+    .replace(/\./g, "")
+    .toLowerCase();
+  return /^(various|multiple)\s+(?:metro\s+)?locations(?:\s+(?:across|within|in)\s+(?:the\s+)?(?:us|usa|united states))?$/.test(text);
+}
+
 function inferPaylocityRemoteType(job, locationText) {
   if (job?.IsRemote === true) {
     return {
@@ -130,8 +137,11 @@ function parsePaylocityPostingsFromPageData(companyNameForPostings, config, page
     if (!location) location = cleanPaylocityText(jobLocation?.Name || "");
     if (!location && isRemote) location = "Remote";
     if (!location && country) location = country;
-    const remoteType = inferPaylocityRemoteType(job, location);
     const normalizedCountry = normalizeCountryName(country);
+    const broadCountryScopeLocation = !city && !state && normalizedCountry && isPaylocityBroadLocationLabel(location);
+    const rawLocation = location;
+    if (broadCountryScopeLocation) location = normalizedCountry;
+    const remoteType = inferPaylocityRemoteType(job, location);
 
     postings.push({
       company_name: effectiveCompanyName,
@@ -143,7 +153,7 @@ function parsePaylocityPostingsFromPageData(companyNameForPostings, config, page
       location: location || null,
       city: city || null,
       state: state || null,
-      country: country || null,
+      country: normalizedCountry || country || null,
       remote_type: remoteType.value || null,
       remote: remoteType.value === "remote",
       is_remote: remoteType.value === "remote" || remoteType.value === "hybrid",
@@ -154,9 +164,9 @@ function parsePaylocityPostingsFromPageData(companyNameForPostings, config, page
         ...(location
           ? {
               location_source: "list_api",
-              location_path: "Jobs[].JobLocation",
-              location_rule_name: "paylocity_job_location",
-              location_raw: location
+              location_path: broadCountryScopeLocation ? "Jobs[].JobLocation.Country" : "Jobs[].JobLocation",
+              location_rule_name: broadCountryScopeLocation ? "paylocity_country_scope_location" : "paylocity_job_location",
+              location_raw: broadCountryScopeLocation ? rawLocation : location
             }
           : {}),
         ...(normalizedCountry

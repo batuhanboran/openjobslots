@@ -199,6 +199,45 @@ test("paylocity source module preserves country and remote evidence from page da
   assert.equal(source.validatePublic(onsiteUs).status, "accepted");
 });
 
+test("paylocity source module collapses broad location labels to country evidence", () => {
+  const source = getSourceModule("paylocity");
+  const sourceDir = path.join(__dirname, "paylocity");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = {
+    Jobs: [
+      {
+        JobId: "5004",
+        JobTitle: "General Application",
+        PublishedDate: "2026-05-10T08:00:00+03:00",
+        HiringDepartment: "Operations",
+        IsRemote: false,
+        LocationName: "Various Locations Across the U.S.",
+        JobLocation: {
+          Name: "Various Locations Across the U.S.",
+          City: "",
+          State: "",
+          Country: "USA"
+        }
+      }
+    ],
+    __sourceConfig: {
+      siteBaseUrl: "https://recruiting.paylocity.com"
+    }
+  };
+
+  const parsed = source.parse(rawList, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+
+  assert.equal(normalized.location_text, "United States");
+  assert.equal(normalized.city, "");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.source_evidence.location_rule_name, "paylocity_country_scope_location");
+  assert.equal(normalized.source_evidence.location_raw, "Various Locations Across the U.S.");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("paylocity source fetchList rejects redirect to unexpected host", async () => {
   const source = getSourceModule("paylocity");
   const sourceDir = path.join(__dirname, "paylocity");
