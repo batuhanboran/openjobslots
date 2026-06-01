@@ -423,6 +423,12 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof hrmDirect.parse, "function");
   assert.equal(typeof hrmDirect.normalize, "function");
   assert.equal(typeof hrmDirect.validate, "function");
+  assert.deepEqual(hrmDirect.payloadShapePolicy.optional_enrichment_prefixes, [
+    "__rssUrl",
+    "__rssXml",
+    "__rssStatus",
+    "__rssFailure"
+  ]);
   assert.deepEqual(validateSourceContract(hrmDirect), { ok: true, failures: [] });
 
   const isolvIsolvedHire = getRegistrySourceModule("isolvisolvedhire");

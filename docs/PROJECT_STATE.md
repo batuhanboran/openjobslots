@@ -69,6 +69,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only parser proof for `estatementgroup.teamtailor.com` recovered a production-quarantined row as `Stockholm, Sweden`, `remote_type=onsite`, `posting_date=2025-11-18`, and public gate `accepted`; a `folketsthlm.teamtailor.com` control probe kept brand-only `Folket` metadata quarantined instead of treating it as geo.
 - Verification covered focused Teamtailor parser tests, full backend/parser tests, API tests, architecture-boundary audit, and whitespace check. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
 
+## HRMDirect RSS Payload-Shape Policy - June 1, 2026
+
+- Fresh read-only worker backlog diagnostics for `hrmdirect`, `rippling`, and `zoho` selected HRMDirect as the next worker-success lane: `2,238` due targets, `2,056` failure pressure, latest-run success `2/4`, recent-run success `59.7%`, `411` recent errors, `4` parser-bug drift events, and `407` source-quality events.
+- Live local parser probes showed the parser core already handles sampled HRMDirect boards: `hasco` parsed `1/1` accepted, `rustonpaving` parsed `20` rows with `19` accepted and `1` source-backed quarantine, `nepgroup` parsed `58` rows with `57` accepted and `1` quarantine, while `morningside` correctly kept `2` no-geo/no-remote rows quarantined.
+- The remaining parser-bug class is payload-shape drift from optional RSS date enrichment, not missing HTML parser support. HRMDirect now declares `__rssUrl`, `__rssXml`, `__rssStatus`, and `__rssFailure` as optional payload-shape enrichment; shared detail maps were already ignored by the generic guard, and missing `html` core still records parser drift.
+- Verification covered changed-file syntax checks, payload-drift tests, source registry contract tests, source contract tests, HRMDirect/source HTML module tests, live read-only parser probes, full backend/API tests, architecture-boundary audit, recovery-readiness index no-write check, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, or worker isolation was run.
+
 ## ATS Recovery Readiness Index - June 1, 2026
 
 - Fresh read-only production checks kept production at `6660eab`, all services running, `331,463` visible job slots, and the known Meili remote-facet drift of `6` onsite vs unknown. Throughput remains `hold`; source freshness still reports `384` unresolved parser-attention events, `389` parser-bug failures, and `1,217` source-quality failures.

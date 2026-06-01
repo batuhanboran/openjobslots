@@ -10,6 +10,14 @@ const baseModule = createSourceModule("hrmdirect");
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList(discover);
 const normalize = createNormalize(baseModule);
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__rssUrl",
+    "__rssXml",
+    "__rssStatus",
+    "__rssFailure"
+  ])
+});
 
 function parse(rawPayload, company = {}) {
   if (rawPayload && Array.isArray(rawPayload.__legacyParsed)) return rawPayload.__legacyParsed;
@@ -35,6 +43,7 @@ module.exports = {
   fetchList,
   parse,
   normalize,
+  payloadShapePolicy,
   normalizeHrmDirectListUrl,
   hrmDirectDetailLimit
 };

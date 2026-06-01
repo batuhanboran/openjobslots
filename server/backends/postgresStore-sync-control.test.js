@@ -1980,6 +1980,75 @@ async function testPayloadDriftAllowsBambooHrLocationObjectVariants() {
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPayloadDriftAllowsHrmDirectOptionalRssEnrichment() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "hrmdirect-html",
+            shape_paths: [
+              "__listUrl:string",
+              "__sourceConfig.baseOrigin:string",
+              "__sourceConfig.jobsUrl:string",
+              "__sourceConfig.list_url:string",
+              "__sourceConfig:object",
+              "html:string"
+            ],
+            observed_count: 411
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`HRMDirect optional RSS/detail variant should not record drift: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "hrmdirect",
+      companyUrl: "https://hasco.hrmdirect.com/employment/job-openings.php",
+      company: { company_name: "hasco" },
+      adapter: {
+        payloadShapePolicy: {
+          optional_enrichment_prefixes: [
+            "__rssUrl",
+            "__rssXml",
+            "__rssStatus",
+            "__rssFailure"
+          ]
+        }
+      }
+    },
+    {
+      html: "<table><tr><td><a href=\"job-opening.php?req=3725759\">Housing Navigator</a></td></tr></table>",
+      __listUrl: "https://hasco.hrmdirect.com/employment/job-openings.php?search=true",
+      __rssUrl: "https://hasco.hrmdirect.com/employment/rss.php?search=true",
+      __rssXml: "<rss><channel><item><guid>https://hasco.hrmdirect.com/employment/job-opening.php?req=3725759</guid><pubDate>Thu, 28 May 2026 04:00:00 +0100</pubDate></item></channel></rss>",
+      __rssStatus: 200,
+      __rssFailure: "",
+      __detailHtmlByUrl: {},
+      __detailStatusByUrl: {},
+      __detailFailureByUrl: {},
+      __sourceConfig: {
+        baseOrigin: "https://hasco.hrmdirect.com",
+        list_url: "https://hasco.hrmdirect.com/employment/job-openings.php?search=true",
+        jobsUrl: "https://hasco.hrmdirect.com/employment/job-openings.php?search=true",
+        detail_fetch_count: 0
+      }
+    },
+    "source-hrmdirect-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.compatible_enrichment_shape, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
   const calls = [];
   const pool = {
@@ -2497,6 +2566,7 @@ async function main() {
   await testPayloadDriftKeepsPositiveCountEmptyJobListAsDrift();
   await testPayloadDriftKeepsPositiveTotalEmptyHitsAsDrift();
   await testPayloadDriftAllowsBambooHrLocationObjectVariants();
+  await testPayloadDriftAllowsHrmDirectOptionalRssEnrichment();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();
