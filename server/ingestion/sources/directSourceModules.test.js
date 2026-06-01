@@ -1274,7 +1274,7 @@ test("zoho source module parses hidden JSON variants for localized geo and remot
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
-  assert.equal(normalized.length, 5);
+  assert.equal(normalized.length, 6);
 
   const remote = byId.get("476000000001002");
   assert.equal(remote.position_name, "Remote Customer Advocate");
@@ -1303,6 +1303,15 @@ test("zoho source module parses hidden JSON variants for localized geo and remot
   assert.equal(sparseDate.country, "Portugal");
   assert.equal(sparseDate.posting_date, null);
   assert.equal(source.validatePublic(sparseDate).status, "accepted");
+
+  const sourceFlagRemote = byId.get("476000000001006");
+  assert.equal(sourceFlagRemote.position_name, "Source Flag Remote Engineer");
+  assert.equal(sourceFlagRemote.location_text, null);
+  assert.equal(sourceFlagRemote.country, "");
+  assert.equal(sourceFlagRemote.remote_type, "remote");
+  assert.equal(sourceFlagRemote.evidence.remote_type.evidence_path, "jobs[].Remote_Job");
+  assert.equal(sourceFlagRemote.evidence.remote_type.rule_name, "zoho_remote_job_flag");
+  assert.equal(source.validatePublic(sourceFlagRemote).status, "accepted");
 });
 
 test("zoho source module parses registry HTML payload wrappers", () => {
@@ -1317,7 +1326,7 @@ test("zoho source module parses registry HTML payload wrappers", () => {
     }
   }, company);
 
-  assert.equal(parsed.length, 5);
+  assert.equal(parsed.length, 6);
   assert.equal(parsed[0].source_job_id, "476000000001001");
   assert.equal(parsed[0].company_name, "Fixture Zoho");
 });

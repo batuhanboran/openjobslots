@@ -9,6 +9,7 @@ This milestone turns ATS ingestion from parser-by-parser repair into a controlle
 - Data-quality pressure remains material: missing country about `6.37%`, missing any normalized geo about `13.28%`, and weak or unknown remote about `2.8%`.
 - Search count parity was aligned, but Meili remote facets still drifted from Postgres and require explicit approval before repair or replace reindex.
 - Source recovery order from read-only evidence starts with `zoho`, `hrmdirect`, `breezy`, `teamtailor`, `adp_workforcenow`, `bamboohr`, `ultipro`, `rippling`, and `applytojob`.
+- `zoho` first-lane local checkpoint maps source-backed `Remote_Job: true` to explicit remote evidence (`jobs[].Remote_Job` / `zoho_remote_job_flag`) without adding inferred country or city values.
 
 ## Done In The Architecture Slice
 

@@ -29,6 +29,11 @@ function cleanZohoText(value) {
     .trim();
 }
 
+function isZohoRemoteJob(job) {
+  if (job?.Remote_Job === true) return true;
+  return cleanZohoText(job?.Remote_Job).toLowerCase() === "true";
+}
+
 function extractZohoListUrl(pageHtml, fallbackUrl) {
   const fallbackParsed = parseUrl(fallbackUrl);
   const fallbackHost = fallbackParsed?.hostname || "";
@@ -108,6 +113,7 @@ function parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     const country = cleanZohoText(job?.Country);
     const location = [city, state, country].filter(Boolean).join(", ") || null;
     const postingDate = cleanZohoText(job?.Date_Opened);
+    const remoteJob = isZohoRemoteJob(job);
 
     postings.push({
       company_name: companyNameForPostings,
@@ -120,7 +126,29 @@ function parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
       city: isRemoteOnlyLocationValue(city) ? null : city || null,
       state: state || null,
       country: normalizeCountryName(country) || normalizeCountryFromLocation(country) || null,
-      department: cleanZohoText(job?.Industry) || null
+      remote_type: remoteJob ? "remote" : null,
+      is_remote: remoteJob || null,
+      workplaceType: remoteJob ? "Remote" : null,
+      department: cleanZohoText(job?.Industry) || null,
+      source_evidence: {
+        list_url: listUrl,
+        source_url: listUrl,
+        title_source: "embedded_json",
+        title_path: job?.Posting_Title ? "jobs[].Posting_Title" : "jobs[].Job_Opening_Name",
+        canonical_url_source: "url",
+        canonical_url_path: "jobs[].id",
+        source_job_id_source: "embedded_json",
+        source_job_id_path: "jobs[].id",
+        location_source: location ? "embedded_json" : "",
+        location_path: location ? "jobs[].City/State/Country" : "",
+        country_path: country ? "jobs[].Country" : "",
+        city_path: city ? "jobs[].City" : "",
+        remote_source: remoteJob ? "embedded_json" : "",
+        remote_path: remoteJob ? "jobs[].Remote_Job" : "",
+        remote_rule_name: remoteJob ? "zoho_remote_job_flag" : "",
+        posting_date_source: postingDate ? "embedded_json" : "",
+        posting_date_path: postingDate ? "jobs[].Date_Opened" : ""
+      }
     });
     seenIds.add(jobId);
   }
