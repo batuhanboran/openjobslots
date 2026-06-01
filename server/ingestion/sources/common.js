@@ -1,6 +1,5 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
-const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
@@ -655,7 +654,7 @@ const SOURCE_SPECS = Object.freeze({
   hrmdirect: {
     sourceFamily: "html_detail",
     confidence: 0.75,
-    parser: (companyName, config, payload) => parseHrmDirectPostingsFromHtml(companyName, config, payload),
+    parser: () => [],
     officialDocs: "observed HRMDirect public job-openings table HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);
