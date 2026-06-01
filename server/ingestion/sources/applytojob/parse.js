@@ -11,7 +11,8 @@ function cleanApplyToJobText(value) {
 
 function isApplyToJobPlaceholderTitle(value) {
   const title = cleanApplyToJobText(value).toLowerCase();
-  return /^(?:test|test job(?:\s+\d+)?|sample job|sample position|demo job)$/.test(title);
+  return /^\[test\]\s+\S/.test(title) ||
+    /^(?:test|test job(?:\s+\d+)?|sample job|sample position|demo job)$/.test(title);
 }
 
 function extractApplyToJobIconField(cardHtml, iconNames) {

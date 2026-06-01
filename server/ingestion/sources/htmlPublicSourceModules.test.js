@@ -1593,6 +1593,14 @@ test("applytojob source module collapses country-scoped location labels and skip
           <i class="fa fa-map-marker"></i> (Multiple States)
         </li>
         <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7008/Test-Prefix">[TEST] API Test Job</a></h3>
+          <i class="fa fa-map-marker"></i> United States
+        </li>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7009/Test-Engineer">Test Engineer</a></h3>
+          <i class="fa fa-map-marker"></i> United States
+        </li>
+        <li class="list-group-item">
           <h3 class="list-group-item-heading"><a href="/apply/ATJ7003/Test">test</a></h3>
           <i class="fa fa-map-marker"></i> Multiple Countries
         </li>
@@ -1604,7 +1612,7 @@ test("applytojob source module collapses country-scoped location labels and skip
     `,
     __listUrl: company.url_string
   }, company);
-  assert.equal(parsed.length, 5);
+  assert.equal(parsed.length, 6);
   const normalized = Object.fromEntries(
     parsed.map((posting) => {
       const row = source.normalize(posting, company);
@@ -1643,6 +1651,10 @@ test("applytojob source module collapses country-scoped location labels and skip
   assert.equal(normalized.ATJ7007.location_text, "(Multiple States)");
   assert.equal(normalized.ATJ7007.country, "");
   assert.equal(source.validatePublic(normalized.ATJ7007).status, "quarantined");
+
+  assert.equal(normalized.ATJ7009.position_name, "Test Engineer");
+  assert.equal(normalized.ATJ7009.country, "United States");
+  assert.equal(source.validatePublic(normalized.ATJ7009).status, "accepted");
 });
 
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {
