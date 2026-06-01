@@ -1,0 +1,19 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Explicit Remote",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://explicitremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://explicitremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://explicitremote.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://explicitremote.hrmdirect.com/employment/job-opening.php?req=HRM9901",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9901\"><td class=\"departments reqitem ReqRowClick\">Operations</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9901\">Project Manager, Implementation</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Operations</td></tr><tr><td class=\"viewFieldName\"><b>Location:</b></td><td class=\"viewFieldValue\"></td></tr></table><p>The opportunity supports multiple implementation teams.</p><p>This position is remote and requires a dedicated, distraction-free work space at home.</p></body></html>",
+  "expected": {
+    "source_job_id": "HRM9901",
+    "remote_type": "remote",
+    "remote_source": "labeled_detail_body",
+    "remote_path": "detail body explicit remote sentence",
+    "remote_rule_name": "hrmdirect_detail_body_explicit_remote_sentence"
+  }
+}

@@ -386,6 +386,15 @@ function extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml) {
   return "";
 }
 
+function extractHrmDirectDetailBodyExplicitRemoteSentenceType(detailHtml) {
+  const text = cleanHrmDirectText(detailHtml);
+  const match = text.match(
+    /\b(?:This|The)\s+(?:position|role|job|opportunity)\s+(?:is|will\s+be)\s+(?:a\s+)?(?:full[-\s]?time,?\s*)?(?:fully\s+)?(remote|hybrid)\b/i
+  );
+  if (!match?.[1]) return "";
+  return String(match[1]).toLowerCase() === "hybrid" ? "hybrid" : "remote";
+}
+
 function extractHrmDirectDetailBodyAddressLocation(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
   const locationAddressPattern = /\bLocation\s*:\s*([^:]{0,220}?,\s*([A-Za-z][A-Za-z .'-]{1,60}),\s*(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\s+\d{5}(?:-\d{4})?)\b/gi;
@@ -604,10 +613,13 @@ function extractHrmDirectDetailFields(detailHtml) {
   const detailBodyWorkModeTagRemoteType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType
     ? ""
     : extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml);
+  const detailBodyExplicitRemoteSentenceType = ["remote", "hybrid"].includes(detailRemoteType) || detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType
+    ? ""
+    : extractHrmDirectDetailBodyExplicitRemoteSentenceType(detailHtml);
   const detailOfficeRemoteType = officeLocation.remoteType && officeLocation.remoteType !== "unknown" ? officeLocation.remoteType : "";
   const remoteType = ["remote", "hybrid"].includes(detailRemoteType)
     ? detailRemoteType
-    : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType || detailOfficeRemoteType;
+    : detailLocationRemoteType || detailRemoteTag || detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType || detailBodyExplicitRemoteSentenceType || detailOfficeRemoteType;
   const locationPath = primaryLocation
     ? "table.viewFields Location"
     : officeLocation.location
@@ -619,7 +631,7 @@ function extractHrmDirectDetailFields(detailHtml) {
   const locationRuleName = primaryLocationRuleName || officeLocation.ruleName || (bodyAddressLocation ? "hrmdirect_detail_body_location_address" : "");
   const country = primaryLocationRuleName === "hrmdirect_detail_location_state_abbreviation" ? "United States" : officeLocation.country || "";
   const remoteSource = remoteType
-    ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType ? "labeled_detail_body" : "labeled_detail_html"
+    ? detailRemoteTag ? "structured_detail_tag" : detailBodyRemoteType || detailBodyWorkArrangementRemoteType || detailBodyWorkModeTagRemoteType || detailBodyExplicitRemoteSentenceType ? "labeled_detail_body" : "labeled_detail_html"
     : "";
   const remotePath = remoteType
     ? detailRemoteTag
@@ -630,11 +642,13 @@ function extractHrmDirectDetailFields(detailHtml) {
           ? "detail body Work Arrangement/Work Environment"
           : detailBodyWorkModeTagRemoteType
             ? "detail body work mode tag"
-            : detailLocationRemoteType
-              ? "table.viewFields Location"
-              : detailOfficeRemoteType
-                ? "table.viewFields Office"
-                : "table.viewFields Workplace Type"
+            : detailBodyExplicitRemoteSentenceType
+              ? "detail body explicit remote sentence"
+              : detailLocationRemoteType
+                ? "table.viewFields Location"
+                : detailOfficeRemoteType
+                  ? "table.viewFields Office"
+                  : "table.viewFields Workplace Type"
     : "";
   const remoteRuleName = remoteType
     ? detailRemoteTag
@@ -645,11 +659,13 @@ function extractHrmDirectDetailFields(detailHtml) {
           ? "hrmdirect_detail_body_work_arrangement_remote"
           : detailBodyWorkModeTagRemoteType
             ? "hrmdirect_detail_body_work_mode_tag"
-            : detailLocationRemoteType
-              ? "hrmdirect_detail_location_remote"
-              : detailOfficeRemoteType
-                ? officeLocation.remoteRuleName
-                : "hrmdirect_detail_workplace_type"
+            : detailBodyExplicitRemoteSentenceType
+              ? "hrmdirect_detail_body_explicit_remote_sentence"
+              : detailLocationRemoteType
+                ? "hrmdirect_detail_location_remote"
+                : detailOfficeRemoteType
+                  ? officeLocation.remoteRuleName
+                  : "hrmdirect_detail_workplace_type"
     : "";
   return {
     location,
