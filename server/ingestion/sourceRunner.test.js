@@ -42,20 +42,56 @@ test("source runner apply requires explicit production safety flags", () => {
   const missingMax = parseArgs(["--source=greenhouse", "--apply", "--confirm-production"]);
   const missingMaxGate = getSafetyGate(missingMax);
   assert.equal(missingMaxGate.authorized, false);
-  assert.deepEqual(missingMaxGate.missing, ["--max-updates=N"]);
+  assert.deepEqual(missingMaxGate.missing, [
+    "--max-updates=N",
+    "--planned-batch=<report>",
+    "--predicted-guard-result=pass"
+  ]);
+
+  const missingPlan = parseArgs([
+    "--mode=apply",
+    "--source=greenhouse",
+    "--confirm-production",
+    "--max-updates=25"
+  ]);
+  const missingPlanGate = getSafetyGate(missingPlan);
+  assert.equal(missingPlanGate.authorized, false);
+  assert.equal(missingPlanGate.planned_batch_required, true);
+  assert.equal(missingPlanGate.planned_batch_present, false);
+  assert.equal(missingPlanGate.predicted_guard_ok, false);
+  assert.ok(missingPlanGate.missing.includes("--planned-batch=<report>"));
+  assert.ok(missingPlanGate.missing.includes("--predicted-guard-result=pass"));
+
+  const failedPrediction = parseArgs([
+    "--mode=apply",
+    "--source=greenhouse",
+    "--confirm-production",
+    "--max-updates=25",
+    "--planned-batch=reports/greenhouse-plan.json",
+    "--predicted-guard-result=fail"
+  ]);
+  const failedPredictionGate = getSafetyGate(failedPrediction);
+  assert.equal(failedPredictionGate.authorized, false);
+  assert.equal(failedPredictionGate.planned_batch_present, true);
+  assert.equal(failedPredictionGate.predicted_guard_ok, false);
+  assert.deepEqual(failedPredictionGate.missing, ["--predicted-guard-result=pass"]);
 
   const authorized = parseArgs([
     "--mode=apply",
     "--source=greenhouse",
     "--apply",
     "--confirm-production",
-    "--max-updates=25"
+    "--max-updates=25",
+    "--planned-batch=reports/greenhouse-plan.json",
+    "--predicted-guard-result=pass"
   ]);
   const gate = getSafetyGate(authorized);
   assert.equal(gate.apply_requested, true);
   assert.equal(gate.authorized, true);
   assert.deepEqual(gate.missing, []);
   assert.equal(gate.recovery_readiness_gate.ok, true);
+  assert.equal(gate.planned_batch_present, true);
+  assert.equal(gate.predicted_guard_ok, true);
 });
 
 test("source runner requires recovery readiness for canary and apply operations", async () => {
@@ -78,7 +114,9 @@ test("source runner requires recovery readiness for canary and apply operations"
     "--mode=apply",
     "--source=not_configured_ats",
     "--confirm-production",
-    "--max-updates=1"
+    "--max-updates=1",
+    "--planned-batch=reports/not-configured-plan.json",
+    "--predicted-guard-result=pass"
   ]);
   const safetyGate = getSafetyGate(blockedApply);
   assert.equal(safetyGate.authorized, false);

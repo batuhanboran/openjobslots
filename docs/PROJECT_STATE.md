@@ -111,6 +111,12 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - The gate accepts either `planned_tenant_batch_file_path` or a structured `planned_batch_report`, and can read the predicted guard result from the report alias. A release now fails if canary/apply evidence skipped batch planning, predicted a failed guard, or cannot show the rollback command.
 - Verification covered `node --check scripts\release-ats-recovery-check.js` and `node scripts\release-ats-recovery-check.test.js` with new negative tests for missing batch proof, failed predicted guard, and missing rollback command. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, cleanup, or worker-budget change was run.
 
+## ATS Source Write Batch-Plan Safety Gate - June 1, 2026
+
+- `server/ingestion/sourceRunner.js` now refuses source-run write authorization unless an apply/canary write request includes `--planned-batch=<report>` and `--predicted-guard-result=pass` in addition to `--confirm-production`, `--max-updates=N`, and a passing recovery-readiness gate.
+- The source-run summary exposes `planned_batch_required`, `planned_batch_present`, `predicted_guard_result`, and `predicted_guard_ok`, so failed write attempts show the exact missing proof before any source writes can start.
+- Verification covered `node --check server\ingestion\sourceRunner.js` and `node server\ingestion\sourceRunner.test.js` with new negative tests for missing batch proof and failed predicted guard. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

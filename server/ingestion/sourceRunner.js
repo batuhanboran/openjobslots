@@ -144,18 +144,29 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
 function getSafetyGate(options = {}) {
   const applyRequested = Boolean(options.apply);
   const readinessGate = getRecoveryReadinessGate(options);
+  const plannedBatch = clean(options.plannedBatch || "", 2000);
+  const predictedGuardResult = clean(options.predictedGuardResult || "", 80).toLowerCase();
+  const predictedGuardOk = ["pass", "passed", "ok", "success", "succeeded", "true"].includes(predictedGuardResult);
   return {
     apply_requested: applyRequested,
     authorized:
       applyRequested &&
       Boolean(options.confirmProduction) &&
       Number(options.maxUpdates || 0) > 0 &&
-      readinessGate.ok,
+      readinessGate.ok &&
+      plannedBatch.length > 0 &&
+      predictedGuardOk,
+    planned_batch_required: applyRequested,
+    planned_batch_present: !applyRequested || plannedBatch.length > 0,
+    predicted_guard_result: predictedGuardResult || "",
+    predicted_guard_ok: !applyRequested || predictedGuardOk,
     recovery_readiness_gate: readinessGate,
     missing: [
       applyRequested && !options.confirmProduction ? "--confirm-production" : "",
       applyRequested && Number(options.maxUpdates || 0) <= 0 ? "--max-updates=N" : "",
-      applyRequested && !readinessGate.ok ? "recovery-readiness-ok" : ""
+      applyRequested && !readinessGate.ok ? "recovery-readiness-ok" : "",
+      applyRequested && plannedBatch.length <= 0 ? "--planned-batch=<report>" : "",
+      applyRequested && !predictedGuardOk ? "--predicted-guard-result=pass" : ""
     ].filter(Boolean)
   };
 }

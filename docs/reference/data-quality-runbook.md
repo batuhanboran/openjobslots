@@ -151,6 +151,8 @@ If an estimator report shows remaining unscanned targets, switch to `ats:invento
 
 Before calling an ATS recovery release successful, the source recovery report must also carry the inventory, batch-plan, rollback, and search-sync proof consumed by `release:ats-recovery:check`: `inventory_scan_report`, `net_new_clean_public_estimate`, `duplicate_existing_public_candidates`, `candidate_pool_exhausted`, `estimate_confidence`, `planned_tenant_batch_file_path` or `planned_batch_report`, `predicted_guard_result`, `rollback_command`, and `bounded_outbox_or_upsert_status`. Missing or unproven fields are release blockers, even when parser fixtures and data-quality percentages pass.
 
+The source-run write path enforces the same batch-plan boundary. `ats:source:canary` / `ats:source:apply` write authorization requires `--planned-batch=<report>` and `--predicted-guard-result=pass` alongside `--confirm-production`, `--max-updates=N`, source recovery readiness, backup/worker isolation, and the later recovery guard. A canary/apply command without a passing planned batch remains read-only/unauthorized even when other production flags are present.
+
 ## Parser Field Evidence And Detail Escalation
 
 Parser dry-runs expose per-candidate parser mechanics so operators can see why a row was accepted, quarantined, rejected, or classified as duplicate:
