@@ -1,0 +1,78 @@
+{
+  "ats_key": "ultipro",
+  "description": "Malformed or unsupported UltiPro source payloads must not produce public rows.",
+  "cases": [
+    {
+      "name": "missing opportunities array",
+      "payload": {
+        "totalCount": 1,
+        "locations": []
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "non-array opportunities",
+      "payload": {
+        "opportunities": {
+          "Id": "OPP-NON-ARRAY",
+          "Title": "Unsupported Shape"
+        },
+        "totalCount": 1,
+        "locations": []
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing source id",
+      "payload": {
+        "opportunities": [
+          {
+            "Title": "Missing Source Id",
+            "PostedDate": "2026-05-29T20:29:21.920Z",
+            "Locations": [
+              {
+                "Address": {
+                  "City": "Dallas",
+                  "State": {
+                    "Code": "TX"
+                  },
+                  "Country": {
+                    "Name": "United States"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "totalCount": 1
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing title",
+      "payload": {
+        "opportunities": [
+          {
+            "Id": "OPP-MISSING-TITLE",
+            "PostedDate": "2026-05-29T20:29:21.920Z",
+            "Locations": [
+              {
+                "Address": {
+                  "City": "Miami Beach",
+                  "State": {
+                    "Code": "FL"
+                  },
+                  "Country": {
+                    "Name": "United States"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "totalCount": 1
+      },
+      "expected_parsed_count": 0
+    }
+  ]
+}

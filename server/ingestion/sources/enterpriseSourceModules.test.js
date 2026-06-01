@@ -835,6 +835,41 @@ test("ultipro source module preserves remote-country and international country e
   assert.equal(source.validatePublic(bolivia).status, "accepted");
 });
 
+test("ultipro source module treats empty boards and malformed source rows conservatively", () => {
+  const source = getSourceModule("ultipro");
+  const sourceDir = path.join(__dirname, "ultipro");
+  const route = readJson(path.join(sourceDir, "fixtures", "route-detection.json"));
+  const malformed = readJson(path.join(sourceDir, "fixtures", "malformed-list-shapes.json"));
+  const missingGeo = readJson(path.join(sourceDir, "fixtures", "missing-geo-list.json"));
+  const company = {
+    company_name: route.company_name,
+    url_string: route.board_url,
+    ATS_name: "ultipro"
+  };
+
+  const discovered = source.discover(company);
+  assert.equal(discovered.config.tenant, route.expected.tenant);
+  assert.equal(discovered.config.boardId, route.expected.board_id);
+  assert.equal(discovered.list_url, route.api_url);
+  assert.equal(source.parse(route.empty_payload, company).length, route.expected.parsed_count);
+
+  for (const item of malformed.cases) {
+    assert.equal(
+      source.parse(item.payload, company).length,
+      item.expected_parsed_count,
+      `UltiPro ${item.name} should not produce parser rows`
+    );
+  }
+
+  const parsed = source.parse(missingGeo.payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, missingGeo.expected.source_job_id);
+  const gate = source.validatePublic(normalized);
+  assert.equal(gate.status, missingGeo.expected.public_gate_status);
+  assert.ok(gate.reason_codes.includes(missingGeo.expected.reason_code));
+});
+
 test("icims source module follows wrapper iframe and enriches from public detail", async () => {
   const source = getSourceModule("icims");
   const sourceDir = path.join(__dirname, "icims");

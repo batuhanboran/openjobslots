@@ -85,14 +85,16 @@ function parseUltiProPostingsFromApi(companyNameForPostings, config, responseJso
   for (const opportunity of opportunities) {
     const item = opportunity && typeof opportunity === "object" ? opportunity : {};
     const opportunityId = String(item?.Id || item?.OpportunityId || item?.opportunityId || "").trim();
+    const title = clean(item?.Title || item?.title || item?.JobTitle || item?.PositionTitle);
     if (!opportunityId || seenIds.has(opportunityId)) continue;
+    if (!title) continue;
     const locationEvidence = extractUltiProLocationEvidence(item);
 
     postings.push({
       company_name: companyName,
       source_job_id: opportunityId,
       id: opportunityId,
-      position_name: String(item?.Title || item?.title || "").trim() || "Untitled Position",
+      position_name: title,
       job_posting_url: `${String(config?.baseBoardUrl || "").replace(/\/+$/, "")}/OpportunityDetail?opportunityId=${encodeURIComponent(opportunityId)}`,
       posting_date: String(item?.PostedDate || item?.postedDate || item?.CreatedDate || "").trim() || null,
       location: locationEvidence.location,

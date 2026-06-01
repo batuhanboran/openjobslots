@@ -1,0 +1,16 @@
+{
+  "ats_key": "ultipro",
+  "company_name": "Fixture UltiPro Empty Board",
+  "board_url": "https://recruiting.ultipro.com/STA1024SOHM/JobBoard/4a4c0774-5801-4cdb-b24c-3a740f9a1d61/?q=&o=postedDateDesc",
+  "api_url": "https://recruiting.ultipro.com/STA1024SOHM/JobBoard/4a4c0774-5801-4cdb-b24c-3a740f9a1d61/JobBoardView/LoadSearchResults",
+  "empty_payload": {
+    "opportunities": [],
+    "totalCount": 0,
+    "locations": []
+  },
+  "expected": {
+    "tenant": "STA1024SOHM",
+    "board_id": "4a4c0774-5801-4cdb-b24c-3a740f9a1d61",
+    "parsed_count": 0
+  }
+}
