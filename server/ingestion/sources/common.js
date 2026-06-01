@@ -1,7 +1,6 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
-const { parseManatalPostingsFromApi } = require("./manatal/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { parseWorkdayPostingsFromApi } = require("./workday/parse");
@@ -309,7 +308,7 @@ const SOURCE_SPECS = Object.freeze({
   manatal: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseManatalPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed public careers-page JSON endpoint",
     discover(company) {
       const domainSlug = firstPathSegment(company.url_string) || hostSlug(company.url_string);
