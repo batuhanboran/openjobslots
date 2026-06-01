@@ -103,6 +103,20 @@ function scanFiles(files, patterns) {
   return hits;
 }
 
+function listSourceLocalModuleDirs() {
+  const sourcesDir = path.join(ROOT, "server/ingestion/sources");
+  return fs.readdirSync(sourcesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((atsKey) => fs.existsSync(path.join(sourcesDir, atsKey, "index.js")))
+    .sort();
+}
+
+function readDirectSourceAtsKeys() {
+  const { DIRECT_SOURCE_ATS_KEYS } = require(path.join(ROOT, "server/ingestion/sources"));
+  return Array.from(DIRECT_SOURCE_ATS_KEYS || []).sort();
+}
+
 function main() {
   const json = process.argv.includes("--json");
   const remotes = git(["remote", "-v"]);
@@ -169,6 +183,22 @@ function main() {
     failures.push(`source modules must not import server/index.js: ${JSON.stringify(sourceImportHits)}`);
   }
 
+  const sourceLocalModuleDirs = listSourceLocalModuleDirs();
+  let directSourceAtsKeys = [];
+  try {
+    directSourceAtsKeys = readDirectSourceAtsKeys();
+  } catch (error) {
+    failures.push(`source module index failed to load: ${error?.message || error}`);
+  }
+  const sourceLocalRegistrationMissing = sourceLocalModuleDirs.filter((atsKey) => !directSourceAtsKeys.includes(atsKey));
+  const sourceLocalRegistrationExtra = directSourceAtsKeys.filter((atsKey) => !sourceLocalModuleDirs.includes(atsKey));
+  if (sourceLocalRegistrationMissing.length || sourceLocalRegistrationExtra.length) {
+    failures.push(`source module index must match source-local module dirs: ${JSON.stringify({
+      missing: sourceLocalRegistrationMissing,
+      extra: sourceLocalRegistrationExtra
+    })}`);
+  }
+
   const result = {
     ok: failures.length === 0,
     server_index_lines: serverIndexLines,
@@ -177,6 +207,10 @@ function main() {
     server_index_ats_boundary_hits: serverIndexAtsHits,
     source_local_ownership_hits: sourceLocalOwnershipHits,
     source_module_boundary_hits: sourceImportHits,
+    source_local_module_dir_count: sourceLocalModuleDirs.length,
+    direct_source_ats_key_count: directSourceAtsKeys.length,
+    source_local_registration_missing: sourceLocalRegistrationMissing,
+    source_local_registration_extra: sourceLocalRegistrationExtra,
     failures,
     warnings
   };
