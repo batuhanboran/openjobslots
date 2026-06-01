@@ -2,7 +2,6 @@ const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
-const { parseRecruitCrmPostingsFromApi } = require("./recruitcrm/parse");
 const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
@@ -328,7 +327,7 @@ const SOURCE_SPECS = Object.freeze({
   recruitcrm: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseRecruitCrmPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed Recruit CRM public jobs endpoint",
     discover() {
       return {

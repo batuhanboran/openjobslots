@@ -31,7 +31,9 @@ const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
   { name: "hrmdirect_parser_import", regex: /require\(["']\.\/hrmdirect\/parse["']\)/ },
   { name: "hrmdirect_parser_spec", regex: /hrmdirect:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseHrmDirectPostingsFromHtml/ },
   { name: "loxo_parser_import", regex: /require\(["']\.\/loxo\/parse["']\)/ },
-  { name: "loxo_parser_spec", regex: /loxo:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseLoxoPostingsFromHtml/ }
+  { name: "loxo_parser_spec", regex: /loxo:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseLoxoPostingsFromHtml/ },
+  { name: "recruitcrm_parser_import", regex: /require\(["']\.\/recruitcrm\/parse["']\)/ },
+  { name: "recruitcrm_parser_spec", regex: /recruitcrm:\s*{[\s\S]*?parser:\s*parseRecruitCrmPostingsFromApi/ },
 ]);
 
 function readText(relativePath) {
