@@ -19,6 +19,7 @@ const {
 } = require("./adapter-metadata");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("./posting");
 const { resolveRegistrySourceKey } = require("./sourceRegistry");
+const { getSourceModule } = require("./sources");
 
 test("canonicalizePostingUrl removes fragments and tracking query noise", () => {
   assert.equal(
@@ -177,6 +178,21 @@ test("fetch dispatcher has registry or legacy ownership for every configured ATS
     missing.push(key);
   }
   assert.deepEqual(missing, []);
+});
+
+test("adapter dispatch preserves source module payload shape policy", () => {
+  for (const item of ATS_FILTER_OPTION_ITEMS) {
+    const atsKey = String(item.value || "");
+    const sourceModule = getSourceModule(atsKey);
+    if (!sourceModule?.payloadShapePolicy) continue;
+    const adapter = adapters.get(atsKey);
+    assert.ok(adapter, `missing adapter ${atsKey}`);
+    assert.deepEqual(
+      adapter.payloadShapePolicy,
+      sourceModule.payloadShapePolicy,
+      `${atsKey} adapter should expose payload shape policy to worker drift checks`
+    );
+  }
 });
 
 test("fixture-backed adapter metadata points to saved fixtures", () => {

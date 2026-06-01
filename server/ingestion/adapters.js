@@ -33,6 +33,7 @@ function createLegacyAdapter(item) {
     key: atsKey,
     displayName,
     parserVersion: sourceModule?.parserVersion || PARSER_VERSION,
+    payloadShapePolicy: sourceModule?.payloadShapePolicy || Object.freeze({}),
     metadata,
     detect(company) {
       return normalizeAtsFilterValue(company?.ATS_name) === atsKey;
