@@ -433,7 +433,10 @@ test("registry returns contract-valid pilot source modules", () => {
     "__rssUrl",
     "__rssXml",
     "__rssStatus",
-    "__rssFailure"
+    "__rssFailure",
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl",
+    "__detailFailureByUrl"
   ]);
   assert.deepEqual(validateSourceContract(hrmDirect), { ok: true, failures: [] });
 

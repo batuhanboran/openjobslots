@@ -15,7 +15,10 @@ const payloadShapePolicy = Object.freeze({
     "__rssUrl",
     "__rssXml",
     "__rssStatus",
-    "__rssFailure"
+    "__rssFailure",
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl",
+    "__detailFailureByUrl"
   ])
 });
 

@@ -85,6 +85,12 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `trustvip.hrmdirect.com`: current local parser parsed `15` rows and accepted `14`, leaving only the detail page with no explicit geo/remote evidence quarantined. Rows such as `Senior Sales Executive` and `OpenText ADM Consultant- Part-time` now carry `hrmdirect_detail_body_explicit_remote_sentence` evidence.
 - Verification covered HRMDirect HTML/public source-module tests including a red/green fixture update, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --json --no-write`, `npm.cmd run ats:workbench -- --source=hrmdirect --json --no-write`, and live read-only parser proof. `release:ats-recovery:check -- --source=hrmdirect --json` correctly remained blocked because no production before/after reports, guard report, preflight report, or Meili parity report were supplied. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## HRMDirect Payload Shape Enrichment Policy - June 1, 2026
+
+- Fresh production drift evidence showed repeated HRMDirect payload-shape events where the observed payload differed only by source-run enrichment fields such as `__detailHtmlByUrl`, `__detailStatusByUrl`, `__detailFailureByUrl`, and RSS sidecars.
+- HRMDirect now declares those detail sidecar maps in its source-local `payloadShapePolicy.optional_enrichment_prefixes`, next to the existing RSS optional fields. This keeps transient detail/RSS enrichment out of parser-drift classification without suppressing real HTML/list shape changes.
+- Verification covered a red/green `sourceRegistry` contract assertion and `postgresStore-sync-control` drift-policy tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.
