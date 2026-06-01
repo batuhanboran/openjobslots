@@ -5252,6 +5252,7 @@ function PostingCard({
   blockingCompanyNames,
   showAdminActions = false,
   isDarkTheme = false,
+  compact = false,
   t = (key, fallback) => fallback || key
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -5284,7 +5285,7 @@ function PostingCard({
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
   const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
   return (
-    <View style={[styles.card, isDarkTheme ? styles.cardDark : null]} testID="posting-card">
+    <View style={[styles.card, compact ? styles.cardMobile : null, isDarkTheme ? styles.cardDark : null]} testID="posting-card">
       <View style={styles.postingCardTopRow}>
         <Pressable
           onPress={onOpenPosting}
@@ -5296,6 +5297,7 @@ function PostingCard({
           <Text
             style={[
               styles.position,
+              compact ? styles.positionMobile : null,
               isDarkTheme ? styles.positionDark : null,
               isPostingVisited ? styles.positionVisited : null,
               isPostingVisited && isDarkTheme ? styles.positionVisitedDark : null
@@ -5304,14 +5306,14 @@ function PostingCard({
           >
             {companyLabel}
           </Text>
-          <Text style={[styles.postingRole, isDarkTheme ? styles.postingRoleDark : null]}>{positionName}</Text>
-          <Text style={[styles.location, isDarkTheme ? styles.locationDark : null]}>{locationLabel}</Text>
-          <Text style={[styles.ats, isDarkTheme ? styles.atsDark : null]}>{t("posting.atsLabel", "ATS")}: {atsLabel}</Text>
-          <Text style={[styles.posted, isDarkTheme ? styles.postedDark : null]}>{postingDateLabel}</Text>
+          <Text style={[styles.postingRole, compact ? styles.postingRoleMobile : null, isDarkTheme ? styles.postingRoleDark : null]}>{positionName}</Text>
+          <Text style={[styles.location, compact ? styles.locationMobile : null, isDarkTheme ? styles.locationDark : null]}>{locationLabel}</Text>
+          <Text style={[styles.ats, compact ? styles.atsMobile : null, isDarkTheme ? styles.atsDark : null]}>{t("posting.atsLabel", "ATS")}: {atsLabel}</Text>
+          <Text style={[styles.posted, compact ? styles.postedMobile : null, isDarkTheme ? styles.postedDark : null]}>{postingDateLabel}</Text>
           {isApplied ? (
             <Text style={styles.postingAppliedNotice}>{appliedByLabel}</Text>
           ) : null}
-          <Text numberOfLines={1} style={[styles.url, isDarkTheme ? styles.urlDark : null]}>
+          <Text numberOfLines={1} style={[styles.url, compact ? styles.urlMobile : null, isDarkTheme ? styles.urlDark : null]}>
             {postingUrlLabel}
           </Text>
         </Pressable>
@@ -7824,12 +7826,6 @@ export default function App() {
   }, [setScrollTopButtonVisible, showResultsSurface]);
 
   useEffect(() => {
-    if (!isDesktopViewport && releaseNotesOpen) {
-      setReleaseNotesOpen(false);
-    }
-  }, [isDesktopViewport, releaseNotesOpen]);
-
-  useEffect(() => {
     if (Platform.OS !== "web") return undefined;
 
     const handleGlobalKeyDown = (event) => {
@@ -8200,10 +8196,13 @@ export default function App() {
     <Modal
       animationType="fade"
       transparent
-      visible={releaseNotesOpen && isDesktopViewport}
+      visible={releaseNotesOpen}
       onRequestClose={() => setReleaseNotesOpen(false)}
     >
-      <View style={styles.releaseNotesOverlay} testID="release-notes-modal">
+      <View
+        style={[styles.releaseNotesOverlay, !isDesktopViewport ? styles.releaseNotesOverlayMobile : null]}
+        testID="release-notes-modal"
+      >
         <Pressable
           style={styles.releaseNotesBackdrop}
           onPress={() => setReleaseNotesOpen(false)}
@@ -8211,7 +8210,7 @@ export default function App() {
           accessibilityRole="button"
           accessibilityLabel={t("release.closeA11y", "Close release notes")}
         />
-        <View style={styles.releaseNotesCard}>
+        <View style={[styles.releaseNotesCard, !isDesktopViewport ? styles.releaseNotesCardMobile : null]}>
           <View style={styles.releaseNotesHeader}>
             <View style={styles.releaseNotesHeaderCopy}>
               <Text style={styles.releaseNotesTitle} testID="release-notes-title">
@@ -8229,8 +8228,11 @@ export default function App() {
             </Pressable>
           </View>
           <ScrollView
-            style={styles.releaseNotesScroll}
-            contentContainerStyle={styles.releaseNotesScrollContent}
+            style={[styles.releaseNotesScroll, !isDesktopViewport ? styles.releaseNotesScrollMobile : null]}
+            contentContainerStyle={[
+              styles.releaseNotesScrollContent,
+              !isDesktopViewport ? styles.releaseNotesScrollContentMobile : null
+            ]}
             testID="release-notes-scroll"
             accessibilityLabel={t("release.historyLabel", "Release notes history")}
           >
@@ -8270,6 +8272,9 @@ export default function App() {
     const renderSearchBox = (mode = "home") => {
       const compact = mode === "results";
       const showAttachedSuggestions = suggestionsVisible && searchSuggestions.length > 0;
+      const searchLength = String(search || "").trim().length;
+      const searchLengthStyle =
+        searchLength >= 34 ? styles.yahooSearchInputVeryLong : searchLength >= 22 ? styles.yahooSearchInputLong : null;
       return (
         <View style={[styles.searchBoxRow, styles.yahooSearchBoxRow, compact ? styles.yahooSearchBoxRowResults : null]}>
           <View
@@ -8297,6 +8302,7 @@ export default function App() {
                   styles.search,
                   isDarkPublicTheme ? styles.searchDark : null,
                   styles.yahooSearchInput,
+                  searchLengthStyle,
                   isDarkPublicTheme ? styles.yahooSearchInputDark : null
                 ]}
                 value={search}
@@ -8313,6 +8319,7 @@ export default function App() {
                 placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
                 autoCapitalize="none"
                 returnKeyType="search"
+                numberOfLines={1}
                 blurOnSubmit={false}
                 testID="search-input"
                 accessibilityLabel={t("search.label", "Search openings")}
@@ -8401,6 +8408,7 @@ export default function App() {
           {publicShellStatsChips.map((chip) => {
             const isJobSlots = chip.key === "job-slots";
             const translatedLabel = getPublicStatsChipLabel(chip, t);
+            const visibleLabel = translatedLabel ? ` ${translatedLabel}` : "";
             return (
               <View
                 key={chip.key}
@@ -8440,7 +8448,7 @@ export default function App() {
                     isDarkPublicTheme ? styles.textMutedDark : null
                   ]}
                 >
-                  {translatedLabel ? ` ${translatedLabel}` : ""}
+                  {visibleLabel}
                 </Text>
               </View>
             );
@@ -8448,6 +8456,19 @@ export default function App() {
         </View>
       );
     };
+    const renderUtilityControls = () => (
+      <View style={[styles.resultsUtilityControls, !isDesktopViewport ? styles.resultsUtilityControlsMobile : null]}>
+        <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} compact={!isDesktopViewport} />
+        <LanguageSelector
+          languageCode={publicLanguageCode}
+          menuOpen={languageMenuOpen}
+          onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
+          onSelectLanguage={selectPublicLanguage}
+          t={t}
+          compact={!isDesktopViewport}
+        />
+      </View>
+    );
     const brandMark = (
       <Pressable
         onPress={handleBrandHome}
@@ -8468,7 +8489,9 @@ export default function App() {
               style={[
                 styles.brandWordmarkLetter,
                 styles.yahooBrandWordmarkLetter,
+                !isDesktopViewport ? styles.yahooBrandWordmarkLetterMobile : null,
                 showResultsSurface ? styles.yahooBrandWordmarkLetterResults : null,
+                showResultsSurface && !isDesktopViewport ? styles.yahooBrandWordmarkLetterResultsMobile : null,
                 { color: segment.color }
               ]}
             >
@@ -8561,7 +8584,9 @@ export default function App() {
         style={[
           styles.yahooTopBar,
           showResultsSurface ? styles.yahooTopBarResults : null,
-          !isDesktopViewport ? styles.yahooTopBarMobile : null
+          !isDesktopViewport ? styles.yahooTopBarMobile : null,
+          !isDesktopViewport && showResultsSurface ? styles.yahooTopBarResultsMobile : null,
+          !isDesktopViewport && !showResultsSurface ? styles.yahooTopBarHomeMobile : null
         ]}
       >
         {showResultsSurface ? (
@@ -8577,28 +8602,43 @@ export default function App() {
           style={[
             styles.yahooTopActions,
             showResultsSurface ? styles.yahooTopActionsResults : null,
-            !isDesktopViewport ? styles.yahooTopActionsMobile : null
+            !isDesktopViewport ? styles.yahooTopActionsMobile : null,
+            !isDesktopViewport && showResultsSurface ? styles.yahooTopActionsResultsMobile : null,
+            !isDesktopViewport && !showResultsSurface ? styles.yahooTopActionsHomeMobile : null
           ]}
         >
-          {showResultsSurface ? (
-            <View style={[styles.yahooResultsBrandSlot, !isDesktopViewport ? styles.yahooResultsBrandSlotMobile : null]}>
-              {brandMark}
-            </View>
-          ) : null}
-          <View style={[styles.resultsMetricsRow, !isDesktopViewport ? styles.resultsMetricsRowMobile : null]} testID="results-metrics-row">
-            {renderPublicStatsChips()}
-            <View style={[styles.resultsUtilityControls, !isDesktopViewport ? styles.resultsUtilityControlsMobile : null]}>
-              <ThemeToggle themeMode={publicTheme} onToggleTheme={togglePublicTheme} t={t} compact={!isDesktopViewport} />
-              <LanguageSelector
-                languageCode={publicLanguageCode}
-                menuOpen={languageMenuOpen}
-                onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
-                onSelectLanguage={selectPublicLanguage}
-                t={t}
-                compact={!isDesktopViewport}
-              />
-            </View>
-          </View>
+          {showResultsSurface && !isDesktopViewport ? (
+            <>
+              <View style={styles.mobileResultsHeaderBand}>
+                <View style={styles.yahooResultsBrandSlotMobile}>
+                  {brandMark}
+                </View>
+                {renderUtilityControls()}
+              </View>
+              <View style={styles.mobileResultsStatsBand} testID="results-metrics-row">
+                {renderPublicStatsChips()}
+              </View>
+            </>
+          ) : (
+            <>
+              {showResultsSurface ? (
+                <View style={styles.yahooResultsBrandSlot}>
+                  {brandMark}
+                </View>
+              ) : null}
+              <View
+                style={[
+                  styles.resultsMetricsRow,
+                  !isDesktopViewport ? styles.resultsMetricsRowMobile : null,
+                  !isDesktopViewport && !showResultsSurface ? styles.resultsMetricsRowHomeMobile : null
+                ]}
+                testID="results-metrics-row"
+              >
+                {renderPublicStatsChips()}
+                {renderUtilityControls()}
+              </View>
+            </>
+          )}
         </View>
       </View>
       {!showResultsSurface ? (
@@ -9011,6 +9051,7 @@ export default function App() {
                     ignoringPostingIds={ignoringPostingIds}
                     blockedCompanyNames={blockedCompanyNames}
                     blockingCompanyNames={blockingCompanyNamesSet}
+                    compact={!isDesktopViewport}
                     isDarkTheme={isDarkPublicTheme}
                     t={t}
                   />
@@ -10066,7 +10107,7 @@ const styles = StyleSheet.create({
   postingsPageContent: {
     paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: Platform.OS === "web" ? 96 : 34
+    paddingBottom: Platform.OS === "web" ? 96 : 116
   },
   webSmoothMotion: {
     transitionProperty: "min-height, padding, margin, transform, opacity",
@@ -10184,6 +10225,17 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 0
   },
+  yahooTopBarHomeMobile: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  yahooTopBarResultsMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 10
+  },
   yahooBrandCluster: {
     flex: 1,
     minWidth: 0,
@@ -10226,11 +10278,29 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8
   },
+  yahooTopActionsHomeMobile: {
+    width: "auto",
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "nowrap",
+    gap: 0
+  },
+  yahooTopActionsResultsMobile: {
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    flexWrap: "nowrap",
+    gap: 7
+  },
   yahooResultsBrandSlot: {
     flexShrink: 0
   },
   yahooResultsBrandSlotMobile: {
-    width: "100%"
+    flex: 1,
+    minWidth: 0,
+    width: "auto"
   },
   yahooResultsSearchTop: {
     flexGrow: 0,
@@ -10263,9 +10333,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0
   },
+  yahooBrandWordmarkLetterMobile: {
+    fontSize: 31,
+    lineHeight: 38
+  },
   yahooBrandWordmarkLetterResults: {
     fontSize: 28,
     lineHeight: 34
+  },
+  yahooBrandWordmarkLetterResultsMobile: {
+    fontSize: 25,
+    lineHeight: 30
   },
   yahooCreditText: {
     maxWidth: 260,
@@ -10291,21 +10369,22 @@ const styles = StyleSheet.create({
     bottom: 18
   },
   publicFooterMetaMobile: {
-    position: Platform.OS === "web" ? "fixed" : "relative",
-    left: Platform.OS === "web" ? 18 : 0,
-    right: Platform.OS === "web" ? 18 : 0,
-    bottom: Platform.OS === "web" ? 14 : 0,
+    position: Platform.OS === "web" ? "fixed" : "absolute",
+    left: Platform.OS === "web" ? 18 : 20,
+    right: Platform.OS === "web" ? 18 : 20,
+    bottom: Platform.OS === "web" ? 14 : 76,
     flexDirection: "column",
     alignItems: "flex-start",
     gap: 6,
-    marginTop: Platform.OS === "web" ? 0 : 18,
-    paddingBottom: Platform.OS === "web" ? 0 : 18
+    marginTop: 0,
+    paddingBottom: 0
   },
   publicFooterMetaDark: {
     color: OJS_DARK_COLORS.muted
   },
   publicFooterVersionButton: {
-    alignSelf: "flex-start"
+    alignSelf: "flex-start",
+    maxWidth: "100%"
   },
   publicFooterCredit: {
     maxWidth: 360,
@@ -10352,7 +10431,8 @@ const styles = StyleSheet.create({
   },
   yahooSearchBoxRow: {
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    overflow: "visible"
   },
   yahooSearchBoxRowResults: {
     width: "100%",
@@ -10365,6 +10445,7 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     height: 52,
     alignSelf: "center",
+    overflow: "visible",
     zIndex: 24
   },
   searchBoxAutocompleteResults: {
@@ -10386,6 +10467,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingLeft: 18,
     paddingRight: 18,
+    overflow: "visible",
     ...(Platform.OS === "web"
       ? {
           boxShadow: "0 2px 8px rgba(35, 42, 49, 0.16)",
@@ -10430,15 +10512,18 @@ const styles = StyleSheet.create({
   yahooSearchInput: {
     flex: 1,
     minWidth: 0,
-    height: 50,
+    height: "100%",
     borderWidth: 0,
     borderRadius: 0,
     backgroundColor: "transparent",
     paddingHorizontal: 0,
+    paddingVertical: 0,
     color: YAHOO_COLORS.ink,
     fontFamily: YAHOO_FONT_STACK,
     fontSize: 18,
     lineHeight: 24,
+    textAlignVertical: "center",
+    includeFontPadding: false,
     ...(Platform.OS === "web"
       ? {
           boxShadow: "none",
@@ -10450,6 +10535,14 @@ const styles = StyleSheet.create({
   yahooSearchInputDark: {
     color: OJS_DARK_COLORS.ink,
     ...(Platform.OS === "web" ? { outlineStyle: "none", outlineWidth: 0 } : {})
+  },
+  yahooSearchInputLong: {
+    fontSize: 16,
+    lineHeight: 22
+  },
+  yahooSearchInputVeryLong: {
+    fontSize: 14,
+    lineHeight: 20
   },
   searchGlyph: {
     width: 22,
@@ -11668,6 +11761,11 @@ const styles = StyleSheet.create({
     gap: 5,
     flexShrink: 1
   },
+  resultsMetricsRowHomeMobile: {
+    width: "auto",
+    maxWidth: "100%",
+    flexShrink: 0
+  },
   resultsUtilityControlsMobile: {
     width: "auto",
     minWidth: 0,
@@ -11676,13 +11774,25 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     gap: 5
   },
+  mobileResultsHeaderBand: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  mobileResultsStatsBand: {
+    width: "100%",
+    alignItems: "stretch",
+    justifyContent: "center"
+  },
   languageSelectorWrap: {
     position: "relative",
     zIndex: 80,
     elevation: 10
   },
   languageSelectorWrapCompact: {
-    width: 50,
+    width: 48,
     flexShrink: 0,
     alignItems: "flex-end"
   },
@@ -11708,6 +11818,7 @@ const styles = StyleSheet.create({
       : {})
   },
   languageSelectorButtonCompact: {
+    minHeight: 44,
     paddingHorizontal: 5,
     paddingVertical: 5,
     gap: 4
@@ -11753,7 +11864,7 @@ const styles = StyleSheet.create({
   },
   languageOptionsCompact: {
     top: 48,
-    minWidth: 168,
+    minWidth: 158,
     maxHeight: 380
   },
   languageOptionsScroll: {
@@ -11901,10 +12012,10 @@ const styles = StyleSheet.create({
   },
   themeToggleCompact: {
     minHeight: 44,
-    minWidth: 78,
-    paddingHorizontal: 7,
+    minWidth: 66,
+    paddingHorizontal: 6,
     paddingVertical: 6,
-    gap: 6
+    gap: 5
   },
   themeToggleDark: {
     borderColor: OJS_DARK_COLORS.border,
@@ -11963,8 +12074,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   themeIconButtonCompact: {
-    width: 22,
-    height: 22
+    width: 20,
+    height: 20
   },
   themeIconButtonDark: {
     backgroundColor: "#221B32"
@@ -11978,8 +12089,8 @@ const styles = StyleSheet.create({
     borderColor: "#FFF6D7"
   },
   themeIconCoreCompact: {
-    width: 12,
-    height: 12,
+    width: 11,
+    height: 11,
     borderWidth: 2
   },
   themeIconCoreDark: {
@@ -12010,8 +12121,8 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   themeToggleTextCompact: {
-    fontSize: 13,
-    lineHeight: 16
+    fontSize: 11,
+    lineHeight: 14
   },
   themeToggleTextDark: {
     color: OJS_DARK_COLORS.ink
@@ -12046,12 +12157,12 @@ const styles = StyleSheet.create({
     maxWidth: "100%"
   },
   publicStatsChipRowMobile: {
-    width: "auto",
-    flexGrow: 1,
-    flexShrink: 1,
+    width: "100%",
+    flexGrow: 0,
+    flexShrink: 0,
     flexWrap: "nowrap",
     justifyContent: "space-between",
-    gap: 4,
+    gap: 6,
     minWidth: 0
   },
   publicStatsChip: {
@@ -12079,14 +12190,14 @@ const styles = StyleSheet.create({
       : {})
   },
   publicStatsChipMobile: {
-    flexDirection: "row",
-    alignItems: "baseline",
+    flexDirection: "column",
+    alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 1,
     borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingHorizontal: 6,
+    paddingTop: 5,
+    paddingBottom: 5,
     minWidth: 0,
     minHeight: 42,
     flexGrow: 1,
@@ -12098,14 +12209,14 @@ const styles = StyleSheet.create({
   },
   publicStatsChipAtsMobile: {
     minWidth: 40,
-    flexGrow: 0.8
+    flexGrow: 1
   },
   publicStatsChipCompanies: {
     minWidth: 118
   },
   publicStatsChipCompaniesMobile: {
     minWidth: 60,
-    flexGrow: 1.25
+    flexGrow: 1
   },
   publicStatsChipDark: {
     borderColor: OJS_DARK_COLORS.softBorder,
@@ -12121,8 +12232,8 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   publicStatsChipValueMobile: {
-    fontSize: 12,
-    lineHeight: 14
+    fontSize: 13,
+    lineHeight: 15
   },
   publicStatsChipLabel: {
     color: YAHOO_COLORS.muted,
@@ -12336,7 +12447,7 @@ const styles = StyleSheet.create({
   },
   scrollTopButtonMobile: {
     right: 16,
-    bottom: 16,
+    bottom: Platform.OS === "web" ? 16 : 82,
     minHeight: 52,
     minWidth: 72
   },
@@ -12361,6 +12472,10 @@ const styles = StyleSheet.create({
     borderBottomColor: YAHOO_COLORS.border,
     fontFamily: YAHOO_FONT_STACK
   },
+  cardMobile: {
+    paddingTop: 13,
+    paddingBottom: 15
+  },
   cardDark: {
     backgroundColor: "transparent",
     borderBottomColor: OJS_DARK_COLORS.softBorder
@@ -12371,6 +12486,10 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     fontWeight: "400",
     color: "#0000AA"
+  },
+  positionMobile: {
+    fontSize: 18,
+    lineHeight: 23
   },
   positionDark: {
     color: "#A9B4FF"
@@ -12389,6 +12508,11 @@ const styles = StyleSheet.create({
     color: YAHOO_COLORS.ink,
     fontWeight: "400"
   },
+  postingRoleMobile: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 18
+  },
   postingRoleDark: {
     color: OJS_DARK_COLORS.text
   },
@@ -12398,6 +12522,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: YAHOO_COLORS.ink
+  },
+  locationMobile: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 18
   },
   locationDark: {
     color: OJS_DARK_COLORS.text
@@ -12421,6 +12550,10 @@ const styles = StyleSheet.create({
     color: YAHOO_COLORS.muted,
     fontWeight: "400"
   },
+  atsMobile: {
+    fontSize: 12,
+    lineHeight: 17
+  },
   atsDark: {
     color: OJS_DARK_COLORS.muted
   },
@@ -12430,6 +12563,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: YAHOO_COLORS.muted
+  },
+  postedMobile: {
+    fontSize: 12,
+    lineHeight: 17
   },
   postingAppliedNotice: {
     marginTop: 6,
@@ -12443,6 +12580,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: YAHOO_COLORS.muted
+  },
+  urlMobile: {
+    fontSize: 12,
+    lineHeight: 17
   },
   urlDark: {
     color: "#A6B5AA"
@@ -12773,6 +12914,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 18
   },
+  releaseNotesOverlayMobile: {
+    justifyContent: "flex-end",
+    alignItems: "stretch",
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === "web" ? 24 : ANDROID_STATUS_BAR_OFFSET + 18,
+    paddingBottom: Platform.OS === "web" ? 24 : 82
+  },
   releaseNotesBackdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 0
@@ -12796,6 +12944,12 @@ const styles = StyleSheet.create({
           shadowRadius: 30,
           shadowOffset: { width: 0, height: 18 }
         })
+  },
+  releaseNotesCardMobile: {
+    maxHeight: Platform.OS === "web" ? "88%" : "78%",
+    maxWidth: "100%",
+    borderRadius: 16,
+    padding: 16
   },
   releaseNotesHeader: {
     flexDirection: "row",
@@ -12832,8 +12986,14 @@ const styles = StyleSheet.create({
   releaseNotesScroll: {
     maxHeight: 540
   },
+  releaseNotesScrollMobile: {
+    maxHeight: Platform.OS === "web" ? 560 : 420
+  },
   releaseNotesScrollContent: {
     paddingBottom: 4
+  },
+  releaseNotesScrollContentMobile: {
+    paddingBottom: 18
   },
   releaseNoteItem: {
     borderTopWidth: 1,

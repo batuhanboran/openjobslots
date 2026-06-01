@@ -349,7 +349,7 @@ async function expectResultCountPill(page) {
 }
 
 async function expectStatsChipsAligned(page) {
-  const chips = await page.evaluate(() => {
+  const metrics = await page.evaluate(() => {
     const readChip = (testId) => {
       const node = document.querySelector(`[data-testid="${testId}"]`);
       if (!node) return null;
@@ -367,6 +367,7 @@ async function expectStatsChipsAligned(page) {
         height: rect.height,
         minHeight: style.minHeight,
         display: style.display,
+        flexDirection: style.flexDirection,
         alignItems: style.alignItems,
         gap: style.columnGap || style.gap,
         fontVariantNumeric: style.fontVariantNumeric,
@@ -378,14 +379,23 @@ async function expectStatsChipsAligned(page) {
         children: children.length
       };
     };
-    return ["result-count", "public-stat-ats", "public-stat-companies"].map(readChip);
+    return {
+      viewportWidth: window.innerWidth,
+      chips: ["result-count", "public-stat-ats", "public-stat-companies"].map(readChip)
+    };
   });
 
-  for (const chip of chips) {
+  const isMobile = metrics.viewportWidth < 768;
+  for (const chip of metrics.chips) {
     expect(chip, "stats chip should exist").toBeTruthy();
     expect(chip.children, `${chip.testId} should render value and label as separate text nodes`).toBe(2);
     expect(chip.display, `${chip.testId} should use flex layout`).toBe("flex");
-    expect(chip.alignItems, `${chip.testId} should baseline-align value and label`).toBe("baseline");
+    if (isMobile) {
+      expect(chip.flexDirection, `${chip.testId} should stack value and label on mobile`).toBe("column");
+      expect(chip.alignItems, `${chip.testId} should center mobile chip copy`).toBe("center");
+    } else {
+      expect(chip.alignItems, `${chip.testId} should baseline-align value and label`).toBe("baseline");
+    }
     expect(Number.parseFloat(chip.minHeight), `${chip.testId} should keep stable height`).toBeGreaterThanOrEqual(42);
     expect(chip.height, `${chip.testId} visual height should be consistent`).toBeGreaterThanOrEqual(40);
     expect(chip.height, `${chip.testId} visual height should be compact`).toBeLessThanOrEqual(48);
@@ -394,7 +404,9 @@ async function expectStatsChipsAligned(page) {
     expect(chip.valueFont, `${chip.testId} should not fall back to the old Arial-first stack`).not.toMatch(/^Arial\b/i);
     expect(chip.valueTopInset, `${chip.testId} value should sit inside the chip`).toBeGreaterThanOrEqual(4);
     expect(chip.labelTopInset, `${chip.testId} label should sit inside the chip`).toBeGreaterThanOrEqual(6);
-    expect(chip.textBottomDelta, `${chip.testId} value and label baselines should visually align`).toBeLessThanOrEqual(4);
+    if (!isMobile) {
+      expect(chip.textBottomDelta, `${chip.testId} value and label baselines should visually align`).toBeLessThanOrEqual(4);
+    }
   }
 }
 
@@ -441,7 +453,7 @@ async function expectMobileTapTarget(page, testId) {
     .toBeGreaterThanOrEqual(44);
 }
 
-async function expectMobileResultsMetricsSingleRow(page) {
+async function expectMobileResultsHeaderStacksCleanly(page) {
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
   if (viewport.width >= 768) return;
   const metrics = await page.evaluate(() => {
@@ -462,17 +474,17 @@ async function expectMobileResultsMetricsSingleRow(page) {
     const stats = box("public-stats-chips");
     const theme = box("theme-toggle");
     const language = box("language-selector");
-    const boxes = [stats, theme, language].filter(Boolean);
     return {
       row,
       stats,
       theme,
       language,
-      sameRow: boxes.length === 3 && Math.max(...boxes.map((item) => item.y)) - Math.min(...boxes.map((item) => item.y)) <= 2,
-      rowContainsAll:
+      utilitySameRow: Boolean(theme && language) && Math.abs(theme.y - language.y) <= 2,
+      statsBelowUtilities: Boolean(stats && theme && language) && stats.y >= Math.max(theme.bottom, language.bottom) + 4,
+      rowContainsStats:
         Boolean(row && stats && theme && language) &&
         stats.x >= row.x - 1 &&
-        language.right <= row.right + 1 &&
+        stats.right <= row.right + 1 &&
         theme.height >= 44 &&
         language.height >= 44,
       rootWidth: document.documentElement.scrollWidth,
@@ -480,8 +492,9 @@ async function expectMobileResultsMetricsSingleRow(page) {
     };
   });
 
-  expect(metrics.sameRow, `metrics controls should stay on one row: ${JSON.stringify(metrics)}`).toBe(true);
-  expect(metrics.rowContainsAll, `metrics row should contain stats, theme, and language controls: ${JSON.stringify(metrics)}`).toBe(true);
+  expect(metrics.utilitySameRow, `theme and language controls should share the compact header row: ${JSON.stringify(metrics)}`).toBe(true);
+  expect(metrics.statsBelowUtilities, `stats should sit below compact controls on mobile: ${JSON.stringify(metrics)}`).toBe(true);
+  expect(metrics.rowContainsStats, `metrics row should contain the stats chips: ${JSON.stringify(metrics)}`).toBe(true);
   expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
 }
 
@@ -1887,12 +1900,31 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
     const searchBox = await page.getByTestId("search-input").boundingBox();
     expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
+
+    await page.getByTestId("language-selector").click();
+    await expect(page.getByTestId("language-options")).toBeVisible();
+    const languageMenu = await page.getByTestId("language-options").boundingBox();
+    expect(languageMenu.x, `language menu should not open off-screen: ${JSON.stringify(languageMenu)}`).toBeGreaterThanOrEqual(0);
+    expect(languageMenu.x + languageMenu.width, `language menu should fit viewport: ${JSON.stringify(languageMenu)}`).toBeLessThanOrEqual(
+      viewport.width + 1
+    );
+    await page.getByTestId("language-option-en").click();
+    await expect(page.getByTestId("language-options")).toHaveCount(0);
+
+    await page.getByTestId("public-version-button").click();
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    const releaseModal = await page.getByTestId("release-notes-modal").boundingBox();
+    expect(releaseModal.y, `release notes should start inside the mobile viewport: ${JSON.stringify(releaseModal)}`).toBeGreaterThanOrEqual(0);
+    await expect(page.getByTestId("release-notes-scroll")).toBeVisible();
+    await page.getByTestId("release-notes-close").click();
+    await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+
     await page.getByTestId("search-input").fill("remote jobs");
     await page.getByTestId("search-input").press("Enter");
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
-    await expectMobileResultsMetricsSingleRow(page);
+    await expectMobileResultsHeaderStacksCleanly(page);
     await expectNoHorizontalOverflow(page);
   });
 

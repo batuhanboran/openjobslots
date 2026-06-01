@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "openjobslots",
+    "name": "OpenJobSlots",
     "slug": "openjobslots",
     "version": "2.2.0",
     "scheme": "openjobslots",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.openjobslots.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [],
       "adaptiveIcon": {
         "foregroundImage": "./ojs-favicon.png",
