@@ -29,7 +29,7 @@ Every configured ATS should have:
 - A bounded read-only inventory scan before any canary or apply.
 - A net-new estimate proving public-row upside without hiding or degrading existing public rows.
 - A canary/apply guard that requires explicit production flags and a rollback path.
-- A release report that records inventory proof, net-new clean public estimate, duplicate public candidates excluded from gain, candidate-pool proof, estimate confidence, and bounded Meili outbox/upsert status.
+- A release report that records inventory proof, net-new clean public estimate, duplicate public candidates excluded from gain, candidate-pool proof, estimate confidence, the tenant batch plan, predicted guard result, audited rollback command, and bounded Meili outbox/upsert status.
 - Post-apply Meili/Postgres count and facet parity proof before calling the recovery successful.
 
 ## Non-Goals

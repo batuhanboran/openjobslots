@@ -111,6 +111,45 @@ test("release check fails when bounded outbox/upsert status is not ok", () => {
   assert.ok(result.failures.some((failure) => failure.code === "bounded_outbox_or_upsert_status_not_ok"));
 });
 
+test("release check fails without planned tenant batch proof", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { planned_tenant_batch_file_path: undefined }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "missing_or_failed_planned_tenant_batch_report"));
+});
+
+test("release check accepts planned batch report alias with predicted guard result", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: {
+      planned_tenant_batch_file_path: undefined,
+      predicted_guard_result: undefined,
+      planned_batch_report: {
+        path: "reports/lever-plan.json",
+        selected_plan: { predicted_guard_result: "pass" }
+      }
+    }
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(result.metrics.predicted_guard_result, "pass");
+});
+
+test("release check fails when planned batch predicted guard does not pass", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { predicted_guard_result: "fail" }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "predicted_guard_result_not_pass"));
+});
+
+test("release check fails without audited rollback command", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { rollback_command: undefined }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "rollback_command_missing"));
+});
+
 test("release check fails when visible count decreases", () => {
   const result = evaluateReleaseCheck(basePayload({
     after: { summary: { total_visible_postings: 99 } }

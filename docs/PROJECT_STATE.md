@@ -104,6 +104,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - This is parser-drift hygiene only: it keeps bounded detail-enrichment metadata from being mistaken for raw list/API shape drift, while still allowing real core payload changes to trigger parser-drift events.
 - Verification covered a red/green `sourceRegistry` invariant, `postgresStore-sync-control` drift-policy tests, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary`, and `npm.cmd run ats:registry-index -- --json --no-write`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## ATS Recovery Release Batch-Plan Gate - June 1, 2026
+
+- Fresh read-only production check still has `/root/OpenJobSlots` at `6660eab`; app, worker, Postgres, and Meili are running, `/health` is `ok`, and public visible/job-slot count is `332,629`. Local recovery commits remain undeployed until explicit approval.
+- `scripts/release-ats-recovery-check.js` now requires final source recovery proof to include the tenant batch plan used before canary/apply, a passing predicted guard result, and the audited source rollback command in addition to inventory, dedupe-aware net-new estimate, duplicate accounting, bounded outbox/upsert status, preflight, recovery guard, tests, and Meili/Postgres parity.
+- The gate accepts either `planned_tenant_batch_file_path` or a structured `planned_batch_report`, and can read the predicted guard result from the report alias. A release now fails if canary/apply evidence skipped batch planning, predicted a failed guard, or cannot show the rollback command.
+- Verification covered `node --check scripts\release-ats-recovery-check.js` and `node scripts\release-ats-recovery-check.test.js` with new negative tests for missing batch proof, failed predicted guard, and missing rollback command. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

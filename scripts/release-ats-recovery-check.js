@@ -140,7 +140,18 @@ const SOURCE_REPORT_FIELD_ALIASES = Object.freeze({
   inventory_scan_report: Object.freeze(["inventory_report"]),
   net_new_clean_public_estimate: Object.freeze(["net_new_clean_public_candidates", "net_new_clean_candidates"]),
   duplicate_existing_public_candidates: Object.freeze(["duplicate_existing_public_rows", "duplicate_count"]),
-  bounded_outbox_or_upsert_status: Object.freeze(["search_upsert_status", "meili_upsert_status"])
+  bounded_outbox_or_upsert_status: Object.freeze(["search_upsert_status", "meili_upsert_status"]),
+  planned_tenant_batch_file_path: Object.freeze([
+    "planned_batch_report",
+    "planned_batch",
+    "batch_plan_report",
+    "tenant_batch_plan_report"
+  ]),
+  predicted_guard_result: Object.freeze([
+    "planned_batch_predicted_guard_result",
+    "batch_predicted_guard_result"
+  ]),
+  rollback_command: Object.freeze(["source_rollback_command"])
 });
 
 function rawSourceReportValue(report = {}, field, options = {}) {
@@ -226,6 +237,51 @@ function boundedOutboxStatusPassed(value) {
   ]).has(normalized);
 }
 
+function plannedBatchProofPassed(value) {
+  if (!hasMeaningfulValue(value)) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (value.ok === false || value.success === false) return false;
+    return hasMeaningfulValue(value.path) ||
+      hasMeaningfulValue(value.report_path) ||
+      hasMeaningfulValue(value.output) ||
+      hasMeaningfulValue(value.selected_plan) ||
+      hasMeaningfulValue(value.selected_tenants) ||
+      hasMeaningfulValue(value.staged_plans);
+  }
+  return true;
+}
+
+function predictedGuardResultValue(rawSourceReport = {}) {
+  const direct = sourceEvidenceValue(rawSourceReport, "predicted_guard_result");
+  if (hasMeaningfulValue(direct)) return direct;
+
+  const batch = sourceEvidenceValue(rawSourceReport, "planned_tenant_batch_file_path");
+  if (batch && typeof batch === "object" && !Array.isArray(batch)) {
+    return batch.predicted_guard_result ||
+      batch.selected_plan?.predicted_guard_result ||
+      batch.selected_batch?.predicted_guard_result ||
+      batch.summary?.predicted_guard_result ||
+      batch.result?.predicted_guard_result;
+  }
+  return undefined;
+}
+
+function predictedGuardPassed(value) {
+  if (!hasMeaningfulValue(value)) return false;
+  if (value === true) return true;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return predictedGuardPassed(
+      value.predicted_guard_result ||
+      value.status ||
+      value.result ||
+      value.state
+    );
+  }
+  const normalized = String(value).trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return new Set(["pass", "passed", "ok", "success", "succeeded", "true"]).has(normalized);
+}
+
 function addFailure(failures, noReleaseAllowed, code, message, detail = {}) {
   failures.push({ code, message, ...detail });
   noReleaseAllowed.push({ code, message });
@@ -247,6 +303,9 @@ function evaluateReleaseCheck(input = {}) {
   let netNewEstimate = null;
   let duplicateExistingPublicCandidates = null;
   let candidatePoolProof = false;
+  let plannedBatchProof = null;
+  let predictedGuardResult = null;
+  let rollbackCommand = null;
 
   if (!before) addFailure(failures, noReleaseAllowed, "missing_before_data_quality", "before data-quality report is required");
   if (!after) addFailure(failures, noReleaseAllowed, "missing_after_data_quality", "after data-quality report is required");
@@ -368,6 +427,44 @@ function evaluateReleaseCheck(input = {}) {
         { status: boundedStatus }
       );
     }
+
+    plannedBatchProof = sourceEvidenceValue(rawSourceReport, "planned_tenant_batch_file_path");
+    if (!plannedBatchProofPassed(plannedBatchProof)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "missing_or_failed_planned_tenant_batch_report",
+        "source recovery report must include the tenant batch plan used before canary/apply writes"
+      );
+    }
+
+    predictedGuardResult = predictedGuardResultValue(rawSourceReport);
+    if (!hasMeaningfulValue(predictedGuardResult)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "predicted_guard_result_missing",
+        "source recovery report must include the tenant batch predicted guard result"
+      );
+    } else if (!predictedGuardPassed(predictedGuardResult)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "predicted_guard_result_not_pass",
+        "tenant batch plan must predict a passing recovery guard before release",
+        { predicted_guard_result: predictedGuardResult }
+      );
+    }
+
+    rollbackCommand = sourceEvidenceValue(rawSourceReport, "rollback_command");
+    if (!hasMeaningfulValue(rollbackCommand)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "rollback_command_missing",
+        "source recovery report must include the audited rollback command for the source run"
+      );
+    }
   }
 
   const beforeMissingAnyGeoPct = before ? globalMissingAnyGeoPct(before) : null;
@@ -460,6 +557,9 @@ function evaluateReleaseCheck(input = {}) {
       net_new_clean_public_estimate: netNewEstimate,
       duplicate_existing_public_candidates: duplicateExistingPublicCandidates,
       candidate_pool_proven: candidatePoolProof,
+      planned_tenant_batch_proof: plannedBatchProof || null,
+      predicted_guard_result: predictedGuardResult || null,
+      rollback_command_present: hasMeaningfulValue(rollbackCommand),
       missing_any_geo_pct_before: beforeMissingAnyGeoPct,
       missing_any_geo_pct_after: afterMissingAnyGeoPct,
       weak_unknown_remote_pct_before: beforeWeakUnknownRemotePct,
@@ -512,6 +612,9 @@ function selfTestPayload() {
     candidate_pool_exhausted: true,
     estimate_confidence: "high",
     bounded_outbox_or_upsert_status: "succeeded",
+    planned_tenant_batch_file_path: "reports/lever-plan.json",
+    predicted_guard_result: "pass",
+    rollback_command: "npm run ats:source:rollback -- --run-id=123 --source=lever --confirm-production --json",
     quarantined: 0,
     skipped_ambiguous: 0,
     missing_geo_before: 2,

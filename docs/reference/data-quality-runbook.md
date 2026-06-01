@@ -149,7 +149,7 @@ Do not use raw `rows_parsed`, raw dry-run `accepted_count`, or total clean candi
 
 If an estimator report shows remaining unscanned targets, switch to `ats:inventory:scan` so offset/resume windows are aggregated into one coverage report. A capped single-window report with `runner_limit_cap_unproven_inventory=true` is not enough evidence for a 5k apply.
 
-Before calling an ATS recovery release successful, the source recovery report must also carry the inventory and search-sync proof consumed by `release:ats-recovery:check`: `inventory_scan_report`, `net_new_clean_public_estimate`, `duplicate_existing_public_candidates`, `candidate_pool_exhausted`, `estimate_confidence`, and `bounded_outbox_or_upsert_status`. Missing or unproven fields are release blockers, even when parser fixtures and data-quality percentages pass.
+Before calling an ATS recovery release successful, the source recovery report must also carry the inventory, batch-plan, rollback, and search-sync proof consumed by `release:ats-recovery:check`: `inventory_scan_report`, `net_new_clean_public_estimate`, `duplicate_existing_public_candidates`, `candidate_pool_exhausted`, `estimate_confidence`, `planned_tenant_batch_file_path` or `planned_batch_report`, `predicted_guard_result`, `rollback_command`, and `bounded_outbox_or_upsert_status`. Missing or unproven fields are release blockers, even when parser fixtures and data-quality percentages pass.
 
 ## Parser Field Evidence And Detail Escalation
 
