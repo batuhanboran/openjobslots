@@ -22,6 +22,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Follow-up boundary cleanup moved Breezy's `__json` optional-enrichment payload-shape policy out of `server/ingestion/sources/common.js` and into `server/ingestion/sources/breezy/index.js`; `audit:architecture-boundary` now fails if that source-local policy drifts back into `common.js`.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run for this architecture slice.
 
+## CareerPlug Single-Job Detail Route - June 1, 2026
+
+- Fresh parser-drift samples showed some CareerPlug boards returning empty arrays; live read-only probes found `fastsigns-11603` was not empty but served one application detail page from the `/jobs` route.
+- CareerPlug now parses that single-detail shape from `link[rel='alternate']` or app detail links, canonicalizes the job URL back to the tenant `/jobs/:id`, strips `Future Opening:` title prefixes, and accepts geo only from deterministic mailto share-body `state - city - label zip` evidence. Employment type is accepted only from explicit labels such as `Full Time`.
+- Live read-only proof on `fastsigns-11603`: current local parser moved the page to `1/1` parsed and public-gate accepted, emitting source job id `3255261`, `Austin, TX, United States`, `onsite`, and `Full Time` with `careerplug_detail_html` evidence.
+- Verification covered CareerPlug syntax checks and the generic HTML/public source-module test suite with the new fixture. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

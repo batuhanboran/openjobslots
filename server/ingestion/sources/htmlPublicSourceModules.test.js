@@ -993,6 +993,54 @@ test("careerplug source module preserves source-local dashed list location evide
   }
 });
 
+test("careerplug source module parses single-job detail pages served from jobs route", () => {
+  const source = getSourceModule("careerplug");
+  const company = {
+    company_name: "FASTSIGNS #11603",
+    url_string: "https://fastsigns-11603.careerplug.com/jobs",
+    ATS_name: "careerplug"
+  };
+  const raw = {
+    html: `
+      <html>
+        <head>
+          <title>Sales Representative - Level 1 | FASTSIGNS #11603</title>
+          <link rel="alternate" href="https://app.careerplug.com/jobs/3255261/apps/new">
+        </head>
+        <body>
+          <div class="job-navbar">
+            <span class="job-name">Sales Representative - Level 1</span>
+            <span class="job-location">Austin - 411</span>
+            <a href="mailto:?subject=FASTSIGNS%20%2311603%20is%20hiring%21&body=Sales%20Representative%20-%20Level%201%20-%20TX%20-%20Austin%20-%20411%2078750%0AApply%20here%3A%20https%3A%2F%2Ffastsigns-11603.careerplug.com%2Fj%2F02vhuld">Email</a>
+          </div>
+          <div class="header">
+            <h1 class="headline">Future Opening: Sales Representative - Level 1</h1>
+            <div class="job-info">Full Time &bull; Austin - 411</div>
+          </div>
+        </body>
+      </html>
+    `,
+    __sourceConfig: {
+      baseOrigin: "https://fastsigns-11603.careerplug.com"
+    }
+  };
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "3255261");
+  assert.equal(normalized.canonical_url, "https://fastsigns-11603.careerplug.com/jobs/3255261");
+  assert.equal(normalized.position_name, "Sales Representative - Level 1");
+  assert.equal(normalized.employment_type, "Full Time");
+  assert.equal(normalized.location_text, "Austin, TX, United States");
+  assert.equal(normalized.city, "Austin");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.source_evidence.route_kind, "careerplug_detail_html");
+  assert.equal(normalized.source_evidence.country_rule_name, "careerplug_detail_share_state_city_zip");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("applitrack source module enriches Output.asp rows from deterministic detail pages", async () => {
   const source = getSourceModule("applitrack");
   const sourceDir = path.join(__dirname, "applitrack");

@@ -218,6 +218,33 @@ function cleanCareerplugStructuredValue(value) {
   return cleanCareerplugText(value);
 }
 
+function decodeCareerplugUrlText(value) {
+  const normalized = String(value || "").replace(/\+/g, " ");
+  try {
+    return decodeURIComponent(normalized);
+  } catch {
+    return normalized;
+  }
+}
+
+function extractCareerplugTaggedText(sourceHtml, className) {
+  return extractCareerplugTaggedTexts(sourceHtml, className)[0] || "";
+}
+
+function extractCareerplugTaggedTexts(sourceHtml, className) {
+  const escaped = String(className || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`<[^>]*class=["'][^"']*\\b${escaped}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>`, "gi");
+  const matches = [];
+  const source = String(sourceHtml || "");
+  let match = pattern.exec(source);
+  while (match) {
+    const text = cleanCareerplugText(match[1] || "");
+    if (text) matches.push(text);
+    match = pattern.exec(source);
+  }
+  return matches;
+}
+
 function firstCareerplugJobLocationAddress(value) {
   const locations = Array.isArray(value) ? value : value ? [value] : [];
   for (const location of locations) {
@@ -260,6 +287,119 @@ function extractCareerplugDetailJobUrlFromHtml(sourceHtml) {
     if (match?.[1]) return match[1];
   }
   return "";
+}
+
+function extractCareerplugShareLocationFields(sourceHtml) {
+  const source = String(sourceHtml || "");
+  const candidates = [];
+  const mailtoPattern = /\bhref=["']mailto:\?([^"']*)["']/gi;
+  let mailtoMatch = mailtoPattern.exec(source);
+  while (mailtoMatch) {
+    candidates.push(decodeCareerplugUrlText(decodeHtmlEntities(mailtoMatch[1] || "")));
+    mailtoMatch = mailtoPattern.exec(source);
+  }
+  candidates.push(cleanCareerplugText(source));
+
+  for (const candidate of candidates) {
+    const match = String(candidate || "").match(/\b([A-Z]{2})\s*-\s*([A-Za-z][A-Za-z .'-]{1,80}?)(?:\s*-\s*[^,\r\n]{0,80})?\s+\d{5}(?:-\d{4})?\b/);
+    const state = String(match?.[1] || "").toUpperCase();
+    const city = cleanCareerplugText(match?.[2] || "");
+    if (!state || !city || !CAREERPLUG_US_STATE_CODES.has(state)) continue;
+    return {
+      location: `${city}, ${state}, United States`,
+      city,
+      state,
+      country: "United States",
+      remote_type: "onsite",
+      workplace_type: "onsite",
+      evidence: {
+        location_source: "detail_html",
+        location_path: "mailto share body",
+        location_rule_name: "careerplug_detail_share_state_city_zip",
+        city_source: "detail_html",
+        city_path: "mailto share body",
+        city_rule_name: "careerplug_detail_share_state_city_zip",
+        region_source: "detail_html",
+        region_path: "mailto share body",
+        region_rule_name: "careerplug_detail_share_state_city_zip",
+        country_source: "detail_html",
+        country_path: "mailto share body",
+        country_rule_name: "careerplug_detail_share_state_city_zip",
+        remote_source: "detail_html",
+        remote_path: "mailto share body",
+        remote_rule_name: "careerplug_detail_structured_physical_location"
+      }
+    };
+  }
+  return null;
+}
+
+function normalizeCareerplugEmploymentType(value) {
+  const cleaned = cleanCareerplugText(value);
+  if (!/^(full[\s-]*time|part[\s-]*time|temporary|seasonal|contract|internship|independent contractor)\b/i.test(cleaned)) {
+    return "";
+  }
+  return cleaned;
+}
+
+function extractCareerplugDetailPagePosting(companyNameForPostings, config, sourceHtml, seenUrls) {
+  const source = String(sourceHtml || "");
+  const rawUrl = extractCareerplugDetailJobUrlFromHtml(source);
+  const absoluteUrl = normalizeCareerplugCanonicalJobUrl(rawUrl, config);
+  if (!absoluteUrl || seenUrls.has(absoluteUrl)) return null;
+
+  const title = cleanCareerplugText(
+    extractCareerplugTaggedText(source, "headline") ||
+    extractCareerplugTaggedText(source, "job-name") ||
+    String(source.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/\s+\|\s+.*$/i, "")
+  ).replace(/^Future Opening:\s*/i, "").trim();
+  if (!title) return null;
+
+  const jobInfoValues = extractCareerplugTaggedTexts(source, "job-info");
+  let jobInfoParts = [];
+  let employmentType = "";
+  for (const jobInfo of jobInfoValues) {
+    const parts = jobInfo.split(/\s*(?:&bull;|\u2022|\|)\s*/);
+    const candidate = normalizeCareerplugEmploymentType(parts[0] || "");
+    if (!candidate) continue;
+    jobInfoParts = parts;
+    employmentType = candidate;
+    break;
+  }
+  if (!jobInfoParts.length && jobInfoValues.length) {
+    jobInfoParts = jobInfoValues[0].split(/\s*(?:&bull;|\u2022|\|)\s*/);
+  }
+  const locationFields = extractCareerplugShareLocationFields(source) || careerplugListLocationFields(
+    extractCareerplugTaggedText(source, "job-location") ||
+    jobInfoParts.slice(1).join(" ")
+  );
+
+  return {
+    company_name: companyNameForPostings,
+    source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "careerplug"),
+    position_name: title,
+    job_posting_url: absoluteUrl,
+    posting_date: null,
+    location: locationFields.location || null,
+    city: locationFields.city || null,
+    state: locationFields.state || null,
+    country: locationFields.country || null,
+    remote_type: locationFields.remote_type || null,
+    workplace_type: locationFields.workplace_type || null,
+    employment_type: employmentType || null,
+    source_evidence: {
+      route_kind: "careerplug_detail_html",
+      title_source: "detail_html",
+      title_path: "h1.headline|.job-name|title",
+      canonical_url_source: "detail_page",
+      canonical_url_path: "link[rel='alternate']|a[href*='/jobs/']",
+      source_job_id_source: "url",
+      source_job_id_path: "/jobs/:id",
+      ...(locationFields.evidence || {}),
+      employment_type_source: employmentType ? "detail_html" : "",
+      employment_type_path: employmentType ? ".job-info" : ""
+    }
+  };
 }
 
 function extractCareerplugJsonLdFieldsFromObject(jobPosting) {
@@ -337,6 +477,11 @@ function parseCareerplugPostingsFromHtml(companyNameForPostings, config, pageHtm
   const postings = [];
   const seenUrls = new Set();
   postings.push(...collectCareerplugJsonLdPostings(companyNameForPostings, config, source, seenUrls));
+  const detailPosting = extractCareerplugDetailPagePosting(companyNameForPostings, config, source, seenUrls);
+  if (detailPosting) {
+    postings.push(detailPosting);
+    seenUrls.add(detailPosting.job_posting_url);
+  }
 
   const rowPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
   const hrefPattern = /\bhref=["'](\/jobs\/\d+(?:[?#][^"']*)?)["']/i;
