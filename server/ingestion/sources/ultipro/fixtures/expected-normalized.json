@@ -27,5 +27,15 @@
     "remote_type": "onsite",
     "posting_date": "2026-05-29T18:34:15.988Z",
     "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "OPP-ETHIOPIA",
+    "company_name": "Fixture UltiPro",
+    "position_name": "MEL Specialist",
+    "country": "Ethiopia",
+    "city": "Addis Ababa",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-30T12:00:00.000Z",
+    "parser_confidence": 0.55
   }
 ]

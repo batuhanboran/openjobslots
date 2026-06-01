@@ -59,6 +59,26 @@
           }
         }
       ]
+    },
+    {
+      "Id": "OPP-ETHIOPIA",
+      "Title": "MEL Specialist",
+      "PostedDate": "2026-05-30T12:00:00.000Z",
+      "JobLocationType": 1,
+      "JobCategoryName": "Programs",
+      "Locations": [
+        {
+          "LocalizedDescription": "Ethiopia/Addis Ababa",
+          "Address": {
+            "City": "Addis Ababa",
+            "State": null,
+            "Country": {
+              "Code": "ETH",
+              "Name": "Ethiopia"
+            }
+          }
+        }
+      ]
     }
   ]
 }

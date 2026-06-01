@@ -943,6 +943,8 @@ test("ultipro source module preserves remote-country and international country e
   assert.equal(remote.country, "United States");
   assert.equal(remote.region, "North America");
   assert.equal(remote.remote_type, "remote");
+  assert.equal(remote.source_evidence.remote_path, "opportunities[].JobLocationType");
+  assert.equal(remote.source_evidence.remote_rule_name, "ultipro_job_location_type_remote");
   assert.equal(source.validatePublic(remote).status, "accepted");
 
   const bolivia = byId.get("OPP-BOLIVIA");
@@ -952,6 +954,16 @@ test("ultipro source module preserves remote-country and international country e
   assert.equal(bolivia.region, "LATAM");
   assert.equal(bolivia.remote_type, "onsite");
   assert.equal(source.validatePublic(bolivia).status, "accepted");
+
+  const ethiopia = byId.get("OPP-ETHIOPIA");
+  assert.equal(ethiopia.location_text, "Addis Ababa, Ethiopia");
+  assert.equal(ethiopia.city, "Addis Ababa");
+  assert.equal(ethiopia.country, "Ethiopia");
+  assert.equal(ethiopia.region, "EMEA");
+  assert.equal(ethiopia.remote_type, "onsite");
+  assert.equal(ethiopia.source_evidence.country_path, "opportunities[].Locations[].Address.Country.Name|Code");
+  assert.equal(ethiopia.source_evidence.remote_rule_name, "ultipro_job_location_type_onsite");
+  assert.equal(source.validatePublic(ethiopia).status, "accepted");
 });
 
 test("ultipro source module treats empty boards and malformed source rows conservatively", () => {

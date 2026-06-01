@@ -3,6 +3,8 @@
 const COUNTRY_CODE_ALIASES = Object.freeze({
   CA: "Canada",
   CAN: "Canada",
+  ET: "Ethiopia",
+  ETH: "Ethiopia",
   GB: "United Kingdom",
   GBR: "United Kingdom",
   UK: "United Kingdom",
@@ -72,7 +74,69 @@ function extractUltiProLocationEvidence(opportunity) {
   return {
     location: values.length > 0 ? values.join(" / ") : null,
     city: uniqueSingle(cities),
-    country: uniqueSingle(countries)
+    country: uniqueSingle(countries),
+    hasLocation: values.length > 0,
+    hasCity: cities.some((value) => clean(value)),
+    hasCountry: countries.some((value) => clean(value))
+  };
+}
+
+function remoteTypeFromUltiProOpportunity(opportunity, locationText) {
+  const jobLocationType = clean(opportunity?.JobLocationType);
+  if (jobLocationType === "1") {
+    return {
+      value: "onsite",
+      path: "opportunities[].JobLocationType",
+      rule: "ultipro_job_location_type_onsite"
+    };
+  }
+  if (jobLocationType === "2") {
+    return {
+      value: "remote",
+      path: "opportunities[].JobLocationType",
+      rule: "ultipro_job_location_type_remote"
+    };
+  }
+  if (jobLocationType === "3") {
+    return {
+      value: "hybrid",
+      path: "opportunities[].JobLocationType",
+      rule: "ultipro_job_location_type_hybrid"
+    };
+  }
+  if (locationLabelLooksRemoteScope(locationText)) {
+    return {
+      value: "remote",
+      path: "opportunities[].Locations[].LocalizedName|LocalizedDescription",
+      rule: "ultipro_location_label_remote"
+    };
+  }
+  return {
+    value: "",
+    path: "",
+    rule: ""
+  };
+}
+
+function buildUltiProSourceEvidence({ locationEvidence, remoteEvidence, postingDate }) {
+  return {
+    title_source: "list_api",
+    title_path: "opportunities[].Title",
+    canonical_url_source: "url",
+    canonical_url_path: "opportunities[].Id",
+    source_job_id_source: "list_api",
+    source_job_id_path: "opportunities[].Id|OpportunityId",
+    location_source: locationEvidence.hasLocation ? "list_api" : "",
+    location_path: locationEvidence.hasLocation ? "opportunities[].Locations[].Address|LocalizedName|LocalizedDescription" : "",
+    city_source: locationEvidence.hasCity ? "list_api" : "",
+    city_path: locationEvidence.hasCity ? "opportunities[].Locations[].Address.City" : "",
+    country_source: locationEvidence.hasCountry ? "list_api" : "",
+    country_path: locationEvidence.hasCountry ? "opportunities[].Locations[].Address.Country.Name|Code" : "",
+    remote_source: remoteEvidence.value ? "list_api" : "",
+    remote_path: remoteEvidence.path,
+    remote_rule_name: remoteEvidence.rule,
+    posting_date_source: postingDate ? "list_api" : "",
+    posting_date_path: postingDate ? "opportunities[].PostedDate|CreatedDate" : ""
   };
 }
 
@@ -89,6 +153,8 @@ function parseUltiProPostingsFromApi(companyNameForPostings, config, responseJso
     if (!opportunityId || seenIds.has(opportunityId)) continue;
     if (!title) continue;
     const locationEvidence = extractUltiProLocationEvidence(item);
+    const remoteEvidence = remoteTypeFromUltiProOpportunity(item, locationEvidence.location);
+    const postingDate = String(item?.PostedDate || item?.postedDate || item?.CreatedDate || "").trim() || null;
 
     postings.push({
       company_name: companyName,
@@ -96,12 +162,19 @@ function parseUltiProPostingsFromApi(companyNameForPostings, config, responseJso
       id: opportunityId,
       position_name: title,
       job_posting_url: `${String(config?.baseBoardUrl || "").replace(/\/+$/, "")}/OpportunityDetail?opportunityId=${encodeURIComponent(opportunityId)}`,
-      posting_date: String(item?.PostedDate || item?.postedDate || item?.CreatedDate || "").trim() || null,
+      posting_date: postingDate,
       location: locationEvidence.location,
       city: locationEvidence.city || null,
       country: locationEvidence.country || null,
+      remote_type: remoteEvidence.value || null,
+      workplace_type: remoteEvidence.value || null,
       employment_type: String(item?.JobType || item?.EmploymentType || item?.JobCategory || "").trim() || null,
-      department: String(item?.Department || item?.DepartmentName || "").trim() || null
+      department: String(item?.Department || item?.DepartmentName || "").trim() || null,
+      source_evidence: buildUltiProSourceEvidence({
+        locationEvidence,
+        remoteEvidence,
+        postingDate
+      })
     });
     seenIds.add(opportunityId);
   }
