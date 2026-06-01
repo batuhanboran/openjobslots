@@ -1,6 +1,7 @@
 "use strict";
 
-const { decodeHtmlEntities } = require("../../parsers/shared/html");
+const { decodeHtmlEntities, extractJsonLdObjectsFromHtml } = require("../../parsers/shared/html");
+const { normalizeCountryName } = require("../../posting");
 
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 
@@ -62,6 +63,117 @@ function mapTeamtailorRemoteStatus(value) {
   if (normalized === "hybrid") return "hybrid";
   if (normalized === "none") return "onsite";
   return "unknown";
+}
+
+function cleanTeamtailorStructuredValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(cleanTeamtailorStructuredValue).filter(Boolean).join(", ");
+  }
+  if (value && typeof value === "object") {
+    return cleanTeamtailorStructuredValue(value.name || value.value || value["@id"]);
+  }
+  return cleanTeamtailorText(value);
+}
+
+function extractTeamtailorRemoteTypeFromValue(value) {
+  const text = cleanTeamtailorText(value).toLowerCase();
+  if (!text) return "";
+  if (/\b(hybrid|partially remote)\b/.test(text)) return "hybrid";
+  if (/\b(telecommute|remote|work from home|wfh|virtual)\b/.test(text)) return "remote";
+  if (/\b(on[-\s]?site|onsite|in[-\s]?person|office[-\s]?based)\b/.test(text)) return "onsite";
+  return "";
+}
+
+function findTeamtailorJobPostingJsonLd(sourceHtml) {
+  return extractJsonLdObjectsFromHtml(sourceHtml).find((item) => {
+    const type = item?.["@type"];
+    return Array.isArray(type)
+      ? type.some((value) => String(value || "").toLowerCase() === "jobposting")
+      : String(type || "").toLowerCase() === "jobposting";
+  }) || null;
+}
+
+function firstTeamtailorStructuredCountry(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const candidate = firstTeamtailorStructuredCountry(item);
+      if (candidate) return candidate;
+    }
+    return "";
+  }
+  if (value && typeof value === "object") {
+    return cleanTeamtailorStructuredValue(value.name || value.addressCountry || value.country || value.value);
+  }
+  return cleanTeamtailorStructuredValue(value);
+}
+
+function extractTeamtailorJsonLdFields(detailHtml) {
+  const jobPosting = findTeamtailorJobPostingJsonLd(detailHtml);
+  if (!jobPosting) return {};
+  const locations = Array.isArray(jobPosting.jobLocation)
+    ? jobPosting.jobLocation
+    : jobPosting.jobLocation
+      ? [jobPosting.jobLocation]
+      : [];
+  let address = {};
+  for (const location of locations) {
+    if (location?.address && typeof location.address === "object") {
+      address = location.address;
+      break;
+    }
+  }
+
+  const city = cleanTeamtailorStructuredValue(address.addressLocality);
+  const state = cleanTeamtailorStructuredValue(address.addressRegion);
+  const countryRaw =
+    cleanTeamtailorStructuredValue(address.addressCountry) ||
+    firstTeamtailorStructuredCountry(jobPosting.applicantLocationRequirements);
+  const country = normalizeCountryName(countryRaw) || countryRaw;
+  const jobLocationType = Array.isArray(jobPosting.jobLocationType)
+    ? jobPosting.jobLocationType.join(" ")
+    : cleanTeamtailorStructuredValue(jobPosting.jobLocationType);
+  const remoteType = extractTeamtailorRemoteTypeFromValue(jobLocationType);
+  const datePosted = cleanTeamtailorStructuredValue(jobPosting.datePosted);
+  const employmentType = Array.isArray(jobPosting.employmentType)
+    ? jobPosting.employmentType.map(cleanTeamtailorStructuredValue).filter(Boolean).join(", ")
+    : cleanTeamtailorStructuredValue(jobPosting.employmentType);
+  const locationParts = [city, city ? state : "", country].filter(Boolean);
+  const locationPath = city || state || cleanTeamtailorStructuredValue(address.addressCountry)
+    ? "script[type='application/ld+json'].jobLocation[].address"
+    : country
+      ? "script[type='application/ld+json'].applicantLocationRequirements"
+      : "";
+  const countryPath = cleanTeamtailorStructuredValue(address.addressCountry)
+    ? "script[type='application/ld+json'].jobLocation[].address.addressCountry"
+    : country
+      ? "script[type='application/ld+json'].applicantLocationRequirements.name"
+      : "";
+
+  return {
+    location: locationParts.length > 0 ? locationParts.join(", ") : "",
+    city,
+    state,
+    country,
+    remote_type: remoteType,
+    posting_date: datePosted,
+    employment_type: employmentType,
+    evidence: {
+      location_source: locationPath ? "json_ld" : "",
+      location_path: locationPath,
+      country_source: country ? "json_ld" : "",
+      country_path: countryPath,
+      city_source: city ? "json_ld" : "",
+      city_path: city ? "script[type='application/ld+json'].jobLocation[].address.addressLocality" : "",
+      region_source: state ? "json_ld" : "",
+      region_path: state ? "script[type='application/ld+json'].jobLocation[].address.addressRegion" : "",
+      remote_source: remoteType ? "json_ld" : "",
+      remote_path: remoteType ? "script[type='application/ld+json'].jobLocationType" : "",
+      posting_date_source: datePosted ? "json_ld" : "",
+      posting_date_path: datePosted ? "script[type='application/ld+json'].datePosted" : "",
+      employment_type_source: employmentType ? "json_ld" : "",
+      employment_type_path: employmentType ? "script[type='application/ld+json'].employmentType" : ""
+    }
+  };
 }
 
 function extractRssLocation(itemXml) {
@@ -231,8 +343,76 @@ function mergeTeamtailorRssAndHtmlPostings(rssPostings = [], htmlPostings = []) 
   return merged;
 }
 
+function canonicalTeamtailorDetailKey(urlValue) {
+  try {
+    const parsed = new URL(String(urlValue || ""));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return String(urlValue || "").trim().replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function lookupTeamtailorDetailMapValue(mapValue, urlValue) {
+  const map = mapValue && typeof mapValue === "object" ? mapValue : {};
+  const key = canonicalTeamtailorDetailKey(urlValue);
+  const candidates = [
+    String(urlValue || ""),
+    String(urlValue || "").replace(/#.*$/, ""),
+    key,
+    `${key}/`
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (Object.prototype.hasOwnProperty.call(map, candidate)) return map[candidate];
+  }
+  return "";
+}
+
+function enrichTeamtailorPostingsWithDetailJsonLd(postings = [], detailHtmlByUrl = {}, detailStatusByUrl = {}) {
+  return (Array.isArray(postings) ? postings : []).map((posting) => {
+    const detailHtml = lookupTeamtailorDetailMapValue(detailHtmlByUrl, posting?.job_posting_url);
+    if (!detailHtml) return posting;
+    const detailFields = extractTeamtailorJsonLdFields(detailHtml);
+    const evidence = detailFields.evidence || {};
+    const detailStatus = Number(lookupTeamtailorDetailMapValue(detailStatusByUrl, posting?.job_posting_url) || 200);
+    return {
+      ...posting,
+      location: posting.location || detailFields.location || null,
+      city: posting.city || detailFields.city || null,
+      state: posting.state || detailFields.state || null,
+      country: posting.country || detailFields.country || null,
+      remote_type: posting.remote_type && posting.remote_type !== "unknown"
+        ? posting.remote_type
+        : detailFields.remote_type || posting.remote_type || null,
+      posting_date: posting.posting_date || detailFields.posting_date || null,
+      employment_type: posting.employment_type || detailFields.employment_type || null,
+      source_evidence: {
+        ...(posting.source_evidence || {}),
+        detail_url: posting.job_posting_url,
+        detail_fetch_status: Number.isFinite(detailStatus) ? detailStatus : 200,
+        location_source: posting.source_evidence?.location_source || evidence.location_source || "",
+        location_path: posting.source_evidence?.location_path || evidence.location_path || "",
+        country_source: posting.source_evidence?.country_source || evidence.country_source || "",
+        country_path: posting.source_evidence?.country_path || evidence.country_path || "",
+        city_source: posting.source_evidence?.city_source || evidence.city_source || "",
+        city_path: posting.source_evidence?.city_path || evidence.city_path || "",
+        region_source: posting.source_evidence?.region_source || evidence.region_source || "",
+        region_path: posting.source_evidence?.region_path || evidence.region_path || "",
+        remote_source: posting.source_evidence?.remote_source || evidence.remote_source || "",
+        remote_path: posting.source_evidence?.remote_path || evidence.remote_path || "",
+        posting_date_source: posting.source_evidence?.posting_date_source || evidence.posting_date_source || "",
+        posting_date_path: posting.source_evidence?.posting_date_path || evidence.posting_date_path || "",
+        employment_type_source: posting.source_evidence?.employment_type_source || evidence.employment_type_source || "",
+        employment_type_path: posting.source_evidence?.employment_type_path || evidence.employment_type_path || ""
+      }
+    };
+  });
+}
+
 module.exports = {
+  extractTeamtailorJsonLdFields,
   parseTeamtailorPostingsFromRss,
   parseTeamtailorPostingsFromHtml,
-  mergeTeamtailorRssAndHtmlPostings
+  mergeTeamtailorRssAndHtmlPostings,
+  enrichTeamtailorPostingsWithDetailJsonLd
 };

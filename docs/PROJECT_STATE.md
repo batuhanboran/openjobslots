@@ -14,6 +14,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and `npm.cmd run test:backend` covers the new boundary tests.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
+
+- Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.
+- The Teamtailor source module now performs bounded detail fetches only for RSS rows whose location is blank, then extracts Schema.org `JobPosting` JSON-LD country/date/work-mode evidence from `jobLocation.address`, `applicantLocationRequirements.name`, `jobLocationType`, `datePosted`, and `employmentType`.
+- No tenant/title/body inference was added. Rows without structured detail country remain blank; brand-only HTML labels still stay quarantined. `Latvija` is now a shared Latvia alias for observed source text.
+- Live read-only proof: `b3consultingpoland` missing geo improved `18 -> 3` with `15` JSON-LD country recoveries; `letuelezioni` improved `7 -> 5`; `humansource` improved `1 -> 0`; `interfacefinancial`, `gmlhr`, and `hillgroupuk` stayed at `0` local missing geo/date under the current parser.
+- Verification covered syntax checks, parser fixture tests, focused Teamtailor source-module tests, and live parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Greenhouse Office Geo And Work-Mode Evidence - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,524` visible job slots and Meili/Postgres document counts remained aligned with the known `22` document remote-facet drift unresolved.

@@ -1,5 +1,6 @@
 const { safeFetch } = require("../../safeFetch");
 const { buildCompanyContext, clean, createDiscover } = require("./discover");
+const parser = require("./parse");
 
 function makeSourceFetchError(reason, message, details = {}) {
   const error = new Error(message);
@@ -70,6 +71,47 @@ async function fetchOptionalJobsHtml(jobsUrl, options = {}) {
   };
 }
 
+async function fetchTeamtailorHtml(url, target, options = {}) {
+  const requestedUrl = clean(url);
+  if (!requestedUrl) {
+    throw makeSourceFetchError("missing_url", "Teamtailor fetch requires a URL");
+  }
+
+  if (typeof options.fetcher === "function") {
+    const payload = await options.fetcher(requestedUrl, target);
+    const status = responseStatus(payload);
+    if (status < 200 || status >= 300) {
+      throw makeSourceFetchError("fetch_failed", `Teamtailor page request failed (${status})`, {
+        status,
+        url: requestedUrl
+      });
+    }
+    const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || requestedUrl);
+    assertTeamtailorFinalHost(finalUrl, requestedUrl);
+    return {
+      html: await payloadToHtml(payload),
+      finalUrl,
+      status
+    };
+  }
+
+  const response = await safeFetch(requestedUrl, target);
+  if (!response.ok) {
+    const body = await response.text();
+    throw makeSourceFetchError("fetch_failed", `Teamtailor page request failed (${response.status}): ${body.slice(0, 180)}`, {
+      status: response.status,
+      url: response.url || requestedUrl
+    });
+  }
+  const finalUrl = clean(response.url || requestedUrl);
+  assertTeamtailorFinalHost(finalUrl, requestedUrl);
+  return {
+    html: await response.text(),
+    finalUrl,
+    status: response.status
+  };
+}
+
 function shouldFetchHtmlFallbackForRss(rssText) {
   const source = String(rssText || "");
   return /<tt:locations>\s*<\/tt:locations>/i.test(source) || !/<tt:location(?:\s|>)/i.test(source);
@@ -105,6 +147,82 @@ function withFinalConfig(config, finalUrl, fallbackUrl) {
   };
 }
 
+function teamtailorDetailKey(urlValue) {
+  try {
+    const parsed = new URL(clean(urlValue));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function postingNeedsTeamtailorDetail(posting = {}) {
+  return Boolean(clean(posting.job_posting_url)) && !clean(posting.location);
+}
+
+function prioritizeTeamtailorDetailCandidates(postings = []) {
+  return (Array.isArray(postings) ? postings : [])
+    .map((posting, index) => {
+      let score = 0;
+      if (!clean(posting.location)) score += 100;
+      if (posting.remote_type === "remote" || posting.remote_type === "hybrid") score += 40;
+      if (!clean(posting.posting_date)) score += 5;
+      return { posting, index, score };
+    })
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((item) => item.posting);
+}
+
+async function buildTeamtailorRssPayload({ rss, optionalHtml, config, finalUrl, rssUrl, context, options }) {
+  const companyName = clean(context.company_name || config.subdomainLower || "teamtailor");
+  const rssPostings = parser.parseTeamtailorPostingsFromRss(companyName, rss);
+  const htmlPostings = optionalHtml?.html
+    ? parser.parseTeamtailorPostingsFromHtml(companyName, config, optionalHtml.html)
+    : [];
+  const preliminary = parser.mergeTeamtailorRssAndHtmlPostings(rssPostings, htmlPostings);
+  const detailLimit = Math.max(0, Math.min(75, Number(process.env.OPENJOBSLOTS_TEAMTAILOR_DETAIL_FETCH_LIMIT_PER_COMPANY || 25)));
+  let detailFetches = 0;
+  const detailHtmlByUrl = {};
+  const detailStatusByUrl = {};
+  const htmlTarget = {
+    method: "GET",
+    headers: buildHeaders()
+  };
+
+  for (const posting of prioritizeTeamtailorDetailCandidates(preliminary)) {
+    if (detailFetches >= detailLimit) break;
+    if (!postingNeedsTeamtailorDetail(posting)) continue;
+    const detailUrl = clean(posting.job_posting_url);
+    try {
+      const detail = await fetchTeamtailorHtml(detailUrl, htmlTarget, options);
+      detailFetches += 1;
+      const key = teamtailorDetailKey(detailUrl);
+      detailHtmlByUrl[detailUrl] = detail.html;
+      detailHtmlByUrl[key] = detail.html;
+      detailStatusByUrl[detailUrl] = detail.status;
+      detailStatusByUrl[key] = detail.status;
+    } catch {
+      detailFetches += 1;
+    }
+  }
+
+  return {
+    rss,
+    ...(optionalHtml?.html ? { html: optionalHtml.html } : {}),
+    __detailHtmlByUrl: detailHtmlByUrl,
+    __detailStatusByUrl: detailStatusByUrl,
+    __sourceConfig: {
+      ...withFinalConfig(config, finalUrl, rssUrl),
+      detail_fetch_count: detailFetches
+    },
+    __sourceDetailFetchCount: detailFetches,
+    __sourceFetchFinalUrl: finalUrl,
+    ...(optionalHtml?.finalUrl ? { __sourceHtmlFetchFinalUrl: optionalHtml.finalUrl } : {}),
+    __sourceFormat: "rss"
+  };
+}
+
 function createFetchList(dependencies = {}) {
   const discover = typeof dependencies.discover === "function" ? dependencies.discover : createDiscover();
 
@@ -134,14 +252,7 @@ function createFetchList(dependencies = {}) {
           const optionalHtml = shouldFetchHtmlFallbackForRss(rss)
             ? await fetchOptionalJobsHtml(jobsUrl, options)
             : null;
-          return {
-            rss,
-            ...(optionalHtml?.html ? { html: optionalHtml.html } : {}),
-            __sourceConfig: withFinalConfig(config, finalUrl, rssUrl),
-            __sourceFetchFinalUrl: finalUrl,
-            ...(optionalHtml?.finalUrl ? { __sourceHtmlFetchFinalUrl: optionalHtml.finalUrl } : {}),
-            __sourceFormat: "rss"
-          };
+          return buildTeamtailorRssPayload({ rss, optionalHtml, config, finalUrl, rssUrl, context, options });
         }
         if (status !== 404) {
           throw makeSourceFetchError("fetch_failed", `Teamtailor RSS request failed (${status})`, {
@@ -158,14 +269,7 @@ function createFetchList(dependencies = {}) {
           const optionalHtml = shouldFetchHtmlFallbackForRss(rss)
             ? await fetchOptionalJobsHtml(jobsUrl, options)
             : null;
-          return {
-            rss,
-            ...(optionalHtml?.html ? { html: optionalHtml.html } : {}),
-            __sourceConfig: withFinalConfig(config, finalUrl, rssUrl),
-            __sourceFetchFinalUrl: finalUrl,
-            ...(optionalHtml?.finalUrl ? { __sourceHtmlFetchFinalUrl: optionalHtml.finalUrl } : {}),
-            __sourceFormat: "rss"
-          };
+          return buildTeamtailorRssPayload({ rss, optionalHtml, config, finalUrl, rssUrl, context, options });
         }
         if (rssRes.status !== 404) {
           const body = await rssRes.text();
@@ -213,5 +317,6 @@ function createFetchList(dependencies = {}) {
 }
 
 module.exports = {
+  postingNeedsTeamtailorDetail,
   createFetchList
 };

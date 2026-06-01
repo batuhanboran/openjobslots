@@ -442,6 +442,85 @@ test("teamtailor source module fetches jobs HTML with source-local discovery and
   );
 });
 
+test("teamtailor source module enriches blank remote country from detail JSON-LD", async () => {
+  const source = getSourceModule("teamtailor");
+  const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));
+  const detailUrl = "https://fixture.teamtailor.com/jobs/7737740-data-engineer";
+  const calls = [];
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method });
+      if (url === "https://fixture.teamtailor.com/jobs.rss") {
+        return {
+          body: [
+            `<?xml version="1.0" encoding="UTF-8"?>`,
+            `<rss version="2.0" xmlns:tt="https://teamtailor.com/locations"><channel>`,
+            `<item>`,
+            `<title>Data Engineer</title>`,
+            `<link>${detailUrl}</link>`,
+            `<guid>teamtailor-rss-guid-detail-country</guid>`,
+            `<pubDate>Thu, 14 May 2026 15:21:34 +0200</pubDate>`,
+            `<remoteStatus>fully</remoteStatus>`,
+            `<tt:department>Software Development</tt:department>`,
+            `<tt:locations></tt:locations>`,
+            `</item>`,
+            `</channel></rss>`
+          ].join(""),
+          status: 200,
+          url
+        };
+      }
+      if (url === "https://fixture.teamtailor.com/jobs") {
+        return {
+          body: [
+            `<ul><li class="w-full">`,
+            `<a class="line-clamp-2 flex" href="${detailUrl}">Data Engineer</a>`,
+            `<div class="mt-1 text-md"><span>Software Development</span></div>`,
+            `</li></ul>`
+          ].join(""),
+          status: 200,
+          url
+        };
+      }
+      if (url === detailUrl) {
+        return {
+          body: [
+            `<script type="application/ld+json">`,
+            `{"@context":"http://schema.org/","@type":"JobPosting","title":"Data Engineer",`,
+            `"datePosted":"2026-05-14T15:21:34+02:00","jobLocationType":"TELECOMMUTE",`,
+            `"applicantLocationRequirements":{"@type":"Country","name":"Poland"},`,
+            `"jobLocation":[{"@type":"Place","address":{}}]}`,
+            `</script>`
+          ].join(""),
+          status: 200,
+          url
+        };
+      }
+      return { body: "", status: 404, url };
+    }
+  });
+
+  assert.deepEqual(calls, [
+    { url: "https://fixture.teamtailor.com/jobs.rss", method: "GET" },
+    { url: "https://fixture.teamtailor.com/jobs", method: "GET" },
+    { url: detailUrl, method: "GET" }
+  ]);
+  assert.equal(payload.__sourceConfig.detail_fetch_count, 1);
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+
+  assert.equal(normalized.source_job_id, "7737740-data-engineer");
+  assert.equal(normalized.country, "Poland");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.remote_type, "remote");
+  assert.equal(normalized.posting_date, "2026-05-14");
+  assert.equal(normalized.source_evidence.country_source, "json_ld");
+  assert.equal(normalized.source_evidence.country_path, "script[type='application/ld+json'].applicantLocationRequirements.name");
+  assert.equal(normalized.source_evidence.detail_fetch_status, 200);
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("teamtailor RSS/HTML merge keeps unhinted brand labels quarantined", () => {
   const source = getSourceModule("teamtailor");
   const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));

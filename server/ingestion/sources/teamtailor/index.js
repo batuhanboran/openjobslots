@@ -38,7 +38,11 @@ function parse(rawPayload, company = {}) {
         payload.html
       )
       : [];
-    return parser.mergeTeamtailorRssAndHtmlPostings(rssPostings, htmlPostings);
+    return parser.enrichTeamtailorPostingsWithDetailJsonLd(
+      parser.mergeTeamtailorRssAndHtmlPostings(rssPostings, htmlPostings),
+      rawPayload.__detailHtmlByUrl,
+      rawPayload.__detailStatusByUrl
+    );
   }
   const html = typeof payload === "string" ? payload : String(payload?.html || payload?.body || "");
   return parser.parseTeamtailorPostingsFromHtml(

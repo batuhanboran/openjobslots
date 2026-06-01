@@ -104,7 +104,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Norway", ["no", "nor", "norway"]],
   ["Finland", ["fi", "fin", "finland"]],
   ["Estonia", ["ee", "est", "estonia"]],
-  ["Latvia", ["lv", "lva", "latvia"]],
+  ["Latvia", ["lv", "lva", "latvia", "latvija"]],
   ["Lithuania", ["lt", "ltu", "lithuania"]],
   ["Greece", ["gr", "grc", "greece"]],
   ["Bulgaria", ["bg", "bgr", "bulgaria"]],
