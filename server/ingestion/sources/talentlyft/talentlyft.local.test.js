@@ -31,6 +31,7 @@ test("talentlyft fetchList fetches landing and fragment with source request meta
 
   const raw = await source.fetchList(company, {
     maxTalentlyftPages: 1,
+    maxTalentlyftDetailPages: 0,
     fetcher: async (url, target) => {
       requests.push({ url, target });
       if (url === "https://fixture.talentlyft.com/") {
@@ -57,6 +58,76 @@ test("talentlyft fetchList fetches landing and fragment with source request meta
   assert.equal(raw.__sourceConfig.subdomainLower, "fixture");
   assert.equal(raw.__sourceRequest.rateLimitMs, TALENTLYFT_RATE_LIMIT_WAIT_MS);
   assert.equal(raw.__sourceRequest.requestCount, 2);
+});
+
+test("talentlyft source module enriches detail JSON-LD date and country evidence", async () => {
+  const company = readJson("company.json");
+  const listFixture = readJson("list.json");
+  const detailUrl = "https://fixture.talentlyft.com/jobs/data-engineer-mz-Ev8";
+  const fragmentHtml = `
+    <a class="jobs__box" href="/jobs/data-engineer-mz-Ev8" data-job-id="105658">
+      <h3 class="jobs__box__heading">Data Engineer (m/z)</h3>
+      <p class="jobs__box__text">Zagreb, Hrvatska</p>
+    </a>
+  `;
+  const detailJsonLd = {
+    "@context": "http://schema.org/",
+    "@type": "JobPosting",
+    title: "Data Engineer",
+    datePosted: "2025-04-10",
+    employmentType: "FULL_TIME",
+    jobLocation: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "Zagreb, Hrvatska",
+        addressLocality: "Zagreb",
+        addressRegion: "Grad Zagreb",
+        postalCode: "10000",
+        addressCountry: "HR"
+      }
+    }
+  };
+  const requests = [];
+
+  const raw = await source.fetchList(company, {
+    maxTalentlyftPages: 1,
+    maxTalentlyftDetailPages: 1,
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      if (url === "https://fixture.talentlyft.com/") {
+        return { status: 200, url, body: listFixture.landingHtml };
+      }
+      if (/^https:\/\/fixture\.talentlyft\.com\/JobList\//.test(url)) {
+        return { status: 200, url, body: fragmentHtml };
+      }
+      if (url === detailUrl) {
+        return {
+          status: 200,
+          url,
+          body: `<script type="application/ld+json">${JSON.stringify(detailJsonLd)}</script>`
+        };
+      }
+      return { status: 404, url, body: "" };
+    }
+  });
+
+  const parsed = source.parse(raw, company);
+  const normalized = source.normalize(parsed[0], company);
+
+  assert.ok(requests.some((request) => request.url === detailUrl));
+  assert.equal(raw.__sourceConfig.detail_fetch_count, 1);
+  assert.equal(raw.__sourceRequest.requestCount, 3);
+  assert.equal(parsed[0].source_job_id, "105658");
+  assert.equal(parsed[0].source_evidence.country_source, "json_ld");
+  assert.equal(parsed[0].source_evidence.posting_date_path, "script[type='application/ld+json'].datePosted");
+  assert.equal(normalized.country, "Croatia");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.city, "Zagreb");
+  assert.equal(normalized.posting_date, "2025-04-10");
+  assert.equal(normalized.employment_type, "FULL_TIME");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
 test("talentlyft fetchList throws no_public_jobs_route for missing route", async () => {

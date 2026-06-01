@@ -54,7 +54,11 @@ function parse(rawPayload, company = {}) {
     }
   }
 
-  return postings;
+  return parser.enrichTalentlyftPostingsWithDetailJsonLd(
+    postings,
+    rawPayload?.__detailHtmlByUrl,
+    rawPayload?.__detailStatusByUrl
+  );
 }
 
 function normalize(posting, company = {}, options = {}) {

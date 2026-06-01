@@ -9,7 +9,8 @@ const {
 } = require("./discover");
 const {
   extractTalentlyftInitialConfig,
-  extractTalentlyftTotalPages
+  extractTalentlyftTotalPages,
+  parseTalentlyftPostingsFromFragment
 } = require("./parse");
 
 const TALENTLYFT_RATE_LIMIT_WAIT_MS = 60 * 1000;
@@ -49,6 +50,13 @@ function buildFragmentHeaders(config) {
   };
 }
 
+function buildDetailHeaders(config) {
+  return {
+    ...buildLandingHeaders(),
+    Referer: `${clean(config?.websiteUrl).replace(/\/+$/, "")}/`
+  };
+}
+
 function assertTalentlyftFinalHost(finalUrl, fallbackUrl) {
   const value = clean(finalUrl || fallbackUrl);
   try {
@@ -60,6 +68,26 @@ function assertTalentlyftFinalHost(finalUrl, fallbackUrl) {
   throw makeSourceFetchError("unexpected_redirect_host", `Talentlyft URL redirected to unexpected host: ${value}`, {
     url: value
   });
+}
+
+function talentlyftDetailKey(urlValue) {
+  try {
+    const parsed = new URL(clean(urlValue));
+    parsed.hash = "";
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return clean(urlValue).replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function resolveTalentlyftDetailFetchLimit(options = {}) {
+  const raw = options.maxTalentlyftDetailPages ??
+    options.detailFetchLimit ??
+    process.env.OPENJOBSLOTS_TALENTLYFT_DETAIL_FETCH_LIMIT_PER_COMPANY ??
+    25;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 25;
+  return Math.max(0, Math.min(75, Math.floor(parsed)));
 }
 
 function withRuntimeConfig(discoveredConfig, landingHtml, finalUrl, fallbackUrl) {
@@ -141,6 +169,22 @@ async function fetchText(url, target, options = {}) {
   };
 }
 
+function buildPreliminaryTalentlyftPostings(fragments = [], context = {}, runtimeConfig = {}) {
+  const companyName = clean(context.company_name || runtimeConfig.subdomainLower || "talentlyft") || "talentlyft";
+  const postings = [];
+  const seenUrls = new Set();
+  for (const fragment of fragments) {
+    const batch = parseTalentlyftPostingsFromFragment(companyName, runtimeConfig, fragment?.html || fragment);
+    for (const posting of batch) {
+      const postingUrl = clean(posting.job_posting_url);
+      if (!postingUrl || seenUrls.has(postingUrl)) continue;
+      seenUrls.add(postingUrl);
+      postings.push(posting);
+    }
+  }
+  return postings;
+}
+
 function createFetchList(dependencies = {}) {
   const discover = typeof dependencies.discover === "function" ? dependencies.discover : createDiscover();
 
@@ -198,10 +242,58 @@ function createFetchList(dependencies = {}) {
       if (!fragment.text && page >= totalPages) break;
     }
 
+    const detailHtmlByUrl = {};
+    const detailStatusByUrl = {};
+    const detailLimit = resolveTalentlyftDetailFetchLimit(options);
+    let detailFetches = 0;
+    const detailTarget = {
+      method: "GET",
+      headers: buildDetailHeaders(runtimeConfig),
+      source_key: "talentlyft",
+      source_family: TALENTLYFT_SOURCE_FAMILY,
+      rateLimitMs: TALENTLYFT_RATE_LIMIT_WAIT_MS
+    };
+
+    for (const posting of buildPreliminaryTalentlyftPostings(fragments, context, runtimeConfig)) {
+      if (detailFetches >= detailLimit) break;
+      const detailUrl = clean(posting.job_posting_url);
+      if (!detailUrl) continue;
+      try {
+        const detail = await fetchText(detailUrl, detailTarget, options);
+        detailFetches += 1;
+        const originalKey = talentlyftDetailKey(detailUrl);
+        const finalKey = talentlyftDetailKey(detail.finalUrl);
+        detailHtmlByUrl[detailUrl] = detail.text;
+        detailHtmlByUrl[originalKey] = detail.text;
+        detailHtmlByUrl[detail.finalUrl] = detail.text;
+        detailHtmlByUrl[finalKey] = detail.text;
+        detailStatusByUrl[detailUrl] = detail.status;
+        detailStatusByUrl[originalKey] = detail.status;
+        detailStatusByUrl[detail.finalUrl] = detail.status;
+        detailStatusByUrl[finalKey] = detail.status;
+        requests.push({
+          url: detailUrl,
+          kind: "detail"
+        });
+      } catch {
+        detailFetches += 1;
+        requests.push({
+          url: detailUrl,
+          kind: "detail"
+        });
+      }
+    }
+
     return {
       landingHtml: landing.text,
       fragments,
-      __sourceConfig: runtimeConfig,
+      __detailHtmlByUrl: detailHtmlByUrl,
+      __detailStatusByUrl: detailStatusByUrl,
+      __sourceConfig: {
+        ...runtimeConfig,
+        detail_fetch_count: detailFetches
+      },
+      __sourceDetailFetchCount: detailFetches,
       __sourceFetchFinalUrl: landing.finalUrl,
       __sourceRequest: {
         careersUrl,

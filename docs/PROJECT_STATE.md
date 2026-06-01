@@ -22,6 +22,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof: `b3consultingpoland` missing geo improved `18 -> 3` with `15` JSON-LD country recoveries; `letuelezioni` improved `7 -> 5`; `humansource` improved `1 -> 0`; `interfacefinancial`, `gmlhr`, and `hillgroupuk` stayed at `0` local missing geo/date under the current parser.
 - Verification covered syntax checks, parser fixture tests, focused Teamtailor source-module tests, and live parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## TalentLyft Localized Country And Detail Date Evidence - June 1, 2026
+
+- TalentLyft production baseline for this lane was `1,576` visible rows, `754` missing country/region rows, `32` weak/unknown remote rows, and `1,576` missing posting dates.
+- Shared normalization now covers observed TalentLyft source country names such as `Hrvatska`, `Austrija`, `Srbija`, `Slovensko`, `Bosna i Hercegovina`, `Slovenija`, `Crna Gora`, `Sjeverna Makedonija`, `Nizozemska`, and `Njemacka`. Long comma-delimited locations no longer treat a middle `Za` token as country code `ZA`, so Croatian multi-city rows do not become South Africa.
+- TalentLyft now performs bounded detail fetches (`OPENJOBSLOTS_TALENTLYFT_DETAIL_FETCH_LIMIT_PER_COMPANY`, default `25`, cap `75`) and enriches future rows from Schema.org `JobPosting` JSON-LD fields for structured address, `datePosted`, `employmentType`, and `jobLocationType`. Rows without structured source evidence stay blank; no tenant/title/body inference was added.
+- Live read-only proof with the default 25-detail budget: `studenac` parsed/accepted `107` rows with missing country/region `106 -> 0` and `25` JSON-LD dates; `raditi` parsed/accepted `118` with missing `96 -> 18`; `victusgroup` parsed/accepted `36` with missing `36 -> 0`; `praca-decathlon` parsed/accepted `26` current rows with missing `27 -> 0`; `m-plus` parsed/accepted `38` current rows with missing `30 -> 0`; `pepco-croatia-doo` parsed/accepted `24` current rows with missing `27 -> 0` and all `24` dates filled. Live row counts may differ from the production snapshot as boards change.
+- Verification covered syntax checks, parser fixture tests, focused TalentLyft source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Greenhouse Office Geo And Work-Mode Evidence - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,524` visible job slots and Meili/Postgres document counts remained aligned with the known `22` document remote-facet drift unresolved.

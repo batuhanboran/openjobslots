@@ -46,9 +46,9 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["United States", ["us", "u.s.", "u.s", "usa", "united states", "unitedstates", "united states of america", "america"]],
   ["United Kingdom", ["uk", "gb", "gbr", "great britain", "united kingdom", "england", "scotland", "wales", "northern ireland"]],
   ["Canada", ["ca", "can", "canada"]],
-  ["Germany", ["de", "deu", "germany", "deutschland"]],
+  ["Germany", ["de", "deu", "germany", "deutschland", "njemacka"]],
   ["France", ["fr", "fra", "france"]],
-  ["Netherlands", ["nl", "nld", "netherlands", "holland", "nederland", "niederlande"]],
+  ["Netherlands", ["nl", "nld", "netherlands", "holland", "nederland", "niederlande", "nizozemska"]],
   ["Spain", ["es", "esp", "spain", "españa", "espana"]],
   ["Italy", ["it", "ita", "italy", "italia"]],
   ["Ireland", ["ie", "irl", "ireland"]],
@@ -94,9 +94,9 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Poland", ["pl", "pol", "poland", "polska"]],
   ["Romania", ["ro", "rou", "romania"]],
   ["Czech Republic", ["cz", "cze", "czech republic", "czechia"]],
-  ["Slovakia", ["sk", "svk", "slovakia"]],
+  ["Slovakia", ["sk", "svk", "slovakia", "slovensko"]],
   ["Hungary", ["hu", "hun", "hungary"]],
-  ["Austria", ["at", "aut", "austria", "osterreich"]],
+  ["Austria", ["at", "aut", "austria", "osterreich", "austrija"]],
   ["Switzerland", ["ch", "che", "switzerland", "schweiz", "suisse"]],
   ["Belgium", ["be", "bel", "belgium", "belgie"]],
   ["Denmark", ["dk", "dnk", "denmark"]],
@@ -108,10 +108,10 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Lithuania", ["lt", "ltu", "lithuania"]],
   ["Greece", ["gr", "grc", "greece"]],
   ["Bulgaria", ["bg", "bgr", "bulgaria"]],
-  ["Croatia", ["hr", "hrv", "croatia"]],
-  ["Serbia", ["rs", "srb", "serbia"]],
-  ["Slovenia", ["si", "svn", "slovenia"]],
-  ["Bosnia and Herzegovina", ["ba", "bih", "bosnia and herzegovina", "bosnia"]],
+  ["Croatia", ["hr", "hrv", "croatia", "hrvatska"]],
+  ["Serbia", ["rs", "srb", "serbia", "srbija"]],
+  ["Slovenia", ["si", "svn", "slovenia", "slovenija"]],
+  ["Bosnia and Herzegovina", ["ba", "bih", "bosnia and herzegovina", "bosnia", "bosna i hercegovina"]],
   ["Kosovo", ["xk", "kosovo"]],
   ["Ukraine", ["ua", "ukr", "ukraine"]],
   ["Israel", ["il", "isr", "israel"]],
@@ -148,7 +148,8 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Mozambique", ["mz", "moz", "mozambique"]],
   ["Zambia", ["zm", "zmb", "zambia"]],
   ["Myanmar", ["mm", "mmr", "myanmar", "burma"]],
-  ["North Macedonia", ["mk", "mkd", "macedonia", "north macedonia"]],
+  ["North Macedonia", ["mk", "mkd", "macedonia", "north macedonia", "sjeverna makedonija"]],
+  ["Montenegro", ["me", "mne", "montenegro", "crna gora"]],
   ["Solomon Islands", ["sb", "slb", "solomon islands"]],
   ["Mauritius", ["mu", "mus", "mauritius"]],
   ["South Africa", ["za", "zaf", "south africa"]],
@@ -378,6 +379,7 @@ function normalizeCountryFromDelimitedCode(location) {
   for (const token of tokens) {
     const compact = token.replace(/\s+/g, "");
     if (compact.length < 2 || compact.length > 3) continue;
+    if (compact.length === 2 && tokens.length > 2) continue;
     const country = COUNTRY_ALIASES[compact];
     if (!country) continue;
     if (country === "United States" || country === "Canada") continue;
@@ -499,6 +501,7 @@ function normalizeRegionFromCountry(country) {
     "mozambique",
     "zambia",
     "north macedonia",
+    "montenegro",
     "morocco",
     "algeria",
     "djibouti",
