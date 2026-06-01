@@ -32,6 +32,10 @@ test("release check passes for clean recovery reports", () => {
   assert.equal(result.metrics.preflight_backup_size_bytes, 1024);
   assert.equal(result.metrics.preflight_long_running_postgres_queries, 0);
   assert.equal(result.metrics.preflight_meili_postgres_delta, 0);
+  assert.equal(result.metrics.meili_remote_facet_delta_count, 0);
+  assert.equal(result.metrics.meili_sample_mismatch_count, 0);
+  assert.equal(result.metrics.meili_extra_document_count, 0);
+  assert.equal(result.metrics.meili_missing_document_count, 0);
 });
 
 test("release check fails without inventory scan proof", () => {
@@ -212,6 +216,50 @@ test("release check fails on Meili/Postgres delta", () => {
   }));
   assert.equal(result.ok, false);
   assert.ok(result.failures.some((failure) => failure.code === "meili_postgres_delta_nonzero"));
+});
+
+test("release check fails on Meili remote facet drift even when counts match", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    meiliCheck: {
+      count_delta: 0,
+      remote_facet_delta: {
+        onsite: { expected: 6, actual: 0, delta: 6 },
+        unknown: { expected: 0, actual: 6, delta: -6 }
+      }
+    }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "meili_remote_facet_delta_nonzero"));
+});
+
+test("release check fails on sampled Meili document field drift", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    meiliCheck: {
+      count_delta: 0,
+      sample_mismatches: [
+        {
+          canonical_url: "https://example.com/jobs/1",
+          mismatches: [{ field: "remote_type", expected: "remote", actual: "unknown" }]
+        }
+      ],
+      sample_mismatch_summary: { missing_documents: 0, field_mismatches: 1 }
+    }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "meili_sample_mismatches_present"));
+});
+
+test("release check fails on Meili extra or missing document drift", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    meiliCheck: {
+      count_delta: 0,
+      extra_meili_document_count: 1,
+      missing_meili_document_count: 1
+    }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "meili_extra_documents_present"));
+  assert.ok(result.failures.some((failure) => failure.code === "meili_missing_documents_present"));
 });
 
 test("release check fails when guard fails", () => {

@@ -101,6 +101,68 @@ function meiliDelta(report = {}) {
   );
 }
 
+function nonZeroFacetDeltas(delta = {}) {
+  if (!delta || typeof delta !== "object" || Array.isArray(delta)) return [];
+  const entries = [];
+  for (const [key, value] of Object.entries(delta)) {
+    const parsed = value && typeof value === "object" && !Array.isArray(value)
+      ? firstNumber(value.delta, value.count_delta)
+      : firstNumber(value);
+    if (parsed === null || parsed !== 0) entries.push({ key, delta: parsed });
+  }
+  return entries;
+}
+
+function arrayLength(value) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function meiliParityStatus(report = {}) {
+  const failures = [];
+  const countDelta = meiliDelta(report);
+  const remoteFacetDeltas = nonZeroFacetDeltas(
+    report.remote_facet_delta ||
+    report.remote_facet_deltas ||
+    report.facet_delta?.remote_type ||
+    report.facets?.remote_type?.delta
+  );
+  const sampleMissing = firstNumber(
+    report.sample_mismatch_summary?.missing_documents,
+    report.drift_diagnosis?.sampled_mismatch_missing_document_count
+  ) || 0;
+  const sampleFieldMismatches = firstNumber(report.sample_mismatch_summary?.field_mismatches) || 0;
+  const extraDocuments = firstNumber(
+    report.extra_meili_document_count,
+    report.drift_diagnosis?.extra_meili_document_count
+  ) || 0;
+  const missingDocuments = firstNumber(
+    report.missing_meili_document_count,
+    report.drift_diagnosis?.missing_meili_document_count
+  ) || 0;
+  const settingsMismatchCount = arrayLength(report.meili_settings_mismatches);
+  const sampleMismatchCount = arrayLength(report.sample_mismatches) + sampleMissing + sampleFieldMismatches;
+
+  if (report.ok !== true) failures.push("meili_parity_check_not_ok");
+  if (countDelta === null) failures.push("meili_delta_unavailable");
+  else if (countDelta !== 0) failures.push("meili_postgres_delta_nonzero");
+  if (remoteFacetDeltas.length > 0) failures.push("meili_remote_facet_delta_nonzero");
+  if (settingsMismatchCount > 0) failures.push("meili_settings_mismatches_present");
+  if (sampleMismatchCount > 0) failures.push("meili_sample_mismatches_present");
+  if (extraDocuments > 0) failures.push("meili_extra_documents_present");
+  if (missingDocuments > 0) failures.push("meili_missing_documents_present");
+
+  return {
+    ok: failures.length === 0,
+    failures: Array.from(new Set(failures)),
+    count_delta: countDelta,
+    remote_facet_deltas: remoteFacetDeltas,
+    settings_mismatch_count: settingsMismatchCount,
+    sample_mismatch_count: sampleMismatchCount,
+    extra_document_count: extraDocuments,
+    missing_document_count: missingDocuments
+  };
+}
+
 function testsPassed(report = {}) {
   if (!report || Object.keys(report).length === 0) return false;
   if (report.ok === true || report.passed === true || report.success === true) return true;
@@ -385,6 +447,7 @@ function evaluateReleaseCheck(input = {}) {
   let predictedGuardResult = null;
   let rollbackCommand = null;
   let preflightProof = null;
+  let meiliParityProof = null;
 
   if (!before) addFailure(failures, noReleaseAllowed, "missing_before_data_quality", "before data-quality report is required");
   if (!after) addFailure(failures, noReleaseAllowed, "missing_after_data_quality", "after data-quality report is required");
@@ -600,10 +663,21 @@ function evaluateReleaseCheck(input = {}) {
   }
 
   const delta = meiliCheck ? meiliDelta(meiliCheck) : null;
-  if (delta === null) {
+  if (meiliCheck) {
+    meiliParityProof = meiliParityStatus(meiliCheck);
+    for (const reason of meiliParityProof.failures) {
+      const message = reason === "meili_remote_facet_delta_nonzero"
+        ? "Meili/Postgres remote facet delta must be empty"
+        : reason === "meili_parity_check_not_ok"
+          ? "Meili/Postgres parity check must report ok=true"
+          : "Meili/Postgres parity report is not clean";
+      addFailure(failures, noReleaseAllowed, reason, message, {
+        count_delta: meiliParityProof.count_delta,
+        remote_facet_deltas: meiliParityProof.remote_facet_deltas
+      });
+    }
+  } else if (delta === null) {
     addFailure(failures, noReleaseAllowed, "meili_delta_unavailable", "Meili/Postgres delta is required");
-  } else if (delta !== 0) {
-    addFailure(failures, noReleaseAllowed, "meili_postgres_delta_nonzero", "Meili/Postgres delta must be 0", { delta });
   }
 
   if (guardReport && !guardPassed(guardReport)) {
@@ -658,7 +732,11 @@ function evaluateReleaseCheck(input = {}) {
       missing_all_geo_and_weak_remote_count_before: beforeNoGeoWeak,
       missing_all_geo_and_weak_remote_count_after: afterNoGeoWeak,
       new_no_geo_no_remote_accepted_count: newNoGeoNoRemote,
-      meili_postgres_delta: delta
+      meili_postgres_delta: delta,
+      meili_remote_facet_delta_count: meiliParityProof?.remote_facet_deltas?.length ?? null,
+      meili_sample_mismatch_count: meiliParityProof?.sample_mismatch_count ?? null,
+      meili_extra_document_count: meiliParityProof?.extra_document_count ?? null,
+      meili_missing_document_count: meiliParityProof?.missing_document_count ?? null
     },
     failures,
     warnings,
@@ -715,11 +793,22 @@ function selfTestPayload() {
     no_improvement_reasons: [],
     rows_newly_accepted_no_geo_no_remote: 0
   };
+  const meiliCheck = {
+    ok: true,
+    count_delta: 0,
+    remote_facet_delta: {},
+    meili_settings_valid: true,
+    meili_settings_mismatches: [],
+    sample_mismatches: [],
+    sample_mismatch_summary: { missing_documents: 0, field_mismatches: 0 },
+    extra_meili_document_count: 0,
+    missing_meili_document_count: 0
+  };
   const guardReport = evaluateRecoveryGuard({
     before,
     after,
     sourceReport,
-    meiliCheck: { count_delta: 0 },
+    meiliCheck,
     ingestionStatus: { ok: true, item: { write_pressure: "idle", heavy_job: { active: false } } },
     serviceStats: [{ name: "openjobslots-app", cpu_percent: "0.10%" }]
   });
@@ -727,7 +816,7 @@ function selfTestPayload() {
     before,
     after,
     sourceReport,
-    meiliCheck: { count_delta: 0 },
+    meiliCheck,
     guardReport,
     testsReport: { ok: true, commands: { backend: "passed", parsers: "passed", api: "passed" } },
     preflightReport: {
