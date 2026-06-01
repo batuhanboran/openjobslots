@@ -2,7 +2,6 @@ const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
-const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { parseWorkdayPostingsFromApi } = require("./workday/parse");
@@ -283,7 +282,7 @@ const SOURCE_SPECS = Object.freeze({
   recruitee: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseRecruiteePostingsFromPublicApp,
+    parser: () => [],
     officialDocs: "https://docs.recruitee.com/reference/intro-to-careers-site-api",
     discover() {
       return {
