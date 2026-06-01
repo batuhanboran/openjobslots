@@ -217,6 +217,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Raw/expected BambooHR fixtures and direct module tests now cover `West Yorkshire -> United Kingdom`, `Western Cape -> South Africa`, `Hokkaido -> Japan`, and `Lagos -> Nigeria`, all with `bamboohr_admin_region_location` evidence.
 - Live read-only proof on the top 30 BambooHR missing-country/region tenants: the production top-list baseline had `987` missing-country/region rows; the local parser accepted `1,465` live rows, reduced missing country/region to `457`, recovered `511` rows through admin-region evidence, and kept weak remote at `0`. Example tenant deltas: `lanesgroup` `221 -> 37`, `htmniseko` `37 -> 0`, `atlashotels` `42 -> 3`, `emedgroup` `41 -> 5`.
 - BambooHR dates remain source-omitted in sampled public list JSON, so this checkpoint intentionally does not invent posting dates. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+- Follow-up architecture cleanup keeps BambooHR parser ownership out of `server/ingestion/sources/common.js`; `audit:architecture-boundary` now fails if BambooHR parser imports or parser specs drift back into common.
 
 ## Zoho Explicit Country Alias Evidence - June 1, 2026
 
