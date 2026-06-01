@@ -163,7 +163,11 @@ async function expectSearchEngineVisualContract(page) {
     expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
   }
   await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
-  await expect(page.getByText(/Enter to search/i)).toBeVisible();
+  if (viewport.width >= 768) {
+    await expect(page.getByText(/Enter to search/i)).toBeVisible();
+  } else {
+    await expect(page.getByText(/Enter to search|Esc to clear/i)).toHaveCount(0);
+  }
 
   const wordmarkColors = await page.getByTestId("app-logo").evaluate((node) => {
     const colors = [];
@@ -2046,6 +2050,13 @@ test.describe("postings page QA", () => {
 
     await openJobSlots(page);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
+    await expect(page.getByText(/Enter to search|Esc to clear/i)).toHaveCount(0);
+    await expect(page.getByTestId("seo-landing-links")).toBeVisible();
+    const popularLinks = await page.getByTestId("seo-landing-links").boundingBox();
+    expect(popularLinks.x, `popular links should not open off-screen: ${JSON.stringify(popularLinks)}`).toBeGreaterThanOrEqual(0);
+    expect(popularLinks.x + popularLinks.width, `popular links should fit viewport: ${JSON.stringify(popularLinks)}`).toBeLessThanOrEqual(
+      viewport.width + 1
+    );
     const searchBox = await page.getByTestId("search-input").boundingBox();
     expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
 

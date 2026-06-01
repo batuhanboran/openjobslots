@@ -15,6 +15,7 @@ assert.strictEqual(PRODUCTION_PUBLIC_API_BASE_URL, "https://openjobslots.com");
 assert.deepStrictEqual(PUBLIC_MOBILE_ENDPOINTS, [
   "/postings",
   "/postings/filter-options",
+  "/search/popular",
   "/search/suggest",
   "/sync/status",
   "/ingestion/status"
@@ -28,6 +29,7 @@ assert.strictEqual(normalizePathname("https://openjobslots.com/search/suggest?q=
 
 assert.strictEqual(isPublicMobileApiPath("/postings?limit=80"), true);
 assert.strictEqual(isPublicMobileApiPath("/postings/filter-options?remote=remote"), true);
+assert.strictEqual(isPublicMobileApiPath("/search/popular?language=en&country=US"), true);
 assert.strictEqual(isPublicMobileApiPath("/search/suggest?search=design"), true);
 assert.strictEqual(isPublicMobileApiPath("/sync/status?_ts=1"), true);
 assert.strictEqual(isPublicMobileApiPath("/ingestion/status"), true);

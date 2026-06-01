@@ -3,6 +3,7 @@ const PRODUCTION_PUBLIC_API_BASE_URL = "https://openjobslots.com";
 const PUBLIC_MOBILE_ENDPOINTS = Object.freeze([
   "/postings",
   "/postings/filter-options",
+  "/search/popular",
   "/search/suggest",
   "/sync/status",
   "/ingestion/status"

@@ -4107,30 +4107,65 @@ function getSeoLandingLinkTestId(route) {
   return `seo-landing-link-${String(route?.path || "route").replace(/^\/+/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}`;
 }
 
-function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems }) {
-  if (Platform.OS !== "web") return null;
+function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, compact = false, onSelectPopularSearch }) {
   const links = Array.isArray(popularSearchItems) && popularSearchItems.length > 0
     ? popularSearchItems
     : getPublicSeoPopularSearchItems(languageCode, [], SEO_LANDING_LINK_LIMIT);
   if (links.length === 0) return null;
   return (
-    <View style={styles.seoLandingLinks} testID="seo-landing-links">
+    <View style={[styles.seoLandingLinks, compact ? styles.seoLandingLinksCompact : null]} testID="seo-landing-links">
       <Text style={[styles.seoLandingLinksTitle, isDarkTheme ? styles.textMutedDark : null]}>
         {t("seo.popularSearches", "Popular searches")}
       </Text>
-      <View style={styles.seoLandingLinksList}>
-        {links.map((route) => (
-          <Text
-            key={route.path}
-            href={route.path}
-            hrefAttrs={{ rel: "bookmark" }}
-            style={[styles.seoLandingLink, isDarkTheme ? styles.seoLandingLinkDark : null]}
-            testID={getSeoLandingLinkTestId(route)}
-            accessibilityRole="link"
-          >
-            {getSeoLandingLinkLabel(route)}
-          </Text>
-        ))}
+      <View style={[styles.seoLandingLinksList, compact ? styles.seoLandingLinksListCompact : null]}>
+        {links.map((route, index) => {
+          const label = getSeoLandingLinkLabel(route);
+          const key = String(route?.path || route?.searchQuery || route?.localizedSearchQuery || label || index);
+          if (Platform.OS === "web") {
+            return (
+              <Text
+                key={key}
+                href={route.path}
+                hrefAttrs={{ rel: "bookmark" }}
+                style={[
+                  styles.seoLandingLink,
+                  compact ? styles.seoLandingLinkCompact : null,
+                  isDarkTheme ? styles.seoLandingLinkDark : null
+                ]}
+                testID={getSeoLandingLinkTestId(route)}
+                accessibilityRole="link"
+              >
+                {label}
+              </Text>
+            );
+          }
+          return (
+            <Pressable
+              key={key}
+              onPress={() => onSelectPopularSearch?.(route)}
+              style={({ pressed }) => [
+                styles.seoLandingLinkButton,
+                compact ? styles.seoLandingLinkButtonCompact : null,
+                isDarkTheme ? styles.seoLandingLinkButtonDark : null,
+                pressed ? styles.buttonPressed : null
+              ]}
+              testID={getSeoLandingLinkTestId(route)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.seoLandingLinkButtonText,
+                  compact ? styles.seoLandingLinkButtonTextCompact : null,
+                  isDarkTheme ? styles.seoLandingLinkButtonTextDark : null
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -6916,6 +6951,18 @@ export default function App() {
     }
   }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
 
+  const selectPopularSearch = useCallback((route) => {
+    const nextQuery = String(
+      route?.searchQuery ||
+      route?.query ||
+      route?.localizedSearchQuery ||
+      route?.label ||
+      ""
+    ).trim();
+    if (!nextQuery) return;
+    submitSearch(nextQuery, { source: "popular_search" });
+  }, [submitSearch]);
+
   const clearSearchAndSuggestions = useCallback(() => {
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
@@ -7750,7 +7797,6 @@ export default function App() {
       countryCode: publicLanguageCountryCode
     });
     setPopularSearchItems(fallbackItems);
-    if (Platform.OS !== "web") return undefined;
 
     let cancelled = false;
     const loadPopularSearches = async () => {
@@ -8753,13 +8799,15 @@ export default function App() {
           ) : null}
         </View>
         <View
-          style={styles.searchLowerRail}
+          style={[styles.searchLowerRail, !isDesktopViewport ? styles.searchLowerRailMobile : null]}
         >
           {!suggestionsVisible ? (
             <>
-              <Text style={[styles.searchShortcutHint, isDarkPublicTheme ? styles.textMutedDark : null]}>
-                {t("search.shortcut", "Enter to search · Esc to clear")}
-              </Text>
+              {isDesktopViewport ? (
+                <Text style={[styles.searchShortcutHint, isDarkPublicTheme ? styles.textMutedDark : null]}>
+                  {t("search.shortcut", "Enter to search · Esc to clear")}
+                </Text>
+              ) : null}
               {searchNotice ? (
                 <Text style={styles.searchNotice} testID="search-notice" {...ACCESSIBILITY_STATUS_PROPS}>
                   {searchNotice}
@@ -8775,6 +8823,8 @@ export default function App() {
                 t={t}
                 isDarkTheme={isDarkPublicTheme}
                 popularSearchItems={popularSearchItems}
+                compact={!isDesktopViewport}
+                onSelectPopularSearch={selectPopularSearch}
               />
             </>
           ) : null}
@@ -10845,6 +10895,9 @@ const styles = StyleSheet.create({
     minHeight: Platform.OS === "web" ? 204 : 176,
     alignItems: "stretch"
   },
+  searchLowerRailMobile: {
+    minHeight: Platform.OS === "web" ? 142 : 132
+  },
   searchLowerRailCompact: {
     minHeight: Platform.OS === "web" ? 58 : 54
   },
@@ -10866,6 +10919,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10
   },
+  seoLandingLinksCompact: {
+    marginTop: 12,
+    paddingHorizontal: 0,
+    gap: 8
+  },
   seoLandingLinksTitle: {
     color: OJS_COLORS.muted,
     fontFamily: YAHOO_FONT_STACK,
@@ -10882,6 +10940,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8
   },
+  seoLandingLinksListCompact: {
+    gap: 6
+  },
   seoLandingLink: {
     color: YAHOO_COLORS.purple,
     backgroundColor: "rgba(100, 79, 240, 0.08)",
@@ -10896,10 +10957,51 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textDecorationLine: "none"
   },
+  seoLandingLinkCompact: {
+    maxWidth: "100%",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12,
+    lineHeight: 16
+  },
   seoLandingLinkDark: {
     color: "#D8CCFF",
     backgroundColor: "rgba(183, 158, 255, 0.14)",
     borderColor: "rgba(183, 158, 255, 0.24)"
+  },
+  seoLandingLinkButton: {
+    maxWidth: "100%",
+    minHeight: 34,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(100, 79, 240, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(100, 79, 240, 0.16)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  seoLandingLinkButtonCompact: {
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  seoLandingLinkButtonDark: {
+    backgroundColor: "rgba(183, 158, 255, 0.14)",
+    borderColor: "rgba(183, 158, 255, 0.24)"
+  },
+  seoLandingLinkButtonText: {
+    color: YAHOO_COLORS.purple,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600"
+  },
+  seoLandingLinkButtonTextCompact: {
+    fontSize: 12,
+    lineHeight: 16
+  },
+  seoLandingLinkButtonTextDark: {
+    color: "#D8CCFF"
   },
   searchActionsRow: {
     marginTop: 12,
