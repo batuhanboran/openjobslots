@@ -6,7 +6,6 @@ const { parseRecruiteePostingsFromPublicApp } = require("./recruitee/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { parseWorkdayPostingsFromApi } = require("./workday/parse");
-const { parseZohoPostingsFromHtml } = require("./zoho/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
@@ -381,7 +380,7 @@ const SOURCE_SPECS = Object.freeze({
   zoho: {
     sourceFamily: "embedded_json",
     confidence: 0.75,
-    parser: parseZohoPostingsFromHtml,
+    parser: () => [],
     officialDocs: "observed Zoho Recruit public careers page embedded payload",
     discover(company) {
       const careersUrl = clean(company.url_string).replace(/\/$/, "");

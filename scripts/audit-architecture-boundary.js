@@ -34,6 +34,8 @@ const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
   { name: "loxo_parser_spec", regex: /loxo:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseLoxoPostingsFromHtml/ },
   { name: "recruitcrm_parser_import", regex: /require\(["']\.\/recruitcrm\/parse["']\)/ },
   { name: "recruitcrm_parser_spec", regex: /recruitcrm:\s*{[\s\S]*?parser:\s*parseRecruitCrmPostingsFromApi/ },
+  { name: "zoho_parser_import", regex: /require\(["']\.\/zoho\/parse["']\)/ },
+  { name: "zoho_parser_spec", regex: /zoho:\s*{[\s\S]*?parser:\s*parseZohoPostingsFromHtml/ },
 ]);
 
 function readText(relativePath) {
