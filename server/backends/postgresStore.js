@@ -53,6 +53,7 @@ const POSTGRES_SOURCE_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("a
 const POSTGRES_SOURCE_ROW_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
 const POSTGRES_SYNC_STATE_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
 const POSTGRES_POSTING_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
+const POSTGRES_POSTING_ROW_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("p.ats_key");
 const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "relevance", label: "Relevance" },
   { value: "last_seen", label: "Fresh source" },
@@ -615,6 +616,33 @@ async function countPostgresPostingsSql(pool, options = {}) {
   return Array.isArray(result.rows) ? result.rows.length : 0;
 }
 
+async function getPostgresPostingResultSummary(pool, options = {}, sourceFacetLimit = PUBLIC_SOURCE_FACET_LIMIT) {
+  const filter = buildFilterSql(options, 1);
+  const [summaryResult, sourceFacets] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          COUNT(*)::int AS count,
+          COUNT(DISTINCT NULLIF(btrim(COALESCE(p.company_name, '')), ''))::int AS visible_company_count,
+          COUNT(DISTINCT NULLIF(btrim(COALESCE(${POSTGRES_POSTING_ROW_ATS_KEY_SQL}, '')), ''))::int AS visible_ats_count
+        FROM postings p
+        LEFT JOIN posting_application_state s
+          ON s.canonical_url = p.canonical_url
+        WHERE ${filter.where.join(" AND ")};
+      `,
+      filter.values
+    ),
+    getPostgresSourceFacets(pool, options, sourceFacetLimit)
+  ]);
+  const row = summaryResult.rows?.[0] || {};
+  return {
+    count: Math.max(0, Number(row.count || 0)),
+    visible_company_count: Math.max(0, Number(row.visible_company_count || 0)),
+    visible_ats_count: Math.max(0, Number(row.visible_ats_count || 0)),
+    source_facets: sourceFacets
+  };
+}
+
 function sanitizePostgresSourceFacetItem(row = {}) {
   const value = normalizeAtsKey(row.value || row.ats_key || "") || "unknown";
   const count = Math.max(0, Number(row.count || 0));
@@ -695,9 +723,8 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
   const offsetIndex = rank.nextIndex + 1;
   const orderBy = getPostgresOrderBy(sortBy);
   const rankedOrderBy = rank.sql ? `${rank.sql} DESC, ${orderBy}` : orderBy;
-  const [count, sourceFacets, result] = await Promise.all([
-    countPostgresPostingsSql(pool, options),
-    getPostgresSourceFacets(pool, options),
+  const [summary, result] = await Promise.all([
+    getPostgresPostingResultSummary(pool, options),
     pool.query(
       `
         SELECT
@@ -723,9 +750,11 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
   ]);
   return {
     items: result.rows.map(rowToPosting).slice(0, limit),
-    count,
+    count: summary.count,
     count_exact: true,
-    source_facets: sourceFacets,
+    visible_company_count: summary.visible_company_count,
+    visible_ats_count: summary.visible_ats_count,
+    source_facets: summary.source_facets,
     limit,
     offset,
     filters: {
@@ -754,25 +783,45 @@ async function listPostgresPostings(pool, options = {}) {
 
   if (useMeili) {
     try {
+      const exactSummaryPromise = getPostgresPostingResultSummary(pool, options);
       const searchLimit = Math.min(2000, offset + Math.max(limit * 2, limit + 40));
       const normalizedOptions = {
         ...options,
         sort_by: sortBy,
         limit: searchLimit,
         offset: 0,
-        facets: ["ats_key"],
         attributesToRetrieve: ["canonical_url"]
       };
       const searchResult = await searchMeiliPostings(normalizedOptions, meiliConfig);
       const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
       const estimatedTotalHits = getMeiliEstimatedTotalHits(searchResult, urls.length);
       if (urls.length === 0 && estimatedTotalHits === 0) {
+        const exactSummary = await exactSummaryPromise;
+        if (exactSummary.count > 0) {
+          logSearchFallback("meili_zero_postgres_exact_positive", {
+            limit,
+            offset,
+            postgres_count: exactSummary.count,
+            filters: {
+              search: Boolean(String(options.search || "").trim()),
+              ats: parseCsv(options.ats).length,
+              countries: parseCsv(options.countries).length,
+              regions: parseCsv(options.regions).length,
+              industries: parseCsv(options.industries).length,
+              remote: String(options.remote || "all"),
+              hide_no_date: Boolean(options.hide_no_date)
+            }
+          });
+          return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+        }
         return {
           items: [],
           count: 0,
-          count_exact: false,
+          count_exact: true,
+          visible_company_count: 0,
+          visible_ats_count: 0,
           page_capped: page.limit_capped || page.offset_capped,
-          source_facets: [],
+          source_facets: exactSummary.source_facets,
           limit,
           offset,
           filters: {
@@ -816,13 +865,15 @@ async function listPostgresPostings(pool, options = {}) {
         });
         return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
       }
-      const sourceFacets = buildMeiliSourceFacets(searchResult);
+      const exactSummary = await exactSummaryPromise;
       return {
         items: items.slice(0, limit),
-        count: Math.max(estimatedTotalHits, loadedThrough),
-        count_exact: false,
+        count: Math.max(exactSummary.count, loadedThrough),
+        count_exact: true,
         page_capped: page.limit_capped || page.offset_capped,
-        source_facets: sourceFacets,
+        visible_company_count: exactSummary.visible_company_count,
+        visible_ats_count: exactSummary.visible_ats_count,
+        source_facets: exactSummary.source_facets,
         limit,
         offset,
         filters: {

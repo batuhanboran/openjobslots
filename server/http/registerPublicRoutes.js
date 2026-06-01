@@ -838,6 +838,8 @@ function registerPublicRoutes(app, context) {
         count_exact: result?.count_exact === false ? false : true,
         count_capped: Boolean(result?.count_capped),
         page_capped: Boolean(result?.page_capped),
+        visible_ats_count: Math.max(0, Number(result?.visible_ats_count || 0)),
+        visible_company_count: Math.max(0, Number(result?.visible_company_count || 0)),
         source_facets: sanitizeFrontendValue(sanitizePublicSourceFacets(result?.source_facets)),
         limit: resultLimit,
         offset: resultOffset,

@@ -28,6 +28,12 @@ function isSourceFacetQuery(sql) {
   return /AS fresh_count/i.test(sql) && /GROUP BY COALESCE\(NULLIF\(btrim\(p\.ats_key\), ''\), 'unknown'\)/i.test(sql);
 }
 
+function isExactResultSummaryQuery(sql) {
+  return /COUNT\(\*\)::int AS count/i.test(sql) &&
+    /visible_company_count/i.test(sql) &&
+    /visible_ats_count/i.test(sql);
+}
+
 function createSourceFacetRows(value = "greenhouse", count = 1) {
   return {
     rows: [{
@@ -491,7 +497,17 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
   };
 
   const pool = {
-    async query() {
+    async query(sql) {
+      if (isExactResultSummaryQuery(sql)) {
+        return {
+          rows: [{
+            count: 2,
+            visible_company_count: 1,
+            visible_ats_count: 1
+          }]
+        };
+      }
+      if (isSourceFacetQuery(sql)) return createSourceFacetRows("greenhouse", 2);
       return {
         rows: [{
           canonical_url: "https://example.com/visible",
@@ -528,11 +544,13 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     assert.match(searchBody.filter, /posting_date IS NOT EMPTY/);
     assert.equal(searchBody.q, "engineer");
     assert.equal(searchBody.matchingStrategy, "all");
-    assert.deepEqual(searchBody.facets, ["ats_key"]);
+    assert.equal(searchBody.facets, undefined);
     assert.deepEqual(searchBody.attributesToRetrieve, ["canonical_url"]);
     assert.equal(result.items.length, 1);
     assert.equal(result.count, 2);
-    assert.equal(result.count_exact, false);
+    assert.equal(result.count_exact, true);
+    assert.equal(result.visible_ats_count, 1);
+    assert.equal(result.visible_company_count, 1);
     assert.equal(result.items[0].job_posting_url, "https://example.com/visible");
   } finally {
     global.fetch = previousFetch;
@@ -544,7 +562,7 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
   }
 }
 
-async function testMeiliPostgresPathUsesMeiliAggregatesWithoutPostgresCount() {
+async function testMeiliPostgresPathUsesPostgresExactAggregates() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousFetch = global.fetch;
   process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
@@ -576,9 +594,38 @@ async function testMeiliPostgresPathUsesMeiliAggregatesWithoutPostgresCount() {
 
   const pool = {
     async query(sql) {
-      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql) || isSourceFacetQuery(sql)) {
+      if (isExactResultSummaryQuery(sql)) {
         postgresAggregateCalls.push(sql);
-        throw new Error("unexpected expensive Postgres aggregate during Meili search path");
+        return {
+          rows: [{
+            count: 37,
+            visible_company_count: 21,
+            visible_ats_count: 2
+          }]
+        };
+      }
+      if (isSourceFacetQuery(sql)) {
+        postgresAggregateCalls.push(sql);
+        return {
+          rows: [
+            {
+              value: "greenhouse",
+              count: 20,
+              avg_confidence: 0.95,
+              avg_quality: 91,
+              latest_seen_epoch: 1778205600,
+              fresh_count: 10
+            },
+            {
+              value: "lever",
+              count: 17,
+              avg_confidence: 0.9,
+              avg_quality: 88,
+              latest_seen_epoch: 1778205600,
+              fresh_count: 7
+            }
+          ]
+        };
       }
       if (/p\.canonical_url = ANY\(\$1\)/i.test(sql)) {
         return {
@@ -621,13 +668,15 @@ async function testMeiliPostgresPathUsesMeiliAggregatesWithoutPostgresCount() {
       include_ignored: true
     });
 
-    assert.deepEqual(searchBody.facets, ["ats_key"]);
-    assert.equal(postgresAggregateCalls.length, 0);
+    assert.equal(searchBody.facets, undefined);
+    assert.equal(postgresAggregateCalls.length, 2);
     assert.equal(result.count, 37);
-    assert.equal(result.count_exact, false);
+    assert.equal(result.count_exact, true);
+    assert.equal(result.visible_company_count, 21);
+    assert.equal(result.visible_ats_count, 2);
     assert.deepEqual(result.source_facets.map((facet) => [facet.value, facet.count]), [
-      ["greenhouse", 31],
-      ["lever", 6]
+      ["greenhouse", 20],
+      ["lever", 17]
     ]);
     assert.deepEqual(result.items.map((item) => item.job_posting_url), [
       "https://example.com/product-1",
@@ -680,6 +729,15 @@ async function testUnderfilledMeiliHydrationFallsBackToPostgres() {
             remote_type: "onsite",
             ats_key: "greenhouse",
             last_seen_epoch: 123
+          }]
+        };
+      }
+      if (isExactResultSummaryQuery(sql)) {
+        return {
+          rows: [{
+            count: 3,
+            visible_company_count: 2,
+            visible_ats_count: 1
           }]
         };
       }
@@ -748,7 +806,7 @@ async function testUnderfilledMeiliHydrationFallsBackToPostgres() {
   }
 }
 
-async function testEmptyMeiliSearchReturnsFastZero() {
+async function testEmptyMeiliSearchReturnsExactPostgresZero() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousFetch = global.fetch;
   const previousWarn = console.warn;
@@ -767,8 +825,63 @@ async function testEmptyMeiliSearchReturnsFastZero() {
   const pool = {
     async query(sql) {
       postgresCalls += 1;
-      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) {
-        return { rows: [{ count: 1 }] };
+      if (isExactResultSummaryQuery(sql)) {
+        return { rows: [{ count: 0, visible_company_count: 0, visible_ats_count: 0 }] };
+      }
+      if (isSourceFacetQuery(sql)) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query for empty Meili exact zero: ${sql}`);
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "\"Director\" \"United States\"",
+      limit: 10,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    assert.equal(postgresCalls, 2);
+    assert.equal(result.count, 0);
+    assert.equal(result.count_exact, true);
+    assert.equal(result.items.length, 0);
+  } finally {
+    console.warn = previousWarn;
+    global.fetch = previousFetch;
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
+async function testEmptyMeiliSearchFallsBackWhenPostgresExactIsPositive() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousFetch = global.fetch;
+  const previousWarn = console.warn;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  const warnings = [];
+
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    async json() {
+      return { hits: [], estimatedTotalHits: 0 };
+    }
+  });
+  console.warn = (...args) => warnings.push(args);
+
+  const pool = {
+    async query(sql) {
+      if (isExactResultSummaryQuery(sql)) {
+        return { rows: [{ count: 1, visible_company_count: 1, visible_ats_count: 1 }] };
+      }
+      if (isSourceFacetQuery(sql)) {
+        return createSourceFacetRows("greenhouse", 1);
       }
       return {
         rows: [{
@@ -795,9 +908,12 @@ async function testEmptyMeiliSearchReturnsFastZero() {
       include_ignored: true
     });
 
-    assert.equal(postgresCalls, 0);
-    assert.equal(result.count, 0);
-    assert.equal(result.items.length, 0);
+    assert.equal(result.count, 1);
+    assert.equal(result.count_exact, true);
+    assert.equal(result.visible_company_count, 1);
+    assert.equal(result.visible_ats_count, 1);
+    assert.equal(result.items.length, 1);
+    assert.ok(warnings.some((entry) => String(entry[0]).includes("search_backend_fallback") && String(entry[1]).includes("meili_zero_postgres_exact_positive")));
   } finally {
     console.warn = previousWarn;
     global.fetch = previousFetch;
@@ -816,9 +932,10 @@ async function testPostgresStructuredFiltersUseConservativeLocationFallbacks() {
   const pool = {
     async query(sql, params = []) {
       calls.push({ sql, params });
-      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) {
-        return { rows: [{ count: 1 }] };
+      if (isExactResultSummaryQuery(sql)) {
+        return { rows: [{ count: 1, visible_company_count: 1, visible_ats_count: 1 }] };
       }
+      if (isSourceFacetQuery(sql)) return createSourceFacetRows("greenhouse", 1);
       return {
         rows: [{
           canonical_url: "https://example.com/technical-support-turkey",
@@ -846,7 +963,7 @@ async function testPostgresStructuredFiltersUseConservativeLocationFallbacks() {
       include_ignored: true
     });
 
-    const countCall = calls.find((call) => /SELECT COUNT\(\*\)::int AS count/i.test(call.sql));
+    const countCall = calls.find((call) => isExactResultSummaryQuery(call.sql));
     assert.match(countCall.sql, /p\.location_text/);
     assert.match(countCall.sql, /p\.country IS NULL OR btrim\(p\.country\) = ''/);
     assert.match(countCall.sql, /p\.remote_type = /);
@@ -873,7 +990,7 @@ async function testPublicPostingReadsDoNotWrite() {
   const pool = {
     async query(sql, params = []) {
       calls.push({ sql, params });
-      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) return { rows: [{ count: 1 }] };
+      if (isExactResultSummaryQuery(sql)) return { rows: [{ count: 1, visible_company_count: 1, visible_ats_count: 1 }] };
       if (isSourceFacetQuery(sql)) return createSourceFacetRows("fixture", 1);
       if (/SELECT\s+row_number\(\) OVER/i.test(sql)) {
         return {
@@ -930,7 +1047,7 @@ async function testPublicPostingsCapsLargeLimitAndOffset() {
   let selectOffset = null;
   const pool = {
     async query(sql, params = []) {
-      if (/SELECT COUNT\(\*\)::int AS count/i.test(sql)) return { rows: [{ count: 6000 }] };
+      if (isExactResultSummaryQuery(sql)) return { rows: [{ count: 6000, visible_company_count: 300, visible_ats_count: 8 }] };
       if (isSourceFacetQuery(sql)) return createSourceFacetRows("fixture", 1);
       if (/SELECT\s+row_number\(\) OVER/i.test(sql)) {
         selectLimit = params[params.length - 2];
@@ -2717,9 +2834,10 @@ async function main() {
   await testIngestionSourcesReportDueAndFailurePressure();
   await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
-  await testMeiliPostgresPathUsesMeiliAggregatesWithoutPostgresCount();
+  await testMeiliPostgresPathUsesPostgresExactAggregates();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
-  await testEmptyMeiliSearchReturnsFastZero();
+  await testEmptyMeiliSearchReturnsExactPostgresZero();
+  await testEmptyMeiliSearchFallsBackWhenPostgresExactIsPositive();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
   await testPublicPostingReadsDoNotWrite();
   await testPublicPostingsCapsLargeLimitAndOffset();
