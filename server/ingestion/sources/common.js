@@ -1,6 +1,5 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
-const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
 const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
@@ -675,7 +674,7 @@ const SOURCE_SPECS = Object.freeze({
     payloadShapePolicy: Object.freeze({
       optional_enrichment_prefixes: Object.freeze(["__json"])
     }),
-    parser: (companyName, config, payload) => parseBreezyPostingsFromHtml(companyName, config, payload),
+    parser: () => [],
     officialDocs: "observed Breezy public portal HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);

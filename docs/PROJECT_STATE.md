@@ -238,6 +238,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Fresh read-only production baseline for Breezy had `21,037` visible rows, `978` missing country/region rows, `1,851` weak/unknown remote rows, and `11,244` missing posting dates.
 - Live Breezy JSON payloads exposed explicit `location.country` values missing from shared normalization: `Bermuda`, `Virgin Islands, British`, `Togo`, `Gabon`, localized `Cameroun`, and `中国`.
 - Shared normalization now covers those country aliases and region buckets. Breezy still uses source-provided JSON API fields; `Worldwide` remote rows remain countryless and no tenant/title/body inference was added.
+- Follow-up architecture cleanup keeps Breezy parser ownership out of `server/ingestion/sources/common.js`; `audit:architecture-boundary` now fails if Breezy parser imports or parser specs drift back into common.
 - Live read-only proof: `hamilton-recruitment` moved from production top-list `46` missing country/region rows to `0/58` local current missing; `gozem` moved from `15` to `0/13`; `wongnai-media-co-ltd` moved from `8` to `0/80`, including `Bermuda -> North America`, `Togo/Gabon/Cameroon -> EMEA`, and `China -> APAC`.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 

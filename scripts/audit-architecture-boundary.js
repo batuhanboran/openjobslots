@@ -22,6 +22,8 @@ const SOURCE_MODULE_FORBIDDEN_IMPORT_PATTERNS = Object.freeze([
 const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
   { name: "applytojob_parser_import", regex: /require\(["']\.\/applytojob\/parse["']\)/ },
   { name: "applytojob_parser_spec", regex: /applytojob:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseApplyToJobPostingsFromHtml/ },
+  { name: "breezy_parser_import", regex: /require\(["']\.\/breezy\/parse["']\)/ },
+  { name: "breezy_parser_spec", regex: /breezy:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseBreezyPostingsFromHtml/ },
   { name: "careerspage_parser_import", regex: /require\(["']\.\/careerspage\/parse["']\)/ },
   { name: "careerspage_parser_spec", regex: /careerspage:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseCareerspagePostingsFromHtml/ },
   { name: "loxo_parser_import", regex: /require\(["']\.\/loxo\/parse["']\)/ },
