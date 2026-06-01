@@ -89,6 +89,51 @@ for (const atsKey of PRIMARY_DIRECT_SOURCES) {
   });
 }
 
+test("greenhouse source module merges office geo and work-mode evidence", () => {
+  const source = getSourceModule("greenhouse");
+  const sourceDir = path.join(__dirname, "greenhouse");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const rows = source.parse(rawList, company).map((posting) => source.normalize(posting, company));
+
+  const remotePakistan = rows.find((row) => row.source_job_id === "2002");
+  assert.equal(remotePakistan.location_text, "Remote, Pakistan");
+  assert.equal(remotePakistan.country, "Pakistan");
+  assert.equal(remotePakistan.region, "APAC");
+  assert.equal(remotePakistan.city, "");
+  assert.equal(remotePakistan.remote_type, "remote");
+  assert.equal(remotePakistan.evidence.country.evidence_path, "jobs[].offices[].name");
+  assert.equal(remotePakistan.evidence.remote_type.evidence_path, "jobs[].location.name");
+
+  const hybridPakistan = rows.find((row) => row.source_job_id === "2003");
+  assert.equal(hybridPakistan.country, "Pakistan");
+  assert.equal(hybridPakistan.city, "Lahore");
+  assert.equal(hybridPakistan.remote_type, "hybrid");
+
+  const stateOffice = rows.find((row) => row.source_job_id === "2004");
+  assert.equal(stateOffice.country, "United States");
+  assert.equal(stateOffice.city, "South Jersey");
+  assert.equal(stateOffice.remote_type, "unknown");
+  assert.equal(stateOffice.evidence.remote_type.present, false);
+
+  const remoteOffice = rows.find((row) => row.source_job_id === "2005");
+  assert.equal(remoteOffice.country, "United States");
+  assert.equal(remoteOffice.remote_type, "remote");
+  assert.equal(remoteOffice.evidence.remote_type.evidence_path, "jobs[].offices[].name");
+
+  const cityWithRemoteOffice = rows.find((row) => row.source_job_id === "2006");
+  assert.equal(cityWithRemoteOffice.country, "United States");
+  assert.equal(cityWithRemoteOffice.city, "Washington D.C");
+  assert.equal(cityWithRemoteOffice.remote_type, "onsite");
+  assert.notEqual(cityWithRemoteOffice.evidence.remote_type.evidence_path, "jobs[].offices[].name");
+
+  const countryCity = rows.find((row) => row.source_job_id === "2007");
+  assert.equal(countryCity.location_text, "Islamabad, Pakistan");
+  assert.equal(countryCity.country, "Pakistan");
+  assert.equal(countryCity.city, "Islamabad");
+  assert.equal(countryCity.remote_type, "onsite");
+});
+
 test("gem source module parses list fixture and emits strict normalized evidence", () => {
   const source = getSourceModule("gem");
   assert.ok(source, "expected gem source module");

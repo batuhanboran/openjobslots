@@ -14,6 +14,15 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and `npm.cmd run test:backend` covers the new boundary tests.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## Greenhouse Office Geo And Work-Mode Evidence - June 1, 2026
+
+- Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,524` visible job slots and Meili/Postgres document counts remained aligned with the known `22` document remote-facet drift unresolved.
+- Greenhouse production quality baseline from the broad source sample: `5,373` visible rows, `289` missing-any-geo rows, and `630` weak/unknown remote rows.
+- Greenhouse now uses source office country evidence when location labels carry remote/hybrid city text, rewrites safe `Country - City` labels to `City, Country`, and limits office-level `Remote` evidence to country-only or generic multi-location rows so city rows do not become false remote jobs.
+- Fixture coverage includes Motive-style Pakistan remote/hybrid rows, Natera-style country-only US remote-office evidence, a South Jersey office-country row with unknown remote, a `Washington D.C` false-positive guard, and a `Pakistan - Islamabad` city rewrite.
+- Live read-only proof: Motive parsed `41` rows with `41` accepted and `0` missing geo; Natera parsed `198` rows with `198` accepted and `0` missing geo. Concrete city rows such as `San Francisco, CA` and `Washington D.C` no longer inherit office-level remote evidence.
+- Verification covered Greenhouse syntax checks, focused direct source-module tests, live read-only parser proof, `npm.cmd run test:parsers`, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
+
 ## Ashby Structured Postal Address Checkpoint - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,515` visible job slots. Meili/Postgres document counts were still aligned at `331,509` each, with the known `22` document remote-facet drift still unresolved. No Meili repair or replace reindex was run.
