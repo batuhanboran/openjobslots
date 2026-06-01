@@ -50,6 +50,10 @@ function extractAshbyLocationHint(value) {
   return null;
 }
 
+function isAshbyGlobalRemoteScope(value) {
+  return /^(?:global|worldwide)$/i.test(String(value || "").trim());
+}
+
 function pushAshbyLocationName(values, value) {
   const hint = extractAshbyLocationHint(value);
   pushUniqueText(values, hint?.location || value);
@@ -115,6 +119,7 @@ function inferAshbyWorkplaceType(posting, primaryLocation, rawLocation) {
   if (posting?.isRemote === true) return "Remote";
   const rawLocationRemoteType = normalizeRemoteType(rawLocation);
   if (rawLocationRemoteType === "remote" || rawLocationRemoteType === "hybrid") return rawLocationRemoteType;
+  if (isAshbyGlobalRemoteScope(rawLocation)) return "Remote";
   return primaryLocation?.hasStructuredPhysicalLocation ? "Onsite" : null;
 }
 
@@ -147,6 +152,13 @@ function buildAshbySourceEvidence(primaryLocationHint, primaryRawLocation, prima
       remote_source: "list_api",
       remote_path: "jobs[].address.postalAddress",
       remote_rule_name: "ashby_structured_physical_location"
+    });
+  }
+  if (workplaceType === "Remote" && isAshbyGlobalRemoteScope(primaryRawLocation)) {
+    Object.assign(evidence, {
+      remote_source: "list_api",
+      remote_path: "jobs[].location",
+      remote_rule_name: "ashby_global_remote_scope"
     });
   }
   return Object.keys(evidence).length > 0 ? evidence : undefined;

@@ -29,6 +29,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof after the local change: `reachtoteachrecruiting` improved from `2` country-backed ambiguous quarantines to `4/4` accepted rows; `pacificacontinental` stopped emitting three exact test placeholder rows and reduced flagged rows from `9` to `6` while keeping accepted rows at `435`; intentionally broad multi-country/multi-state rows on `opencapitaladvisors`, `prepnetworkllc`, and `h2oai` remained quarantined.
 - Verification covered focused ApplyToJob source-module tests, live read-only parser probes, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --no-write`, `git diff --check`, and changed-file secret scans. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Ashby Global Remote-Scope Evidence - June 1, 2026
+
+- Fresh read-only production evidence had Ashby at `28,055` visible rows, `5,882` missing-any-normalized-geo rows, `292` missing-all-geo rows, `200` weak/unknown remote rows, and `8` rows missing all geo plus weak remote. Recent parser-validation pressure included `ambiguous_location, no_geo_no_remote` on `lido.fi`, `peek`, and `attio`, plus `ambiguous_location` on `aiand`.
+- Ashby `jobs[].location` values of exactly `Worldwide` or `Global` are now treated as explicit remote-scope evidence with `ashby_global_remote_scope`. This is source-local and uses only the list API location field; `All Locations` and other generic/open-application labels remain quarantined.
+- Live read-only proof after the local change: `lido.fi` improved from `0/3` accepted to `3/3` accepted with three global remote-scope rows; `aiand` improved from `25/27` accepted to `27/27` accepted with two global remote-scope rows; `peek` and `attio` kept their `All Locations` general-application rows quarantined.
+- Verification covered focused Ashby source-module tests and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Zoho Remote Job Evidence - June 1, 2026
 
 - Fresh read-only source evidence kept Zoho as the top recovery priority: `356` recent `no_geo_no_remote` source-quality failures, `14,562` visible rows, `1,860` missing country/region rows, `2,511` missing-any-geo rows, `235` weak/unknown remote rows, and `0` visible no-geo/no-remote rows.

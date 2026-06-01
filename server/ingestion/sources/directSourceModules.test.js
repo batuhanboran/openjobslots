@@ -904,6 +904,63 @@ test("ashby source module uses structured postal address as primary geo evidence
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("ashby source module treats global source-location scopes as explicit remote evidence", () => {
+  const source = getSourceModule("ashby");
+  const company = readJson(path.join(__dirname, "ashby", "fixtures", "company.json"));
+  const parsed = source.parse({
+    jobs: [
+      {
+        id: "ash-worldwide",
+        title: "Worldwide Protocol Lead",
+        location: "Worldwide",
+        isRemote: null,
+        workplaceType: null,
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-worldwide"
+      },
+      {
+        id: "ash-global",
+        title: "Global Legal Counsel",
+        location: "Global",
+        isRemote: null,
+        workplaceType: null,
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-global"
+      },
+      {
+        id: "ash-all-locations",
+        title: "General Application",
+        location: "All Locations",
+        isRemote: null,
+        workplaceType: null,
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-all-locations"
+      }
+    ]
+  }, company);
+  const normalized = Object.fromEntries(
+    parsed.map((posting) => {
+      const row = source.normalize(posting, company);
+      return [row.source_job_id, row];
+    })
+  );
+
+  assert.equal(normalized["ash-worldwide"].remote_type, "remote");
+  assert.equal(normalized["ash-worldwide"].country || "", "");
+  assert.equal(normalized["ash-worldwide"].source_evidence.remote_path, "jobs[].location");
+  assert.equal(normalized["ash-worldwide"].source_evidence.remote_rule_name, "ashby_global_remote_scope");
+  assert.equal(source.validatePublic(normalized["ash-worldwide"]).status, "accepted");
+
+  assert.equal(normalized["ash-global"].remote_type, "remote");
+  assert.equal(normalized["ash-global"].country || "", "");
+  assert.equal(normalized["ash-global"].source_evidence.remote_path, "jobs[].location");
+  assert.equal(normalized["ash-global"].source_evidence.remote_rule_name, "ashby_global_remote_scope");
+  assert.equal(source.validatePublic(normalized["ash-global"]).status, "accepted");
+
+  const allLocationsGate = source.validatePublic(normalized["ash-all-locations"]);
+  assert.equal(normalized["ash-all-locations"].remote_type, "unknown");
+  assert.equal(allLocationsGate.status, "quarantined");
+  assert.ok(allLocationsGate.reason_codes.includes("ambiguous_location"));
+  assert.ok(allLocationsGate.reason_codes.includes("no_geo_no_remote"));
+});
+
 test("bamboohr source module completes sparse structured EU locations without accepting ambiguous bases", () => {
   const source = getSourceModule("bamboohr");
   const company = readJson(path.join(__dirname, "bamboohr", "fixtures", "company.json"));
