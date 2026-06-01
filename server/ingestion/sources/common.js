@@ -1,4 +1,3 @@
-const { parseApplyToJobPostingsFromHtml } = require("./applytojob/parse");
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
 const { parseBreezyPostingsFromHtml } = require("./breezy/parse");
@@ -709,7 +708,7 @@ const SOURCE_SPECS = Object.freeze({
   applytojob: {
     sourceFamily: "html_detail",
     confidence: 0.75,
-    parser: (companyName, config, payload) => parseApplyToJobPostingsFromHtml(companyName, config, payload),
+    parser: () => [],
     officialDocs: "observed ApplyToJob public list HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);
