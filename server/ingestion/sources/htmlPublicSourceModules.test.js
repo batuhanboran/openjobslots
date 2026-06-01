@@ -1525,6 +1525,18 @@ test("applytojob source module collapses country-scoped location labels and skip
           <i class="fa fa-map-marker"></i> Multiple locations, Taiwan, Taiwan
         </li>
         <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7005/Public-Health">Public Health Lecturer</a></h3>
+          <i class="fa fa-map-marker"></i> Multiple Locations, CT
+        </li>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7006/Regional-Consultant">Regional Consultant</a></h3>
+          <i class="fa fa-map-marker"></i> Multiple Cities/States, MN
+        </li>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7007/National-Scout">National Scout</a></h3>
+          <i class="fa fa-map-marker"></i> (Multiple States)
+        </li>
+        <li class="list-group-item">
           <h3 class="list-group-item-heading"><a href="/apply/ATJ7003/Test">test</a></h3>
           <i class="fa fa-map-marker"></i> Multiple Countries
         </li>
@@ -1536,7 +1548,7 @@ test("applytojob source module collapses country-scoped location labels and skip
     `,
     __listUrl: company.url_string
   }, company);
-  assert.equal(parsed.length, 2);
+  assert.equal(parsed.length, 5);
   const normalized = Object.fromEntries(
     parsed.map((posting) => {
       const row = source.normalize(posting, company);
@@ -1557,6 +1569,24 @@ test("applytojob source module collapses country-scoped location labels and skip
   assert.equal(normalized.ATJ7002.source_evidence.location_raw, "Multiple locations, Taiwan, Taiwan");
   assert.equal(normalized.ATJ7002.source_evidence.location_rule_name, "applytojob_country_scope_location");
   assert.equal(source.validatePublic(normalized.ATJ7002).status, "accepted");
+
+  assert.equal(normalized.ATJ7005.location_text, "United States");
+  assert.equal(normalized.ATJ7005.country, "United States");
+  assert.equal(normalized.ATJ7005.city, "");
+  assert.equal(normalized.ATJ7005.source_evidence.location_raw, "Multiple Locations, CT");
+  assert.equal(normalized.ATJ7005.source_evidence.location_rule_name, "applytojob_country_scope_location");
+  assert.equal(source.validatePublic(normalized.ATJ7005).status, "accepted");
+
+  assert.equal(normalized.ATJ7006.location_text, "United States");
+  assert.equal(normalized.ATJ7006.country, "United States");
+  assert.equal(normalized.ATJ7006.city, "");
+  assert.equal(normalized.ATJ7006.source_evidence.location_raw, "Multiple Cities/States, MN");
+  assert.equal(normalized.ATJ7006.source_evidence.location_rule_name, "applytojob_country_scope_location");
+  assert.equal(source.validatePublic(normalized.ATJ7006).status, "accepted");
+
+  assert.equal(normalized.ATJ7007.location_text, "(Multiple States)");
+  assert.equal(normalized.ATJ7007.country, "");
+  assert.equal(source.validatePublic(normalized.ATJ7007).status, "quarantined");
 });
 
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {

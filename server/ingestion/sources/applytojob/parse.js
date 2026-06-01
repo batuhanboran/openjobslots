@@ -246,6 +246,12 @@ const APPLYTOJOB_COUNTRY_TOKEN_HINTS = Object.freeze({
   "puerto rico": { country: "Puerto Rico", region: "North America" }
 });
 
+const APPLYTOJOB_US_STATE_SCOPE_TOKENS = Object.freeze(new Set([
+  "al", "ak", "az", "ar", "ca", "co", "ct", "de", "dc", "fl", "ga", "hi", "ia", "id", "il", "in", "ks", "ky",
+  "la", "ma", "md", "me", "mi", "mn", "mo", "ms", "mt", "nc", "nd", "ne", "nh", "nj", "nm", "nv", "ny", "oh",
+  "ok", "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "va", "vt", "wa", "wi", "wv", "wy"
+]));
+
 function normalizeApplyToJobToken(value) {
   return cleanApplyToJobText(value)
     .normalize("NFD")
@@ -256,8 +262,11 @@ function normalizeApplyToJobToken(value) {
 }
 
 function isApplyToJobAmbiguousCountryScopeToken(value) {
-  const normalized = normalizeApplyToJobToken(value);
-  return /^(?:multiple|various)(?:\s+(?:locations?|cities?|regions?|areas?|markets?))?$/.test(normalized);
+  const normalized = normalizeApplyToJobToken(value)
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return /^(?:multiple|various)(?:\s+(?:locations?|cities?|states?|countries?|regions?|areas?|markets?)(?:\s+(?:and\s+)?(?:locations?|cities?|states?|countries?|regions?|areas?|markets?))*)?$/.test(normalized);
 }
 
 function collapseApplyToJobCountryScopeLocation(tokens, hint) {
@@ -271,6 +280,9 @@ function collapseApplyToJobCountryScopeLocation(tokens, hint) {
   })).filter((token) => token.normalized);
   if (trailingTokens.length === 0) return "";
   const lastToken = trailingTokens[trailingTokens.length - 1];
+  if (hint.countryScopeOnly && APPLYTOJOB_US_STATE_SCOPE_TOKENS.has(lastToken.normalized)) {
+    return hint.country;
+  }
   if (lastToken.normalized !== normalizedCountry && normalizeApplyToJobToken(lastToken.country) !== normalizedCountry) {
     return "";
   }
@@ -285,10 +297,14 @@ function extractApplyToJobCountryTokenHint(locationValue) {
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
     const token = tokens[index];
     const normalizedToken = normalizeApplyToJobToken(token);
-    const configuredHint = APPLYTOJOB_COUNTRY_TOKEN_HINTS[normalizedToken];
+    const configuredHint = APPLYTOJOB_COUNTRY_TOKEN_HINTS[normalizedToken] ||
+      (APPLYTOJOB_US_STATE_SCOPE_TOKENS.has(normalizedToken)
+        ? { country: "United States", region: "North America", countryScopeOnly: true }
+        : null);
     const resolvedCountry = normalizedToken.length > 2 ? normalizeCountryName(token) : "";
     const hint = configuredHint || (resolvedCountry ? { country: resolvedCountry } : null);
     if (!hint) continue;
+    if (hint.countryScopeOnly && !isApplyToJobAmbiguousCountryScopeToken(tokens[0])) continue;
     if (hint.requiresCityToken && tokens.length < 2) continue;
     const cityToken = tokens.length === 1 ? "" : cleanApplyToJobText(tokens[0]);
     const normalizedCity = normalizeApplyToJobToken(cityToken);
