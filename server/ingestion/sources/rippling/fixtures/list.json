@@ -72,6 +72,26 @@
         "name": "Sales"
       },
       "language": "en-US"
+    },
+    {
+      "id": "rip-structured-state-city-5",
+      "name": "Business Operations Manager",
+      "url": "https://ats.rippling.com/fixtureco/jobs/rip-structured-state-city-5",
+      "locations": [
+        {
+          "name": "New York, NY",
+          "city": "New York",
+          "state": "New York",
+          "stateCode": "NY",
+          "country": "United States",
+          "countryCode": "US",
+          "workplaceType": "ON_SITE"
+        }
+      ],
+      "department": {
+        "name": "Operations"
+      },
+      "language": "en-US"
     }
   ],
   "totalPages": 1

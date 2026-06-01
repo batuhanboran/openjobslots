@@ -30,5 +30,14 @@
     "country": "United States",
     "remote_type": "remote",
     "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-remote-state-4"
+  },
+  {
+    "source_job_id": "rip-structured-state-city-5",
+    "company_name": "Fixture Rippling Co",
+    "position_name": "Business Operations Manager",
+    "city": "New York",
+    "country": "United States",
+    "remote_type": "onsite",
+    "job_posting_url": "https://ats.rippling.com/fixtureco/jobs/rip-structured-state-city-5"
   }
 ]

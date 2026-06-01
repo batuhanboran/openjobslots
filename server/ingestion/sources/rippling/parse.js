@@ -77,6 +77,88 @@ function remoteTypeFromRipplingLocations(locationsValue) {
   return "";
 }
 
+function uniqueNonBlank(values) {
+  const seen = new Map();
+  for (const value of values) {
+    const cleaned = clean(value);
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (!seen.has(key)) seen.set(key, cleaned);
+  }
+  return Array.from(seen.values());
+}
+
+function extractStructuredRipplingLocation(locationsValue) {
+  const locations = Array.isArray(locationsValue) ? locationsValue : [];
+  const cities = [];
+  const states = [];
+  const countries = [];
+
+  for (const location of locations) {
+    const item = location && typeof location === "object" ? location : {};
+    cities.push(item?.city);
+    states.push(item?.state || item?.stateCode);
+    countries.push(countryLabel(item?.country, item?.countryCode));
+  }
+
+  const uniqueCities = uniqueNonBlank(cities);
+  const uniqueStates = uniqueNonBlank(states);
+  const uniqueCountries = uniqueNonBlank(countries);
+
+  return {
+    city: uniqueCities.length === 1 ? uniqueCities[0] : "",
+    state: uniqueStates.length === 1 ? uniqueStates[0] : "",
+    country: uniqueCountries.length === 1 ? uniqueCountries[0] : ""
+  };
+}
+
+function buildRipplingSourceEvidence({ locationText, structuredLocation, remoteType, postingDate }) {
+  const evidence = {};
+  if (locationText) {
+    Object.assign(evidence, {
+      location_source: "list_api",
+      location_path: "items[].locations[]",
+      location_rule_name: "rippling_structured_location_fields"
+    });
+  }
+  if (structuredLocation.city) {
+    Object.assign(evidence, {
+      city_source: "list_api",
+      city_path: "items[].locations[].city",
+      city_rule_name: "rippling_structured_location_city"
+    });
+  }
+  if (structuredLocation.state) {
+    Object.assign(evidence, {
+      region_source: "list_api",
+      region_path: "items[].locations[].state|stateCode",
+      region_rule_name: "rippling_structured_location_region"
+    });
+  }
+  if (structuredLocation.country) {
+    Object.assign(evidence, {
+      country_source: "list_api",
+      country_path: "items[].locations[].country|countryCode",
+      country_rule_name: "rippling_structured_location_country"
+    });
+  }
+  if (remoteType) {
+    Object.assign(evidence, {
+      remote_source: "list_api",
+      remote_path: "items[].locations[].workplaceType|workplaceType",
+      remote_rule_name: "rippling_structured_workplace_type"
+    });
+  }
+  if (postingDate) {
+    Object.assign(evidence, {
+      posting_date_source: "list_api",
+      posting_date_path: "items[].postedAt|createdAt|updatedAt|publishedAt",
+      posting_date_rule_name: "rippling_posting_date"
+    });
+  }
+  return Object.keys(evidence).length > 0 ? evidence : undefined;
+}
+
 function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJson) {
   const items = Array.isArray(responseJson?.items) ? responseJson.items : [];
   const postings = [];
@@ -93,6 +175,10 @@ function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJs
       String(item?.postedAt || item?.createdAt || item?.updatedAt || item?.publishedAt || "").trim() || null;
     const department = String(item?.department?.name || "").trim() || null;
     const locationRemoteType = remoteTypeFromRipplingLocations(item?.locations);
+    const remoteType = String(item?.remoteType || item?.remote_type || item?.workplaceType || item?.workplace_type || locationRemoteType || "").trim() || null;
+    const workplaceType = String(item?.workplaceType || item?.workplace_type || locationRemoteType || "").trim() || null;
+    const locationText = formatRipplingLocation(item?.locations);
+    const structuredLocation = extractStructuredRipplingLocation(item?.locations);
 
     postings.push({
       source_job_id: postingId || null,
@@ -100,12 +186,21 @@ function parseRipplingPostingsFromApi(companyNameForPostings, config, responseJs
       position_name: String(item?.name || "").trim() || "Untitled Position",
       job_posting_url: jobUrl,
       posting_date: postingDate,
-      location: formatRipplingLocation(item?.locations),
+      location: locationText,
+      city: structuredLocation.city || null,
+      state: structuredLocation.state || null,
+      country: structuredLocation.country || null,
       department,
       employment_type: String(item?.employmentType || item?.employment_type || "").trim() || null,
-      remote_type: String(item?.remoteType || item?.remote_type || item?.workplaceType || item?.workplace_type || locationRemoteType || "").trim() || null,
-      workplace_type: String(item?.workplaceType || item?.workplace_type || locationRemoteType || "").trim() || null,
-      language: String(item?.language || "").trim() || null
+      remote_type: remoteType,
+      workplace_type: workplaceType,
+      language: String(item?.language || "").trim() || null,
+      source_evidence: buildRipplingSourceEvidence({
+        locationText,
+        structuredLocation,
+        remoteType: normalizeRipplingWorkplaceType(remoteType || workplaceType),
+        postingDate
+      })
     });
     seenUrls.add(jobUrl);
   }
