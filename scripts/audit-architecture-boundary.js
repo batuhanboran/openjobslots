@@ -40,6 +40,8 @@ const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
   { name: "recruitcrm_parser_spec", regex: /recruitcrm:\s*{[\s\S]*?parser:\s*parseRecruitCrmPostingsFromApi/ },
   { name: "recruitee_parser_import", regex: /require\(["']\.\/recruitee\/parse["']\)/ },
   { name: "recruitee_parser_spec", regex: /recruitee:\s*{[\s\S]*?parser:\s*parseRecruiteePostingsFromPublicApp/ },
+  { name: "workday_parser_import", regex: /require\(["']\.\/workday\/parse["']\)/ },
+  { name: "workday_parser_spec", regex: /workday:\s*{[\s\S]*?parser:\s*parseWorkdayPostingsFromApi/ },
   { name: "zoho_parser_import", regex: /require\(["']\.\/zoho\/parse["']\)/ },
   { name: "zoho_parser_spec", regex: /zoho:\s*{[\s\S]*?parser:\s*parseZohoPostingsFromHtml/ },
 ]);

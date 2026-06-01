@@ -2,7 +2,6 @@ const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
-const { parseWorkdayPostingsFromApi } = require("./workday/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
@@ -390,7 +389,7 @@ const SOURCE_SPECS = Object.freeze({
   workday: {
     sourceFamily: "enterprise_api",
     confidence: 0.65,
-    parser: parseWorkdayPostingsFromApi,
+    parser: () => [],
     fetchList: fetchWorkdaySourceList,
     officialDocs: "observed Workday CXS public jobs endpoint",
     discover(company) {
