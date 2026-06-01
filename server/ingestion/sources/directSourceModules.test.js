@@ -719,6 +719,42 @@ test("ashby source module normalizes source-provided location shorthand without 
   assert.equal(source.validatePublic(sf).status, "accepted");
 });
 
+test("ashby source module uses structured postal address as primary geo evidence", () => {
+  const source = getSourceModule("ashby");
+  const company = readJson(path.join(__dirname, "ashby", "fixtures", "company.json"));
+  const parsed = source.parse({
+    jobs: [
+      {
+        id: "ash-malmo",
+        title: "Malmo Fleet Care Manager",
+        location: "Malmö",
+        address: {
+          postalAddress: {
+            addressLocality: "Malmö",
+            addressRegion: "Malmö",
+            addressCountry: "Sweden"
+          }
+        },
+        isRemote: null,
+        publishedAt: "2026-05-15T08:00:00+03:00",
+        jobUrl: "https://jobs.ashbyhq.com/fixtureco/ash-malmo"
+      }
+    ]
+  }, company);
+  const normalized = source.normalize(parsed[0], company);
+
+  assert.equal(normalized.location_text, "Malmö / Malmö, Malmö, Sweden");
+  assert.equal(normalized.country, "Sweden");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.city, "Malmö");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.source_evidence.location_path, "jobs[].address.postalAddress");
+  assert.equal(normalized.source_evidence.country_path, "jobs[].address.postalAddress.addressCountry");
+  assert.equal(normalized.source_evidence.remote_rule_name, "ashby_structured_physical_location");
+  assert.equal(normalized.evidence.remote_type.explicit, true);
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("bamboohr source module completes sparse structured EU locations without accepting ambiguous bases", () => {
   const source = getSourceModule("bamboohr");
   const company = readJson(path.join(__dirname, "bamboohr", "fixtures", "company.json"));

@@ -61,5 +61,21 @@
     "department": "Data",
     "employment_type": "FullTime",
     "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "ashby",
+    "source_job_id": "ash-1005",
+    "company_name": "Fixture Ashby",
+    "position_name": "Malmo Fleet Care Manager",
+    "job_posting_url": "https://jobs.ashbyhq.com/fixtureco/ash-1005",
+    "country": "Sweden",
+    "region": "EMEA",
+    "city": "Malmö",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-15T08:00:00+03:00",
+    "industry": "Operations",
+    "department": "Operations",
+    "employment_type": "FullTime",
+    "parser_confidence": 0.75
   }
 ]

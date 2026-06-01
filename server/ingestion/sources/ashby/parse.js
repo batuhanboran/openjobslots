@@ -1,6 +1,6 @@
 "use strict";
 
-const { normalizeCountryFromLocation, normalizeCountryName } = require("../../posting");
+const { normalizeCountryFromLocation, normalizeCountryName, normalizeRemoteType } = require("../../posting");
 const { isRemoteOnlyLocationValue } = require("../../parsers/shared/location");
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 
@@ -68,6 +68,13 @@ function buildAddressLocationLabel(address) {
   return parts.length > 0 ? parts.join(", ") : "";
 }
 
+function getAshbyPostalAddress(address) {
+  if (address?.postalAddress && typeof address.postalAddress === "object") {
+    return address.postalAddress;
+  }
+  return address && typeof address === "object" ? address : {};
+}
+
 function extractAshbyLocationName(posting) {
   const names = [];
   pushAshbyLocationName(names, posting?.locationName);
@@ -85,18 +92,64 @@ function extractAshbyLocationName(posting) {
 }
 
 function extractAshbyPrimaryLocationParts(posting) {
-  const address = posting?.address && typeof posting.address === "object" ? posting.address : {};
+  const address = getAshbyPostalAddress(posting?.address);
   const rawLocation = String(posting?.locationName || posting?.location || "").trim();
   const sourceHint = extractAshbyLocationHint(rawLocation);
   const city = String(address?.addressLocality || address?.city || "").trim();
   const state = String(address?.addressRegion || address?.state || address?.region || "").trim();
   const country = String(address?.addressCountry || address?.country || "").trim();
+  const structuredCountry = normalizeCountryName(country);
+  const normalizedCountry = structuredCountry || normalizeCountryFromLocation(sourceHint?.location || rawLocation);
   return {
     city: sourceHint?.city !== undefined ? sourceHint.city : isRemoteOnlyLocationValue(city) ? "" : city,
     state,
     region: sourceHint?.region || "",
-    country: sourceHint?.country || normalizeCountryName(country) || normalizeCountryFromLocation(sourceHint?.location || rawLocation)
+    country: sourceHint?.country || normalizedCountry,
+    hasStructuredPhysicalLocation: Boolean(city || state || structuredCountry)
   };
+}
+
+function inferAshbyWorkplaceType(posting, primaryLocation, rawLocation) {
+  const explicit = String(posting?.workplaceType || "").trim();
+  if (explicit) return explicit;
+  if (posting?.isRemote === true) return "Remote";
+  const rawLocationRemoteType = normalizeRemoteType(rawLocation);
+  if (rawLocationRemoteType === "remote" || rawLocationRemoteType === "hybrid") return rawLocationRemoteType;
+  return primaryLocation?.hasStructuredPhysicalLocation ? "Onsite" : null;
+}
+
+function buildAshbySourceEvidence(primaryLocationHint, primaryRawLocation, primaryLocation, workplaceType) {
+  const evidence = {};
+  if (primaryLocationHint) {
+    Object.assign(evidence, {
+      location_source: "list_api",
+      location_path: "jobs[].location",
+      location_rule_name: primaryLocationHint.ruleName,
+      location_raw: primaryRawLocation
+    });
+  }
+  if (primaryLocation?.hasStructuredPhysicalLocation) {
+    Object.assign(evidence, {
+      location_source: "list_api",
+      location_path: "jobs[].address.postalAddress",
+      location_rule_name: "ashby_structured_address",
+      location_raw: primaryRawLocation,
+      city_source: "list_api",
+      city_path: "jobs[].address.postalAddress.addressLocality",
+      city_rule_name: "ashby_structured_address_city",
+      country_source: "list_api",
+      country_path: "jobs[].address.postalAddress.addressCountry",
+      country_rule_name: "ashby_structured_address_country"
+    });
+  }
+  if (workplaceType === "Onsite" && primaryLocation?.hasStructuredPhysicalLocation) {
+    Object.assign(evidence, {
+      remote_source: "list_api",
+      remote_path: "jobs[].address.postalAddress",
+      remote_rule_name: "ashby_structured_physical_location"
+    });
+  }
+  return Object.keys(evidence).length > 0 ? evidence : undefined;
 }
 
 function buildAshbyJobUrl(organizationHostedJobsPageName, jobId) {
@@ -128,6 +181,7 @@ function parseAshbyPostingsFromApi(companyNameForPostings, config, response) {
     const primaryRawLocation = String(posting?.locationName || posting?.location || "").trim();
     const primaryLocationHint = extractAshbyLocationHint(primaryRawLocation);
     const primaryLocation = extractAshbyPrimaryLocationParts(posting);
+    const workplaceType = inferAshbyWorkplaceType(posting, primaryLocation, primaryRawLocation);
 
     collected.push({
       company_name: companyName,
@@ -142,7 +196,7 @@ function parseAshbyPostingsFromApi(companyNameForPostings, config, response) {
       region: primaryLocation.region || null,
       state: primaryLocation.state || null,
       country: primaryLocation.country || null,
-      workplaceType: String(posting?.workplaceType || "").trim() || (posting?.isRemote === true ? "Remote" : null),
+      workplaceType,
       remote: posting?.isRemote === true,
       employment_type: String(posting?.employmentType || "").trim() || null,
       department:
@@ -151,14 +205,7 @@ function parseAshbyPostingsFromApi(companyNameForPostings, config, response) {
         null,
       description_html: String(posting?.descriptionHtml || "").trim() || null,
       description_plain: String(posting?.descriptionPlain || "").trim() || null,
-      source_evidence: primaryLocationHint
-        ? {
-            location_source: "list_api",
-            location_path: "jobs[].location",
-            location_rule_name: primaryLocationHint.ruleName,
-            location_raw: primaryRawLocation
-          }
-        : undefined
+      source_evidence: buildAshbySourceEvidence(primaryLocationHint, primaryRawLocation, primaryLocation, workplaceType)
     });
     seenUrls.add(jobUrl);
   }

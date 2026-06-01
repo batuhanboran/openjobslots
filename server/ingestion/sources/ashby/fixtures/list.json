@@ -54,6 +54,23 @@
       "publishedAt": "2026-05-14T10:00:00+03:00",
       "employmentType": "FullTime",
       "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1004"
+    },
+    {
+      "id": "ash-1005",
+      "title": "Malmo Fleet Care Manager",
+      "location": "Malmö",
+      "address": {
+        "postalAddress": {
+          "addressLocality": "Malmö",
+          "addressRegion": "Malmö",
+          "addressCountry": "Sweden"
+        }
+      },
+      "department": "Operations",
+      "isRemote": null,
+      "publishedAt": "2026-05-15T08:00:00+03:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/fixtureco/ash-1005"
     }
   ]
 }
