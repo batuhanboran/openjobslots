@@ -4125,15 +4125,31 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems }) {
   );
 }
 
+const PUBLIC_RELEASE_MONTH_INDEX = Object.freeze({
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11
+});
+
 function getPublicLocale(languageCode) {
   return PUBLIC_LOCALE_BY_LANGUAGE_CODE[languageCode] || PUBLIC_LOCALE_BY_LANGUAGE_CODE.en;
 }
 
 function formatPublicReleaseDate(rawDate, languageCode) {
   const raw = String(rawDate || "").trim();
-  const mayMatch = raw.match(/^May\s+(\d{1,2}),\s*(\d{4})$/i);
-  const date = mayMatch
-    ? new Date(Date.UTC(Number(mayMatch[2]), 4, Number(mayMatch[1]), 12, 0, 0))
+  const namedMonthMatch = raw.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  const namedMonthIndex = PUBLIC_RELEASE_MONTH_INDEX[namedMonthMatch?.[1]?.toLowerCase()];
+  const date = namedMonthIndex !== undefined
+    ? new Date(Date.UTC(Number(namedMonthMatch[3]), namedMonthIndex, Number(namedMonthMatch[2]), 12, 0, 0))
     : new Date(raw);
   if (Number.isNaN(date.getTime())) return raw;
   try {

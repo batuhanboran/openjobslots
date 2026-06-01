@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 const parser = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
 
@@ -85,6 +86,24 @@ function extractAppI18nState() {
   });
 
   return state;
+}
+
+function extractReleaseDateFormatter() {
+  const localeStart = source.indexOf("const PUBLIC_LOCALE_BY_LANGUAGE_CODE = ");
+  const localeEnd = source.indexOf(";\nconst PUBLIC_MESSAGES", localeStart);
+  const formatterStart = source.indexOf("const PUBLIC_RELEASE_MONTH_INDEX = ");
+  const formatterEnd = source.indexOf("function getLocalizedReleaseNote", formatterStart);
+  assert.ok(localeStart >= 0 && localeEnd > localeStart, "locale map should be extractable");
+  assert.ok(formatterStart >= 0 && formatterEnd > formatterStart, "release date formatter should be extractable");
+
+  const moduleRef = { exports: {} };
+  vm.runInNewContext(
+    `${source.slice(localeStart, localeEnd + 1)}
+${source.slice(formatterStart, formatterEnd)}
+module.exports = { formatPublicReleaseDate };`,
+    { module: moduleRef, exports: moduleRef.exports, Intl, Date, Number, Object, String }
+  );
+  return moduleRef.exports.formatPublicReleaseDate;
 }
 
 function buildPublicLanguagePackSupplement(copy = {}) {
@@ -236,4 +255,11 @@ test("visible non-English release-note lanes have handcrafted top-release transl
       assert.ok(state.releaseTranslations[languageCode]?.[version]?.summary, `${languageCode} missing release summary ${version}`);
     }
   }
+});
+
+test("release date formatting keeps named English month dates timezone-stable", () => {
+  const formatPublicReleaseDate = extractReleaseDateFormatter();
+  assert.equal(formatPublicReleaseDate("June 1, 2026", "en"), "Jun 1, 2026");
+  assert.equal(formatPublicReleaseDate("June 1, 2026", "tr"), "1 Haz 2026");
+  assert.equal(formatPublicReleaseDate("May 31, 2026", "en"), "May 31, 2026");
 });
