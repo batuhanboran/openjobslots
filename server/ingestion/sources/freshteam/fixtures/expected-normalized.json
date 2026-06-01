@@ -14,5 +14,13 @@
     "position_name": "Remote Support Specialist",
     "remote_type": "remote",
     "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "ft_5003",
+    "company_name": "Fixture Freshteam",
+    "position_name": "Customer Success Manager",
+    "country": "United States",
+    "remote_type": "onsite",
+    "parser_confidence": 0.55
   }
 ]

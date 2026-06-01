@@ -345,7 +345,7 @@ test("freshteam source module fetches jobs HTML with source-local discovery and 
   }]);
   assert.equal(payload.__sourceConfig.subdomainLower, "fixture");
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 2);
+  assert.equal(parsed.length, 3);
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
@@ -355,6 +355,9 @@ test("freshteam source module fetches jobs HTML with source-local discovery and 
   assert.equal(source.validatePublic(byId.get("3421-product-engineer")).status, "accepted");
   assert.equal(byId.get("3422-remote-support-specialist").remote_type, "remote");
   assert.equal(source.validatePublic(byId.get("3422-remote-support-specialist")).status, "accepted");
+  assert.equal(byId.get("ft_5003").canonical_url, "https://fixture.freshteam.com/jobs/ft_5003/customer-success-manager");
+  assert.equal(byId.get("ft_5003").source_evidence.source_job_id_path, "/jobs/:source_id/:slug?");
+  assert.equal(source.validatePublic(byId.get("ft_5003")).status, "accepted");
 
   await assert.rejects(
     () => source.fetchList(company, {

@@ -5,9 +5,9 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 ## Current Coverage
 
 - Configured ATS keys: 60.
-- Fixture-backed ATS keys: 32.
-- Strict saved raw parser-fixture-backed ATS keys: 32 (`adp_workforcenow`, `applicantai`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `calcareers`, `calopps`, `careerplug`, `fountain`, `greenhouse`, `hibob`, `hirebridge`, `hrmdirect`, `icims`, `jobvite`, `k12jobspot`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `statejobsny`, `talentreef`, `taleo`, `workday`, `zoho`).
-- Configured enabled ATS still pending strict raw parser fixtures: 27.
+- Fixture-backed ATS keys: 33.
+- Strict saved raw parser-fixture-backed ATS keys: 33 (`adp_workforcenow`, `applicantai`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `calcareers`, `calopps`, `careerplug`, `fountain`, `freshteam`, `greenhouse`, `hibob`, `hirebridge`, `hrmdirect`, `icims`, `jobvite`, `k12jobspot`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `statejobsny`, `talentreef`, `taleo`, `workday`, `zoho`).
+- Configured enabled ATS still pending strict raw parser fixtures: 26.
 - Disabled unsupported ATS: `dayforcehcm`.
 
 The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires the raw parser fixture.
@@ -90,7 +90,7 @@ Current source-disable/quarantine recommendations are evidence-based, not perman
 
 Subagent/work-packet findings in this certification pass:
 
-- Direct JSON/API: `teamtailor`, `freshteam`, and `getro` are the main certification gaps. `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
+- Direct/hosted boards: `teamtailor` and `getro` are the main certification gaps. `freshteam`, `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
 - Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module fixtures and invalid-shape tests. `eightfold` still needs raw parser fixtures before public enablement can be called safe. `taleo` and `brassring` remain low-confidence; `pageup`, `saphrcloud`, and `ultipro` need live canaries before promotion.
 - Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `isolvisolvedhire`, `jobvite`, and `theapplicantmanager` now have source-local raw fixtures; `theapplicantmanager` remains disabled until live canary evidence proves quality. `talentreef` and `hirebridge` remain raw-fixture blockers.
 - Vendor/public-sector: `applicantai`, `manatal`, and `hibob` are certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs` and `policeapp` must stop fabricated recency before public confidence can be raised; CalOpps now keeps close dates separate and leaves posting dates null.
@@ -104,7 +104,7 @@ Subagent/work-packet findings in this certification pass:
 | `recruitee` | PublicApp embedded JSON in HTML/API payload. | Localized country names, department/source id, workplace type, and source dates are certified when present; missing translated title is rejected. | v1.5.24 adds saved raw PublicApp fixture and failure fixture. Next: add more language and sparse-date tenant variants. |
 | `bamboohr` | BambooHR careers JSON. | Some source rows expose only city plus full state/province, or string locations. | v1.5.24 adds saved raw API fixture plus failure fixture; rows without id and URL are skipped. Wave B recovers source id from `/careers/{id}` URLs, prevents remote-only labels from becoming city values, and adds city + admin-region country recovery for deterministic source tokens such as UK counties, South African provinces, Japanese prefectures, and Lagos. Next: add tenant variants for sparse string-only locations and keep posting dates blank when list JSON omits dates. |
 | `teamtailor` | Teamtailor board HTML. | Null date; HTML classes are brittle. | v1.5.16 carries source id from `/jobs/{id}` URL; prefer stable JSON endpoint if available, otherwise certify saved HTML fixture. |
-| `freshteam` | Freshteam board HTML. | Null date; remote attribute is not normalized into `remote_type`. | Emit remote field from `data-portal-remote-location`; add raw HTML fixture. |
+| `freshteam` | Freshteam board HTML. | Null date in observed list HTML; source id can be either `/jobs/{slug}` or `/jobs/{opaque-id}/{slug}`. | Raw HTML fixture now proves title/location/remote extraction and preserves the first `/jobs/{source_id}/{slug?}` segment as `source_job_id`; keep posting date null unless a source fixture exposes it. |
 | `pinpointhq` | Pinpoint `postings.json`. | Sparse location/path variants need coverage. | v1.5.16 carries source id from API id/uuid or postings URL; extend direct fixtures for path fallback, sparse location, remote/hybrid/onsite. |
 | `recruitcrm` | RecruitCRM jobs API. | Country often blank for non-remote rows. | v1.5.16 carries source id from API id/job id/slug or URL; add pagination fixture, URL override, and city/country cases. |
 | `fountain` | Fountain board `.json`. | Department can still be absent; URL parsing depends on `/c/{company}`. | Parser now carries `id`/`opening_id`/`to_param` as `source_job_id`; add path, pagination, and sparse location fixtures before broad source expansion. |

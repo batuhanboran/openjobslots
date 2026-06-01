@@ -9,6 +9,32 @@ function cleanFreshteamText(value) {
     .trim();
 }
 
+function decodePathPart(value) {
+  try {
+    return decodeURIComponent(String(value || ""));
+  } catch {
+    return String(value || "");
+  }
+}
+
+function extractFreshteamSourceJobId(urlValue) {
+  try {
+    const parsed = new URL(String(urlValue || ""));
+    const parts = parsed.pathname
+      .split("/")
+      .map((part) => decodePathPart(part).trim())
+      .filter(Boolean);
+    const jobsIndex = parts.findIndex((part) => part.toLowerCase() === "jobs");
+    const sourceId = jobsIndex >= 0 ? parts[jobsIndex + 1] : "";
+    if (sourceId && !["jobs", "careers", "employment"].includes(sourceId.toLowerCase())) {
+      return sourceId;
+    }
+  } catch {
+    // Fall back to the generic URL source-id extractor below.
+  }
+  return extractSourceIdFromPostingUrl(urlValue, "freshteam");
+}
+
 function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
@@ -39,13 +65,23 @@ function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml
 
     postings.push({
       company_name: companyNameForPostings,
-      source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "freshteam"),
+      source_job_id: extractFreshteamSourceJobId(absoluteUrl),
       position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: null,
       location: location || locationInfo || null,
       location_info: locationInfo || null,
-      is_remote: isRemoteRaw === "true" ? 1 : 0
+      is_remote: isRemoteRaw === "true" ? 1 : 0,
+      source_evidence: {
+        route_kind: "freshteam_jobs_html",
+        canonical_url_source: "html",
+        canonical_url_path: "a.heading[href^='/jobs/']",
+        source_job_id_source: "url_path",
+        source_job_id_path: "/jobs/:source_id/:slug?",
+        location_source: location ? "data-portal-location" : (locationInfo ? ".location-info" : "source_location_absent"),
+        remote_source: isRemoteRaw ? "data-portal-remote-location" : "source_remote_type_absent",
+        posting_date_source: "source_posting_date_absent"
+      }
     });
 
     seenUrls.add(absoluteUrl);
@@ -56,5 +92,6 @@ function parseFreshteamPostingsFromHtml(companyNameForPostings, config, pageHtml
 }
 
 module.exports = {
+  extractFreshteamSourceJobId,
   parseFreshteamPostingsFromHtml
 };
