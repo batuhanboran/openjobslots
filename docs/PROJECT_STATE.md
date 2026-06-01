@@ -31,6 +31,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof after the change: Protecht parsed `11` rows; sampled `Sydney, New South Wales` and `Sydney, New South Wales, Australia` rows normalize to `country=Australia`, `region=APAC`, public gate `accepted`. Atlanta controls stayed `United States`; source-countryless `Remote` stayed countryless instead of inventing a country.
 - Verification covered ApplyToJob focused tests, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## ApplicantPro ISO3 And Workplace Evidence - June 1, 2026
+
+- Fresh read-only production checks kept production at `6660eab`; public health reported `331,515` visible job slots, and `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,509`/`331,509`) with the known `22` document remote-facet drift.
+- ApplicantPro production quality baseline: `19,722` visible rows, `76` missing country/region rows, and `189` weak/unknown remote rows. Samples showed live source rows where `iso3` and `workplaceType` were available but not fully carried into normalized country/region/remote fields.
+- ApplicantPro now maps observed source `iso3` values such as `NGA`, `COD`, `CIV`, `SLE`, `MLI`, and `TGO` in the source module, clears country-only labels from `city`, and uses exact source `workplaceType` labels for work-mode normalization.
+- Live read-only parser proof for `corus.applicantpro.com` parsed `48` rows with `48` accepted, `0` missing country/region, and `6` remaining weak/unknown remote rows where the source did not expose workplace evidence. Nigeria, DRC, Côte d'Ivoire, Sierra Leone, Mali, and Togo sample rows now normalize with source-backed country/region.
+- Verification covered ApplicantPro syntax checks, direct parser fixture tests, HTML/public source module tests, and live read-only parser proof. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
+
 ## Zoho Read-Only Recovery Wave - June 1, 2026
 
 - Fresh production checks kept production at `6660eab` with all four runtime services running. Public health still reports `331,463` visible job slots. `search:reindex:check -- --json` still has Postgres/Meili count parity (`331,457`/`331,457`) but remains `ok=false` because remote facets drift by `6` onsite vs unknown.

@@ -3,11 +3,11 @@
 const { validateNormalizedPostingContract } = require("../../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../../publicPostingGate");
 const { decideDetailEscalation } = require("../../parserEvidence");
-const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../../posting");
+const { canonicalizePostingUrl, normalizePosting, normalizePostingValue, validatePosting } = require("../../posting");
 const { createDiscover } = require("./discover");
 const { createFetchList } = require("./fetchList");
 const { normalizeCompanyName } = require("./helpers");
-const { parseApplicantProPostingsFromApi } = require("./parse");
+const { normalizeApplicantProWorkplaceType, parseApplicantProPostingsFromApi } = require("./parse");
 
 const atsKey = "applicantpro";
 const parserVersion = "source-applicantpro-v1";
@@ -31,12 +31,45 @@ function parse(rawPayload, company = {}) {
   );
 }
 
+function normalizeComparable(value) {
+  return normalizePostingValue(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function applyApplicantProSourceEvidence(normalized, posting) {
+  const sourceCountry = normalizePostingValue(posting?.country);
+  const sourceRegion = normalizePostingValue(posting?.region);
+  if (sourceCountry && sourceRegion) {
+    normalized.country = sourceCountry;
+    normalized.region = sourceRegion;
+    const normalizedCity = normalizeComparable(normalized.city);
+    if (
+      normalizedCity &&
+      (normalizedCity === normalizeComparable(sourceCountry) ||
+        normalizedCity === normalizeComparable(posting?.applicantpro_iso3))
+    ) {
+      normalized.city = "";
+    }
+  }
+
+  const sourceRemoteType =
+    normalizePostingValue(posting?.remote_type) ||
+    normalizeApplicantProWorkplaceType(posting?.applicantpro_workplace_type);
+  if (sourceRemoteType) {
+    normalized.remote_type = sourceRemoteType;
+  }
+}
+
 function normalize(posting, company = {}, options = {}) {
   const normalized = normalizePosting(posting, company, atsKey, {
     parserVersion,
     confidence: options.confidence || parserConfidence,
     ...options
   });
+  applyApplicantProSourceEvidence(normalized, posting);
   normalized.parser_key = atsKey;
   normalized.parser_version = parserVersion;
   normalized.parser_confidence = Number(normalized.parser_confidence || parserConfidence);

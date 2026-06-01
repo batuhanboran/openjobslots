@@ -38,6 +38,39 @@
             "name": "Operations"
           },
           "jobType": "Full-time"
+        },
+        {
+          "id": 445568,
+          "title": "Country Program Director",
+          "jobUrl": "/jobs/445568",
+          "startDateRef": "2026-05-10",
+          "jobLocation": "Nigeria",
+          "city": "",
+          "iso3": "NGA",
+          "workplaceType": "Onsite",
+          "employmentType": "Regular Full-Time"
+        },
+        {
+          "id": 445569,
+          "title": "Regional MERL Manager",
+          "jobUrl": "/jobs/445569",
+          "startDateRef": "2026-05-11",
+          "jobLocation": "Abengourou, C\u00f4te d'Ivoire, 12345",
+          "city": "Abengourou",
+          "iso3": "CIV",
+          "workplaceType": "Onsite",
+          "employmentType": "Consultancy"
+        },
+        {
+          "id": 445570,
+          "title": "Flexible Finance Director",
+          "jobUrl": "/jobs/445570",
+          "startDateRef": "2026-05-12",
+          "jobLocation": "Freetown, Sierra Leone",
+          "city": "Freetown",
+          "iso3": "SLE",
+          "workplaceType": "Work from home flexibility",
+          "employmentType": "Regular Full-Time"
         }
       ]
     }
@@ -78,6 +111,51 @@
       "posting_date": "2026-05-09",
       "department": "Operations",
       "employment_type": "Full-time"
+    },
+    {
+      "ats_key": "applicantpro",
+      "company_name": "Fixture ApplicantPro",
+      "position_name": "Country Program Director",
+      "source_job_id": "445568",
+      "job_posting_url": "https://fixtureco.applicantpro.com/jobs/445568",
+      "location_text": "Nigeria",
+      "city": "",
+      "country": "Nigeria",
+      "region": "EMEA",
+      "remote_type": "onsite",
+      "posting_date": "2026-05-10",
+      "department": "",
+      "employment_type": "Regular Full-Time"
+    },
+    {
+      "ats_key": "applicantpro",
+      "company_name": "Fixture ApplicantPro",
+      "position_name": "Regional MERL Manager",
+      "source_job_id": "445569",
+      "job_posting_url": "https://fixtureco.applicantpro.com/jobs/445569",
+      "location_text": "Abengourou, C\u00f4te d'Ivoire, 12345",
+      "city": "Abengourou",
+      "country": "Cote d'Ivoire",
+      "region": "EMEA",
+      "remote_type": "onsite",
+      "posting_date": "2026-05-11",
+      "department": "",
+      "employment_type": "Consultancy"
+    },
+    {
+      "ats_key": "applicantpro",
+      "company_name": "Fixture ApplicantPro",
+      "position_name": "Flexible Finance Director",
+      "source_job_id": "445570",
+      "job_posting_url": "https://fixtureco.applicantpro.com/jobs/445570",
+      "location_text": "Freetown, Sierra Leone",
+      "city": "Freetown",
+      "country": "Sierra Leone",
+      "region": "EMEA",
+      "remote_type": "hybrid",
+      "posting_date": "2026-05-12",
+      "department": "",
+      "employment_type": "Regular Full-Time"
     }
   ]
 }
