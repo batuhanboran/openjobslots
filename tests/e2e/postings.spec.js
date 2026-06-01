@@ -498,6 +498,54 @@ async function expectMobileResultsHeaderStacksCleanly(page) {
   expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
 }
 
+async function expectMobileResultSuggestionsPushHeaderDown(page) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width >= 768) return;
+  const metrics = await page.evaluate(() => {
+    const box = (testId) => {
+      const el = document.querySelector(`[data-testid="${testId}"]`);
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        right: rect.right,
+        bottom: rect.bottom
+      };
+    };
+    return {
+      frame: box("search-box-frame"),
+      suggestions: box("search-suggestions-panel"),
+      brand: box("app-logo"),
+      theme: box("theme-toggle"),
+      language: box("language-selector"),
+      rootWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth
+    };
+  });
+
+  expect(metrics.frame).toBeTruthy();
+  expect(metrics.suggestions).toBeTruthy();
+  expect(metrics.brand).toBeTruthy();
+  expect(metrics.theme).toBeTruthy();
+  expect(metrics.language).toBeTruthy();
+  expect(metrics.suggestions.y, `suggestions should attach below the compact search box: ${JSON.stringify(metrics)}`).toBeGreaterThanOrEqual(
+    metrics.frame.bottom - 8
+  );
+  expect(metrics.brand.y, `mobile brand should be pushed below suggestions: ${JSON.stringify(metrics)}`).toBeGreaterThanOrEqual(
+    metrics.suggestions.bottom + 4
+  );
+  expect(metrics.theme.y, `theme toggle should be pushed below suggestions: ${JSON.stringify(metrics)}`).toBeGreaterThanOrEqual(
+    metrics.suggestions.bottom + 4
+  );
+  expect(metrics.language.y, `language toggle should be pushed below suggestions: ${JSON.stringify(metrics)}`).toBeGreaterThanOrEqual(
+    metrics.suggestions.bottom + 4
+  );
+  expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+}
+
 async function expectScrollTopButtonWorks(page) {
   await expect(page.getByTestId("postings-scroll-top-button")).toHaveCount(0);
   await page.getByTestId("postings-page-scroll").hover();
@@ -1895,6 +1943,19 @@ test.describe("postings page QA", () => {
   test("mobile shell keeps the search surface filter-free without horizontal overflow", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile shell behavior is covered by the mobile project");
+    await page.route("**/search/suggest**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            { label: "Product Manager", value: "Product Manager", type: "title" },
+            { label: "Product Designer II", value: "Product Designer II", type: "title" },
+            { label: "Production Supervisor", value: "Production Supervisor", type: "title" }
+          ]
+        })
+      });
+    });
 
     await openJobSlots(page);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
@@ -1925,6 +1986,10 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("postings-filter-toggle")).toHaveCount(0);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
     await expectMobileResultsHeaderStacksCleanly(page);
+    await page.getByTestId("search-input").fill("Produ");
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await expect(page.getByTestId("public-stats-chips")).toHaveCount(0);
+    await expectMobileResultSuggestionsPushHeaderDown(page);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -1987,6 +2052,18 @@ test.describe("postings page QA", () => {
         })
       });
     });
+    await page.route("**/search/suggest**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            { label: "Data Analyst", value: "Data Analyst", type: "title" },
+            { label: "Data Analyst in Toronto", value: "Data Analyst in Toronto", type: "title" }
+          ]
+        })
+      });
+    });
 
     await openJobSlots(page);
     await page.getByTestId("search-input").fill("dynamic");
@@ -1995,6 +2072,9 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("public-stat-ats")).toContainText("4 ATS");
     await expect(page.getByTestId("public-stat-companies")).toContainText("11 companies");
     await expectStatsChipsAligned(page);
+    await page.getByTestId("search-input").fill("Data Analyst in Toro");
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await expect(page.getByTestId("public-stats-chips")).toHaveCount(0);
     await expect(page.getByTestId("sort-control")).toHaveCount(0);
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
     await expect

@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.openjobslots.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": [],
       "adaptiveIcon": {
         "foregroundImage": "./ojs-favicon.png",

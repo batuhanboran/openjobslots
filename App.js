@@ -5951,6 +5951,10 @@ export default function App() {
   const [sourceFacets, setSourceFacets] = useState([]);
   const [postingsTotalCount, setPostingsTotalCount] = useState(0);
   const [postingsResultCoverage, setPostingsResultCoverage] = useState(null);
+  const [postingsResultQuery, setPostingsResultQuery] = useState("");
+  const [postingsResultFiltersSignature, setPostingsResultFiltersSignature] = useState(
+    getPostingsFiltersSignature(createDefaultPostingsFilters())
+  );
   const [postingsHasMore, setPostingsHasMore] = useState(false);
   const [postingsNextOffset, setPostingsNextOffset] = useState(0);
   const [postingsLoadingMore, setPostingsLoadingMore] = useState(false);
@@ -6472,6 +6476,8 @@ export default function App() {
     const append = Boolean(options.append);
     const silent = Boolean(options.silent);
     const filters = options.filters || postingsFiltersRef.current;
+    const requestedSearch = String(q || "").trim();
+    const requestedFiltersSignature = getPostingsFiltersSignature(filters);
     const limit = Math.max(1, Math.min(500, Number(options.limit || FRONTEND_POSTINGS_PAGE_SIZE)));
     const offset = append
       ? Math.max(0, Number(options.offset ?? postingsNextOffsetRef.current ?? postingsRef.current.length))
@@ -6509,7 +6515,7 @@ export default function App() {
         page_language: publicLanguageCode,
         ...(publicLanguageCountryCode ? { page_country: publicLanguageCountryCode } : {})
       };
-      const response = await fetchPostings(q, limit, offset, analyticsFilters);
+      const response = await fetchPostings(requestedSearch, limit, offset, analyticsFilters);
       if (requestSequence !== postingsRequestSequenceRef.current) {
         return;
       }
@@ -6540,6 +6546,10 @@ export default function App() {
       setPostings(nextVisibleItems);
       setSourceFacets(effectiveSourceFacets);
       setPostingsTotalCount(totalCount);
+      if (!append) {
+        setPostingsResultQuery(requestedSearch);
+        setPostingsResultFiltersSignature(requestedFiltersSignature);
+      }
       setPostingsResultCoverage(buildFrontendResultCoverage(response, nextVisibleItems, effectiveSourceFacets, totalCount));
       setPostingsNextOffset(nextOffset);
       setPostingsHasMore(Boolean(responseHasMore && normalizedItems.length > 0));
@@ -6569,7 +6579,7 @@ export default function App() {
           setSearchNotice("Could not load the next result page. Try scrolling again in a moment.");
         }
         queueFrontendLog("error", append ? "load_more_postings_failed" : "load_postings_failed", String(e?.stack || e?.message || e), {
-          search: q,
+          search: requestedSearch,
           offset,
           limit,
           append,
@@ -6853,6 +6863,7 @@ export default function App() {
     const now = Date.now();
     const filters = postingsFiltersRef.current;
     const filtersSignature = getPostingsFiltersSignature(filters);
+    const defaultFiltersSignature = getPostingsFiltersSignature(createDefaultPostingsFilters());
     const lastSubmit = lastSearchSubmitRef.current || { value: "", at: 0 };
     const duplicateSubmit =
       lastSubmit.value === nextSearch &&
@@ -6866,10 +6877,25 @@ export default function App() {
         ...recentSearchesRef.current.filter((item) => normalizeSuggestionQuery(item) !== normalizeSuggestionQuery(nextSearch))
       ].slice(0, 8);
     }
+    if (!nextSearch && filtersSignature === defaultFiltersSignature) {
+      setSearchResultsMode(false);
+      setSearch("");
+      replacePublicSearchUrlQuery("");
+      setPostingsResultCoverage(null);
+      setPostingsResultQuery("");
+      setPostingsResultFiltersSignature(filtersSignature);
+      setSearchSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+      scrollPostingsToTop();
+      void loadPostings("", { filters });
+      return;
+    }
     setSearchResultsMode(true);
     setSearch(nextSearch);
     replacePublicSearchUrlQuery(nextSearch);
-    setPostingsResultCoverage(null);
+    if (!duplicateSubmit) {
+      setPostingsResultCoverage(null);
+    }
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
@@ -6895,6 +6921,8 @@ export default function App() {
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
     setPostingsResultCoverage(null);
+    setPostingsResultQuery("");
+    setPostingsResultFiltersSignature(getPostingsFiltersSignature(defaultFilters));
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
@@ -6948,6 +6976,8 @@ export default function App() {
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
     setPostingsResultCoverage(null);
+    setPostingsResultQuery("");
+    setPostingsResultFiltersSignature(getPostingsFiltersSignature(defaultFilters));
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     suppressedSuggestionQueryRef.current = "";
@@ -6964,16 +6994,17 @@ export default function App() {
   const handleSearchChange = useCallback((value) => {
     cancelPendingSearchSuggestion();
     const nextValue = String(value || "");
+    const previousResultQuery = String(postingsResultQuery || "").trim();
     searchRef.current = nextValue;
     lastSearchInputAtRef.current = Date.now();
     if (suppressedSuggestionQueryRef.current !== nextValue.trim()) {
       suppressedSuggestionQueryRef.current = "";
     }
-    if (showResultsSurface && nextValue.trim() !== String(searchRef.current || "").trim()) {
+    if (showResultsSurface && nextValue.trim() !== previousResultQuery) {
       setPostingsResultCoverage(null);
     }
     setSearch(nextValue);
-  }, [cancelPendingSearchSuggestion, showResultsSurface]);
+  }, [cancelPendingSearchSuggestion, postingsResultQuery, showResultsSurface]);
 
   const focusSearch = useCallback(() => {
     setActivePage(PAGE_KEYS.POSTINGS);
@@ -8260,18 +8291,27 @@ export default function App() {
   const renderPostingsPage = () => {
     const filtersVisible = false;
     const resultTotalCount = Math.max(postingsTotalCount, postings.length);
+    const currentPostingsFiltersSignature = getPostingsFiltersSignature(postingsFilters);
+    const resultStateMatchesCurrentSearch =
+      String(postingsResultQuery || "").trim() === searchQueryText &&
+      postingsResultFiltersSignature === currentPostingsFiltersSignature;
     const resultsAwaitingFreshResponse =
       showResultsSurface && !initializing && !error && postings.length === 0 && !postingsResultCoverage;
-    const resultStatsSource = postingsResultCoverage || buildFrontendResultCoverage({}, postings, sourceFacets, resultTotalCount);
+    const resultStatsSource = resultStateMatchesCurrentSearch
+      ? (postingsResultCoverage || buildFrontendResultCoverage({}, postings, sourceFacets, resultTotalCount))
+      : null;
     const publicStatsSource = showResultsSurface ? resultStatsSource : applyPublicStatsOverride(status);
     const resultStatsLoading = resultsAwaitingFreshResponse;
-    const publicShellStatsChips = resultStatsLoading ? [] : buildPublicStatsChips(publicStatsSource);
+    const suppressPublicStatsChips = showResultsSurface && (!resultStateMatchesCurrentSearch || suggestionsVisible);
+    const publicShellStatsChips =
+      resultStatsLoading || suppressPublicStatsChips || !publicStatsSource ? [] : buildPublicStatsChips(publicStatsSource);
     const showPostingsRefreshIndicator = !initializing && (loading || resultsAwaitingFreshResponse);
     const showPostingsEmptyState =
       !initializing && !loading && !error && !resultsAwaitingFreshResponse && postings.length === 0;
     const renderSearchBox = (mode = "home") => {
       const compact = mode === "results";
       const showAttachedSuggestions = suggestionsVisible && searchSuggestions.length > 0;
+      const showResultsMobileSuggestions = compact && !isDesktopViewport && showAttachedSuggestions;
       const searchLength = String(search || "").trim().length;
       const searchLengthStyle =
         searchLength >= 34 ? styles.yahooSearchInputVeryLong : searchLength >= 22 ? styles.yahooSearchInputLong : null;
@@ -8280,7 +8320,8 @@ export default function App() {
           <View
             style={[
               styles.searchBoxAutocomplete,
-              compact ? styles.searchBoxAutocompleteResults : null
+              compact ? styles.searchBoxAutocompleteResults : null,
+              showResultsMobileSuggestions ? styles.searchBoxAutocompleteResultsWithSuggestions : null
             ]}
             testID="search-box-autocomplete"
           >
@@ -8352,6 +8393,7 @@ export default function App() {
                 style={[
                   styles.searchSuggestionsPanel,
                   compact ? styles.searchSuggestionsPanelResults : null,
+                  showResultsMobileSuggestions ? styles.searchSuggestionsPanelResultsMobileInFlow : null,
                   isDarkPublicTheme ? styles.searchSuggestionsPanelDark : null,
                   suggestionsMotionStyle
                 ]}
@@ -10455,6 +10497,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     zIndex: 24
   },
+  searchBoxAutocompleteResultsWithSuggestions: {
+    height: "auto",
+    minHeight: 46,
+    zIndex: 120,
+    elevation: 14
+  },
   yahooSearchBoxFrame: {
     width: 614,
     maxWidth: "100%",
@@ -11313,6 +11361,15 @@ const styles = StyleSheet.create({
     top: 46,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20
+  },
+  searchSuggestionsPanelResultsMobileInFlow: {
+    position: "relative",
+    top: 0,
+    left: 0,
+    right: 0,
+    maxWidth: 640,
+    zIndex: 120,
+    elevation: 14
   },
   searchSuggestionsPanelDark: {
     borderColor: OJS_DARK_COLORS.border,
