@@ -2319,6 +2319,9 @@ function ignoredPayloadDriftStem(stem, policy = {}) {
   if (!normalizedStem) return true;
   if (normalizedStem.startsWith("__source")) return true;
   if (normalizedStem === "__listUrl") return true;
+  if (normalizedStem === "__legacyParsed" || normalizedStem.startsWith("__legacyParsed[]")) return true;
+  if (normalizedStem === "__companyNameForPostings") return true;
+  if (normalizedStem === "detail_fetch_count") return true;
   if (
     normalizedStem === "__detailHtmlByUrl" ||
     normalizedStem === "detailHtmlByUrl" ||

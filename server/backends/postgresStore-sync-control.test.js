@@ -2207,6 +2207,54 @@ async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPayloadDriftIgnoresSourceInternalMetadataFields() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "careerplug-html",
+            shape_paths: [
+              "html:string"
+            ],
+            observed_count: 22
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Source-internal metadata should not record drift: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "careerplug",
+      companyUrl: "https://example.careerplug.com/jobs",
+      company: { company_name: "CareerPlug Fixture" },
+      adapter: {}
+    },
+    {
+      html: "<a href=\"/job/123\">Crew Member</a>",
+      __legacyParsed: [],
+      __companyNameForPostings: "CareerPlug Fixture",
+      detail_fetch_count: 0,
+      __sourceConfig: {
+        host: "example.careerplug.com",
+        jobsUrl: "https://example.careerplug.com/jobs"
+      }
+    },
+    "source-careerplug-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.equal(result.compatible_enrichment_shape, true);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPayloadDriftStillFlagsBreezyMissingHtmlCore() {
   const calls = [];
   const pool = {
@@ -2640,6 +2688,7 @@ async function main() {
   await testPayloadDriftAllowsUltiProLocationFacetVariants();
   await testPayloadDriftAllowsHrmDirectOptionalRssEnrichment();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
+  await testPayloadDriftIgnoresSourceInternalMetadataFields();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();
   await testPublicSearchEventKeepsMissingResultCountsUnknown();
