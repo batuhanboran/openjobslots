@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { buildPostgresAtsFilterCanonicalExpression } = require("./atsFilters");
 
 const BLANK_TEXT_VALUES = new Set([
   "",
@@ -657,6 +658,9 @@ async function getPostgresSourceFreshnessReport(pool, options = {}) {
   const staleDays = normalizePositiveInt(options.staleDays || options.stale_days, 30);
   const cutoffEpoch = cutoffEpochForDays(staleDays, options.nowEpoch);
   const limit = Math.max(1, Math.min(1000, Number(options.limit || 100)));
+  const canonicalCompanyAts = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+  const canonicalSourceAts = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
+  const canonicalPostingAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
   const result = await pool.query(
     `
       WITH source_targets AS (
@@ -667,25 +671,26 @@ async function getPostgresSourceFreshnessReport(pool, options = {}) {
           COALESCE(NULLIF(btrim(s.protection_status), ''), 'normal') AS protection_status,
           COUNT(c.id)::bigint AS target_count
         FROM ats_sources s
-        LEFT JOIN companies c ON c.ats_key = s.ats_key
+        LEFT JOIN companies c ON ${canonicalCompanyAts} = s.ats_key
+        WHERE s.ats_key = ${canonicalSourceAts}
         GROUP BY s.ats_key, s.display_name, s.enabled, s.protection_status
       ),
       posting_seen AS (
         SELECT
-          ats_key,
+          ${canonicalPostingAts} AS ats_key,
           COUNT(*) FILTER (WHERE hidden = false)::bigint AS visible_rows,
           COUNT(*) FILTER (WHERE hidden = false AND COALESCE(last_seen_epoch, 0) >= $1)::bigint AS visible_rows_seen_within_window,
           COALESCE(MAX(last_seen_epoch) FILTER (WHERE hidden = false), 0)::bigint AS latest_seen_epoch
         FROM postings
-        GROUP BY ats_key
+        GROUP BY ${canonicalPostingAts}
       ),
       run_seen AS (
         SELECT
-          ats_key,
+          ${canonicalPostingAts} AS ats_key,
           COALESCE(MAX(EXTRACT(EPOCH FROM COALESCE(finished_at, started_at)))::bigint, 0)::bigint AS latest_source_run_epoch,
           COUNT(*) FILTER (WHERE started_at >= to_timestamp($1))::bigint AS runs_within_window
         FROM ats_source_runs
-        GROUP BY ats_key
+        GROUP BY ${canonicalPostingAts}
       )
       SELECT
         st.ats_key,

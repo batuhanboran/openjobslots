@@ -340,9 +340,10 @@ test("buildPostgresDailySourceHealthQueries counts new unsafe public rows from f
   assert.deepEqual(queries.parserDriftRecheck.values, [24, [], 100]);
   assert.match(queries.postings.sql, /first_seen_epoch/i);
   assert.match(queries.budgetUsage.sql, /targets_started_today/i);
-  assert.match(queries.dueByAts.sql, /GROUP BY c\.ats_key/i);
+  assert.match(queries.dueByAts.sql, /GROUP BY \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/i);
+  assert.match(queries.dueByAts.sql, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/i);
   assert.match(queries.postings.sql, /new_no_geo_no_remote_rows/i);
-  assert.match(queries.qualityGateSources.sql, /GROUP BY ats_key/i);
+  assert.match(queries.qualityGateSources.sql, /GROUP BY \(CASE LOWER\(BTRIM\(ats_key\)\)/i);
   assert.match(queries.qualityGateSources.sql, /new_no_geo_no_remote_rows/i);
   assert.match(queries.parserAttention.sql, /ingestion_run_errors/i);
   assert.match(queries.parserAttention.sql, /parser_drift/i);

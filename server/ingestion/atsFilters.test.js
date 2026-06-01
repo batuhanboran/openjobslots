@@ -5,6 +5,8 @@ const {
   ATS_FILTER_OPTION_ITEMS,
   ATS_FILTER_OPTIONS,
   SYNC_DEFAULT_ENABLED_ATS,
+  buildPostgresAtsFilterCanonicalExpression,
+  getAtsFilterAliasValues,
   normalizeAtsFilterValue,
   normalizeAtsFilters,
   normalizeSyncEnabledAts
@@ -23,6 +25,18 @@ test("normalizeAtsFilterValue maps legacy host aliases to canonical ATS keys", (
   assert.equal(normalizeAtsFilterValue("ats.rippling.com"), "rippling");
   assert.equal(normalizeAtsFilterValue("workforcenow.adp.com"), "adp_workforcenow");
   assert.equal(normalizeAtsFilterValue("jobappnetwork.com"), "talentreef");
+});
+
+test("ATS alias helpers expose canonical source target lookups", () => {
+  assert.deepEqual(
+    getAtsFilterAliasValues("adp_myjobs").filter((value) => value === "adp_myjobs" || value === "adpmyjobs"),
+    ["adp_myjobs", "adpmyjobs"]
+  );
+
+  const expression = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+  assert.match(expression, /LOWER\(BTRIM\(c\.ats_key\)\)/);
+  assert.match(expression, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/);
+  assert.match(expression, /WHEN 'adpworkforcenow' THEN 'adp_workforcenow'/);
 });
 
 test("normalizeAtsFilters dedupes configured canonical keys and ignores unsupported values", () => {

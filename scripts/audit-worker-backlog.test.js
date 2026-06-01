@@ -151,7 +151,8 @@ test("probeEmptyNoJobsTargets samples empty boards without writing", async () =>
 test("buildWorkerBacklogQuery is read-only and reports due source fields", () => {
   const query = buildWorkerBacklogQuery({ nowEpoch: 1_800_000_000, limit: 10 });
   assert.deepEqual(query.values, [1_800_000_000, 10, []]);
-  assert.match(query.sql, /WITH target_state AS/i);
+  assert.match(query.sql, /target_state AS/i);
+  assert.match(query.sql, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/i);
   assert.match(query.sql, /due_count/i);
   assert.match(query.sql, /runnable_due_count/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
@@ -179,7 +180,7 @@ test("buildRecentErrorsQuery groups http status for failure taxonomy", () => {
   assert.deepEqual(query.values, [48, ["applytojob", "breezy"]]);
   assert.match(query.sql, /http_status/i);
   assert.match(query.sql, /error_message/i);
-  assert.match(query.sql, /GROUP BY ats_key, error_type, http_status, error_message/i);
+  assert.match(query.sql, /GROUP BY \(CASE LOWER\(BTRIM\(ats_key\)\)/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -194,8 +195,8 @@ test("buildRecentErrorScopeQuery separates target failures from posting rejectio
   assert.match(query.sql, /THEN 'posting_rejection'/i);
   assert.match(query.sql, /ELSE 'target_failure'/i);
   assert.match(query.sql, /LEFT JOIN ingestion_runs r/i);
-  assert.match(query.sql, /LEFT JOIN company_sync_state st/i);
-  assert.match(query.sql, /GROUP BY e\.ats_key, error_scope, e\.error_type/i);
+  assert.match(query.sql, /LEFT JOIN sync_state st/i);
+  assert.match(query.sql, /GROUP BY \(CASE LOWER\(BTRIM\(e\.ats_key\)\)/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -247,7 +248,7 @@ test("buildLatestRunFailureReasonsQuery groups only the latest run by source", (
   assert.match(query.sql, /FROM ingestion_run_errors/i);
   assert.match(query.sql, /e\.run_id = l\.id/i);
   assert.match(query.sql, /error_message/i);
-  assert.match(query.sql, /GROUP BY e\.ats_key, e\.error_type, COALESCE\(e\.http_status, 0\), e\.error_message/i);
+  assert.match(query.sql, /GROUP BY \(CASE LOWER\(BTRIM\(e\.ats_key\)\)/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -274,8 +275,8 @@ test("buildRecentRunTrendBySourceQuery is read-only and groups recent runs by AT
   assert.match(query.sql, /WITH recent_runs AS/i);
   assert.match(query.sql, /company_sync_state/i);
   assert.match(query.sql, /ingestion_run_errors/i);
-  assert.match(query.sql, /GROUP BY r\.id, st\.ats_key/i);
-  assert.match(query.sql, /GROUP BY r\.id, e\.ats_key/i);
+  assert.match(query.sql, /GROUP BY r\.id, \(CASE LOWER\(BTRIM\(st\.ats_key\)\)/i);
+  assert.match(query.sql, /GROUP BY r\.id, \(CASE LOWER\(BTRIM\(e\.ats_key\)\)/i);
   assert.match(query.sql, /LIMIT \$1/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
@@ -286,7 +287,7 @@ test("buildSourceBudgetUsageQuery mirrors worker source budget accounting", () =
   assert.deepEqual(query.values, [1_800_057_600]);
   assert.match(query.sql, /FROM company_sync_state/i);
   assert.match(query.sql, /last_success_epoch >= \$1/i);
-  assert.match(query.sql, /GROUP BY ats_key/i);
+  assert.match(query.sql, /GROUP BY \(CASE LOWER\(BTRIM\(ats_key\)\)/i);
   assert.doesNotMatch(query.sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i);
 });
 
@@ -299,12 +300,12 @@ test("buildTargetFailurePressureQuery is read-only and returns full due failure 
   });
 
   assert.deepEqual(query.values, [1_800_086_400, 48, ["applytojob", "breezy"]]);
-  assert.match(query.sql, /WITH due_targets AS/i);
-  assert.match(query.sql, /JOIN company_sync_state/i);
+  assert.match(query.sql, /due_targets AS/i);
+  assert.match(query.sql, /FROM company_sync_state/i);
   assert.match(query.sql, /FROM ingestion_run_errors/i);
   assert.match(query.sql, /company_created_at_epoch/i);
   assert.match(query.sql, /LEFT JOIN ingestion_runs r\s+ON r\.id = e\.run_id/i);
-  assert.match(query.sql, /LEFT JOIN company_sync_state error_state/i);
+  assert.match(query.sql, /LEFT JOIN sync_state error_state/i);
   assert.match(query.sql, /error_state\.last_success_epoch < r\.started_at_epoch/i);
   assert.match(query.sql, /error_state\.last_success_epoch > COALESCE\(r\.finished_at_epoch/i);
   assert.match(query.sql, /COALESCE\(st\.consecutive_failures, 0\)/i);
@@ -893,7 +894,7 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
           ]
         };
       }
-      if (/WITH due_targets AS/i.test(sql)) {
+      if (/due_targets AS/i.test(sql)) {
         return {
           rows: [
             {
@@ -987,7 +988,7 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
       }
       if (/FROM ingestion_run_errors/i.test(sql)) {
         if (/e\.run_id = l\.id/i.test(sql)) {
-          if (/GROUP BY e\.ats_key, e\.error_type/i.test(sql)) {
+          if (/GROUP BY \(CASE LOWER\(BTRIM\(e\.ats_key\)\)/i.test(sql) && /e\.error_type/i.test(sql)) {
             return {
               rows: [
                 { ats_key: "applytojob", error_type: "parser_validation", http_status: 0, count: 3 },

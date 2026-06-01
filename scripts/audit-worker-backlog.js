@@ -1,6 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../server/backends/postgres");
+const {
+  buildPostgresAtsFilterCanonicalExpression,
+  normalizeAtsFilterValue
+} = require("../server/ingestion/atsFilters");
 const { readWorkerBudgetConfig } = require("../server/ingestion/workerConfig");
 const {
   FAILURE_REASON_BUCKETS,
@@ -90,11 +94,9 @@ function parseBacklogArgs(argv = process.argv.slice(2)) {
 }
 
 function parseTargetAtsKeys(value = "") {
-  return String(value || "")
+  return normalizeTargetAtsKeys(String(value || "")
     .split(",")
-    .map((part) => part.trim().toLowerCase())
-    .filter(Boolean)
-    .filter((part, index, list) => list.indexOf(part) === index);
+    .map((part) => part.trim().toLowerCase()));
 }
 
 function positiveInteger(value, fallback) {
@@ -221,13 +223,27 @@ function adjustFailureReasonCountsByScopeForParserDriftRecheck(countsByScope = {
 function buildWorkerBacklogQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const limit = Math.max(1, Math.min(500, Math.floor(Number(options.limit || 100))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalCompanyAts = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+  const canonicalSourceAts = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
+  const canonicalSyncAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
   return {
     values: [nowEpoch, limit, targetAtsKeys],
     sql: `
-      WITH target_state AS (
+      WITH sync_state AS (
         SELECT
-          c.ats_key,
+          ${canonicalSyncAts} AS ats_key,
+          company_url,
+          MAX(COALESCE(next_sync_epoch, 0))::bigint AS next_sync_epoch,
+          MAX(COALESCE(last_success_epoch, 0))::bigint AS last_success_epoch,
+          MAX(COALESCE(last_failure_epoch, 0))::bigint AS last_failure_epoch,
+          MAX(COALESCE(consecutive_failures, 0))::bigint AS consecutive_failures
+        FROM company_sync_state
+        GROUP BY ${canonicalSyncAts}, company_url
+      ),
+      target_state AS (
+        SELECT
+          ${canonicalCompanyAts} AS ats_key,
           c.url_string,
           c.company_name,
           COALESCE(st.next_sync_epoch, 0)::bigint AS next_sync_epoch,
@@ -235,8 +251,8 @@ function buildWorkerBacklogQuery(options = {}) {
           COALESCE(st.last_failure_epoch, 0)::bigint AS last_failure_epoch,
           COALESCE(st.consecutive_failures, 0)::bigint AS consecutive_failures
         FROM companies c
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = c.ats_key
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${canonicalCompanyAts}
           AND st.company_url = c.url_string
       )
       SELECT
@@ -264,6 +280,8 @@ function buildWorkerBacklogQuery(options = {}) {
       LEFT JOIN target_state t
         ON t.ats_key = s.ats_key
       WHERE (
+        s.ats_key = ${canonicalSourceAts}
+      ) AND (
         cardinality($3::text[]) = 0
         OR s.ats_key = ANY($3::text[])
       )
@@ -276,12 +294,13 @@ function buildWorkerBacklogQuery(options = {}) {
 
 function buildRecentErrorsQuery(options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalErrorAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
   return {
     values: [errorWindowHours, targetAtsKeys],
     sql: `
       SELECT
-        ats_key,
+        ${canonicalErrorAts} AS ats_key,
         error_type,
         COALESCE(http_status, 0)::int AS http_status,
         COALESCE(error_message, '') AS error_message,
@@ -290,9 +309,9 @@ function buildRecentErrorsQuery(options = {}) {
       WHERE created_at >= now() - ($1::int * interval '1 hour')
         AND (
           cardinality($2::text[]) = 0
-          OR ats_key = ANY($2::text[])
+          OR ${canonicalErrorAts} = ANY($2::text[])
         )
-      GROUP BY ats_key, error_type, http_status, error_message
+      GROUP BY ${canonicalErrorAts}, error_type, http_status, error_message
       ORDER BY count DESC, ats_key ASC, error_type ASC, http_status ASC, error_message ASC;
     `
   };
@@ -300,13 +319,23 @@ function buildRecentErrorsQuery(options = {}) {
 
 function buildRecentErrorScopeQuery(options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalErrorAts = buildPostgresAtsFilterCanonicalExpression("e.ats_key");
+  const canonicalStateAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
   return {
     values: [errorWindowHours, targetAtsKeys],
     sql: `
-      WITH scoped_errors AS (
+      WITH sync_state AS (
         SELECT
-          e.ats_key,
+          ${canonicalStateAts} AS ats_key,
+          company_url,
+          MAX(COALESCE(last_success_epoch, 0))::bigint AS last_success_epoch
+        FROM company_sync_state
+        GROUP BY ${canonicalStateAts}, company_url
+      ),
+      scoped_errors AS (
+        SELECT
+          ${canonicalErrorAts} AS ats_key,
           CASE WHEN st.last_success_epoch >= r.started_at_epoch
               AND st.last_success_epoch <= COALESCE(r.finished_at_epoch, EXTRACT(EPOCH FROM now())::bigint)
             THEN 'posting_rejection'
@@ -319,15 +348,15 @@ function buildRecentErrorScopeQuery(options = {}) {
         FROM ingestion_run_errors e
         LEFT JOIN ingestion_runs r
           ON r.id = e.run_id
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = e.ats_key
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${canonicalErrorAts}
           AND st.company_url = e.company_url
         WHERE e.created_at >= now() - ($1::int * interval '1 hour')
           AND (
             cardinality($2::text[]) = 0
-            OR e.ats_key = ANY($2::text[])
+            OR ${canonicalErrorAts} = ANY($2::text[])
           )
-        GROUP BY e.ats_key, error_scope, e.error_type, COALESCE(e.http_status, 0), e.error_message
+        GROUP BY ${canonicalErrorAts}, error_scope, e.error_type, COALESCE(e.http_status, 0), e.error_message
       )
       SELECT *
       FROM scoped_errors
@@ -357,7 +386,7 @@ function buildLatestRunSummaryQuery() {
 
 function buildRecentRunTrendQuery(options = {}) {
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.recentRunLimit || 20))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
   return {
     values: [limit, targetAtsKeys],
     sql: `
@@ -388,7 +417,9 @@ function buildRecentRunTrendQuery(options = {}) {
 
 function buildRecentRunTrendBySourceQuery(options = {}) {
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.recentRunLimit || 20))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalStateAts = buildPostgresAtsFilterCanonicalExpression("st.ats_key");
+  const canonicalErrorAts = buildPostgresAtsFilterCanonicalExpression("e.ats_key");
   return {
     values: [limit, targetAtsKeys],
     sql: `
@@ -410,7 +441,7 @@ function buildRecentRunTrendBySourceQuery(options = {}) {
       successes AS (
         SELECT
           r.id AS run_id,
-          st.ats_key,
+          ${canonicalStateAts} AS ats_key,
           COUNT(*)::int AS success_count
         FROM recent_runs r
         JOIN company_sync_state st
@@ -418,23 +449,23 @@ function buildRecentRunTrendBySourceQuery(options = {}) {
           AND st.last_success_epoch <= r.finished_at_epoch
         WHERE (
           cardinality($2::text[]) = 0
-          OR st.ats_key = ANY($2::text[])
+          OR ${canonicalStateAts} = ANY($2::text[])
         )
-        GROUP BY r.id, st.ats_key
+        GROUP BY r.id, ${canonicalStateAts}
       ),
       failures AS (
         SELECT
           r.id AS run_id,
-          e.ats_key,
+          ${canonicalErrorAts} AS ats_key,
           COUNT(DISTINCT COALESCE(NULLIF(e.company_url, ''), e.id::text))::int AS failure_count
         FROM recent_runs r
         JOIN ingestion_run_errors e
           ON e.run_id = r.id
         WHERE (
           cardinality($2::text[]) = 0
-          OR e.ats_key = ANY($2::text[])
+          OR ${canonicalErrorAts} = ANY($2::text[])
         )
-        GROUP BY r.id, e.ats_key
+        GROUP BY r.id, ${canonicalErrorAts}
       ),
       by_run AS (
         SELECT
@@ -465,7 +496,9 @@ function buildRecentRunTrendBySourceQuery(options = {}) {
 }
 
 function buildLatestRunBySourceQuery(options = {}) {
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalStateAts = buildPostgresAtsFilterCanonicalExpression("st.ats_key");
+  const canonicalErrorAts = buildPostgresAtsFilterCanonicalExpression("e.ats_key");
   return {
     values: [targetAtsKeys],
     sql: `
@@ -481,7 +514,7 @@ function buildLatestRunBySourceQuery(options = {}) {
       successes AS (
         SELECT
           l.id AS latest_run_id,
-          st.ats_key,
+          ${canonicalStateAts} AS ats_key,
           COUNT(*)::int AS success_count
         FROM company_sync_state st
         JOIN latest l
@@ -489,23 +522,23 @@ function buildLatestRunBySourceQuery(options = {}) {
           AND st.last_success_epoch <= l.finished_at_epoch
         WHERE (
           cardinality($1::text[]) = 0
-          OR st.ats_key = ANY($1::text[])
+          OR ${canonicalStateAts} = ANY($1::text[])
         )
-        GROUP BY l.id, st.ats_key
+        GROUP BY l.id, ${canonicalStateAts}
       ),
       failures AS (
         SELECT
           l.id AS latest_run_id,
-          e.ats_key,
+          ${canonicalErrorAts} AS ats_key,
           COUNT(DISTINCT COALESCE(NULLIF(e.company_url, ''), e.id::text))::int AS failure_count
         FROM ingestion_run_errors e
         JOIN latest l
           ON e.run_id = l.id
         WHERE (
           cardinality($1::text[]) = 0
-          OR e.ats_key = ANY($1::text[])
+          OR ${canonicalErrorAts} = ANY($1::text[])
         )
-        GROUP BY l.id, e.ats_key
+        GROUP BY l.id, ${canonicalErrorAts}
       )
       SELECT
         COALESCE(s.latest_run_id, f.latest_run_id)::bigint AS latest_run_id,
@@ -522,7 +555,8 @@ function buildLatestRunBySourceQuery(options = {}) {
 }
 
 function buildLatestRunFailureReasonsQuery(options = {}) {
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalErrorAts = buildPostgresAtsFilterCanonicalExpression("e.ats_key");
   return {
     values: [targetAtsKeys],
     sql: `
@@ -533,7 +567,7 @@ function buildLatestRunFailureReasonsQuery(options = {}) {
         LIMIT 1
       )
       SELECT
-        e.ats_key,
+        ${canonicalErrorAts} AS ats_key,
         e.error_type,
         COALESCE(e.http_status, 0)::int AS http_status,
         COALESCE(e.error_message, '') AS error_message,
@@ -543,10 +577,10 @@ function buildLatestRunFailureReasonsQuery(options = {}) {
         ON e.run_id = l.id
       WHERE (
         cardinality($1::text[]) = 0
-        OR e.ats_key = ANY($1::text[])
+        OR ${canonicalErrorAts} = ANY($1::text[])
       )
-      GROUP BY e.ats_key, e.error_type, COALESCE(e.http_status, 0), e.error_message
-      ORDER BY count DESC, e.ats_key ASC, e.error_type ASC, http_status ASC, error_message ASC;
+      GROUP BY ${canonicalErrorAts}, e.error_type, COALESCE(e.http_status, 0), e.error_message
+      ORDER BY count DESC, ats_key ASC, e.error_type ASC, http_status ASC, error_message ASC;
     `
   };
 }
@@ -567,15 +601,16 @@ function buildAutoSyncBudgetUsageQuery(options = {}) {
 function buildSourceBudgetUsageQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+  const canonicalSyncAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
   return {
     values: [dayStartEpoch],
     sql: `
       SELECT
-        ats_key,
+        ${canonicalSyncAts} AS ats_key,
         COUNT(*)::int AS successful_targets_today
       FROM company_sync_state
       WHERE last_success_epoch >= $1
-      GROUP BY ats_key
+      GROUP BY ${canonicalSyncAts}
       ORDER BY ats_key ASC;
     `
   };
@@ -584,13 +619,29 @@ function buildSourceBudgetUsageQuery(options = {}) {
 function buildTargetFailurePressureQuery(options = {}) {
   const nowEpoch = Math.max(0, Math.floor(Number(options.nowEpoch || Math.floor(Date.now() / 1000))));
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
+  const canonicalCompanyAts = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+  const canonicalSyncAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const canonicalErrorAts = buildPostgresAtsFilterCanonicalExpression("e.ats_key");
   return {
     values: [nowEpoch, errorWindowHours, targetAtsKeys],
     sql: `
-      WITH due_targets AS (
+      WITH sync_state AS (
         SELECT
-          c.ats_key,
+          ${canonicalSyncAts} AS ats_key,
+          company_url,
+          MAX(COALESCE(next_sync_epoch, 0))::bigint AS next_sync_epoch,
+          MAX(COALESCE(last_success_epoch, 0))::bigint AS last_success_epoch,
+          MAX(COALESCE(last_failure_epoch, 0))::bigint AS last_failure_epoch,
+          MAX(COALESCE(consecutive_failures, 0))::bigint AS consecutive_failures,
+          MAX(COALESCE(last_http_status, 0))::int AS last_http_status,
+          MAX(COALESCE(last_error, '')) AS last_error
+        FROM company_sync_state
+        GROUP BY ${canonicalSyncAts}, company_url
+      ),
+      due_targets AS (
+        SELECT
+          ${canonicalCompanyAts} AS ats_key,
           c.url_string AS company_url,
           c.company_name,
           COALESCE(EXTRACT(EPOCH FROM c.created_at)::bigint, 0)::bigint AS company_created_at_epoch,
@@ -603,21 +654,21 @@ function buildTargetFailurePressureQuery(options = {}) {
           COALESCE(st.last_error, '') AS last_error
         FROM companies c
         INNER JOIN ats_sources s
-          ON s.ats_key = c.ats_key
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = c.ats_key
+          ON s.ats_key = ${canonicalCompanyAts}
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${canonicalCompanyAts}
           AND st.company_url = c.url_string
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
           AND COALESCE(st.next_sync_epoch, 0) <= $1
           AND (
             cardinality($3::text[]) = 0
-            OR c.ats_key = ANY($3::text[])
+            OR ${canonicalCompanyAts} = ANY($3::text[])
           )
       ),
       recent_error_groups AS (
         SELECT
-          e.ats_key,
+          ${canonicalErrorAts} AS ats_key,
           e.company_url,
           e.error_type,
           COALESCE(e.http_status, 0)::int AS http_status,
@@ -626,8 +677,8 @@ function buildTargetFailurePressureQuery(options = {}) {
         FROM ingestion_run_errors e
         LEFT JOIN ingestion_runs r
           ON r.id = e.run_id
-        LEFT JOIN company_sync_state error_state
-          ON error_state.ats_key = e.ats_key
+        LEFT JOIN sync_state error_state
+          ON error_state.ats_key = ${canonicalErrorAts}
           AND error_state.company_url = e.company_url
         WHERE e.created_at >= now() - ($2::int * interval '1 hour')
           AND COALESCE(e.company_url, '') <> ''
@@ -639,9 +690,9 @@ function buildTargetFailurePressureQuery(options = {}) {
           )
           AND (
             cardinality($3::text[]) = 0
-            OR e.ats_key = ANY($3::text[])
+            OR ${canonicalErrorAts} = ANY($3::text[])
           )
-        GROUP BY e.ats_key, e.company_url, e.error_type, COALESCE(e.http_status, 0), e.error_message
+        GROUP BY ${canonicalErrorAts}, e.company_url, e.error_type, COALESCE(e.http_status, 0), e.error_message
       ),
       recent_target_errors AS (
         SELECT
@@ -692,13 +743,15 @@ function buildTargetFailurePressureQuery(options = {}) {
 
 function buildParserDriftRecheckQuery(options = {}) {
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
   const limit = Math.max(1, Math.min(500, Math.floor(Number(options.parserDriftRecheckLimit || 100))));
+  const canonicalEventAts = buildPostgresAtsFilterCanonicalExpression("e.ats_key");
+  const canonicalShapeAts = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
   return {
     values: [errorWindowHours, targetAtsKeys, limit],
     sql: `
       SELECT
-        e.ats_key,
+        ${canonicalEventAts} AS ats_key,
         e.parser_version,
         e.similarity AS stored_similarity,
         e.reason,
@@ -706,12 +759,12 @@ function buildParserDriftRecheckQuery(options = {}) {
         s.shape_paths AS baseline_shape_paths
       FROM parser_drift_events e
       LEFT JOIN source_payload_shapes s
-        ON s.ats_key = e.ats_key
+        ON ${canonicalShapeAts} = ${canonicalEventAts}
         AND s.parser_version = e.parser_version
       WHERE e.created_at >= now() - ($1::int * interval '1 hour')
         AND (
           cardinality($2::text[]) = 0
-          OR e.ats_key = ANY($2::text[])
+          OR ${canonicalEventAts} = ANY($2::text[])
         )
       ORDER BY e.created_at DESC
       LIMIT $3;
@@ -1121,8 +1174,9 @@ function calculateSuccessRate(successCount, totalTargets) {
 
 function normalizeTargetAtsKeys(value) {
   return (Array.isArray(value) ? value : [])
-    .map((item) => String(item || "").trim().toLowerCase())
-    .filter(Boolean);
+    .map((item) => normalizeAtsFilterValue(item))
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index);
 }
 
 function selectGateRecentRunTrend(recentRunTrend = {}, recentRunTrendBySource = {}, targetAtsKeys = []) {
@@ -2603,7 +2657,7 @@ function summarizeTargetFailurePressureRows(rows = [], options = {}) {
 function attachBacklogDiagnostics(report, options = {}) {
   const recentByAts = summarizeRecentErrors(options.recentErrorRows || []);
   const sourceBudgetUsageByAts = summarizeSourceBudgetUsageRows(options.sourceBudgetUsageRows || [], options);
-  const targetAtsKeys = Array.isArray(options.targetAtsKeys) ? options.targetAtsKeys : [];
+  const targetAtsKeys = normalizeTargetAtsKeys(options.targetAtsKeys);
   const errorWindowHours = Math.max(1, Math.min(168, Math.floor(Number(options.errorWindowHours || 24))));
   const parserAttentionCount = Array.from(recentByAts.values())
     .reduce((sum, item) => sum + Number(item.parser_attention_count || 0), 0);

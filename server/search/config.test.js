@@ -4,6 +4,7 @@ const {
   MEILI_POSTINGS_SETTINGS,
   expandSearchTokens,
   getCountryFilterTerms,
+  normalizeAtsKey,
   normalizeCountryFilterValue,
   normalizeSearchQuery
 } = require("./config");
@@ -44,6 +45,13 @@ test("search config maps localized SEO search phrases to indexed search intent",
   assert.equal(normalizeSearchQuery("i\u015f ilanlar\u0131"), "job openings");
   assert.equal(normalizeSearchQuery("yaz\u0131l\u0131m m\u00fchendisi i\u015f ilanlar\u0131"), "software engineer");
   assert.equal(normalizeSearchQuery("teknik destek m\u00fchendisi i\u015f ilanlar\u0131"), "technical support engineer");
+});
+
+test("search config keeps ADP ATS keys canonical for indexed rows", () => {
+  assert.equal(normalizeAtsKey("adp_myjobs"), "adp_myjobs");
+  assert.equal(normalizeAtsKey("adpmyjobs"), "adp_myjobs");
+  assert.equal(normalizeAtsKey("adp_workforcenow"), "adp_workforcenow");
+  assert.equal(normalizeAtsKey("adpworkforcenow"), "adp_workforcenow");
 });
 
 test("Meili settings keep title/company ahead of description and include filters", () => {

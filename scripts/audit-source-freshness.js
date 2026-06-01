@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../server/backends/postgres");
 const { withHeavyJobLock } = require("../server/backends/heavyJobLock");
+const { buildPostgresAtsFilterCanonicalExpression } = require("../server/ingestion/atsFilters");
 const { readWorkerBudgetConfig } = require("../server/ingestion/workerConfig");
 const {
   getPostgresSourceFreshnessReport,
@@ -610,16 +611,27 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
   const failureGroupLimit = Math.max(25, Math.min(1000, Math.floor(Number(options.failureGroupLimit || 500))));
   const qualityGateSourceLimit = Math.max(1, Math.min(100, Math.floor(Number(options.qualityGateSourceLimit || 25))));
   const dueByAtsLimit = Math.max(1, Math.min(100, Math.floor(Number(options.dueByAtsLimit || 25))));
+  const canonicalCompanyAts = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+  const canonicalSyncAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const canonicalPostingAts = buildPostgresAtsFilterCanonicalExpression("ats_key");
   return {
     due: {
       values: [nowEpoch],
       sql: `
+        WITH sync_state AS (
+          SELECT
+            ${canonicalSyncAts} AS ats_key,
+            company_url,
+            MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+          FROM company_sync_state
+          GROUP BY ${canonicalSyncAts}, company_url
+        )
         SELECT COUNT(c.id)::int AS targets_due
         FROM companies c
         INNER JOIN ats_sources s
-          ON s.ats_key = c.ats_key
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = c.ats_key
+          ON s.ats_key = ${canonicalCompanyAts}
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${canonicalCompanyAts}
           AND st.company_url = c.url_string
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
@@ -629,20 +641,28 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
     dueByAts: {
       values: [nowEpoch, dueByAtsLimit],
       sql: `
+        WITH sync_state AS (
+          SELECT
+            ${canonicalSyncAts} AS ats_key,
+            company_url,
+            MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+          FROM company_sync_state
+          GROUP BY ${canonicalSyncAts}, company_url
+        )
         SELECT
-          c.ats_key,
+          ${canonicalCompanyAts} AS ats_key,
           COUNT(c.id)::int AS targets_due
         FROM companies c
         INNER JOIN ats_sources s
-          ON s.ats_key = c.ats_key
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = c.ats_key
+          ON s.ats_key = ${canonicalCompanyAts}
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${canonicalCompanyAts}
           AND st.company_url = c.url_string
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')
           AND COALESCE(st.next_sync_epoch, 0) <= $1
-        GROUP BY c.ats_key
-        ORDER BY targets_due DESC, c.ats_key ASC
+        GROUP BY ${canonicalCompanyAts}
+        ORDER BY targets_due DESC, ats_key ASC
         LIMIT $2;
       `
     },
@@ -701,7 +721,7 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
       values: [windowStartEpoch, qualityGateSourceLimit],
       sql: `
         SELECT
-          COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+          COALESCE(NULLIF(${canonicalPostingAts}, ''), 'unknown') AS ats_key,
           COUNT(*) FILTER (
             WHERE (
               NULLIF(btrim(country), '') IS NULL
@@ -727,7 +747,7 @@ function buildPostgresDailySourceHealthQueries(options = {}) {
         FROM postings
         WHERE hidden = false
           AND COALESCE(first_seen_epoch, 0) >= $1
-        GROUP BY ats_key
+        GROUP BY ${canonicalPostingAts}
         HAVING
           COUNT(*) FILTER (
             WHERE NULLIF(btrim(country), '') IS NULL

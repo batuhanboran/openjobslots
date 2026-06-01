@@ -141,8 +141,8 @@ function createStatusMockPool(controlStatus = "requested", options = {}) {
           }]
         };
       }
-      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) {
-        return { rows: [{ count: 62 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE ats_key =/i.test(sql)) {
+        return { rows: [{ count: 60 }] };
       }
       if (/FROM companies c\s+INNER JOIN ats_sources s/i.test(sql)) {
         return { rows: [{ count: 18 }] };
@@ -150,7 +150,7 @@ function createStatusMockPool(controlStatus = "requested", options = {}) {
       if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) {
         return { rows: [{ count: 8 }] };
       }
-      if (/COUNT\(DISTINCT ats_key/i.test(sql)) {
+      if (/COUNT\(DISTINCT/i.test(sql) && /COALESCE\(ats_key, ''\)/i.test(sql)) {
         return { rows: [{ count: 3 }] };
       }
       if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) {
@@ -159,7 +159,7 @@ function createStatusMockPool(controlStatus = "requested", options = {}) {
       if (/FROM postings WHERE hidden = false/i.test(sql)) {
         return { rows: [{ count: 30 }] };
       }
-      if (/SELECT ats_key, COUNT\(\*\)::int AS count FROM companies/i.test(sql)) {
+      if (/FROM companies c\s+GROUP BY/i.test(sql)) {
         return { rows: [{ ats_key: "greenhouse", count: 2 }] };
       }
       throw new Error(`Unexpected query: ${sql}`);
@@ -416,6 +416,7 @@ async function testIngestionSourcesReportDueAndFailurePressure() {
   const result = await listPostgresIngestionSources(pool, 2);
 
   assert.match(captured.sql, /due_company_count/);
+  assert.match(captured.sql, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/);
   assert.equal(captured.params[1], 2);
   assert.equal(result[0].ats_key, "lever");
   assert.equal(result[0].due_company_count, 3);
@@ -1489,12 +1490,12 @@ async function testPostgresCountsCacheReusesShortTtlSnapshot() {
           }]
         };
       }
-      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) return { rows: [{ count: 62 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE ats_key =/i.test(sql)) return { rows: [{ count: 60 }] };
       if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) return { rows: [{ count: 8 }] };
-      if (/COUNT\(DISTINCT ats_key/i.test(sql)) return { rows: [{ count: 3 }] };
+      if (/COUNT\(DISTINCT/i.test(sql) && /COALESCE\(ats_key, ''\)/i.test(sql)) return { rows: [{ count: 3 }] };
       if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) return { rows: [{ count: 7 }] };
       if (/FROM postings WHERE hidden = false/i.test(sql)) return { rows: [{ count: 30 }] };
-      if (/SELECT ats_key, COUNT\(\*\)::int AS count FROM companies/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 2 }] };
+      if (/FROM companies c\s+GROUP BY/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 2 }] };
       throw new Error(`Unexpected count query: ${sql}`);
     }
   };
@@ -1577,12 +1578,12 @@ async function testPostgresCountsExposePublicStatsCounters() {
           }]
         };
       }
-      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources;/i.test(sql)) return { rows: [{ count: 62 }] };
+      if (/SELECT COUNT\(\*\)::int AS count FROM ats_sources WHERE ats_key =/i.test(sql)) return { rows: [{ count: 60 }] };
       if (/COUNT\(DISTINCT NULLIF\(company_name/i.test(sql)) return { rows: [{ count: 8076 }] };
-      if (/COUNT\(DISTINCT ats_key/i.test(sql)) return { rows: [{ count: 18 }] };
+      if (/COUNT\(DISTINCT/i.test(sql) && /COALESCE\(ats_key, ''\)/i.test(sql)) return { rows: [{ count: 18 }] };
       if (/FROM postings WHERE hidden = false AND last_seen_epoch/i.test(sql)) return { rows: [{ count: 48451 }] };
       if (/FROM postings WHERE hidden = false/i.test(sql)) return { rows: [{ count: 157355 }] };
-      if (/SELECT ats_key, COUNT\(\*\)::int AS count FROM companies/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 44 }] };
+      if (/FROM companies c\s+GROUP BY/i.test(sql)) return { rows: [{ ats_key: "greenhouse", count: 44 }] };
       throw new Error(`Unexpected public stats count query: ${sql}`);
     }
   };
@@ -1598,7 +1599,7 @@ async function testPostgresCountsExposePublicStatsCounters() {
   assert.equal(counts.quarantine_only_ats_count, 7);
   assert.equal(counts.disabled_ats_count, 7);
   assert.equal(counts.worker_auto_eligible_ats_count, 48);
-  assert.equal(counts.configured_ats_count, 62);
+  assert.equal(counts.configured_ats_count, 60);
   assert.equal(counts.visible_ats_count, 18);
 }
 

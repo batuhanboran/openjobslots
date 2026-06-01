@@ -5,6 +5,10 @@ const { acquireHeavyJobLock } = require("../backends/heavyJobLock");
 const { normalizeAtsKey } = require("../backends/postgresStore");
 const { canonicalizePostingUrl } = require("./posting");
 const {
+  buildPostgresAtsFilterCanonicalExpression,
+  getAtsFilterAliasValues
+} = require("./atsFilters");
+const {
   MAX_RUN_LIMIT,
   DEFAULT_SOURCE_RUN_LIMIT,
   discoverSourceTargets,
@@ -450,6 +454,7 @@ function summarizeInventory({ configuredTargets, targetsScanned, requestedLimit,
 
 async function countConfiguredTargets(pool, source, options = {}) {
   const normalizedSource = normalizeAtsKey(source);
+  const sourceAliases = getAtsFilterAliasValues(normalizedSource);
   const enabledFilter = options.includeDisabled
     ? ""
     : "AND s.enabled = true AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')";
@@ -457,11 +462,11 @@ async function countConfiguredTargets(pool, source, options = {}) {
     `
       SELECT COUNT(*)::int AS count
       FROM companies c
-      INNER JOIN ats_sources s ON s.ats_key = c.ats_key
-      WHERE c.ats_key = $1
+      INNER JOIN ats_sources s ON s.ats_key = $1
+      WHERE c.ats_key = ANY($2::text[])
         ${enabledFilter};
     `,
-    [normalizedSource]
+    [normalizedSource, sourceAliases]
   );
   const configuredTargets = Number(result.rows[0]?.count || 0);
   if (configuredTargets > 0) return configuredTargets;
@@ -783,9 +788,13 @@ async function runNetNewEstimate(options = {}, env = process.env) {
 }
 
 async function listEstimateSources(pool, options = {}) {
-  const enabledFilter = options.includeDisabled
-    ? ""
-    : "WHERE s.enabled = true AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')";
+  const canonicalCompanyAts = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+  const canonicalSourceAts = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
+  const filters = [`s.ats_key = ${canonicalSourceAts}`];
+  if (!options.includeDisabled) {
+    filters.push("s.enabled = true AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')");
+  }
+  const sourceFilter = `WHERE ${filters.join(" AND ")}`;
   const result = await pool.query(
     `
       SELECT
@@ -795,8 +804,8 @@ async function listEstimateSources(pool, options = {}) {
         COALESCE(s.disabled_reason, '') AS disabled_reason,
         COUNT(c.id)::int AS configured_targets
       FROM ats_sources s
-      LEFT JOIN companies c ON c.ats_key = s.ats_key
-      ${enabledFilter}
+      LEFT JOIN companies c ON ${canonicalCompanyAts} = s.ats_key
+      ${sourceFilter}
       GROUP BY s.ats_key, s.enabled, s.protection_status, s.disabled_reason
       ORDER BY s.ats_key ASC;
     `
@@ -1045,6 +1054,7 @@ module.exports = {
   ensureTenantSummary,
   finalizeReport,
   getExistingRowsForCandidates,
+  listEstimateSources,
   markCandidateSeen,
   parseEstimatorArgs,
   runAllSourceNetNewEstimate,

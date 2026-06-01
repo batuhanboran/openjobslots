@@ -6,7 +6,8 @@ const path = require("path");
 const sqlite3 = require("sqlite3");
 const {
   aggregateRows,
-  classifyStoredPosting
+  classifyStoredPosting,
+  getPostgresSourceFreshnessReport
 } = require("./dataQualityAudit");
 const { runAudit } = require("../../scripts/audit-data-quality");
 
@@ -125,6 +126,38 @@ test("stored-field classifier handles null, empty, unknown, n/a, remote, and mul
   assert.equal(classifyStoredPosting({ location_text: "multiple locations" }).suspicious_unknown_geo, true);
   assert.equal(classifyStoredPosting({ remote_type: "" }).missing_remote_type, true);
   assert.equal(classifyStoredPosting({ remote_type: "remote" }).weak_unknown_remote_type, false);
+});
+
+test("Postgres source freshness folds legacy ATS aliases into canonical source rows", async () => {
+  let observedSql = "";
+  const pool = {
+    async query(sql) {
+      observedSql = String(sql);
+      return {
+        rows: [{
+          ats_key: "adp_myjobs",
+          display_name: "ADP MyJobs",
+          enabled: true,
+          protection_status: "canary_only",
+          target_count: 544,
+          visible_rows: 10,
+          visible_rows_seen_within_window: 10,
+          latest_seen_epoch: 2_000_000,
+          latest_source_run_epoch: 2_000_000,
+          runs_within_window: 1
+        }]
+      };
+    }
+  };
+
+  const report = await getPostgresSourceFreshnessReport(pool, { staleDays: 30, limit: 10, nowEpoch: 2_000_000 });
+
+  assert.equal(report.items.length, 1);
+  assert.equal(report.items[0].ats_key, "adp_myjobs");
+  assert.equal(report.items[0].target_count, 544);
+  assert.match(observedSql, /LEFT JOIN companies c ON \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/);
+  assert.match(observedSql, /WHERE s\.ats_key = \(CASE LOWER\(BTRIM\(s\.ats_key\)\)/);
+  assert.match(observedSql, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/);
 });
 
 test("audit command reads SQLite in read-only mode and does not mutate rows", async () => {

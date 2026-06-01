@@ -693,6 +693,45 @@ test("source runner exposes virtual targets for public aggregate boards in inclu
   assert.equal(queries.length, 2);
 });
 
+test("source runner canonicalizes legacy source target aliases through canonical source settings", async () => {
+  const queries = [];
+  const pool = {
+    async query(sql, params) {
+      queries.push({ sql: String(sql), params });
+      if (/FROM companies c/i.test(sql)) {
+        return {
+          rows: [{
+            id: 42,
+            company_name: "Legacy ADP MyJobs",
+            url_string: "https://myjobs.adp.com/example/cx/job-details",
+            ats_key: "adpmyjobs",
+            enabled: true,
+            protection_status: "canary_only",
+            disabled_reason: "",
+            rate_limit_ms: 0
+          }]
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const targets = await discoverSourceTargets(pool, {
+    source: "adp_myjobs",
+    limit: 25,
+    offset: 0
+  });
+
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].atsKey, "adp_myjobs");
+  assert.equal(targets[0].company.ATS_name, "adpmyjobs");
+  assert.ok(targets[0].adapter, "legacy alias targets should still resolve the canonical adapter");
+  assert.match(queries[0].sql, /s\.ats_key = \$1/);
+  assert.match(queries[0].sql, /c\.ats_key = ANY\(\$2::text\[\]\)/);
+  assert.equal(queries[0].params[0], "adp_myjobs");
+  assert.ok(queries[0].params[1].includes("adpmyjobs"));
+});
+
 test("source runner does not expose disabled virtual targets without include-disabled", async () => {
   const pool = {
     async query(sql) {

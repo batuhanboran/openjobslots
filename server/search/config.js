@@ -300,6 +300,7 @@ function normalizeAtsKey(value) {
     loxoco: "loxo",
     icims: "icims",
     applicantai: "applicantai",
+    adpmyjobs: "adp_myjobs",
     adpworkforcenow: "adp_workforcenow",
     workforcenow: "adp_workforcenow"
   };

@@ -7,6 +7,7 @@ const {
 } = require("../index");
 const {
   ATS_FILTER_OPTION_ITEMS,
+  buildPostgresAtsFilterCanonicalExpression,
   normalizeAtsFilterValue
 } = require("./atsFilters");
 const { getAdapterForCompany } = require("./adapters");
@@ -73,6 +74,9 @@ const PER_HOST_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(
   process.env.INGESTION_PER_HOST_CONCURRENCY,
   1
 )));
+const POSTGRES_COMPANY_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+const POSTGRES_SYNC_STATE_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
+const POSTGRES_ERROR_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
 const PG_STAT_STATEMENTS_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS ?? "1").trim().toLowerCase()
 );
@@ -913,12 +917,20 @@ async function postgresStopRequested(pool) {
 async function countPostgresDueTargets(pool) {
   const result = await pool.query(
     `
+      WITH sync_state AS (
+        SELECT
+          ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
+          company_url,
+          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+        FROM company_sync_state
+        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
+      )
       SELECT COUNT(*)::int AS count
       FROM companies c
       INNER JOIN ats_sources s
-        ON s.ats_key = c.ats_key
-      LEFT JOIN company_sync_state st
-        ON st.ats_key = c.ats_key
+        ON s.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
+      LEFT JOIN sync_state st
+        ON st.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
         AND st.company_url = c.url_string
       WHERE s.enabled = true
         AND COALESCE(st.next_sync_epoch, 0) <= $1;
@@ -1016,20 +1028,28 @@ async function countPostgresDueTargetsByAts(pool) {
   const nowEpoch = nowEpochSeconds();
   const result = await pool.query(
     `
+      WITH sync_state AS (
+        SELECT
+          ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
+          company_url,
+          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+        FROM company_sync_state
+        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
+      )
       SELECT
-        c.ats_key,
+        ${POSTGRES_COMPANY_ATS_KEY_SQL} AS ats_key,
         COUNT(*)::int AS due_count
       FROM companies c
       INNER JOIN ats_sources s
-        ON s.ats_key = c.ats_key
-      LEFT JOIN company_sync_state st
-        ON st.ats_key = c.ats_key
+        ON s.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
+      LEFT JOIN sync_state st
+        ON st.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
         AND st.company_url = c.url_string
       WHERE s.enabled = true
         AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled', 'quarantine_only')
         AND COALESCE(st.next_sync_epoch, 0) <= $1
-      GROUP BY c.ats_key
-      ORDER BY due_count DESC, c.ats_key ASC;
+      GROUP BY ${POSTGRES_COMPANY_ATS_KEY_SQL}
+      ORDER BY due_count DESC, ats_key ASC;
     `,
     [nowEpoch]
   );
@@ -1049,7 +1069,7 @@ async function loadPostgresAdaptiveSourceSignals(pool, options = {}) {
       pool.query(
         `
           SELECT
-            ats_key,
+            ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
             COUNT(*) FILTER (WHERE COALESCE(last_success_epoch, 0) >= $1)::int AS recent_success_count,
             COUNT(*) FILTER (WHERE COALESCE(last_failure_epoch, 0) >= $1)::int AS recent_failure_count,
             COUNT(*) FILTER (
@@ -1059,21 +1079,21 @@ async function loadPostgresAdaptiveSourceSignals(pool, options = {}) {
           FROM company_sync_state
           WHERE COALESCE(last_success_epoch, 0) >= $1
              OR COALESCE(last_failure_epoch, 0) >= $1
-          GROUP BY ats_key;
+          GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL};
         `,
         [lookbackEpoch]
       ),
       pool.query(
         `
           SELECT
-            ats_key,
+            ${POSTGRES_ERROR_ATS_KEY_SQL} AS ats_key,
             error_type,
             COALESCE(http_status, 0)::int AS http_status,
             COALESCE(error_message, '') AS error_message,
             COUNT(*)::int AS count
           FROM ingestion_run_errors
           WHERE created_at >= now() - ($1::int * interval '1 hour')
-          GROUP BY ats_key, error_type, COALESCE(http_status, 0), COALESCE(error_message, '')
+          GROUP BY ${POSTGRES_ERROR_ATS_KEY_SQL}, error_type, COALESCE(http_status, 0), COALESCE(error_message, '')
           ORDER BY count DESC, ats_key ASC, error_type ASC;
         `,
         [lookbackHours]
@@ -1101,12 +1121,21 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
   const candidateLimit = computeDueTargetCandidateLimit(targetLimit);
   const result = await pool.query(
     `
-      WITH due_targets AS (
+      WITH sync_state AS (
+        SELECT
+          ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
+          company_url,
+          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch,
+          MAX(COALESCE(consecutive_failures, 0)) AS consecutive_failures
+        FROM company_sync_state
+        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
+      ),
+      due_targets AS (
         SELECT
           c.id,
           c.company_name,
           c.url_string,
-          c.ats_key,
+          ${POSTGRES_COMPANY_ATS_KEY_SQL} AS ats_key,
           s.protection_status,
           s.disabled_reason,
           s.default_ttl_seconds,
@@ -1121,7 +1150,7 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
             ELSE 3
           END AS protection_priority,
           row_number() OVER (
-            PARTITION BY c.ats_key
+            PARTITION BY ${POSTGRES_COMPANY_ATS_KEY_SQL}
             ORDER BY
               CASE WHEN COALESCE(st.consecutive_failures, 0) > 0 THEN 1 ELSE 0 END ASC,
               COALESCE(st.next_sync_epoch, 0) ASC,
@@ -1130,9 +1159,9 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
           ) AS ats_rank
         FROM companies c
         INNER JOIN ats_sources s
-          ON s.ats_key = c.ats_key
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = c.ats_key
+          ON s.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
           AND st.company_url = c.url_string
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled', 'quarantine_only')
@@ -1188,10 +1217,10 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
   if (SOURCE_DAILY_TARGET_BUDGET > 0) {
     const budgetRows = await pool.query(
       `
-        SELECT ats_key, COUNT(*)::int AS count
+        SELECT ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key, COUNT(*)::int AS count
         FROM company_sync_state
         WHERE last_success_epoch >= $1
-        GROUP BY ats_key;
+        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL};
       `,
       [dayStartEpoch]
     );

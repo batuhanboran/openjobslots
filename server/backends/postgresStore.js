@@ -5,6 +5,7 @@ const {
   upsertMeiliPostings
 } = require("../search/meili");
 const searchConfig = require("../search/config");
+const { buildPostgresAtsFilterCanonicalExpression } = require("../ingestion/atsFilters");
 const { getAdapterMetadata } = require("../ingestion/adapter-metadata");
 const {
   buildQualityMetadata,
@@ -47,6 +48,11 @@ const DEFAULT_PUBLIC_POSTINGS_MAX_OFFSET = 2000;
 const DEFAULT_DAILY_REDDIT_POST_LIMIT = 10;
 const MAX_DAILY_REDDIT_POST_LIMIT = 20;
 const DEFAULT_PUBLIC_SITE_ORIGIN = "https://openjobslots.com";
+const POSTGRES_COMPANY_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
+const POSTGRES_SOURCE_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
+const POSTGRES_SOURCE_ROW_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
+const POSTGRES_SYNC_STATE_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
+const POSTGRES_POSTING_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
 const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "relevance", label: "Relevance" },
   { value: "last_seen", label: "Fresh source" },
@@ -872,7 +878,7 @@ async function getPostgresCounts(pool, options = {}) {
         SELECT COUNT(*)::int AS count
         FROM companies c
         INNER JOIN ats_sources s
-          ON s.ats_key = c.ats_key
+          ON s.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') IN ('normal', 'public_enabled', 'canary_only');
       `
@@ -901,17 +907,22 @@ async function getPostgresCounts(pool, options = {}) {
             WHERE enabled = true
               AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('normal', 'public_enabled', 'canary_only')
           )::int AS worker_auto_eligible_ats_count
-        FROM ats_sources;
+        FROM ats_sources
+        WHERE ats_key = ${POSTGRES_SOURCE_ATS_KEY_SQL};
       `
     ),
-    pool.query("SELECT COUNT(*)::int AS count FROM ats_sources;"),
+    pool.query(`SELECT COUNT(*)::int AS count FROM ats_sources WHERE ats_key = ${POSTGRES_SOURCE_ATS_KEY_SQL};`),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false;"),
     pool.query("SELECT COUNT(DISTINCT NULLIF(company_name, ''))::int AS count FROM postings WHERE hidden = false;"),
-    pool.query("SELECT COUNT(DISTINCT ats_key)::int AS count FROM postings WHERE hidden = false AND COALESCE(ats_key, '') <> '';"),
+    pool.query(`SELECT COUNT(DISTINCT ${POSTGRES_POSTING_ATS_KEY_SQL})::int AS count FROM postings WHERE hidden = false AND COALESCE(ats_key, '') <> '';`),
     pool.query("SELECT COUNT(*)::int AS count FROM postings WHERE hidden = false AND last_seen_epoch >= $1;", [
       Math.floor(nowMs / 1000) - 24 * 60 * 60
     ]),
-    pool.query("SELECT ats_key, COUNT(*)::int AS count FROM companies GROUP BY ats_key;")
+    pool.query(`
+      SELECT ${POSTGRES_COMPANY_ATS_KEY_SQL} AS ats_key, COUNT(*)::int AS count
+      FROM companies c
+      GROUP BY ${POSTGRES_COMPANY_ATS_KEY_SQL};
+    `)
   ]);
   const company_count_by_ats = {};
   for (const row of atsRows.rows) company_count_by_ats[row.ats_key || "Unknown"] = Number(row.count || 0);
@@ -1292,6 +1303,17 @@ async function getPostgresParserAttentionByAts(pool, limit = 20) {
 async function getPostgresAtsAdmin(pool) {
   const rows = await pool.query(
     `
+      WITH sync_state AS (
+        SELECT
+          ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
+          company_url,
+          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch,
+          MAX(COALESCE(last_success_epoch, 0)) AS last_success_epoch,
+          MAX(COALESCE(last_failure_epoch, 0)) AS last_failure_epoch,
+          MAX(COALESCE(consecutive_failures, 0)) AS consecutive_failures
+        FROM company_sync_state
+        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
+      )
       SELECT
         s.ats_key,
         s.display_name,
@@ -1596,10 +1618,11 @@ async function listPostgresIngestionSources(pool, limit = 100) {
         SUM(COALESCE(st.consecutive_failures, 0))::bigint AS consecutive_failure_total
       FROM ats_sources s
       LEFT JOIN companies c
-        ON c.ats_key = s.ats_key
-      LEFT JOIN company_sync_state st
-        ON st.ats_key = c.ats_key
+        ON ${POSTGRES_COMPANY_ATS_KEY_SQL} = s.ats_key
+      LEFT JOIN sync_state st
+        ON st.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
         AND st.company_url = c.url_string
+      WHERE s.ats_key = ${POSTGRES_SOURCE_ROW_ATS_KEY_SQL}
       GROUP BY s.ats_key, s.display_name, s.enabled, s.default_ttl_seconds, s.rate_limit_ms
       ORDER BY due_company_count DESC, company_count DESC, s.display_name ASC
       LIMIT $2;
@@ -2549,12 +2572,20 @@ async function getPostgresSyncStatus(pool, options = {}) {
     ),
     pool.query(
       `
+        WITH sync_state AS (
+          SELECT
+            ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
+            company_url,
+            MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+          FROM company_sync_state
+          GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
+        )
         SELECT COUNT(*)::int AS count
         FROM companies c
         INNER JOIN ats_sources s
-          ON s.ats_key = c.ats_key
-        LEFT JOIN company_sync_state st
-          ON st.ats_key = c.ats_key
+          ON s.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
+        LEFT JOIN sync_state st
+          ON st.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
           AND st.company_url = c.url_string
         WHERE s.enabled = true
           AND COALESCE(NULLIF(s.protection_status, ''), 'normal') IN ('normal', 'public_enabled', 'canary_only')

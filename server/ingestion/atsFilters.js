@@ -292,6 +292,32 @@ function normalizeAtsFilterValue(value) {
   return ATS_FILTER_ALIASES.get(normalized) || normalized;
 }
 
+function getAtsFilterAliasValues(value) {
+  const canonical = normalizeAtsFilterValue(value);
+  if (!canonical) return [];
+  const aliases = new Set([canonical]);
+  for (const [alias, target] of ATS_FILTER_ALIASES.entries()) {
+    if (target === canonical) aliases.add(alias);
+  }
+  return Array.from(aliases);
+}
+
+function quotePostgresLiteral(value) {
+  return `'${String(value || "").replace(/'/g, "''")}'`;
+}
+
+function buildPostgresAtsFilterCanonicalExpression(columnSql) {
+  const column = String(columnSql || "").trim();
+  if (!column) throw new Error("columnSql is required");
+  const normalizedColumn = `LOWER(BTRIM(${column}))`;
+  const cases = [];
+  for (const [alias, target] of ATS_FILTER_ALIASES.entries()) {
+    if (!alias || !target || alias === target) continue;
+    cases.push(`WHEN ${quotePostgresLiteral(alias)} THEN ${quotePostgresLiteral(target)}`);
+  }
+  return `(CASE ${normalizedColumn} ${cases.join(" ")} ELSE ${normalizedColumn} END)`;
+}
+
 function normalizeAtsFilters(value) {
   const items = normalizeStringArray(Array.isArray(value) ? value : [value])
     .map((item) => normalizeAtsFilterValue(item))
@@ -315,6 +341,8 @@ module.exports = {
   ATS_FILTER_OPTION_ITEMS,
   ATS_FILTER_OPTIONS,
   SYNC_DEFAULT_ENABLED_ATS,
+  buildPostgresAtsFilterCanonicalExpression,
+  getAtsFilterAliasValues,
   normalizeAtsFilterValue,
   normalizeAtsFilters,
   normalizeSyncEnabledAts

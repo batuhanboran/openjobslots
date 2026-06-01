@@ -10,6 +10,7 @@ const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality")
 const { classifyStoredPosting } = require("./dataQualityAudit");
 const { buildDetailEvidenceSummary, collectDetailEvidence } = require("./detailEvidence");
 const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
+const { getAtsFilterAliasValues } = require("./atsFilters");
 const {
   FAILURE_REASONS,
   decideDetailEscalation,
@@ -818,6 +819,7 @@ function rowToSourceTarget(row, company) {
 async function discoverSourceTargets(pool, options = {}) {
   const source = normalizeAtsKey(options.source);
   if (!source) throw new Error("--source=<ats> is required");
+  const sourceAliases = getAtsFilterAliasValues(source);
   const enabledFilter = options.includeDisabled ? "" : "AND s.enabled = true AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled')";
   const result = await pool.query(
     `
@@ -831,14 +833,15 @@ async function discoverSourceTargets(pool, options = {}) {
         s.disabled_reason,
         s.rate_limit_ms
       FROM companies c
-      INNER JOIN ats_sources s ON s.ats_key = c.ats_key
-      WHERE c.ats_key = $1
+      INNER JOIN ats_sources s ON s.ats_key = $1
+      WHERE c.ats_key = ANY($2::text[])
         ${enabledFilter}
       ORDER BY c.updated_at DESC, c.id ASC
-      LIMIT $2 OFFSET $3;
+      LIMIT $3 OFFSET $4;
     `,
     [
       source,
+      sourceAliases,
       Math.max(1, Number(options.limit || DEFAULT_SOURCE_RUN_LIMIT)),
       Math.max(0, Number(options.offset || 0))
     ]

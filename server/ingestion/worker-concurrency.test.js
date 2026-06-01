@@ -295,7 +295,7 @@ test("postgres due target selection over-selects when early sources exhaust dail
   let candidateLimit = 0;
   const pool = {
     async query(sql, params) {
-      if (String(sql).includes("WITH due_targets")) {
+      if (String(sql).includes("due_targets AS")) {
         candidateLimit = Number(params[2] || 0);
         return { rows: rows.slice(0, candidateLimit) };
       }
@@ -328,7 +328,7 @@ test("postgres due target query clamps candidates per ATS before global candidat
   let observedParams = [];
   const pool = {
     async query(sql, params) {
-      if (String(sql).includes("WITH due_targets")) {
+      if (String(sql).includes("due_targets AS")) {
         observedSql = String(sql);
         observedParams = params;
         return { rows: [] };
@@ -354,7 +354,7 @@ test("postgres due target query excludes quarantine-only sources from automatic 
   let observedSql = "";
   const pool = {
     async query(sql) {
-      if (String(sql).includes("WITH due_targets")) {
+      if (String(sql).includes("due_targets AS")) {
         observedSql = String(sql);
         return { rows: [] };
       }
@@ -371,6 +371,47 @@ test("postgres due target query excludes quarantine-only sources from automatic 
   });
 
   assert.match(observedSql, /NOT IN \('disabled', 'auto_disabled', 'quarantine_only'\)/);
+});
+
+test("postgres due target selection folds legacy company ATS aliases into canonical source policy", async () => {
+  let observedSql = "";
+  const pool = {
+    async query(sql) {
+      if (String(sql).includes("due_targets AS")) {
+        observedSql = String(sql);
+        return {
+          rows: [{
+            id: 1,
+            company_name: "Legacy ADP MyJobs",
+            url_string: "https://myjobs.adp.com/example/cx/job-details",
+            ats_key: "adp_myjobs",
+            protection_status: "canary_only",
+            default_ttl_seconds: 3600,
+            rate_limit_ms: 0,
+            next_sync_epoch: 1,
+            ats_rank: 1
+          }]
+        };
+      }
+      if (String(sql).includes("FROM company_sync_state")) {
+        return { rows: [] };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+
+  const targets = await selectPostgresDueTargets(pool, 1, {
+    dueByAtsRows: [{ ats_key: "adp_myjobs", due_count: 1 }],
+    adaptiveSignals: {
+      adp_myjobs: { due_count: 1, recent_success_count: 20, recent_failure_count: 0, success_rate_pct: 100 }
+    }
+  });
+
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].atsKey, "adp_myjobs");
+  assert.match(observedSql, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/);
+  assert.match(observedSql, /ON s\.ats_key = \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/);
+  assert.match(observedSql, /PARTITION BY \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/);
 });
 
 test("postgres due target selection uses adaptive caps for parser-risk sources", async () => {
@@ -434,7 +475,7 @@ test("postgres due target selection uses adaptive caps for parser-risk sources",
   const counters = createRunCounters();
   const pool = {
     async query(sql, params) {
-      if (String(sql).includes("WITH due_targets")) {
+      if (String(sql).includes("due_targets AS")) {
         return { rows: rows.slice(0, Number(params[2] || 0)) };
       }
       if (String(sql).includes("FROM company_sync_state")) {

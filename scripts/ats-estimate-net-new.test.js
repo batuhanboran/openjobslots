@@ -7,6 +7,8 @@ const {
   classifyEstimateDecision,
   markCandidateSeen,
   parseEstimatorArgs,
+  countConfiguredTargets,
+  listEstimateSources,
   summarizeInventory
 } = require("../server/ingestion/netNewEstimator");
 const {
@@ -114,6 +116,50 @@ test("estimator accepts all-source read-only report flags", () => {
   assert.equal(options.sourceTimeoutMs, 90000);
   assert.equal(options.markdownOutput, "reports/ats-evidence.md");
   assert.equal(options.json, true);
+});
+
+test("estimator counts legacy target aliases under canonical source settings", async () => {
+  const queries = [];
+  const pool = {
+    async query(sql, params) {
+      queries.push({ sql: String(sql), params });
+      return { rows: [{ count: 544 }] };
+    }
+  };
+
+  const count = await countConfiguredTargets(pool, "adp_myjobs");
+
+  assert.equal(count, 544);
+  assert.match(queries[0].sql, /s\.ats_key = \$1/);
+  assert.match(queries[0].sql, /c\.ats_key = ANY\(\$2::text\[\]\)/);
+  assert.equal(queries[0].params[0], "adp_myjobs");
+  assert.ok(queries[0].params[1].includes("adpmyjobs"));
+});
+
+test("all-source estimator lists canonical source rows and folds legacy target aliases", async () => {
+  let observedSql = "";
+  const pool = {
+    async query(sql) {
+      observedSql = String(sql);
+      return {
+        rows: [{
+          ats_key: "adp_myjobs",
+          enabled: true,
+          protection_status: "canary_only",
+          disabled_reason: "",
+          configured_targets: 544
+        }]
+      };
+    }
+  };
+
+  const sources = await listEstimateSources(pool, { includeDisabled: true });
+
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].ats_key, "adp_myjobs");
+  assert.equal(sources[0].configured_targets, 544);
+  assert.match(observedSql, /LEFT JOIN companies c ON \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/);
+  assert.match(observedSql, /WHERE s\.ats_key = \(CASE LOWER\(BTRIM\(s\.ats_key\)\)/);
 });
 
 test("estimate decision buckets separate pass candidates and blocked sources", () => {
