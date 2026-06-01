@@ -1,4 +1,7 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
 const {
   attachDetailEvidenceSnapshot,
@@ -6,6 +9,7 @@ const {
   buildQualityGapFlags,
   candidateDetailEvidenceUrl,
   classifySourceCandidateErrorType,
+  evaluatePlannedBatchGate,
   evaluateSourceRecoveryReadiness,
   getRecoveryReadinessGate,
   getSafetyGate,
@@ -15,6 +19,43 @@ const {
   runWithLimitedConcurrency,
   sourceHost
 } = require("./sourceRunner");
+
+function plannedBatchReport(overrides = {}) {
+  const selectedPlan = {
+    target_gain: 25,
+    selected_tenant_count: 1,
+    selected_tenants: [{
+      source: "greenhouse",
+      tenant_key: "tenant-a",
+      tenant_host: "tenant-a.greenhouse.io",
+      net_new_clean_public_candidates: 25,
+      predicted_guard_result: "pass"
+    }],
+    cumulative_net_new_clean_public_candidates: 25,
+    cumulative_missing_any_geo_count: 0,
+    cumulative_weak_unknown_remote_count: 0,
+    cumulative_no_geo_no_remote_count: 0,
+    predicted_guard_result: "pass",
+    fail_reasons: []
+  };
+  return {
+    ok: true,
+    mode: "tenant-batch-plan",
+    read_only: true,
+    source: "greenhouse",
+    target_gain: 25,
+    net_new_clean_public_candidates: 25,
+    selected_plan: selectedPlan,
+    ...overrides
+  };
+}
+
+function writePlannedBatchReport(report = plannedBatchReport()) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openjobslots-plan-"));
+  const filePath = path.join(dir, "plan.json");
+  fs.writeFileSync(filePath, `${JSON.stringify(report, null, 2)}\n`);
+  return filePath;
+}
 
 test("source runner apply requires explicit production safety flags", () => {
   const dryRun = parseArgs(["--source=greenhouse", "--limit=5"]);
@@ -67,14 +108,59 @@ test("source runner apply requires explicit production safety flags", () => {
     "--source=greenhouse",
     "--confirm-production",
     "--max-updates=25",
-    "--planned-batch=reports/greenhouse-plan.json",
+    `--planned-batch=${writePlannedBatchReport()}`,
     "--predicted-guard-result=fail"
   ]);
   const failedPredictionGate = getSafetyGate(failedPrediction);
   assert.equal(failedPredictionGate.authorized, false);
   assert.equal(failedPredictionGate.planned_batch_present, true);
+  assert.equal(failedPredictionGate.planned_batch_report_ok, true);
   assert.equal(failedPredictionGate.predicted_guard_ok, false);
   assert.deepEqual(failedPredictionGate.missing, ["--predicted-guard-result=pass"]);
+
+  const missingReportFile = parseArgs([
+    "--mode=apply",
+    "--source=greenhouse",
+    "--confirm-production",
+    "--max-updates=25",
+    "--planned-batch=reports/greenhouse-plan.json",
+    "--predicted-guard-result=pass"
+  ]);
+  const missingReportFileGate = getSafetyGate(missingReportFile);
+  assert.equal(missingReportFileGate.authorized, false);
+  assert.equal(missingReportFileGate.planned_batch_report_ok, false);
+  assert.ok(missingReportFileGate.missing.includes("planned-batch-report-valid"));
+
+  const sourceMismatch = parseArgs([
+    "--mode=apply",
+    "--source=greenhouse",
+    "--confirm-production",
+    "--max-updates=25",
+    `--planned-batch=${writePlannedBatchReport(plannedBatchReport({ source: "lever" }))}`,
+    "--predicted-guard-result=pass"
+  ]);
+  const sourceMismatchGate = getSafetyGate(sourceMismatch);
+  assert.equal(sourceMismatchGate.authorized, false);
+  assert.ok(sourceMismatchGate.planned_batch_report_failures.includes("planned_batch_report_source_mismatch"));
+
+  const failedReportPrediction = parseArgs([
+    "--mode=apply",
+    "--source=greenhouse",
+    "--confirm-production",
+    "--max-updates=25",
+    `--planned-batch=${writePlannedBatchReport(plannedBatchReport({
+      selected_plan: {
+        ...plannedBatchReport().selected_plan,
+        predicted_guard_result: "fail",
+        fail_reasons: ["insufficient_guard_safe_tenant_rows"]
+      }
+    }))}`,
+    "--predicted-guard-result=pass"
+  ]);
+  const failedReportPredictionGate = getSafetyGate(failedReportPrediction);
+  assert.equal(failedReportPredictionGate.authorized, false);
+  assert.equal(failedReportPredictionGate.predicted_guard_ok, false);
+  assert.ok(failedReportPredictionGate.planned_batch_report_failures.includes("planned_batch_predicted_guard_not_pass"));
 
   const authorized = parseArgs([
     "--mode=apply",
@@ -82,7 +168,7 @@ test("source runner apply requires explicit production safety flags", () => {
     "--apply",
     "--confirm-production",
     "--max-updates=25",
-    "--planned-batch=reports/greenhouse-plan.json",
+    `--planned-batch=${writePlannedBatchReport()}`,
     "--predicted-guard-result=pass"
   ]);
   const gate = getSafetyGate(authorized);
@@ -91,7 +177,24 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.deepEqual(gate.missing, []);
   assert.equal(gate.recovery_readiness_gate.ok, true);
   assert.equal(gate.planned_batch_present, true);
+  assert.equal(gate.planned_batch_report_ok, true);
+  assert.equal(gate.planned_batch_report_source, "greenhouse");
+  assert.equal(gate.planned_batch_report_selected_tenant_count, 1);
+  assert.equal(gate.planned_batch_report_selected_gain, 25);
   assert.equal(gate.predicted_guard_ok, true);
+});
+
+test("source runner validates inline planned batch reports for unit callers", () => {
+  const gate = evaluatePlannedBatchGate({
+    apply: true,
+    source: "greenhouse",
+    plannedBatch: "inline-plan",
+    plannedBatchReport: plannedBatchReport()
+  });
+  assert.equal(gate.ok, true);
+  assert.equal(gate.status, "pass");
+  assert.equal(gate.source_type, "inline");
+  assert.equal(gate.predicted_guard_result, "pass");
 });
 
 test("source runner requires recovery readiness for canary and apply operations", async () => {

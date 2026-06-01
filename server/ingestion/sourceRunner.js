@@ -73,6 +73,151 @@ function clean(value, max = 1000) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function predictedGuardPassed(value) {
+  return ["pass", "passed", "ok", "success", "succeeded", "true"].includes(
+    clean(value || "", 80).toLowerCase()
+  );
+}
+
+function readPlannedBatchReport(options = {}, plannedBatchPath = "") {
+  if (options.plannedBatchReport && typeof options.plannedBatchReport === "object" && !Array.isArray(options.plannedBatchReport)) {
+    return {
+      ok: true,
+      source_type: "inline",
+      report: options.plannedBatchReport
+    };
+  }
+  if (!plannedBatchPath) {
+    return {
+      ok: false,
+      source_type: "",
+      status: "missing-path",
+      failures: ["planned_batch_path_missing"]
+    };
+  }
+  const resolvedPath = path.resolve(plannedBatchPath);
+  try {
+    const parsed = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {
+        ok: false,
+        source_type: "file",
+        path: resolvedPath,
+        status: "invalid-json-shape",
+        failures: ["planned_batch_report_must_be_object"]
+      };
+    }
+    return {
+      ok: true,
+      source_type: "file",
+      path: resolvedPath,
+      report: parsed
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      source_type: "file",
+      path: resolvedPath,
+      status: "unreadable",
+      failures: [`planned_batch_report_unreadable: ${clean(error?.message || error, 240)}`]
+    };
+  }
+}
+
+function firstMeaningful(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim().length === 0) continue;
+    return value;
+  }
+  return undefined;
+}
+
+function evaluatePlannedBatchGate(options = {}) {
+  const applyRequested = Boolean(options.apply);
+  const plannedBatch = clean(options.plannedBatch || "", 2000);
+  if (!applyRequested) {
+    return {
+      required: false,
+      ok: true,
+      status: "not-required",
+      path: plannedBatch,
+      source_type: "",
+      failures: [],
+      predicted_guard_result: "",
+      predicted_guard_ok: true,
+      selected_tenant_count: 0,
+      selected_gain: 0
+    };
+  }
+
+  const loaded = readPlannedBatchReport(options, plannedBatch);
+  const failures = [...(loaded.failures || [])];
+  const report = loaded.report || null;
+  const selectedPlan = report?.selected_plan || report?.selected_batch || report?.summary?.selected_plan || null;
+  const selectedTenants = Array.isArray(selectedPlan?.selected_tenants)
+    ? selectedPlan.selected_tenants
+    : Array.isArray(report?.selected_tenants)
+      ? report.selected_tenants
+      : [];
+  const reportSource = normalizeAtsKey(firstMeaningful(report?.source, selectedPlan?.source));
+  const expectedSource = normalizeAtsKey(options.source);
+  const predictedGuardResult = clean(firstMeaningful(
+    report?.predicted_guard_result,
+    selectedPlan?.predicted_guard_result,
+    report?.selected_batch?.predicted_guard_result,
+    report?.summary?.predicted_guard_result,
+    report?.result?.predicted_guard_result
+  ) || "", 80).toLowerCase();
+  const selectedGain = Number(firstMeaningful(
+    selectedPlan?.cumulative_net_new_clean_public_candidates,
+    selectedPlan?.net_new_clean_public_candidates,
+    report?.selected_gain,
+    report?.net_new_clean_public_candidates
+  ) || 0);
+  const noGeoNoRemote = Number(firstMeaningful(
+    selectedPlan?.cumulative_no_geo_no_remote_count,
+    selectedPlan?.no_geo_no_remote_count,
+    report?.new_no_geo_no_remote_accepted_count
+  ) || 0);
+
+  if (!loaded.ok) {
+    // readPlannedBatchReport already recorded the failure.
+  } else {
+    if (report?.ok === false || report?.success === false) failures.push("planned_batch_report_not_ok");
+    if (report?.read_only !== true) failures.push("planned_batch_report_must_be_read_only");
+    if (clean(report?.mode || "", 80) !== "tenant-batch-plan") failures.push("planned_batch_report_mode_must_be_tenant_batch_plan");
+    if (!reportSource) failures.push("planned_batch_report_source_missing");
+    else if (reportSource !== expectedSource) failures.push("planned_batch_report_source_mismatch");
+    if (!selectedPlan || typeof selectedPlan !== "object" || Array.isArray(selectedPlan)) {
+      failures.push("planned_batch_selected_plan_missing");
+    }
+    if (selectedTenants.length <= 0) failures.push("planned_batch_selected_tenants_missing");
+    if (selectedTenants.some((tenant) => !predictedGuardPassed(tenant?.predicted_guard_result))) {
+      failures.push("planned_batch_selected_tenant_guard_not_pass");
+    }
+    if (selectedGain <= 0) failures.push("planned_batch_selected_gain_missing");
+    if (noGeoNoRemote > 0) failures.push("planned_batch_selected_no_geo_no_remote_candidates");
+    if (!predictedGuardPassed(predictedGuardResult)) failures.push("planned_batch_predicted_guard_not_pass");
+  }
+
+  return {
+    required: true,
+    ok: failures.length === 0,
+    status: failures.length === 0 ? "pass" : "blocked",
+    path: plannedBatch,
+    resolved_path: loaded.path || "",
+    source_type: loaded.source_type || "",
+    report_source: reportSource || "",
+    expected_source: expectedSource || "",
+    failures: Array.from(new Set(failures)),
+    predicted_guard_result: predictedGuardResult || "",
+    predicted_guard_ok: predictedGuardPassed(predictedGuardResult),
+    selected_tenant_count: selectedTenants.length,
+    selected_gain: selectedGain
+  };
+}
+
 function postingSourceFailureReasons(posting = {}) {
   const values = Array.isArray(posting?.source_failure_reasons)
     ? posting.source_failure_reasons
@@ -146,7 +291,8 @@ function getSafetyGate(options = {}) {
   const readinessGate = getRecoveryReadinessGate(options);
   const plannedBatch = clean(options.plannedBatch || "", 2000);
   const predictedGuardResult = clean(options.predictedGuardResult || "", 80).toLowerCase();
-  const predictedGuardOk = ["pass", "passed", "ok", "success", "succeeded", "true"].includes(predictedGuardResult);
+  const plannedBatchGate = evaluatePlannedBatchGate(options);
+  const predictedGuardOk = predictedGuardPassed(predictedGuardResult) && plannedBatchGate.predicted_guard_ok;
   return {
     apply_requested: applyRequested,
     authorized:
@@ -155,9 +301,19 @@ function getSafetyGate(options = {}) {
       Number(options.maxUpdates || 0) > 0 &&
       readinessGate.ok &&
       plannedBatch.length > 0 &&
+      plannedBatchGate.ok &&
       predictedGuardOk,
     planned_batch_required: applyRequested,
     planned_batch_present: !applyRequested || plannedBatch.length > 0,
+    planned_batch_report_ok: !applyRequested || plannedBatchGate.ok,
+    planned_batch_report_status: plannedBatchGate.status,
+    planned_batch_report_source_type: plannedBatchGate.source_type,
+    planned_batch_report_source: plannedBatchGate.report_source,
+    planned_batch_report_expected_source: plannedBatchGate.expected_source,
+    planned_batch_report_selected_tenant_count: plannedBatchGate.selected_tenant_count,
+    planned_batch_report_selected_gain: plannedBatchGate.selected_gain,
+    planned_batch_report_failures: plannedBatchGate.failures,
+    planned_batch_predicted_guard_result: plannedBatchGate.predicted_guard_result,
     predicted_guard_result: predictedGuardResult || "",
     predicted_guard_ok: !applyRequested || predictedGuardOk,
     recovery_readiness_gate: readinessGate,
@@ -166,6 +322,7 @@ function getSafetyGate(options = {}) {
       applyRequested && Number(options.maxUpdates || 0) <= 0 ? "--max-updates=N" : "",
       applyRequested && !readinessGate.ok ? "recovery-readiness-ok" : "",
       applyRequested && plannedBatch.length <= 0 ? "--planned-batch=<report>" : "",
+      applyRequested && plannedBatch.length > 0 && !plannedBatchGate.ok ? "planned-batch-report-valid" : "",
       applyRequested && !predictedGuardOk ? "--predicted-guard-result=pass" : ""
     ].filter(Boolean)
   };
@@ -991,7 +1148,7 @@ async function processTarget(pool, target, options, summary, runId) {
 
   const accepted = [];
   const targetCandidateReports = [];
-  const safetyGate = getSafetyGate(options);
+  const safetyGate = summary.safety_gate || getSafetyGate(options);
   for (const item of Array.isArray(parsed) ? parsed : []) {
     let evaluated;
     try {
@@ -1151,7 +1308,7 @@ async function runWithLimitedConcurrency(items, worker, options = {}) {
 
 async function runSourceJob(options = parseArgs(), env = process.env) {
   const summary = buildInitialSummary(options);
-  const safetyGate = getSafetyGate(options);
+  const safetyGate = summary.safety_gate || getSafetyGate(options);
   summary.safety_gate = safetyGate;
   summary.recovery_readiness_gate = safetyGate.recovery_readiness_gate;
   summary.apply_mode = safetyGate.authorized;
@@ -1237,6 +1394,7 @@ module.exports = {
   buildQualityGapFlags,
   candidateDetailEvidenceUrl,
   classifySourceCandidateErrorType,
+  evaluatePlannedBatchGate,
   evaluateSourceRecoveryReadiness,
   evaluateSourceCandidate,
   getVirtualSourceTarget,
