@@ -230,6 +230,7 @@ function preflightProofStatus(report = {}) {
   const backupPath = String(firstMeaningful(checks.backup_path, report.backup_path) || "").trim();
   const backupFileExists = firstMeaningful(checks.backup_file_exists, report.backup_file_exists, report.backup_exists, report.backup?.exists);
   const backupSizeBytes = preflightNumber(checks.backup_size_bytes, report.backup_size_bytes, report.backup_bytes, report.backup?.size_bytes);
+  const generatedAt = String(firstMeaningful(report.generated_at, report.generatedAt, report.timestamp) || "").trim();
   const productionCommit = String(firstMeaningful(checks.production_checkout_commit, report.production_checkout_commit, report.checkout_commit, report.git?.commit) || "").trim();
   const expectedCommit = String(firstMeaningful(checks.expected_commit, report.expected_commit) || "").trim();
   const longRunningQueries = preflightNumber(checks.long_running_postgres_queries, report.long_running_postgres_queries, report.postgres?.long_running_queries);
@@ -238,6 +239,8 @@ function preflightProofStatus(report = {}) {
 
   if (report.ok !== true || report.unsafe === true) failures.push("preflight_report_not_safe");
   if (Array.isArray(report.failures) && report.failures.length > 0) failures.push("preflight_report_failures_present");
+  if (!generatedAt) failures.push("preflight_generated_at_missing");
+  else if (!Number.isFinite(Date.parse(generatedAt))) failures.push("preflight_generated_at_invalid");
   if (!productionCommit) failures.push("preflight_production_commit_missing");
   if (!expectedCommit) failures.push("preflight_expected_commit_missing");
   if (productionCommit && expectedCommit && !preflightCommitMatches(productionCommit, expectedCommit)) failures.push("preflight_production_commit_mismatch");
@@ -255,6 +258,7 @@ function preflightProofStatus(report = {}) {
   return {
     ok: failures.length === 0,
     failures: Array.from(new Set(failures)),
+    generated_at: generatedAt,
     production_checkout_commit: productionCommit,
     expected_commit: expectedCommit,
     backup_path: backupPath,
@@ -723,6 +727,7 @@ function evaluateReleaseCheck(input = {}) {
       predicted_guard_result: predictedGuardResult || null,
       rollback_command_present: hasMeaningfulValue(rollbackCommand),
       preflight_backup_size_bytes: preflightProof?.backup_size_bytes ?? null,
+      preflight_generated_at: preflightProof?.generated_at || null,
       preflight_long_running_postgres_queries: preflightProof?.long_running_postgres_queries ?? null,
       preflight_meili_postgres_delta: preflightProof?.meili_postgres_delta ?? null,
       missing_any_geo_pct_before: beforeMissingAnyGeoPct,
@@ -822,6 +827,7 @@ function selfTestPayload() {
     preflightReport: {
       ok: true,
       unsafe: false,
+      generated_at: new Date().toISOString(),
       checks: {
         production_checkout_commit: "abcdef1234567890",
         expected_commit: "abcdef1234567890",

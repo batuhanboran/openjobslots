@@ -64,6 +64,7 @@ function preflightReport(overrides = {}) {
   return {
     ok: true,
     unsafe: false,
+    generated_at: new Date().toISOString(),
     checks: {
       production_checkout_commit: "abcdef1234567890",
       expected_commit: "abcdef1234567890",
@@ -260,6 +261,8 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(gate.planned_batch_report_selected_tenant_count, 1);
   assert.equal(gate.planned_batch_report_selected_gain, 25);
   assert.equal(gate.preflight_report_ok, true);
+  assert.equal(typeof gate.preflight_generated_at, "string");
+  assert.equal(gate.preflight_max_age_minutes, 60);
   assert.equal(gate.preflight_production_checkout_commit, "abcdef1234567890");
   assert.equal(gate.preflight_expected_commit, "abcdef1234567890");
   assert.equal(gate.preflight_backup_size_bytes, 1024);
@@ -317,6 +320,7 @@ test("source runner validates preflight reports for source operations", () => {
   assert.equal(gate.expected_commit, "abcdef1234567890");
   assert.equal(gate.long_running_postgres_queries, 0);
   assert.equal(gate.meili_postgres_delta, 0);
+  assert.equal(gate.max_age_minutes, 60);
 
   const missingBackup = evaluatePreflightReportGate({
     mode: "canary",
@@ -347,6 +351,27 @@ test("source runner validates preflight reports for source operations", () => {
   });
   assert.equal(missingCommit.ok, false);
   assert.ok(missingCommit.failures.includes("preflight_production_commit_missing"));
+
+  const missingTimestamp = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightReportPayload: preflightReport({ generated_at: "" })
+  });
+  assert.equal(missingTimestamp.ok, false);
+  assert.ok(missingTimestamp.failures.includes("preflight_generated_at_missing"));
+
+  const staleTimestamp = evaluatePreflightReportGate({
+    mode: "canary",
+    source: "greenhouse",
+    preflightReport: "inline-preflight",
+    preflightMaxAgeMinutes: 60,
+    preflightReportPayload: preflightReport({
+      generated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    })
+  });
+  assert.equal(staleTimestamp.ok, false);
+  assert.ok(staleTimestamp.failures.includes("preflight_report_stale"));
 
   const mismatchedCommit = evaluatePreflightReportGate({
     mode: "canary",

@@ -30,6 +30,7 @@ test("release check passes for clean recovery reports", () => {
   assert.equal(result.ok, true);
   assert.equal(result.release_allowed, true);
   assert.equal(result.metrics.preflight_backup_size_bytes, 1024);
+  assert.equal(typeof result.metrics.preflight_generated_at, "string");
   assert.equal(result.metrics.preflight_long_running_postgres_queries, 0);
   assert.equal(result.metrics.preflight_meili_postgres_delta, 0);
   assert.equal(result.metrics.meili_remote_facet_delta_count, 0);
@@ -301,6 +302,19 @@ test("release check fails when preflight lacks backup file proof", () => {
   assert.ok(failure);
   assert.ok(failure.reasons.includes("preflight_backup_file_missing"));
   assert.ok(failure.reasons.includes("preflight_backup_file_empty"));
+});
+
+test("release check fails when preflight lacks generated timestamp", () => {
+  const payload = selfTestPayload();
+  const result = evaluateReleaseCheck(basePayload({
+    preflightReport: {
+      ...payload.preflightReport,
+      generated_at: ""
+    }
+  }));
+  assert.equal(result.ok, false);
+  const failure = result.failures.find((item) => item.code === "preflight_unsafe_or_undocumented");
+  assert.ok(failure.reasons.includes("preflight_generated_at_missing"));
 });
 
 test("release check fails when preflight search state is undocumented", () => {

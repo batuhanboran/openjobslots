@@ -24,6 +24,7 @@ const DEFAULT_SOURCE_RUN_LIMIT = 25;
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
 const DEFAULT_HOST_CONCURRENCY = 1;
 const DEFAULT_BATCH_SIZE = 100;
+const DEFAULT_PREFLIGHT_MAX_AGE_MINUTES = 60;
 const MAX_RUN_LIMIT = 1000;
 const MAX_RUN_OFFSET = 1_000_000;
 const MAX_CONCURRENCY = 4;
@@ -198,6 +199,43 @@ function preflightNumber(...values) {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+function preflightTimestampStatus(report = {}, options = {}) {
+  const generatedAt = clean(firstMeaningful(report?.generated_at, report?.generatedAt, report?.timestamp) || "", 120);
+  const maxAgeMinutes = Number.isFinite(Number(options.preflightMaxAgeMinutes)) && Number(options.preflightMaxAgeMinutes) > 0
+    ? Number(options.preflightMaxAgeMinutes)
+    : DEFAULT_PREFLIGHT_MAX_AGE_MINUTES;
+  if (!generatedAt) {
+    return {
+      ok: false,
+      generated_at: "",
+      age_minutes: null,
+      max_age_minutes: maxAgeMinutes,
+      failures: ["preflight_generated_at_missing"]
+    };
+  }
+  const parsed = Date.parse(generatedAt);
+  if (!Number.isFinite(parsed)) {
+    return {
+      ok: false,
+      generated_at: generatedAt,
+      age_minutes: null,
+      max_age_minutes: maxAgeMinutes,
+      failures: ["preflight_generated_at_invalid"]
+    };
+  }
+  const ageMinutes = (Date.now() - parsed) / 60_000;
+  const failures = [];
+  if (ageMinutes < -5) failures.push("preflight_generated_at_in_future");
+  if (ageMinutes > maxAgeMinutes) failures.push("preflight_report_stale");
+  return {
+    ok: failures.length === 0,
+    generated_at: generatedAt,
+    age_minutes: Number(ageMinutes.toFixed(2)),
+    max_age_minutes: maxAgeMinutes,
+    failures
+  };
 }
 
 function normalizeScopeValue(value, max = 2000) {
@@ -440,10 +478,18 @@ function evaluatePreflightReportGate(options = {}) {
   const meiliDelta = preflightNumber(checks.meili_postgres_delta, report?.meili_postgres_delta, report?.meili?.postgres_delta);
   const heavyJobActive = firstMeaningful(checks.heavy_job_active, report?.heavy_job_active, report?.heavy_job?.active);
   const failuresPresent = Array.isArray(report?.failures) && report.failures.length > 0;
+  const timestamp = loaded.ok ? preflightTimestampStatus(report, options) : {
+    ok: false,
+    generated_at: "",
+    age_minutes: null,
+    max_age_minutes: DEFAULT_PREFLIGHT_MAX_AGE_MINUTES,
+    failures: []
+  };
 
   if (!loaded.ok) {
     // readPreflightReport already recorded the failure.
   } else {
+    failures.push(...timestamp.failures);
     if (report?.ok !== true || report?.unsafe === true) failures.push("preflight_report_not_safe");
     if (failuresPresent) failures.push("preflight_report_failures_present");
     if (!productionCommit) failures.push("preflight_production_commit_missing");
@@ -469,6 +515,9 @@ function evaluatePreflightReportGate(options = {}) {
     resolved_path: loaded.path || "",
     source_type: loaded.source_type || "",
     failures: Array.from(new Set(failures)),
+    generated_at: timestamp.generated_at,
+    age_minutes: timestamp.age_minutes,
+    max_age_minutes: timestamp.max_age_minutes,
     production_checkout_commit: productionCommit,
     expected_commit: expectedCommit,
     backup_path: backupPath,
@@ -517,6 +566,12 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     includeDisabled: asBool(env.OPENJOBSLOTS_ATS_SOURCE_INCLUDE_DISABLED),
     plannedBatch: String(env.OPENJOBSLOTS_ATS_SOURCE_PLANNED_BATCH || "").trim(),
     preflightReport: String(env.OPENJOBSLOTS_ATS_SOURCE_PREFLIGHT_REPORT || "").trim(),
+    preflightMaxAgeMinutes: asInt(
+      env.OPENJOBSLOTS_ATS_SOURCE_PREFLIGHT_MAX_AGE_MINUTES,
+      DEFAULT_PREFLIGHT_MAX_AGE_MINUTES,
+      1,
+      1440
+    ),
     predictedGuardResult: String(env.OPENJOBSLOTS_ATS_SOURCE_PREDICTED_GUARD_RESULT || "").trim(),
     detailEvidence: asBool(env.OPENJOBSLOTS_DETAIL_EVIDENCE),
     detailEvidenceProvider: String(env.OPENJOBSLOTS_DETAIL_EVIDENCE_PROVIDER || "local").trim().toLowerCase(),
@@ -543,6 +598,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     else if (arg.startsWith("--output=")) options.output = String(arg.slice("--output=".length)).trim();
     else if (arg.startsWith("--planned-batch=")) options.plannedBatch = String(arg.slice("--planned-batch=".length)).trim();
     else if (arg.startsWith("--preflight-report=")) options.preflightReport = String(arg.slice("--preflight-report=".length)).trim();
+    else if (arg.startsWith("--preflight-max-age-minutes=")) options.preflightMaxAgeMinutes = asInt(arg.slice("--preflight-max-age-minutes=".length), options.preflightMaxAgeMinutes, 1, 1440);
     else if (arg.startsWith("--predicted-guard-result=")) options.predictedGuardResult = String(arg.slice("--predicted-guard-result=".length)).trim();
     else if (arg === "--detail-evidence") options.detailEvidence = true;
     else if (arg === "--no-detail-evidence") options.detailEvidence = false;
@@ -605,6 +661,9 @@ function getSafetyGate(options = {}) {
     preflight_report_status: preflightReportGate.status,
     preflight_report_source_type: preflightReportGate.source_type,
     preflight_report_failures: preflightReportGate.failures,
+    preflight_generated_at: preflightReportGate.generated_at || "",
+    preflight_age_minutes: preflightReportGate.age_minutes,
+    preflight_max_age_minutes: preflightReportGate.max_age_minutes,
     preflight_production_checkout_commit: preflightReportGate.production_checkout_commit || "",
     preflight_expected_commit: preflightReportGate.expected_commit || "",
     preflight_backup_path: preflightReportGate.backup_path || "",
