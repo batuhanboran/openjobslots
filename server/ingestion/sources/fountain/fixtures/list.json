@@ -6,6 +6,15 @@
       "posted_at": "2026-05-06T08:00:00+03:00",
       "location_name": "Madrid, Spain",
       "job_type": "On-site"
+    },
+    {
+      "id": "18ad4902-cef9-46fb-ba10-2a599b5fc4ce",
+      "title": "Facilities Technician",
+      "to_param": "facilities-technician-35-hours-per-week-tampa-fl",
+      "location_name": "ACS Tampa FL",
+      "location_address": "Tampa, FL, 33612, US",
+      "location_state_code": "FL",
+      "job_type": "permanent"
     }
   ]
 }

@@ -55,6 +55,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `partnerid=16030&siteid=6090`: source API reported `JobsCount=1,679`; the default bounded fetch used `12` pages and parsed/accepted `548` current rows in the latest probe, preserving more than the current public `488` BrassRing rows instead of the previous single-page `50` ceiling.
 - Verification covered BrassRing syntax checks, enterprise source-module pagination fixtures, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Fountain Structured Address And Pagination - June 1, 2026
+
+- Fresh read-only production baseline had Fountain at `424` visible rows, `153` missing country/region rows, `148` weak/unknown remote rows, and `424` missing posting dates.
+- Fountain board JSON exposes source-backed `openings[].location_address` and `openings[].location_state_code`; `location_name` can be a brand/site label that should not be treated as geo by itself. The parser now derives compact city/state/country from the structured address field and leaves address-less remote/internal labels countryless.
+- Fountain fetch now follows bounded JSON pagination from `pagination.next_page`, defaulting to `8` pages and capped by `OPENJOBSLOTS_FOUNTAIN_MAX_PAGES_PER_COMPANY` / `maxFountainPages`, avoiding the previous first-page-only `25` row ceiling for larger boards.
+- Live read-only proof across `marsden`, `wedriveu`, `fetch-package-delivery`, `clear`, `nursedash`, and `assist-services`: bounded pagination fetched `542` current rows. Legacy local behavior would have had `272` missing country/region rows and `266` weak remote rows; the new parser reduced those to `11` and `3`, with `519` rows carrying `openings[].location_address` country evidence.
+- No URL-path, title, tenant, body, or board-name inference was added. Posting dates remain null when Fountain omits them. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.

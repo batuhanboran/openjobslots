@@ -344,6 +344,71 @@ test("fountain source module fetches the board JSON endpoint with source-local d
   assert.equal(payload.openings.length, 1);
 });
 
+test("fountain source module follows bounded JSON pagination", async () => {
+  const source = getSourceModule("fountain");
+  const company = readJson(path.join(__dirname, "fountain", "fixtures", "company.json"));
+  const calls = [];
+
+  const payload = await source.fetchList(company, {
+    maxFountainPages: 2,
+    fetcher: async (url, target) => {
+      calls.push({ url, method: target.method });
+      if (url.endsWith("board.json")) {
+        return {
+          openings: [{ id: "page-1", title: "Page One", to_param: "page-one", location_name: "Madrid, Spain" }],
+          pagination: { current_page: 1, next_page: 2, total_pages: 3 }
+        };
+      }
+      return {
+        openings: [{ id: "page-2", title: "Page Two", to_param: "page-two", location_name: "Lisbon, Portugal" }],
+        pagination: { current_page: 2, next_page: 3, total_pages: 3 }
+      };
+    }
+  });
+
+  assert.deepEqual(calls, [
+    { url: "https://web.fountain.com/c/fixtureco/jobs/board.json", method: "GET" },
+    { url: "https://web.fountain.com/c/fixtureco/jobs/board.json?page=2", method: "GET" }
+  ]);
+  assert.equal(payload.openings.length, 2);
+  assert.equal(payload.__sourceFetchPageCount, 2);
+  assert.equal(payload.__sourceFetchTruncated, true);
+});
+
+test("fountain source module prefers structured location_address geo evidence", () => {
+  const source = getSourceModule("fountain");
+  const company = readJson(path.join(__dirname, "fountain", "fixtures", "company.json"));
+  const rawList = readJson(path.join(__dirname, "fountain", "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const structured = normalized.find((row) => row.source_job_id === "18ad4902-cef9-46fb-ba10-2a599b5fc4ce");
+
+  assert.equal(structured.location_text, "Tampa, FL, United States");
+  assert.equal(structured.country, "United States");
+  assert.equal(structured.region, "North America");
+  assert.equal(structured.city, "Tampa");
+  assert.equal(structured.remote_type, "onsite");
+  assert.equal(structured.evidence.country.evidence_path, "openings[].location_address");
+  assert.equal(source.validatePublic(structured).status, "accepted");
+});
+
+test("fountain source module parses structured address variants without state-code metadata", () => {
+  const { extractFountainAddressEvidence } = require("./fountain/parse");
+
+  assert.deepEqual(extractFountainAddressEvidence({ location_address: "Toronto, ON, Canada" }), {
+    city: "Toronto",
+    state: "ON",
+    country: "Canada",
+    location: "Toronto, ON, Canada"
+  });
+  assert.deepEqual(extractFountainAddressEvidence({ location_address: "123 Main St, Tampa, FL, 33612, US" }), {
+    city: "Tampa",
+    state: "FL",
+    country: "United States",
+    location: "Tampa, FL, United States"
+  });
+});
+
 test("pinpointhq source module fetches postings JSON with source-local cache-busting metadata", async () => {
   const source = getSourceModule("pinpointhq");
   const company = readJson(path.join(__dirname, "pinpointhq", "fixtures", "company.json"));

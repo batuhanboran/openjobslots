@@ -8,5 +8,15 @@
     "remote_type": "onsite",
     "is_remote": false,
     "source_job_id": "delivery-operations-associate"
+  },
+  {
+    "ats_key": "fountain",
+    "company_name": "Fixture Fountain",
+    "position_name": "Facilities Technician",
+    "job_posting_url": "https://web.fountain.com/c/fixtureco/jobs/board/facilities-technician-35-hours-per-week-tampa-fl",
+    "country": "United States",
+    "remote_type": "onsite",
+    "is_remote": false,
+    "source_job_id": "18ad4902-cef9-46fb-ba10-2a599b5fc4ce"
   }
 ]
