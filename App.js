@@ -3081,6 +3081,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "2.2.0",
+    date: "June 1, 2026",
+    title: "ATS architecture and recovery guardrails",
+    summary:
+      "Moves ATS recovery proof closer to source-local modules, tightens alias and fixture ownership, adds safer read-only Meili/Postgres facet-drift diagnostics, and reduces false parser-drift alerts from optional enrichment payloads."
+  },
+  {
     version: "2.1.0",
     date: "May 31, 2026",
     title: "ATS pipeline and runtime safety",
@@ -3342,6 +3349,11 @@ const PUBLIC_RELEASE_NOTES = [
 ];
 const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
   tr: {
+    "2.2.0": {
+      title: "ATS mimarisi ve kurtarma güvenlik hatları",
+      summary:
+        "ATS kurtarma kanıtını kaynak yerel modüllere yaklaştırır, alias ve fixture sahipliğini sıkılaştırır, daha güvenli salt okunur Meili/Postgres facet-drift tanılaması ekler ve isteğe bağlı zenginleştirme payload'larından gelen hatalı parser-drift uyarılarını azaltır."
+    },
     "2.1.0": {
       title: "ATS pipeline ve runtime güvenliği",
       summary:
@@ -3379,6 +3391,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   de: {
+    "2.2.0": {
+      title: "ATS-Architektur und Recovery-Schutz",
+      summary:
+        "Rückt ATS-Recovery-Nachweise näher an quelllokale Module, verschärft Alias- und Fixture-Verantwortung, ergänzt sicherere schreibgeschützte Meili/Postgres-Facet-Drift-Diagnosen und reduziert falsche Parser-Drift-Meldungen aus optionalen Anreicherungspayloads."
+    },
     "2.1.0": {
       title: "ATS-Pipeline und Laufzeitsicherheit",
       summary:
@@ -3416,6 +3433,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   fr: {
+    "2.2.0": {
+      title: "Architecture ATS et garde-fous de récupération",
+      summary:
+        "Rapproche les preuves de récupération ATS des modules propres à chaque source, renforce la responsabilité des alias et fixtures, ajoute des diagnostics Meili/Postgres en lecture seule plus sûrs pour les écarts de facettes, et réduit les fausses alertes de drift parser liées aux payloads d'enrichissement optionnels."
+    },
     "2.1.0": {
       title: "Pipeline ATS et sécurité d'exécution",
       summary:
@@ -3453,6 +3475,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   es: {
+    "2.2.0": {
+      title: "Arquitectura ATS y controles de recuperación",
+      summary:
+        "Acerca la evidencia de recuperación ATS a los módulos propios de cada fuente, refuerza la propiedad de alias y fixtures, añade diagnósticos Meili/Postgres de solo lectura más seguros para el drift de facetas y reduce falsas alertas de drift de parser por payloads opcionales de enriquecimiento."
+    },
     "2.1.0": {
       title: "Pipeline ATS y seguridad en ejecución",
       summary:
@@ -3490,6 +3517,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-BR": {
+    "2.2.0": {
+      title: "Arquitetura ATS e guardrails de recuperação",
+      summary:
+        "Aproxima a prova de recuperação ATS dos módulos locais de cada fonte, reforça a propriedade de aliases e fixtures, adiciona diagnósticos Meili/Postgres somente leitura mais seguros para drift de facetas e reduz falsos alertas de drift de parser vindos de payloads opcionais de enriquecimento."
+    },
     "2.1.0": {
       title: "Pipeline ATS e segurança de runtime",
       summary:
@@ -3527,6 +3559,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-PT": {
+    "2.2.0": {
+      title: "Arquitetura ATS e guardas de recuperação",
+      summary:
+        "Aproxima a prova de recuperação ATS dos módulos locais de cada fonte, reforça a propriedade de aliases e fixtures, acrescenta diagnósticos Meili/Postgres só de leitura mais seguros para drift de facetas e reduz falsos alertas de drift de parser vindos de payloads opcionais de enriquecimento."
+    },
     "2.1.0": {
       title: "Pipeline ATS e segurança de runtime",
       summary:
@@ -3564,6 +3601,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   it: {
+    "2.2.0": {
+      title: "Architettura ATS e protezioni di recupero",
+      summary:
+        "Avvicina le prove di recupero ATS ai moduli locali delle fonti, rafforza la proprietà di alias e fixture, aggiunge diagnostica Meili/Postgres in sola lettura più sicura per il drift delle faccette e riduce i falsi avvisi di drift del parser dai payload opzionali di arricchimento."
+    },
     "2.1.0": {
       title: "Pipeline ATS e sicurezza runtime",
       summary:
@@ -3601,6 +3643,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   nl: {
+    "2.2.0": {
+      title: "ATS-architectuur en herstelwaarborgen",
+      summary:
+        "Brengt ATS-herstelbewijs dichter bij bronspecifieke modules, scherpt eigenaarschap van aliassen en fixtures aan, voegt veiligere alleen-lezen Meili/Postgres-facetdrift-diagnoses toe en vermindert valse parserdriftmeldingen uit optionele verrijkingspayloads."
+    },
     "2.1.0": {
       title: "ATS-pipeline en runtimeveiligheid",
       summary:
@@ -3638,6 +3685,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   pl: {
+    "2.2.0": {
+      title: "Architektura ATS i zabezpieczenia odzyskiwania",
+      summary:
+        "Przenosi dowody odzyskiwania ATS bliżej modułów właściwych dla źródeł, zaostrza własność aliasów i fixture'ów, dodaje bezpieczniejszą diagnostykę tylko do odczytu dla driftu facetów Meili/Postgres oraz ogranicza fałszywe alerty driftu parsera z opcjonalnych payloadów wzbogacających."
+    },
     "2.1.0": {
       title: "Pipeline ATS i bezpieczeństwo runtime",
       summary:
@@ -3675,6 +3727,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   ja: {
+    "2.2.0": {
+      title: "ATSアーキテクチャと復旧ガードレール",
+      summary:
+        "ATS復旧の証跡をソースローカルなモジュールへ近づけ、エイリアスとフィクスチャの所有範囲を明確にし、読み取り専用のMeili/Postgresファセットドリフト診断をより安全に追加し、任意の拡張ペイロードによる誤ったパーサードリフト警告を減らします。"
+    },
     "2.1.0": {
       title: "ATSパイプラインとランタイム安全性",
       summary:
@@ -3682,6 +3739,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   ko: {
+    "2.2.0": {
+      title: "ATS 아키텍처와 복구 가드레일",
+      summary:
+        "ATS 복구 증거를 소스별 로컬 모듈에 더 가깝게 두고, alias와 fixture 소유 범위를 강화하며, 더 안전한 읽기 전용 Meili/Postgres facet drift 진단을 추가하고, 선택적 보강 payload에서 발생하는 잘못된 parser drift 경고를 줄입니다."
+    },
     "2.1.0": {
       title: "ATS 파이프라인과 런타임 안전성",
       summary:
@@ -3689,6 +3751,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "zh-CN": {
+    "2.2.0": {
+      title: "ATS 架构与恢复护栏",
+      summary:
+        "将 ATS 恢复证据更贴近源本地模块，收紧别名和 fixture 的归属，加入更安全的只读 Meili/Postgres facet drift 诊断，并减少可选增强 payload 带来的误报 parser drift 告警。"
+    },
     "2.1.0": {
       title: "ATS 管道与运行时安全",
       summary:
@@ -3696,6 +3763,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   hi: {
+    "2.2.0": {
+      title: "ATS आर्किटेक्चर और रिकवरी गार्डरेल",
+      summary:
+        "ATS recovery proof को source-local modules के करीब लाता है, alias और fixture ownership को सख्त करता है, सुरक्षित read-only Meili/Postgres facet-drift diagnostics जोड़ता है, और optional enrichment payloads से आने वाले गलत parser-drift alerts घटाता है।"
+    },
     "2.1.0": {
       title: "ATS pipeline और runtime सुरक्षा",
       summary:
@@ -3703,6 +3775,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   ar: {
+    "2.2.0": {
+      title: "بنية ATS وحواجز أمان الاسترداد",
+      summary:
+        "يقرب إثباتات استرداد ATS من وحدات المصادر المحلية، ويشدد ملكية الأسماء البديلة والـ fixtures، ويضيف تشخيصات Meili/Postgres للقراءة فقط بشكل أكثر أمانا لاختلاف faceting، ويقلل تنبيهات parser drift الخاطئة الناتجة عن payloads الإثراء الاختيارية."
+    },
     "2.1.0": {
       title: "مسار ATS وأمان وقت التشغيل",
       summary:
@@ -3710,6 +3787,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   id: {
+    "2.2.0": {
+      title: "Arsitektur ATS dan pagar pemulihan",
+      summary:
+        "Mendekatkan bukti pemulihan ATS ke modul lokal tiap sumber, memperketat kepemilikan alias dan fixture, menambahkan diagnostik facet drift Meili/Postgres read-only yang lebih aman, serta mengurangi peringatan parser drift palsu dari payload pengayaan opsional."
+    },
     "2.1.0": {
       title: "Pipeline ATS dan keamanan runtime",
       summary:
@@ -3717,6 +3799,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   sv: {
+    "2.2.0": {
+      title: "ATS-arkitektur och skydd för återhämtning",
+      summary:
+        "Flyttar ATS-återhämtningsbevis närmare källlokala moduler, skärper ägarskap för alias och fixtures, lägger till säkrare skrivskyddad diagnostik för Meili/Postgres facet-drift och minskar falska parser-drift-varningar från valfria berikningspayloads."
+    },
     "2.1.0": {
       title: "ATS-pipeline och runtime-säkerhet",
       summary:
@@ -3724,6 +3811,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   da: {
+    "2.2.0": {
+      title: "ATS-arkitektur og gærder for gendannelse",
+      summary:
+        "Flytter ATS-gendannelsesbeviser tættere på kildelokale moduler, skærper ejerskab af aliaser og fixtures, tilføjer sikrere skrivebeskyttet diagnostik for Meili/Postgres facet-drift og reducerer falske parser-drift-advarsler fra valgfrie berigelses-payloads."
+    },
     "2.1.0": {
       title: "ATS-pipeline og runtime-sikkerhed",
       summary:
@@ -3731,6 +3823,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   no: {
+    "2.2.0": {
+      title: "ATS-arkitektur og gjerder for gjenoppretting",
+      summary:
+        "Flytter ATS-gjenopprettingsbevis nærmere kildelokale moduler, skjerper eierskap for aliaser og fixtures, legger til sikrere skrivebeskyttet diagnostikk for Meili/Postgres facet-drift og reduserer falske parser-drift-varsler fra valgfrie berikelses-payloads."
+    },
     "2.1.0": {
       title: "ATS-pipeline og runtime-sikkerhet",
       summary:
@@ -3738,6 +3835,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   fi: {
+    "2.2.0": {
+      title: "ATS-arkkitehtuuri ja palautuksen suojakaiteet",
+      summary:
+        "Siirtää ATS-palautuksen todisteet lähemmäs lähdekohtaisia moduuleja, tiukentaa aliasten ja fixture-tiedostojen omistajuutta, lisää turvallisempaa vain luku -tilan Meili/Postgres facet-drift -diagnostiikkaa ja vähentää valinnaisista rikastuspayloadista tulevia virheellisiä parser-drift-hälytyksiä."
+    },
     "2.1.0": {
       title: "ATS-putki ja runtime-turvallisuus",
       summary:
