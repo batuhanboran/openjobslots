@@ -1,5 +1,4 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
-const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
@@ -234,7 +233,7 @@ const SOURCE_SPECS = Object.freeze({
   lever: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseLeverPostingsFromApi,
+    parser: () => [],
     officialDocs: "https://github.com/lever/postings-api",
     discover(company) {
       const organization = firstPathSegment(company.url_string);

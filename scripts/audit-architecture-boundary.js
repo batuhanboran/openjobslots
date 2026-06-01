@@ -32,6 +32,8 @@ const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
   { name: "careerplug_parser_spec", regex: /careerplug:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseCareerplugPostingsFromHtml/ },
   { name: "hrmdirect_parser_import", regex: /require\(["']\.\/hrmdirect\/parse["']\)/ },
   { name: "hrmdirect_parser_spec", regex: /hrmdirect:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseHrmDirectPostingsFromHtml/ },
+  { name: "lever_parser_import", regex: /require\(["']\.\/lever\/parse["']\)/ },
+  { name: "lever_parser_spec", regex: /lever:\s*{[\s\S]*?parser:\s*parseLeverPostingsFromApi/ },
   { name: "loxo_parser_import", regex: /require\(["']\.\/loxo\/parse["']\)/ },
   { name: "loxo_parser_spec", regex: /loxo:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseLoxoPostingsFromHtml/ },
   { name: "manatal_parser_import", regex: /require\(["']\.\/manatal\/parse["']\)/ },
