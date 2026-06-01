@@ -1920,6 +1920,37 @@ test("hrmdirect source module does not publish list state abbreviation as city",
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("hrmdirect source module preserves Puerto Rico numeric region evidence", () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Puerto Rico",
+    ATS_name: "hrmdirect",
+    url_string: "https://prfixture.hrmdirect.com/employment/job-openings.php"
+  };
+  const parsed = source.parse({
+    html: `<table><tr class="reqitem">
+      <td class="departments reqitem ReqRowClick">VEG</td>
+      <td class="posTitle reqitem ReqRowClick"><a href="job-opening.php?req=3725496&req_loc=1339384">Scheduler / Planning Engineer</a></td>
+      <td class="cities reqitem ReqRowClick">Humacao</td>
+      <td class="state reqitem ReqRowClick">069</td>
+    </tr></table>`,
+    __listUrl: "https://prfixture.hrmdirect.com/employment/job-openings.php?search=true"
+  }, company);
+  const [normalized] = parsed.map((posting) => source.normalize(posting, company));
+
+  assert.equal(normalized.source_job_id, "3725496");
+  assert.equal(normalized.location_text, "Humacao, 069");
+  assert.equal(normalized.country, "Puerto Rico");
+  assert.equal(normalized.region, "North America");
+  assert.equal(normalized.city, "Humacao");
+  assert.equal(normalized.remote_type, "unknown");
+  assert.equal(normalized.source_evidence.location_source, "labeled_html");
+  assert.equal(normalized.source_evidence.location_path, "td.cities + td.state");
+  assert.equal(normalized.source_evidence.location_rule_name, "hrmdirect_list_puerto_rico_numeric_region");
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("hrmdirect source module accepts labeled detail office state as geo evidence", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");

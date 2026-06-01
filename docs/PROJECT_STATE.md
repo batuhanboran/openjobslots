@@ -109,6 +109,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on the top 30 Zoho missing-country/region tenants: the production top-list baseline had `1,236` missing-country/region rows; the local parser parsed `1,634` current live rows, accepted `1,577`, reduced missing country/region to `283`, and preserved `978` source posting dates. Example tenant deltas: `peopleandpartnersgroup` `93 -> 0`, `ubuntuimpact` `89 -> 0`, `dunnandbraxton` `61 -> 0`, `royalinstitute` `66 -> 0`, `pacificmanpower` `50 -> 0`, `gigmile` `72 -> 1`.
 - Remaining top-list gaps are mostly explicit remote/no-location rows or tenants whose source payload does not expose a country. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## HRMDirect Puerto Rico Numeric Region Evidence - June 1, 2026
+
+- Fresh read-only production baseline selected HRMDirect after Zoho: `39,871` visible rows, `1,338` missing country/region rows, `1,260` weak/unknown remote rows, and `22,823` missing posting dates.
+- Top missing-country/region tenant `veg-group.hrmdirect.com` had production `261` visible rows and `247` missing country/region rows. Its HRMDirect list exposes `td.cities` plus a numeric three-digit `td.state` value for Puerto Rico city evidence such as `Humacao, 069`, `Gurabo, 063`, `Punta Santiago, 069`, `Carolina, 031/127`, and `Juncos, 077`.
+- HRMDirect parser now maps only source-local `td.cities + td.state` rows where the city is in the observed Puerto Rico city set and the state cell is a three-digit numeric region. This does not use tenant-level, title, or body inference.
+- Live read-only proof on `veg-group`: local parser parsed and accepted `251` current rows, reduced missing country/region from `236` local sample rows to `0`, and recovered `236` rows as `Puerto Rico` / `North America` with rule `hrmdirect_list_puerto_rico_numeric_region`. Remote type remains `unknown` where HRMDirect has no explicit remote/work-mode field.
+- Other sampled HRMDirect tenants such as `carespot`, `ccsnh`, `ne-arc`, and `thebreakers` still require source-backed location evidence; city-only, campus-name, title-parenthetical, or employment-type-like values were not converted into country evidence. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplicantPro ISO3 And Workplace Evidence - June 1, 2026
 
 - Fresh read-only production checks kept production at `6660eab`; public health reported `331,515` visible job slots, and `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,509`/`331,509`) with the known `22` document remote-facet drift.

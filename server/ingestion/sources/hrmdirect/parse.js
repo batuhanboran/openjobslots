@@ -76,6 +76,20 @@ const HRMDIRECT_CANADA_PROVINCE_NAMES = new Set([
   "yukon"
 ]);
 
+const HRMDIRECT_PUERTO_RICO_NUMERIC_REGION_CITIES = new Set([
+  "aibonito",
+  "barceloneta",
+  "carolina",
+  "cayey",
+  "dorado",
+  "gurabo",
+  "humacao",
+  "juana diaz",
+  "juncos",
+  "manati",
+  "punta santiago"
+]);
+
 const HRMDIRECT_US_STATE_ABBREVIATION_PATTERN =
   /\b(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\b/i;
 const HRMDIRECT_US_STATE_ABBREVIATION_EXACT_PATTERN =
@@ -122,6 +136,21 @@ function cleanHrmDirectLocationText(value) {
     .trim();
   if (!text || /^[,;:|/\s-]+$/.test(text)) return "";
   return text;
+}
+
+function normalizeHrmDirectSearchText(value) {
+  return cleanHrmDirectText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function normalizeHrmDirectPuertoRicoNumericRegionCountry(city, state) {
+  const normalizedCity = normalizeHrmDirectSearchText(city);
+  const stateCode = cleanHrmDirectText(state);
+  if (!/^\d{3}$/.test(stateCode)) return "";
+  if (!HRMDIRECT_PUERTO_RICO_NUMERIC_REGION_CITIES.has(normalizedCity)) return "";
+  return "Puerto Rico";
 }
 
 function isHrmDirectPlaceholderTitle(value) {
@@ -891,7 +920,12 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
       null;
     const listLocation = [city, listState].filter(Boolean).join(", ");
     const location = listLocation || listRemoteLocation.location || groupedRemoteLocation.location || workModeLocation || listOfficeLocation.location;
-    const country = listStateOnlyAbbreviation ? "United States" : listOfficeLocation.country || normalizeCountryFromLocation(location) || normalizeCountryName(state);
+    const puertoRicoNumericRegionCountry = listLocation
+      ? normalizeHrmDirectPuertoRicoNumericRegionCountry(city, listState)
+      : "";
+    const country = listStateOnlyAbbreviation
+      ? "United States"
+      : listOfficeLocation.country || puertoRicoNumericRegionCountry || normalizeCountryFromLocation(location) || normalizeCountryName(state);
     const usesListOfficeLocation = Boolean(
       listOfficeLocation.location &&
       !listLocation &&
@@ -918,9 +952,11 @@ function parseHrmDirectPostingsFromHtml(companyNameForPostings, config, pageHtml
         ? "hrmdirect_grouped_list_remote_location"
         : listStateOnlyAbbreviation
           ? "hrmdirect_list_state_abbreviation"
-          : usesListOfficeLocation
-            ? listOfficeLocation.ruleName
-            : "";
+          : puertoRicoNumericRegionCountry
+            ? "hrmdirect_list_puerto_rico_numeric_region"
+            : usesListOfficeLocation
+              ? listOfficeLocation.ruleName
+              : "";
     const remotePath = remoteType !== "unknown"
       ? workModeRemoteType !== "unknown"
         ? "td.custSort1"
