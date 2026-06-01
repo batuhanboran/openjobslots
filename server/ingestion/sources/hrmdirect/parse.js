@@ -389,7 +389,7 @@ function extractHrmDirectDetailBodyWorkModeTagRemoteType(detailHtml) {
 function extractHrmDirectDetailBodyExplicitRemoteSentenceType(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
   const match = text.match(
-    /\b(?:(?:This|The)\s+(?:position|role|job|opportunity)\s+(?:is|will\s+be)\s+(?:a\s+)?(?:full[-\s]?time,?\s*)?(?:fully\s+)?(remote|hybrid)|(?:This|The)\s+is\s+a\s+(remote|hybrid)\s+(?:position|role|job|opportunity))\b/i
+    /\b(?:(?:This|The)\s+(?:position|role|job|opportunity)\s+(?:is|will\s+be)\s+(?:a\s+)?(?:full[-\s]?time,?\s*)?(?:fully\s+)?(remote|hybrid)|(?:This|The)\s+is\s+a\s+(remote|hybrid)(?:\s+(?:full[-\s]?time|part[-\s]?time|contract))?\s+(?:position|role|job|opportunity))\b/i
   );
   const value = match?.[1] || match?.[2] || "";
   if (!value) return "";
