@@ -7,6 +7,9 @@ const { hostSlug, normalizeCompanyName } = require("./helpers");
 const baseModule = createSourceModule("breezy");
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList(discover);
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze(["__json"])
+});
 
 function parse(rawPayload, company = {}) {
   if (rawPayload && Array.isArray(rawPayload.__legacyParsed)) return rawPayload.__legacyParsed;
@@ -27,5 +30,6 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

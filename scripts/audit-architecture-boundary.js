@@ -46,6 +46,7 @@ const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
   { name: "bamboohr_parser_spec", regex: /bamboohr:\s*{[\s\S]*?parser:\s*parseBambooHrPostingsFromApi/ },
   { name: "breezy_parser_import", regex: /require\(["']\.\/breezy\/parse["']\)/ },
   { name: "breezy_parser_spec", regex: /breezy:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseBreezyPostingsFromHtml/ },
+  { name: "breezy_payload_shape_policy", regex: /breezy:\s*{(?:(?!\n\s{2}applytojob:\s*{)[\s\S])*payloadShapePolicy:/ },
   { name: "careerspage_parser_import", regex: /require\(["']\.\/careerspage\/parse["']\)/ },
   { name: "careerspage_parser_spec", regex: /careerspage:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseCareerspagePostingsFromHtml/ },
   { name: "careerplug_parser_import", regex: /require\(["']\.\/careerplug\/parse["']\)/ },
