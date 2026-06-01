@@ -22,6 +22,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Fixture coverage includes a production-shaped Malmo postal-address row and a direct source-module test for city/country evidence paths plus explicit remote evidence. Live read-only parser proof for `roadsurfer.com` parsed `289` rows with `289` accepted, `0` missing country/region, `0` weak/unknown remote, and `242` structured-address onsite rows. A top-25 affected Ashby board sample parsed `1,066` rows with `1,066` accepted and `164` structured-address onsite rows.
 - Remaining Ashby gaps are mostly countryless remote-region scopes such as EU/LATAM/Worldwide; do not turn those into fake countries without stronger source evidence. Verification covered Ashby syntax checks, direct source-module tests, `npm.cmd run test:parsers`, and `npm.cmd run audit:architecture-boundary`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## Paylocity Country And Remote Evidence - June 1, 2026
+
+- Paylocity production quality baseline: `6,968` visible rows, `248` missing country/region rows, `92` weak/unknown remote rows, and `0` missing posting dates or source ids.
+- Live `window.pageData` samples showed deterministic source evidence in `Jobs[].JobLocation.Country`, `Jobs[].IsRemote`, and source location labels such as `Remote Worker - N/A`, while current normalization dropped the country when city/state display labels existed.
+- Paylocity now preserves source country/city/state and emits source-backed remote evidence. `IsRemote=true` maps to `remote`; `IsRemote=false` maps to `onsite` unless source location/title text explicitly says remote or hybrid.
+- Fixture coverage includes remote-USA and onsite-USA rows plus an enterprise source-module test for country evidence and explicit remote evidence. Live read-only proof across six sampled production boards parsed `182` rows with `182` accepted, `0` missing country/region, `0` weak/unknown remote, `182` source-country rows, and `182` explicit remote-mode rows.
+- Verification covered Paylocity syntax checks, enterprise source-module tests, `npm.cmd run test:parsers`, and `npm.cmd run audit:architecture-boundary`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
+
 ## UltiPro Source Geo and Payload Drift Checkpoint - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab` with app/worker/Postgres/Meili running. Public health reported `331,490` visible job slots. `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,484`/`331,484`) but remained `ok=false` because remote facets drift by `22` onsite vs unknown documents. No Meili repair or replace reindex was run.

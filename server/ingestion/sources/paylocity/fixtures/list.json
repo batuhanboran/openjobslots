@@ -11,6 +11,34 @@
         "State": "",
         "Country": "Germany"
       }
+    },
+    {
+      "JobId": "5002",
+      "JobTitle": "Remote Solutions Architect",
+      "PublishedDate": "2026-05-09T08:00:00+03:00",
+      "HiringDepartment": "Engineering",
+      "IsRemote": true,
+      "LocationName": "Remote Worker - N/A",
+      "JobLocation": {
+        "Name": "Remote Worker - N/A",
+        "City": "",
+        "State": "",
+        "Country": "USA"
+      }
+    },
+    {
+      "JobId": "5003",
+      "JobTitle": "Facilities Technician",
+      "PublishedDate": "2026-05-10T08:00:00+03:00",
+      "HiringDepartment": "Operations",
+      "IsRemote": false,
+      "LocationName": "Buffalo HQ",
+      "JobLocation": {
+        "Name": "Buffalo HQ",
+        "City": "",
+        "State": "",
+        "Country": "USA"
+      }
     }
   ]
 }

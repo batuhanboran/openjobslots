@@ -172,6 +172,32 @@ test("paylocity fetchList extracts window.pageData and keeps source metadata", a
   assert.equal(parsed[0].job_posting_url, "https://recruiting.paylocity.com/Recruiting/Jobs/Details/5001");
 });
 
+test("paylocity source module preserves country and remote evidence from page data", () => {
+  const source = getSourceModule("paylocity");
+  const sourceDir = path.join(__dirname, "paylocity");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const remoteUs = byId.get("5002");
+  assert.equal(remoteUs.country, "United States");
+  assert.equal(remoteUs.region, "North America");
+  assert.equal(remoteUs.remote_type, "remote");
+  assert.equal(remoteUs.source_evidence.country_path, "Jobs[].JobLocation.Country");
+  assert.equal(remoteUs.source_evidence.remote_path, "Jobs[].IsRemote");
+  assert.equal(source.validatePublic(remoteUs).status, "accepted");
+
+  const onsiteUs = byId.get("5003");
+  assert.equal(onsiteUs.country, "United States");
+  assert.equal(onsiteUs.region, "North America");
+  assert.equal(onsiteUs.remote_type, "onsite");
+  assert.equal(onsiteUs.source_evidence.remote_rule_name, "paylocity_is_remote_false");
+  assert.equal(onsiteUs.evidence.remote_type.explicit, true);
+  assert.equal(source.validatePublic(onsiteUs).status, "accepted");
+});
+
 test("paylocity source fetchList rejects redirect to unexpected host", async () => {
   const source = getSourceModule("paylocity");
   const sourceDir = path.join(__dirname, "paylocity");

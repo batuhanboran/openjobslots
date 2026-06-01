@@ -1,11 +1,54 @@
 "use strict";
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
+const { normalizeCountryName, normalizeRemoteType } = require("../../posting");
 
 function cleanPaylocityText(value) {
   return decodeHtmlEntities(String(value || ""))
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function inferPaylocityRemoteType(job, locationText) {
+  if (job?.IsRemote === true) {
+    return {
+      value: "remote",
+      path: "Jobs[].IsRemote",
+      ruleName: "paylocity_is_remote_true"
+    };
+  }
+
+  const locationRemoteType = normalizeRemoteType(locationText);
+  if (locationRemoteType === "remote" || locationRemoteType === "hybrid") {
+    return {
+      value: locationRemoteType,
+      path: "Jobs[].JobLocation.Name",
+      ruleName: "paylocity_location_remote_text"
+    };
+  }
+
+  const titleRemoteType = normalizeRemoteType(job?.JobTitle || "");
+  if (titleRemoteType === "remote" || titleRemoteType === "hybrid") {
+    return {
+      value: titleRemoteType,
+      path: "Jobs[].JobTitle",
+      ruleName: "paylocity_title_remote_text"
+    };
+  }
+
+  if (job?.IsRemote === false) {
+    return {
+      value: "onsite",
+      path: "Jobs[].IsRemote",
+      ruleName: "paylocity_is_remote_false"
+    };
+  }
+
+  return {
+    value: "",
+    path: "",
+    ruleName: ""
+  };
 }
 
 function extractPaylocityPageDataJson(pageHtml) {
@@ -84,8 +127,11 @@ function parsePaylocityPostingsFromPageData(companyNameForPostings, config, page
     const locationParts = [city, state].filter(Boolean);
     let location = locationParts.join(", ");
     if (!location) location = cleanPaylocityText(job?.LocationName || "");
+    if (!location) location = cleanPaylocityText(jobLocation?.Name || "");
     if (!location && isRemote) location = "Remote";
     if (!location && country) location = country;
+    const remoteType = inferPaylocityRemoteType(job, location);
+    const normalizedCountry = normalizeCountryName(country);
 
     postings.push({
       company_name: effectiveCompanyName,
@@ -95,8 +141,46 @@ function parsePaylocityPostingsFromPageData(companyNameForPostings, config, page
       job_posting_url: `${String(config?.siteBaseUrl || "").replace(/\/+$/, "")}/Recruiting/Jobs/Details/${encodeURIComponent(jobId)}`,
       posting_date: cleanPaylocityText(job?.PublishedDate || "") || null,
       location: location || null,
+      city: city || null,
+      state: state || null,
+      country: country || null,
+      remote_type: remoteType.value || null,
+      remote: remoteType.value === "remote",
+      is_remote: remoteType.value === "remote" || remoteType.value === "hybrid",
+      workplaceType: remoteType.value || null,
       department: cleanPaylocityText(job?.HiringDepartment || "") || null,
-      employment_type: isRemote ? "Remote" : null
+      employment_type: isRemote ? "Remote" : null,
+      source_evidence: {
+        ...(location
+          ? {
+              location_source: "list_api",
+              location_path: "Jobs[].JobLocation",
+              location_rule_name: "paylocity_job_location",
+              location_raw: location
+            }
+          : {}),
+        ...(normalizedCountry
+          ? {
+              country_source: "list_api",
+              country_path: "Jobs[].JobLocation.Country",
+              country_rule_name: "paylocity_job_location_country"
+            }
+          : {}),
+        ...(city
+          ? {
+              city_source: "list_api",
+              city_path: "Jobs[].JobLocation.City",
+              city_rule_name: "paylocity_job_location_city"
+            }
+          : {}),
+        ...(remoteType.value
+          ? {
+              remote_source: "list_api",
+              remote_path: remoteType.path,
+              remote_rule_name: remoteType.ruleName
+            }
+          : {})
+      }
     });
     seenIds.add(normalizedJobId);
   }
