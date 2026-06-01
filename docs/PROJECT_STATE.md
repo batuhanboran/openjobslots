@@ -38,6 +38,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof with `maxApplyToJobDetailPages: 25`: `palmpaylimited` parsed `380` rows with accepted missing country/region `250 -> 0`, `379` labeled-country rows, and `25` JSON-LD dates; `morphiuscorp` parsed/accepted `598` rows with `25` detail fetches, `14` JSON-LD dates, and remaining missing country rows primarily explicit-remote rows accepted by public gate.
 - Verification covered syntax checks, parser fixture tests, focused HTML public source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## BambooHR Source-Local Admin Geo Evidence - June 1, 2026
+
+- Fresh read-only production baseline for this lane had BambooHR at `19,038` visible rows, `3,060` missing country/region rows, `483` weak/unknown remote rows, and `19,038` missing posting dates. Top missing-country boards included `lanesgroup`, `ahkgroup`, `ri`, `atlashotels`, `emedgroup`, and `htmniseko`.
+- Live BambooHR public API payloads expose `result[].location.city/state`, `result[].atsLocation`, and `result[].locationType`, but the sampled top boards did not expose posting date fields. The parser now treats `N/A` and `.` location parts as blank and adds source-local admin/city hints observed in BambooHR payloads, including UK counties/admin areas, Malaysia state labels, South Jakarta, Makati/Legaspi, Juba, Idleb/Hasaka, and related country aliases for Sudan, South Sudan, and Syria.
+- No tenant, title, body, or board-name inference was added. Remaining city-only ambiguous rows such as Lanes-only `Sheffield`/`Rochdale`/`Warrington`, AHK `Lima`, and RI `Gaza` stayed blank.
+- Live read-only proof: `lanesgroup` parsed `268` rows with accepted missing country/region `221 -> 17`; `ahkgroup` parsed `71` with missing `58 -> 1`; `ri` parsed `55` with missing `54 -> 2`; `htmniseko` parsed `37` with missing `37 -> 0`. All sampled rows still lacked posting dates because the source payload had no date fields.
+- Verification covered syntax checks, parser fixture tests, focused BambooHR direct source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Loxo Source-Local Region Code Evidence - June 1, 2026
 
 - Loxo production baseline for this lane was `3,782` visible rows, `486` missing country/region rows, `315` weak/unknown remote rows, and `412` missing posting dates.

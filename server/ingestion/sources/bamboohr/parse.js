@@ -29,6 +29,9 @@ const BAMBOOHR_COUNTRY_HINTS = Object.freeze({
   "rep.dom": "Dominican Republic",
   serbia: "Serbia",
   singapore: "Singapore",
+  sudan: "Sudan",
+  "south sudan": "South Sudan",
+  syria: "Syria",
   tanzania: "Tanzania",
   "trinidad and tobago": "Trinidad and Tobago",
   uae: "United Arab Emirates",
@@ -51,6 +54,9 @@ const BAMBOOHR_COUNTRY_REGIONS = Object.freeze({
   Mozambique: "EMEA",
   Nicaragua: "LATAM",
   Panama: "LATAM",
+  Sudan: "EMEA",
+  "South Sudan": "EMEA",
+  Syria: "EMEA",
   Tanzania: "EMEA",
   "Trinidad and Tobago": "North America",
   Zambia: "EMEA"
@@ -62,8 +68,11 @@ const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
   buckinghamshire: "United Kingdom",
   cambridgeshire: "United Kingdom",
   cheshire: "United Kingdom",
+  conwy: "United Kingdom",
   "county down": "United Kingdom",
+  cornwall: "United Kingdom",
   cumbria: "United Kingdom",
+  derbyshire: "United Kingdom",
   devon: "United Kingdom",
   durham: "United Kingdom",
   essex: "United Kingdom",
@@ -77,6 +86,7 @@ const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
   lancashire: "United Kingdom",
   leicestershire: "United Kingdom",
   merseyside: "United Kingdom",
+  "mid glamorgan": "United Kingdom",
   middlesex: "United Kingdom",
   norfolk: "United Kingdom",
   nottinghamshire: "United Kingdom",
@@ -95,6 +105,7 @@ const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
   warwickshire: "United Kingdom",
   "west sussex": "United Kingdom",
   "west yorkshire": "United Kingdom",
+  wiltshire: "United Kingdom",
   worcestershire: "United Kingdom",
   wirral: "United Kingdom",
   denbighshire: "United Kingdom",
@@ -128,8 +139,11 @@ const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
   "dki jakarta": "Indonesia",
   jakarta: "Indonesia",
   "east kalimantan": "Indonesia",
+  "south jakarta": "Indonesia",
   banten: "Indonesia",
   bali: "Indonesia",
+  "selangor darul ehsan": "Malaysia",
+  "johor darul takzim": "Malaysia",
   maputo: "Mozambique",
   attica: "Greece",
   piraeus: "Greece",
@@ -137,11 +151,25 @@ const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
   "miguel hidalgo": "Mexico",
   "las condes": "Chile",
   pudahuel: "Chile",
+  oruro: "Bolivia",
+  barranquilla: "Colombia",
   "el oro": "Ecuador",
   ncr: "Philippines",
   "metro manila": "Philippines",
+  "makati city": "Philippines",
+  "legaspi village": "Philippines",
   "new providence": "Bahamas",
   eleuthera: "Bahamas",
+  copperbelt: "Zambia",
+  kitwe: "Zambia",
+  juba: "South Sudan",
+  idleb: "Syria",
+  idlib: "Syria",
+  hasaka: "Syria",
+  "der alzor": "Syria",
+  "der alzor hasaka": "Syria",
+  "deir ez zor": "Syria",
+  montrouge: "France",
   bergamo: "Italy",
   lombardy: "Italy",
   "rheinland-pfalz": "Germany",
@@ -189,7 +217,7 @@ function normalizeBambooHrAdminRegionCountry(value) {
 
 function isBlankLocationPart(value) {
   const normalized = normalizeHintKey(value);
-  return !normalized || ["n/a", "na", "none", "null", "nil", "-", "--"].includes(normalized);
+  return !normalized || ["n/a", "n a", "na", "none", "null", "nil", "-", "--", "."].includes(normalized);
 }
 
 function cleanLocationPart(value) {
@@ -260,6 +288,7 @@ function bambooHrStructuredLocationParts(parts) {
   const cityCountry = normalizeBambooHrCountry(city);
   const stateCountry = normalizeBambooHrCountry(state);
   const stateAdminCountry = city ? normalizeBambooHrAdminRegionCountry(state) : "";
+  const cityAdminCountry = !state ? normalizeBambooHrAdminRegionCountry(city) : "";
 
   if (!country && cityCountry && state && !stateCountry) {
     country = cityCountry;
@@ -275,6 +304,9 @@ function bambooHrStructuredLocationParts(parts) {
     city = "";
     state = "";
     ruleName = "bamboohr_country_token_location";
+  } else if (!country && cityAdminCountry) {
+    country = cityAdminCountry;
+    ruleName = "bamboohr_admin_region_location";
   } else if (!country && stateAdminCountry) {
     country = stateAdminCountry;
     ruleName = "bamboohr_admin_region_location";

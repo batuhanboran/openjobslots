@@ -1078,6 +1078,103 @@ test("bamboohr source module maps locationType and country-token structured loca
   assert.equal(source.validatePublic(lagos).status, "accepted");
 });
 
+test("bamboohr source module maps observed source-local admin and city geo hints", () => {
+  const source = getSourceModule("bamboohr");
+  const company = readJson(path.join(__dirname, "bamboohr", "fixtures", "company.json"));
+  const parsed = source.parse({
+    result: [
+      {
+        id: "bhr-conwy",
+        jobOpeningName: "Waste Water Operative",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-conwy",
+        location: { city: "Towyn", state: "Conwy" },
+        locationType: "0"
+      },
+      {
+        id: "bhr-south-jakarta",
+        jobOpeningName: "Sales Manager",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-south-jakarta",
+        location: { city: "South Jakarta", state: null },
+        locationType: "0"
+      },
+      {
+        id: "bhr-juba",
+        jobOpeningName: "Access and Liaison Assistant",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-juba",
+        location: { city: "Juba", state: null },
+        locationType: "0"
+      },
+      {
+        id: "bhr-hasaka",
+        jobOpeningName: "Health Coordinator",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-hasaka",
+        location: { city: "Der Alzor, Hasaka", state: "." },
+        locationType: "0"
+      },
+      {
+        id: "bhr-johor",
+        jobOpeningName: "Sample Preparation Technician",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-johor",
+        location: { city: "Johor Darul Takzim", state: "N/A" },
+        locationType: "0"
+      },
+      {
+        id: "bhr-makati",
+        jobOpeningName: "Finance Officer",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-makati",
+        location: { city: "Makati City", state: "Legaspi Village" },
+        locationType: "0"
+      }
+    ]
+  }, company);
+  const normalized = new Map(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+
+  const conwy = normalized.get("bhr-conwy");
+  assert.equal(conwy.country, "United Kingdom");
+  assert.equal(conwy.region, "EMEA");
+  assert.equal(conwy.city, "Towyn");
+  assert.equal(conwy.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(conwy).status, "accepted");
+
+  const southJakarta = normalized.get("bhr-south-jakarta");
+  assert.equal(southJakarta.country, "Indonesia");
+  assert.equal(southJakarta.region, "APAC");
+  assert.equal(southJakarta.city, "South Jakarta");
+  assert.equal(southJakarta.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(southJakarta).status, "accepted");
+
+  const juba = normalized.get("bhr-juba");
+  assert.equal(juba.country, "South Sudan");
+  assert.equal(juba.region, "EMEA");
+  assert.equal(juba.city, "Juba");
+  assert.equal(juba.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(juba).status, "accepted");
+
+  const hasaka = normalized.get("bhr-hasaka");
+  assert.equal(hasaka.country, "Syria");
+  assert.equal(hasaka.region, "EMEA");
+  assert.equal(hasaka.city, "Der Alzor, Hasaka");
+  assert.equal(hasaka.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(hasaka).status, "accepted");
+
+  const johor = normalized.get("bhr-johor");
+  assert.equal(johor.country, "Malaysia");
+  assert.equal(johor.region, "APAC");
+  assert.equal(johor.city, "Johor Darul Takzim");
+  assert.equal(johor.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(johor).status, "accepted");
+
+  const makati = normalized.get("bhr-makati");
+  assert.equal(makati.country, "Philippines");
+  assert.equal(makati.region, "APAC");
+  assert.equal(makati.city, "Makati City");
+  assert.equal(makati.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(makati).status, "accepted");
+});
+
 function zohoFixtureContext() {
   return {
     source: getSourceModule("zoho"),
