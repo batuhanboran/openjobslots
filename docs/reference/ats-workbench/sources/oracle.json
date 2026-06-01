@@ -23,14 +23,16 @@
       "server/ingestion/sources/oracle/fixtures/company.json",
       "server/ingestion/sources/oracle/fixtures/expected-normalized.json",
       "server/ingestion/sources/oracle/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/oracle/fixtures/list.json"
+      "server/ingestion/sources/oracle/fixtures/list.json",
+      "server/ingestion/sources/oracle/oracle.local.test.js"
     ],
     "present": [
       "server/ingestion/fixtures/oracle-direct.json",
       "server/ingestion/sources/oracle/fixtures/company.json",
       "server/ingestion/sources/oracle/fixtures/expected-normalized.json",
       "server/ingestion/sources/oracle/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/oracle/fixtures/list.json"
+      "server/ingestion/sources/oracle/fixtures/list.json",
+      "server/ingestion/sources/oracle/oracle.local.test.js"
     ],
     "missing": []
   },
@@ -38,13 +40,16 @@
     "present": true,
     "path": "server/ingestion/sources/oracle/index.js",
     "fixtures_dir": "server/ingestion/sources/oracle/fixtures",
-    "parser_version": "source-oracle-v1"
+    "parser_version": "source-oracle-v1",
+    "registry_status": "enabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
     "mode": "public_enabled",
     "minimum_confidence": 0.7,
     "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
@@ -65,7 +70,7 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseOraclePostingsFromApi",
+    "path": "server/ingestion/sources/oracle/parse.js parseOraclePostingsFromApi",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },

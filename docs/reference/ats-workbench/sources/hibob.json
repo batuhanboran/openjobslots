@@ -1,32 +1,36 @@
 {
   "ats_key": "hibob",
   "display_name": "HiBob",
-  "current_status": "source-local registry module",
+  "current_status": "certified",
   "source_family": "html_detail",
   "official_public_docs_or_observed_endpoint": "Observed HiBob careers board plus job-ad API.",
-  "source_discovery_method": "parse supported *.careers.hibob.com public board URLs and build same-origin /api/job-ad endpoint",
-  "list_fetch_method": "source-local board GET followed by same-origin job-ad API GET with final-host guards",
-  "detail_fetch_method": "not enabled; saved fixture covers list/API payload fields only",
-  "pagination_method": "no pagination proven in saved fixture; keep bounded single API response until a source variant proves pagination",
-  "canonical_url_rule": "prefer jobUrl/absoluteUrl/url from jobAdDetails; otherwise rebuild same-origin /job/{id} URL",
-  "source_job_id_rule": "preserve jobAdDetails[].id as source_job_id",
+  "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
+  "list_fetch_method": "bounded HTML list fetch through source runner",
+  "detail_fetch_method": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
+  "pagination_method": "only follow known next-page/list links with max-page and max-row limits",
+  "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
+  "source_job_id_rule": "list-payload: Saved job-ad API fixture covers jobAdDetails[].id as stable source_job_id evidence.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "use jobAdDetails[].site first, then jobAdDetails[].country; leave blank when source omits both",
-  "country_region_city_rule": "normalize country from jobAdDetails[].country/site and city from a concrete site first segment; do not publish country-only values as city",
-  "remote_type_rule": "remote/hybrid remains source-absent unless exact source fields appear; geo-backed rows normalize as onsite through source-location evidence",
-  "posting_date_rule": "use jobAdDetails[].publishedAt only; leave null when source omits it",
+  "location_text_rule": "list-payload: Saved job-ad API fixture covers jobAdDetails[].site and jobAdDetails[].country as source-backed geo evidence.",
+  "country_region_city_rule": "list-payload: Saved job-ad API fixture covers jobAdDetails[].site and jobAdDetails[].country as source-backed geo evidence.",
+  "remote_type_rule": "source-absent: Saved job-ad API fixture exposes no explicit remote/hybrid field; geo-backed rows normalize as onsite through source-location evidence and missing-geo rows remain gated.",
+  "posting_date_rule": "list-payload: Saved job-ad API fixture preserves jobAdDetails[].publishedAt when present and leaves posting date null when absent.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/sources/hibob/fixtures/list.json",
+      "server/ingestion/sources/hibob/fixtures/company.json",
       "server/ingestion/sources/hibob/fixtures/expected-normalized.json",
-      "server/ingestion/sources/hibob/fixtures/invalid-shapes.json"
+      "server/ingestion/sources/hibob/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/hibob/fixtures/list.json",
+      "server/ingestion/sources/hibob/hibob.local.test.js"
     ],
     "present": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
+      "server/ingestion/sources/hibob/fixtures/company.json",
+      "server/ingestion/sources/hibob/fixtures/expected-normalized.json",
+      "server/ingestion/sources/hibob/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/hibob/fixtures/list.json",
+      "server/ingestion/sources/hibob/hibob.local.test.js"
     ],
     "missing": []
   },
@@ -34,15 +38,18 @@
     "present": true,
     "path": "server/ingestion/sources/hibob/index.js",
     "fixtures_dir": "server/ingestion/sources/hibob/fixtures",
-    "parser_version": "source-hibob-v1"
+    "parser_version": "source-hibob-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": false
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: disabled/collect-when-disabled off until bounded live canary proves source quality",
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -56,26 +63,26 @@
     "missing_city_pct": 0,
     "missing_any_geo_pct": 0,
     "weak_remote_pct": 0,
-    "risk_score": 35,
-    "wave_priority": "wave-4-fixture",
+    "risk_score": 0,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
     "path": "server/ingestion/sources/hibob/parse.js parseHibobPostingsFromApi",
     "parser_version_status": "parser-fixture-backed",
-    "confidence": 0.57
+    "confidence": "medium"
   },
   "runner_interface": {
     "discover": "server/ingestion/sources/hibob/discover.js",
     "fetchList": "server/ingestion/sources/hibob/fetchList.js",
-    "fetchDetail": "not enabled",
-    "parseList": "server/ingestion/sources/hibob/parse.js parseHibobPostingsFromApi",
-    "parseDetail": "not enabled",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "fetchDetail": "server/ingestion/sources/hibob/fetchDetail.js",
+    "parseList": "server/ingestion/sources/hibob/parse.js",
+    "parseDetail": "server/ingestion/sources/hibob/parse.js",
+    "normalize": "server/ingestion/sources/hibob/normalize.js",
+    "validate": "server/ingestion/sources/hibob/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "keep disabled until bounded live canary and source quality evidence are approved",
-  "certification_blockers": "live canary/source quality evidence pending; no production source apply has been run"
+  "next_action": "monitor with parser stats and live field-quality audit",
+  "certification_blockers": "none"
 }

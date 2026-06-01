@@ -19,24 +19,29 @@
   "parser_fixtures": {
     "status": "parser-fixture-backed",
     "files": [
-      "server/ingestion/fixtures/applicantpro-direct.json"
+      "server/ingestion/fixtures/applicantpro-direct.json",
+      "server/ingestion/fixtures/applicantpro-failures.json"
     ],
     "present": [
-      "server/ingestion/fixtures/applicantpro-direct.json"
+      "server/ingestion/fixtures/applicantpro-direct.json",
+      "server/ingestion/fixtures/applicantpro-failures.json"
     ],
     "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/applicantpro/index.js",
+    "fixtures_dir": "server/ingestion/sources/applicantpro/fixtures",
+    "parser_version": "source-applicantpro-v1",
+    "registry_status": "enabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
     "mode": "public_enabled",
     "minimum_confidence": 0.7,
     "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
@@ -57,18 +62,18 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseApplicantProPostingsFromApi",
+    "path": "server/ingestion/sources/applicantpro/parse.js parseApplicantProPostingsFromApi",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and extract embedded JSON or domain id before parsing",
-    "fetchList": "fetch public board or discovered JSON endpoint with bounded response size",
-    "fetchDetail": "optional detail fetch only when list evidence is insufficient and fixture-backed",
-    "parseList": "server/index.js parseApplicantProPostingsFromApi",
-    "parseDetail": "server/index.js parseApplicantProPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/applicantpro/discover.js",
+    "fetchList": "server/ingestion/sources/applicantpro/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/applicantpro/fetchDetail.js",
+    "parseList": "server/ingestion/sources/applicantpro/parse.js",
+    "parseDetail": "server/ingestion/sources/applicantpro/parse.js",
+    "normalize": "server/ingestion/sources/applicantpro/normalize.js",
+    "validate": "server/ingestion/sources/applicantpro/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },

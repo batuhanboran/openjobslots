@@ -1,7 +1,7 @@
 {
   "ats_key": "theapplicantmanager",
   "display_name": "The Applicant Manager",
-  "current_status": "source-local registry module",
+  "current_status": "certified",
   "source_family": "html_detail",
   "official_public_docs_or_observed_endpoint": "Observed The Applicant Manager public careers HTML.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
@@ -38,15 +38,18 @@
     "present": true,
     "path": "server/ingestion/sources/theapplicantmanager/index.js",
     "fixtures_dir": "server/ingestion/sources/theapplicantmanager/fixtures",
-    "parser_version": "source-theapplicantmanager-v1"
+    "parser_version": "source-theapplicantmanager-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": false
   },
   "quality_threshold": {
-    "mode": "registry-backed-disabled",
-    "minimum_confidence": 0.56,
-    "public_write_rule": "keep disabled/collect-when-disabled off until bounded live canary and source quality evidence are approved"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": false,
-  "quarantine_reason": "registry-backed but disabled; live canary/source quality evidence pending",
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -60,26 +63,26 @@
     "missing_city_pct": 0,
     "missing_any_geo_pct": 0,
     "weak_remote_pct": 0,
-    "risk_score": 35,
-    "wave_priority": "wave-4-fixture",
+    "risk_score": 0,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
     "path": "server/ingestion/sources/theapplicantmanager/parse.js parseTheApplicantManagerPostingsFromHtml",
-    "parser_version_status": "source-theapplicantmanager-v1",
-    "confidence": 0.56
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
     "discover": "server/ingestion/sources/theapplicantmanager/discover.js",
     "fetchList": "server/ingestion/sources/theapplicantmanager/fetchList.js",
-    "fetchDetail": "not enabled",
+    "fetchDetail": "server/ingestion/sources/theapplicantmanager/fetchDetail.js",
     "parseList": "server/ingestion/sources/theapplicantmanager/parse.js",
-    "parseDetail": "not enabled",
-    "normalize": "server/ingestion/sources/theapplicantmanager/index.js source-specific normalizer",
-    "validate": "server/ingestion/sources/theapplicantmanager/index.js source-specific validation plus public gate",
+    "parseDetail": "server/ingestion/sources/theapplicantmanager/parse.js",
+    "normalize": "server/ingestion/sources/theapplicantmanager/normalize.js",
+    "validate": "server/ingestion/sources/theapplicantmanager/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "keep disabled until bounded live canary proves source quality",
-  "certification_blockers": "live canary/source quality evidence pending; no production source apply has been run"
+  "next_action": "monitor with parser stats and live field-quality audit",
+  "certification_blockers": "none"
 }

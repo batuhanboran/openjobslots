@@ -23,6 +23,8 @@
       "server/ingestion/fixtures/lever-failures.json",
       "server/ingestion/fixtures/lever-postings.json",
       "server/ingestion/sources/lever/fixtures/company.json",
+      "server/ingestion/sources/lever/fixtures/employment-location-expected.json",
+      "server/ingestion/sources/lever/fixtures/employment-location.json",
       "server/ingestion/sources/lever/fixtures/expected-normalized.json",
       "server/ingestion/sources/lever/fixtures/invalid-shapes.json",
       "server/ingestion/sources/lever/fixtures/list.json"
@@ -32,6 +34,8 @@
       "server/ingestion/fixtures/lever-failures.json",
       "server/ingestion/fixtures/lever-postings.json",
       "server/ingestion/sources/lever/fixtures/company.json",
+      "server/ingestion/sources/lever/fixtures/employment-location-expected.json",
+      "server/ingestion/sources/lever/fixtures/employment-location.json",
       "server/ingestion/sources/lever/fixtures/expected-normalized.json",
       "server/ingestion/sources/lever/fixtures/invalid-shapes.json",
       "server/ingestion/sources/lever/fixtures/list.json"
@@ -42,13 +46,16 @@
     "present": true,
     "path": "server/ingestion/sources/lever/index.js",
     "fixtures_dir": "server/ingestion/sources/lever/fixtures",
-    "parser_version": "source-lever-v1"
+    "parser_version": "source-lever-v1",
+    "registry_status": "enabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
     "mode": "public_enabled",
     "minimum_confidence": 0.7,
     "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
@@ -73,7 +80,7 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js Lever collector",
+    "path": "server/ingestion/sources/lever/parse.js parseLeverPostingsFromApi",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },

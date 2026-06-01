@@ -21,18 +21,22 @@
     "files": [
       "server/ingestion/fixtures/taleo-direct.json",
       "server/ingestion/fixtures/taleo-failures.json",
+      "server/ingestion/sources/taleo/fixtures/ajax-list.txt",
       "server/ingestion/sources/taleo/fixtures/company.json",
       "server/ingestion/sources/taleo/fixtures/expected-normalized.json",
       "server/ingestion/sources/taleo/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/taleo/fixtures/list.json"
+      "server/ingestion/sources/taleo/fixtures/list.json",
+      "server/ingestion/sources/taleo/fixtures/unsupported-shapes.json"
     ],
     "present": [
       "server/ingestion/fixtures/taleo-direct.json",
       "server/ingestion/fixtures/taleo-failures.json",
+      "server/ingestion/sources/taleo/fixtures/ajax-list.txt",
       "server/ingestion/sources/taleo/fixtures/company.json",
       "server/ingestion/sources/taleo/fixtures/expected-normalized.json",
       "server/ingestion/sources/taleo/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/taleo/fixtures/list.json"
+      "server/ingestion/sources/taleo/fixtures/list.json",
+      "server/ingestion/sources/taleo/fixtures/unsupported-shapes.json"
     ],
     "missing": []
   },
@@ -40,15 +44,18 @@
     "present": true,
     "path": "server/ingestion/sources/taleo/index.js",
     "fixtures_dir": "server/ingestion/sources/taleo/fixtures",
-    "parser_version": "source-taleo-v1"
+    "parser_version": "source-taleo-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "public_enabled",
-    "minimum_confidence": 0.7,
-    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [
       "unstable column order",
@@ -71,7 +78,7 @@
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js extractTaleoPostingsFromRest",
+    "path": "server/ingestion/sources/taleo/parse.js extractTaleoPostingsFromRest",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "low"
   },

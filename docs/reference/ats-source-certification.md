@@ -5,12 +5,12 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 ## Current Coverage
 
 - Configured ATS keys: 60.
-- Fixture-backed ATS keys: 33.
-- Strict saved raw parser-fixture-backed ATS keys: 33 (`adp_workforcenow`, `applicantai`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `calcareers`, `calopps`, `careerplug`, `fountain`, `freshteam`, `greenhouse`, `hibob`, `hirebridge`, `hrmdirect`, `icims`, `jobvite`, `k12jobspot`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `statejobsny`, `talentreef`, `taleo`, `workday`, `zoho`).
-- Configured enabled ATS still pending strict raw parser fixtures: 26.
+- Fixture-backed ATS keys: 59.
+- Strict saved raw or source-module parser-fixture-backed ATS keys: 59. Every configured ATS except `dayforcehcm` has source-backed raw/list fixtures, expected normalized fixtures, and parser rejection coverage recorded by the generated workbench.
+- Configured enabled ATS still pending strict raw/source-module parser fixtures: 0.
 - Disabled unsupported ATS: `dayforcehcm`.
 
-The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires the raw parser fixture.
+The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw or source-module parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires that parser fixture, but certification is not production promotion. Registry status, live canary quality, accepted-row volume, and Postgres/Meili parity still gate public writes.
 
 Certification must also prove search impact. A parser is not production-ready if it creates rows that cannot be found by title, country, region, remote mode, or canonical URL in the production Postgres plus Meilisearch path. Use the [Search Quality Runbook](./search-quality-runbook.md) for corpus and parity expectations.
 
@@ -80,20 +80,20 @@ npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreb
 
 The command is read-only and includes every configured ATS key, including sources with no visible rows. The generated fields now include wave priority, certification blockers, exact next parser action, public-enabled recommendation, source-id reliability, canonical URL reliability, and detail-refetch requirement.
 
-Current workbench counts: 60 configured ATS, 33 strict parser-fixture-backed, 0 partial, 26 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
+Current workbench counts: 60 configured ATS, 59 strict parser-fixture-backed, 0 partial, 0 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
-- Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`.
-- Disable/hold no-row unproven configured sources until raw fixtures prove source id, canonical URL, and parser behavior: `policeapp`, `sagehr`. `calcareers`, `calopps`, `hibob`, `statejobsny`, `theapplicantmanager`, and `usajobs` now have raw fixtures but remain disabled until live canary evidence proves source quality and field coverage.
+- Disable/hold public exposure until live canary bad-row rates improve: `brassring`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`, and other disabled/canary registry sources whose parser fixtures are certified but whose live quality or rollout state is not public-ready.
+- Keep parser-certified but disabled/canary sources behind registry gates until live inventory, net-new estimate, bounded canary, and search parity prove safe promotion. Parser certification alone must not flip `public_enabled`.
 - Keep disabled: `dayforcehcm`.
 
 Subagent/work-packet findings in this certification pass:
 
-- Direct/hosted boards: `teamtailor` and `getro` are the main certification gaps. `freshteam`, `fountain`, `pinpointhq`, and `recruitcrm` should add source-id/path/pagination variants even though they are already raw parser-backed.
-- Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module fixtures and invalid-shape tests. `eightfold` still needs raw parser fixtures before public enablement can be called safe. `taleo` and `brassring` remain low-confidence; `pageup`, `saphrcloud`, and `ultipro` need live canaries before promotion.
-- Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `isolvisolvedhire`, `jobvite`, and `theapplicantmanager` now have source-local raw fixtures; `theapplicantmanager` remains disabled until live canary evidence proves quality. `talentreef` and `hirebridge` remain raw-fixture blockers.
-- Vendor/public-sector: `applicantai`, `manatal`, and `hibob` are certified; most other vendor-specific and public-sector sources need source-id assertions and raw fixtures. `governmentjobs` and `policeapp` must stop fabricated recency before public confidence can be raised; CalOpps now keeps close dates separate and leaves posting dates null.
+- Direct/hosted boards: `teamtailor`, `getro`, `freshteam`, `fountain`, `pinpointhq`, and `recruitcrm` are parser-fixture-backed; the next work is broader tenant variants, live inventory, and bounded canary proof.
+- Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `eightfold`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` have source-module or strict raw fixtures plus invalid-shape tests. Brittle sources remain low-confidence or registry-disabled until live canaries prove tenant variants.
+- Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `careerplug`, `applicantpro`, `applytojob`, `breezy`, `hirebridge`, `hrmdirect`, `isolvisolvedhire`, `jobvite`, `talentreef`, `theapplicantmanager`, and `zoho` have parser fixtures; disabled sources still require live canary evidence before promotion.
+- Vendor/public-sector: all configured vendor-specific and public-sector ATS except unsupported `dayforcehcm` are parser-fixture-backed. The remaining work is live quality, source-specific field repair, canary/apply safety, and Postgres/Meili parity.
 
 | ATS | Current source/parser path | Field gaps seen | Certification action |
 | --- | --- | --- | --- |

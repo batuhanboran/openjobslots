@@ -6,28 +6,31 @@
   "official_public_docs_or_observed_endpoint": "Observed Simplicant public board HTML.",
   "source_discovery_method": "fetch public board HTML and parse validated cards/links only",
   "list_fetch_method": "bounded HTML list fetch through source runner",
-  "detail_fetch_method": "not currently enabled; use only future fixture-backed detail extractors",
+  "detail_fetch_method": "detail page required when list cards omit location/date/remote; use only fixture-backed extractors",
   "pagination_method": "only follow known next-page/list links with max-page and max-row limits",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "source id is the stable path segment after /jobs/{id}/detail or /leads/{id}/detail",
+  "source_job_id_rule": "list-payload: Prefer raw id; otherwise use fixture-backed stable URL id.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "use source card subtitle only; do not infer missing location from body/title text",
-  "country_region_city_rule": "normalize from source card subtitle when deterministic; otherwise leave blank/null",
-  "remote_type_rule": "use explicit remote/hybrid card title or subtitle text; source-backed location without remote/hybrid stays onsite",
-  "posting_date_rule": "Simplicant public list fixture has no posting-date evidence; leave null unless future source-backed field is added",
+  "location_text_rule": "list-payload: Use vendor-specific source fixture geo fields only; leave nullable fields blank when absent.",
+  "country_region_city_rule": "list-payload: Use vendor-specific source fixture geo fields only; leave nullable fields blank when absent.",
+  "remote_type_rule": "list-payload: Use explicit remote/workplace fields or fixture-backed labeled source text only.",
+  "posting_date_rule": "list-payload: Use source date only; leave null when source omits it.",
   "rate_limit": "strict host serialization, jitter, retry cap, and high block-rate stop",
   "parser_fixtures": {
-    "status": "present",
+    "status": "parser-fixture-backed",
     "files": [
       "server/ingestion/sources/simplicant/fixtures/company.json",
-      "server/ingestion/sources/simplicant/fixtures/list.json",
       "server/ingestion/sources/simplicant/fixtures/expected-normalized.json",
-      "server/ingestion/sources/simplicant/fixtures/invalid-shapes.json"
+      "server/ingestion/sources/simplicant/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/simplicant/fixtures/list.json",
+      "server/ingestion/sources/simplicant/simplicant.local.test.js"
     ],
     "present": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
+      "server/ingestion/sources/simplicant/fixtures/company.json",
+      "server/ingestion/sources/simplicant/fixtures/expected-normalized.json",
+      "server/ingestion/sources/simplicant/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/simplicant/fixtures/list.json",
+      "server/ingestion/sources/simplicant/simplicant.local.test.js"
     ],
     "missing": []
   },
@@ -35,13 +38,16 @@
     "present": true,
     "path": "server/ingestion/sources/simplicant/index.js",
     "fixtures_dir": "server/ingestion/sources/simplicant/fixtures",
-    "parser_version": "source-simplicant-v1"
+    "parser_version": "source-simplicant-v1",
+    "registry_status": "enabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "enabled_with_public_gate",
-    "minimum_confidence": 0.73,
-    "public_write_rule": "public writes require source_job_id plus title/company/canonical URL and geo or explicit remote/hybrid evidence"
+    "mode": "public_enabled",
+    "minimum_confidence": 0.7,
+    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
@@ -57,26 +63,26 @@
     "missing_city_pct": 6.56,
     "missing_any_geo_pct": 13.35,
     "weak_remote_pct": 3.98,
-    "risk_score": 74.96,
-    "wave_priority": "wave-3-certification",
+    "risk_score": 39.96,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/ingestion/sources/simplicant/parse.js",
-    "parser_version_status": "source-simplicant-v1",
-    "confidence": 0.73
+    "path": "server/ingestion/sources/simplicant/parse.js parseSimplicantPostingsFromHtml",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and parse validated cards/links only",
-    "fetchList": "bounded HTML list fetch through source runner",
-    "fetchDetail": "not currently enabled; list card evidence only",
-    "parseList": "server/ingestion/sources/simplicant/parse.js parseSimplicantPostingsFromHtml",
-    "parseDetail": "not currently enabled",
-    "normalize": "server/ingestion/sources/simplicant/index.js source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/simplicant/discover.js",
+    "fetchList": "server/ingestion/sources/simplicant/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/simplicant/fetchDetail.js",
+    "parseList": "server/ingestion/sources/simplicant/parse.js",
+    "parseDetail": "server/ingestion/sources/simplicant/parse.js",
+    "normalize": "server/ingestion/sources/simplicant/normalize.js",
+    "validate": "server/ingestion/sources/simplicant/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "monitor with parser stats and live field-quality audit after deploy/source refresh",
-  "certification_blockers": ""
+  "next_action": "monitor with parser stats and live field-quality audit",
+  "certification_blockers": "none"
 }

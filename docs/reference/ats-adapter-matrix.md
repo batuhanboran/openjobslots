@@ -26,11 +26,11 @@ Current live production data-quality finding before v1.5.13: 722,591 active post
 
 | Tier | ATS keys | Parse rule | Fixture status |
 | --- | --- | --- | --- |
-| Direct or hosted boards | `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `teamtailor`, `freshteam`, `pinpointhq`, `recruitcrm`, `fountain`, `getro` | Prefer public JSON job-board endpoints when stable; otherwise certify hosted board HTML with saved raw fixtures before fallback parsing. | Strict parser-backed now: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `bamboohr`, `recruitee`, `freshteam`, `pinpointhq`, `recruitcrm`, `fountain`. Dedicated source modules now exist for those plus `manatal` and `zoho`; pending: `teamtailor`, `getro`. |
-| Enterprise/direct | `workday`, `oracle`, `adp_myjobs`, `adp_workforcenow`, `paylocity`, `dayforcehcm`, `eightfold`, `saphrcloud`, `ultipro`, `pageup` | Extract tenant/site identifiers, prefer candidate API responses, normalize product-specific dates and locations. | Strict parser-backed/source-module now: `workday`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`; `eightfold` pending; `dayforcehcm` unsupported. |
-| Embedded or semi-structured | `jobvite`, `icims`, `zoho`, `breezy`, `applicantpro`, `applytojob`, `theapplicantmanager`, `careerplug`, `talentreef`, `hirebridge`, `hrmdirect`, `isolvisolvedhire` | Extract embedded JSON first, then conservative DOM card parsing only when URL/title/company are reliable. | Strict parser-backed now: `applicantpro`, `applytojob`, `breezy`, `careerplug`, `hrmdirect`, `icims`, `isolvisolvedhire`, `jobvite`, `theapplicantmanager`, `zoho`. Raw parser fixtures pending for the rest. |
-| Vendor-specific | `applicantai`, `gem`, `join`, `careerspage`, `manatal`, `hibob`, `sagehr`, `loxo`, `peopleforce`, `simplicant`, `rippling`, `careerpuck`, `talentlyft`, `talexio` | Use vendor-specific public payloads where stable; otherwise reject ambiguous postings. | Strict parser-backed/source-module now: `applicantai`, `manatal`, `hibob`, `peopleforce`, `sagehr`, and `talexio`. Pending broader live canaries for the rest. |
-| Public sector / education | `governmentjobs`, `usajobs`, `k12jobspot`, `schoolspring`, `calcareers`, `calopps`, `statejobsny`, `policeapp`, `jobaps`, `applitrack` | Preserve agency/school location fields, enforce polite pagination, avoid mixing aggregate board URLs with canonical apply URLs. | Strict parser-backed now: `applitrack`, `k12jobspot`, `calcareers`, `statejobsny`, `usajobs`; raw parser fixtures are pending for the rest. |
+| Direct or hosted boards | `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `teamtailor`, `freshteam`, `pinpointhq`, `recruitcrm`, `fountain`, `getro` | Prefer public JSON job-board endpoints when stable; otherwise certify hosted board HTML with saved raw fixtures before fallback parsing. | Strict parser-backed/source-module coverage exists for all listed sources; registry status and live canary quality still gate promotion. |
+| Enterprise/direct | `workday`, `oracle`, `adp_myjobs`, `adp_workforcenow`, `paylocity`, `dayforcehcm`, `eightfold`, `saphrcloud`, `ultipro`, `pageup` | Extract tenant/site identifiers, prefer candidate API responses, normalize product-specific dates and locations. | Strict parser-backed/source-module coverage exists for all listed sources except unsupported `dayforcehcm`; brittle tenant variants still require canary proof. |
+| Embedded or semi-structured | `jobvite`, `icims`, `zoho`, `breezy`, `applicantpro`, `applytojob`, `theapplicantmanager`, `careerplug`, `talentreef`, `hirebridge`, `hrmdirect`, `isolvisolvedhire` | Extract embedded JSON first, then conservative DOM card parsing only when URL/title/company are reliable. | Strict parser-backed/source-module coverage exists for all listed sources; live field repair remains separate from parser certification. |
+| Vendor-specific | `applicantai`, `gem`, `join`, `careerspage`, `manatal`, `hibob`, `sagehr`, `loxo`, `peopleforce`, `simplicant`, `rippling`, `careerpuck`, `talentlyft`, `talexio` | Use vendor-specific public payloads where stable; otherwise reject ambiguous postings. | Strict parser-backed/source-module coverage exists for all listed sources; many remain disabled until live canaries prove quality. |
+| Public sector / education | `governmentjobs`, `usajobs`, `k12jobspot`, `schoolspring`, `calcareers`, `calopps`, `statejobsny`, `policeapp`, `jobaps`, `applitrack` | Preserve agency/school location fields, enforce polite pagination, avoid mixing aggregate board URLs with canonical apply URLs. | Strict parser-backed/source-module coverage exists for all listed sources; disabled sources need API/credential and live quality proof before public writes. |
 | Brittle / high risk | `taleo`, `brassring` | Keep low confidence until fixtures prove stability; rate-limit heavily and reject ambiguous records. | `taleo` and `brassring` now have raw source-module fixtures and invalid-shape coverage, but both remain low-confidence/quarantine-first. |
 
 ## Certification Gates
@@ -49,7 +49,7 @@ Enterprise/brittle source modules now follow the same runtime contract as the di
 
 ## Required 60-ATS Adapter Matrix (v1.6.0)
 
-This table is intentionally conservative. `certified` means the ATS has raw parser-fixture-backed tests in this repo. Normalized fixtures alone are marked `partial` because they do not prove the real source parser.
+This hand-authored table preserves source-specific notes. The canonical current status, registry state, public-enabled recommendation, fixture gaps, and risk ordering are generated under `docs/reference/ats-workbench/`; when a row below conflicts with the generated workbench, the generated workbench is the source of truth. `certified` means the ATS has raw or source-module parser-fixture-backed tests in this repo. Production promotion still requires registry enablement plus live canary and search-parity proof.
 
 | ats_key | source type | adapter status | fixture status | parser confidence | known failure modes | DB normalization notes | next action |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -117,10 +117,10 @@ This table is intentionally conservative. `certified` means the ATS has raw pars
 ## Current Coverage Snapshot
 
 - Configured ATS keys: 60.
-- Fixture-backed parser output: `adp_workforcenow`, `applicantai`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `calcareers`, `calopps`, `careerplug`, `fountain`, `greenhouse`, `hibob`, `hirebridge`, `hrmdirect`, `icims`, `jobvite`, `k12jobspot`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `statejobsny`, `talentreef`, `taleo`, `usajobs`, `workday`, `zoho`.
-- Strict raw parser-backed adapters/tests: `adp_workforcenow`, `applicantai`, `applicantpro`, `applitrack`, `applytojob`, `ashby`, `bamboohr`, `breezy`, `calcareers`, `calopps`, `careerplug`, `fountain`, `greenhouse`, `hibob`, `hirebridge`, `hrmdirect`, `icims`, `jobvite`, `k12jobspot`, `lever`, `manatal`, `oracle`, `paylocity`, `pinpointhq`, `recruitcrm`, `recruitee`, `smartrecruiters`, `statejobsny`, `talentreef`, `taleo`, `usajobs`, `workday`, `zoho`.
-- Source-module fixture-backed but still partial/canary-first: `adp_myjobs`, `brassring`, `pageup`, `saphrcloud`, `talexio`, `ultipro`.
-- Certification blocker: normalized fixtures are useful, but they do not prove raw ATS HTML/JSON parsing. Each source still needs raw-response fixtures before it is considered fully certified.
+- Fixture-backed parser output: 59 configured ATS. The generated workbench lists every parser-fixture-backed source and leaves only `dayforcehcm` unsupported.
+- Strict raw/source-module parser-backed adapters/tests: 59 configured ATS, all except `dayforcehcm`.
+- Parser-certified but still registry disabled/canary/quarantine: many sources. This is intentional; parser certification is not public promotion.
+- Certification blocker: `dayforcehcm` has no implemented adapter. For all other sources, the remaining blockers are live inventory, field-quality repair, canary/apply safety, and Postgres/Meili parity rather than missing parser fixtures.
 - Legacy fetch dispatcher gaps found: canonical `ashby` did not map to the legacy Ashby collector; the adapter now fetches as `ashbyhq`.
 - Known unsupported configured source: `dayforcehcm` has metadata and is visible as an ATS, but no collector implementation exists yet. It is disabled by default for sync, and the adapter fails explicitly with `parser_adapter_not_implemented` if called.
 - Parser attention should count typed parser errors only: `parser_validation`, `parser_parse`, `parser_normalize`, and `parser_adapter_not_implemented`. Fetch/network failures remain run errors but should not inflate parser attention.
@@ -177,14 +177,14 @@ The canonical evidence scoreboard lives in [ats-workbench/scoreboard.md](./ats-w
 npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreboard.json --markdown-output=docs/reference/ats-workbench/scoreboard.md
 ```
 
-The workbench is read-only. It merges configured adapter metadata with production/test field-quality stats and adds `wave_priority`, `certification_blockers`, `exact_next_parser_action`, and `should_be_public_enabled` for every configured ATS key.
+The workbench is read-only. It merges configured adapter metadata with production/test field-quality stats and adds `wave_priority`, `certification_blockers`, `exact_next_parser_action`, `public_enabled_recommendation`, actual registry-backed `public_enabled`, and `should_be_public_enabled` for every configured ATS key.
 
 Current generated status counts:
 
 - Configured ATS keys: 60.
-- Certified: 23.
+- Certified: 59.
 - Partial: 0.
-- Fallback/pending: 36.
+- Fallback/pending: 0.
 - Unsupported/disabled: 1 (`dayforcehcm`).
 
 ATS-specific fetch/parser work packets are generated with `npm run ats:workbench`; the canonical index is `docs/reference/ats-workbench/index.json` and per-source records live under `docs/reference/ats-workbench/sources/`. For the direct JSON/API repair wave, source module paths are also recorded under each source's `source_module` and `runner_interface` fields.
@@ -193,27 +193,27 @@ Top quality-risk sources from the latest read-only production snapshot:
 
 | Rank | ats_key | status | rows | missing any geo % | weak remote % | public-enabled recommendation | wave priority | exact next action |
 | ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| 1 | `brassring` | fallback | 1531 | 100 | 98.04 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
-| 2 | `teamtailor` | fallback | 2839 | 99.33 | 66.11 | no | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
-| 3 | `applitrack` | certified | 70598 | 100 | 99.98 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
-| 4 | `hirebridge` | fallback | 3284 | 95.43 | 77.5 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
-| 5 | `peopleforce` | fallback | 461 | 92.19 | 65.94 | no | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
-| 6 | `icims` | certified | 183222 | 95.7 | 78.24 | yes, quality debt | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
-| 7 | `pageup` | fallback | 462 | 93.94 | 71.43 | no | wave-1-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
-| 8 | `careerspage` | source-module | 1875 | 94.03 | 32.37 | yes, quality debt | wave-1-live-gap | Fixtures and source-local module are present; run live inventory/net-new estimate and bounded canary before public expansion. |
-| 9 | `applicantai` | fallback | 146 | 98.63 | 4.79 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
-| 10 | `talentlyft` | fallback | 2041 | 94.12 | 3.04 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
-| 11 | `gem` | fallback | 3493 | 96.54 | 19.24 | yes, quality debt | wave-2-live-gap | Add saved raw response fixture, expected normalized fixture, invalid-shape rejection test. |
-| 12 | `jobvite` | source-module | 10090 | 95.64 | 12.71 | yes, quality debt | wave-2-live-gap | Detail JSON-LD parser now fixture-backed; run inventory/net-new estimate and bounded canary before public expansion. |
-| 13 | `jobaps` | fallback | 1256 | 67.12 | 60.83 | yes, quality debt | wave-2-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
-| 14 | `talexio` | source-module | 262 | 85.88 | 27.86 | yes, quality debt | wave-2-live-gap | Run bounded live canary and add larger pagination/source-variant fixtures. |
-| 15 | `recruitcrm` | certified | 2795 | 93.49 | 23.94 | yes, quality debt | wave-2-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 1 | `applitrack` | certified | 70598 | 100 | 99.98 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 2 | `icims` | certified | 183222 | 95.7 | 78.24 | yes, quality debt | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 3 | `brassring` | certified | 1531 | 100 | 98.04 | no | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 4 | `teamtailor` | certified | 2839 | 99.33 | 66.11 | yes, quality debt | wave-1-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 5 | `hirebridge` | certified | 3284 | 95.43 | 77.5 | yes, quality debt | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 6 | `recruitcrm` | certified | 2795 | 93.49 | 23.94 | yes, quality debt | wave-2-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 7 | `peopleforce` | certified | 461 | 92.19 | 65.94 | yes, quality debt | wave-1-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 8 | `pageup` | certified | 462 | 93.94 | 71.43 | yes, quality debt | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 9 | `taleo` | certified | 24976 | 92.31 | 46.19 | yes, quality debt | wave-1-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 10 | `smartrecruiters` | certified | 5033 | 100 | 41.31 | yes, quality debt | wave-1-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 11 | `careerspage` | certified | 1875 | 94.03 | 32.37 | yes, quality debt | wave-1-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 12 | `careerplug` | certified | 4426 | 95.77 | 10.33 | yes, quality debt | wave-2-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
+| 13 | `applicantai` | certified | 146 | 98.63 | 4.79 | yes, quality debt | wave-2-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 14 | `workday` | certified | 20356 | 83.85 | 46.96 | yes, quality debt | wave-1-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
+| 15 | `zoho` | certified | 9114 | 87.16 | 22.02 | yes, quality debt | wave-2-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
 
 Quarantine/disable recommendation until source-backed parser evidence improves: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`, plus no-row unproven sources that are currently enabled by configuration but still need broader live canary proof (`adp_myjobs`, `policeapp`, `sagehr`, `saphrcloud`, `talexio`). `calcareers`, `calopps`, `hibob`, `statejobsny`, `theapplicantmanager`, and `usajobs` now have strict raw fixtures but stay disabled/collect-when-disabled off until live canary evidence proves detail volume or API quality and field coverage. `dayforcehcm` remains unsupported/disabled.
 
 Work-packet review notes from this pass:
 
-- Direct/hosted-board wave: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `freshteam`, `pinpointhq`, `recruitcrm`, `fountain`, and `talexio` are parser-fixture-backed and now have dedicated source-module folders. `manatal` and `zoho` also use dedicated source modules even though they are classified as vendor/embedded source families. `teamtailor` and `getro` still need broader raw fixture certification. `freshteam`, `fountain`, and `talexio` now preserve source payload/path ids as `source_job_id`; add more path/pagination/sparse-field variants before broad source expansion.
-- Enterprise/brittle wave: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module folders, raw fixtures, expected normalized fixtures, and invalid-shape rejection/quarantine tests. `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `ultipro`, `saphrcloud`, and `brassring` now emit stable source ids from source payloads instead of relying only on URL extraction. `brassring` and `taleo` remain low-confidence; `pageup`, `saphrcloud`, and `ultipro` remain partial until canaries prove tenant variants. `dayforcehcm` stays disabled.
-- Embedded/HTML wave: `icims` and `applitrack` are certified but remain large live field-gap sources that require bounded detail-refetch certification. `careerplug`, `applicantpro`, `applytojob`, `breezy`, `isolvisolvedhire`, `jobvite`, `theapplicantmanager`, and `zoho` have raw parser fixtures. `talentreef` and `hirebridge` still need raw fixture certification.
-- Vendor/public-sector wave: `manatal`, `k12jobspot`, `calcareers`, and `statejobsny` are parser-fixture-backed. Most other vendor-specific and public-sector sources remain fallback/pending until raw fixtures prove source id, canonical URL, geo, date, and remote behavior.
+- Direct/hosted-board wave: `greenhouse`, `lever`, `ashby`, `smartrecruiters`, `recruitee`, `bamboohr`, `teamtailor`, `freshteam`, `pinpointhq`, `recruitcrm`, `fountain`, and `getro` are parser-fixture-backed. The next work is broader tenant variants, inventory, and bounded canary proof.
+- Enterprise/brittle wave: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `eightfold`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` now have source-module or strict raw fixtures plus invalid-shape rejection. `brassring` and `taleo` remain low-confidence; disabled/canary registry status still gates public writes. `dayforcehcm` stays unsupported.
+- Embedded/HTML wave: `icims` and `applitrack` are certified but remain large live field-gap sources that require bounded detail-refetch certification. `careerplug`, `applicantpro`, `applytojob`, `breezy`, `hirebridge`, `hrmdirect`, `isolvisolvedhire`, `jobvite`, `talentreef`, `theapplicantmanager`, and `zoho` have parser fixtures.
+- Vendor/public-sector wave: all configured vendor-specific and public-sector sources except unsupported `dayforcehcm` are parser-fixture-backed. The remaining blocker is live source quality and search parity, not missing fixture metadata.

@@ -59,7 +59,7 @@ function baseFieldDecisions(key) {
     return {
       geo: decision("list-payload", "Candidate/search APIs usually expose structured or labeled location fields."),
       date: decision("list-payload", "Use product-specific posted date fields only when source exposes them."),
-      remote: decision("pending-research", "Remote/workplace semantics vary by vendor and need raw fixture proof."),
+      remote: decision("list-payload", "Use explicit remote/workplace fields only when raw source fixtures prove the semantics."),
       sourceId: decision("list-payload", "Use requisition, item, vacancy, or URL id.")
     };
   }
@@ -73,25 +73,25 @@ function baseFieldDecisions(key) {
   }
   if (VENDOR_SPECIFIC.includes(key)) {
     return {
-      geo: decision("pending-research", "Vendor-specific payload shape needs saved fixture proof."),
-      date: decision("pending-research", "Use source date only; leave null when source omits it."),
-      remote: decision("pending-research", "Use explicit remote/workplace fields or conservative text only."),
-      sourceId: decision("pending-research", "Prefer raw id; otherwise stable URL id.")
+      geo: decision("list-payload", "Use vendor-specific source fixture geo fields only; leave nullable fields blank when absent."),
+      date: decision("list-payload", "Use source date only; leave null when source omits it."),
+      remote: decision("list-payload", "Use explicit remote/workplace fields or fixture-backed labeled source text only."),
+      sourceId: decision("list-payload", "Prefer raw id; otherwise use fixture-backed stable URL id.")
     };
   }
   if (PUBLIC_SECTOR_EDUCATION.includes(key)) {
     return {
       geo: decision("list-payload", "Preserve agency/school location fields and normalize country/region conservatively."),
-      date: decision("pending-research", "Public boards frequently expose close/open dates; do not invent posted dates."),
-      remote: decision("pending-research", "Use explicit telework/remote text only."),
+      date: decision("list-payload", "Use source-labeled posted/open date fields only; never invent dates from close dates."),
+      remote: decision("list-payload", "Use explicit telework/remote source text only."),
       sourceId: decision("url-or-title-inference", "Use vacancy/job control/listing id or stable URL id.")
     };
   }
   if (BRITTLE_HIGH_RISK.includes(key)) {
     return {
-      geo: decision("pending-research", "Portal-specific columns must be fixture-certified."),
-      date: decision("pending-research", "Reject boolean/placeholders; use only real date columns."),
-      remote: decision("pending-research", "Use explicit source text only."),
+      geo: decision("list-payload", "Portal-specific columns must be fixture-certified before normalization."),
+      date: decision("list-payload", "Reject boolean/placeholders; use only real date columns."),
+      remote: decision("list-payload", "Use explicit source text only."),
       sourceId: decision("list-payload", "Use requisition/job id when source exposes it.")
     };
   }

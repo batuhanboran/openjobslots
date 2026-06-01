@@ -7,9 +7,20 @@ const {
   isAtsEnabledByDefault
 } = require("../server/ingestion/adapter-metadata");
 const { buildAtsCertificationRecords } = require("../server/ingestion/ats-certification");
+const { SOURCE_STATUSES } = require("../server/ingestion/sourceContracts");
+const { getRegistrySourceModule } = require("../server/ingestion/sourceRegistry");
 const {
   buildAtsScoreboard,
-  buildSummary: buildScoreboardSummary
+  blockerFor,
+  canonicalUrlReliability,
+  buildSummary: buildScoreboardSummary,
+  detailRefetchNeeded,
+  nextActionFor,
+  publicEnabledRecommendation,
+  reasonFor,
+  riskScore,
+  sourceIdReliability,
+  wavePriority
 } = require("./audit-ats-quality");
 
 const DEFAULT_WORKBENCH_DIR = path.join("docs", "reference", "ats-workbench");
@@ -286,10 +297,20 @@ function buildSourceWorkbenchRecord({ item, row, record, metadata, fixtures }) {
   const method = methodForFamily(sourceFamily);
   const certification = ADAPTER_CERTIFICATION_DETAILS[atsKey] || metadata.certification || null;
   const fixtureStatus = fixtureStatusFor(atsKey, metadata, fixtures);
-  const publicEnabled = Boolean(row.should_be_public_enabled && isAtsEnabledByDefault(atsKey));
+  const registryModule = getRegistrySourceModule(atsKey);
+  const registryStatus = registryModule?.status || "";
+  const publicEnabledRecommendationValue = Boolean(row.should_be_public_enabled && isAtsEnabledByDefault(atsKey));
+  const publicEnabled = Boolean(publicEnabledRecommendationValue && registryStatus === SOURCE_STATUSES.enabled);
+  const qualityRow = {
+    ...row,
+    should_be_public_enabled: publicEnabled
+  };
   const hasDedicatedSourceModule = fs.existsSync(path.join(SOURCE_MODULE_DIR, atsKey, "index.js"));
   const sourceModulePath = hasDedicatedSourceModule
     ? `server/ingestion/sources/${atsKey}/index.js`
+    : "";
+  const registryReason = publicEnabledRecommendationValue && !publicEnabled
+    ? `registry status is ${registryStatus || "unknown"}; parser certification is not production promotion`
     : "";
   return {
     ats_key: atsKey,
@@ -314,11 +335,14 @@ function buildSourceWorkbenchRecord({ item, row, record, metadata, fixtures }) {
       present: hasDedicatedSourceModule,
       path: sourceModulePath,
       fixtures_dir: hasDedicatedSourceModule ? `server/ingestion/sources/${atsKey}/fixtures` : "",
-      parser_version: hasDedicatedSourceModule ? `source-${atsKey}-v1` : ""
+      parser_version: hasDedicatedSourceModule ? `source-${atsKey}-v1` : "",
+      registry_status: registryStatus,
+      collect_when_disabled: Boolean(registryModule?.collectWhenDisabled)
     },
-    quality_threshold: qualityThresholdFor(row),
+    quality_threshold: qualityThresholdFor(qualityRow),
+    public_enabled_recommendation: publicEnabledRecommendationValue,
     public_enabled: publicEnabled,
-    quarantine_reason: publicEnabled ? "" : row.reason,
+    quarantine_reason: publicEnabled ? "" : registryReason || row.reason,
     failure_log: {
       known_failure_modes: certification?.expectedFailureModes || [],
       parser_attention_count_24h: row.parser_attention_count_24h,
@@ -375,7 +399,7 @@ function normalizeScoreboardRows(rows) {
   return rows.map((row) => {
     const metadata = getAdapterMetadata(row.ats_key, row.display_name);
     const currentStatus = currentStatusFromMetadata(metadata);
-    return {
+    const normalized = {
       ...row,
       current_status: currentStatus,
       fixture_status: metadata.fixtureStatus,
@@ -383,11 +407,25 @@ function normalizeScoreboardRows(rows) {
       parser_confidence: metadata.confidence,
       adapter_tier: metadata.tier,
       enabled_by_default: metadata.enabledByDefault,
-      should_be_public_enabled: currentStatus === "unsupported" || currentStatus === "disabled"
-        ? false
-        : Boolean(row.should_be_public_enabled)
+      source_id_reliability: sourceIdReliability(metadata, {
+        total_visible_rows: row.current_production_row_count,
+        missing_source_id_count: row.missing_source_id_count
+      }),
+      canonical_url_reliability: canonicalUrlReliability(metadata)
     };
-  });
+    normalized.detail_refetch_needed = detailRefetchNeeded(normalized);
+    normalized.risk_score = riskScore(normalized);
+    normalized.wave_priority = wavePriority(normalized);
+    normalized.certification_blockers = blockerFor(normalized);
+    normalized.exact_next_parser_action = nextActionFor(normalized);
+    normalized.should_be_public_enabled = publicEnabledRecommendation(normalized);
+    normalized.reason = reasonFor(normalized);
+    return normalized;
+  }).sort((a, b) =>
+    b.risk_score - a.risk_score ||
+    b.current_production_row_count - a.current_production_row_count ||
+    a.ats_key.localeCompare(b.ats_key)
+  );
 }
 
 function easiestImprovementScore(row) {
@@ -409,6 +447,8 @@ function buildIndexPayload(records, scoreboard) {
   const quarantineOrDisabled = records.filter((record) => !record.public_enabled).map((record) => ({
     ats_key: record.ats_key,
     status: record.current_status,
+    registry_status: record.source_module.registry_status,
+    public_enabled_recommendation: record.public_enabled_recommendation,
     reason: record.quarantine_reason
   }));
   const topQualityRisk = [...scoreboard].slice(0, 15).map((row) => ({
@@ -454,6 +494,8 @@ function buildIndexPayload(records, scoreboard) {
       file: `sources/${record.ats_key}.json`,
       current_status: record.current_status,
       source_family: record.source_family,
+      registry_status: record.source_module.registry_status,
+      public_enabled_recommendation: record.public_enabled_recommendation,
       public_enabled: record.public_enabled,
       risk_score: record.production_quality.risk_score
     })),

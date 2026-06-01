@@ -392,10 +392,15 @@ module.exports = {
   buildAtsScoreboard,
   buildMarkdown,
   buildSummary,
+  blockerFor,
+  canonicalUrlReliability,
   currentStatus,
   detailRefetchNeeded,
+  nextActionFor,
   parseArgs,
   publicEnabledRecommendation,
+  reasonFor,
   riskScore,
+  sourceIdReliability,
   wavePriority
 };

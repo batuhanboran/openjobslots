@@ -1,7 +1,7 @@
 {
   "ats_key": "eightfold",
   "display_name": "Eightfold",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "enterprise_api",
   "official_public_docs_or_observed_endpoint": "Observed Eightfold careers HTML plus search API.",
   "source_discovery_method": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
@@ -13,32 +13,45 @@
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
   "location_text_rule": "list-payload: Candidate/search APIs usually expose structured or labeled location fields.",
   "country_region_city_rule": "list-payload: Candidate/search APIs usually expose structured or labeled location fields.",
-  "remote_type_rule": "pending-research: Remote/workplace semantics vary by vendor and need raw fixture proof.",
+  "remote_type_rule": "list-payload: Use explicit remote/workplace fields only when raw source fixtures prove the semantics.",
   "posting_date_rule": "list-payload: Use product-specific posted date fields only when source exposes them.",
   "rate_limit": "conservative tenant-level budget, per-host serialization, retry/backoff on 429/5xx",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/eightfold/eightfold.local.test.js",
+      "server/ingestion/sources/eightfold/fixtures/company.json",
+      "server/ingestion/sources/eightfold/fixtures/expected-normalized.json",
+      "server/ingestion/sources/eightfold/fixtures/fetch-list.json",
+      "server/ingestion/sources/eightfold/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/eightfold/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/eightfold/eightfold.local.test.js",
+      "server/ingestion/sources/eightfold/fixtures/company.json",
+      "server/ingestion/sources/eightfold/fixtures/expected-normalized.json",
+      "server/ingestion/sources/eightfold/fixtures/fetch-list.json",
+      "server/ingestion/sources/eightfold/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/eightfold/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/eightfold/index.js",
+    "fixtures_dir": "server/ingestion/sources/eightfold/fixtures",
+    "parser_version": "source-eightfold-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": false
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -52,26 +65,26 @@
     "missing_city_pct": 45.59,
     "missing_any_geo_pct": 45.59,
     "weak_remote_pct": 4.49,
-    "risk_score": 102.75,
-    "wave_priority": "wave-3-certification",
+    "risk_score": 67.75,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseEightfoldPostingsFromApi",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "medium-low-pending-fixture"
+    "path": "server/ingestion/sources/eightfold/parse.js parseEightfoldPostingsFromApi",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "extract tenant, site, portal, or requisition API identifiers from configured company URL",
-    "fetchList": "bounded API request to candidate/search endpoint through source runner",
-    "fetchDetail": "detail fetch only when list response lacks geo/date/remote and parser certification covers detail shape",
-    "parseList": "server/index.js parseEightfoldPostingsFromApi",
-    "parseDetail": "server/index.js parseEightfoldPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/eightfold/discover.js",
+    "fetchList": "server/ingestion/sources/eightfold/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/eightfold/fetchDetail.js",
+    "parseList": "server/ingestion/sources/eightfold/parse.js",
+    "parseDetail": "server/ingestion/sources/eightfold/parse.js",
+    "normalize": "server/ingestion/sources/eightfold/normalize.js",
+    "validate": "server/ingestion/sources/eightfold/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "none"
 }

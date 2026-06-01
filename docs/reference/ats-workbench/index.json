@@ -1,9 +1,8 @@
 {
-  "generated_at": "2026-05-12T14:21:39.933Z",
+  "generated_at": "2026-06-01T08:54:17.550Z",
   "ats_count": 60,
   "status_counts": {
-    "fallback": 32,
-    "certified": 27,
+    "certified": 59,
     "unsupported": 1
   },
   "source_family_counts": {
@@ -16,44 +15,12 @@
   },
   "top_15_quality_risk": [
     {
-      "ats_key": "brassring",
-      "risk_score": 218.54,
-      "rows": 1531,
-      "missing_any_geo_pct": 100,
-      "weak_remote_pct": 98.04,
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "teamtailor",
-      "risk_score": 209.81,
-      "rows": 2839,
-      "missing_any_geo_pct": 99.33,
-      "weak_remote_pct": 66.11,
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
       "ats_key": "applitrack",
       "risk_score": 208.37,
       "rows": 70598,
       "missing_any_geo_pct": 100,
       "weak_remote_pct": 99.98,
       "reason": "hold/quarantine recommendation: high missing normalized geo; high weak remote classification"
-    },
-    {
-      "ats_key": "hirebridge",
-      "risk_score": 202.61,
-      "rows": 3284,
-      "missing_any_geo_pct": 95.43,
-      "weak_remote_pct": 77.5,
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "peopleforce",
-      "risk_score": 192.07,
-      "rows": 461,
-      "missing_any_geo_pct": 92.19,
-      "weak_remote_pct": 65.94,
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
     },
     {
       "ats_key": "icims",
@@ -64,68 +31,28 @@
       "reason": "enabled with quality debt: high missing normalized geo; high weak remote classification"
     },
     {
-      "ats_key": "pageup",
-      "risk_score": 190.78,
-      "rows": 462,
-      "missing_any_geo_pct": 93.94,
-      "weak_remote_pct": 71.43,
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+      "ats_key": "brassring",
+      "risk_score": 183.54,
+      "rows": 1531,
+      "missing_any_geo_pct": 100,
+      "weak_remote_pct": 98.04,
+      "reason": "hold/quarantine recommendation: high missing normalized geo; high weak remote classification"
     },
     {
-      "ats_key": "careerspage",
-      "risk_score": 182.88,
-      "rows": 1875,
-      "missing_any_geo_pct": 94.03,
-      "weak_remote_pct": 32.37,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
+      "ats_key": "teamtailor",
+      "risk_score": 174.81,
+      "rows": 2839,
+      "missing_any_geo_pct": 99.33,
+      "weak_remote_pct": 66.11,
+      "reason": "enabled with quality debt: high missing normalized geo; high weak remote classification"
     },
     {
-      "ats_key": "applicantai",
-      "risk_score": 178.83,
-      "rows": 146,
-      "missing_any_geo_pct": 98.63,
-      "weak_remote_pct": 4.79,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "talentlyft",
-      "risk_score": 166.89,
-      "rows": 2041,
-      "missing_any_geo_pct": 94.12,
-      "weak_remote_pct": 3.04,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "gem",
-      "risk_score": 165.68,
-      "rows": 3493,
-      "missing_any_geo_pct": 96.54,
-      "weak_remote_pct": 19.24,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "jobvite",
-      "risk_score": 162.33,
-      "rows": 10090,
-      "missing_any_geo_pct": 95.64,
-      "weak_remote_pct": 12.71,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "jobaps",
-      "risk_score": 161.03,
-      "rows": 1256,
-      "missing_any_geo_pct": 67.12,
-      "weak_remote_pct": 60.83,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
-    },
-    {
-      "ats_key": "talexio",
-      "risk_score": 158.86,
-      "rows": 262,
-      "missing_any_geo_pct": 85.88,
-      "weak_remote_pct": 27.86,
-      "reason": "enabled with quality debt: missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
+      "ats_key": "hirebridge",
+      "risk_score": 167.61,
+      "rows": 3284,
+      "missing_any_geo_pct": 95.43,
+      "weak_remote_pct": 77.5,
+      "reason": "enabled with quality debt: high missing normalized geo; high weak remote classification"
     },
     {
       "ats_key": "recruitcrm",
@@ -133,6 +60,78 @@
       "rows": 2795,
       "missing_any_geo_pct": 93.49,
       "weak_remote_pct": 23.94,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "peopleforce",
+      "risk_score": 157.07,
+      "rows": 461,
+      "missing_any_geo_pct": 92.19,
+      "weak_remote_pct": 65.94,
+      "reason": "enabled with quality debt: high missing normalized geo; high weak remote classification"
+    },
+    {
+      "ats_key": "pageup",
+      "risk_score": 155.78,
+      "rows": 462,
+      "missing_any_geo_pct": 93.94,
+      "weak_remote_pct": 71.43,
+      "reason": "enabled with quality debt: high missing normalized geo; high weak remote classification"
+    },
+    {
+      "ats_key": "taleo",
+      "risk_score": 152.02,
+      "rows": 24976,
+      "missing_any_geo_pct": 92.31,
+      "weak_remote_pct": 46.19,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "smartrecruiters",
+      "risk_score": 152.01,
+      "rows": 5033,
+      "missing_any_geo_pct": 100,
+      "weak_remote_pct": 41.31,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "careerspage",
+      "risk_score": 147.88,
+      "rows": 1875,
+      "missing_any_geo_pct": 94.03,
+      "weak_remote_pct": 32.37,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "careerplug",
+      "risk_score": 146.29,
+      "rows": 4426,
+      "missing_any_geo_pct": 95.77,
+      "weak_remote_pct": 10.33,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "applicantai",
+      "risk_score": 143.83,
+      "rows": 146,
+      "missing_any_geo_pct": 98.63,
+      "weak_remote_pct": 4.79,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "workday",
+      "risk_score": 142.68,
+      "rows": 20356,
+      "missing_any_geo_pct": 83.85,
+      "weak_remote_pct": 46.96,
+      "reason": "enabled with quality debt: high missing normalized geo"
+    },
+    {
+      "ats_key": "zoho",
+      "risk_score": 132.02,
+      "rows": 9114,
+      "missing_any_geo_pct": 87.16,
+      "weak_remote_pct": 22.02,
       "reason": "enabled with quality debt: high missing normalized geo"
     }
   ],
@@ -156,12 +155,30 @@
       "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
     },
     {
+      "ats_key": "hirebridge",
+      "easiest_improvement_score": 380,
+      "status": "certified",
+      "rows": 3284,
+      "missing_any_geo_pct": 95.43,
+      "weak_remote_pct": 77.5,
+      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
+    },
+    {
       "ats_key": "workday",
       "easiest_improvement_score": 376.32,
       "status": "certified",
       "rows": 20356,
       "missing_any_geo_pct": 83.85,
       "weak_remote_pct": 46.96,
+      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
+    },
+    {
+      "ats_key": "teamtailor",
+      "easiest_improvement_score": 370.32,
+      "status": "certified",
+      "rows": 2839,
+      "missing_any_geo_pct": 99.33,
+      "weak_remote_pct": 66.11,
       "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
     },
     {
@@ -210,6 +227,24 @@
       "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
     },
     {
+      "ats_key": "rippling",
+      "easiest_improvement_score": 313.84,
+      "status": "certified",
+      "rows": 8474,
+      "missing_any_geo_pct": 94.12,
+      "weak_remote_pct": 2.32,
+      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
+    },
+    {
+      "ats_key": "gem",
+      "easiest_improvement_score": 311.88,
+      "status": "certified",
+      "rows": 3493,
+      "missing_any_geo_pct": 96.54,
+      "weak_remote_pct": 19.24,
+      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
+    },
+    {
       "ats_key": "hrmdirect",
       "easiest_improvement_score": 309.19,
       "status": "certified",
@@ -235,47 +270,10 @@
       "missing_any_geo_pct": 83.51,
       "weak_remote_pct": 0,
       "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "recruitcrm",
-      "easiest_improvement_score": 300.37,
-      "status": "certified",
-      "rows": 2795,
-      "missing_any_geo_pct": 93.49,
-      "weak_remote_pct": 23.94,
-      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
-    },
-    {
-      "ats_key": "applytojob",
-      "easiest_improvement_score": 290.09,
-      "status": "certified",
-      "rows": 65917,
-      "missing_any_geo_pct": 70.33,
-      "weak_remote_pct": 3.11,
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "applitrack",
-      "easiest_improvement_score": 261.82,
-      "status": "certified",
-      "rows": 70598,
-      "missing_any_geo_pct": 100,
-      "weak_remote_pct": 99.98,
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "ashby",
-      "easiest_improvement_score": 252.72,
-      "status": "certified",
-      "rows": 26620,
-      "missing_any_geo_pct": 60.95,
-      "weak_remote_pct": 16.42,
-      "next_action": "audit raw payloads and add field-specific parser/backfill fixture"
     }
   ],
   "public_enabled_sources": [
     "adp_workforcenow",
-    "applicantai",
     "applicantpro",
     "applytojob",
     "ashby",
@@ -283,196 +281,302 @@
     "breezy",
     "careerplug",
     "careerpuck",
-    "careerspage",
-    "eightfold",
     "fountain",
-    "freshteam",
-    "gem",
-    "getro",
     "governmentjobs",
     "greenhouse",
     "hrmdirect",
     "icims",
-    "jobaps",
-    "jobvite",
-    "join",
     "k12jobspot",
     "lever",
-    "loxo",
-    "manatal",
     "oracle",
     "paylocity",
-    "pinpointhq",
-    "recruitcrm",
-    "recruitee",
-    "rippling",
     "schoolspring",
     "simplicant",
-    "smartrecruiters",
-    "talentlyft",
-    "talentreef",
-    "taleo",
-    "talexio",
-    "ultipro",
-    "workday",
-    "zoho"
+    "smartrecruiters"
   ],
   "quarantine_or_disabled_sources": [
     {
       "ats_key": "adp_myjobs",
-      "status": "source-local registry module",
-      "reason": "registry-backed but disabled; live canary/source quality evidence pending"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "applicantai",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "applitrack",
       "status": "certified",
+      "registry_status": "quarantine",
+      "public_enabled_recommendation": false,
       "reason": "hold/quarantine recommendation: high missing normalized geo; high weak remote classification"
     },
     {
       "ats_key": "brassring",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": false,
+      "reason": "hold/quarantine recommendation: high missing normalized geo; high weak remote classification"
     },
     {
       "ats_key": "calcareers",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "calopps",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "careerspage",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "dayforcehcm",
       "status": "unsupported",
+      "registry_status": "unsupported",
+      "public_enabled_recommendation": false,
       "reason": "unsupported source; no implemented adapter"
     },
     {
+      "ats_key": "eightfold",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "freshteam",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "gem",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "getro",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
       "ats_key": "hibob",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "hirebridge",
       "status": "certified",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "isolvisolvedhire",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "jobaps",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "jobvite",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "join",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "loxo",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "manatal",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "pageup",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "peopleforce",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "pinpointhq",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "policeapp",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "recruitcrm",
+      "status": "certified",
+      "registry_status": "quarantine",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is quarantine; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "recruitee",
+      "status": "certified",
+      "registry_status": "quarantine",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is quarantine; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "rippling",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "sagehr",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "saphrcloud",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "statejobsny",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "talentlyft",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "talentreef",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "taleo",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "talexio",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "teamtailor",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "theapplicantmanager",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "ultipro",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
     },
     {
       "ats_key": "usajobs",
-      "status": "fallback",
-      "reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "workday",
+      "status": "certified",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is disabled; parser certification is not production promotion"
+    },
+    {
+      "ats_key": "zoho",
+      "status": "certified",
+      "registry_status": "canary",
+      "public_enabled_recommendation": true,
+      "reason": "registry status is canary; parser certification is not production promotion"
     }
   ],
   "fixture_gaps": [
-    {
-      "ats_key": "adp_myjobs",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "applicantai",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "brassring",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "calcareers",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "calopps",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "careerpuck",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "careerspage",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
     {
       "ats_key": "dayforcehcm",
       "missing": [
@@ -481,263 +585,46 @@
         "parser rejection tests"
       ],
       "next_action": "keep disabled; implement source-backed adapter only with raw fixtures"
-    },
-    {
-      "ats_key": "eightfold",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "freshteam",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "gem",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "getro",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "governmentjobs",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "hibob",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "isolvisolvedhire",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "jobaps",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "join",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "k12jobspot",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "loxo",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "pageup",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "peopleforce",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "policeapp",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "rippling",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "sagehr",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "saphrcloud",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "schoolspring",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence"
-    },
-    {
-      "ats_key": "simplicant",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "statejobsny",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "talentlyft",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "talexio",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "teamtailor",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "ultipro",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
-    },
-    {
-      "ats_key": "usajobs",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test"
     }
   ],
   "sources": [
     {
       "ats_key": "adp_myjobs",
       "file": "sources/adp_myjobs.json",
-      "current_status": "source-local registry module",
+      "current_status": "certified",
       "source_family": "enterprise_api",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "adp_workforcenow",
       "file": "sources/adp_workforcenow.json",
       "current_status": "certified",
       "source_family": "enterprise_api",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 44.8
     },
     {
       "ats_key": "applicantai",
       "file": "sources/applicantai.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 178.83
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 143.83
     },
     {
       "ats_key": "applicantpro",
       "file": "sources/applicantpro.json",
       "current_status": "certified",
       "source_family": "embedded_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 31.17
     },
@@ -746,6 +633,8 @@
       "file": "sources/applitrack.json",
       "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "quarantine",
+      "public_enabled_recommendation": false,
       "public_enabled": false,
       "risk_score": 208.37
     },
@@ -754,6 +643,8 @@
       "file": "sources/applytojob.json",
       "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 113.79
     },
@@ -762,6 +653,8 @@
       "file": "sources/ashby.json",
       "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 106.3
     },
@@ -770,223 +663,279 @@
       "file": "sources/bamboohr.json",
       "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 127.12
     },
     {
       "ats_key": "brassring",
       "file": "sources/brassring.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "brittle",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": false,
       "public_enabled": false,
-      "risk_score": 218.54
+      "risk_score": 183.54
     },
     {
       "ats_key": "breezy",
       "file": "sources/breezy.json",
       "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 122.97
     },
     {
       "ats_key": "calcareers",
       "file": "sources/calcareers.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "calopps",
       "file": "sources/calopps.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "careerplug",
       "file": "sources/careerplug.json",
       "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 146.29
     },
     {
       "ats_key": "careerpuck",
       "file": "sources/careerpuck.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
-      "risk_score": 104.23
+      "risk_score": 69.23
     },
     {
       "ats_key": "careerspage",
       "file": "sources/careerspage.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 182.88
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 147.88
     },
     {
       "ats_key": "dayforcehcm",
       "file": "sources/dayforcehcm.json",
       "current_status": "unsupported",
       "source_family": "enterprise_api",
+      "registry_status": "unsupported",
+      "public_enabled_recommendation": false,
       "public_enabled": false,
       "risk_score": -65
     },
     {
       "ats_key": "eightfold",
       "file": "sources/eightfold.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "enterprise_api",
-      "public_enabled": true,
-      "risk_score": 102.75
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 67.75
     },
     {
       "ats_key": "fountain",
       "file": "sources/fountain.json",
       "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 87.56
     },
     {
       "ats_key": "freshteam",
       "file": "sources/freshteam.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
-      "risk_score": 142.85
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 107.85
     },
     {
       "ats_key": "gem",
       "file": "sources/gem.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
-      "risk_score": 165.68
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 130.68
     },
     {
       "ats_key": "getro",
       "file": "sources/getro.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
-      "risk_score": 105.03
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 70.03
     },
     {
       "ats_key": "governmentjobs",
       "file": "sources/governmentjobs.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
-      "risk_score": 157.35
+      "risk_score": 122.35
     },
     {
       "ats_key": "greenhouse",
       "file": "sources/greenhouse.json",
       "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 94.3
     },
     {
       "ats_key": "hibob",
       "file": "sources/hibob.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "hirebridge",
       "file": "sources/hirebridge.json",
       "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 202.61
+      "risk_score": 167.61
     },
     {
       "ats_key": "hrmdirect",
       "file": "sources/hrmdirect.json",
       "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
-      "risk_score": 131.72
+      "risk_score": 113.72
     },
     {
       "ats_key": "icims",
       "file": "sources/icims.json",
       "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 191.81
     },
     {
       "ats_key": "isolvisolvedhire",
       "file": "sources/isolvisolvedhire.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "embedded_json",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "jobaps",
       "file": "sources/jobaps.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
-      "public_enabled": true,
-      "risk_score": 161.03
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 126.03
     },
     {
       "ats_key": "jobvite",
       "file": "sources/jobvite.json",
       "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 162.33
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 127.33
     },
     {
       "ats_key": "join",
       "file": "sources/join.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 80.06
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 45.06
     },
     {
       "ats_key": "k12jobspot",
       "file": "sources/k12jobspot.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
-      "risk_score": 137.3
+      "risk_score": 102.3
     },
     {
       "ats_key": "lever",
       "file": "sources/lever.json",
       "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 89.81
     },
     {
       "ats_key": "loxo",
       "file": "sources/loxo.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 137.66
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 102.66
     },
     {
       "ats_key": "manatal",
       "file": "sources/manatal.json",
       "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 81.21
     },
     {
@@ -994,55 +943,69 @@
       "file": "sources/oracle.json",
       "current_status": "certified",
       "source_family": "enterprise_api",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 61.36
     },
     {
       "ats_key": "pageup",
       "file": "sources/pageup.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "enterprise_api",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 190.78
+      "risk_score": 155.78
     },
     {
       "ats_key": "paylocity",
       "file": "sources/paylocity.json",
       "current_status": "certified",
       "source_family": "enterprise_api",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 86.63
     },
     {
       "ats_key": "peopleforce",
       "file": "sources/peopleforce.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 192.07
+      "risk_score": 157.07
     },
     {
       "ats_key": "pinpointhq",
       "file": "sources/pinpointhq.json",
       "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 100.77
     },
     {
       "ats_key": "policeapp",
       "file": "sources/policeapp.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "recruitcrm",
       "file": "sources/recruitcrm.json",
       "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
+      "registry_status": "quarantine",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 158.49
     },
     {
@@ -1050,135 +1013,169 @@
       "file": "sources/recruitee.json",
       "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
+      "registry_status": "quarantine",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 63.89
     },
     {
       "ats_key": "rippling",
       "file": "sources/rippling.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
-      "risk_score": 151.53
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 116.53
     },
     {
       "ats_key": "sagehr",
       "file": "sources/sagehr.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "saphrcloud",
       "file": "sources/saphrcloud.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "enterprise_api",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "schoolspring",
       "file": "sources/schoolspring.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
-      "risk_score": 142.44
+      "risk_score": 107.44
     },
     {
       "ats_key": "simplicant",
       "file": "sources/simplicant.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
-      "risk_score": 74.96
+      "risk_score": 39.96
     },
     {
       "ats_key": "smartrecruiters",
       "file": "sources/smartrecruiters.json",
       "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "enabled",
+      "public_enabled_recommendation": true,
       "public_enabled": true,
       "risk_score": 152.01
     },
     {
       "ats_key": "statejobsny",
       "file": "sources/statejobsny.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "talentlyft",
       "file": "sources/talentlyft.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 166.89
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 131.89
     },
     {
       "ats_key": "talentreef",
       "file": "sources/talentreef.json",
       "current_status": "certified",
       "source_family": "html_detail",
-      "public_enabled": true,
-      "risk_score": 144.81
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 109.81
     },
     {
       "ats_key": "taleo",
       "file": "sources/taleo.json",
       "current_status": "certified",
       "source_family": "brittle",
-      "public_enabled": true,
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 152.02
     },
     {
       "ats_key": "talexio",
       "file": "sources/talexio.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
-      "public_enabled": true,
-      "risk_score": 158.86
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 123.86
     },
     {
       "ats_key": "teamtailor",
       "file": "sources/teamtailor.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "direct_json",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 209.81
+      "risk_score": 174.81
     },
     {
       "ats_key": "theapplicantmanager",
       "file": "sources/theapplicantmanager.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "html_detail",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "ultipro",
       "file": "sources/ultipro.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "enterprise_api",
-      "public_enabled": true,
-      "risk_score": 111.63
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
+      "risk_score": 76.63
     },
     {
       "ats_key": "usajobs",
       "file": "sources/usajobs.json",
-      "current_status": "fallback",
+      "current_status": "certified",
       "source_family": "public_sector",
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
       "public_enabled": false,
-      "risk_score": 35
+      "risk_score": 0
     },
     {
       "ats_key": "workday",
       "file": "sources/workday.json",
       "current_status": "certified",
       "source_family": "enterprise_api",
-      "public_enabled": true,
+      "registry_status": "disabled",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 142.68
     },
     {
@@ -1186,7 +1183,9 @@
       "file": "sources/zoho.json",
       "current_status": "certified",
       "source_family": "embedded_json",
-      "public_enabled": true,
+      "registry_status": "canary",
+      "public_enabled_recommendation": true,
+      "public_enabled": false,
       "risk_score": 132.02
     }
   ],

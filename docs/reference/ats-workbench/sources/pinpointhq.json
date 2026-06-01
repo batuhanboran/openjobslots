@@ -38,15 +38,18 @@
     "present": true,
     "path": "server/ingestion/sources/pinpointhq/index.js",
     "fixtures_dir": "server/ingestion/sources/pinpointhq/fixtures",
-    "parser_version": "source-pinpointhq-v1"
+    "parser_version": "source-pinpointhq-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "public_enabled",
-    "minimum_confidence": 0.7,
-    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -65,7 +68,7 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parsePinpointHqPostingsFromApi",
+    "path": "server/ingestion/sources/pinpointhq/parse.js parsePinpointHqPostingsFromApi",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },

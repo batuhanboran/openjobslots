@@ -26,7 +26,10 @@
       "server/ingestion/sources/icims/fixtures/company.json",
       "server/ingestion/sources/icims/fixtures/expected-normalized.json",
       "server/ingestion/sources/icims/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/icims/fixtures/list.json"
+      "server/ingestion/sources/icims/fixtures/list.json",
+      "server/ingestion/sources/icims/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/icims/fixtures/route-detection.json",
+      "server/ingestion/sources/icims/icims.local.test.js"
     ],
     "present": [
       "server/ingestion/fixtures/detail-refetch/icims-detail-geo.html",
@@ -36,7 +39,10 @@
       "server/ingestion/sources/icims/fixtures/company.json",
       "server/ingestion/sources/icims/fixtures/expected-normalized.json",
       "server/ingestion/sources/icims/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/icims/fixtures/list.json"
+      "server/ingestion/sources/icims/fixtures/list.json",
+      "server/ingestion/sources/icims/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/icims/fixtures/route-detection.json",
+      "server/ingestion/sources/icims/icims.local.test.js"
     ],
     "missing": []
   },
@@ -44,13 +50,16 @@
     "present": true,
     "path": "server/ingestion/sources/icims/index.js",
     "fixtures_dir": "server/ingestion/sources/icims/fixtures",
-    "parser_version": "source-icims-v1"
+    "parser_version": "source-icims-v1",
+    "registry_status": "enabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
     "mode": "public_enabled",
     "minimum_confidence": 0.7,
     "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
@@ -71,7 +80,7 @@
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js parseIcimsPostingsFromHtml plus detail helpers",
+    "path": "server/ingestion/sources/icims/parse.js parseIcimsPostingsFromHtml plus detail helpers",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },

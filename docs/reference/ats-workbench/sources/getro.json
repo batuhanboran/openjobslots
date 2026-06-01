@@ -1,7 +1,7 @@
 {
   "ats_key": "getro",
   "display_name": "Getro",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "direct_json",
   "official_public_docs_or_observed_endpoint": "Observed Getro Next.js __NEXT_DATA__ jobs payload.",
   "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
@@ -17,28 +17,39 @@
   "posting_date_rule": "list-payload: Use source date fields when present; otherwise document source absence.",
   "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/getro/fixtures/company.json",
+      "server/ingestion/sources/getro/fixtures/expected-normalized.json",
+      "server/ingestion/sources/getro/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/getro/fixtures/list.json",
+      "server/ingestion/sources/getro/getro.local.test.js"
+    ],
+    "present": [
+      "server/ingestion/sources/getro/fixtures/company.json",
+      "server/ingestion/sources/getro/fixtures/expected-normalized.json",
+      "server/ingestion/sources/getro/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/getro/fixtures/list.json",
+      "server/ingestion/sources/getro/getro.local.test.js"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/getro/index.js",
+    "fixtures_dir": "server/ingestion/sources/getro/fixtures",
+    "parser_version": "source-getro-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -52,26 +63,26 @@
     "missing_city_pct": 30.72,
     "missing_any_geo_pct": 31.25,
     "weak_remote_pct": 22.71,
-    "risk_score": 105.03,
-    "wave_priority": "wave-3-certification",
+    "risk_score": 70.03,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseGetroPostingsFromHtml",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "medium-pending-fixture"
+    "path": "server/ingestion/sources/getro/parse.js parseGetroPostingsFromHtml",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseGetroPostingsFromHtml",
-    "parseDetail": "server/index.js parseGetroPostingsFromHtml",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/getro/discover.js",
+    "fetchList": "server/ingestion/sources/getro/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/getro/fetchDetail.js",
+    "parseList": "server/ingestion/sources/getro/parse.js",
+    "parseDetail": "server/ingestion/sources/getro/parse.js",
+    "normalize": "server/ingestion/sources/getro/normalize.js",
+    "validate": "server/ingestion/sources/getro/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "none"
 }

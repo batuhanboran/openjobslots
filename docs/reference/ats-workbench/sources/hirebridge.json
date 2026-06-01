@@ -20,12 +20,14 @@
     "status": "parser-fixture-backed",
     "files": [
       "server/ingestion/sources/hirebridge/fixtures/company.json",
+      "server/ingestion/sources/hirebridge/fixtures/detail-pages.json",
       "server/ingestion/sources/hirebridge/fixtures/expected-normalized.json",
       "server/ingestion/sources/hirebridge/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hirebridge/fixtures/list.json"
     ],
     "present": [
       "server/ingestion/sources/hirebridge/fixtures/company.json",
+      "server/ingestion/sources/hirebridge/fixtures/detail-pages.json",
       "server/ingestion/sources/hirebridge/fixtures/expected-normalized.json",
       "server/ingestion/sources/hirebridge/fixtures/invalid-shapes.json",
       "server/ingestion/sources/hirebridge/fixtures/list.json"
@@ -36,15 +38,18 @@
     "present": true,
     "path": "server/ingestion/sources/hirebridge/index.js",
     "fixtures_dir": "server/ingestion/sources/hirebridge/fixtures",
-    "parser_version": "source-hirebridge-v1"
+    "parser_version": "source-hirebridge-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": false
   },
   "quality_threshold": {
     "mode": "certified_but_quarantine_risk",
     "minimum_confidence": 0.8,
     "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven",
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -58,12 +63,12 @@
     "missing_city_pct": 66.63,
     "missing_any_geo_pct": 95.43,
     "weak_remote_pct": 77.5,
-    "risk_score": 202.61,
-    "wave_priority": "wave-1-live-gap",
+    "risk_score": 167.61,
+    "wave_priority": "wave-2-live-gap",
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js parseHirebridgePostingsFromHtml",
+    "path": "server/ingestion/sources/hirebridge/parse.js parseHirebridgePostingsFromHtml",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },
@@ -79,5 +84,5 @@
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
   "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
-  "certification_blockers": "missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+  "certification_blockers": "high missing normalized geo; high weak remote classification"
 }

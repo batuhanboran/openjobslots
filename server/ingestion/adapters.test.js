@@ -13,6 +13,7 @@ const {
   FIXTURE_BACKED,
   FUTURE_DIRECT_SOURCE_CANDIDATES,
   PARSER_FIXTURE_BACKED,
+  UNSUPPORTED_ATS,
   getAdapterMetadata,
   isAtsEnabledByDefault
 } = require("./adapter-metadata");
@@ -192,50 +193,29 @@ test("fixture-backed adapter metadata points to saved fixtures", () => {
 });
 
 test("strict parser-backed metadata is separate from normalized fixture coverage", () => {
+  const expectedParserBacked = ATS_FILTER_OPTION_ITEMS
+    .map((item) => item.value)
+    .filter((atsKey) => {
+      if (UNSUPPORTED_ATS.has(atsKey)) return false;
+      const directFixture = path.join(__dirname, "fixtures", `${atsKey}-direct.json`);
+      const postingsFixture = path.join(__dirname, "fixtures", `${atsKey}-postings.json`);
+      const sourceDir = path.join(__dirname, "sources", atsKey, "fixtures");
+      return fs.existsSync(directFixture) ||
+        fs.existsSync(postingsFixture) ||
+        ["list.json", "expected-normalized.json", "invalid-shapes.json"].every((file) =>
+          fs.existsSync(path.join(sourceDir, file))
+        );
+    })
+    .sort();
   assert.deepEqual(
     Array.from(PARSER_FIXTURE_BACKED).sort(),
-    [
-      "adp_workforcenow",
-      "applicantai",
-      "applicantpro",
-      "applitrack",
-      "ashby",
-      "applytojob",
-      "bamboohr",
-      "breezy",
-      "calcareers",
-      "calopps",
-      "careerplug",
-      "fountain",
-      "greenhouse",
-      "hirebridge",
-      "hibob",
-      "hrmdirect",
-      "icims",
-      "jobvite",
-      "k12jobspot",
-      "lever",
-      "manatal",
-      "oracle",
-      "paylocity",
-      "pinpointhq",
-      "recruitcrm",
-      "recruitee",
-      "smartrecruiters",
-      "statejobsny",
-      "talentreef",
-      "taleo",
-      "theapplicantmanager",
-      "usajobs",
-      "workday",
-      "zoho"
-    ].sort()
+    expectedParserBacked
   );
   for (const atsKey of PARSER_FIXTURE_BACKED) {
     const metadata = getAdapterMetadata(atsKey);
     assert.equal(metadata.parserFixtureStatus, "parser-fixture-backed");
   }
-  assert.equal(getAdapterMetadata("teamtailor").parserFixtureStatus, "pending-parser-fixture");
+  assert.equal(getAdapterMetadata("teamtailor").parserFixtureStatus, "parser-fixture-backed");
 });
 
 test("dayforcehcm is configured but disabled until parser certification exists", () => {

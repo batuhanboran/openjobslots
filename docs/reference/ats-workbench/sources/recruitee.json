@@ -25,7 +25,9 @@
       "server/ingestion/sources/recruitee/fixtures/company.json",
       "server/ingestion/sources/recruitee/fixtures/expected-normalized.json",
       "server/ingestion/sources/recruitee/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/recruitee/fixtures/list.json"
+      "server/ingestion/sources/recruitee/fixtures/list.json",
+      "server/ingestion/sources/recruitee/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/recruitee/fixtures/missing-geo-list.json"
     ],
     "present": [
       "server/ingestion/fixtures/recruitee-direct.json",
@@ -34,7 +36,9 @@
       "server/ingestion/sources/recruitee/fixtures/company.json",
       "server/ingestion/sources/recruitee/fixtures/expected-normalized.json",
       "server/ingestion/sources/recruitee/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/recruitee/fixtures/list.json"
+      "server/ingestion/sources/recruitee/fixtures/list.json",
+      "server/ingestion/sources/recruitee/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/recruitee/fixtures/missing-geo-list.json"
     ],
     "missing": []
   },
@@ -42,15 +46,18 @@
     "present": true,
     "path": "server/ingestion/sources/recruitee/index.js",
     "fixtures_dir": "server/ingestion/sources/recruitee/fixtures",
-    "parser_version": "source-recruitee-v1"
+    "parser_version": "source-recruitee-v1",
+    "registry_status": "quarantine",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "public_enabled",
-    "minimum_confidence": 0.7,
-    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is quarantine; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -69,7 +76,7 @@
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseRecruiteePostingsFromPublicApp",
+    "path": "server/ingestion/sources/recruitee/parse.js parseRecruiteePostingsFromPublicApp",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },

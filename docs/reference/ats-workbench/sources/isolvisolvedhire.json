@@ -1,7 +1,7 @@
 {
   "ats_key": "isolvisolvedhire",
   "display_name": "isolvedhire",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "embedded_json",
   "official_public_docs_or_observed_endpoint": "Observed iSolved Hire board domain id plus core jobs API.",
   "source_discovery_method": "fetch public board HTML and extract embedded JSON or domain id before parsing",
@@ -17,28 +17,37 @@
   "posting_date_rule": "detail-page: List cards often omit date; detail fixture decides whether date exists.",
   "rate_limit": "one host request at a time with source daily budget and block-rate stop",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/isolvisolvedhire/fixtures/company.json",
+      "server/ingestion/sources/isolvisolvedhire/fixtures/expected-normalized.json",
+      "server/ingestion/sources/isolvisolvedhire/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/isolvisolvedhire/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/isolvisolvedhire/fixtures/company.json",
+      "server/ingestion/sources/isolvisolvedhire/fixtures/expected-normalized.json",
+      "server/ingestion/sources/isolvisolvedhire/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/isolvisolvedhire/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/isolvisolvedhire/index.js",
+    "fixtures_dir": "server/ingestion/sources/isolvisolvedhire/fixtures",
+    "parser_version": "source-isolvisolvedhire-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": false,
-  "quarantine_reason": "hold/quarantine recommendation: missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven",
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -52,26 +61,26 @@
     "missing_city_pct": 0,
     "missing_any_geo_pct": 0,
     "weak_remote_pct": 0,
-    "risk_score": 35,
-    "wave_priority": "wave-4-fixture",
+    "risk_score": 0,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseIsolvisolvedhirePostingsFromApi",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/isolvisolvedhire/parse.js parseIsolvisolvedhirePostingsFromApi",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "fetch public board HTML and extract embedded JSON or domain id before parsing",
-    "fetchList": "fetch public board or discovered JSON endpoint with bounded response size",
-    "fetchDetail": "optional detail fetch only when list evidence is insufficient and fixture-backed",
-    "parseList": "server/index.js parseIsolvisolvedhirePostingsFromApi",
-    "parseDetail": "server/index.js parseIsolvisolvedhirePostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/isolvisolvedhire/discover.js",
+    "fetchList": "server/ingestion/sources/isolvisolvedhire/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/isolvisolvedhire/fetchDetail.js",
+    "parseList": "server/ingestion/sources/isolvisolvedhire/parse.js",
+    "parseDetail": "server/ingestion/sources/isolvisolvedhire/parse.js",
+    "normalize": "server/ingestion/sources/isolvisolvedhire/normalize.js",
+    "validate": "server/ingestion/sources/isolvisolvedhire/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "monitor with parser stats and live field-quality audit",
+  "certification_blockers": "none"
 }

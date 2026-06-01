@@ -1,7 +1,7 @@
 {
   "ats_key": "jobaps",
   "display_name": "JobAps",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "public_sector",
   "official_public_docs_or_observed_endpoint": "Observed JobAps public agency/company page.",
   "source_discovery_method": "use configured agency/board URL and official/list endpoint where visible",
@@ -13,32 +13,43 @@
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
   "location_text_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
   "country_region_city_rule": "list-payload: Preserve agency/school location fields and normalize country/region conservatively.",
-  "remote_type_rule": "pending-research: Use explicit telework/remote text only.",
-  "posting_date_rule": "pending-research: Public boards frequently expose close/open dates; do not invent posted dates.",
+  "remote_type_rule": "list-payload: Use explicit telework/remote source text only.",
+  "posting_date_rule": "list-payload: Use source-labeled posted/open date fields only; never invent dates from close dates.",
   "rate_limit": "strict public-board rate limit with long cooldown after 429/403",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/jobaps/fixtures/company.json",
+      "server/ingestion/sources/jobaps/fixtures/expected-normalized.json",
+      "server/ingestion/sources/jobaps/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/jobaps/fixtures/list.json",
+      "server/ingestion/sources/jobaps/jobaps.local.test.js"
+    ],
+    "present": [
+      "server/ingestion/sources/jobaps/fixtures/company.json",
+      "server/ingestion/sources/jobaps/fixtures/expected-normalized.json",
+      "server/ingestion/sources/jobaps/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/jobaps/fixtures/list.json",
+      "server/ingestion/sources/jobaps/jobaps.local.test.js"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/jobaps/index.js",
+    "fixtures_dir": "server/ingestion/sources/jobaps/fixtures",
+    "parser_version": "source-jobaps-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -52,26 +63,26 @@
     "missing_city_pct": 37.82,
     "missing_any_geo_pct": 67.12,
     "weak_remote_pct": 60.83,
-    "risk_score": 161.03,
-    "wave_priority": "wave-2-live-gap",
+    "risk_score": 126.03,
+    "wave_priority": "monitor",
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js JobAps collector",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/jobaps/parse.js parseJobApsPostingsFromHtml",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "use configured agency/board URL and official/list endpoint where visible",
-    "fetchList": "bounded public-sector feed/API/HTML list request",
-    "fetchDetail": "detail fetch for date/location only when fixture-backed and polite",
-    "parseList": "server/index.js JobAps collector",
-    "parseDetail": "server/index.js JobAps collector",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/jobaps/discover.js",
+    "fetchList": "server/ingestion/sources/jobaps/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/jobaps/fetchDetail.js",
+    "parseList": "server/ingestion/sources/jobaps/parse.js",
+    "parseDetail": "server/ingestion/sources/jobaps/parse.js",
+    "normalize": "server/ingestion/sources/jobaps/normalize.js",
+    "validate": "server/ingestion/sources/jobaps/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
   "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
-  "certification_blockers": "missing strict raw parser fixture; high missing normalized geo; high weak remote classification; source id reliability unproven/weak; canonical URL reliability unproven"
+  "certification_blockers": "high missing normalized geo; high weak remote classification"
 }

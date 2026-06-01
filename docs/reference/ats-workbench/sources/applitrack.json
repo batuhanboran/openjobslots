@@ -26,7 +26,8 @@
       "server/ingestion/sources/applitrack/fixtures/company.json",
       "server/ingestion/sources/applitrack/fixtures/expected-normalized.json",
       "server/ingestion/sources/applitrack/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/applitrack/fixtures/list.json"
+      "server/ingestion/sources/applitrack/fixtures/list.json",
+      "server/ingestion/sources/applitrack/fixtures/route-detection.json"
     ],
     "present": [
       "server/ingestion/fixtures/applitrack-detail-certification.json",
@@ -36,7 +37,8 @@
       "server/ingestion/sources/applitrack/fixtures/company.json",
       "server/ingestion/sources/applitrack/fixtures/expected-normalized.json",
       "server/ingestion/sources/applitrack/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/applitrack/fixtures/list.json"
+      "server/ingestion/sources/applitrack/fixtures/list.json",
+      "server/ingestion/sources/applitrack/fixtures/route-detection.json"
     ],
     "missing": []
   },
@@ -44,13 +46,16 @@
     "present": true,
     "path": "server/ingestion/sources/applitrack/index.js",
     "fixtures_dir": "server/ingestion/sources/applitrack/fixtures",
-    "parser_version": "source-applitrack-v1"
+    "parser_version": "source-applitrack-v1",
+    "registry_status": "quarantine",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
     "mode": "certified_but_quarantine_risk",
     "minimum_confidence": 0.8,
     "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
+  "public_enabled_recommendation": false,
   "public_enabled": false,
   "quarantine_reason": "hold/quarantine recommendation: high missing normalized geo; high weak remote classification",
   "failure_log": {
@@ -71,7 +76,7 @@
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js parseApplitrackPostings and extractApplitrackDetailFields",
+    "path": "server/ingestion/sources/applitrack/parse.js parseApplitrackPostings and extractApplitrackDetailFields",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },

@@ -21,14 +21,18 @@
     "files": [
       "server/ingestion/sources/talentreef/fixtures/company.json",
       "server/ingestion/sources/talentreef/fixtures/expected-normalized.json",
+      "server/ingestion/sources/talentreef/fixtures/fetch-list.json",
       "server/ingestion/sources/talentreef/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/talentreef/fixtures/list.json"
+      "server/ingestion/sources/talentreef/fixtures/list.json",
+      "server/ingestion/sources/talentreef/talentreef.local.test.js"
     ],
     "present": [
       "server/ingestion/sources/talentreef/fixtures/company.json",
       "server/ingestion/sources/talentreef/fixtures/expected-normalized.json",
+      "server/ingestion/sources/talentreef/fixtures/fetch-list.json",
       "server/ingestion/sources/talentreef/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/talentreef/fixtures/list.json"
+      "server/ingestion/sources/talentreef/fixtures/list.json",
+      "server/ingestion/sources/talentreef/talentreef.local.test.js"
     ],
     "missing": []
   },
@@ -36,15 +40,18 @@
     "present": true,
     "path": "server/ingestion/sources/talentreef/index.js",
     "fixtures_dir": "server/ingestion/sources/talentreef/fixtures",
-    "parser_version": "source-talentreef-v1"
+    "parser_version": "source-talentreef-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": false
   },
   "quality_threshold": {
-    "mode": "public_enabled",
-    "minimum_confidence": 0.7,
-    "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -58,12 +65,12 @@
     "missing_city_pct": 83.51,
     "missing_any_geo_pct": 83.51,
     "weak_remote_pct": 0,
-    "risk_score": 144.81,
-    "wave_priority": "wave-2-live-gap",
+    "risk_score": 109.81,
+    "wave_priority": "monitor",
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js parseTalentreefPostingsFromSearchResponse",
+    "path": "server/ingestion/sources/talentreef/parse.js parseTalentreefPostingsFromSearchResponse",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },
@@ -79,5 +86,5 @@
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
   "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
-  "certification_blockers": "missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
+  "certification_blockers": "high missing normalized geo"
 }

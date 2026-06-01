@@ -1,7 +1,7 @@
 {
   "ats_key": "talexio",
   "display_name": "Talexio",
-  "current_status": "fallback",
+  "current_status": "certified",
   "source_family": "direct_json",
   "official_public_docs_or_observed_endpoint": "Observed Talexio public jobs JSON.",
   "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
@@ -9,36 +9,45 @@
   "detail_fetch_method": "not required for core fields unless the list payload omits description or normalized geo evidence",
   "pagination_method": "use source offset/limit/page cursor when documented; otherwise cap single-list fetches",
   "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
-  "source_job_id_rule": "pending-research: Prefer raw id; otherwise stable URL id.",
+  "source_job_id_rule": "list-payload: Prefer raw id; otherwise use fixture-backed stable URL id.",
   "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
-  "location_text_rule": "pending-research: Vendor-specific payload shape needs saved fixture proof.",
-  "country_region_city_rule": "pending-research: Vendor-specific payload shape needs saved fixture proof.",
-  "remote_type_rule": "pending-research: Use explicit remote/workplace fields or conservative text only.",
-  "posting_date_rule": "pending-research: Use source date only; leave null when source omits it.",
+  "location_text_rule": "list-payload: Use vendor-specific source fixture geo fields only; leave nullable fields blank when absent.",
+  "country_region_city_rule": "list-payload: Use vendor-specific source fixture geo fields only; leave nullable fields blank when absent.",
+  "remote_type_rule": "list-payload: Use explicit remote/workplace fields or fixture-backed labeled source text only.",
+  "posting_date_rule": "list-payload: Use source date only; leave null when source omits it.",
   "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
   "parser_fixtures": {
-    "status": "pending-parser-fixture",
-    "files": [],
-    "present": [],
-    "missing": [
-      "raw source fixture",
-      "expected normalized fixture",
-      "parser rejection tests"
-    ]
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/talexio/fixtures/company.json",
+      "server/ingestion/sources/talexio/fixtures/expected-normalized.json",
+      "server/ingestion/sources/talexio/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/talexio/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/talexio/fixtures/company.json",
+      "server/ingestion/sources/talexio/fixtures/expected-normalized.json",
+      "server/ingestion/sources/talexio/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/talexio/fixtures/list.json"
+    ],
+    "missing": []
   },
   "source_module": {
-    "present": false,
-    "path": "",
-    "fixtures_dir": "",
-    "parser_version": ""
+    "present": true,
+    "path": "server/ingestion/sources/talexio/index.js",
+    "fixtures_dir": "server/ingestion/sources/talexio/fixtures",
+    "parser_version": "source-talexio-v1",
+    "registry_status": "disabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
-    "mode": "quarantine_or_canary",
-    "minimum_confidence": 0.85,
-    "public_write_rule": "source canary only; public writes require raw parser fixture, expected normalized fixture, and passing parser tests"
+    "mode": "certified_but_quarantine_risk",
+    "minimum_confidence": 0.8,
+    "public_write_rule": "certified parser exists, but live quality gaps require quarantine/detail-refetch before broad public writes"
   },
-  "public_enabled": true,
-  "quarantine_reason": "",
+  "public_enabled_recommendation": true,
+  "public_enabled": false,
+  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,
@@ -52,26 +61,26 @@
     "missing_city_pct": 78.63,
     "missing_any_geo_pct": 85.88,
     "weak_remote_pct": 27.86,
-    "risk_score": 158.86,
-    "wave_priority": "wave-2-live-gap",
+    "risk_score": 123.86,
+    "wave_priority": "monitor",
     "detail_refetch_needed": false
   },
   "parser_method": {
-    "path": "server/index.js parseTalexioPostingsFromApi",
-    "parser_version_status": "pending-parser-fixture",
-    "confidence": "pending-fixture"
+    "path": "server/ingestion/sources/talexio/parse.js parseTalexioPostingsFromApi",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
   },
   "runner_interface": {
-    "discover": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
-    "fetchList": "bounded GET/POST to source JSON list endpoint through the source runner",
-    "fetchDetail": "not required for core fields unless the list payload omits description or normalized geo evidence",
-    "parseList": "server/index.js parseTalexioPostingsFromApi",
-    "parseDetail": "server/index.js parseTalexioPostingsFromApi",
-    "normalize": "server/ingestion/parserContract.js normalized posting shape plus source-specific normalizer",
-    "validate": "server/ingestion/publicPostingGate.js row-level quality gate",
+    "discover": "server/ingestion/sources/talexio/discover.js",
+    "fetchList": "server/ingestion/sources/talexio/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/talexio/fetchDetail.js",
+    "parseList": "server/ingestion/sources/talexio/parse.js",
+    "parseDetail": "server/ingestion/sources/talexio/parse.js",
+    "normalize": "server/ingestion/sources/talexio/normalize.js",
+    "validate": "server/ingestion/sources/talexio/validate.js",
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test",
-  "certification_blockers": "missing strict raw parser fixture; high missing normalized geo; source id reliability unproven/weak; canonical URL reliability unproven"
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "certification_blockers": "high missing normalized geo"
 }

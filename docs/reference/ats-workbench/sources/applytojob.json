@@ -25,7 +25,8 @@
       "server/ingestion/sources/applytojob/fixtures/company.json",
       "server/ingestion/sources/applytojob/fixtures/expected-normalized.json",
       "server/ingestion/sources/applytojob/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/applytojob/fixtures/list.json"
+      "server/ingestion/sources/applytojob/fixtures/list.json",
+      "server/ingestion/sources/applytojob/fixtures/route-detection.json"
     ],
     "present": [
       "server/ingestion/fixtures/applytojob-direct.json",
@@ -34,7 +35,8 @@
       "server/ingestion/sources/applytojob/fixtures/company.json",
       "server/ingestion/sources/applytojob/fixtures/expected-normalized.json",
       "server/ingestion/sources/applytojob/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/applytojob/fixtures/list.json"
+      "server/ingestion/sources/applytojob/fixtures/list.json",
+      "server/ingestion/sources/applytojob/fixtures/route-detection.json"
     ],
     "missing": []
   },
@@ -42,13 +44,16 @@
     "present": true,
     "path": "server/ingestion/sources/applytojob/index.js",
     "fixtures_dir": "server/ingestion/sources/applytojob/fixtures",
-    "parser_version": "source-applytojob-v1"
+    "parser_version": "source-applytojob-v1",
+    "registry_status": "enabled",
+    "collect_when_disabled": true
   },
   "quality_threshold": {
     "mode": "public_enabled",
     "minimum_confidence": 0.7,
     "public_write_rule": "accepted rows must pass title/company/canonical_url and row-level quality gate"
   },
+  "public_enabled_recommendation": true,
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
@@ -69,7 +74,7 @@
     "detail_refetch_needed": true
   },
   "parser_method": {
-    "path": "server/index.js parseApplyToJobPostingsFromHtml",
+    "path": "server/ingestion/sources/applytojob/parse.js parseApplyToJobPostingsFromHtml",
     "parser_version_status": "parser-fixture-backed",
     "confidence": "medium"
   },
