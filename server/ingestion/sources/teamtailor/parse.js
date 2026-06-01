@@ -11,6 +11,12 @@ function cleanTeamtailorText(value) {
     .trim();
 }
 
+function isTeamtailorPlaceholderTitle(value) {
+  const title = cleanTeamtailorText(value);
+  return title.toLowerCase() === "untitled position" ||
+    /^demo\s*(?:-|:|\u2013|\u2014)\s+\S/i.test(title);
+}
+
 function isTeamtailorSeparator(value) {
   const cleaned = String(value || "").trim();
   const markerCode = cleaned.length === 1 ? cleaned.charCodeAt(0) : 0;
@@ -202,6 +208,10 @@ function parseTeamtailorPostingsFromRss(companyNameForPostings, rssXml) {
       continue;
     }
     const title = extractTagText(itemXml, "title") || "Untitled Position";
+    if (isTeamtailorPlaceholderTitle(title)) {
+      itemMatch = itemPattern.exec(source);
+      continue;
+    }
     const remoteType = mapTeamtailorRemoteStatus(extractTagText(itemXml, "remoteStatus"));
 
     postings.push({
@@ -281,6 +291,10 @@ function parseTeamtailorPostingsFromHtml(companyNameForPostings, config, pageHtm
     const titleFromAttr = cleanTeamtailorText(itemHtml.match(titleAttrPattern)?.[1] || "");
     const titleFromBody = firstMatch(itemHtml, [titleBodyPattern, anchorBodyPattern]);
     const title = titleFromAttr || titleFromBody || "Untitled Position";
+    if (isTeamtailorPlaceholderTitle(title)) {
+      itemMatch = itemPattern.exec(source);
+      continue;
+    }
 
     const metaRaw = String(itemHtml.match(metaPattern)?.[1] || "");
     const metaParts = extractTeamtailorMetaParts(metaRaw);

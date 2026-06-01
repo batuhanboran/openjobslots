@@ -637,6 +637,62 @@ test("teamtailor RSS/HTML merge keeps unhinted brand labels quarantined", () => 
   assert.ok(source.validatePublic(normalized).reason_codes.includes("no_geo_no_remote"));
 });
 
+test("teamtailor source module skips exact demo placeholder titles", () => {
+  const source = getSourceModule("teamtailor");
+  const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));
+  const rssParsed = source.parse({
+    rss: [
+      `<?xml version="1.0" encoding="UTF-8"?>`,
+      `<rss version="2.0" xmlns:tt="https://teamtailor.com/locations"><channel>`,
+      `<item>`,
+      `<title></title>`,
+      `<link>https://fixture.teamtailor.com/jobs/7000-blank-title</link>`,
+      `<guid>7000</guid>`,
+      `<remoteStatus>none</remoteStatus>`,
+      `</item>`,
+      `<item>`,
+      `<title>DEMO &#8211; Template Consultant</title>`,
+      `<link>https://fixture.teamtailor.com/jobs/7001-demo-template-consultant</link>`,
+      `<guid>7001</guid>`,
+      `<pubDate>Mon, 01 Jun 2026 12:00:00 GMT</pubDate>`,
+      `<remoteStatus>none</remoteStatus>`,
+      `</item>`,
+      `<item>`,
+      `<title>Customer Success Lead</title>`,
+      `<link>https://fixture.teamtailor.com/jobs/7002-customer-success-lead</link>`,
+      `<guid>7002</guid>`,
+      `<pubDate>Mon, 01 Jun 2026 12:00:00 GMT</pubDate>`,
+      `<remoteStatus>hybrid</remoteStatus>`,
+      `<tt:location><tt:city>Stockholm</tt:city><tt:country>Sweden</tt:country></tt:location>`,
+      `</item>`,
+      `</channel></rss>`
+    ].join("")
+  }, company);
+  assert.equal(rssParsed.length, 1);
+  assert.equal(rssParsed[0].position_name, "Customer Success Lead");
+
+  const htmlParsed = source.parse({
+    html: [
+      `<ul>`,
+      `<li class="block-grid-item">`,
+      `<a href="/jobs/7000-blank-title"><span class="absolute inset-0"></span></a>`,
+      `</li>`,
+      `<li class="block-grid-item">`,
+      `<a href="/jobs/7003-demo-sales-technician"><span class="text-block-base-link" title="DEMO &#8211; Sales Technician">DEMO &#8211; Sales Technician</span></a>`,
+      `</li>`,
+      `<li class="block-grid-item">`,
+      `<a href="/jobs/7004-support-engineer"><span class="text-block-base-link" title="Support Engineer">Support Engineer</span><div class="mt-1 text-md"><span>Engineering</span><span>Berlin</span></div></a>`,
+      `</li>`,
+      `</ul>`
+    ].join(""),
+    __sourceConfig: {
+      baseOrigin: "https://fixture.teamtailor.com"
+    }
+  }, company);
+  assert.equal(htmlParsed.length, 1);
+  assert.equal(htmlParsed[0].position_name, "Support Engineer");
+});
+
 test("jobvite source module fetches jobs HTML with source-local discovery and host guard", async () => {
   const source = getSourceModule("jobvite");
   assert.ok(source, "expected Jobvite source module");
