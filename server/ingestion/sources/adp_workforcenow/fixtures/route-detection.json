@@ -1,0 +1,12 @@
+{
+  "company": {
+    "company_name": "Fixture ADP WFN",
+    "url_string": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc123&ccId=ACME-FOODS",
+    "ATS_name": "ADP Workforce Now"
+  },
+  "expected": {
+    "contentLinksBaseUrl": "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/content-links/career-center",
+    "jobRequisitionsUrl": "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions?cid=abc123&ccId=ACME-FOODS",
+    "boardUrl": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc123&ccId=ACME-FOODS"
+  }
+}

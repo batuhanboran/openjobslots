@@ -1,0 +1,48 @@
+{
+  "ats_key": "adp_workforcenow",
+  "description": "Malformed or unsupported ADP Workforce Now list payload shapes should parse to no postings instead of fabricating rows.",
+  "cases": [
+    {
+      "name": "null payload",
+      "payload": null,
+      "expected_count": 0
+    },
+    {
+      "name": "jobRequisitions is not an array",
+      "payload": {
+        "jobRequisitions": {
+          "itemID": "REQ-NOT-ARRAY"
+        }
+      },
+      "expected_count": 0
+    },
+    {
+      "name": "unsupported jobs key from another source family",
+      "payload": {
+        "jobs": [
+          {
+            "id": "REQ-UNSUPPORTED",
+            "title": "Unsupported Jobs Payload"
+          }
+        ]
+      },
+      "expected_count": 0
+    },
+    {
+      "name": "job requisition missing source id",
+      "payload": {
+        "jobRequisitions": [
+          {
+            "requisitionTitle": "Missing Source ID",
+            "links": [
+              {
+                "href": "https://workforcenow.adp.com/jobs/apply/posting.html?client=ACME-FOODS"
+              }
+            ]
+          }
+        ]
+      },
+      "expected_count": 0
+    }
+  ]
+}

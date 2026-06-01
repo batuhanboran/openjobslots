@@ -1,0 +1,22 @@
+{
+  "jobRequisitions": [
+    {
+      "itemID": "REQ-MISSING-GEO",
+      "requisitionTitle": "Unlocated Analyst",
+      "postDate": "2026-05-16T10:00:00+00:00",
+      "workLevelCode": {
+        "shortName": "Full Time"
+      },
+      "links": [
+        {
+          "href": "https://workforcenow.adp.com/jobs/apply/posting.html?client=ACME-FOODS&jobId=REQ-MISSING-GEO#apply"
+        }
+      ]
+    }
+  ],
+  "__companyNameForPostings": "Fixture ADP WFN",
+  "__sourceConfig": {
+    "ccId": "ACME-FOODS",
+    "boardUrl": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=abc123&ccId=ACME-FOODS"
+  }
+}

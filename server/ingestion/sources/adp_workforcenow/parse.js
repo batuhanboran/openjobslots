@@ -1,7 +1,7 @@
 "use strict";
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
-const { isPlaceholderCompanyName } = require("../../posting");
+const { isPlaceholderCompanyName, normalizeCountryName } = require("../../posting");
 
 function parseUrl(urlString) {
   if (!urlString) return null;
@@ -139,6 +139,24 @@ function normalizeAdpWorkforcenowSourceCompanyName(value) {
   return cleaned && !isPlaceholderCompanyName(cleaned) ? cleaned : "";
 }
 
+function adpWorkforcenowCityLooksRemote(value) {
+  return /^(remote|virtual|work from home|wfh|anywhere)$/i.test(cleanAdpWorkforcenowText(value));
+}
+
+function parseAdpWorkforcenowRemoteLocationLabel(value) {
+  const text = cleanAdpWorkforcenowText(value);
+  if (!/\b(remote|virtual|work from home|wfh)\b/i.test(text)) return {};
+  const parts = text.split(",").map((part) => cleanAdpWorkforcenowText(part)).filter(Boolean);
+  const countryCandidate = parts.length > 1 ? parts[parts.length - 1] : "";
+  const country = normalizeCountryName(countryCandidate) || "";
+  const state = parts.length > 2 ? parts[parts.length - 2] : "";
+  return {
+    remote_type: "remote",
+    state,
+    country
+  };
+}
+
 function resolveAdpWorkforcenowCompanyName(company, config, contentLinksJson) {
   const sourceCompanyName = normalizeAdpWorkforcenowSourceCompanyName(company?.company_name);
   if (sourceCompanyName) return sourceCompanyName;
@@ -173,9 +191,14 @@ function extractAdpWorkforcenowLocation(job) {
         : {};
     const state = String(stateData?.codeValue || stateData?.longName || "").trim();
     const countryData = address?.country && typeof address.country === "object" ? address.country : {};
-    const country = String(countryData?.codeValue || countryData?.longName || "").trim();
-    const addressLabel = [city, state, country].filter(Boolean).join(", ");
-    const combined = [label, addressLabel].filter(Boolean).join(" - ").trim();
+    const labelLocation = parseAdpWorkforcenowRemoteLocationLabel(label);
+    const country = String(countryData?.codeValue || countryData?.longName || "").trim() || labelLocation.country || "";
+    const effectiveState = state || labelLocation.state || "";
+    const effectiveCity = adpWorkforcenowCityLooksRemote(city) && labelLocation.remote_type ? "" : city;
+    const addressLabel = [effectiveCity, effectiveState, country].filter(Boolean).join(", ");
+    const combined = labelLocation.remote_type && labelLocation.country
+      ? label
+      : [label, addressLabel].filter(Boolean).join(" - ").trim();
     const normalized = combined.toLowerCase();
     if (!combined || seen.has(normalized)) continue;
     seen.add(normalized);
@@ -194,10 +217,14 @@ function extractAdpWorkforcenowStructuredLocation(job) {
       ? address.countrySubdivisionLevel1
       : {};
   const countryData = address?.country && typeof address.country === "object" ? address.country : {};
+  const nameCode = location?.nameCode && typeof location.nameCode === "object" ? location.nameCode : {};
+  const labelLocation = parseAdpWorkforcenowRemoteLocationLabel(nameCode?.shortName || nameCode?.longName || "");
+  const city = String(address?.cityName || "").trim();
   return {
-    city: String(address?.cityName || "").trim(),
-    state: String(stateData?.codeValue || stateData?.longName || "").trim(),
-    country: String(countryData?.longName || countryData?.codeValue || "").trim()
+    city: adpWorkforcenowCityLooksRemote(city) && labelLocation.remote_type ? "" : city,
+    state: String(stateData?.codeValue || stateData?.longName || "").trim() || labelLocation.state || "",
+    country: String(countryData?.longName || countryData?.codeValue || "").trim() || labelLocation.country || "",
+    remote_type: labelLocation.remote_type || ""
   };
 }
 
@@ -229,6 +256,7 @@ function parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, res
   for (const row of jobs) {
     const item = row && typeof row === "object" ? row : {};
     const itemId = String(item?.itemID || "").trim();
+    if (!itemId) continue;
     if (itemId && seenIds.has(itemId)) continue;
 
     const jobUrl = buildAdpWorkforcenowPostingUrl(item, config);
@@ -246,6 +274,7 @@ function parseAdpWorkforcenowPostingsFromApi(companyNameForPostings, config, res
       city: structuredLocation.city || null,
       state: structuredLocation.state || null,
       country: structuredLocation.country || null,
+      remote_type: structuredLocation.remote_type || null,
       employment_type: String(item?.workLevelCode?.shortName || "").trim() || null,
       department: null
     });
