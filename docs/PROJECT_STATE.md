@@ -23,6 +23,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof: US Fertility parsed `144` rows, with sampled remote rows normalizing to `Remote, United States`, `country=United States`, `remote_type=remote`, and public gate `accepted`. TechnoServe parsed `90` rows, with `Chief of Party, USDA Food for Progress Program` normalizing to `La Paz, Bolivia`, `city=La Paz`, `country=Bolivia`, `region=LATAM`, `remote_type=onsite`, and public gate `accepted`.
 - Verification covered focused UltiPro tests, payload-drift tests, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## ApplyToJob Australia Location Token Checkpoint - June 1, 2026
+
+- Fresh production sampling showed ApplyToJob remains a large source-quality lane: `51,330` visible rows, `6,687` missing country/region rows, `1,438` weak/unknown remote rows, and `36,298` rows without posting dates. No production write was run while sampling.
+- A live local parser probe for `protechtgroup.applytojob.com` exposed a correctness bug, not just a missing-field gap: source labels such as `Sydney, New South Wales` and `Sydney, New South Wales, Australia` were normalizing to `country=United Kingdom` because the generic fallback matched `Wales` before `Australia`.
+- ApplyToJob now applies source-local location token hints before shared normalization for explicit country tokens and Australian state/province tokens such as `New South Wales`, `NSW`, `Queensland`, and `VIC`. State/province hints require a city token, so a standalone ambiguous token is not enough to invent an Australian country.
+- Live read-only proof after the change: Protecht parsed `11` rows; sampled `Sydney, New South Wales` and `Sydney, New South Wales, Australia` rows normalize to `country=Australia`, `region=APAC`, public gate `accepted`. Atlanta controls stayed `United States`; source-countryless `Remote` stayed countryless instead of inventing a country.
+- Verification covered ApplyToJob focused tests, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
+
 ## Zoho Read-Only Recovery Wave - June 1, 2026
 
 - Fresh production checks kept production at `6660eab` with all four runtime services running. Public health still reports `331,463` visible job slots. `search:reindex:check -- --json` still has Postgres/Meili count parity (`331,457`/`331,457`) but remains `ok=false` because remote facets drift by `6` onsite vs unknown.

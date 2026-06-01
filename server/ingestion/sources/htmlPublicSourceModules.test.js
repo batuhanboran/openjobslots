@@ -942,11 +942,19 @@ test("applytojob source module normalizes source-provided country tokens", () =>
           <a class="job-title" href="/apply/ATJ4004/Salesforce-Consultant">Salesforce Consultant</a>
           <div><span>Location:</span><span>Casablanca, Morocco</span></div>
         </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4005/Sydney-Analyst">Sydney Analyst</a>
+          <div><span>Location:</span><span>Sydney, New South Wales</span></div>
+        </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4006/Product-Manager">Product Manager</a>
+          <div><span>Location:</span><span>Sydney, New South Wales, Australia</span></div>
+        </article>
       </section>
     `,
     __listUrl: company.url_string
   }, company);
-  assert.equal(parsed.length, 4);
+  assert.equal(parsed.length, 6);
   const normalized = Object.fromEntries(
     parsed.map((posting) => {
       const row = source.normalize(posting, company);
@@ -973,6 +981,16 @@ test("applytojob source module normalizes source-provided country tokens", () =>
   assert.equal(normalized.ATJ4004.region, "EMEA");
   assert.equal(normalized.ATJ4004.city, "Casablanca");
   assert.equal(normalized.ATJ4004.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4005.country, "Australia");
+  assert.equal(normalized.ATJ4005.region, "APAC");
+  assert.equal(normalized.ATJ4005.city, "Sydney");
+  assert.equal(normalized.ATJ4005.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4006.country, "Australia");
+  assert.equal(normalized.ATJ4006.region, "APAC");
+  assert.equal(normalized.ATJ4006.city, "Sydney");
+  assert.equal(normalized.ATJ4006.source_evidence.location_rule_name, "applytojob_country_token_hint");
 });
 
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {

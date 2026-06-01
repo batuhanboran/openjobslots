@@ -214,7 +214,21 @@ function extractApplyToJobRemoteTypeFromValue(value) {
 
 const APPLYTOJOB_COUNTRY_TOKEN_HINTS = Object.freeze({
   aruba: { country: "Aruba", region: "North America" },
+  australia: { country: "Australia", region: "APAC" },
   bahamas: { country: "Bahamas", region: "North America" },
+  "new south wales": { country: "Australia", region: "APAC", requiresCityToken: true },
+  nsw: { country: "Australia", region: "APAC", requiresCityToken: true },
+  queensland: { country: "Australia", region: "APAC", requiresCityToken: true },
+  qld: { country: "Australia", region: "APAC", requiresCityToken: true },
+  "western australia": { country: "Australia", region: "APAC", requiresCityToken: true },
+  "south australia": { country: "Australia", region: "APAC", requiresCityToken: true },
+  tasmania: { country: "Australia", region: "APAC", requiresCityToken: true },
+  tas: { country: "Australia", region: "APAC", requiresCityToken: true },
+  "australian capital territory": { country: "Australia", region: "APAC", requiresCityToken: true },
+  act: { country: "Australia", region: "APAC", requiresCityToken: true },
+  "northern territory": { country: "Australia", region: "APAC", requiresCityToken: true },
+  victoria: { country: "Australia", region: "APAC", requiresCityToken: true },
+  vic: { country: "Australia", region: "APAC", requiresCityToken: true },
   "the bahamas": { country: "Bahamas", region: "North America" },
   malta: { country: "Malta", region: "EMEA" },
   morocco: { country: "Morocco", region: "EMEA" },
@@ -238,14 +252,18 @@ function extractApplyToJobCountryTokenHint(locationValue) {
   if (tokens.length === 0) return null;
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
     const token = tokens[index];
-    const hint = APPLYTOJOB_COUNTRY_TOKEN_HINTS[normalizeApplyToJobToken(token)];
+    const normalizedToken = normalizeApplyToJobToken(token);
+    const configuredHint = APPLYTOJOB_COUNTRY_TOKEN_HINTS[normalizedToken];
+    const resolvedCountry = normalizedToken.length > 2 ? normalizeCountryName(token) : "";
+    const hint = configuredHint || (resolvedCountry ? { country: resolvedCountry } : null);
     if (!hint) continue;
+    if (hint.requiresCityToken && tokens.length < 2) continue;
     const cityToken = tokens.length === 1 ? "" : cleanApplyToJobText(tokens[0]);
     const normalizedCity = normalizeApplyToJobToken(cityToken);
-    const normalizedCountry = normalizeApplyToJobToken(hint.country);
+    const normalizedHintCountry = normalizeApplyToJobToken(hint.country);
     return {
       ...hint,
-      city: normalizedCity && normalizedCity !== normalizedCountry ? cityToken : "",
+      city: normalizedCity && normalizedCity !== normalizedHintCountry ? cityToken : "",
       raw: location,
       token,
       ruleName: "applytojob_country_token_hint"
@@ -263,6 +281,26 @@ function buildApplyToJobLocationHintEvidence(locationValue) {
     country_source: "labeled_html",
     country_path: "Location country token",
     country_rule_name: hint.ruleName
+  };
+}
+
+function applyApplyToJobLocationHint(posting) {
+  const hint = extractApplyToJobCountryTokenHint(posting?.location || posting?.location_text);
+  if (!hint) return posting;
+  return {
+    ...posting,
+    city: posting.city || hint.city || null,
+    country: posting.country || hint.country || null,
+    source_evidence: {
+      ...(posting.source_evidence || {}),
+      location_rule_name: hint.ruleName,
+      location_raw: hint.raw,
+      country_source: posting.source_evidence?.country_source || "labeled_html",
+      country_path: posting.source_evidence?.country_path || "Location country token",
+      country_rule_name: posting.source_evidence?.country_rule_name || hint.ruleName,
+      city_source: posting.source_evidence?.city_source || (hint.city ? "labeled_html" : ""),
+      city_path: posting.source_evidence?.city_path || (hint.city ? "Location city token" : "")
+    }
   };
 }
 
@@ -350,7 +388,7 @@ function collectApplyToJobJsonLdPostings(companyNameForPostings, config, sourceH
     const identifierValue = cleanApplyToJobStructuredValue(
       Array.isArray(identifier) ? identifier[0]?.value || identifier[0]?.name : identifier?.value || identifier?.name
     );
-    postings.push({
+    postings.push(applyApplyToJobLocationHint({
       company_name: companyNameForPostings,
       source_job_id: extractApplyToJobSourceId(absoluteUrl) || identifierValue,
       position_name: cleanApplyToJobStructuredValue(jobPosting?.title || jobPosting?.name) || "Untitled Position",
@@ -375,7 +413,7 @@ function collectApplyToJobJsonLdPostings(companyNameForPostings, config, sourceH
         ...(fields.evidence || {})
       },
       source_failure_reasons: []
-    });
+    }));
     seenUrls.add(absoluteUrl);
   }
   return postings.map((posting) => ({
@@ -483,9 +521,10 @@ function applyToJobSourceFailureReasons(posting) {
 
 function enrichApplyToJobPostingFromDetail(posting, detailHtml, detailStatus) {
   if (!detailHtml) {
+    const hinted = applyApplyToJobLocationHint(posting);
     return {
-      ...posting,
-      source_failure_reasons: applyToJobSourceFailureReasons(posting)
+      ...hinted,
+      source_failure_reasons: applyToJobSourceFailureReasons(hinted)
     };
   }
   const detailFields = extractApplyToJobDetailFields(detailHtml);
@@ -506,7 +545,7 @@ function enrichApplyToJobPostingFromDetail(posting, detailHtml, detailStatus) {
     posting_date_source: detailFields.evidence.posting_date_source || posting.source_evidence?.posting_date_source || "",
     posting_date_path: detailFields.evidence.posting_date_path || posting.source_evidence?.posting_date_path || ""
   };
-  const enriched = {
+  const enriched = applyApplyToJobLocationHint({
     ...posting,
     location: detailFields.location || posting.location || null,
     city: detailFields.city || posting.city || null,
@@ -516,7 +555,7 @@ function enrichApplyToJobPostingFromDetail(posting, detailHtml, detailStatus) {
     posting_date: posting.posting_date || detailFields.posting_date || null,
     employment_type: posting.employment_type || detailFields.employment_type || null,
     source_evidence: sourceEvidence
-  };
+  });
   return {
     ...enriched,
     source_failure_reasons: applyToJobSourceFailureReasons(enriched)
