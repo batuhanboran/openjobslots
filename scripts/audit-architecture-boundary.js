@@ -4,6 +4,24 @@ const { execFileSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const SERVER_INDEX_CAP = Number(process.env.OPENJOBSLOTS_SERVER_INDEX_LINE_CAP || 3000);
+const INGESTION_ORCHESTRATION_LINE_BUDGETS = Object.freeze([
+  {
+    file: "server/ingestion/sourceCollectors.js",
+    cap: Number(process.env.OPENJOBSLOTS_SOURCE_COLLECTORS_LINE_CAP || 700)
+  },
+  {
+    file: "server/ingestion/sourceDiscovery.js",
+    cap: Number(process.env.OPENJOBSLOTS_SOURCE_DISCOVERY_LINE_CAP || 900)
+  },
+  {
+    file: "server/ingestion/sources/common.js",
+    cap: Number(process.env.OPENJOBSLOTS_SOURCE_COMMON_LINE_CAP || 1000)
+  },
+  {
+    file: "server/ingestion/sourceRegistry.js",
+    cap: Number(process.env.OPENJOBSLOTS_SOURCE_REGISTRY_LINE_CAP || 650)
+  }
+]);
 const SERVER_INDEX_FORBIDDEN_ATS_PATTERNS = Object.freeze([
   { name: "source_module_import", regex: /require\(["']\.\/ingestion\/sources\// },
   { name: "greenhouse_api_endpoint", regex: /boards-api\.greenhouse\.io/i },
@@ -114,6 +132,16 @@ function main() {
     warnings.push(`known debt: server/index.js still contains legacy ATS bootstrap/alias patterns (${knownServerIndexDebt.join(", ")})`);
   }
 
+  const ingestionOrchestrationLineCounts = INGESTION_ORCHESTRATION_LINE_BUDGETS.map((entry) => ({
+    file: entry.file,
+    lines: lineCount(entry.file),
+    cap: entry.cap
+  }));
+  const orchestrationLineFailures = ingestionOrchestrationLineCounts.filter((entry) => entry.lines > entry.cap);
+  if (orchestrationLineFailures.length) {
+    failures.push(`ingestion orchestration files exceed line caps: ${JSON.stringify(orchestrationLineFailures)}`);
+  }
+
   const publicFiles = listTrackedFiles(["App.js", "src", "server/http", "README.md"]);
   const leakHits = scanFiles(publicFiles, [
     { name: "windows_private_user_path", regex: /C:\\Users\\BaronPC/i },
@@ -145,6 +173,7 @@ function main() {
     ok: failures.length === 0,
     server_index_lines: serverIndexLines,
     server_index_cap: SERVER_INDEX_CAP,
+    ingestion_orchestration_line_counts: ingestionOrchestrationLineCounts,
     server_index_ats_boundary_hits: serverIndexAtsHits,
     source_local_ownership_hits: sourceLocalOwnershipHits,
     source_module_boundary_hits: sourceImportHits,
@@ -156,6 +185,9 @@ function main() {
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.log(`server/index.js lines: ${serverIndexLines}/${SERVER_INDEX_CAP}`);
+    for (const entry of ingestionOrchestrationLineCounts) {
+      console.log(`${entry.file} lines: ${entry.lines}/${entry.cap}`);
+    }
     for (const warning of warnings) console.warn(`warning: ${warning}`);
     for (const failure of failures) console.error(`failure: ${failure}`);
   }

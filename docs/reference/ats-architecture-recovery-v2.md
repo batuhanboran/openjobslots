@@ -43,6 +43,7 @@ Architecture gates:
 - `node --check server\ingestion\sources\common.js`
 - No `require("./<ats>/parse")` or `parser: parse<Ats>` ownership in `server/ingestion/sources/common.js`.
 - No source module imports `server/index.js`.
+- `server/ingestion/sourceCollectors.js`, `server/ingestion/sourceDiscovery.js`, `server/ingestion/sources/common.js`, and `server/ingestion/sourceRegistry.js` remain under architecture-boundary line caps so ATS behavior cannot silently move into a new shared god file.
 
 Fixture and parser gates:
 
