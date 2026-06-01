@@ -97,6 +97,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Breezy now declares the detail sidecar maps in its source-local `payloadShapePolicy.optional_enrichment_prefixes` alongside `__json`. This keeps optional enrichment payloads out of parser-drift classification while preserving real HTML/API list-shape drift detection.
 - Verification covered a red/green `sourceRegistry` contract assertion, `postgresStore-sync-control` drift-policy tests, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --json --no-write`, and `npm.cmd run ats:workbench -- --source=breezy --json --no-write`. `release:ats-recovery:check -- --source=breezy --json` correctly remained blocked because no production before/after reports, guard report, preflight report, or Meili parity report were supplied. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Detail-Fetching Source Payload Shape Policy Coverage - June 1, 2026
+
+- A source-local registry invariant now requires every detail-fetching source module that emits sidecar detail maps to declare those sidecars in `payloadShapePolicy.optional_enrichment_prefixes`.
+- Coverage now includes ApplyToJob, Breezy, HireBridge, HRMDirect, Jobvite, Loxo, PageUp, TalentLyft, and Teamtailor. PageUp declares its source-specific `__detailPostingDateByUrl` plus `__detailFailureByUrl`; sources that carry detail HTML/status maps declare those exact prefixes.
+- This is parser-drift hygiene only: it keeps bounded detail-enrichment metadata from being mistaken for raw list/API shape drift, while still allowing real core payload changes to trigger parser-drift events.
+- Verification covered a red/green `sourceRegistry` invariant, `postgresStore-sync-control` drift-policy tests, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary`, and `npm.cmd run ats:registry-index -- --json --no-write`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

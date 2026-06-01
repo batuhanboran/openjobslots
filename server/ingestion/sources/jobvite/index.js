@@ -6,6 +6,9 @@ const { createFetchList } = require("./fetchList");
 const baseModule = createSourceModule("jobvite");
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze(["__detailHtmlByUrl"])
+});
 
 function normalizeCompanyName(company = {}, fallback = "jobvite") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -23,5 +26,6 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

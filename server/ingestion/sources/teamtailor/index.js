@@ -11,6 +11,12 @@ const parserVersion = "source-teamtailor-v1";
 const parserConfidence = 0.55;
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl"
+  ])
+});
 const TEAMTAILOR_CITY_COUNTRY_HINTS = Object.freeze({
   "batumi, georgia": { city: "Batumi", country: "Georgia", region: "EMEA" },
   "tbilisi, georgia": { city: "Tbilisi", country: "Georgia", region: "EMEA" }
@@ -170,5 +176,6 @@ module.exports = {
   validatePublic,
   rateLimit,
   qualityThreshold,
+  payloadShapePolicy,
   fixtures
 };

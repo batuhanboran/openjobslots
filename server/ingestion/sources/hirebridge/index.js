@@ -8,6 +8,13 @@ const baseModule = createSourceModule(atsKey);
 const parserVersion = `${baseModule.parserVersion || "source-hirebridge-v1"}`;
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl",
+    "__detailFailureByUrl"
+  ])
+});
 
 function clean(value) {
   return String(value || "").trim();
@@ -171,5 +178,6 @@ module.exports = {
   discover,
   fetchList,
   parse,
+  payloadShapePolicy,
   fetchDetail: async () => null
 };

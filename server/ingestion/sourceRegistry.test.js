@@ -13,6 +13,33 @@ const {
   resolveRegistrySourceKey
 } = require("./sourceRegistry");
 
+const DETAIL_ENRICHMENT_PREFIXES = [
+  "__detailHtmlByUrl",
+  "__detailStatusByUrl",
+  "__detailFailureByUrl"
+];
+const DETAIL_ENRICHMENT_PREFIXES_BY_SOURCE = Object.freeze({
+  applytojob: DETAIL_ENRICHMENT_PREFIXES,
+  breezy: DETAIL_ENRICHMENT_PREFIXES,
+  hirebridge: DETAIL_ENRICHMENT_PREFIXES,
+  hrmdirect: DETAIL_ENRICHMENT_PREFIXES,
+  jobvite: ["__detailHtmlByUrl"],
+  loxo: ["__detailHtmlByUrl"],
+  pageup: ["__detailPostingDateByUrl", "__detailFailureByUrl"],
+  talentlyft: ["__detailHtmlByUrl", "__detailStatusByUrl"],
+  teamtailor: ["__detailHtmlByUrl", "__detailStatusByUrl"]
+});
+
+function assertOptionalEnrichmentPolicyIncludes(sourceModule, prefixes) {
+  const actual = sourceModule?.payloadShapePolicy?.optional_enrichment_prefixes || [];
+  for (const prefix of prefixes) {
+    assert.ok(
+      actual.includes(prefix),
+      `${sourceModule?.atsKey || "source"} payloadShapePolicy should include ${prefix}`
+    );
+  }
+}
+
 test("registry exposes source-owned pilot sources including legacy collector migrations", () => {
   assert.equal(isRegistryPilotSource("adp_myjobs"), true);
   assert.equal(isRegistryPilotSource("adp_workforcenow"), true);
@@ -138,6 +165,12 @@ test("registry exposes source-owned pilot sources including legacy collector mig
     "workday",
     "zoho"
   ]);
+});
+
+test("detail-fetching source modules declare detail sidecar payload policy", () => {
+  for (const [atsKey, prefixes] of Object.entries(DETAIL_ENRICHMENT_PREFIXES_BY_SOURCE)) {
+    assertOptionalEnrichmentPolicyIncludes(getRegistrySourceModule(atsKey), prefixes);
+  }
 });
 
 test("registry returns contract-valid pilot source modules", () => {

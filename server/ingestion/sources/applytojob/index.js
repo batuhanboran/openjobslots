@@ -7,6 +7,13 @@ const { hostSlug, normalizeCompanyName } = require("./helpers");
 const baseModule = createSourceModule("applytojob");
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList(discover);
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl",
+    "__detailFailureByUrl"
+  ])
+});
 
 function parse(rawPayload, company = {}) {
   if (rawPayload && Array.isArray(rawPayload.__legacyParsed)) return rawPayload.__legacyParsed;
@@ -27,5 +34,6 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

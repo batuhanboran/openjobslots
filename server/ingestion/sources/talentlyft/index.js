@@ -13,6 +13,12 @@ const PARSER_CONFIDENCE = 0.75;
 
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl"
+  ])
+});
 
 function normalizeCompanyName(company = {}, fallback = "talentlyft") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
@@ -140,5 +146,6 @@ module.exports = {
   validatePublic,
   rateLimit,
   qualityThreshold,
+  payloadShapePolicy,
   fixtures
 };

@@ -8,6 +8,12 @@ const baseModule = createSourceModule(atsKey);
 const parserVersion = `${baseModule.parserVersion || "source-pageup-v1"}`;
 const discover = createDiscover(parserVersion);
 const fetchList = createFetchList({ discover });
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__detailPostingDateByUrl",
+    "__detailFailureByUrl"
+  ])
+});
 
 function clean(value) {
   return String(value || "").trim();
@@ -69,5 +75,6 @@ module.exports = {
   discover,
   fetchList,
   parse,
+  payloadShapePolicy,
   fetchDetail: async () => null
 };
