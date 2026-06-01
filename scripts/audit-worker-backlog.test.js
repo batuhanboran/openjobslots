@@ -1963,7 +1963,10 @@ test("attachBacklogDiagnostics joins recent errors and fixture coverage without 
 
   const applicantpro = withDiagnostics.items.find((item) => item.ats_key === "applicantpro");
   assert.equal(applicantpro.recent_errors.total_count, 1);
-  assert.equal(applicantpro.fixture_coverage.source_fixture_dir, false);
+  assert.equal(applicantpro.fixture_coverage.source_fixture_dir, true);
+  assert.equal(applicantpro.fixture_coverage.source_fixtures.list, true);
+  assert.equal(applicantpro.fixture_coverage.source_fixtures.expected_normalized, true);
+  assert.equal(applicantpro.fixture_coverage.source_fixtures.invalid_shapes, true);
   assert.equal(applicantpro.fixture_coverage.legacy_fixtures.direct, true);
 });
 

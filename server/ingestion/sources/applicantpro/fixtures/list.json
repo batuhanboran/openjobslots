@@ -1,0 +1,64 @@
+{
+  "success": true,
+  "data": {
+    "jobs": [
+      {
+        "id": 445566,
+        "title": "Remote Technical Support Engineer",
+        "jobUrl": "/jobs/445566",
+        "startDateRef": "2026-05-08",
+        "jobLocation": "",
+        "city": "Istanbul",
+        "abbreviation": "",
+        "iso3": "TUR",
+        "department": "Support",
+        "employmentType": "Full-time"
+      },
+      {
+        "job_id": "445567",
+        "jobTitle": "Onsite Operations Manager",
+        "url": "/jobs/445567",
+        "postedDate": "2026-05-09",
+        "jobLocation": "Phoenix, AZ, United States",
+        "countryName": "United States",
+        "department": {
+          "name": "Operations"
+        },
+        "jobType": "Full-time"
+      },
+      {
+        "id": 445568,
+        "title": "Country Program Director",
+        "jobUrl": "/jobs/445568",
+        "startDateRef": "2026-05-10",
+        "jobLocation": "Nigeria",
+        "city": "",
+        "iso3": "NGA",
+        "workplaceType": "Onsite",
+        "employmentType": "Regular Full-Time"
+      },
+      {
+        "id": 445569,
+        "title": "Regional MERL Manager",
+        "jobUrl": "/jobs/445569",
+        "startDateRef": "2026-05-11",
+        "jobLocation": "Abengourou, C\u00f4te d'Ivoire, 12345",
+        "city": "Abengourou",
+        "iso3": "CIV",
+        "workplaceType": "Onsite",
+        "employmentType": "Consultancy"
+      },
+      {
+        "id": 445570,
+        "title": "Flexible Finance Director",
+        "jobUrl": "/jobs/445570",
+        "startDateRef": "2026-05-12",
+        "jobLocation": "Freetown, Sierra Leone",
+        "city": "Freetown",
+        "iso3": "SLE",
+        "workplaceType": "Work from home flexibility",
+        "employmentType": "Regular Full-Time"
+      }
+    ]
+  }
+}

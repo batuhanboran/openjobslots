@@ -3,7 +3,7 @@ const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { evaluatePublicPosting } = require("../publicPostingGate");
-const { DIRECT_SOURCE_ATS_KEYS, getSourceModule } = require("./index");
+const { DIRECT_SOURCE_ATS_KEYS, getSourceModule, sourceModules } = require("./index");
 
 const PRIMARY_DIRECT_SOURCES = Object.freeze([
   "greenhouse",
@@ -48,6 +48,24 @@ test("source index registers every source-local module directory", () => {
     const source = getSourceModule(atsKey);
     assert.ok(source, `${atsKey} should load from the source index`);
     assert.equal(hasSourceModuleContract(source), true, `${atsKey} should expose the source module contract`);
+  }
+});
+
+test("source modules publish only source-local fixture paths", () => {
+  assert.equal(sourceModules.size, DIRECT_SOURCE_ATS_KEYS.length);
+  for (const [atsKey, source] of sourceModules) {
+    assert.equal(typeof source.fixtures, "function", `${atsKey} should expose fixtures()`);
+    const fixtures = source.fixtures();
+    assert.ok(Array.isArray(fixtures), `${atsKey} fixtures() should return an array`);
+    assert.ok(fixtures.length > 0, `${atsKey} should publish fixture paths`);
+    for (const fixturePath of fixtures) {
+      const normalizedPath = String(fixturePath || "").replace(/\\/g, "/");
+      assert.ok(
+        normalizedPath.startsWith(`server/ingestion/sources/${atsKey}/fixtures/`),
+        `${atsKey} fixture should be source-local: ${normalizedPath}`
+      );
+      assert.ok(fs.existsSync(path.resolve(normalizedPath)), `${atsKey} fixture should exist: ${normalizedPath}`);
+    }
   }
 });
 

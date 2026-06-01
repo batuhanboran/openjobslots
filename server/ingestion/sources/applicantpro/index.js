@@ -120,8 +120,10 @@ function qualityThreshold() {
 
 function fixtures() {
   return [
-    "server/ingestion/fixtures/applicantpro-direct.json",
-    "server/ingestion/fixtures/applicantpro-failures.json"
+    "server/ingestion/sources/applicantpro/fixtures/company.json",
+    "server/ingestion/sources/applicantpro/fixtures/list.json",
+    "server/ingestion/sources/applicantpro/fixtures/expected-normalized.json",
+    "server/ingestion/sources/applicantpro/fixtures/invalid-shapes.json"
   ];
 }
 
