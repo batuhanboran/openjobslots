@@ -23,6 +23,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof: `Talentbank_1_jobs` accepted missing country/region improved `45 -> 0`; `rcrm` improved `37 -> 1`; `talentsource` improved `21 -> 9`; `somewhere` improved `253 -> 206` on current live accepted rows.
 - Verification covered RecruitCRM syntax checks, direct source-module fixture tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## CareersPage Source-Local City Country Evidence - June 1, 2026
+
+- Fresh read-only production baseline for this lane had CareersPage at `229` visible rows, `217` missing country/region rows, `84` weak/unknown remote rows, and `229` missing posting dates. Top missing-country boards included `new-paradigm-staffing`, `nextgen-hospitality-solutions`, `netchex`, `new-jersey-iec`, and `nextstep`.
+- CareersPage list HTML exposes labeled location spans, and `nextgen-hospitality-solutions` uses city-only list values for many United States restaurant roles. The parser now maps only source-local deterministic city/country hints from that labeled list field. No detail crawl, title/body, tenant-name, or board-name inference was added.
+- Remote-only and hybrid-only labels remain countryless. Ambiguous standalone city labels such as `Aurora`, `Fayetteville`, `Lancaster`, `Orange`, `Columbus`, and `Independence` remain unresolved. Posting dates remain null because sampled list payloads did not expose dates.
+- Live read-only proof: `nextgen-hospitality-solutions` parsed/accepted `94` current rows with accepted missing country/region `86 -> 15` and `71` rows carrying `careerspage_city_country_hint` evidence. Remote-only boards such as `new-paradigm-staffing`, `netchex`, and `new-jersey-iec` stayed countryless by design.
+- Verification covered CareersPage syntax checks, local CareersPage fixture tests, generic HTML/public source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.

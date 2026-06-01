@@ -83,7 +83,7 @@ test("careerspage parser preserves source ids, location, and date-null behavior"
   const fixture = readJson("list.json");
 
   const parsed = source.parse({ html: fixture.html }, company);
-  assert.equal(parsed.length, 2);
+  assert.equal(parsed.length, 3);
   assert.equal(parsed[0].source_job_id, "cp-1001");
   assert.equal(parsed[0].location, "Remote");
   assert.equal(parsed[0].posting_date, null);
@@ -92,6 +92,9 @@ test("careerspage parser preserves source ids, location, and date-null behavior"
   assert.equal(parsed[1].employment_type, "Contract");
   assert.equal(parsed[1].source_evidence?.route_kind, "careerspage_public_list");
   assert.equal(parsed[1].source_evidence?.list_url, "https://careerspage.io/fixtureco");
+  assert.equal(parsed[2].source_job_id, "cp-1003");
+  assert.equal(parsed[2].country, "United States");
+  assert.equal(parsed[2].source_evidence?.country_rule_name, "careerspage_city_country_hint");
 });
 
 test("careerspage normalize validates fixture evidence without invented dates", () => {
@@ -111,6 +114,11 @@ test("careerspage normalize validates fixture evidence without invented dates", 
     assert.equal(row.remote_type, expected.remote_type);
     if (expected.country) assert.equal(row.country, expected.country);
     if (expected.city) assert.equal(row.city, expected.city);
+    if (expected.source_job_id === "cp-1003") {
+      assert.equal(row.source_evidence.country_source, "labeled_html");
+      assert.equal(row.source_evidence.country_rule_name, "careerspage_city_country_hint");
+      assert.equal(source.validatePublic(row).status, "accepted");
+    }
   }
 });
 

@@ -20,5 +20,17 @@
     "city": "Istanbul",
     "remote_type": "onsite",
     "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "cp-1003",
+    "company_name": "Fixture CareersPage",
+    "position_name": "Restaurant General Manager",
+    "job_posting_url": "https://careerspage.io/fixtureco/job/cp-1003",
+    "posting_date": null,
+    "location": "Boca Raton",
+    "country": "United States",
+    "city": "Boca Raton",
+    "remote_type": "unknown",
+    "parser_confidence": 0.55
   }
 ]
