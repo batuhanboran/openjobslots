@@ -131,7 +131,22 @@ const BREEZY_US_STATE_CODES = new Set([
   "WI", "WV", "WY"
 ]);
 
+const BREEZY_US_STATE_NAMES = new Set([
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware",
+  "district of columbia", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
+  "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota",
+  "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey",
+  "new mexico", "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon",
+  "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah",
+  "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming"
+]);
+
 const BREEZY_CANADA_PROVINCE_CODES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
+const BREEZY_CANADA_PROVINCE_NAMES = new Set([
+  "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland and labrador",
+  "northwest territories", "nova scotia", "nunavut", "ontario", "prince edward island", "quebec",
+  "saskatchewan", "yukon"
+]);
 
 function escapeBreezyRegex(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -224,18 +239,23 @@ function normalizeBreezyComparableText(value) {
     .toLowerCase();
 }
 
-function breezyLocalityLooksNonCity(value, country) {
+function breezyLocalityLooksNonCity(value, country, state) {
   const text = cleanBreezyStructuredValue(value);
   if (!text) return false;
   if (/^(none|null|n\/?a|not applicable|not specified|to be determined|tbd|unknown|unavailable)$/i.test(text)) return true;
   const normalized = normalizeBreezyComparableText(text);
   const normalizedCountry = normalizeBreezyComparableText(country);
+  const normalizedState = normalizeBreezyComparableText(state);
   if (normalizedCountry && normalized === normalizedCountry) return true;
+  if (normalizedState && normalized === normalizedState) return true;
   const countryFromLocality = normalizeCountryName(text);
   if (countryFromLocality && (!country || countryFromLocality === country)) return true;
   const upper = text.toUpperCase();
   if (country === "United States" && BREEZY_US_STATE_CODES.has(upper)) return true;
+  if (country === "United States" && BREEZY_US_STATE_NAMES.has(normalized)) return true;
   if (country === "Canada" && BREEZY_CANADA_PROVINCE_CODES.has(upper)) return true;
+  if (country === "Canada" && BREEZY_CANADA_PROVINCE_NAMES.has(normalized)) return true;
+  if (text.includes(",") && !/\b(?:city|town|county|parish)\b/i.test(text)) return true;
   return false;
 }
 
@@ -259,7 +279,7 @@ function extractBreezyJsonLdFieldsFromObject(jobPosting) {
     cleanBreezyStructuredValue(address.addressCountry) ||
     firstBreezyStructuredCountry(jobPosting.applicantLocationRequirements);
   const country = normalizeCountryName(countryRaw) || countryRaw;
-  const city = breezyLocalityLooksNonCity(rawCity, country) ? "" : rawCity;
+  const city = breezyLocalityLooksNonCity(rawCity, country, state) ? "" : rawCity;
   const locationParts = [city, city ? state : "", country].filter(Boolean);
   const jobLocationType = Array.isArray(jobPosting.jobLocationType)
     ? jobPosting.jobLocationType.join(" ")
@@ -362,8 +382,8 @@ function normalizeBreezyApiLocation(locationValue) {
   const location = locationValue && typeof locationValue === "object" ? locationValue : {};
   const countryRaw = cleanBreezyStructuredValue(location.country?.name || location.country?.id || location.country);
   const country = normalizeCountryName(countryRaw) || countryRaw;
-  const city = breezyLocalityLooksNonCity(location.city, country) ? "" : cleanBreezyStructuredValue(location.city);
   const state = cleanBreezyStructuredValue(location.state?.id || location.state?.name || location.state);
+  const city = breezyLocalityLooksNonCity(location.city, country, state) ? "" : cleanBreezyStructuredValue(location.city);
   const locationName = cleanBreezyLocationText(location.name);
   const locationParts = [city, city ? state : "", country].filter(Boolean);
   const remoteType = location.is_remote === true ? "remote" : location.is_remote === false ? "onsite" : "";

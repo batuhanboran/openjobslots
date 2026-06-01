@@ -1521,20 +1521,34 @@ test("breezy source module prefers public JSON locations over ambiguous portal t
       }
       if (value === "https://fixture-json.breezy.hr/json") {
         return {
-          html: JSON.stringify([{
-            id: "brz-json",
-            name: "Sales Representative",
-            url: "https://fixture-json.breezy.hr/p/brz-json-sales-representative",
-            published_date: "2026-05-21T10:00:00.000Z",
-            type: { name: "Full-Time" },
-            location: {
-              city: "Dunkirk",
-              state: { id: "MD", name: "Maryland" },
-              country: { id: "US", name: "United States" },
-              name: "Dunkirk, MD",
-              is_remote: false
+          html: JSON.stringify([
+            {
+              id: "brz-json",
+              name: "Sales Representative",
+              url: "https://fixture-json.breezy.hr/p/brz-json-sales-representative",
+              published_date: "2026-05-21T10:00:00.000Z",
+              type: { name: "Full-Time" },
+              location: {
+                city: "Dunkirk",
+                state: { id: "MD", name: "Maryland" },
+                country: { id: "US", name: "United States" },
+                name: "Dunkirk, MD",
+                is_remote: false
+              }
+            },
+            {
+              id: "brz-state-scope",
+              name: "Academic Tutor",
+              url: "https://fixture-json.breezy.hr/p/brz-state-scope-academic-tutor",
+              published_date: "2026-05-22T10:00:00.000Z",
+              type: { name: "Contract" },
+              location: {
+                city: "Maryland",
+                country: { id: "US", name: "United States" },
+                name: "Maryland, US"
+              }
             }
-          }]),
+          ]),
           status: 200,
           url: value
         };
@@ -1543,8 +1557,12 @@ test("breezy source module prefers public JSON locations over ambiguous portal t
     }
   });
   const parsed = source.parse(raw, company);
-  assert.equal(parsed.length, 1);
-  const normalized = source.normalize(parsed[0], company);
+  assert.equal(parsed.length, 2);
+  const rows = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+  const normalized = rows["brz-json"];
   assert.equal(normalized.source_job_id, "brz-json");
   assert.equal(normalized.location_text, "Dunkirk, MD, United States");
   assert.equal(normalized.country, "United States");
@@ -1554,6 +1572,13 @@ test("breezy source module prefers public JSON locations over ambiguous portal t
   assert.equal(normalized.source_evidence.route_kind, "breezy_public_json");
   assert.deepEqual(normalized.source_failure_reasons || [], []);
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+
+  const stateScope = rows["brz-state-scope"];
+  assert.equal(stateScope.location_text, "United States");
+  assert.equal(stateScope.country, "United States");
+  assert.equal(stateScope.city, "");
+  assert.equal(stateScope.source_evidence.city_source || "", "");
+  assert.equal(evaluatePublicPosting(stateScope, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
 test("breezy source module normalizes explicit country payload tokens", () => {
