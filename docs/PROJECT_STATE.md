@@ -91,6 +91,12 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - HRMDirect now declares those detail sidecar maps in its source-local `payloadShapePolicy.optional_enrichment_prefixes`, next to the existing RSS optional fields. This keeps transient detail/RSS enrichment out of parser-drift classification without suppressing real HTML/list shape changes.
 - Verification covered a red/green `sourceRegistry` contract assertion and `postgresStore-sync-control` drift-policy tests. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Breezy Payload Shape Enrichment Policy - June 1, 2026
+
+- Fresh production drift samples showed Breezy payload-shape events where the observed payload was dominated by optional `__json` enrichment plus detail sidecar maps such as `__detailHtmlByUrl`, `__detailStatusByUrl`, and `__detailFailureByUrl`.
+- Breezy now declares the detail sidecar maps in its source-local `payloadShapePolicy.optional_enrichment_prefixes` alongside `__json`. This keeps optional enrichment payloads out of parser-drift classification while preserving real HTML/API list-shape drift detection.
+- Verification covered a red/green `sourceRegistry` contract assertion, `postgresStore-sync-control` drift-policy tests, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --json --no-write`, and `npm.cmd run ats:workbench -- --source=breezy --json --no-write`. `release:ats-recovery:check -- --source=breezy --json` correctly remained blocked because no production before/after reports, guard report, preflight report, or Meili parity report were supplied. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

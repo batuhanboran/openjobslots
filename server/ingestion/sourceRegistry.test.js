@@ -255,7 +255,12 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof breezy.parse, "function");
   assert.equal(typeof breezy.normalize, "function");
   assert.equal(typeof breezy.validate, "function");
-  assert.deepEqual(breezy.payloadShapePolicy.optional_enrichment_prefixes, ["__json"]);
+  assert.deepEqual(breezy.payloadShapePolicy.optional_enrichment_prefixes, [
+    "__json",
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl",
+    "__detailFailureByUrl"
+  ]);
   assert.deepEqual(validateSourceContract(breezy), { ok: true, failures: [] });
 
   const careerplug = getRegistrySourceModule("careerplug");

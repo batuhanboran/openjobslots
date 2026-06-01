@@ -8,7 +8,12 @@ const baseModule = createSourceModule("breezy");
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList(discover);
 const payloadShapePolicy = Object.freeze({
-  optional_enrichment_prefixes: Object.freeze(["__json"])
+  optional_enrichment_prefixes: Object.freeze([
+    "__json",
+    "__detailHtmlByUrl",
+    "__detailStatusByUrl",
+    "__detailFailureByUrl"
+  ])
 });
 
 function parse(rawPayload, company = {}) {
