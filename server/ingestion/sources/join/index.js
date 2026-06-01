@@ -1,7 +1,7 @@
 const { validateNormalizedPostingContract } = require("../../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../../publicPostingGate");
 const { decideDetailEscalation } = require("../../parserEvidence");
-const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../../posting");
+const { canonicalizePostingUrl, normalizePosting, normalizePostingValue, validatePosting } = require("../../posting");
 const parser = require("./parse");
 const { JOIN_DOCS_URL, JOIN_SOURCE_FAMILY, clean, createDiscover } = require("./discover");
 const { createFetchList } = require("./fetchList");
@@ -33,12 +33,26 @@ function parse(rawPayload, company = {}) {
   );
 }
 
+function applyJoinSourceEvidence(normalized, posting) {
+  const sourceCountry = normalizePostingValue(posting?.country);
+  const sourceRegion = normalizePostingValue(posting?.region);
+  if (sourceCountry && sourceRegion) {
+    normalized.country = sourceCountry;
+    normalized.region = sourceRegion;
+  }
+  const sourceCity = normalizePostingValue(posting?.city);
+  if (sourceCity) {
+    normalized.city = sourceCity;
+  }
+}
+
 function normalize(posting, company = {}, options = {}) {
   const normalized = normalizePosting(posting, company, atsKey, {
     parserVersion,
     confidence: options.confidence || parserConfidence,
     ...options
   });
+  applyJoinSourceEvidence(normalized, posting);
   normalized.parser_key = atsKey;
   normalized.parser_version = parserVersion;
   normalized.parser_confidence = Number(normalized.parser_confidence || parserConfidence);

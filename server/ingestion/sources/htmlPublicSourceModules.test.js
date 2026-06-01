@@ -560,12 +560,20 @@ test("join source module fetches Next.js company page with source-local host gua
   }]);
   assert.equal(payload.__sourceConfig.companySlug, "fixtureco");
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 1);
-  const normalized = source.normalize(parsed[0], company);
-  assert.equal(normalized.source_job_id, "fixture-remote-role");
-  assert.equal(normalized.country, "Germany");
-  assert.equal(normalized.remote_type, "hybrid");
-  assert.equal(source.validatePublic(normalized).status, "accepted");
+  assert.equal(parsed.length, 3);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+  assert.equal(byId.get("fixture-remote-role").country, "Germany");
+  assert.equal(byId.get("fixture-remote-role").remote_type, "hybrid");
+  assert.equal(byId.get("fixture-bangladesh-role").country, "Bangladesh");
+  assert.equal(byId.get("fixture-bangladesh-role").region, "APAC");
+  assert.equal(byId.get("fixture-bangladesh-role").city, "Dhaka");
+  assert.equal(byId.get("fixture-bangladesh-role").remote_type, "onsite");
+  assert.equal(byId.get("fixture-kosovo-role").country, "Kosovo");
+  assert.equal(byId.get("fixture-kosovo-role").region, "EMEA");
+  assert.equal(byId.get("fixture-kosovo-role").city, "Pristina");
+  assert.equal(byId.get("fixture-kosovo-role").remote_type, "hybrid");
+  assert.equal(source.validatePublic(byId.get("fixture-kosovo-role")).status, "accepted");
 
   await assert.rejects(
     () => source.fetchList(company, {

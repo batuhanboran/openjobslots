@@ -9,5 +9,29 @@
     "remote_type": "hybrid",
     "posting_date": "2026-05-25T09:00:00.000Z",
     "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "fixture-bangladesh-role",
+    "company_name": "Fixture Join",
+    "position_name": "Fixture Bangladesh Role",
+    "job_posting_url": "https://join.com/companies/fixtureco/fixture-bangladesh-role",
+    "country": "Bangladesh",
+    "region": "APAC",
+    "city": "Dhaka",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-26T09:00:00.000Z",
+    "parser_confidence": 0.55
+  },
+  {
+    "source_job_id": "fixture-kosovo-role",
+    "company_name": "Fixture Join",
+    "position_name": "Fixture Kosovo Role",
+    "job_posting_url": "https://join.com/companies/fixtureco/fixture-kosovo-role",
+    "country": "Kosovo",
+    "region": "EMEA",
+    "city": "Pristina",
+    "remote_type": "hybrid",
+    "posting_date": "2026-05-27T09:00:00.000Z",
+    "parser_confidence": 0.55
   }
 ]

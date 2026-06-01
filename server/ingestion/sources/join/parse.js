@@ -22,6 +22,32 @@ function cleanJoinText(value) {
     .trim();
 }
 
+function normalizeJoinComparable(value) {
+  return cleanJoinText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+const JOIN_COUNTRY_REGION_BY_NAME = Object.freeze({
+  albania: { country: "Albania", region: "EMEA" },
+  bangladesh: { country: "Bangladesh", region: "APAC" },
+  bosniaandherzegovina: { country: "Bosnia and Herzegovina", region: "EMEA" },
+  costarica: { country: "Costa Rica", region: "LATAM" },
+  ghana: { country: "Ghana", region: "EMEA" },
+  kosovo: { country: "Kosovo", region: "EMEA" },
+  liechtenstein: { country: "Liechtenstein", region: "EMEA" },
+  reunion: { country: "Reunion", region: "EMEA" },
+  uganda: { country: "Uganda", region: "EMEA" },
+  venezuela: { country: "Venezuela", region: "LATAM" }
+});
+
+function normalizeJoinCountryEvidence(countryName) {
+  const key = normalizeJoinComparable(countryName);
+  return JOIN_COUNTRY_REGION_BY_NAME[key] || { country: "", region: "" };
+}
+
 function buildJoinJobUrl(companySlug, idParam) {
   const slug = cleanJoinText(companySlug);
   const jobIdParam = cleanJoinText(idParam);
@@ -48,6 +74,7 @@ function parseJoinPostingsFromNextData(companyNameForPostings, companySlug, next
     const city = item?.city && typeof item.city === "object" ? item.city : {};
     const cityName = cleanJoinText(city?.cityName || "");
     const countryName = cleanJoinText(city?.countryName || "");
+    const countryEvidence = normalizeJoinCountryEvidence(countryName);
     const locationParts = [cityName, countryName].filter(Boolean);
     let location = locationParts.join(", ");
 
@@ -69,6 +96,9 @@ function parseJoinPostingsFromNextData(companyNameForPostings, companySlug, next
       source_job_id: idParam,
       posting_date: cleanJoinText(item?.createdAt || "") || null,
       location: location || null,
+      city: cityName || null,
+      country: countryEvidence.country || countryName || null,
+      region: countryEvidence.region || null,
       remote_type: remoteType || workplaceType || null,
       department: cleanJoinText(category?.name || "") || null,
       employment_type: cleanJoinText(employmentType?.name || "") || null
@@ -81,5 +111,6 @@ function parseJoinPostingsFromNextData(companyNameForPostings, companySlug, next
 
 module.exports = {
   extractJoinNextDataJsonFromHtml,
+  normalizeJoinCountryEvidence,
   parseJoinPostingsFromNextData
 };

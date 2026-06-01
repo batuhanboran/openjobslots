@@ -39,6 +39,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only parser proof for `corus.applicantpro.com` parsed `48` rows with `48` accepted, `0` missing country/region, and `6` remaining weak/unknown remote rows where the source did not expose workplace evidence. Nigeria, DRC, Côte d'Ivoire, Sierra Leone, Mali, and Togo sample rows now normalize with source-backed country/region.
 - Verification covered ApplicantPro syntax checks, direct parser fixture tests, HTML/public source module tests, and live read-only parser proof. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## JOIN Structured Country Evidence - June 1, 2026
+
+- Production sampling showed JOIN as a small, clean source-quality lane: `2,273` visible rows, `21` missing country/region rows, and `2` weak/unknown remote rows. The affected rows had source-backed `city.cityName` and `city.countryName` values in JOIN Next.js data.
+- JOIN now maps observed source country names such as Bangladesh, Kosovo, Ghana, Costa Rica, Albania, Liechtenstein, Uganda, Venezuela, Reunion, and Bosnia and Herzegovina inside the source module, and preserves city only from the structured `cityName` field.
+- Fixture coverage now includes Bangladesh and Kosovo rows in the JOIN source fixture and expected-normalized fixture. Live read-only parser proof for `theblondhrcom`, `sawoo`, `prosupportservicesghcom`, and `maximonivel` parsed `12` rows total with `12` accepted, `0` missing country/region, and `0` weak/unknown remote rows.
+- Verification covered JOIN syntax checks, HTML/public source module tests, direct source module tests, and live read-only parser proof. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
+
 ## Zoho Read-Only Recovery Wave - June 1, 2026
 
 - Fresh production checks kept production at `6660eab` with all four runtime services running. Public health still reports `331,463` visible job slots. `search:reindex:check -- --json` still has Postgres/Meili count parity (`331,457`/`331,457`) but remains `ok=false` because remote facets drift by `6` onsite vs unknown.
