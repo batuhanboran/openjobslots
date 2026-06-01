@@ -1,0 +1,19 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect Body Section Remote",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://bodysectionremote.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://bodysectionremote.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://bodysectionremote.hrmdirect.com/employment/rss.php?search=true",
+  "detail_url": "https://bodysectionremote.hrmdirect.com/employment/job-opening.php?req=HRM9901",
+  "list_html": "<table><tr class=\"reqitem\" data-req-id=\"HRM9901\"><td class=\"departments reqitem ReqRowClick\">Clinical Opportunities</td><td class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=HRM9901\">Licensed Clinical Therapist - TX</a></td><td class=\"cities reqitem ReqRowClick\"></td><td class=\"state reqitem ReqRowClick\"></td></tr></table>",
+  "detail_html": "<html><body><table class=\"viewFields\"><tr><td class=\"viewFieldName\"><b>Department:</b></td><td class=\"viewFieldValue\">Clinical Opportunities</td></tr><tr><td class=\"viewFieldName\"><b>Office:</b></td><td class=\"viewFieldValue\">Unassigned</td></tr></table><section><h2>Location</h2><p>TimelyCare's primary location is Fort Worth Texas. This is a remote position reviewing candidates licensed in TX.</p></section><section><h2>Requirements</h2><p>Active state license in TX.</p></section></body></html>",
+  "expected": {
+    "source_job_id": "HRM9901",
+    "remote_type": "remote",
+    "remote_source": "labeled_detail_body",
+    "remote_path": "detail body Location",
+    "remote_rule_name": "hrmdirect_detail_body_location_remote"
+  }
+}

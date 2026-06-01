@@ -8,8 +8,9 @@ This milestone turns ATS ingestion from parser-by-parser repair into a controlle
 - Public rows were about `331.7k`; visible ATS coverage was `37` ATS out of `62` configured ATS observed in production status.
 - Data-quality pressure remains material: missing country about `6.37%`, missing any normalized geo about `13.28%`, and weak or unknown remote about `2.8%`.
 - Search count parity was aligned, but Meili remote facets still drifted from Postgres and require explicit approval before repair or replace reindex.
-- Source recovery order from read-only evidence starts with `zoho`, `hrmdirect`, `breezy`, `teamtailor`, `adp_workforcenow`, `bamboohr`, `ultipro`, `rippling`, and `applytojob`.
+- Source recovery order from read-only evidence starts with `zoho`, `hrmdirect`, `breezy`, `teamtailor`, `bamboohr`, `adp_workforcenow`, `applytojob`, `ultipro`, `loxo`, and `rippling`.
 - `zoho` first-lane local checkpoint maps source-backed `Remote_Job: true` to explicit remote evidence (`jobs[].Remote_Job` / `zoho_remote_job_flag`) without adding inferred country or city values.
+- `hrmdirect` next-lane local checkpoint maps label-bounded detail body `Location` sections that say `This is a remote position/role/job` to explicit remote evidence (`detail body Location` / `hrmdirect_detail_body_location_remote`) while leaving title-only or generic prose remote rows quarantined.
 
 ## Done In The Architecture Slice
 

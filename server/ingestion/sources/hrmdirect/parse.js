@@ -360,7 +360,10 @@ function extractHrmDirectDetailBodyLocationRemoteType(detailHtml) {
   const text = cleanHrmDirectText(detailHtml);
   const directMatch = text.match(/\bLocation\s*:\s*(Remote|Hybrid)\b/i);
   const roleMatch = text.match(/\bLocation\s*:\s*This\s+is\s+a\s+(remote|hybrid)\s+(?:role|position|job)\b/i);
-  const value = directMatch?.[1] || roleMatch?.[1] || "";
+  const labeledSectionMatch = text.match(
+    /\bLocation\b.{0,260}\bThis\s+is\s+a\s+(remote|hybrid)\s+(?:role|position|job)\b/i
+  );
+  const value = directMatch?.[1] || roleMatch?.[1] || labeledSectionMatch?.[1] || "";
   if (!value) return "";
   return String(value).toLowerCase() === "hybrid" ? "hybrid" : "remote";
 }
