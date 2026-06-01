@@ -80,6 +80,10 @@ function assertGreenhouseHost(value, fallbackUrl) {
   }
 }
 
+function isResponseTooLargeError(error) {
+  return error?.ingestionErrorType === "response_too_large" || error?.code === "response_too_large";
+}
+
 function createFetchList(dependencies = {}) {
   const discover = typeof dependencies.discover === "function"
     ? dependencies.discover
@@ -108,50 +112,70 @@ function createFetchList(dependencies = {}) {
       }
     };
 
-    const response = typeof options.fetcher === "function"
-      ? await options.fetcher(discovered.list_url, requestTarget)
-      : await safeFetch(discovered.list_url, {
+    async function fetchApiPayload(requestUrl) {
+      const response = typeof options.fetcher === "function"
+        ? await options.fetcher(requestUrl, requestTarget)
+        : await safeFetch(requestUrl, {
           ...requestTarget,
           ...(options.fetchOptions || {})
         });
 
-    const status = responseStatus(response);
-    if (status < 200 || status >= 300) {
-      const body = await responseToText(response);
-      throw makeSourceFetchError(
-        "fetch_failed",
-        `Greenhouse jobs API request failed (${status}): ${String(body).slice(0, 180)}`,
-        { status, url: clean(response?.url || discovered.list_url) }
-      );
+      const status = responseStatus(response);
+      if (status < 200 || status >= 300) {
+        const body = await responseToText(response);
+        throw makeSourceFetchError(
+          "fetch_failed",
+          `Greenhouse jobs API request failed (${status}): ${String(body).slice(0, 180)}`,
+          { status, url: clean(response?.url || requestUrl) }
+        );
+      }
+
+      const finalUrl = clean(response?.url || response?.__sourceFetchFinalUrl || requestUrl);
+      assertGreenhouseHost(finalUrl, requestUrl);
+
+      let payload;
+      try {
+        payload = await parseJsonPayload(response, finalUrl);
+      } catch (error) {
+        if (typeof response.text === "function") {
+          throw error;
+        }
+
+        if (typeof response?.body === "string" || typeof response?.html === "string") {
+          throw error;
+        }
+
+        const text = await readLimitedResponseText(response, { sourceUrl: finalUrl }).catch(() => "");
+        throw makeSourceFetchError(
+          "non_json_api_response",
+          `Greenhouse jobs API response was not JSON: ${String(text).slice(0, 180)}`,
+          { url: finalUrl }
+        );
+      }
+
+      return { payload, finalUrl };
     }
 
-    const finalUrl = clean(response?.url || response?.__sourceFetchFinalUrl || discovered.list_url);
-    assertGreenhouseHost(finalUrl, discovered.list_url);
-
-    let payload;
+    let requestedListUrl = discovered.list_url;
+    let contentIncluded = true;
+    let result;
     try {
-      payload = await parseJsonPayload(response, finalUrl);
+      result = await fetchApiPayload(requestedListUrl);
     } catch (error) {
-      if (typeof response.text === "function") {
+      const fallbackListUrl = greenhouseListUrl(config, { includeContent: false });
+      if (!isResponseTooLargeError(error) || !fallbackListUrl || fallbackListUrl === requestedListUrl) {
         throw error;
       }
-
-      if (typeof response?.body === "string" || typeof response?.html === "string") {
-        throw error;
-      }
-
-      const text = await readLimitedResponseText(response, { sourceUrl: finalUrl }).catch(() => "");
-      throw makeSourceFetchError(
-        "non_json_api_response",
-        `Greenhouse jobs API response was not JSON: ${String(text).slice(0, 180)}`,
-        { url: finalUrl }
-      );
+      requestedListUrl = fallbackListUrl;
+      contentIncluded = false;
+      result = await fetchApiPayload(requestedListUrl);
     }
 
+    const { payload, finalUrl } = result;
     const listUrl = greenhouseListUrl(config);
     const requestCount = {
-      payloadFetches: 1,
-      total: 1
+      payloadFetches: contentIncluded ? 1 : 2,
+      total: contentIncluded ? 1 : 2
     };
 
     return {
@@ -165,8 +189,10 @@ function createFetchList(dependencies = {}) {
       __sourceFetchFinalUrl: finalUrl,
       __sourceRequest: {
         boardUrl: listUrl,
+        requestedUrl: requestedListUrl,
         finalUrl,
         requestCount,
+        contentIncluded,
         rateLimitMs: GREENHOUSE_RATE_LIMIT_WAIT_MS
       }
     };

@@ -60,8 +60,46 @@ test("greenhouse fetchList preserves API metadata and request options", async ()
   assert.equal(raw.__sourceConfig.companyNameForPostings, "Fixture Greenhouse");
 
   const parsed = source.parse(raw, company);
-  assert.equal(parsed.length, 1);
+  assert.equal(parsed.length, listFixture.jobs.length);
   assert.equal(parsed[0].source_job_id, "1001");
+});
+
+test("greenhouse fetchList retries without content when the API payload is too large", async () => {
+  const requests = [];
+  const fetchList = createFetchList({ discover: createDiscover(source.parserVersion) });
+
+  const raw = await fetchList(company, {
+    fetcher: async (url) => {
+      requests.push(url);
+      if (url.endsWith("?content=true")) {
+        const error = new Error("source response is too large");
+        error.ingestionErrorType = "response_too_large";
+        throw error;
+      }
+      return {
+        status: 200,
+        url,
+        body: JSON.stringify({
+          jobs: listFixture.jobs.map((job) => {
+            const { content, ...rest } = job;
+            return rest;
+          })
+        })
+      };
+    }
+  });
+
+  assert.deepEqual(requests, [
+    "https://boards-api.greenhouse.io/v1/boards/fixtureco/jobs?content=true",
+    "https://boards-api.greenhouse.io/v1/boards/fixtureco/jobs"
+  ]);
+  assert.equal(raw.__sourceRequest.contentIncluded, false);
+  assert.equal(raw.__sourceRequest.requestCount.total, 2);
+  assert.equal(raw.__sourceRequest.requestedUrl, "https://boards-api.greenhouse.io/v1/boards/fixtureco/jobs");
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, listFixture.jobs.length);
+  assert.equal(parsed[0].source_job_id, "1001");
+  assert.equal(parsed[0].description_html, null);
 });
 
 test("greenhouse fetchList rejects non-JSON API payloads", async () => {
@@ -121,8 +159,7 @@ test("greenhouse parse uses __legacyParsed and preserves fixture source id and p
   assert.deepEqual(legacyParsed, legacy);
 
   const parsed = source.parse({ ...listFixture, __sourceConfig: { boardTokenLower: "fixtureco" } }, company);
-  assert.equal(parsed.length, 1);
+  assert.equal(parsed.length, listFixture.jobs.length);
   assert.equal(parsed[0].source_job_id, "1001");
   assert.equal(parsed[0].posting_date, "2026-05-05T08:00:00+03:00");
 });
-

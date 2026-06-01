@@ -47,9 +47,12 @@ function parseGreenhouseCompany(urlString) {
   };
 }
 
-function greenhouseListUrl(config = {}) {
+function greenhouseListUrl(config = {}, options = {}) {
   const boardToken = clean(config.boardToken);
-  return boardToken ? `${GREENHOUSE_API_URL_BASE}/${encodeURIComponent(boardToken)}/jobs?content=true` : "";
+  if (!boardToken) return "";
+  const includeContent = options.includeContent !== false;
+  const suffix = includeContent ? "?content=true" : "";
+  return `${GREENHOUSE_API_URL_BASE}/${encodeURIComponent(boardToken)}/jobs${suffix}`;
 }
 
 function createDiscover(parserVersion = "source-greenhouse-v1") {
