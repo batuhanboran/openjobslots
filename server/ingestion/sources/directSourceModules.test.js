@@ -25,6 +25,32 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function listSourceLocalModuleDirs() {
+  return fs.readdirSync(__dirname, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((atsKey) => fs.existsSync(path.join(__dirname, atsKey, "index.js")))
+    .sort();
+}
+
+function hasSourceModuleContract(source = {}) {
+  return ["discover", "fetchList", "parse", "normalize", "validate"].every(
+    (name) => typeof source?.[name] === "function"
+  );
+}
+
+test("source index registers every source-local module directory", () => {
+  const sourceLocalDirs = listSourceLocalModuleDirs();
+  const missingFromDirectKeys = sourceLocalDirs.filter((atsKey) => !DIRECT_SOURCE_ATS_KEYS.includes(atsKey));
+  assert.deepEqual(missingFromDirectKeys, []);
+
+  for (const atsKey of sourceLocalDirs) {
+    const source = getSourceModule(atsKey);
+    assert.ok(source, `${atsKey} should load from the source index`);
+    assert.equal(hasSourceModuleContract(source), true, `${atsKey} should expose the source module contract`);
+  }
+});
+
 for (const atsKey of PRIMARY_DIRECT_SOURCES) {
   test(`${atsKey} source module parses list fixture and emits strict normalized evidence`, () => {
     assert.ok(DIRECT_SOURCE_ATS_KEYS.includes(atsKey), `${atsKey} should be registered`);

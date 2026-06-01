@@ -4,8 +4,16 @@ const {
   getSourceSpec,
   setLegacyCollectPostingsForCompany
 } = require("./common");
+const fs = require("node:fs");
+const path = require("node:path");
 
-const LOCAL_ONLY_SOURCE_ATS_KEYS = Object.freeze(["talexio"]);
+function listLocalSourceAtsKeys() {
+  return fs.readdirSync(__dirname, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((atsKey) => fs.existsSync(path.join(__dirname, atsKey, "index.js")))
+    .sort();
+}
 
 function loadSourceModule(atsKey) {
   const key = String(atsKey || "").trim().toLowerCase();
@@ -35,7 +43,7 @@ function hasSourceModuleContractShape(sourceModule = {}) {
 }
 
 const modules = new Map(
-  Array.from(new Set([...Object.keys(SOURCE_SPECS), ...LOCAL_ONLY_SOURCE_ATS_KEYS]))
+  Array.from(new Set([...Object.keys(SOURCE_SPECS), ...listLocalSourceAtsKeys()]))
     .map((atsKey) => [atsKey, loadSourceModule(atsKey)])
     .filter(([, sourceModule]) => sourceModule)
 );

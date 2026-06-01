@@ -14,6 +14,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and now line-caps the next orchestration surfaces: `sourceCollectors.js`, `sourceDiscovery.js`, `sources/common.js`, and `sourceRegistry.js`.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## Source Module Inventory - June 1, 2026
+
+- Local architecture checkpoint after commit `836d6c2`: production is still `/root/OpenJobSlots` `6660eab`, public rows were freshly observed at `332,539`, and source freshness stayed on `hold` with `160` unresolved parser-attention events. Existing parser fixes remain local until an explicit deploy/source refresh.
+- `server/ingestion/sources/index.js` now builds startup source-module inventory from every source-local directory with an `index.js`. This removes the transitional `LOCAL_ONLY_SOURCE_ATS_KEYS` exception and makes all `60` contract modules visible through `DIRECT_SOURCE_ATS_KEYS` and `sourceModules`, not just the `35` legacy `SOURCE_SPECS`/exception modules.
+- `server/ingestion/sources/directSourceModules.test.js` now asserts that every source-local module directory is registered and exposes the required source contract. `ats:registry-index -- --json --no-write` reports `configured_ats_count: 60`, `read_only_recovery_ready_count: 60`, and no recovery readiness blockers.
+- No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run for this architecture slice.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.
