@@ -334,6 +334,100 @@ test("brassring fetchList posts MatchedJobs request with source-local tokens and
   assert.equal(parsed[0].position_name, "BrassRing Role 1");
 });
 
+test("brassring fetchList paginates bounded ProcessSortAndShowMoreJobs pages", async () => {
+  const source = getSourceModule("brassring");
+  const sourceDir = path.join(__dirname, "brassring");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const requests = [];
+  const boardUrl = "https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid=1&siteid=2";
+  const matchedJobsUrl = "https://sjobs.brassring.com/TgNewUI/Search/Ajax/MatchedJobs";
+  const showMoreUrl = "https://sjobs.brassring.com/TgNewUI/Search/Ajax/ProcessSortAndShowMoreJobs";
+
+  const raw = await source.fetchList(company, {
+    maxBrassringPages: 2,
+    fetcher: async (url, target) => {
+      requests.push({ url, target });
+      if (url === boardUrl) {
+        return {
+          status: 200,
+          url: boardUrl,
+          headers: { get: () => "BRSESSION=abc; Path=/" },
+          body: `
+            <html><body>
+              <input type="hidden" name="__RequestVerificationToken" value="token-123">
+              <input type="hidden" name="CookieValue" value="encrypted-session">
+              <script>{"PartnerName":"Fixture BrassRing"}</script>
+            </body></html>
+          `
+        };
+      }
+      if (url === matchedJobsUrl) {
+        return {
+          status: 200,
+          url: matchedJobsUrl,
+          JobsCount: 125,
+          SortFields: [{ Name: "LastUpdated" }],
+          Jobs: {
+            Job: [
+              {
+                Questions: [
+                  { QuestionName: "reqid", Value: "BR-7001" },
+                  { QuestionName: "jobtitle", Value: "BrassRing Page 1" },
+                  { QuestionName: "location", Value: "Toronto, ON, Canada" }
+                ]
+              },
+              {
+                Questions: [
+                  { QuestionName: "reqid", Value: "BR-7002" },
+                  { QuestionName: "jobtitle", Value: "BrassRing Duplicate Seed" },
+                  { QuestionName: "location", Value: "Austin, TX, United States" }
+                ]
+              }
+            ]
+          }
+        };
+      }
+      assert.equal(url, showMoreUrl);
+      const body = JSON.parse(target.body);
+      assert.equal(body.pageNumber, 2);
+      assert.equal(body.SortType, "LastUpdated");
+      assert.equal(body.encryptedSessionValue, "encrypted-session");
+      return {
+        status: 200,
+        url: showMoreUrl,
+        JobsCount: 125,
+        Jobs: {
+          Job: [
+            {
+              Questions: [
+                { QuestionName: "reqid", Value: "BR-7002" },
+                { QuestionName: "jobtitle", Value: "BrassRing Duplicate Seed" },
+                { QuestionName: "location", Value: "Austin, TX, United States" }
+              ]
+            },
+            {
+              Questions: [
+                { QuestionName: "reqid", Value: "BR-7003" },
+                { QuestionName: "jobtitle", Value: "BrassRing Page 2" },
+                { QuestionName: "location", Value: "Vancouver, BC, Canada" }
+              ]
+            }
+          ]
+        }
+      };
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => request.url), [boardUrl, matchedJobsUrl, showMoreUrl]);
+  assert.equal(raw.__sourceRequest.jobsCount, 125);
+  assert.equal(raw.__sourceRequest.pagesFetched, 2);
+  assert.equal(raw.__sourceRequest.maxPages, 2);
+  assert.equal(raw.responseJson.Jobs.Job.length, 3);
+
+  const parsed = source.parse(raw, company);
+  assert.deepEqual(parsed.map((posting) => posting.source_job_id), ["BR-7001", "BR-7002", "BR-7003"]);
+});
+
 test("brassring source fetchList rejects redirect to unexpected host", async () => {
   const source = getSourceModule("brassring");
   const sourceDir = path.join(__dirname, "brassring");

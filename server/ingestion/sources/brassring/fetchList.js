@@ -2,13 +2,30 @@ const { safeFetch } = require("../../safeFetch");
 const { createDiscover } = require("./discover");
 const {
   extractBrassringCompanyName,
-  extractBrassringHiddenInput
+  extractBrassringHiddenInput,
+  extractBrassringQuestionValue
 } = require("./parse");
 
 const BRASSRING_RATE_LIMIT_WAIT_MS = 60 * 1000;
+const BRASSRING_PAGE_SIZE = 50;
+const BRASSRING_DEFAULT_MAX_PAGES = 12;
+const BRASSRING_MAX_PAGE_CAP = 40;
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function toPositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function brassringMaxPages(options = {}) {
+  const configured = toPositiveInteger(
+    options.maxBrassringPages ?? options.maxPages ?? process.env.OPENJOBSLOTS_BRASSRING_MAX_PAGES_PER_COMPANY,
+    BRASSRING_DEFAULT_MAX_PAGES
+  );
+  return Math.min(BRASSRING_MAX_PAGE_CAP, Math.max(1, configured));
 }
 
 function responseStatus(payload) {
@@ -85,6 +102,53 @@ function assertBrassringHost(urlValue, fallbackUrl = "") {
   if (host !== "sjobs.brassring.com" && host !== "www.sjobs.brassring.com") {
     throw new Error(`BrassRing URL redirected to unexpected host: ${value}`);
   }
+}
+
+function brassringJobs(responseJson) {
+  return Array.isArray(responseJson?.Jobs?.Job) ? responseJson.Jobs.Job : [];
+}
+
+function brassringJobKey(job) {
+  return extractBrassringQuestionValue(job, "reqid") || clean(job?.Link) || JSON.stringify(job || {});
+}
+
+function appendUniqueBrassringJobs(allJobs, seenJobKeys, pageJobs) {
+  let added = 0;
+  for (const job of pageJobs) {
+    const key = brassringJobKey(job);
+    if (key && seenJobKeys.has(key)) continue;
+    if (key) seenJobKeys.add(key);
+    allJobs.push(job);
+    added += 1;
+  }
+  return added;
+}
+
+function buildBrassringShowMorePayload(config, encryptedSessionValue, sortType, pageNumber) {
+  return {
+    partnerId: config.partnerId,
+    siteId: config.siteId,
+    keyword: "",
+    location: "",
+    keywordCustomSolrFields: "",
+    locationCustomSolrFields: "Location",
+    linkId: "",
+    Latitude: 0,
+    Longitude: 0,
+    facetfilterfields: { Facet: [] },
+    powersearchoptions: { PowerSearchOption: [] },
+    SortType: sortType || "LastUpdated",
+    pageNumber,
+    encryptedSessionValue
+  };
+}
+
+function brassringShowMoreUrl(apiUrl) {
+  const parsed = new URL(apiUrl);
+  parsed.pathname = "/TgNewUI/Search/Ajax/ProcessSortAndShowMoreJobs";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
 }
 
 function createFetchList(discover) {
@@ -173,6 +237,40 @@ function createFetchList(discover) {
     const responseJson = await payloadJson(apiResponse);
     const finalMatchedJobsUrl = payloadUrl(apiResponse, config.apiUrl);
     assertBrassringHost(finalMatchedJobsUrl, config.apiUrl);
+    const allJobs = [];
+    const seenJobKeys = new Set();
+    appendUniqueBrassringJobs(allJobs, seenJobKeys, brassringJobs(responseJson));
+
+    const jobsCount = Number(responseJson?.JobsCount || allJobs.length || 0);
+    const sortType = clean(responseJson?.SortFields?.[0]?.Name) || "LastUpdated";
+    const showMoreUrl = brassringShowMoreUrl(config.apiUrl);
+    const maxPages = brassringMaxPages(options);
+    let pagesFetched = 1;
+
+    for (let pageNumber = 2; pageNumber <= maxPages && allJobs.length < jobsCount; pageNumber += 1) {
+      const pageTarget = {
+        ...apiTarget,
+        body: JSON.stringify(buildBrassringShowMorePayload(config, encryptedSessionValue, sortType, pageNumber))
+      };
+      const pageResponse = options.fetcher
+        ? await options.fetcher(showMoreUrl, pageTarget)
+        : await safeFetch(showMoreUrl, pageTarget);
+      const pageStatus = responseStatus(pageResponse);
+      if (pageStatus < 200 || pageStatus >= 300) break;
+      const pageJson = await payloadJson(pageResponse);
+      const finalPageUrl = payloadUrl(pageResponse, showMoreUrl);
+      assertBrassringHost(finalPageUrl, showMoreUrl);
+      pagesFetched += 1;
+      const pageJobs = brassringJobs(pageJson);
+      const added = appendUniqueBrassringJobs(allJobs, seenJobKeys, pageJobs);
+      if (pageJobs.length === 0 || added === 0 || pageJobs.length < BRASSRING_PAGE_SIZE) break;
+    }
+
+    responseJson.Jobs = {
+      ...(responseJson.Jobs || {}),
+      Job: allJobs
+    };
+
     return {
       responseJson,
       companyName,
@@ -184,6 +282,10 @@ function createFetchList(discover) {
       __sourceRequest: {
         boardUrl,
         finalBoardUrl,
+        jobsCount,
+        pageSize: BRASSRING_PAGE_SIZE,
+        pagesFetched,
+        maxPages,
         rateLimitMs: BRASSRING_RATE_LIMIT_WAIT_MS
       }
     };
@@ -192,5 +294,6 @@ function createFetchList(discover) {
 
 module.exports = {
   BRASSRING_RATE_LIMIT_WAIT_MS,
+  BRASSRING_PAGE_SIZE,
   createFetchList
 };

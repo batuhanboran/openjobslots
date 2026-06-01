@@ -103,5 +103,6 @@ function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJ
 module.exports = {
   extractBrassringCompanyName,
   extractBrassringHiddenInput,
+  extractBrassringQuestionValue,
   parseBrassringPostingsFromApi
 };

@@ -47,6 +47,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof with `maxCareerplugDetailFetches: 0`: the top 10 sampled boards parsed/accepted `276/276` rows. Nine boards had `0` missing country/region and `0` weak remote; the only remaining gap was `grand-canyon-resort-corp` with `20` rows carrying local site labels but no country/work-mode evidence.
 - Verification covered CareerPlug syntax checks, expanded CareerPlug raw/expected fixtures, generic HTML/public source-module tests with evidence assertions, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## BrassRing Bounded Pagination Preservation - June 1, 2026
+
+- Fresh read-only production baseline had BrassRing at `488` visible rows, `471` missing country/region rows, `0` missing-all-geo rows, `439` weak/unknown remote rows, and `0` missing posting dates. Public rows were concentrated on the MSCCN BrassRing board.
+- The BrassRing public API returns only the first `50` jobs from `MatchedJobs`, while the same response exposes `JobsCount` and the UI retrieves additional pages through `ProcessSortAndShowMoreJobs`. The source module now performs bounded same-session pagination with source-local request metadata, defaulting to `12` pages (`600` raw rows) and capped by `OPENJOBSLOTS_BRASSRING_MAX_PAGES_PER_COMPANY` / `maxBrassringPages`.
+- This checkpoint intentionally does not reverse-geocode source coordinates or infer country/remote from title, tenant, body, or board text. Existing coordinate-only rows remain missing country/region and weak remote until BrassRing exposes deterministic city/state/country or work-mode evidence.
+- Live read-only proof on `partnerid=16030&siteid=6090`: source API reported `JobsCount=1,679`; the default bounded fetch used `12` pages and parsed/accepted `548` current rows in the latest probe, preserving more than the current public `488` BrassRing rows instead of the previous single-page `50` ceiling.
+- Verification covered BrassRing syntax checks, enterprise source-module pagination fixtures, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.
