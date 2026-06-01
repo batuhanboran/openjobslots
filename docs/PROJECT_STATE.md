@@ -83,6 +83,15 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof after the change: Protecht parsed `11` rows; sampled `Sydney, New South Wales` and `Sydney, New South Wales, Australia` rows normalize to `country=Australia`, `region=APAC`, public gate `accepted`. Atlanta controls stayed `United States`; source-countryless `Remote` stayed countryless instead of inventing a country.
 - Verification covered ApplyToJob focused tests, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `git diff --check`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## ApplyToJob Nigeria Token And Detail Merge - June 1, 2026
+
+- Fresh read-only ranking kept ApplyToJob as the biggest remaining source-quality lane: `51,350` visible rows, `6,687` missing country/region rows, `1,438` weak/unknown remote rows, and `36,301` missing posting dates.
+- Existing ApplyToJob detail fetch can recover `datePosted` for sampled rows, but broad date recovery requires inventory/net-new/batch planning and explicit production approval. The parser-only fix here is the deterministic source-token gap.
+- ApplyToJob now recognizes `Nigeria` in shared country normalization and maps `Lagos` / `Lagos State` source tokens to Nigeria only when a city token is present. This fixes sampled `palmpaylimited.applytojob.com` rows such as `Ikeja, Lagos`, `Lagos, Lagos State`, and `Lekki, Lagos`.
+- Detail merge now keeps stronger list geo when detail JSON-LD supplies date/city/state but omits `addressCountry`, so date enrichment does not increase missing country/region or weak remote.
+- Live read-only proof: Palmpay parsed `379` rows with `379` accepted; detail budget `15` filled `15` dates; missing country/region stayed `19`, weak remote stayed `22`, and no no-geo/weak-remote rows were accepted. BGC/Taguig stayed `Philippines` while Lagos/Ikeja/Lekki normalized to `Nigeria`.
+- No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplicantPro ISO3 And Workplace Evidence - June 1, 2026
 
 - Fresh read-only production checks kept production at `6660eab`; public health reported `331,515` visible job slots, and `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,509`/`331,509`) with the known `22` document remote-facet drift.

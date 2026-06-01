@@ -960,6 +960,52 @@ test("applytojob source fetch spends limited detail budget on rows missing geo e
   }
 });
 
+test("applytojob source module preserves list country when detail JSON-LD omits country", () => {
+  const source = getSourceModule("applytojob");
+  const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));
+  const detailUrl = "https://fixture.applytojob.com/apply/ATJ6001/Payments-Specialist";
+  const parsed = source.parse({
+    html: `
+      <section class="jobs">
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ6001/Payments-Specialist">Payments Specialist</a>
+          <div><span>Location:</span><span>BGC, Taguig City, Philippines</span></div>
+        </article>
+      </section>
+    `,
+    __listUrl: company.url_string,
+    __detailHtmlByUrl: {
+      [detailUrl]: `
+        <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            "title": "Payments Specialist",
+            "datePosted": "2026-05-31",
+            "jobLocation": {
+              "@type": "Place",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "BGC, Taguig City",
+                "addressRegion": "Metro Manila"
+              }
+            }
+          }
+        </script>
+      `
+    }
+  }, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.country, "Philippines");
+  assert.equal(normalized.city, "BGC, Taguig City");
+  assert.equal(normalized.posting_date, "2026-05-31");
+  assert.equal(normalized.source_evidence.location_source, "labeled_html");
+  assert.equal(normalized.source_evidence.country_source, "labeled_html");
+  assert.equal(normalized.source_evidence.city_source, "json_ld");
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
 test("applytojob source module parses generic card links with labeled fields", () => {
   const source = getSourceModule("applytojob");
   const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));
@@ -1048,11 +1094,19 @@ test("applytojob source module normalizes source-provided country tokens", () =>
           <a class="job-title" href="/apply/ATJ4006/Product-Manager">Product Manager</a>
           <div><span>Location:</span><span>Sydney, New South Wales, Australia</span></div>
         </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4007/Fraud-Analyst">Fraud Analyst</a>
+          <div><span>Location:</span><span>Ikeja, Lagos</span></div>
+        </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4008/Dealer-Manager">Dealer Manager</a>
+          <div><span>Location:</span><span>Lagos, Lagos State</span></div>
+        </article>
       </section>
     `,
     __listUrl: company.url_string
   }, company);
-  assert.equal(parsed.length, 6);
+  assert.equal(parsed.length, 8);
   const normalized = Object.fromEntries(
     parsed.map((posting) => {
       const row = source.normalize(posting, company);
@@ -1089,6 +1143,16 @@ test("applytojob source module normalizes source-provided country tokens", () =>
   assert.equal(normalized.ATJ4006.region, "APAC");
   assert.equal(normalized.ATJ4006.city, "Sydney");
   assert.equal(normalized.ATJ4006.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4007.country, "Nigeria");
+  assert.equal(normalized.ATJ4007.region, "EMEA");
+  assert.equal(normalized.ATJ4007.city, "Ikeja");
+  assert.equal(normalized.ATJ4007.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4008.country, "Nigeria");
+  assert.equal(normalized.ATJ4008.region, "EMEA");
+  assert.equal(normalized.ATJ4008.city, "Lagos");
+  assert.equal(normalized.ATJ4008.source_evidence.location_rule_name, "applytojob_country_token_hint");
 });
 
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {

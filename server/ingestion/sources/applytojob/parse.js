@@ -232,6 +232,9 @@ const APPLYTOJOB_COUNTRY_TOKEN_HINTS = Object.freeze({
   "the bahamas": { country: "Bahamas", region: "North America" },
   malta: { country: "Malta", region: "EMEA" },
   morocco: { country: "Morocco", region: "EMEA" },
+  nigeria: { country: "Nigeria", region: "EMEA" },
+  lagos: { country: "Nigeria", region: "EMEA", requiresCityToken: true },
+  "lagos state": { country: "Nigeria", region: "EMEA", requiresCityToken: true },
   pr: { country: "Puerto Rico", region: "North America" },
   "puerto rico": { country: "Puerto Rico", region: "North America" }
 });
@@ -520,40 +523,45 @@ function applyToJobSourceFailureReasons(posting) {
 }
 
 function enrichApplyToJobPostingFromDetail(posting, detailHtml, detailStatus) {
+  const listPosting = applyApplyToJobLocationHint(posting);
   if (!detailHtml) {
-    const hinted = applyApplyToJobLocationHint(posting);
     return {
-      ...hinted,
-      source_failure_reasons: applyToJobSourceFailureReasons(hinted)
+      ...listPosting,
+      source_failure_reasons: applyToJobSourceFailureReasons(listPosting)
     };
   }
   const detailFields = extractApplyToJobDetailFields(detailHtml);
+  const keepListLocation = Boolean(listPosting.country && detailFields.location && !detailFields.country);
   const sourceEvidence = {
-    ...(posting.source_evidence || {}),
-    detail_url: posting.job_posting_url,
+    ...(listPosting.source_evidence || {}),
+    detail_url: listPosting.job_posting_url,
     detail_fetch_status: detailStatus || 200,
-    location_source: detailFields.evidence.location_source || posting.source_evidence?.location_source || "",
-    location_path: detailFields.evidence.location_path || posting.source_evidence?.location_path || "",
-    city_source: detailFields.evidence.city_source || "",
-    city_path: detailFields.evidence.city_path || "",
-    region_source: detailFields.evidence.region_source || "",
-    region_path: detailFields.evidence.region_path || "",
-    country_source: detailFields.evidence.country_source || "",
-    country_path: detailFields.evidence.country_path || "",
-    remote_source: detailFields.evidence.remote_source || posting.source_evidence?.remote_source || "",
-    remote_path: detailFields.evidence.remote_path || posting.source_evidence?.remote_path || "",
-    posting_date_source: detailFields.evidence.posting_date_source || posting.source_evidence?.posting_date_source || "",
-    posting_date_path: detailFields.evidence.posting_date_path || posting.source_evidence?.posting_date_path || ""
+    location_source: keepListLocation
+      ? listPosting.source_evidence?.location_source || ""
+      : detailFields.evidence.location_source || listPosting.source_evidence?.location_source || "",
+    location_path: keepListLocation
+      ? listPosting.source_evidence?.location_path || ""
+      : detailFields.evidence.location_path || listPosting.source_evidence?.location_path || "",
+    city_source: detailFields.evidence.city_source || listPosting.source_evidence?.city_source || "",
+    city_path: detailFields.evidence.city_path || listPosting.source_evidence?.city_path || "",
+    region_source: detailFields.evidence.region_source || listPosting.source_evidence?.region_source || "",
+    region_path: detailFields.evidence.region_path || listPosting.source_evidence?.region_path || "",
+    country_source: detailFields.evidence.country_source || listPosting.source_evidence?.country_source || "",
+    country_path: detailFields.evidence.country_path || listPosting.source_evidence?.country_path || "",
+    remote_source: detailFields.evidence.remote_source || listPosting.source_evidence?.remote_source || "",
+    remote_path: detailFields.evidence.remote_path || listPosting.source_evidence?.remote_path || "",
+    posting_date_source: detailFields.evidence.posting_date_source || listPosting.source_evidence?.posting_date_source || "",
+    posting_date_path: detailFields.evidence.posting_date_path || listPosting.source_evidence?.posting_date_path || ""
   };
   const enriched = applyApplyToJobLocationHint({
-    ...posting,
-    location: detailFields.location || posting.location || null,
-    city: detailFields.city || posting.city || null,
-    state: detailFields.state || posting.state || null,
-    country: detailFields.country || posting.country || null,
-    remote_type: detailFields.remote_type || posting.remote_type || null,
-    posting_date: posting.posting_date || detailFields.posting_date || null,
-    employment_type: posting.employment_type || detailFields.employment_type || null,
+    ...listPosting,
+    location: keepListLocation ? listPosting.location : detailFields.location || listPosting.location || null,
+    city: detailFields.city || listPosting.city || null,
+    state: detailFields.state || listPosting.state || null,
+    country: detailFields.country || listPosting.country || null,
+    remote_type: detailFields.remote_type || listPosting.remote_type || null,
+    posting_date: listPosting.posting_date || detailFields.posting_date || null,
+    employment_type: listPosting.employment_type || detailFields.employment_type || null,
     source_evidence: sourceEvidence
   });
   return {
