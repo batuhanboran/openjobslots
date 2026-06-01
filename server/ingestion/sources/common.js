@@ -1,7 +1,6 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
-const { parseUltiProPostingsFromApi } = require("./ultipro/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
@@ -500,7 +499,7 @@ const SOURCE_SPECS = Object.freeze({
   ultipro: {
     sourceFamily: "enterprise_api",
     confidence: 0.55,
-    parser: parseUltiProPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed UKG/UltiPro public JobBoard LoadSearchResults endpoint",
     discover(company) {
       const parts = parsePathParts(company.url_string);
