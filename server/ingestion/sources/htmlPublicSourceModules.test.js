@@ -1408,6 +1408,55 @@ test("applytojob source module normalizes source-provided country tokens", () =>
   assert.equal(normalized.ATJ4010.source_evidence.location_rule_name, "applytojob_country_token_hint");
 });
 
+test("applytojob source module collapses country-scoped location labels and skips test placeholders", () => {
+  const source = getSourceModule("applytojob");
+  const company = readJson(path.join(__dirname, "applytojob", "fixtures", "company.json"));
+  const parsed = source.parse({
+    html: `
+      <ul>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7001/Teach-Japan">Teach English Across Japan</a></h3>
+          <i class="fa fa-map-marker"></i> Various locations, Japan, Japan
+        </li>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7002/Teach-Taiwan">Teach In Taiwan</a></h3>
+          <i class="fa fa-map-marker"></i> Multiple locations, Taiwan, Taiwan
+        </li>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7003/Test">test</a></h3>
+          <i class="fa fa-map-marker"></i> Multiple Countries
+        </li>
+        <li class="list-group-item">
+          <h3 class="list-group-item-heading"><a href="/apply/ATJ7004/Test-Job-1">Test Job 1</a></h3>
+          <i class="fa fa-map-marker"></i> Multiple Countries
+        </li>
+      </ul>
+    `,
+    __listUrl: company.url_string
+  }, company);
+  assert.equal(parsed.length, 2);
+  const normalized = Object.fromEntries(
+    parsed.map((posting) => {
+      const row = source.normalize(posting, company);
+      return [row.source_job_id, row];
+    })
+  );
+
+  assert.equal(normalized.ATJ7001.location_text, "Japan");
+  assert.equal(normalized.ATJ7001.country, "Japan");
+  assert.equal(normalized.ATJ7001.city, "");
+  assert.equal(normalized.ATJ7001.source_evidence.location_raw, "Various locations, Japan, Japan");
+  assert.equal(normalized.ATJ7001.source_evidence.location_rule_name, "applytojob_country_scope_location");
+  assert.equal(source.validatePublic(normalized.ATJ7001).status, "accepted");
+
+  assert.equal(normalized.ATJ7002.location_text, "Taiwan");
+  assert.equal(normalized.ATJ7002.country, "Taiwan");
+  assert.equal(normalized.ATJ7002.city, "");
+  assert.equal(normalized.ATJ7002.source_evidence.location_raw, "Multiple locations, Taiwan, Taiwan");
+  assert.equal(normalized.ATJ7002.source_evidence.location_rule_name, "applytojob_country_scope_location");
+  assert.equal(source.validatePublic(normalized.ATJ7002).status, "accepted");
+});
+
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {
   const source = getSourceModule("breezy");
   const sourceDir = path.join(__dirname, "breezy");

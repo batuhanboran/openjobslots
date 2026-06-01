@@ -9,6 +9,11 @@ function cleanApplyToJobText(value) {
     .trim();
 }
 
+function isApplyToJobPlaceholderTitle(value) {
+  const title = cleanApplyToJobText(value).toLowerCase();
+  return /^(?:test|test job(?:\s+\d+)?|sample job|sample position|demo job)$/.test(title);
+}
+
 function extractApplyToJobIconField(cardHtml, iconNames) {
   const source = String(cardHtml || "");
   const names = Array.isArray(iconNames) ? iconNames : [iconNames];
@@ -250,6 +255,28 @@ function normalizeApplyToJobToken(value) {
     .trim();
 }
 
+function isApplyToJobAmbiguousCountryScopeToken(value) {
+  const normalized = normalizeApplyToJobToken(value);
+  return /^(?:multiple|various)(?:\s+(?:locations?|cities?|regions?|areas?|markets?))?$/.test(normalized);
+}
+
+function collapseApplyToJobCountryScopeLocation(tokens, hint) {
+  if (!hint?.country || !Array.isArray(tokens) || tokens.length < 2) return "";
+  if (!isApplyToJobAmbiguousCountryScopeToken(tokens[0])) return "";
+  const normalizedCountry = normalizeApplyToJobToken(hint.country);
+  const trailingTokens = tokens.slice(1).map((token) => ({
+    raw: token,
+    normalized: normalizeApplyToJobToken(token),
+    country: normalizeCountryName(token)
+  })).filter((token) => token.normalized);
+  if (trailingTokens.length === 0) return "";
+  const lastToken = trailingTokens[trailingTokens.length - 1];
+  if (lastToken.normalized !== normalizedCountry && normalizeApplyToJobToken(lastToken.country) !== normalizedCountry) {
+    return "";
+  }
+  return hint.country;
+}
+
 function extractApplyToJobCountryTokenHint(locationValue) {
   const location = cleanApplyToJobText(locationValue);
   if (!location || /^(remote|hybrid|onsite|on[-\s]?site)$/i.test(location)) return null;
@@ -266,12 +293,15 @@ function extractApplyToJobCountryTokenHint(locationValue) {
     const cityToken = tokens.length === 1 ? "" : cleanApplyToJobText(tokens[0]);
     const normalizedCity = normalizeApplyToJobToken(cityToken);
     const normalizedHintCountry = normalizeApplyToJobToken(hint.country);
+    const countryScopeLocation = collapseApplyToJobCountryScopeLocation(tokens, hint);
     return {
       ...hint,
-      city: normalizedCity && normalizedCity !== normalizedHintCountry ? cityToken : "",
+      city: countryScopeLocation ? "" : (normalizedCity && normalizedCity !== normalizedHintCountry ? cityToken : ""),
       raw: location,
       token,
-      ruleName: "applytojob_country_token_hint"
+      location: countryScopeLocation || "",
+      isCountryScope: Boolean(countryScopeLocation),
+      ruleName: countryScopeLocation ? "applytojob_country_scope_location" : "applytojob_country_token_hint"
     };
   }
   return null;
@@ -294,7 +324,8 @@ function applyApplyToJobLocationHint(posting) {
   if (!hint) return posting;
   return {
     ...posting,
-    city: posting.city || hint.city || null,
+    location: hint.location || posting.location || posting.location_text || null,
+    city: hint.isCountryScope ? null : (posting.city || hint.city || null),
     country: posting.country || hint.country || null,
     source_evidence: {
       ...(posting.source_evidence || {}),
@@ -303,8 +334,9 @@ function applyApplyToJobLocationHint(posting) {
       country_source: posting.source_evidence?.country_source || "labeled_html",
       country_path: posting.source_evidence?.country_path || "Location country token",
       country_rule_name: posting.source_evidence?.country_rule_name || hint.ruleName,
-      city_source: posting.source_evidence?.city_source || (hint.city ? "labeled_html" : ""),
-      city_path: posting.source_evidence?.city_path || (hint.city ? "Location city token" : "")
+      location_scope: hint.isCountryScope ? "country" : posting.source_evidence?.location_scope || "",
+      city_source: hint.isCountryScope ? "" : (posting.source_evidence?.city_source || (hint.city ? "labeled_html" : "")),
+      city_path: hint.isCountryScope ? "" : (posting.source_evidence?.city_path || (hint.city ? "Location city token" : ""))
     }
   };
 }
@@ -393,10 +425,13 @@ function collectApplyToJobJsonLdPostings(companyNameForPostings, config, sourceH
     const identifierValue = cleanApplyToJobStructuredValue(
       Array.isArray(identifier) ? identifier[0]?.value || identifier[0]?.name : identifier?.value || identifier?.name
     );
+    const positionName = cleanApplyToJobStructuredValue(jobPosting?.title || jobPosting?.name);
+    if (isApplyToJobPlaceholderTitle(positionName)) continue;
+
     postings.push(applyApplyToJobLocationHint({
       company_name: companyNameForPostings,
       source_job_id: extractApplyToJobSourceId(absoluteUrl) || identifierValue,
-      position_name: cleanApplyToJobStructuredValue(jobPosting?.title || jobPosting?.name) || "Untitled Position",
+      position_name: positionName || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: fields.posting_date || null,
       location: fields.location || null,
@@ -627,10 +662,16 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
         ? { value: locationRemoteType, path: "list location label/icon" }
         : null);
 
+    const positionName = cleanApplyToJobText(headingMatch[2]);
+    if (isApplyToJobPlaceholderTitle(positionName)) {
+      listItemMatch = listItemPattern.exec(source);
+      continue;
+    }
+
     const basePosting = {
       company_name: companyNameForPostings,
       source_job_id: extractApplyToJobSourceId(absoluteUrl),
-      position_name: cleanApplyToJobText(headingMatch[2]) || "Untitled Position",
+      position_name: positionName || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
       location,
@@ -710,10 +751,13 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
         ? { value: locationRemoteType, path: "legacy location label/icon" }
         : null);
 
+    const positionName = cleanApplyToJobText(match?.[2]);
+    if (isApplyToJobPlaceholderTitle(positionName)) continue;
+
     const basePosting = {
       company_name: companyNameForPostings,
       source_job_id: extractApplyToJobSourceId(absoluteUrl),
-      position_name: cleanApplyToJobText(match?.[2]) || "Untitled Position",
+      position_name: positionName || "Untitled Position",
       job_posting_url: absoluteUrl,
       posting_date: postingDate,
       location,
@@ -757,7 +801,7 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
     if (!absoluteUrl || seenUrls.has(absoluteUrl)) continue;
 
     const title = cleanApplyToJobText(match?.[2] || "");
-    if (!title) continue;
+    if (!title || isApplyToJobPlaceholderTitle(title)) continue;
 
     const nextStart = index + 1 < genericMatches.length ? Number(genericMatches[index + 1].index || 0) : source.length;
     const contextStart = Number(match.index || 0);
