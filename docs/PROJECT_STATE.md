@@ -14,6 +14,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and now line-caps the next orchestration surfaces: `sourceCollectors.js`, `sourceDiscovery.js`, `sources/common.js`, and `sourceRegistry.js`.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
+
+- Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.
+- Release proof gates now reject hand-wavy recovery claims: `scripts/release-ats-recovery-check.js` requires explicit before/after net-new evidence, search parity, field-quality deltas, source-local fixture coverage, rollback notes, and no missing production proof before a recovery release can be called ready.
+- Breezy, ADP Workforce Now, UltiPro, BambooHR, HiBob, and TalentReef now have stricter edge-shape coverage for empty boards, malformed raw rows, missing list geo, and source-backed title handling. The parsers skip raw rows without source titles instead of inventing `Untitled Position`, and no-geo/no-explicit-remote rows stay quarantined instead of being promoted.
+- Verification across these local checkpoints covered focused parser/source tests, live read-only parser probes where useful, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --no-write`, `git diff --check`, and changed-file secret scans. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Zoho Remote Job Evidence - June 1, 2026
 
 - Fresh read-only source evidence kept Zoho as the top recovery priority: `356` recent `no_geo_no_remote` source-quality failures, `14,562` visible rows, `1,860` missing country/region rows, `2,511` missing-any-geo rows, `235` weak/unknown remote rows, and `0` visible no-geo/no-remote rows.
