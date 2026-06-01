@@ -16,7 +16,8 @@ assert.ok(fs.existsSync(easJsonPath), "eas.json must exist for store build profi
 const easJson = JSON.parse(fs.readFileSync(easJsonPath, "utf8"));
 
 const expo = appConfig.expo || {};
-assert.strictEqual(expo.name, "OpenJobSlots", "Android launcher label should not hyphen-wrap the product name");
+assert.strictEqual(expo.name, "OJS", "Android launcher label should stay short enough for mobile home screens");
+assert.ok(expo.name.length <= 4, "Android launcher label should not hyphen-wrap the product name");
 assert.ok((expo.platforms || []).includes("ios"), "Expo config must include ios");
 assert.ok((expo.platforms || []).includes("android"), "Expo config must include android");
 assert.strictEqual(expo.ios?.bundleIdentifier, "com.openjobslots.app");
