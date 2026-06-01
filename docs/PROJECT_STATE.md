@@ -30,6 +30,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof with the default 25-detail budget: `studenac` parsed/accepted `107` rows with missing country/region `106 -> 0` and `25` JSON-LD dates; `raditi` parsed/accepted `118` with missing `96 -> 18`; `victusgroup` parsed/accepted `36` with missing `36 -> 0`; `praca-decathlon` parsed/accepted `26` current rows with missing `27 -> 0`; `m-plus` parsed/accepted `38` current rows with missing `30 -> 0`; `pepco-croatia-doo` parsed/accepted `24` current rows with missing `27 -> 0` and all `24` dates filled. Live row counts may differ from the production snapshot as boards change.
 - Verification covered syntax checks, parser fixture tests, focused TalentLyft source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## ApplyToJob Detail Budget And Burkina Faso Evidence - June 1, 2026
+
+- Fresh read-only production baseline for this lane had ApplyToJob at `51,361` visible rows, `6,694` missing country/region rows, `1,438` weak/unknown remote rows, and `36,308` missing posting dates. Top missing-country boards included `spadepartners`, `morphiuscorp`, `palmpaylimited`, `farinspections`, and several remote insurance-agency boards.
+- ApplyToJob fetch now honors `maxApplyToJobDetailPages` / `detailFetchLimit` options before the env default, still capped at `50`, so read-only probes and canaries can spend bounded detail budget intentionally instead of being pinned to `OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY` / default `15`.
+- The source-local ApplyToJob country-token hints now preserve explicit `Burkina Faso` and `Ouagadougou` list evidence. Shared country normalization also recognizes Burkina Faso and maps it to `EMEA`.
+- Live read-only proof with `maxApplyToJobDetailPages: 25`: `palmpaylimited` parsed `380` rows with accepted missing country/region `250 -> 0`, `379` labeled-country rows, and `25` JSON-LD dates; `morphiuscorp` parsed/accepted `598` rows with `25` detail fetches, `14` JSON-LD dates, and remaining missing country rows primarily explicit-remote rows accepted by public gate.
+- Verification covered syntax checks, parser fixture tests, focused HTML public source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Loxo Source-Local Region Code Evidence - June 1, 2026
 
 - Loxo production baseline for this lane was `3,782` visible rows, `486` missing country/region rows, `315` weak/unknown remote rows, and `412` missing posting dates.

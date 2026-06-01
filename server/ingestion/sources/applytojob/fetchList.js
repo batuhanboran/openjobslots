@@ -119,6 +119,16 @@ function prioritizeApplyToJobDetailCandidates(postings = []) {
     .map((item) => item.posting);
 }
 
+function resolveApplyToJobDetailFetchLimit(options = {}) {
+  const raw = options.maxApplyToJobDetailPages ??
+    options.detailFetchLimit ??
+    process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY ??
+    15;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 15;
+  return Math.max(0, Math.min(50, Math.floor(parsed)));
+}
+
 function createFetchList(discover) {
   return async function fetchList(company = {}, options = {}) {
     const context = buildCompanyContext(company);
@@ -151,7 +161,7 @@ function createFetchList(discover) {
       });
     }
 
-    const detailLimit = Math.max(0, Math.min(50, Number(process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY || 15)));
+    const detailLimit = resolveApplyToJobDetailFetchLimit(options);
     let detailFetches = 0;
     const detailHtmlByUrl = {};
     const detailStatusByUrl = {};
@@ -198,5 +208,6 @@ function createFetchList(discover) {
 
 module.exports = {
   applyToJobPostingNeedsDetail,
-  createFetchList
+  createFetchList,
+  resolveApplyToJobDetailFetchLimit
 };

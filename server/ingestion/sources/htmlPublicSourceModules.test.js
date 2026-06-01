@@ -961,7 +961,7 @@ test("applytojob source module enriches list rows from JSON-LD and labeled detai
   assert.equal(evaluatePublicPosting(byId["ATJ2004"], { parserVersion: source.parserVersion }).status, "quarantined");
 });
 
-test("applytojob source fetch spends limited detail budget on rows missing geo evidence", async () => {
+test("applytojob source fetch honors bounded detail override for rows missing geo evidence", async () => {
   const source = getSourceModule("applytojob");
   const company = {
     company_name: "Fixture ApplyToJob",
@@ -989,6 +989,9 @@ test("applytojob source fetch spends limited detail budget on rows missing geo e
                 </li>
                 <li class="list-group-item">
                   <h3 class="list-group-item-heading"><a href="/apply/ATJ-NEEDS/Training-Manager">Training Manager</a></h3>
+                </li>
+                <li class="list-group-item">
+                  <h3 class="list-group-item-heading"><a href="/apply/ATJ-NEEDS-2/Field-Coordinator">Field Coordinator</a></h3>
                 </li>
               </ul>
             `
@@ -1019,17 +1022,47 @@ test("applytojob source fetch spends limited detail budget on rows missing geo e
             `
           };
         }
+        if (value.includes("/ATJ-NEEDS-2/")) {
+          return {
+            status: 200,
+            url: value,
+            html: `
+              <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "JobPosting",
+                  "title": "Field Coordinator",
+                  "datePosted": "2026-05-14",
+                  "jobLocation": {
+                    "@type": "Place",
+                    "address": {
+                      "@type": "PostalAddress",
+                      "addressLocality": "Nairobi",
+                      "addressCountry": "KE"
+                    }
+                  }
+                }
+              </script>
+            `
+          };
+        }
         return { status: 200, url: value, html: "<html></html>" };
-      }
+      },
+      maxApplyToJobDetailPages: 2
     });
     const parsed = source.parse(raw, company);
     const normalized = parsed.map((posting) => source.normalize(posting, company));
     const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
 
     assert.ok(fetchedUrls.some((url) => url.includes("/ATJ-NEEDS/")));
+    assert.ok(fetchedUrls.some((url) => url.includes("/ATJ-NEEDS-2/")));
+    assert.equal(raw.__sourceConfig.detail_fetch_count, 2);
     assert.equal(byId["ATJ-NEEDS"].country, "Philippines");
     assert.equal(byId["ATJ-NEEDS"].city, "Iloilo City");
     assert.equal(evaluatePublicPosting(byId["ATJ-NEEDS"], { parserVersion: source.parserVersion }).status, "accepted");
+    assert.equal(byId["ATJ-NEEDS-2"].country, "Kenya");
+    assert.equal(byId["ATJ-NEEDS-2"].city, "Nairobi");
+    assert.equal(evaluatePublicPosting(byId["ATJ-NEEDS-2"], { parserVersion: source.parserVersion }).status, "accepted");
   } finally {
     if (previousLimit === undefined) {
       delete process.env.OPENJOBSLOTS_APPLYTOJOB_DETAIL_FETCH_LIMIT_PER_COMPANY;
@@ -1181,11 +1214,19 @@ test("applytojob source module normalizes source-provided country tokens", () =>
           <a class="job-title" href="/apply/ATJ4008/Dealer-Manager">Dealer Manager</a>
           <div><span>Location:</span><span>Lagos, Lagos State</span></div>
         </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4009/Compliance-Manager">Compliance Manager</a>
+          <div><span>Location:</span><span>Ouagadougou, Burkina Faso</span></div>
+        </article>
+        <article class="job-card">
+          <a class="job-title" href="/apply/ATJ4010/Admin-Specialist">Admin Specialist</a>
+          <div><span>Location:</span><span>Ouagadougou, Ouagadougou</span></div>
+        </article>
       </section>
     `,
     __listUrl: company.url_string
   }, company);
-  assert.equal(parsed.length, 8);
+  assert.equal(parsed.length, 10);
   const normalized = Object.fromEntries(
     parsed.map((posting) => {
       const row = source.normalize(posting, company);
@@ -1232,6 +1273,16 @@ test("applytojob source module normalizes source-provided country tokens", () =>
   assert.equal(normalized.ATJ4008.region, "EMEA");
   assert.equal(normalized.ATJ4008.city, "Lagos");
   assert.equal(normalized.ATJ4008.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4009.country, "Burkina Faso");
+  assert.equal(normalized.ATJ4009.region, "EMEA");
+  assert.equal(normalized.ATJ4009.city, "Ouagadougou");
+  assert.equal(normalized.ATJ4009.source_evidence.location_rule_name, "applytojob_country_token_hint");
+
+  assert.equal(normalized.ATJ4010.country, "Burkina Faso");
+  assert.equal(normalized.ATJ4010.region, "EMEA");
+  assert.equal(normalized.ATJ4010.city, "Ouagadougou");
+  assert.equal(normalized.ATJ4010.source_evidence.location_rule_name, "applytojob_country_token_hint");
 });
 
 test("breezy source module enriches list rows from JSON-LD and labeled detail pages", async () => {
