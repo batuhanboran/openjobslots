@@ -2,11 +2,13 @@ import { Platform } from "react-native";
 import {
   isNativeStorePlatform,
   isPublicMobileApiPath,
-  resolveDefaultApiBaseUrl
+  resolveRuntimeApiBaseUrl
 } from "./mobile/publicSurface";
 
-const DEFAULT_API_BASE_URL = resolveDefaultApiBaseUrl(Platform.OS);
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
+const IS_DEV_BUILD = typeof __DEV__ !== "undefined" ? Boolean(__DEV__) : process.env.NODE_ENV !== "production";
+const API_BASE_URL = resolveRuntimeApiBaseUrl(Platform.OS, process.env.EXPO_PUBLIC_API_BASE_URL, {
+  isDev: IS_DEV_BUILD
+});
 const IS_NATIVE_STORE_SURFACE = isNativeStorePlatform(Platform.OS);
 
 function stripHtml(value) {
@@ -93,10 +95,18 @@ async function request(path, options = {}) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { "Content-Type": "application/json" },
-      ...options
-    });
+    let res;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        headers: { "Content-Type": "application/json" },
+        ...options
+      });
+    } catch (e) {
+      const error = new Error("Could not reach OpenJobSlots. Check your connection and try again.");
+      error.path = path;
+      error.cause = e;
+      throw error;
+    }
 
     if (res.ok) {
       return res.json();

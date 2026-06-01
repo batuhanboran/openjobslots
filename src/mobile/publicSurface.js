@@ -44,6 +44,18 @@ function resolveDefaultApiBaseUrl(platformOs) {
   return "http://localhost:8787";
 }
 
+function resolveRuntimeApiBaseUrl(platformOs, configuredApiBaseUrl, options = {}) {
+  const configured = String(configuredApiBaseUrl || "").trim();
+  if (configured) return configured;
+
+  const isDev = options.isDev !== false;
+  if (!isDev && isNativeStorePlatform(platformOs)) {
+    return PRODUCTION_PUBLIC_API_BASE_URL;
+  }
+
+  return resolveDefaultApiBaseUrl(platformOs);
+}
+
 module.exports = {
   FLYONUI_NATIVE_POLICY,
   NATIVE_STORE_PLATFORMS,
@@ -52,5 +64,6 @@ module.exports = {
   isNativeStorePlatform,
   isPublicMobileApiPath,
   normalizePathname,
-  resolveDefaultApiBaseUrl
+  resolveDefaultApiBaseUrl,
+  resolveRuntimeApiBaseUrl
 };

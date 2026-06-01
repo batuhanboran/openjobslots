@@ -528,8 +528,8 @@ const PUBLIC_MESSAGES = {
     "sort.posted_date": "Posted date",
     "sort.ats_source": "ATS/source",
     "sort.confidence": "Confidence",
-    "theme.day": "Day",
-    "theme.night": "Night",
+    "theme.day": "Light",
+    "theme.night": "Dark",
     "language.label": "Language",
     "version.label": "Public v{version}",
     "credit.deployed": "Deployed and developed by",
@@ -8509,23 +8509,25 @@ export default function App() {
             {translatedPublicText(t, "version.label", PUBLIC_VERSION_LABEL, { version: PUBLIC_APP_VERSION })}
           </Text>
         </Pressable>
-        <Text
-          style={[styles.searchCreditText, styles.yahooCreditText, styles.publicFooterCredit, isDarkPublicTheme ? styles.searchCreditTextDark : null]}
-          testID="search-credit-text"
-        >
-          {t("credit.deployed", "Deployed and developed by")}{" "}
+        {!isPublicNativeStoreSurface ? (
           <Text
-            href={BATUHAN_WEBSITE_URL}
-            hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
-            onPress={handleOpenDeveloperCredit}
-            style={[styles.searchCreditLink, isDarkPublicTheme ? styles.searchCreditLinkDark : null]}
-            testID="search-credit-link"
-            accessibilityRole="link"
-            accessibilityLabel="Batuhan Boran website"
+            style={[styles.searchCreditText, styles.yahooCreditText, styles.publicFooterCredit, isDarkPublicTheme ? styles.searchCreditTextDark : null]}
+            testID="search-credit-text"
           >
-            Batuhan Boran
+            {t("credit.deployed", "Deployed and developed by")}{" "}
+            <Text
+              href={BATUHAN_WEBSITE_URL}
+              hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
+              onPress={handleOpenDeveloperCredit}
+              style={[styles.searchCreditLink, isDarkPublicTheme ? styles.searchCreditLinkDark : null]}
+              testID="search-credit-link"
+              accessibilityRole="link"
+              accessibilityLabel="Batuhan Boran website"
+            >
+              Batuhan Boran
+            </Text>
           </Text>
-        </Text>
+        ) : null}
       </View>
     );
 
@@ -10064,7 +10066,7 @@ const styles = StyleSheet.create({
   postingsPageContent: {
     paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: 96
+    paddingBottom: Platform.OS === "web" ? 96 : 34
   },
   webSmoothMotion: {
     transitionProperty: "min-height, padding, margin, transform, opacity",
@@ -10222,7 +10224,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignItems: "flex-start",
     flexWrap: "wrap",
-    gap: 10
+    gap: 8
   },
   yahooResultsBrandSlot: {
     flexShrink: 0
@@ -10289,12 +10291,15 @@ const styles = StyleSheet.create({
     bottom: 18
   },
   publicFooterMetaMobile: {
-    left: 18,
-    right: 18,
-    bottom: 14,
+    position: Platform.OS === "web" ? "fixed" : "relative",
+    left: Platform.OS === "web" ? 18 : 0,
+    right: Platform.OS === "web" ? 18 : 0,
+    bottom: Platform.OS === "web" ? 14 : 0,
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: 6
+    gap: 6,
+    marginTop: Platform.OS === "web" ? 0 : 18,
+    paddingBottom: Platform.OS === "web" ? 0 : 18
   },
   publicFooterMetaDark: {
     color: OJS_DARK_COLORS.muted
@@ -10317,9 +10322,9 @@ const styles = StyleSheet.create({
     paddingBottom: 80
   },
   yahooSearchShellMobile: {
-    minHeight: Platform.OS === "web" ? "min(360px, calc(100svh - 220px))" : 320,
-    paddingTop: 24,
-    paddingBottom: 28
+    minHeight: Platform.OS === "web" ? "min(360px, calc(100svh - 220px))" : 260,
+    paddingTop: 18,
+    paddingBottom: 22
   },
   yahooSearchShellCompact: {
     minHeight: Platform.OS === "web" ? 170 : 160,
@@ -11659,6 +11664,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     justifyContent: "flex-start",
+    flexWrap: "nowrap",
     gap: 5,
     flexShrink: 1
   },
@@ -11895,9 +11901,10 @@ const styles = StyleSheet.create({
   },
   themeToggleCompact: {
     minHeight: 44,
-    paddingHorizontal: 5,
-    paddingVertical: 5,
-    gap: 4
+    minWidth: 78,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    gap: 6
   },
   themeToggleDark: {
     borderColor: OJS_DARK_COLORS.border,
@@ -11956,8 +11963,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   themeIconButtonCompact: {
-    width: 20,
-    height: 20
+    width: 22,
+    height: 22
   },
   themeIconButtonDark: {
     backgroundColor: "#221B32"
@@ -11971,8 +11978,8 @@ const styles = StyleSheet.create({
     borderColor: "#FFF6D7"
   },
   themeIconCoreCompact: {
-    width: 11,
-    height: 11,
+    width: 12,
+    height: 12,
     borderWidth: 2
   },
   themeIconCoreDark: {
@@ -12003,8 +12010,8 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   themeToggleTextCompact: {
-    fontSize: 10,
-    lineHeight: 12
+    fontSize: 13,
+    lineHeight: 16
   },
   themeToggleTextDark: {
     color: OJS_DARK_COLORS.ink
@@ -12014,8 +12021,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   resultCountTextMobile: {
-    minWidth: 56,
-    paddingHorizontal: 5,
+    minWidth: 0,
+    paddingHorizontal: 6,
     flexGrow: 1.1
   },
   resultCountValueText: {
@@ -12077,11 +12084,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 2,
     borderRadius: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     paddingTop: 4,
     paddingBottom: 4,
-    minWidth: 50,
-    minHeight: 44,
+    minWidth: 0,
+    minHeight: 42,
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 0
