@@ -124,6 +124,84 @@ function preflightPassed(report = {}) {
   return report.ok === true && !report.unsafe;
 }
 
+function firstMeaningful(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim().length === 0) continue;
+    return value;
+  }
+  return undefined;
+}
+
+function preflightNumber(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim().length === 0) continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function preflightWorkerSafe(checks = {}, report = {}) {
+  if (checks.worker_isolated === true || report.worker_isolated === true || report.worker?.isolated === true) return true;
+  const state = String(firstMeaningful(checks.worker_state, report.worker_state, report.worker?.state) || "").trim().toLowerCase();
+  return ["stopped", "exited", "paused", "not_running", "not running", "disabled", "inactive", "dead"].includes(state);
+}
+
+function preflightAutodeploySafe(checks = {}, report = {}) {
+  if (checks.autodeploy_recovery_safe === true || report.autodeploy_recovery_safe === true || report.autodeploy?.recovery_safe === true) return true;
+  const state = String(firstMeaningful(checks.autodeploy_timer_state, report.autodeploy_timer_state, report.autodeploy?.timer_state) || "").trim().toLowerCase();
+  return ["inactive", "disabled", "stopped", "not_found", "not-found", "failed", "dead"].includes(state);
+}
+
+function preflightCommitMatches(actual, expected) {
+  if (!actual || !expected) return false;
+  return actual.startsWith(expected) || expected.startsWith(actual);
+}
+
+function preflightProofStatus(report = {}) {
+  const failures = [];
+  const checks = report?.checks && typeof report.checks === "object" && !Array.isArray(report.checks)
+    ? report.checks
+    : {};
+  const backupPath = String(firstMeaningful(checks.backup_path, report.backup_path) || "").trim();
+  const backupFileExists = firstMeaningful(checks.backup_file_exists, report.backup_file_exists, report.backup_exists, report.backup?.exists);
+  const backupSizeBytes = preflightNumber(checks.backup_size_bytes, report.backup_size_bytes, report.backup_bytes, report.backup?.size_bytes);
+  const productionCommit = String(firstMeaningful(checks.production_checkout_commit, report.production_checkout_commit, report.checkout_commit, report.git?.commit) || "").trim();
+  const expectedCommit = String(firstMeaningful(checks.expected_commit, report.expected_commit) || "").trim();
+  const longRunningQueries = preflightNumber(checks.long_running_postgres_queries, report.long_running_postgres_queries, report.postgres?.long_running_queries);
+  const meiliPostgresDelta = preflightNumber(checks.meili_postgres_delta, report.meili_postgres_delta, report.meili?.postgres_delta);
+  const heavyJobActive = firstMeaningful(checks.heavy_job_active, report.heavy_job_active, report.heavy_job?.active);
+
+  if (report.ok !== true || report.unsafe === true) failures.push("preflight_report_not_safe");
+  if (Array.isArray(report.failures) && report.failures.length > 0) failures.push("preflight_report_failures_present");
+  if (!productionCommit) failures.push("preflight_production_commit_missing");
+  if (!expectedCommit) failures.push("preflight_expected_commit_missing");
+  if (productionCommit && expectedCommit && !preflightCommitMatches(productionCommit, expectedCommit)) failures.push("preflight_production_commit_mismatch");
+  if (longRunningQueries === null) failures.push("preflight_long_running_queries_missing");
+  else if (longRunningQueries > 0) failures.push("preflight_long_running_queries_active");
+  if (!backupPath) failures.push("preflight_backup_path_missing");
+  else if (!/[/\\]backups[/\\]/.test(backupPath)) failures.push("preflight_backup_path_not_under_backups");
+  if (backupFileExists !== true) failures.push("preflight_backup_file_missing");
+  if (backupSizeBytes === null || backupSizeBytes <= 0) failures.push("preflight_backup_file_empty");
+  if (!preflightWorkerSafe(checks, report)) failures.push("preflight_worker_not_isolated");
+  if (!preflightAutodeploySafe(checks, report)) failures.push("preflight_autodeploy_timer_unsafe");
+  if (heavyJobActive !== false) failures.push("preflight_heavy_job_lock_not_clear");
+  if (meiliPostgresDelta !== 0) failures.push("preflight_meili_postgres_delta_nonzero");
+
+  return {
+    ok: failures.length === 0,
+    failures: Array.from(new Set(failures)),
+    production_checkout_commit: productionCommit,
+    expected_commit: expectedCommit,
+    backup_path: backupPath,
+    backup_size_bytes: backupSizeBytes,
+    long_running_postgres_queries: longRunningQueries,
+    meili_postgres_delta: meiliPostgresDelta
+  };
+}
+
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object || {}, key);
 }
@@ -306,6 +384,7 @@ function evaluateReleaseCheck(input = {}) {
   let plannedBatchProof = null;
   let predictedGuardResult = null;
   let rollbackCommand = null;
+  let preflightProof = null;
 
   if (!before) addFailure(failures, noReleaseAllowed, "missing_before_data_quality", "before data-quality report is required");
   if (!after) addFailure(failures, noReleaseAllowed, "missing_after_data_quality", "after data-quality report is required");
@@ -535,8 +614,17 @@ function evaluateReleaseCheck(input = {}) {
     addFailure(failures, noReleaseAllowed, "tests_not_passed", "required tests did not pass or were not documented");
   }
 
-  if (preflightReport && !preflightPassed(preflightReport)) {
-    addFailure(failures, noReleaseAllowed, "preflight_unsafe_or_undocumented", "worker/autodeploy/heavy-job state is unsafe or undocumented");
+  if (preflightReport) {
+    preflightProof = preflightProofStatus(preflightReport);
+    if (!preflightPassed(preflightReport) || !preflightProof.ok) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "preflight_unsafe_or_undocumented",
+        "source recovery preflight must prove safe worker/autodeploy/heavy-job/search/backup state",
+        { reasons: preflightProof.failures }
+      );
+    }
   }
 
   if (guardReport && guardReport.no_release_allowed?.length) {
@@ -560,6 +648,9 @@ function evaluateReleaseCheck(input = {}) {
       planned_tenant_batch_proof: plannedBatchProof || null,
       predicted_guard_result: predictedGuardResult || null,
       rollback_command_present: hasMeaningfulValue(rollbackCommand),
+      preflight_backup_size_bytes: preflightProof?.backup_size_bytes ?? null,
+      preflight_long_running_postgres_queries: preflightProof?.long_running_postgres_queries ?? null,
+      preflight_meili_postgres_delta: preflightProof?.meili_postgres_delta ?? null,
       missing_any_geo_pct_before: beforeMissingAnyGeoPct,
       missing_any_geo_pct_after: afterMissingAnyGeoPct,
       weak_unknown_remote_pct_before: beforeWeakUnknownRemotePct,
@@ -639,7 +730,25 @@ function selfTestPayload() {
     meiliCheck: { count_delta: 0 },
     guardReport,
     testsReport: { ok: true, commands: { backend: "passed", parsers: "passed", api: "passed" } },
-    preflightReport: { ok: true, unsafe: false }
+    preflightReport: {
+      ok: true,
+      unsafe: false,
+      checks: {
+        production_checkout_commit: "abcdef1234567890",
+        expected_commit: "abcdef1234567890",
+        worker_state: "stopped",
+        worker_isolated: false,
+        autodeploy_timer_state: "inactive",
+        autodeploy_recovery_safe: false,
+        heavy_job_active: false,
+        long_running_postgres_queries: 0,
+        meili_postgres_delta: 0,
+        backup_path: "/root/OpenJobSlots/backups/postgres-openjobslots-pre-lever-recovery-PENDING.dump",
+        backup_file_exists: true,
+        backup_size_bytes: 1024
+      },
+      failures: []
+    }
   };
 }
 

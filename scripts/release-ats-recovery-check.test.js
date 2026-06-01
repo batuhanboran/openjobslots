@@ -29,6 +29,9 @@ test("release check passes for clean recovery reports", () => {
   const result = evaluateReleaseCheck(basePayload());
   assert.equal(result.ok, true);
   assert.equal(result.release_allowed, true);
+  assert.equal(result.metrics.preflight_backup_size_bytes, 1024);
+  assert.equal(result.metrics.preflight_long_running_postgres_queries, 0);
+  assert.equal(result.metrics.preflight_meili_postgres_delta, 0);
 });
 
 test("release check fails without inventory scan proof", () => {
@@ -231,6 +234,59 @@ test("release check fails when preflight is unsafe", () => {
   }));
   assert.equal(result.ok, false);
   assert.ok(result.failures.some((failure) => failure.code === "preflight_unsafe_or_undocumented"));
+});
+
+test("release check fails when preflight lacks backup file proof", () => {
+  const payload = selfTestPayload();
+  const result = evaluateReleaseCheck(basePayload({
+    preflightReport: {
+      ...payload.preflightReport,
+      checks: {
+        ...payload.preflightReport.checks,
+        backup_file_exists: false,
+        backup_size_bytes: null
+      }
+    }
+  }));
+  assert.equal(result.ok, false);
+  const failure = result.failures.find((item) => item.code === "preflight_unsafe_or_undocumented");
+  assert.ok(failure);
+  assert.ok(failure.reasons.includes("preflight_backup_file_missing"));
+  assert.ok(failure.reasons.includes("preflight_backup_file_empty"));
+});
+
+test("release check fails when preflight search state is undocumented", () => {
+  const payload = selfTestPayload();
+  const result = evaluateReleaseCheck(basePayload({
+    preflightReport: {
+      ...payload.preflightReport,
+      checks: {
+        ...payload.preflightReport.checks,
+        long_running_postgres_queries: null,
+        meili_postgres_delta: null
+      }
+    }
+  }));
+  assert.equal(result.ok, false);
+  const failure = result.failures.find((item) => item.code === "preflight_unsafe_or_undocumented");
+  assert.ok(failure.reasons.includes("preflight_long_running_queries_missing"));
+  assert.ok(failure.reasons.includes("preflight_meili_postgres_delta_nonzero"));
+});
+
+test("release check fails when preflight production commit mismatches expected commit", () => {
+  const payload = selfTestPayload();
+  const result = evaluateReleaseCheck(basePayload({
+    preflightReport: {
+      ...payload.preflightReport,
+      checks: {
+        ...payload.preflightReport.checks,
+        production_checkout_commit: "different-prod-sha"
+      }
+    }
+  }));
+  assert.equal(result.ok, false);
+  const failure = result.failures.find((item) => item.code === "preflight_unsafe_or_undocumented");
+  assert.ok(failure.reasons.includes("preflight_production_commit_mismatch"));
 });
 
 console.log("release ats recovery check tests passed");

@@ -29,7 +29,7 @@ Every configured ATS should have:
 - A bounded read-only inventory scan before any canary or apply.
 - A net-new estimate proving public-row upside without hiding or degrading existing public rows.
 - A canary/apply guard that requires explicit production flags, backup confirmation, worker isolation proof, a passing preflight report with non-empty backup-file proof, a readable source-matched `ats:plan-batches` report with a selected tenant plan and `predicted_guard_result=pass`, scopes operations to selected tenant targets only, requires `--max-updates=N` for apply writes, and records a rollback path.
-- A release report that records inventory proof, net-new clean public estimate, duplicate public candidates excluded from gain, candidate-pool proof, estimate confidence, the tenant batch plan, predicted guard result, audited rollback command, and bounded Meili outbox/upsert status.
+- A release report that records inventory proof, preflight proof with non-empty backup file and safe runtime/search state, net-new clean public estimate, duplicate public candidates excluded from gain, candidate-pool proof, estimate confidence, the tenant batch plan, predicted guard result, audited rollback command, and bounded Meili outbox/upsert status.
 - Post-apply Meili/Postgres count and facet parity proof before calling the recovery successful.
 
 ## Non-Goals
