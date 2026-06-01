@@ -30,7 +30,15 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("greenhouse").scripts.workbench, "npm.cmd run ats:workbench -- --source=greenhouse --json");
   assert.equal(byKey.get("greenhouse").scripts.dry_run, "npm.cmd run ats:source:dry-run -- --source=greenhouse --limit=10 --json");
   assert.ok(byKey.get("greenhouse").scripts.inventory_scan.includes("ats:inventory:scan"));
+  assert.ok(byKey.get("greenhouse").scripts.source_canary.includes("ats:source:canary"));
+  assert.ok(byKey.get("greenhouse").scripts.source_canary.includes("--planned-batch=<planned_batch_report>"));
+  assert.ok(byKey.get("greenhouse").scripts.source_canary.includes("--preflight-max-age-minutes=60"));
+  assert.ok(byKey.get("greenhouse").scripts.source_apply.includes("--max-updates=<safe_max_updates>"));
   assert.ok(byKey.get("greenhouse").scripts.recovery_guard.includes("ats:recovery:guard"));
+  assert.ok(byKey.get("greenhouse").scripts.recovery_guard.includes("--output=<guard_report>"));
+  assert.ok(byKey.get("greenhouse").scripts.release_check.includes("--before=<before_data_quality>"));
+  assert.ok(byKey.get("greenhouse").scripts.release_check.includes("--tests-report=<tests_report>"));
+  assert.ok(byKey.get("greenhouse").scripts.release_check.includes("--preflight-report=<fresh_preflight_report>"));
   assert.ok(byKey.get("greenhouse").scripts.parity_check.includes("search:reindex:check"));
 
   assert.equal(byKey.get("icims").family, "embedded-or-semi-structured");
@@ -53,6 +61,7 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("paycomonline").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").registry_status, "research-only");
   assert.equal(byKey.get("paycomonline").recovery_readiness.status, "research-only");
+  assert.ok(byKey.get("paycomonline").scripts.source_canary.includes("not available"));
   assert.ok(payload.summary.read_only_recovery_ready_count >= 60);
   assert.deepEqual(
     payload.summary.recovery_readiness_blockers

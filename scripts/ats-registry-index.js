@@ -162,6 +162,18 @@ function sourceModuleStatus(atsKey) {
   return getRegistrySourceModule(atsKey)?.status || "";
 }
 
+function sourceOperationSafetyArgs() {
+  return [
+    "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
+    "--planned-batch=<planned_batch_report>",
+    "--preflight-report=<fresh_preflight_report>",
+    "--preflight-max-age-minutes=60",
+    "--predicted-guard-result=pass"
+  ].join(" ");
+}
+
 function registryStatusFor(source) {
   const atsKey = String(source.ats_key || "").trim().toLowerCase();
   if (UNSUPPORTED_ATS.has(atsKey) || source.current_status === "unsupported") return "unsupported";
@@ -187,6 +199,8 @@ function scriptsForTarget(atsKey, family, future = false) {
       inventory_scan: "not available until adapter and source target exist",
       estimate_net_new: "not available until adapter and source target exist",
       plan_batches: "not available until adapter and source target exist",
+      source_canary: "not available until adapter and source target exist",
+      source_apply: "not available until adapter and source target exist and canary/release proof passes",
       recovery_preflight: "not available until adapter and source target exist",
       recovery_guard: "not available until adapter and source target exist",
       release_check: "not available until recovery guard reports exist",
@@ -201,9 +215,11 @@ function scriptsForTarget(atsKey, family, future = false) {
     inventory_scan: `npm.cmd run ats:inventory:scan -- --source=${atsKey} --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>`,
     estimate_net_new: `npm.cmd run ats:estimate-net-new -- --source=${atsKey} --limit=<safe_limit> --company-limit=<safe_company_limit> --json`,
     plan_batches: `npm.cmd run ats:plan-batches -- --source=${atsKey} --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>`,
-    recovery_preflight: "npm.cmd run ats:recovery:preflight -- --json --system-report=<system_report> --expected-commit=<sha> --backup-path=<backup>",
-    recovery_guard: "npm.cmd run ats:recovery:guard -- --json --before=<before> --after=<after> --source-report=<report> --meili-check=<meili_check> --ingestion-status=<ingestion_status> --service-stats=<service_stats>",
-    release_check: "npm.cmd run release:ats-recovery:check -- --json --guard-report=<guard> --source-report=<report> --meili-check=<meili_check> --preflight-report=<preflight>",
+    source_canary: `npm.cmd run ats:source:canary -- --source=${atsKey} --limit=<safe_limit> ${sourceOperationSafetyArgs()} --json --output=<source_report>`,
+    source_apply: `npm.cmd run ats:source:apply -- --source=${atsKey} --limit=<safe_limit> --max-updates=<safe_max_updates> ${sourceOperationSafetyArgs()} --json --output=<source_report>`,
+    recovery_preflight: "npm.cmd run ats:recovery:preflight -- --json --system-report=<system_report> --expected-commit=<sha> --backup-path=<backup> --output=<fresh_preflight_report>",
+    recovery_guard: "npm.cmd run ats:recovery:guard -- --json --before=<before_data_quality> --after=<after_data_quality> --source-report=<source_report> --meili-check=<meili_check> --ingestion-status=<ingestion_status> --service-stats=<service_stats> --output=<guard_report>",
+    release_check: "npm.cmd run release:ats-recovery:check -- --json --before=<before_data_quality> --after=<after_data_quality> --source-report=<source_report> --meili-check=<meili_check> --guard-report=<guard_report> --tests-report=<tests_report> --preflight-report=<fresh_preflight_report> --output=<release_report>",
     parity_check: "npm.cmd run search:reindex:check -- --json --sample-limit=25",
     registry_check: "node server/ingestion/sourceRegistry.test.js"
   };
