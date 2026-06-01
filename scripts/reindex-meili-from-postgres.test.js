@@ -57,6 +57,7 @@ test("reindex check mode is explicit and non-mutating", () => {
   assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).dryRun, true);
   assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).json, true);
   assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).output, "reports/meili.json");
+  assert.equal(parseReindexArgs(["--facet-drift-max-inspected=250"], {}).facetDriftMaxInspectedHits, 250);
   assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).apply, true);
   assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).confirmProduction, true);
   assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).repairExtraDocuments, true);
@@ -795,6 +796,7 @@ test("remote facet inspection samples Meili-overrepresented facet documents with
     const body = JSON.parse(options.body || "{}");
     assert.equal(options.method, "POST");
     assert.match(body.filter, /remote_type = "unknown"/);
+    assert.deepEqual(body.sort, ["last_seen_epoch:desc"]);
     if (url.endsWith("/indexes/postings/search")) {
       return createResponse(200, {
         hits: [
@@ -820,9 +822,67 @@ test("remote facet inspection samples Meili-overrepresented facet documents with
     );
 
     assert.equal(result.sampled, 1);
+    assert.equal(result.inspected_hits, 1);
+    assert.equal(result.inspection_truncated, false);
     assert.deepEqual(result.inspected_meili_remote_types, ["unknown"]);
+    assert.deepEqual(result.sort, ["last_seen_epoch:desc"]);
     assert.equal(result.samples[0].meili_remote_type, "unknown");
     assert.equal(result.samples[0].postgres_remote_type, "remote");
+    assert.ok(pool.queries.every((query) => !/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i.test(query.sql)));
+  } finally {
+    mock.restore();
+  }
+});
+
+test("remote facet inspection caps sorted read-only scans", async () => {
+  const pool = {
+    queries: [],
+    async query(sql, params = []) {
+      this.queries.push({ sql: String(sql), params });
+      if (/canonical_url = ANY/i.test(sql)) {
+        return {
+          rows: (params[0] || []).map((canonicalUrl) => ({
+            canonical_url: canonicalUrl,
+            remote_type: "unknown",
+            hidden: false
+          }))
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+  const mock = installFetchMock((url, options) => {
+    const body = JSON.parse(options.body || "{}");
+    assert.equal(options.method, "POST");
+    assert.deepEqual(body.sort, ["last_seen_epoch:desc"]);
+    assert.equal(body.limit, 100);
+    if (url.endsWith("/indexes/postings/search")) {
+      return createResponse(200, {
+        hits: Array.from({ length: 100 }, (_, index) => ({
+          canonical_url: `https://example.com/jobs/unknown-${index}`,
+          title: `Unknown ${index}`,
+          company: "Example Co",
+          remote_type: "unknown"
+        })),
+        estimatedTotalHits: 1000
+      });
+    }
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await inspectRemoteFacetMismatches(
+      pool,
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
+      "postings",
+      { unknown: { expected: 0, actual: 1000, delta: -1000 } },
+      { sampleLimit: 5, pageSize: 100, maxInspectedHits: 100 }
+    );
+
+    assert.equal(result.sampled, 0);
+    assert.equal(result.inspected_hits, 100);
+    assert.equal(result.max_inspected_hits, 100);
+    assert.equal(result.inspection_truncated, true);
+    assert.equal(mock.calls.length, 1);
     assert.ok(pool.queries.every((query) => !/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i.test(query.sql)));
   } finally {
     mock.restore();

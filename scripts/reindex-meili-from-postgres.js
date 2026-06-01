@@ -22,6 +22,7 @@ const DEFAULT_SAMPLE_QUERIES = Object.freeze([
   "engineer"
 ]);
 const PLACEHOLDER_TITLE_PATTERN = /^(untitled|unknown|n\/?a|not available|job opening|new job|open position|position)$/i;
+const DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS = 5000;
 
 function parseNumberOption(value, fallback, min, max) {
   const parsed = Number(value);
@@ -46,6 +47,12 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     output: String(env.OPENJOBSLOTS_REINDEX_OUTPUT || "").trim(),
     repairExtraDocuments: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPAIR_EXTRA_DOCUMENTS) ||
       parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_DELETE_EXTRA_DOCUMENTS),
+    facetDriftMaxInspectedHits: parseNumberOption(
+      env.OPENJOBSLOTS_REINDEX_FACET_DRIFT_MAX_INSPECTED_HITS || DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
+      DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
+      100,
+      50000
+    ),
     sampleLimit: parseNumberOption(env.OPENJOBSLOTS_REINDEX_SAMPLE_LIMIT || 25, 25, 0, 200),
     taskTimeoutMs: parseNumberOption(env.OPENJOBSLOTS_REINDEX_TASK_TIMEOUT_MS || 120000, 120000, 30000, 300000),
     tempIndexSuffix: String(env.OPENJOBSLOTS_REINDEX_TEMP_SUFFIX || "").trim(),
@@ -81,6 +88,14 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     }
     if (arg.startsWith("--sample-limit=")) {
       options.sampleLimit = parseNumberOption(arg.slice("--sample-limit=".length), options.sampleLimit, 0, 200);
+    }
+    if (arg.startsWith("--facet-drift-max-inspected=")) {
+      options.facetDriftMaxInspectedHits = parseNumberOption(
+        arg.slice("--facet-drift-max-inspected=".length),
+        options.facetDriftMaxInspectedHits,
+        100,
+        50000
+      );
     }
     if (arg.startsWith("--temp-index-suffix=")) {
       options.tempIndexSuffix = String(arg.slice("--temp-index-suffix=".length) || "").trim();
@@ -644,26 +659,55 @@ async function getPostgresRemoteTypesByCanonicalUrl(pool, canonicalUrls = []) {
 
 async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacetDeltas = {}, options = {}) {
   const sampleLimit = Math.max(0, Math.min(100, Number(options.sampleLimit ?? 20)));
-  if (!config?.enabled || !indexName || sampleLimit <= 0) return { sampled: 0, samples: [] };
+  const maxInspectedHits = parseNumberOption(
+    options.maxInspectedHits ?? DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
+    DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
+    100,
+    50000
+  );
+  if (!config?.enabled || !indexName || sampleLimit <= 0) {
+    return {
+      sampled: 0,
+      inspected_hits: 0,
+      max_inspected_hits: maxInspectedHits,
+      inspection_truncated: false,
+      samples: []
+    };
+  }
   const remoteTypes = remoteTypesForFacetInspection(remoteFacetDeltas);
-  if (remoteTypes.length === 0) return { sampled: 0, samples: [] };
+  if (remoteTypes.length === 0) {
+    return {
+      sampled: 0,
+      inspected_hits: 0,
+      max_inspected_hits: maxInspectedHits,
+      inspection_truncated: false,
+      samples: []
+    };
+  }
   const samples = [];
+  let inspectedHits = 0;
   const perRequestLimit = Math.max(1, Math.min(100, Number(options.pageSize || 50)));
+  const sort = Array.isArray(options.sort) && options.sort.length > 0
+    ? options.sort.map((item) => String(item || "").trim()).filter(Boolean)
+    : ["last_seen_epoch:desc"];
   for (const remoteType of remoteTypes) {
     let offset = 0;
-    while (samples.length < sampleLimit) {
+    while (samples.length < sampleLimit && inspectedHits < maxInspectedHits) {
+      const requestBody = {
+        q: "",
+        filter: `hidden = false AND remote_type = ${quoteMeiliFilterValue(remoteType)}`,
+        attributesToRetrieve: ["canonical_url", "title", "company", "remote_type"],
+        limit: perRequestLimit,
+        offset
+      };
+      if (sort.length > 0) requestBody.sort = sort;
       const result = await meiliRequest(config, `/indexes/${encodeIndex(indexName)}/search`, {
         method: "POST",
-        body: JSON.stringify({
-          q: "",
-          filter: `hidden = false AND remote_type = ${quoteMeiliFilterValue(remoteType)}`,
-          attributesToRetrieve: ["canonical_url", "title", "company", "remote_type"],
-          limit: perRequestLimit,
-          offset
-        })
+        body: JSON.stringify(requestBody)
       });
       const hits = Array.isArray(result?.hits) ? result.hits : [];
       if (hits.length === 0) break;
+      inspectedHits += hits.length;
       const postgresRows = await getPostgresRemoteTypesByCanonicalUrl(
         pool,
         hits.map((hit) => hit?.canonical_url)
@@ -693,7 +737,11 @@ async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacet
   }
   return {
     sampled: samples.length,
+    inspected_hits: inspectedHits,
+    max_inspected_hits: maxInspectedHits,
+    inspection_truncated: samples.length < sampleLimit && inspectedHits >= maxInspectedHits,
     inspected_meili_remote_types: remoteTypes,
+    sort,
     samples
   };
 }
@@ -810,7 +858,8 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
     : { extra_meili_documents: [], missing_meili_documents: [] };
   const remoteFacetMismatchInspection = config.enabled && index?.uid && remoteFacetComparison.ok === false
     ? await inspectRemoteFacetMismatches(pool, config, indexName, remoteFacetComparison.deltas, {
-      sampleLimit: options.facetDriftSampleLimit ?? options.sampleLimit ?? 20
+      sampleLimit: options.facetDriftSampleLimit ?? options.sampleLimit ?? 20,
+      maxInspectedHits: options.facetDriftMaxInspectedHits
     })
     : { sampled: 0, samples: [] };
   const sampleMismatchSummary = summarizeSampleMismatches(samples.sample_mismatches);
