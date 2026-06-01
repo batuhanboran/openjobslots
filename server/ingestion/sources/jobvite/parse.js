@@ -198,7 +198,7 @@ function extractJobviteDetailFields(detailHtml) {
 }
 
 function jobviteListLocationLooksAmbiguous(location) {
-  return /^\s*(?:\d+\s+locations?|multiple locations?|various locations?|all locations?)\s*$/i.test(cleanJobviteText(location));
+  return /^\s*(?:\d+\s+locations?|multiple(?:\s+locations?)?|various(?:\s+locations?)?|all(?:\s+locations?))(?:,\s*[A-Za-z][A-Za-z .'-]+)?\s*$/i.test(cleanJobviteText(location));
 }
 
 function extractJobviteWorkModePrefix(location) {

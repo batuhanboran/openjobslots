@@ -50,6 +50,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `timelycare`: accepted rows improved from `20/30` to `29/30`. The `wsps` sample stayed `0/6` accepted because its structured fields remain blank and only title/body-region prose is available.
 - Verification covered HRMDirect syntax checks, focused html/public source tests, and live parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Jobvite Multiple-Country Label - June 1, 2026
+
+- Fresh read-only production evidence had a small Jobvite residual on `saama`: `Multiple, United States` list labels were being carried into public location text despite detail JSON-LD country evidence.
+- Jobvite now treats generic multi-location labels with a country suffix as ambiguous list labels, keeps them out of city/location fields, and preserves source-backed country-only geo from detail JSON-LD.
+- Live read-only proof on `saama`: accepted rows improved from `8/10` to `10/10`; the two fixed rows now publish `United States` with blank city from JSON-LD country evidence.
+- Verification covered Jobvite syntax checks, focused html/public source tests, and live parser proof. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplyToJob Country-Scope And Placeholder Hardening - June 1, 2026
 
 - Fresh read-only production evidence kept ApplyToJob as a large remaining surface: `51,370` visible rows, `9,122` missing-any-normalized-geo rows, `1,438` weak/unknown remote rows, `7,173` parser errors, and `3,571` rejections. Recent ApplyToJob parser-validation pressure was dominated by `no_geo_no_remote`, `ambiguous_location`, and combined `ambiguous_location, no_geo_no_remote` rows.

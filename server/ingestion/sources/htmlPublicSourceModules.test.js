@@ -776,6 +776,30 @@ test("jobvite source module does not publish numeric multi-location labels as ge
   assert.equal(source.validatePublic(byId.get("oPORTUGAL3")).status, "accepted");
 });
 
+test("jobvite source module keeps detail country when list location is multiple-country label", () => {
+  const source = getSourceModule("jobvite");
+  const company = readJson(path.join(__dirname, "jobvite", "fixtures", "company.json"));
+  const payload = {
+    html: "<h3>Operations</h3><table class=\"jv-job-list\"><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oCOUNTRY4\">Country Role</a></td><td class=\"jv-job-list-location\">Multiple, United States</td></tr></table>",
+    __detailHtmlByUrl: {
+      "https://jobs.jobvite.com/fixture/job/oCOUNTRY4": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Country Role\",\"datePosted\":\"2026-05-06\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressCountry\":\"United States\"}}}</script>"
+    },
+    __sourceConfig: {
+      baseOrigin: "https://jobs.jobvite.com",
+      companySlugLower: "fixture"
+    }
+  };
+
+  const [normalized] = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+
+  assert.equal(normalized.location_text, "United States");
+  assert.equal(normalized.city || "", "");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.source_evidence.location_source, "detail_json_ld");
+  assert.equal(normalized.source_evidence.location_rule_name, "jobvite_json_ld_location");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("join source module fetches Next.js company page with source-local host guard", async () => {
   const source = getSourceModule("join");
   const company = readJson(path.join(__dirname, "join", "fixtures", "company.json"));
