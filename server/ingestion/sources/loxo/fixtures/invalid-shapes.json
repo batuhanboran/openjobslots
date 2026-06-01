@@ -4,8 +4,8 @@
       "name": "empty payload",
       "posting": {
         "company_name": "Fixture Loxo",
-        "position_name": "",
-        "job_posting_url": "",
+        "position_name": "Invalid Loxo Role",
+        "job_posting_url": "https://app.loxo.co/jobs/missing-source-id",
         "location": ""
       },
       "expected": "rejected",

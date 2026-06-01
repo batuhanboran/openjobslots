@@ -31,6 +31,7 @@ const HTML_PUBLIC_SOURCES = Object.freeze([
   "hibob",
   "hrmdirect",
   "breezy",
+  "loxo",
   "applytojob"
 ]);
 

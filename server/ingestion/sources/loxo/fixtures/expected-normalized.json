@@ -5,7 +5,9 @@
     "position_name": "Senior Backend Engineer",
     "job_posting_url": "https://app.loxo.co/jobs/1001",
     "posting_date": "2026-05-01",
-    "location": "Remote"
+    "location": "Remote",
+    "remote_type": "remote",
+    "parser_confidence": 0.55
   },
   {
     "source_job_id": "1002",
@@ -13,6 +15,10 @@
     "position_name": "Product Analyst",
     "job_posting_url": "https://app.loxo.co/jobs/1002",
     "posting_date": null,
-    "location": "Istanbul, Turkey"
+    "location": "Istanbul, Turkey",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "parser_confidence": 0.55
   }
 ]

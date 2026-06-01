@@ -19,6 +19,10 @@ const SERVER_INDEX_KNOWN_ATS_DEBT_PATTERNS = Object.freeze([
 const SOURCE_MODULE_FORBIDDEN_IMPORT_PATTERNS = Object.freeze([
   { name: "server_index_import", regex: /require\(["'](?:\.\.\/){2,3}index["']\)/ }
 ]);
+const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
+  { name: "loxo_parser_import", regex: /require\(["']\.\/loxo\/parse["']\)/ },
+  { name: "loxo_parser_spec", regex: /loxo:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseLoxoPostingsFromHtml/ }
+]);
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -95,6 +99,12 @@ function main() {
   if (/require\(["']\.\.\/\.\.\/index["']\)/.test(sourceCommon)) {
     warnings.push("known debt: server/ingestion/sources/common.js still imports ../../index for legacy collector fallback");
   }
+  const sourceLocalOwnershipHits = SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS
+    .filter((pattern) => pattern.regex.test(sourceCommon))
+    .map((pattern) => ({ file: "server/ingestion/sources/common.js", pattern: pattern.name }));
+  if (sourceLocalOwnershipHits.length) {
+    failures.push(`source-local ATS parsers must stay out of common.js: ${JSON.stringify(sourceLocalOwnershipHits)}`);
+  }
   const sourceFiles = listTrackedFiles(["server/ingestion/sources"]);
   const sourceImportHits = scanFiles(sourceFiles, SOURCE_MODULE_FORBIDDEN_IMPORT_PATTERNS);
   if (sourceImportHits.length) {
@@ -106,6 +116,7 @@ function main() {
     server_index_lines: serverIndexLines,
     server_index_cap: SERVER_INDEX_CAP,
     server_index_ats_boundary_hits: serverIndexAtsHits,
+    source_local_ownership_hits: sourceLocalOwnershipHits,
     source_module_boundary_hits: sourceImportHits,
     failures,
     warnings
