@@ -36,6 +36,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `Vertical-Recruitment`: accepted rows improved from `507/538` to `510/538`, fixing labeled `South Manchester`, `Any UK office`, and `Remote | Type: Full-time` rows. `Top-Tier-Talent-Group` stayed `66/68` accepted because its remaining gaps lacked strict detail location labels.
 - Verification covered Loxo syntax checks, focused tests, html/public source tests, live parser probes, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `npm.cmd run ats:workbench -- --source=loxo --json --no-write`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Lever Duplicate Team/Location City Evidence - June 1, 2026
+
+- Fresh read-only production evidence had Lever at `14` recent `no_geo_no_remote` parser-validation rows. The main live target was `pp-la`, where `categories.location` and `categories.team` both carried the same clinic/city label.
+- Lever now preserves source `categories.location` when it matches a source-local observed city/neighborhood country hint, even if `categories.team` duplicates it. Employment categories such as `Full-time` are still filtered, and no body/title/tenant inference was added.
+- Live read-only proof on `pp-la`: accepted rows improved from `13/24` to `24/24`, covering `Van Nuys`, `Burbank`, `Compton`, `East Los Angeles`, `Long Beach Central`, `Koreatown`, `Santa Monica`, `Huntington Park`, and `Lakewood` with United States country evidence from `[].categories.location`.
+- Verification covered focused Lever tests, live parser proof, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary -- --json`, `npm.cmd run ats:registry-index -- --json --no-write`, and `npm.cmd run ats:workbench -- --source=lever --json --no-write`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplyToJob Country-Scope And Placeholder Hardening - June 1, 2026
 
 - Fresh read-only production evidence kept ApplyToJob as a large remaining surface: `51,370` visible rows, `9,122` missing-any-normalized-geo rows, `1,438` weak/unknown remote rows, `7,173` parser errors, and `3,571` rejections. Recent ApplyToJob parser-validation pressure was dominated by `no_geo_no_remote`, `ambiguous_location`, and combined `ambiguous_location, no_geo_no_remote` rows.

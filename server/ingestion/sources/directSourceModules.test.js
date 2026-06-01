@@ -812,6 +812,42 @@ test("lever source module filters employment categories that are misfiled as loc
   assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
 });
 
+test("lever source module keeps source location when team duplicates a city label", () => {
+  const source = getSourceModule("lever");
+  const company = {
+    company_name: "Planned Parenthood Los Angeles",
+    company_url: "https://jobs.lever.co/pp-la",
+    ATS_name: "Lever"
+  };
+  const parsed = source.parse([
+    {
+      id: "pp-la-van-nuys",
+      text: "Health Center Supervisor - Van Nuys, CA",
+      createdAt: 1778043600000,
+      categories: {
+        commitment: "Full-Time Regular",
+        department: "Patient Services",
+        location: "Van Nuys",
+        team: "Van Nuys",
+        allLocations: ["Van Nuys"]
+      },
+      country: null,
+      workplaceType: "onsite",
+      hostedUrl: "https://jobs.lever.co/pp-la/pp-la-van-nuys"
+    }
+  ], company);
+
+  assert.equal(parsed[0].location, "Van Nuys");
+  assert.equal(parsed[0].country, "United States");
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.location_text, "Van Nuys");
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.city, "Van Nuys");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.source_evidence.country_rule_name, "lever_location_city_country_hint");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("ashby source module normalizes source-provided location shorthand without shared ATS logic", () => {
   const source = getSourceModule("ashby");
   const company = readJson(path.join(__dirname, "ashby", "fixtures", "company.json"));

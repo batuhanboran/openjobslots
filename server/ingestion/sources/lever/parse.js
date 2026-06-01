@@ -2,6 +2,20 @@
 
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
 
+const LEVER_CITY_COUNTRY_HINTS = Object.freeze({
+  burbank: "United States",
+  compton: "United States",
+  "downtown los angeles": "United States",
+  "east los angeles": "United States",
+  "huntington park": "United States",
+  koreatown: "United States",
+  lakewood: "United States",
+  "long beach central": "United States",
+  "los angeles": "United States",
+  "santa monica": "United States",
+  "van nuys": "United States"
+});
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -40,11 +54,16 @@ function isSameCategoryValue(left, right) {
 
 function isLeverNonLocationCategory(posting, value) {
   const categories = posting?.categories || {};
+  if (leverCityCountryHint(value)) return false;
   if (isLeverEmploymentCategory(value)) return true;
   if (isSameCategoryValue(value, categories.commitment)) return true;
   if (isSameCategoryValue(value, categories.team)) return true;
   if (isSameCategoryValue(value, categories.department)) return true;
   return false;
+}
+
+function leverCityCountryHint(value) {
+  return LEVER_CITY_COUNTRY_HINTS[clean(value).toLowerCase()] || "";
 }
 
 function extractLeverEmploymentType(posting) {
@@ -84,7 +103,13 @@ function extractLeverWorkplaceType(posting, location) {
   return null;
 }
 
-function buildLeverSourceEvidence(posting, location, workplaceType) {
+function extractLeverCountry(posting, location) {
+  return clean(posting?.country) || leverCityCountryHint(location) || null;
+}
+
+function buildLeverSourceEvidence(posting, location, workplaceType, country) {
+  const sourceCountry = clean(posting?.country);
+  const countryFromLocationHint = !sourceCountry && country && leverCityCountryHint(location);
   return {
     title_source: "list_api",
     title_path: "[].text",
@@ -101,6 +126,9 @@ function buildLeverSourceEvidence(posting, location, workplaceType) {
     location_source: location ? "list_api" : "",
     location_path: location ? "[].categories.allLocations|[].categories.location" : "",
     location_rule_name: location ? "lever_location_categories" : "lever_filtered_non_location_category",
+    country_source: country ? "list_api" : "",
+    country_path: sourceCountry ? "[].country" : countryFromLocationHint ? "[].categories.location" : "",
+    country_rule_name: sourceCountry ? "lever_country" : countryFromLocationHint ? "lever_location_city_country_hint" : "",
     remote_source: workplaceType ? "list_api" : "",
     remote_path: workplaceType ? "[].workplaceType" : "",
     remote_rule_name: workplaceType ? "lever_workplace_type" : "",
@@ -128,6 +156,7 @@ function parseLeverPostingsFromApi(companyNameForPostings, config, response) {
       Number.isFinite(createdAt) && createdAt > 0 ? new Date(createdAt).toISOString() : null;
     const location = extractLeverLocationName(posting);
     const workplaceType = extractLeverWorkplaceType(posting, location);
+    const country = extractLeverCountry(posting, location);
 
     collected.push({
       company_name: resolvedCompanyName,
@@ -138,13 +167,13 @@ function parseLeverPostingsFromApi(companyNameForPostings, config, response) {
       apply_url: clean(posting?.applyUrl) || jobUrl,
       posting_date: postingDate,
       location,
-      country: clean(posting?.country) || null,
+      country,
       workplaceType,
       department: clean(posting?.categories?.team || posting?.categories?.department) || null,
       employment_type: extractLeverEmploymentType(posting),
       description_html: clean(posting?.description || posting?.opening) || null,
       description_plain: clean(posting?.descriptionPlain || posting?.openingPlain) || null,
-      source_evidence: buildLeverSourceEvidence(posting, location, workplaceType)
+      source_evidence: buildLeverSourceEvidence(posting, location, workplaceType, country)
     });
   }
 
