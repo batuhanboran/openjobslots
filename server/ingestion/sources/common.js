@@ -1,6 +1,5 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
-const { parseSapHrCloudPostingsFromApi } = require("./saphrcloud/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
@@ -532,7 +531,7 @@ const SOURCE_SPECS = Object.freeze({
   saphrcloud: {
     sourceFamily: "enterprise_api",
     confidence: 0.55,
-    parser: parseSapHrCloudPostingsFromApi,
+    parser: () => [],
     officialDocs: "observed SAP SuccessFactors Recruiting Marketing public search payload",
     discover(company) {
       const parsed = asUrl(company.url_string);
