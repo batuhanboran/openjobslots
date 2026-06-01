@@ -1,0 +1,16 @@
+{
+  "ats_key": "bamboohr",
+  "company_name": "Fixture BambooHR Empty Board",
+  "board_url": "https://rebuy.bamboohr.com/careers",
+  "api_url": "https://rebuy.bamboohr.com/careers/list",
+  "empty_payload": {
+    "meta": {
+      "totalCount": 0
+    },
+    "result": []
+  },
+  "expected": {
+    "company_subdomain": "rebuy",
+    "parsed_count": 0
+  }
+}

@@ -1260,6 +1260,41 @@ test("bamboohr source module maps observed source-local admin and city geo hints
   assert.equal(source.validatePublic(makati).status, "accepted");
 });
 
+test("bamboohr source module treats empty boards and malformed source rows conservatively", () => {
+  const source = getSourceModule("bamboohr");
+  const sourceDir = path.join(__dirname, "bamboohr", "fixtures");
+  const route = readJson(path.join(sourceDir, "route-detection.json"));
+  const malformed = readJson(path.join(sourceDir, "malformed-list-shapes.json"));
+  const missingGeo = readJson(path.join(sourceDir, "missing-geo-list.json"));
+  const company = {
+    company_name: route.company_name,
+    url_string: route.board_url,
+    ATS_name: "bamboohr"
+  };
+
+  const discovered = source.discover(company);
+  assert.equal(discovered.config.companySubdomainLower, route.expected.company_subdomain);
+  assert.equal(discovered.list_url, route.api_url);
+  assert.equal(source.parse(route.empty_payload, company).length, route.expected.parsed_count);
+  assert.deepEqual(source.payloadShapePolicy.empty_job_list_stems, ["result"]);
+
+  for (const item of malformed.cases) {
+    assert.equal(
+      source.parse(item.payload, company).length,
+      item.expected_parsed_count,
+      `BambooHR ${item.name} should not produce parser rows`
+    );
+  }
+
+  const parsed = source.parse(missingGeo.payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, missingGeo.expected.source_job_id);
+  const gate = source.validatePublic(normalized);
+  assert.equal(gate.status, missingGeo.expected.public_gate_status);
+  assert.ok(gate.reason_codes.includes(missingGeo.expected.reason_code));
+});
+
 function zohoFixtureContext() {
   return {
     source: getSourceModule("zoho"),

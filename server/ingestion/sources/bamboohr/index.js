@@ -8,6 +8,7 @@ const baseModule = createSourceModule("bamboohr");
 const discover = createDiscover(baseModule.parserVersion);
 const fetchList = createFetchList(discover);
 const payloadShapePolicy = Object.freeze({
+  empty_job_list_stems: Object.freeze(["result"]),
   ignored_stems: Object.freeze([
     "result[].location.city",
     "result[].location.state",

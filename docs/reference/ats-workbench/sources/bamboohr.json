@@ -25,7 +25,10 @@
       "server/ingestion/sources/bamboohr/fixtures/company.json",
       "server/ingestion/sources/bamboohr/fixtures/expected-normalized.json",
       "server/ingestion/sources/bamboohr/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/bamboohr/fixtures/list.json"
+      "server/ingestion/sources/bamboohr/fixtures/list.json",
+      "server/ingestion/sources/bamboohr/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/bamboohr/fixtures/missing-geo-list.json",
+      "server/ingestion/sources/bamboohr/fixtures/route-detection.json"
     ],
     "present": [
       "server/ingestion/fixtures/bamboohr-direct.json",
@@ -34,7 +37,10 @@
       "server/ingestion/sources/bamboohr/fixtures/company.json",
       "server/ingestion/sources/bamboohr/fixtures/expected-normalized.json",
       "server/ingestion/sources/bamboohr/fixtures/invalid-shapes.json",
-      "server/ingestion/sources/bamboohr/fixtures/list.json"
+      "server/ingestion/sources/bamboohr/fixtures/list.json",
+      "server/ingestion/sources/bamboohr/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/bamboohr/fixtures/missing-geo-list.json",
+      "server/ingestion/sources/bamboohr/fixtures/route-detection.json"
     ],
     "missing": []
   },
@@ -55,7 +61,11 @@
   "public_enabled": true,
   "quarantine_reason": "",
   "failure_log": {
-    "known_failure_modes": [],
+    "known_failure_modes": [
+      "empty result payloads with totalCount 0 are valid no-job boards, not parser drift",
+      "raw jobs without a source title are skipped instead of inventing placeholder titles",
+      "rows without list geo or explicit remote evidence stay quarantined"
+    ],
     "parser_attention_count_24h": 0,
     "rejected_count": 0,
     "quarantined_count": 0,
@@ -87,6 +97,6 @@
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
+  "next_action": "run bounded inventory/net-new canary planning after deploy; keep empty-board and malformed-row handling source-local",
   "certification_blockers": "high missing normalized geo"
 }

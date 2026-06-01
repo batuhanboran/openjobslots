@@ -42,10 +42,5 @@
       }
     ]
   },
-  "expected_rejections": [
-    {
-      "source_job_id": "bad-title",
-      "reason": "placeholder position_name"
-    }
-  ]
+  "expected_rejections": []
 }

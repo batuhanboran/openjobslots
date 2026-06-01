@@ -1,0 +1,63 @@
+{
+  "ats_key": "bamboohr",
+  "description": "Malformed or unsupported BambooHR source payloads must not produce public rows.",
+  "cases": [
+    {
+      "name": "missing result array",
+      "payload": {
+        "meta": {
+          "totalCount": 1
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "non-array result",
+      "payload": {
+        "meta": {
+          "totalCount": 1
+        },
+        "result": {
+          "id": "bhr-non-array",
+          "jobOpeningName": "Unsupported Shape"
+        }
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing source id and url",
+      "payload": {
+        "result": [
+          {
+            "jobOpeningName": "Missing Identity",
+            "location": {
+              "city": "Memphis",
+              "state": "Tennessee",
+              "country": "United States"
+            },
+            "locationType": "0"
+          }
+        ]
+      },
+      "expected_parsed_count": 0
+    },
+    {
+      "name": "missing title",
+      "payload": {
+        "result": [
+          {
+            "id": "bhr-missing-title",
+            "url": "https://fixtureco.bamboohr.com/careers/bhr-missing-title",
+            "location": {
+              "city": "Memphis",
+              "state": "Tennessee",
+              "country": "United States"
+            },
+            "locationType": "0"
+          }
+        ]
+      },
+      "expected_parsed_count": 0
+    }
+  ]
+}

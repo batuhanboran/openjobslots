@@ -1,0 +1,21 @@
+{
+  "ats_key": "bamboohr",
+  "description": "BambooHR rows without list geo or explicit remote evidence must stay out of public accepted rows.",
+  "payload": {
+    "result": [
+      {
+        "id": "bhr-no-geo",
+        "jobOpeningName": "Customer Support Specialist",
+        "url": "https://fixtureco.bamboohr.com/careers/bhr-no-geo",
+        "location": {},
+        "atsLocation": {},
+        "locationType": ""
+      }
+    ]
+  },
+  "expected": {
+    "source_job_id": "bhr-no-geo",
+    "public_gate_status": "quarantined",
+    "reason_code": "no_geo_no_remote"
+  }
+}

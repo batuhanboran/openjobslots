@@ -391,6 +391,8 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
         ? `${config.boardUrl}/${encodeURIComponent(postingId)}`
         : "";
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
+    const title = clean(item?.jobOpeningName || item?.title || item?.jobTitle);
+    if (!title) continue;
 
     const locationObject = item?.location && typeof item.location === "object" ? item.location : {};
     const atsLocationObject = item?.atsLocation && typeof item.atsLocation === "object" ? item.atsLocation : {};
@@ -481,7 +483,7 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
       company_name: companyNameForPostings,
       source_job_id: postingId || extractSourceIdFromPostingUrl(jobUrl, "bamboohr"),
       id: postingId,
-      position_name: clean(item?.jobOpeningName || item?.title) || "Untitled Position",
+      position_name: title,
       job_posting_url: jobUrl,
       posting_date: postingDate,
       location,
