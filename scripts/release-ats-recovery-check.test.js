@@ -31,6 +31,86 @@ test("release check passes for clean recovery reports", () => {
   assert.equal(result.release_allowed, true);
 });
 
+test("release check fails without inventory scan proof", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { inventory_scan_report: undefined }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "missing_or_failed_inventory_scan_report"));
+});
+
+test("release check fails when net-new estimate is below accepted gain", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { net_new_clean_public_estimate: 9 }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "net_new_clean_public_estimate_below_gain"));
+});
+
+test("release check fails without duplicate candidate accounting", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { duplicate_existing_public_candidates: undefined }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "duplicate_existing_public_candidates_missing"));
+});
+
+test("release check accepts explicit empty duplicate candidate list", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { duplicate_existing_public_candidates: [] }
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(result.metrics.duplicate_existing_public_candidates, 0);
+});
+
+test("release check fails when candidate pool is unproven", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: {
+      inventory_scan_report: {
+        path: "reports/lever-inventory.json",
+        candidate_pool_exhausted: false,
+        estimate_confidence: "low"
+      },
+      candidate_pool_exhausted: false,
+      estimate_confidence: "low"
+    }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "candidate_pool_unproven"));
+});
+
+test("release check accepts bounded subset proof above the 5k recovery threshold", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: {
+      inventory_scan_report: {
+        path: "reports/lever-inventory.json",
+        candidate_pool_exhausted: false,
+        estimate_confidence: "medium"
+      },
+      net_new_clean_public_estimate: 5000,
+      candidate_pool_exhausted: false,
+      estimate_confidence: "medium"
+    }
+  }));
+  assert.equal(result.ok, true);
+});
+
+test("release check fails without bounded outbox/upsert status", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { bounded_outbox_or_upsert_status: undefined }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "bounded_outbox_or_upsert_status_missing"));
+});
+
+test("release check fails when bounded outbox/upsert status is not ok", () => {
+  const result = evaluateReleaseCheck(basePayload({
+    sourceReport: { bounded_outbox_or_upsert_status: "failed" }
+  }));
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.code === "bounded_outbox_or_upsert_status_not_ok"));
+});
+
 test("release check fails when visible count decreases", () => {
   const result = evaluateReleaseCheck(basePayload({
     after: { summary: { total_visible_postings: 99 } }

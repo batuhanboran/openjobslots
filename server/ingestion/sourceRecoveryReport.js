@@ -8,6 +8,12 @@ const SOURCE_RECOVERY_REPORT_REQUIRED_FIELDS = Object.freeze([
   "public_row_gain",
   "rows_updated_existing",
   "rows_newly_accepted",
+  "inventory_scan_report",
+  "net_new_clean_public_estimate",
+  "duplicate_existing_public_candidates",
+  "candidate_pool_exhausted",
+  "estimate_confidence",
+  "bounded_outbox_or_upsert_status",
   "quarantined",
   "skipped_ambiguous",
   "missing_geo_before",
@@ -30,6 +36,12 @@ const SOURCE_RECOVERY_REPORT_SCHEMA = Object.freeze({
     public_row_gain: "accepted_public_rows_after - accepted_public_rows_before.",
     rows_updated_existing: "Existing public rows updated with better source evidence.",
     rows_newly_accepted: "Rows newly accepted into the public dataset.",
+    inventory_scan_report: "Path, object, or summary proving the bounded read-only inventory scan used before writes.",
+    net_new_clean_public_estimate: "Dedupe-aware estimate of clean public rows that can be newly accepted.",
+    duplicate_existing_public_candidates: "Existing public duplicates excluded from the net-new estimate.",
+    candidate_pool_exhausted: "Whether inventory coverage exhausted the candidate pool, or a bounded subset already proves the requested gain.",
+    estimate_confidence: "Confidence label from inventory/net-new estimation.",
+    bounded_outbox_or_upsert_status: "Bounded search outbox/upsert status for affected rows after canary/apply.",
     quarantined: "Rows written or kept in quarantine.",
     skipped_ambiguous: "Ambiguous rows skipped instead of failing the recovery task.",
     missing_geo_before: "Rows for the source missing normalized geo before recovery.",
@@ -52,6 +64,13 @@ const SOURCE_RECOVERY_REPORT_SCHEMA = Object.freeze({
     "newly_accepted_row_evidence",
     "accepted_row_evidence",
     "clean_row_evidence",
+    "inventory_report",
+    "net_new_clean_public_candidates",
+    "net_new_clean_candidates",
+    "duplicate_existing_public_rows",
+    "duplicate_count",
+    "search_upsert_status",
+    "meili_upsert_status",
     "planned_tenant_batch_file_path",
     "predicted_guard_result",
     "actual_guard_result",
@@ -73,6 +92,48 @@ function toNumber(value, fallback = 0) {
 function countOrLength(value) {
   if (Array.isArray(value)) return value.length;
   return toNumber(value, 0);
+}
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function pickReportValue(report, field, aliases = []) {
+  for (const key of [field, ...aliases]) {
+    if (report[key] !== undefined) return report[key];
+  }
+  return undefined;
+}
+
+function inventoryScanReport(report = {}) {
+  return pickReportValue(report, "inventory_scan_report", ["inventory_report"]);
+}
+
+function normalizeReference(value) {
+  if (value === undefined) return undefined;
+  if (typeof value === "string") return cleanString(value);
+  if (isObject(value) || Array.isArray(value)) return value;
+  return value;
+}
+
+function inventoryField(report = {}, field) {
+  const inventory = inventoryScanReport(report);
+  if (isObject(inventory) && inventory[field] !== undefined) return inventory[field];
+  return undefined;
+}
+
+function hasReportField(report = {}, field) {
+  const aliases = {
+    inventory_scan_report: ["inventory_report"],
+    net_new_clean_public_estimate: ["net_new_clean_public_candidates", "net_new_clean_candidates"],
+    duplicate_existing_public_candidates: ["duplicate_existing_public_rows", "duplicate_count"],
+    bounded_outbox_or_upsert_status: ["search_upsert_status", "meili_upsert_status"]
+  };
+  if (pickReportValue(report, field, aliases[field] || []) !== undefined) return true;
+  if (["candidate_pool_exhausted", "estimate_confidence"].includes(field)) {
+    return inventoryField(report, field) !== undefined;
+  }
+  return false;
 }
 
 function normalizeReasonItem(item = {}) {
@@ -156,6 +217,21 @@ function normalizeSourceRecoveryReport(report = {}) {
     public_row_gain: toNumber(report.public_row_gain, acceptedAfter - acceptedBefore),
     rows_updated_existing: toNumber(report.rows_updated_existing),
     rows_newly_accepted: toNumber(report.rows_newly_accepted),
+    inventory_scan_report: normalizeReference(inventoryScanReport(report)),
+    net_new_clean_public_estimate: toNumber(pickReportValue(report, "net_new_clean_public_estimate", [
+      "net_new_clean_public_candidates",
+      "net_new_clean_candidates"
+    ])),
+    duplicate_existing_public_candidates: countOrLength(pickReportValue(report, "duplicate_existing_public_candidates", [
+      "duplicate_existing_public_rows",
+      "duplicate_count"
+    ])),
+    candidate_pool_exhausted: pickReportValue(report, "candidate_pool_exhausted") === true || inventoryField(report, "candidate_pool_exhausted") === true,
+    estimate_confidence: cleanString(pickReportValue(report, "estimate_confidence") ?? inventoryField(report, "estimate_confidence")),
+    bounded_outbox_or_upsert_status: normalizeReference(pickReportValue(report, "bounded_outbox_or_upsert_status", [
+      "search_upsert_status",
+      "meili_upsert_status"
+    ])),
     quarantined: toNumber(report.quarantined),
     skipped_ambiguous: toNumber(report.skipped_ambiguous),
     missing_geo_before: toNumber(report.missing_geo_before),
@@ -191,7 +267,7 @@ function validateSourceRecoveryReport(report = {}) {
   const normalized = normalizeSourceRecoveryReport(report);
   const errors = [];
   for (const field of SOURCE_RECOVERY_REPORT_REQUIRED_FIELDS) {
-    if (!(field in report) && field !== "public_row_gain") {
+    if (!hasReportField(report, field) && field !== "public_row_gain") {
       errors.push(`missing required source recovery report field: ${field}`);
     }
   }
@@ -201,6 +277,12 @@ function validateSourceRecoveryReport(report = {}) {
   }
   if (normalized.rows_newly_accepted_no_geo_no_remote > 0) {
     errors.push("newly accepted public rows include no_geo_no_remote rows");
+  }
+  if (normalized.net_new_clean_public_estimate < 0) {
+    errors.push("net_new_clean_public_estimate cannot be negative");
+  }
+  if (normalized.duplicate_existing_public_candidates < 0) {
+    errors.push("duplicate_existing_public_candidates cannot be negative");
   }
   return {
     ok: errors.length === 0,

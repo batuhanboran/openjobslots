@@ -49,6 +49,16 @@ function sourceReport(overrides = {}) {
     public_row_gain: acceptedAfter - acceptedBefore,
     rows_updated_existing: 1,
     rows_newly_accepted: Math.max(0, acceptedAfter - acceptedBefore),
+    inventory_scan_report: {
+      path: "reports/greenhouse-inventory.json",
+      candidate_pool_exhausted: true,
+      estimate_confidence: "high"
+    },
+    net_new_clean_public_estimate: Math.max(0, acceptedAfter - acceptedBefore),
+    duplicate_existing_public_candidates: 0,
+    candidate_pool_exhausted: true,
+    estimate_confidence: "high",
+    bounded_outbox_or_upsert_status: "succeeded",
     quarantined: 0,
     skipped_ambiguous: 1,
     missing_geo_before: 4,

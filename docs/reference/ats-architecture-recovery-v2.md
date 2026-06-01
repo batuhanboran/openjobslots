@@ -29,6 +29,7 @@ Every configured ATS should have:
 - A bounded read-only inventory scan before any canary or apply.
 - A net-new estimate proving public-row upside without hiding or degrading existing public rows.
 - A canary/apply guard that requires explicit production flags and a rollback path.
+- A release report that records inventory proof, net-new clean public estimate, duplicate public candidates excluded from gain, candidate-pool proof, estimate confidence, and bounded Meili outbox/upsert status.
 - Post-apply Meili/Postgres count and facet parity proof before calling the recovery successful.
 
 ## Non-Goals
@@ -59,6 +60,7 @@ Backend and public API gates:
 - `npm.cmd run test:backend`
 - `npm.cmd run test:api`
 - `npm.cmd run ats:registry-index -- --json --no-write`
+- `npm.cmd run release:ats-recovery:check -- --self-test --json`
 - `git diff --check`
 
 Production read-only gates:
@@ -78,4 +80,4 @@ Production read-only gates:
 
 ## Success Definition
 
-The milestone is complete only when the architecture gates pass, source-specific recovery evidence is saved, public rows do not drop, data-quality gaps improve by source, parser attention does not move to a new family, and Meili/Postgres parity is clean or explicitly approved as a known residual.
+The milestone is complete only when the architecture gates pass, source-specific recovery evidence is saved, release check proof fields are complete, public rows do not drop, data-quality gaps improve by source, parser attention does not move to a new family, and Meili/Postgres parity is clean or explicitly approved as a known residual.

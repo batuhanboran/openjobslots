@@ -6,7 +6,7 @@ const {
   globalWeakUnknownRemotePct,
   visibleCount
 } = require("./ats-recovery-guard");
-const { normalizeSourceRecoveryReport } = require("../server/ingestion/sourceRecoveryReport");
+const { validateSourceRecoveryReport } = require("../server/ingestion/sourceRecoveryReport");
 
 let stdinCache = null;
 
@@ -124,6 +124,108 @@ function preflightPassed(report = {}) {
   return report.ok === true && !report.unsafe;
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function hasMeaningfulValue(value) {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+const SOURCE_REPORT_FIELD_ALIASES = Object.freeze({
+  inventory_scan_report: Object.freeze(["inventory_report"]),
+  net_new_clean_public_estimate: Object.freeze(["net_new_clean_public_candidates", "net_new_clean_candidates"]),
+  duplicate_existing_public_candidates: Object.freeze(["duplicate_existing_public_rows", "duplicate_count"]),
+  bounded_outbox_or_upsert_status: Object.freeze(["search_upsert_status", "meili_upsert_status"])
+});
+
+function rawSourceReportValue(report = {}, field, options = {}) {
+  for (const key of [field, ...(SOURCE_REPORT_FIELD_ALIASES[field] || [])]) {
+    if (options.allowEmptyArray && hasOwn(report, key) && Array.isArray(report[key])) return report[key];
+    if (hasOwn(report, key) && hasMeaningfulValue(report[key])) return report[key];
+  }
+  return undefined;
+}
+
+function inventoryReportObject(report = {}) {
+  const value = rawSourceReportValue(report, "inventory_scan_report");
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+function sourceEvidenceValue(report = {}, field, options = {}) {
+  const direct = rawSourceReportValue(report, field, options);
+  if (direct !== undefined) return direct;
+  const inventory = inventoryReportObject(report);
+  if (options.allowEmptyArray && inventory && hasOwn(inventory, field) && Array.isArray(inventory[field])) return inventory[field];
+  if (inventory && hasOwn(inventory, field) && hasMeaningfulValue(inventory[field])) return inventory[field];
+  return undefined;
+}
+
+function numberOrCount(value) {
+  if (Array.isArray(value)) return value.length;
+  return firstNumber(value);
+}
+
+function sourceEvidenceNumber(report = {}, field) {
+  const value = sourceEvidenceValue(report, field, { allowEmptyArray: field === "duplicate_existing_public_candidates" });
+  return value === undefined ? null : numberOrCount(value);
+}
+
+function booleanTrue(value) {
+  if (value === true) return true;
+  return String(value || "").trim().toLowerCase() === "true";
+}
+
+function confidenceAllowsSubsetProof(value) {
+  return ["medium", "high"].includes(String(value || "").trim().toLowerCase());
+}
+
+function candidatePoolProven(rawSourceReport = {}, sourceReport = {}, netNewEstimate = null) {
+  const exhausted = sourceEvidenceValue(rawSourceReport, "candidate_pool_exhausted");
+  if (booleanTrue(exhausted) || sourceReport.candidate_pool_exhausted === true) return true;
+  const confidence = sourceEvidenceValue(rawSourceReport, "estimate_confidence") || sourceReport.estimate_confidence;
+  return netNewEstimate !== null && netNewEstimate >= 5000 && confidenceAllowsSubsetProof(confidence);
+}
+
+function inventoryScanProofPassed(rawSourceReport = {}) {
+  const value = rawSourceReportValue(rawSourceReport, "inventory_scan_report");
+  if (!hasMeaningfulValue(value)) return false;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (value.ok === false || value.success === false) return false;
+  }
+  return true;
+}
+
+function boundedOutboxStatusPassed(value) {
+  if (!hasMeaningfulValue(value)) return false;
+  if (value === true) return true;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (value.ok === true || value.success === true) return true;
+    if (value.ok === false || value.success === false) return false;
+    return boundedOutboxStatusPassed(value.status || value.result || value.state);
+  }
+  const normalized = String(value).trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return new Set([
+    "ok",
+    "pass",
+    "passed",
+    "success",
+    "succeeded",
+    "complete",
+    "completed",
+    "processed",
+    "upserted",
+    "no_op",
+    "noop",
+    "not_required",
+    "not_applicable"
+  ]).has(normalized);
+}
+
 function addFailure(failures, noReleaseAllowed, code, message, detail = {}) {
   failures.push({ code, message, ...detail });
   noReleaseAllowed.push({ code, message });
@@ -135,11 +237,16 @@ function evaluateReleaseCheck(input = {}) {
   const noReleaseAllowed = [];
   const before = input.before || null;
   const after = input.after || null;
-  const sourceReport = input.sourceReport ? normalizeSourceRecoveryReport(input.sourceReport) : null;
+  const rawSourceReport = input.sourceReport || null;
+  const sourceReportValidation = rawSourceReport ? validateSourceRecoveryReport(rawSourceReport) : null;
+  const sourceReport = sourceReportValidation?.report || null;
   const guardReport = input.guardReport || null;
   const testsReport = input.testsReport || null;
   const preflightReport = input.preflightReport || null;
   const meiliCheck = input.meiliCheck || null;
+  let netNewEstimate = null;
+  let duplicateExistingPublicCandidates = null;
+  let candidatePoolProof = false;
 
   if (!before) addFailure(failures, noReleaseAllowed, "missing_before_data_quality", "before data-quality report is required");
   if (!after) addFailure(failures, noReleaseAllowed, "missing_after_data_quality", "after data-quality report is required");
@@ -148,6 +255,18 @@ function evaluateReleaseCheck(input = {}) {
   if (!testsReport) addFailure(failures, noReleaseAllowed, "missing_tests_report", "test result report is required");
   if (!preflightReport) addFailure(failures, noReleaseAllowed, "missing_preflight_report", "preflight report is required");
   if (!meiliCheck) addFailure(failures, noReleaseAllowed, "missing_meili_check", "Meili/Postgres parity report is required");
+
+  if (sourceReportValidation && !sourceReportValidation.ok) {
+    for (const error of sourceReportValidation.errors) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "invalid_source_recovery_report",
+        error,
+        { source: sourceReport?.source || null }
+      );
+    }
+  }
 
   const beforeVisible = before ? visibleCount(before) : null;
   const afterVisible = after ? visibleCount(after) : null;
@@ -170,6 +289,85 @@ function evaluateReleaseCheck(input = {}) {
         after: sourceReport.accepted_public_rows_after
       }
     );
+  }
+
+  if (sourceReport) {
+    if (!inventoryScanProofPassed(rawSourceReport)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "missing_or_failed_inventory_scan_report",
+        "source recovery report must include a passing bounded inventory scan proof"
+      );
+    }
+
+    netNewEstimate = sourceEvidenceNumber(rawSourceReport, "net_new_clean_public_estimate");
+    if (netNewEstimate === null) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "missing_net_new_clean_public_estimate",
+        "source recovery report must include a dedupe-aware net-new clean public estimate"
+      );
+    } else {
+      const requiredGain = Math.max(sourceReport.rows_newly_accepted, sourceReport.public_row_gain, 0);
+      if (netNewEstimate < requiredGain) {
+        addFailure(
+          failures,
+          noReleaseAllowed,
+          "net_new_clean_public_estimate_below_gain",
+          "net-new clean public estimate is lower than the accepted public row gain",
+          { estimate: netNewEstimate, required_gain: requiredGain }
+        );
+      }
+    }
+
+    duplicateExistingPublicCandidates = sourceEvidenceNumber(rawSourceReport, "duplicate_existing_public_candidates");
+    if (duplicateExistingPublicCandidates === null) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "duplicate_existing_public_candidates_missing",
+        "source recovery report must include duplicate existing public candidates excluded from net-new gain"
+      );
+    }
+
+    if (!hasMeaningfulValue(sourceEvidenceValue(rawSourceReport, "estimate_confidence"))) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "estimate_confidence_missing",
+        "source recovery report must include inventory/net-new estimate confidence"
+      );
+    }
+
+    candidatePoolProof = candidatePoolProven(rawSourceReport, sourceReport, netNewEstimate);
+    if (!candidatePoolProof) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "candidate_pool_unproven",
+        "candidate pool must be exhausted or the scanned subset must prove at least 5,000 net-new clean public candidates"
+      );
+    }
+
+    const boundedStatus = sourceEvidenceValue(rawSourceReport, "bounded_outbox_or_upsert_status");
+    if (!hasMeaningfulValue(boundedStatus)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "bounded_outbox_or_upsert_status_missing",
+        "source recovery report must include bounded search outbox/upsert status"
+      );
+    } else if (!boundedOutboxStatusPassed(boundedStatus)) {
+      addFailure(
+        failures,
+        noReleaseAllowed,
+        "bounded_outbox_or_upsert_status_not_ok",
+        "bounded search outbox/upsert status must be ok before release",
+        { status: boundedStatus }
+      );
+    }
   }
 
   const beforeMissingAnyGeoPct = before ? globalMissingAnyGeoPct(before) : null;
@@ -259,6 +457,9 @@ function evaluateReleaseCheck(input = {}) {
       visible_count_after: afterVisible,
       accepted_public_rows_before: sourceReport?.accepted_public_rows_before ?? null,
       accepted_public_rows_after: sourceReport?.accepted_public_rows_after ?? null,
+      net_new_clean_public_estimate: netNewEstimate,
+      duplicate_existing_public_candidates: duplicateExistingPublicCandidates,
+      candidate_pool_proven: candidatePoolProof,
       missing_any_geo_pct_before: beforeMissingAnyGeoPct,
       missing_any_geo_pct_after: afterMissingAnyGeoPct,
       weak_unknown_remote_pct_before: beforeWeakUnknownRemotePct,
@@ -301,6 +502,16 @@ function selfTestPayload() {
     public_row_gain: 10,
     rows_updated_existing: 0,
     rows_newly_accepted: 10,
+    inventory_scan_report: {
+      path: "reports/lever-inventory.json",
+      candidate_pool_exhausted: true,
+      estimate_confidence: "high"
+    },
+    net_new_clean_public_estimate: 12,
+    duplicate_existing_public_candidates: 2,
+    candidate_pool_exhausted: true,
+    estimate_confidence: "high",
+    bounded_outbox_or_upsert_status: "succeeded",
     quarantined: 0,
     skipped_ambiguous: 0,
     missing_geo_before: 2,
