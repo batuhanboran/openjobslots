@@ -30,6 +30,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof with the default 25-detail budget: `studenac` parsed/accepted `107` rows with missing country/region `106 -> 0` and `25` JSON-LD dates; `raditi` parsed/accepted `118` with missing `96 -> 18`; `victusgroup` parsed/accepted `36` with missing `36 -> 0`; `praca-decathlon` parsed/accepted `26` current rows with missing `27 -> 0`; `m-plus` parsed/accepted `38` current rows with missing `30 -> 0`; `pepco-croatia-doo` parsed/accepted `24` current rows with missing `27 -> 0` and all `24` dates filled. Live row counts may differ from the production snapshot as boards change.
 - Verification covered syntax checks, parser fixture tests, focused TalentLyft source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Loxo Source-Local Region Code Evidence - June 1, 2026
+
+- Loxo production baseline for this lane was `3,782` visible rows, `486` missing country/region rows, `315` weak/unknown remote rows, and `412` missing posting dates.
+- Loxo list HTML exposes source-local location suffixes in `div.job-location`. The parser now maps observed UK `ENG`/`WLS`, Belgian `BRU`/`WLG`/`WHT`/`VAN`/`VBR`/`VLI`/`VOV`/`WBR`, Netherlands `ZE`, and observed French city hints inside the Loxo source module only. This avoids adding risky global interpretations for short tokens such as `VAN` or `ZE`.
+- Blank locations and countryless remote rows stay unchanged, and no detail-page/body inference was added. The new rows carry source evidence via `loxo_list_region_country_code` or `loxo_list_city_country_hint`.
+- Live read-only proof: `Vertical-Recruitment` accepted missing country/region improved `145 -> 5` with `443` source-list country rows; `Sparagus` improved `141 -> 5` with `134` source-list country rows; `THOMAS-Professional` improved `65 -> 2` with `64` source-list country rows.
+- Verification covered syntax checks, focused Loxo source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Greenhouse Office Geo And Work-Mode Evidence - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,524` visible job slots and Meili/Postgres document counts remained aligned with the known `22` document remote-facet drift unresolved.

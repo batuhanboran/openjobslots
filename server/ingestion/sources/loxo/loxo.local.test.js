@@ -96,6 +96,39 @@ test("loxo parser preserves source ids, location, and date-null behavior", () =>
   assert.equal(parsed[1].source_evidence?.list_url, "https://app.loxo.co/fixtureco");
 });
 
+test("loxo parser maps source-local region codes without global token inference", () => {
+  const company = readJson("company.json");
+  const card = (id, title, location) => `
+    <div class='jobs-listing-card'>
+      <a class='job-title' href='/job/${id}'>${title}</a>
+      <div class='job-date'>2 days ago</div>
+    </div></div>
+    <div class='data-cell'><div class='job-location'>${location}</div></div>
+  `;
+  const parsed = source.parse({
+    html: [
+      card("uk-eng", "Quantity Surveyor", "Northwich, ENG"),
+      card("uk-wls", "Prototype Engineer", "Cardiff, WLS"),
+      card("be-bru", "Functional Analyst", "Bruxelles, BRU"),
+      card("nl-ze", "Marine Engineer", "Vlissingen, ZE"),
+      card("fr-city", "Relationship Manager", "Dunkerque, 59")
+    ].join("")
+  }, company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.equal(normalized["uk-eng"].country, "United Kingdom");
+  assert.equal(normalized["uk-wls"].country, "United Kingdom");
+  assert.equal(normalized["be-bru"].country, "Belgium");
+  assert.equal(normalized["nl-ze"].country, "Netherlands");
+  assert.equal(normalized["fr-city"].country, "France");
+  assert.equal(normalized["be-bru"].city, "Bruxelles");
+  assert.equal(normalized["be-bru"].source_evidence.country_rule_name, "loxo_list_region_country_code");
+  assert.equal(normalized["fr-city"].source_evidence.country_rule_name, "loxo_list_city_country_hint");
+});
+
 test("loxo parse preserves __legacyParsed payloads", () => {
   const company = readJson("company.json");
   const legacy = [{ source_job_id: "legacy-1", company_name: "Fixture Loxo", position_name: "Legacy" }];
