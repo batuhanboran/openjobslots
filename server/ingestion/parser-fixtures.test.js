@@ -109,6 +109,11 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeCountryFromLocation("Paramaribo, Suriname"), "Suriname");
   assert.equal(normalizeCountryFromLocation("Arawa, Autonomous Region of Bougainville, Papua New Guinea"), "Papua New Guinea");
   assert.equal(normalizeCountryFromLocation("ABIDJAN, Cote D'Ivoire (Ivory Coast)"), "Cote d'Ivoire");
+  assert.equal(normalizeCountryFromLocation("Hamilton, Bermuda"), "Bermuda");
+  assert.equal(normalizeCountryFromLocation("Road Town, Virgin Islands, British"), "British Virgin Islands");
+  assert.equal(normalizeCountryFromLocation("Lome, Togo"), "Togo");
+  assert.equal(normalizeCountryFromLocation("Libreville, Gabon"), "Gabon");
+  assert.equal(normalizeCountryFromLocation("Yaounde, Cameroun"), "Cameroon");
   assert.equal(normalizeCountryFromLocation("Bago, Myanmar"), "Myanmar");
   assert.equal(normalizeCountryFromLocation("Skopje, Centar, Macedonia"), "North Macedonia");
   assert.equal(normalizeCountryFromLocation("Honiara, Solomon Islands"), "Solomon Islands");
@@ -128,6 +133,10 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeRegionFromCountry("Costa Rica"), "LATAM");
   assert.equal(normalizeRegionFromCountry("Sri Lanka"), "APAC");
   assert.equal(normalizeRegionFromCountry("Saint Kitts and Nevis"), "North America");
+  assert.equal(normalizeRegionFromCountry("Bermuda"), "North America");
+  assert.equal(normalizeRegionFromCountry("British Virgin Islands"), "North America");
+  assert.equal(normalizeRegionFromCountry("Togo"), "EMEA");
+  assert.equal(normalizeRegionFromCountry("Gabon"), "EMEA");
   assert.equal(normalizeRegionFromCountry("North Macedonia"), "EMEA");
   assert.equal(normalizeRegionFromCountry("Mauritius"), "EMEA");
   assert.equal(normalizeRegionFromCountry("Djibouti"), "EMEA");
@@ -142,6 +151,8 @@ test("location, country, date, and remote normalization cover common aliases", (
   assert.equal(normalizeCountryName("Laos"), "Laos");
   assert.equal(normalizeCountryName("Macao"), "Macao");
   assert.equal(normalizeCountryName("Monaco"), "Monaco");
+  assert.equal(normalizeCountryName("Cameroun"), "Cameroon");
+  assert.equal(normalizeCountryName("中国"), "China");
   assert.equal(normalizeRemoteType("Hybrid Remote - Ankara"), "hybrid");
   assert.equal(normalizeRemoteType("Remote - EMEA"), "remote");
   assert.equal(normalizeRemoteType("Home office - Portugal"), "remote");

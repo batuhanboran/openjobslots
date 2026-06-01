@@ -117,6 +117,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof on `veg-group`: local parser parsed and accepted `251` current rows, reduced missing country/region from `236` local sample rows to `0`, and recovered `236` rows as `Puerto Rico` / `North America` with rule `hrmdirect_list_puerto_rico_numeric_region`. Remote type remains `unknown` where HRMDirect has no explicit remote/work-mode field.
 - Other sampled HRMDirect tenants such as `carespot`, `ccsnh`, `ne-arc`, and `thebreakers` still require source-backed location evidence; city-only, campus-name, title-parenthetical, or employment-type-like values were not converted into country evidence. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Breezy Explicit Country Alias Evidence - June 1, 2026
+
+- Fresh read-only production baseline for Breezy had `21,037` visible rows, `978` missing country/region rows, `1,851` weak/unknown remote rows, and `11,244` missing posting dates.
+- Live Breezy JSON payloads exposed explicit `location.country` values missing from shared normalization: `Bermuda`, `Virgin Islands, British`, `Togo`, `Gabon`, localized `Cameroun`, and `中国`.
+- Shared normalization now covers those country aliases and region buckets. Breezy still uses source-provided JSON API fields; `Worldwide` remote rows remain countryless and no tenant/title/body inference was added.
+- Live read-only proof: `hamilton-recruitment` moved from production top-list `46` missing country/region rows to `0/58` local current missing; `gozem` moved from `15` to `0/13`; `wongnai-media-co-ltd` moved from `8` to `0/80`, including `Bermuda -> North America`, `Togo/Gabon/Cameroon -> EMEA`, and `China -> APAC`.
+- No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplicantPro ISO3 And Workplace Evidence - June 1, 2026
 
 - Fresh read-only production checks kept production at `6660eab`; public health reported `331,515` visible job slots, and `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,509`/`331,509`) with the known `22` document remote-facet drift.

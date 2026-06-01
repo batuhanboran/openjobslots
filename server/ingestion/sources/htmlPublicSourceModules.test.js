@@ -1254,6 +1254,58 @@ test("breezy source module prefers public JSON locations over ambiguous portal t
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("breezy source module normalizes explicit country payload tokens", () => {
+  const source = getSourceModule("breezy");
+  const company = {
+    company_name: "Fixture Breezy Country Tokens",
+    ATS_name: "breezy",
+    url_string: "https://fixture-country.breezy.hr/"
+  };
+  const rows = [
+    ["brz-bermuda", "Actuarial Manager", "Hamilton", "Bermuda"],
+    ["brz-bvi", "Trust Officer", "Road Town", "Virgin Islands, British"],
+    ["brz-togo", "Operations Manager", "Lome", "Togo"],
+    ["brz-cameroon", "Finance Lead", "Yaounde", "Cameroun"],
+    ["brz-china", "Support Analyst", "Dalian", "中国"]
+  ].map(([id, name, city, country]) => ({
+    id,
+    name,
+    url: `https://fixture-country.breezy.hr/p/${id}`,
+    published_date: "2026-05-22T10:00:00.000Z",
+    location: {
+      city,
+      country: { name: country },
+      name: `${city}, ${country}`,
+      is_remote: false
+    }
+  }));
+  const parsed = source.parse({
+    html: "",
+    __listUrl: "https://fixture-country.breezy.hr/",
+    __json: rows
+  }, company);
+  const normalized = Object.fromEntries(parsed.map((posting) => {
+    const row = source.normalize(posting, company);
+    return [row.source_job_id, row];
+  }));
+
+  assert.equal(normalized["brz-bermuda"].country, "Bermuda");
+  assert.equal(normalized["brz-bermuda"].region, "North America");
+  assert.equal(normalized["brz-bvi"].country, "British Virgin Islands");
+  assert.equal(normalized["brz-bvi"].region, "North America");
+  assert.equal(normalized["brz-togo"].country, "Togo");
+  assert.equal(normalized["brz-togo"].region, "EMEA");
+  assert.equal(normalized["brz-cameroon"].country, "Cameroon");
+  assert.equal(normalized["brz-cameroon"].region, "EMEA");
+  assert.equal(normalized["brz-china"].country, "China");
+  assert.equal(normalized["brz-china"].region, "APAC");
+  for (const row of Object.values(normalized)) {
+    assert.equal(row.source_evidence.country_source, "json_api");
+    assert.deepEqual(row.source_failure_reasons || [], []);
+    assert.equal(evaluatePublicPosting(row, { parserVersion: source.parserVersion }).status, "accepted");
+  }
+});
+
 test("breezy source module parses card titles outside heading tags", () => {
   const source = getSourceModule("breezy");
   const company = readJson(path.join(__dirname, "breezy", "fixtures", "company.json"));
