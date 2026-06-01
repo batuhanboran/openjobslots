@@ -98,7 +98,8 @@ function parse(rawPayload, company = {}) {
     seenUrls.add(postingUrl);
 
     const detailHtml = lookupMapValue(detailHtmlByUrl, postingUrl);
-    const postingDate = clean(parser.extractHirebridgeDatePostedFromDetailHtml(detailHtml));
+    const detailFields = parser.extractHirebridgeDetailFields(detailHtml);
+    const postingDate = clean(detailFields.posting_date);
     if (!postingDate) continue;
 
     const detailUrl = clean(parser.buildHirebridgeDetailsUrl(config, postingUrl) || postingUrl);
@@ -111,18 +112,46 @@ function parse(rawPayload, company = {}) {
       sourceFailureReasons.push(detailFailureReason);
     }
 
+    const sourceEvidence = {
+      ...(posting.source_evidence || {}),
+      list_url: listFinalUrl,
+      detail_url: detailUrl,
+      detail_fetch_status: Number.isFinite(detailFetchStatus) ? detailFetchStatus : 200,
+      posting_date_source: "detail_json_ld",
+      posting_date_path: "script[type=\"application/ld+json\"].datePosted",
+      posting_date_rule_name: "hirebridge_detail_dateposted"
+    };
+    if (clean(detailFields.location)) {
+      sourceEvidence.location_source = detailFields.location_source || "detail_json_ld";
+      sourceEvidence.location_path = detailFields.location_path || "script[type=\"application/ld+json\"].jobLocation.address";
+      sourceEvidence.location_rule_name = "hirebridge_detail_joblocation";
+      if (clean(detailFields.country)) {
+        sourceEvidence.country_source = detailFields.location_source || "detail_json_ld";
+        sourceEvidence.country_path = detailFields.location_path || "script[type=\"application/ld+json\"].jobLocation.address";
+        sourceEvidence.country_rule_name = "hirebridge_detail_joblocation_country";
+      }
+      if (clean(detailFields.city)) {
+        sourceEvidence.city_source = detailFields.location_source || "detail_json_ld";
+        sourceEvidence.city_path = detailFields.location_path || "script[type=\"application/ld+json\"].jobLocation.address";
+      }
+    }
+    if (clean(detailFields.remote_type)) {
+      sourceEvidence.remote_source = detailFields.remote_source || "detail_json_ld";
+      sourceEvidence.remote_path = detailFields.remote_path || "script[type=\"application/ld+json\"].jobLocationType";
+      sourceEvidence.remote_rule_name = "hirebridge_detail_remote_type";
+    }
+
     collected.push({
       ...posting,
       posting_date: postingDate,
-      source_evidence: {
-        ...(posting.source_evidence || {}),
-        list_url: listFinalUrl,
-        detail_url: detailUrl,
-        detail_fetch_status: Number.isFinite(detailFetchStatus) ? detailFetchStatus : 200,
-        posting_date_source: "labeled_detail_html",
-        posting_date_path: "structured detail datePosted",
-        posting_date_rule_name: "hirebridge_detail_dateposted"
-      },
+      location: clean(detailFields.location) || clean(posting.location) || null,
+      city: clean(detailFields.city) || clean(posting.city) || null,
+      state: clean(detailFields.state) || clean(posting.state) || null,
+      country: clean(detailFields.country) || clean(posting.country) || null,
+      remote_type: clean(detailFields.remote_type) || clean(posting.remote_type) || null,
+      department: clean(detailFields.department) || clean(posting.department) || null,
+      employment_type: clean(detailFields.employment_type) || clean(posting.employment_type) || null,
+      source_evidence: sourceEvidence,
       source_failure_reasons: sourceFailureReasons
     });
   }

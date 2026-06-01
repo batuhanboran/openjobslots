@@ -258,7 +258,17 @@ test("hirebridge source module fetches list plus detail pages, enriches posting 
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0].source_job_id, "HB1001");
   assert.equal(parsed[0].posting_date, "2026-05-18");
+  assert.equal(parsed[0].location, "Chelsea, MA, United States");
+  assert.equal(parsed[0].city, "Chelsea");
+  assert.equal(parsed[0].country, "United States");
+  assert.equal(parsed[0].employment_type, "Full Time");
   assert.equal(parsed[0].job_posting_url, "https://recruit.hirebridge.com/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001");
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.country, "United States");
+  assert.equal(normalized.region, "North America");
+  assert.equal(normalized.city, "Chelsea");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.evidence.country.evidence_path, "script[type=\"application/ld+json\"].jobLocation.address");
 });
 
 test("hirebridge source module enforces recruit.hirebridge.com host guards for list and detail fetches", async () => {

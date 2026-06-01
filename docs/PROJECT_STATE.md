@@ -63,6 +63,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof across `marsden`, `wedriveu`, `fetch-package-delivery`, `clear`, `nursedash`, and `assist-services`: bounded pagination fetched `542` current rows. Legacy local behavior would have had `272` missing country/region rows and `266` weak remote rows; the new parser reduced those to `11` and `3`, with `519` rows carrying `openings[].location_address` country evidence.
 - No URL-path, title, tenant, body, or board-name inference was added. Posting dates remain null when Fountain omits them. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## HireBridge Detail JSON-LD Geo Evidence - June 1, 2026
+
+- Fresh read-only production baseline had HireBridge at `115` visible rows, `111` missing country/region rows, `115` weak/unknown remote rows, and `0` missing posting dates.
+- HireBridge detail pages expose `JobPosting` JSON-LD with `jobLocation.address`; list `.department` often contains job categories (`Production`, `Cook`, `QA`) and should not be used as geo unless it is explicitly geo/remote-shaped.
+- The parser now derives city/state/country from detail JSON-LD address evidence and preserves posting dates from the same detail evidence path. It does not use URL-path, title, tenant, or body inference for geo/remote.
+- Live read-only proof across `Kayem Foods` (`cid=7718`) and `J. Alexander's Restaurants` (`cid=8362`): detail fetch parsed `60` current rows. Legacy local behavior would have had `59` missing country/region rows and `60` weak remote rows; the new parser reduced both to `0`, with rows carrying `script[type="application/ld+json"].jobLocation.address` country evidence and no row-count drop.
+- No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.

@@ -1,7 +1,7 @@
 {
   "list_html": "<ul><li><span class=\"department\">Istanbul, Turkiye</span><a href=\"/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001\">Support Engineer</a></li><li><span class=\"department\">Remote</span><a href=\"/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1002\">Remote QA Analyst</a></li><li><span class=\"department\">Remote</span><a href=\"/v3/Jobs/JobDetails.aspx?cid=1234&jid=HB1001\">Support Engineer Duplicate</a></li></ul>",
   "detail_html_by_jid": {
-    "HB1001": "<script type=\"application/ld+json\">{\"datePosted\":\"2026-05-18\"}</script>",
+    "HB1001": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"datePosted\":\"2026-05-18\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"streetAddress\":\"75 Arlington St\",\"addressLocality\":\"Chelsea\",\"addressRegion\":\"MA\",\"postalCode\":\"02150\"}},\"employmentType\":\"Full Time\"}</script><span class=\"joblocation\"><span id=\"ctl00_pageContent_ctl00_html_jobloc\"><i class=\"fa fa-map-marker\"></i> <span id=\"ctl00_pageContent_ctl00_jobloc\">Chelsea, MA</span></span><span id=\"ctl00_pageContent_ctl00_html_jobcat\"> | <span id=\"ctl00_pageContent_ctl00_jobcat\">Engineering</span></span></span>",
     "HB1002": "<html><body>No structured posting date here.</body></html>"
   }
 }
