@@ -602,6 +602,16 @@ test("jobvite source module fetches jobs HTML with source-local discovery and ho
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
   }, {
+    url: "https://jobs.jobvite.com/fixture/job/oPHLxfw5",
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  }, {
     url: "https://jobs.jobvite.com/fixture/job/oAUSxfw7",
     method: "GET",
     headers: {
@@ -633,9 +643,9 @@ test("jobvite source module fetches jobs HTML with source-local discovery and ho
     }
   }]);
   assert.equal(payload.__sourceConfig.companySlugLower, "fixture");
-  assert.equal(payload.__sourceConfig.detail_fetch_count, 4);
+  assert.equal(payload.__sourceConfig.detail_fetch_count, 5);
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 4);
+  assert.equal(parsed.length, 5);
   const normalized = parsed.map((posting) => source.normalize(posting, company));
   const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
 
@@ -648,6 +658,12 @@ test("jobvite source module fetches jobs HTML with source-local discovery and ho
   assert.equal(byId.get("oDEFxfw8").country, "United States");
   assert.equal(byId.get("oDEFxfw8").posting_date, "2026-05-02");
   assert.equal(source.validatePublic(byId.get("oDEFxfw8")).status, "accepted");
+  assert.equal(byId.get("oPHLxfw5").country, "Philippines");
+  assert.equal(byId.get("oPHLxfw5").city, "Cabuyao");
+  assert.equal(byId.get("oPHLxfw5").posting_date, "2026-05-06");
+  assert.equal(byId.get("oPHLxfw5").evidence.country.evidence_path, "script[type='application/ld+json'].jobLocation[].address.addressRegion");
+  assert.equal(byId.get("oPHLxfw5").evidence.country.rule_name, "jobvite_json_ld_region_country_hint");
+  assert.equal(source.validatePublic(byId.get("oPHLxfw5")).status, "accepted");
   assert.equal(byId.get("oAUSxfw7").country, "Australia");
   assert.equal(byId.get("oAUSxfw7").city, "Sydney");
   assert.equal(byId.get("oAUSxfw7").evidence.country.evidence_path, "script[type='application/ld+json'].jobLocation[].address.addressCountry");
@@ -673,7 +689,7 @@ test("jobvite source module does not publish numeric multi-location labels as ge
   const source = getSourceModule("jobvite");
   const company = readJson(path.join(__dirname, "jobvite", "fixtures", "company.json"));
   const payload = {
-    html: "<h3>Operations</h3><table class=\"jv-job-list\"><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oAMBIGzfw1\">Ambiguous Role</a></td><td class=\"jv-job-list-location\">2 Locations</td></tr><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oREMOTEzfw2\">Remote Role</a></td><td class=\"jv-job-list-location\">Remote, 18 Locations</td></tr></table>",
+    html: "<h3>Operations</h3><table class=\"jv-job-list\"><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oAMBIGzfw1\">Ambiguous Role</a></td><td class=\"jv-job-list-location\">2 Locations</td></tr><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oREMOTEzfw2\">Remote Role</a></td><td class=\"jv-job-list-location\">Remote, 18 Locations</td></tr><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oPORTUGAL3\">Store Role</a></td><td class=\"jv-job-list-location\">Vila Nova de Famalicão</td></tr></table>",
     __detailHtmlByUrl: {
       "https://jobs.jobvite.com/fixture/job/oAMBIGzfw1": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Ambiguous Role\",\"datePosted\":\"2026-05-04\"}</script>",
       "https://jobs.jobvite.com/fixture/job/oREMOTEzfw2": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Remote Role\",\"datePosted\":\"2026-05-05\"}</script>"
@@ -697,6 +713,12 @@ test("jobvite source module does not publish numeric multi-location labels as ge
   assert.equal(byId.get("oREMOTEzfw2").remote_type, "remote");
   assert.equal(byId.get("oREMOTEzfw2").posting_date, "2026-05-05");
   assert.equal(source.validatePublic(byId.get("oREMOTEzfw2")).status, "accepted");
+
+  assert.equal(byId.get("oPORTUGAL3").country, "Portugal");
+  assert.equal(byId.get("oPORTUGAL3").city, "Vila Nova de Famalicão");
+  assert.equal(byId.get("oPORTUGAL3").evidence.country.evidence_path, "table.jv-job-list td.jv-job-list-location");
+  assert.equal(byId.get("oPORTUGAL3").evidence.country.rule_name, "jobvite_list_location_country_hint");
+  assert.equal(source.validatePublic(byId.get("oPORTUGAL3")).status, "accepted");
 });
 
 test("join source module fetches Next.js company page with source-local host guard", async () => {

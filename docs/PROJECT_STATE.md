@@ -31,6 +31,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof: `nextgen-hospitality-solutions` parsed/accepted `94` current rows with accepted missing country/region `86 -> 15` and `71` rows carrying `careerspage_city_country_hint` evidence. Remote-only boards such as `new-paradigm-staffing`, `netchex`, and `new-jersey-iec` stayed countryless by design.
 - Verification covered CareersPage syntax checks, local CareersPage fixture tests, generic HTML/public source-module tests, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## Jobvite Source-Local Location Evidence And Detail Priority - June 1, 2026
+
+- Fresh read-only production baseline for this lane had Jobvite at `9,200` visible rows, `1,162` missing country/region rows, `1,093` weak/unknown remote rows, and `9,200` missing posting dates. Top missing-country boards included `sumitomo-electric`, `pathways`, `longos-internal`, `longos`, `ips-careers`, `ninjaone`, `rkmi`, `salsa`, `von`, and `parts-town`.
+- Jobvite list HTML does not expose posting dates, so date recovery still depends on bounded detail JSON-LD. The fetcher now prioritizes ambiguous/countryless concrete locations inside the existing detail budget, and the parser maps only Jobvite-source deterministic location hints from list/detail location fields.
+- No tenant/title/body/company-name inference was added. Generic remote-only labels, multi-location counts, blank rows, and unresolved labels stay countryless unless detail JSON-LD provides structured evidence.
+- Live read-only proof with detail fetch disabled showed source-local geo improvement without extra requests: `sumitomo-electric` missing geo `108 -> 30`, `longos` `30 -> 1`, `longos-internal` `32 -> 1`, `salsa` `28 -> 1`, and `ovt` `19 -> 5`. With a bounded `75` detail budget, current `sumitomo-electric` missing geo was `6`, while `salsa` and `ovt` parsed with `0` missing geo/date on current live rows.
+- Verification covered Jobvite syntax checks, generic HTML/public source-module tests, fixture coverage for JSON-LD region-country hints and list-location country hints, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## Teamtailor Detail JSON-LD Country Evidence - June 1, 2026
 
 - Teamtailor production baseline for this lane was `8,128` visible rows, `403` missing country/region rows, `305` weak/unknown remote rows, and `372` missing posting dates.

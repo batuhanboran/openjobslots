@@ -1,4 +1,5 @@
 const { safeFetch } = require("../../safeFetch");
+const { normalizeCountryFromLocation } = require("../../posting");
 const { buildCompanyContext, clean, createDiscover, parseJobviteCompany, supportedJobviteHost } = require("./discover");
 const { parseJobvitePostingsFromHtml } = require("./parse");
 
@@ -114,10 +115,24 @@ function jobviteLocationHasAustraliaState(location) {
   return /\b(new south wales|queensland|victoria|western australia|south australia|tasmania|australian capital territory|northern territory|nsw|qld|vic|wa|sa|tas|act|nt)\b/i.test(clean(location));
 }
 
+function stripJobviteWorkModePrefix(location) {
+  return clean(location).replace(/^\s*(?:hybrid(?:\s+remote)?|remote)\b\s*,?\s*/i, "").trim();
+}
+
+function jobviteLocationLooksCountrylessConcrete(location) {
+  const sourceLocation = clean(location);
+  const locationValue = stripJobviteWorkModePrefix(sourceLocation);
+  if (!locationValue) return false;
+  if (jobviteLocationLooksAmbiguous(locationValue)) return false;
+  if (/^(remote|hybrid(?:\s+remote)?)$/i.test(sourceLocation)) return false;
+  return !normalizeCountryFromLocation(locationValue);
+}
+
 function jobvitePostingNeedsDetail(posting = {}) {
   const sourceLocation = posting.source_list_location || posting.location;
   return !clean(posting.posting_date) ||
     jobviteLocationLooksAmbiguous(sourceLocation) ||
+    jobviteLocationLooksCountrylessConcrete(sourceLocation) ||
     jobviteLocationHasAustraliaState(sourceLocation);
 }
 
@@ -125,6 +140,7 @@ function jobviteDetailPriorityScore(posting = {}) {
   let score = 0;
   const sourceLocation = posting.source_list_location || posting.location;
   if (jobviteLocationLooksAmbiguous(sourceLocation)) score += 100;
+  if (jobviteLocationLooksCountrylessConcrete(sourceLocation)) score += 90;
   if (jobviteLocationHasAustraliaState(sourceLocation)) score += 80;
   if (!clean(sourceLocation)) score += 40;
   if (!clean(posting.posting_date)) score += 5;
