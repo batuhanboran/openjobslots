@@ -1,6 +1,5 @@
 const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { parseBambooHrPostingsFromApi } = require("./bamboohr/parse");
-const { parseCareerplugPostingsFromHtml } = require("./careerplug/parse");
 const { parseHrmDirectPostingsFromHtml } = require("./hrmdirect/parse");
 const { parseLeverPostingsFromApi } = require("./lever/parse");
 const { parseManatalPostingsFromApi } = require("./manatal/parse");
@@ -629,7 +628,7 @@ const SOURCE_SPECS = Object.freeze({
   careerplug: {
     sourceFamily: "html_detail",
     confidence: 0.75,
-    parser: (companyName, config, payload) => parseCareerplugPostingsFromHtml(companyName, config, payload?.html || payload),
+    parser: () => [],
     officialDocs: "observed CareerPlug public jobs HTML",
     discover(company) {
       const parsed = asUrl(company.url_string);
