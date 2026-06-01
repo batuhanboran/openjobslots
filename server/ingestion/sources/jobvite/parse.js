@@ -137,12 +137,14 @@ function extractJobviteJsonLdLocations(jobPosting) {
 
   for (const location of locations) {
     const address = location?.address && typeof location.address === "object" ? location.address : {};
-    const city = cleanJobviteStructuredValue(address.addressLocality);
+    const rawCity = cleanJobviteStructuredValue(address.addressLocality);
+    const broadCity = jobviteCityLooksBroadScope(rawCity);
+    const city = broadCity ? "" : rawCity;
     const state = cleanJobviteStructuredValue(address.addressRegion);
     const countryRaw = cleanJobviteStructuredValue(address.addressCountry);
     const countryHint = resolveJobviteCountryHint({
-      label: [city, state, countryRaw].filter(Boolean).join(", "),
-      city,
+      label: [rawCity, state, countryRaw].filter(Boolean).join(", "),
+      city: rawCity,
       state,
       countryRaw,
       defaultRuleName: "jobvite_json_ld_country",
@@ -152,7 +154,8 @@ function extractJobviteJsonLdLocations(jobPosting) {
       cityPath: "script[type='application/ld+json'].jobLocation[].address.addressLocality"
     });
     const country = countryHint.country;
-    const label = [city, state, country].filter(Boolean).join(", ");
+    const countryScopeLocation = broadCity && country && countryRaw;
+    const label = countryScopeLocation ? country : [city, state, country].filter(Boolean).join(", ");
     const key = label.toLowerCase();
     if (!label || seen.has(key)) continue;
     seen.add(key);
@@ -198,7 +201,16 @@ function extractJobviteDetailFields(detailHtml) {
 }
 
 function jobviteListLocationLooksAmbiguous(location) {
-  return /^\s*(?:\d+\s+locations?|multiple(?:\s+locations?)?|various(?:\s+locations?)?|all(?:\s+locations?))(?:,\s*[A-Za-z][A-Za-z .'-]+)?\s*$/i.test(cleanJobviteText(location));
+  const cleaned = cleanJobviteText(location);
+  return /^\s*(?:\d+\s+locations?|multiple(?:\s+locations?)?|various(?:\s+locations?)?|all(?:\s+locations?))(?:,\s*[A-Za-z][A-Za-z .'-]+)?\s*$/i.test(cleaned) ||
+    jobviteCityLooksBroadScope(cleaned);
+}
+
+function jobviteCityLooksBroadScope(value) {
+  const text = normalizeJobviteLookupText(value);
+  if (!text) return false;
+  return /^(?:\d+\s+locations?|multiple(?:\s+locations?)?|various(?:\s+locations?)?|all(?:\s+locations?))\b/.test(text) ||
+    /\bvarious\b.*\blocations?\b/.test(text);
 }
 
 function extractJobviteWorkModePrefix(location) {

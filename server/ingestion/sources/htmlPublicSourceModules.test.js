@@ -800,9 +800,10 @@ test("jobvite source module keeps detail country when list location is multiple-
   const source = getSourceModule("jobvite");
   const company = readJson(path.join(__dirname, "jobvite", "fixtures", "company.json"));
   const payload = {
-    html: "<h3>Operations</h3><table class=\"jv-job-list\"><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oCOUNTRY4\">Country Role</a></td><td class=\"jv-job-list-location\">Multiple, United States</td></tr></table>",
+    html: "<h3>Operations</h3><table class=\"jv-job-list\"><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oCOUNTRY4\">Country Role</a></td><td class=\"jv-job-list-location\">Multiple, United States</td></tr><tr><td class=\"jv-job-list-name\"><a href=\"/fixture/job/oBROAD5\">Broad City Role</a></td><td class=\"jv-job-list-location\">Various NY/NJ PA Locations, New York</td></tr></table>",
     __detailHtmlByUrl: {
-      "https://jobs.jobvite.com/fixture/job/oCOUNTRY4": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Country Role\",\"datePosted\":\"2026-05-06\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressCountry\":\"United States\"}}}</script>"
+      "https://jobs.jobvite.com/fixture/job/oCOUNTRY4": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Country Role\",\"datePosted\":\"2026-05-06\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressCountry\":\"United States\"}}}</script>",
+      "https://jobs.jobvite.com/fixture/job/oBROAD5": "<script type=\"application/ld+json\">{\"@context\":\"http://schema.org\",\"@type\":\"JobPosting\",\"title\":\"Broad City Role\",\"datePosted\":\"2026-05-07\",\"jobLocation\":{\"@type\":\"Place\",\"address\":{\"@type\":\"PostalAddress\",\"addressLocality\":\"Various NY/NJ PA Locations\",\"addressRegion\":\"New York\",\"addressCountry\":\"United States\"}}}</script>"
     },
     __sourceConfig: {
       baseOrigin: "https://jobs.jobvite.com",
@@ -810,14 +811,23 @@ test("jobvite source module keeps detail country when list location is multiple-
     }
   };
 
-  const [normalized] = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+  const normalized = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+  const countryRole = byId.get("oCOUNTRY4");
 
-  assert.equal(normalized.location_text, "United States");
-  assert.equal(normalized.city || "", "");
-  assert.equal(normalized.country, "United States");
-  assert.equal(normalized.source_evidence.location_source, "detail_json_ld");
-  assert.equal(normalized.source_evidence.location_rule_name, "jobvite_json_ld_location");
-  assert.equal(source.validatePublic(normalized).status, "accepted");
+  assert.equal(countryRole.location_text, "United States");
+  assert.equal(countryRole.city || "", "");
+  assert.equal(countryRole.country, "United States");
+  assert.equal(countryRole.source_evidence.location_source, "detail_json_ld");
+  assert.equal(countryRole.source_evidence.location_rule_name, "jobvite_json_ld_location");
+  assert.equal(source.validatePublic(countryRole).status, "accepted");
+
+  const broadCity = byId.get("oBROAD5");
+  assert.equal(broadCity.location_text, "United States");
+  assert.equal(broadCity.city || "", "");
+  assert.equal(broadCity.country, "United States");
+  assert.equal(broadCity.source_evidence.country_rule_name, "jobvite_json_ld_country");
+  assert.equal(source.validatePublic(broadCity).status, "accepted");
 });
 
 test("join source module fetches Next.js company page with source-local host guard", async () => {
