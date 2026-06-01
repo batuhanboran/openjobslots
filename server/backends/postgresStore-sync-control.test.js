@@ -2208,6 +2208,71 @@ async function testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants() {
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
 }
 
+async function testPayloadDriftSimilarityIgnoresOptionalEnrichmentVolume() {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/FROM source_payload_shapes/i.test(sql)) {
+        return {
+          rows: [{
+            shape_hash: "fixture-core-with-large-json",
+            shape_paths: [
+              "html:string",
+              "jobs:array",
+              "jobs[].id:string",
+              "jobs[]:object",
+              "__json:array",
+              "__json[].legacy_a:string",
+              "__json[].legacy_b:string",
+              "__json[].legacy_c:string",
+              "__json[].legacy_d:string",
+              "__json[].legacy_e:string",
+              "__json[]:object"
+            ],
+            observed_count: 19
+          }]
+        };
+      }
+      if (/UPDATE source_payload_shapes/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Optional enrichment volume should not record drift: ${sql}`);
+    }
+  };
+
+  const result = await checkAndRecordPostgresPayloadDrift(
+    pool,
+    {
+      atsKey: "fixtureats",
+      companyUrl: "https://fixture.example/jobs",
+      company: { company_name: "Fixture ATS" },
+      adapter: {
+        payloadShapePolicy: {
+          optional_enrichment_prefixes: ["__json"]
+        }
+      }
+    },
+    {
+      html: "<a href=\"/jobs/1\">Engineer</a>",
+      jobs: [{
+        id: "1",
+        department: "Engineering"
+      }],
+      __json: [{
+        current_x: "x",
+        current_y: "y",
+        current_z: "z",
+        current_nested: { value: "nested" }
+      }]
+    },
+    "source-fixtureats-v1"
+  );
+
+  assert.equal(result.drift, false);
+  assert.ok(result.similarity >= 0.55);
+  assert.ok(calls.some((call) => /UPDATE source_payload_shapes/i.test(call.sql)));
+  assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
+}
+
 async function testPayloadDriftIgnoresSourceInternalMetadataFields() {
   const calls = [];
   const pool = {
@@ -2689,6 +2754,7 @@ async function main() {
   await testPayloadDriftAllowsUltiProLocationFacetVariants();
   await testPayloadDriftAllowsHrmDirectOptionalRssEnrichment();
   await testPayloadDriftAllowsBreezyOptionalJsonAndDetailMapVariants();
+  await testPayloadDriftSimilarityIgnoresOptionalEnrichmentVolume();
   await testPayloadDriftIgnoresSourceInternalMetadataFields();
   await testPayloadDriftStillFlagsBreezyMissingHtmlCore();
   await testPublicSearchEventInsertIsPrivacyBounded();

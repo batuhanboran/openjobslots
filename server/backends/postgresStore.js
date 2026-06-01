@@ -2388,6 +2388,13 @@ function payloadShapesHaveSameCore(baselinePaths = [], observedPaths = [], polic
   return baselineCore.every((path, index) => path === observedCore[index]);
 }
 
+function payloadDriftComparableShape(shape = {}, policy, normalizeShapePathsForDrift) {
+  return {
+    ...shape,
+    shape_paths: corePayloadDriftPaths(shape?.shape_paths || [], policy, normalizeShapePathsForDrift)
+  };
+}
+
 async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersion, options = {}) {
   const { analyzePayloadShape, detectParserDrift, normalizeShapePathsForDrift } = require("../ingestion/sourceQualityPolicy");
   const atsKey = String(target?.atsKey || "").trim();
@@ -2462,12 +2469,18 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
     );
     return { drift: false, compatible_enrichment_shape: true, observed, baseline };
   }
-  const drift = detectParserDrift(
+  const comparableBaseline = payloadDriftComparableShape(
     {
       shape_hash: String(baseline.shape_hash || ""),
       shape_paths: baselinePaths
     },
-    observed,
+    payloadShapePolicy,
+    normalizeShapePathsForDrift
+  );
+  const comparableObserved = payloadDriftComparableShape(observed, payloadShapePolicy, normalizeShapePathsForDrift);
+  const drift = detectParserDrift(
+    comparableBaseline,
+    comparableObserved,
     options
   );
   if (drift.drift) {
