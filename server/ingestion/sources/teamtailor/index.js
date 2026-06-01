@@ -11,9 +11,44 @@ const parserVersion = "source-teamtailor-v1";
 const parserConfidence = 0.55;
 const discover = createDiscover();
 const fetchList = createFetchList({ discover });
+const TEAMTAILOR_CITY_COUNTRY_HINTS = Object.freeze({
+  "batumi, georgia": { city: "Batumi", country: "Georgia", region: "EMEA" },
+  "tbilisi, georgia": { city: "Tbilisi", country: "Georgia", region: "EMEA" }
+});
 
 function normalizeCompanyName(company = {}, fallback = "teamtailor") {
   return clean(company.company_name || company.companyName || company.name || fallback) || fallback;
+}
+
+function normalizeHintKey(value) {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function teamtailorCityCountryHint(locationText) {
+  return TEAMTAILOR_CITY_COUNTRY_HINTS[normalizeHintKey(locationText)] || null;
+}
+
+function applyTeamtailorSourceGeoHints(normalized) {
+  const hint = teamtailorCityCountryHint(normalized.location_text || normalized.location);
+  if (!hint) return;
+  normalized.city = hint.city;
+  normalized.country = hint.country;
+  normalized.region = hint.region;
+  normalized.source_evidence = {
+    ...(normalized.source_evidence || {}),
+    location_source: normalized.source_evidence?.location_source || "list_or_rss_location",
+    location_path: normalized.source_evidence?.location_path || "teamtailor_location_text",
+    country_source: "list_or_rss_location",
+    country_path: "teamtailor_location_text",
+    country_rule_name: "teamtailor_city_country_hint",
+    city_source: "list_or_rss_location",
+    city_path: "teamtailor_location_text",
+    city_rule_name: "teamtailor_city_country_hint"
+  };
 }
 
 function stripInternalPayloadFields(rawPayload) {
@@ -66,6 +101,7 @@ function normalize(posting, company = {}, options = {}) {
   normalized.job_posting_url = normalized.canonical_url;
   normalized.apply_url = canonicalizePostingUrl(normalized.apply_url || normalized.canonical_url);
   normalized.source_family = TEAMTAILOR_SOURCE_FAMILY;
+  applyTeamtailorSourceGeoHints(normalized);
   normalized.evidence = buildEvidenceMetadata(normalized, {
     parserVersion,
     sourceFamily: TEAMTAILOR_SOURCE_FAMILY

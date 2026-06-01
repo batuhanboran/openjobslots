@@ -576,6 +576,26 @@ test("teamtailor source module enriches blank remote country from detail JSON-LD
   assert.equal(source.validatePublic(normalized).status, "accepted");
 });
 
+test("teamtailor source module keeps Georgia country for Batumi source locations", () => {
+  const source = getSourceModule("teamtailor");
+  const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));
+  const payload = readJson(path.join(__dirname, "teamtailor", "fixtures", "georgia-rss.json"));
+
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+
+  assert.equal(normalized.source_job_id, "6026659-game-show-host");
+  assert.equal(normalized.location_text, "Batumi, Georgia");
+  assert.equal(normalized.city, "Batumi");
+  assert.equal(normalized.country, "Georgia");
+  assert.equal(normalized.region, "EMEA");
+  assert.equal(normalized.remote_type, "onsite");
+  assert.equal(normalized.source_evidence.country_rule_name, "teamtailor_city_country_hint");
+  assert.equal(normalized.source_evidence.city_rule_name, "teamtailor_city_country_hint");
+  assert.equal(source.validatePublic(normalized).status, "accepted");
+});
+
 test("teamtailor RSS/HTML merge keeps unhinted brand labels quarantined", () => {
   const source = getSourceModule("teamtailor");
   const company = readJson(path.join(__dirname, "teamtailor", "fixtures", "company.json"));
