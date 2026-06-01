@@ -20,7 +20,7 @@ function parse(rawPayload, company = {}) {
   const target = discover(company);
   const config = rawPayload?.__sourceConfig || target.config || {};
   const companyName = normalizeCompanyName(company, config.tenantLower || "isolvisolvedhire");
-  return parser.parseIsolvisolvedhirePostingsFromApi(companyName, stripInternalPayloadFields(rawPayload));
+  return parser.parseIsolvisolvedhirePostingsFromApi(companyName, stripInternalPayloadFields(rawPayload), config);
 }
 
 module.exports = {

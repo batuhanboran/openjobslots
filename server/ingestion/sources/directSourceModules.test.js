@@ -594,16 +594,35 @@ test("isolvisolvedhire source module fetches board HTML before jobs API", async 
   ]);
   assert.equal(payload.__sourceConfig.domainId, "12345");
   assert.equal(payload.__sourceConfig.apiUrl, apiUrl);
-  assert.equal(payload.data.jobs.length, 1);
+  assert.equal(payload.data.jobs.length, 4);
 
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 1);
-  const normalized = source.normalize(parsed[0], company);
+  assert.equal(parsed.length, 4);
+  const normalizedRows = parsed.map((row) => source.normalize(row, company));
+  const normalized = normalizedRows[0];
   assert.equal(normalized.source_job_id, "iso-1001");
   assert.equal(normalized.country, "United States");
   assert.equal(normalized.remote_type, "remote");
   assert.equal(normalized.posting_date, "2026-05-21");
   assert.equal(source.validatePublic(normalized).status, "accepted");
+
+  const placeholderRemote = normalizedRows.find((row) => row.source_job_id === "iso-1002");
+  assert.equal(placeholderRemote.location_text, "Remote, USA");
+  assert.equal(placeholderRemote.country, "United States");
+  assert.equal(placeholderRemote.city, "");
+  assert.equal(placeholderRemote.remote_type, "remote");
+  assert.equal(placeholderRemote.evidence.country.evidence_path, "data.jobs[].iso3");
+  assert.equal(placeholderRemote.evidence.remote_type.evidence_path, "data.jobs[].workplaceType");
+
+  const spanishUsLocation = normalizedRows.find((row) => row.source_job_id === "iso-1003");
+  assert.equal(spanishUsLocation.country, "United States");
+  assert.equal(spanishUsLocation.city, "Centereach");
+  assert.equal(spanishUsLocation.remote_type, "onsite");
+
+  const usVirginIslands = normalizedRows.find((row) => row.source_job_id === "iso-1004");
+  assert.equal(usVirginIslands.country, "U.S. Virgin Islands");
+  assert.equal(usVirginIslands.region, "North America");
+  assert.equal(usVirginIslands.remote_type, "onsite");
 
   await assert.rejects(
     () => source.fetchList(company, {

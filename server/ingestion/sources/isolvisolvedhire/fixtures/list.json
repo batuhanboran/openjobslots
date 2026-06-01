@@ -6,7 +6,52 @@
         "title": "Remote Support Coordinator",
         "jobUrl": "https://fixture.isolvedhire.com/jobs/remote-support-coordinator-iso-1001",
         "startDateRef": "2026-05-21",
-        "jobLocation": "Remote - United States"
+        "jobLocation": "Remote - United States",
+        "city": "",
+        "stateName": null,
+        "abbreviation": null,
+        "iso3": "USA",
+        "workplaceType": "Fully remote",
+        "employmentType": "Full Time"
+      },
+      {
+        "id": "iso-1002",
+        "title": "Developer Experience Architect",
+        "jobUrl": "https://fixture.isolvedhire.com/jobs/developer-experience-architect-iso-1002",
+        "startDateRef": "2026-05-27",
+        "jobLocation": "00000, US",
+        "city": "",
+        "stateName": null,
+        "abbreviation": null,
+        "iso3": "USA",
+        "workplaceType": "Fully remote",
+        "employmentType": "Full Time"
+      },
+      {
+        "id": "iso-1003",
+        "title": "Floral Merchandiser",
+        "jobUrl": "https://fixture.isolvedhire.com/jobs/floral-merchandiser-iso-1003",
+        "startDateRef": "2026-04-24",
+        "jobLocation": "Centereach, Nueva York, EE. UU., 11720",
+        "city": "Centereach",
+        "stateName": "New York",
+        "abbreviation": "NY",
+        "iso3": "USA",
+        "workplaceType": "Onsite",
+        "employmentType": "Part Time"
+      },
+      {
+        "id": "iso-1004",
+        "title": "Program Coordinator",
+        "jobUrl": "https://fixture.isolvedhire.com/jobs/program-coordinator-iso-1004",
+        "startDateRef": "2026-04-24",
+        "jobLocation": "Kingshill, St. Croix, USVI",
+        "city": "",
+        "stateName": null,
+        "abbreviation": null,
+        "iso3": "VIR",
+        "workplaceType": "Onsite",
+        "employmentType": "Full Time"
       }
     ]
   }

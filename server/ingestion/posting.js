@@ -133,6 +133,7 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Ecuador", ["ec", "ecu", "ecuador"]],
   ["Bahamas", ["bs", "bhs", "bahamas", "the bahamas"]],
   ["Puerto Rico", ["pr", "pri", "puerto rico"]],
+  ["U.S. Virgin Islands", ["vi", "vir", "usvi", "u.s. virgin islands", "us virgin islands", "united states virgin islands", "virgin islands, u.s."]],
   ["Dominican Republic", ["do", "dom", "dominican republic", "rep dom", "rep.dom"]],
   ["Jamaica", ["jm", "jam", "jamaica"]],
   ["Barbados", ["bb", "brb", "barbados"]],
@@ -522,6 +523,7 @@ function normalizeRegionFromCountry(country) {
     "dominican republic",
     "jamaica",
     "puerto rico",
+    "u.s. virgin islands",
     "trinidad and tobago"
   ].includes(normalized)) {
     return "North America";
