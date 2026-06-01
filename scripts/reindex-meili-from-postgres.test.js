@@ -8,6 +8,7 @@ const {
   ensureMeiliIndex,
   getExtraDocumentRepairSafetyGate,
   getReplaceSafetyGate,
+  inspectRemoteFacetMismatches,
   compareSettingList,
   compareMeiliDocument,
   compareFacetDistributions,
@@ -769,6 +770,60 @@ test("replace validation catches remote facet mismatch", async () => {
     assert.equal(result.ok, false);
     assert.equal(result.remote_facet_delta.remote.delta, 1);
     assert.equal(result.remote_facet_delta.unknown.delta, -1);
+    assert.equal(result.remote_facet_mismatch_inspection.sampled, 0);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("remote facet inspection samples Meili-overrepresented facet documents without writing", async () => {
+  const pool = {
+    queries: [],
+    async query(sql, params = []) {
+      this.queries.push({ sql: String(sql), params });
+      if (/canonical_url = ANY/i.test(sql)) {
+        return {
+          rows: [
+            { canonical_url: "https://example.com/jobs/remote-in-meili", remote_type: "remote", hidden: false }
+          ]
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+  const mock = installFetchMock((url, options) => {
+    const body = JSON.parse(options.body || "{}");
+    assert.equal(options.method, "POST");
+    assert.match(body.filter, /remote_type = "unknown"/);
+    if (url.endsWith("/indexes/postings/search")) {
+      return createResponse(200, {
+        hits: [
+          {
+            canonical_url: "https://example.com/jobs/remote-in-meili",
+            title: "Remote Engineer",
+            company: "Example Co",
+            remote_type: "unknown"
+          }
+        ],
+        estimatedTotalHits: 1
+      });
+    }
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await inspectRemoteFacetMismatches(
+      pool,
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
+      "postings",
+      { remote: { expected: 2, actual: 1, delta: 1 }, unknown: { expected: 0, actual: 1, delta: -1 } },
+      { sampleLimit: 5 }
+    );
+
+    assert.equal(result.sampled, 1);
+    assert.deepEqual(result.inspected_meili_remote_types, ["unknown"]);
+    assert.equal(result.samples[0].meili_remote_type, "unknown");
+    assert.equal(result.samples[0].postgres_remote_type, "remote");
+    assert.ok(pool.queries.every((query) => !/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i.test(query.sql)));
   } finally {
     mock.restore();
   }

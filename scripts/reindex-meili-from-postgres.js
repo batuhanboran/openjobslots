@@ -603,6 +603,101 @@ function summarizeSampleMismatches(samples = []) {
   return summary;
 }
 
+function quoteMeiliFilterValue(value) {
+  return JSON.stringify(String(value || ""));
+}
+
+function remoteTypesForFacetInspection(deltas = {}) {
+  return Object.entries(deltas || {})
+    .filter(([, value]) => Number(value?.delta || 0) < 0)
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+      const leftMagnitude = Math.abs(Number(leftValue?.delta || 0));
+      const rightMagnitude = Math.abs(Number(rightValue?.delta || 0));
+      return rightMagnitude - leftMagnitude || leftKey.localeCompare(rightKey);
+    })
+    .map(([key]) => key)
+    .filter(Boolean);
+}
+
+async function getPostgresRemoteTypesByCanonicalUrl(pool, canonicalUrls = []) {
+  const urls = Array.from(new Set((Array.isArray(canonicalUrls) ? canonicalUrls : [])
+    .map((url) => String(url || "").trim())
+    .filter(Boolean)));
+  if (urls.length === 0) return new Map();
+  const result = await pool.query(
+    `
+      SELECT canonical_url, remote_type, hidden
+      FROM postings
+      WHERE canonical_url = ANY($1::text[]);
+    `,
+    [urls]
+  );
+  const rows = new Map();
+  for (const row of result.rows || []) {
+    rows.set(String(row.canonical_url || "").trim(), {
+      remote_type: String(row.remote_type || "").trim(),
+      hidden: row.hidden === true
+    });
+  }
+  return rows;
+}
+
+async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacetDeltas = {}, options = {}) {
+  const sampleLimit = Math.max(0, Math.min(100, Number(options.sampleLimit ?? 20)));
+  if (!config?.enabled || !indexName || sampleLimit <= 0) return { sampled: 0, samples: [] };
+  const remoteTypes = remoteTypesForFacetInspection(remoteFacetDeltas);
+  if (remoteTypes.length === 0) return { sampled: 0, samples: [] };
+  const samples = [];
+  const perRequestLimit = Math.max(1, Math.min(100, Number(options.pageSize || 50)));
+  for (const remoteType of remoteTypes) {
+    let offset = 0;
+    while (samples.length < sampleLimit) {
+      const result = await meiliRequest(config, `/indexes/${encodeIndex(indexName)}/search`, {
+        method: "POST",
+        body: JSON.stringify({
+          q: "",
+          filter: `hidden = false AND remote_type = ${quoteMeiliFilterValue(remoteType)}`,
+          attributesToRetrieve: ["canonical_url", "title", "company", "remote_type"],
+          limit: perRequestLimit,
+          offset
+        })
+      });
+      const hits = Array.isArray(result?.hits) ? result.hits : [];
+      if (hits.length === 0) break;
+      const postgresRows = await getPostgresRemoteTypesByCanonicalUrl(
+        pool,
+        hits.map((hit) => hit?.canonical_url)
+      );
+      for (const hit of hits) {
+        const canonicalUrl = String(hit?.canonical_url || "").trim();
+        if (!canonicalUrl) continue;
+        const postgresRow = postgresRows.get(canonicalUrl);
+        const postgresRemoteType = String(postgresRow?.remote_type || "").trim();
+        const meiliRemoteType = String(hit?.remote_type || "").trim();
+        if (postgresRemoteType === meiliRemoteType && postgresRow?.hidden !== true) continue;
+        samples.push({
+          canonical_url: canonicalUrl,
+          title: String(hit?.title || "").trim(),
+          company: String(hit?.company || "").trim(),
+          meili_remote_type: meiliRemoteType,
+          postgres_remote_type: postgresRemoteType,
+          postgres_hidden: postgresRow?.hidden === true,
+          inspected_meili_facet: remoteType
+        });
+        if (samples.length >= sampleLimit) break;
+      }
+      offset += hits.length;
+      if (hits.length < perRequestLimit) break;
+    }
+    if (samples.length >= sampleLimit) break;
+  }
+  return {
+    sampled: samples.length,
+    inspected_meili_remote_types: remoteTypes,
+    samples
+  };
+}
+
 function incrementCount(target, key, amount = 1) {
   const normalizedKey = String(key || "unknown").trim() || "unknown";
   target[normalizedKey] = Number(target[normalizedKey] || 0) + Number(amount || 0);
@@ -713,6 +808,11 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
       sampleLimit: options.driftSampleLimit ?? 20
     })
     : { extra_meili_documents: [], missing_meili_documents: [] };
+  const remoteFacetMismatchInspection = config.enabled && index?.uid && remoteFacetComparison.ok === false
+    ? await inspectRemoteFacetMismatches(pool, config, indexName, remoteFacetComparison.deltas, {
+      sampleLimit: options.facetDriftSampleLimit ?? options.sampleLimit ?? 20
+    })
+    : { sampled: 0, samples: [] };
   const sampleMismatchSummary = summarizeSampleMismatches(samples.sample_mismatches);
   const sampleSearches = config.enabled && index?.uid && options.sampleSearches !== false
     ? await runSampleSearches(config, indexName)
@@ -733,6 +833,7 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
     postgres_remote_facet: postgresRemoteFacet,
     meili_remote_facet: meiliRemoteFacet,
     remote_facet_delta: remoteFacetComparison.deltas,
+    remote_facet_mismatch_inspection: remoteFacetMismatchInspection,
     meili_settings_valid: Boolean(settingsValidation.ok),
     meili_settings_mismatches: settingsValidation.mismatches || [],
     sampled: samples.sampled,
@@ -1204,6 +1305,7 @@ module.exports = {
   getMeiliRemoteFacet,
   getPostgresRemoteFacet,
   getReplaceSafetyGate,
+  inspectRemoteFacetMismatches,
   indexablePostingsWhereClause,
   meiliRequest,
   parseReindexArgs,
