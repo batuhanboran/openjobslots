@@ -113,6 +113,54 @@
       "isRemote": null,
       "locationType": "0",
       "department": "Operations"
+    },
+    {
+      "id": "1009",
+      "jobOpeningName": "Leeds Operations Lead",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1009",
+      "location": {
+        "city": "Leeds",
+        "state": "West Yorkshire"
+      },
+      "isRemote": null,
+      "locationType": "0",
+      "department": "Operations"
+    },
+    {
+      "id": "1010",
+      "jobOpeningName": "Cape Town Growth Manager",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1010",
+      "location": {
+        "city": "Bellville",
+        "state": "Western Cape"
+      },
+      "isRemote": null,
+      "locationType": "0",
+      "department": "Growth"
+    },
+    {
+      "id": "1011",
+      "jobOpeningName": "Niseko Resort Coordinator",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1011",
+      "location": {
+        "city": "Kutchan-cho, Abuta-gun",
+        "state": "Hokkaido"
+      },
+      "isRemote": null,
+      "locationType": "0",
+      "department": "Operations"
+    },
+    {
+      "id": "1012",
+      "jobOpeningName": "Lagos Dealer Manager",
+      "applicationUrl": "https://fixtureco.bamboohr.com/careers/1012",
+      "location": {
+        "city": "Ikeja",
+        "state": "Lagos"
+      },
+      "isRemote": null,
+      "locationType": "0",
+      "department": "Sales"
     }
   ]
 }

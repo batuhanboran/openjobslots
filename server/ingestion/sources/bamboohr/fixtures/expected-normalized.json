@@ -109,5 +109,61 @@
     "posting_date": null,
     "industry": "Operations",
     "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1009",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Leeds Operations Lead",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1009",
+    "country": "United Kingdom",
+    "region": "EMEA",
+    "city": "Leeds",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "Operations",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1010",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Cape Town Growth Manager",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1010",
+    "country": "South Africa",
+    "region": "EMEA",
+    "city": "Bellville",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "Growth",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1011",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Niseko Resort Coordinator",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1011",
+    "country": "Japan",
+    "region": "APAC",
+    "city": "Kutchan-cho, Abuta-gun",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "Operations",
+    "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1012",
+    "company_name": "Fixture BambooHR",
+    "position_name": "Lagos Dealer Manager",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1012",
+    "country": "Nigeria",
+    "region": "EMEA",
+    "city": "Ikeja",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "Sales",
+    "parser_confidence": 0.75
   }
 ]

@@ -92,6 +92,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof: Palmpay parsed `379` rows with `379` accepted; detail budget `15` filled `15` dates; missing country/region stayed `19`, weak remote stayed `22`, and no no-geo/weak-remote rows were accepted. BGC/Taguig stayed `Philippines` while Lagos/Ikeja/Lekki normalized to `Nigeria`.
 - No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## BambooHR Admin Region Token Evidence - June 1, 2026
+
+- Fresh read-only production baseline: BambooHR had `19,032` visible rows, `3,060` missing country/region rows, `483` weak/unknown remote rows, and `19,032` missing posting dates. Posting cache had `19,027` valid rows and `144` quarantined rows (`129` `no_geo_no_remote`, `13` `ambiguous_location`, `2` mixed).
+- The parser now maps source-local administrative region tokens to countries only when BambooHR provides a city plus state/province/admin-region evidence. Covered token families include UK counties, South African provinces, Australian states, Japanese prefectures, Nigerian `Lagos`, Indonesian provinces, and selected deterministic LATAM/APAC/EMEA administrative regions. Single-token locations such as `Cheshire` or `Rochdale` still do not infer a country.
+- Raw/expected BambooHR fixtures and direct module tests now cover `West Yorkshire -> United Kingdom`, `Western Cape -> South Africa`, `Hokkaido -> Japan`, and `Lagos -> Nigeria`, all with `bamboohr_admin_region_location` evidence.
+- Live read-only proof on the top 30 BambooHR missing-country/region tenants: the production top-list baseline had `987` missing-country/region rows; the local parser accepted `1,465` live rows, reduced missing country/region to `457`, recovered `511` rows through admin-region evidence, and kept weak remote at `0`. Example tenant deltas: `lanesgroup` `221 -> 37`, `htmniseko` `37 -> 0`, `atlashotels` `42 -> 3`, `emedgroup` `41 -> 5`.
+- BambooHR dates remain source-omitted in sampled public list JSON, so this checkpoint intentionally does not invent posting dates. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ApplicantPro ISO3 And Workplace Evidence - June 1, 2026
 
 - Fresh read-only production checks kept production at `6660eab`; public health reported `331,515` visible job slots, and `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,509`/`331,509`) with the known `22` document remote-facet drift.

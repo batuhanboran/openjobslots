@@ -56,6 +56,106 @@ const BAMBOOHR_COUNTRY_REGIONS = Object.freeze({
   Zambia: "EMEA"
 });
 
+const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
+  aberdeenshire: "United Kingdom",
+  berkshire: "United Kingdom",
+  buckinghamshire: "United Kingdom",
+  cambridgeshire: "United Kingdom",
+  cheshire: "United Kingdom",
+  "county down": "United Kingdom",
+  cumbria: "United Kingdom",
+  devon: "United Kingdom",
+  durham: "United Kingdom",
+  essex: "United Kingdom",
+  "east sussex": "United Kingdom",
+  fife: "United Kingdom",
+  gloucestershire: "United Kingdom",
+  hampshire: "United Kingdom",
+  hertfordshire: "United Kingdom",
+  highland: "United Kingdom",
+  kent: "United Kingdom",
+  lancashire: "United Kingdom",
+  leicestershire: "United Kingdom",
+  merseyside: "United Kingdom",
+  middlesex: "United Kingdom",
+  norfolk: "United Kingdom",
+  nottinghamshire: "United Kingdom",
+  northamptonshire: "United Kingdom",
+  "north yorkshire": "United Kingdom",
+  oxfordshire: "United Kingdom",
+  renfrewshire: "United Kingdom",
+  shropshire: "United Kingdom",
+  "south yorkshire": "United Kingdom",
+  "south ayrshire": "United Kingdom",
+  staffordshire: "United Kingdom",
+  "stockton-on-tees": "United Kingdom",
+  surrey: "United Kingdom",
+  somerset: "United Kingdom",
+  "tyne and wear": "United Kingdom",
+  warwickshire: "United Kingdom",
+  "west sussex": "United Kingdom",
+  "west yorkshire": "United Kingdom",
+  worcestershire: "United Kingdom",
+  wirral: "United Kingdom",
+  denbighshire: "United Kingdom",
+  "western cape": "South Africa",
+  gauteng: "South Africa",
+  "eastern cape": "South Africa",
+  "kwazulu-natal": "South Africa",
+  "kwazulu natal": "South Africa",
+  limpopo: "South Africa",
+  mpumalanga: "South Africa",
+  "north west": "South Africa",
+  "northern cape": "South Africa",
+  "free state": "South Africa",
+  "new south wales": "Australia",
+  nsw: "Australia",
+  queensland: "Australia",
+  qld: "Australia",
+  victoria: "Australia",
+  vic: "Australia",
+  "western australia": "Australia",
+  "south australia": "Australia",
+  tasmania: "Australia",
+  tas: "Australia",
+  "australian capital territory": "Australia",
+  act: "Australia",
+  "northern territory": "Australia",
+  lagos: "Nigeria",
+  hokkaido: "Japan",
+  hyogo: "Japan",
+  okinawa: "Japan",
+  "dki jakarta": "Indonesia",
+  jakarta: "Indonesia",
+  "east kalimantan": "Indonesia",
+  banten: "Indonesia",
+  bali: "Indonesia",
+  maputo: "Mozambique",
+  attica: "Greece",
+  piraeus: "Greece",
+  colima: "Mexico",
+  "miguel hidalgo": "Mexico",
+  "las condes": "Chile",
+  pudahuel: "Chile",
+  "el oro": "Ecuador",
+  ncr: "Philippines",
+  "metro manila": "Philippines",
+  "new providence": "Bahamas",
+  eleuthera: "Bahamas",
+  bergamo: "Italy",
+  lombardy: "Italy",
+  "rheinland-pfalz": "Germany",
+  munster: "Ireland",
+  "buenos aires": "Argentina",
+  "grad zagreb": "Croatia",
+  zagrebacka: "Croatia",
+  harjumaa: "Estonia",
+  riga: "Latvia",
+  "tel aviv": "Israel",
+  bangkok: "Thailand",
+  hcmc: "Vietnam"
+});
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -79,6 +179,12 @@ function normalizeBambooHrCountry(value) {
 
 function normalizeBambooHrRegion(country) {
   return BAMBOOHR_COUNTRY_REGIONS[country] || "";
+}
+
+function normalizeBambooHrAdminRegionCountry(value) {
+  const normalized = normalizeHintKey(value);
+  if (!normalized) return "";
+  return BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS[normalized] || "";
 }
 
 function isBlankLocationPart(value) {
@@ -153,6 +259,7 @@ function bambooHrStructuredLocationParts(parts) {
 
   const cityCountry = normalizeBambooHrCountry(city);
   const stateCountry = normalizeBambooHrCountry(state);
+  const stateAdminCountry = city ? normalizeBambooHrAdminRegionCountry(state) : "";
 
   if (!country && cityCountry && state && !stateCountry) {
     country = cityCountry;
@@ -168,6 +275,9 @@ function bambooHrStructuredLocationParts(parts) {
     city = "";
     state = "";
     ruleName = "bamboohr_country_token_location";
+  } else if (!country && stateAdminCountry) {
+    country = stateAdminCountry;
+    ruleName = "bamboohr_admin_region_location";
   } else if (country && stateCountry === country) {
     state = "";
     ruleName = "bamboohr_country_token_location";
@@ -381,6 +491,7 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
 }
 
 module.exports = {
+  normalizeBambooHrAdminRegionCountry,
   normalizeBambooHrCountry,
   normalizeBambooHrRegion,
   parseBambooHrPostingsFromApi

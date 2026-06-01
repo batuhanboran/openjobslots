@@ -950,6 +950,50 @@ test("bamboohr source module maps locationType and country-token structured loca
         },
         isRemote: null,
         locationType: "0"
+      },
+      {
+        id: "bhr-leeds",
+        jobOpeningName: "Leeds Operations Lead",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-leeds",
+        location: {
+          city: "Leeds",
+          state: "West Yorkshire"
+        },
+        isRemote: null,
+        locationType: "0"
+      },
+      {
+        id: "bhr-western-cape",
+        jobOpeningName: "Cape Town Growth Manager",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-western-cape",
+        location: {
+          city: "Bellville",
+          state: "Western Cape"
+        },
+        isRemote: null,
+        locationType: "0"
+      },
+      {
+        id: "bhr-hokkaido",
+        jobOpeningName: "Niseko Resort Coordinator",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-hokkaido",
+        location: {
+          city: "Kutchan-cho, Abuta-gun",
+          state: "Hokkaido"
+        },
+        isRemote: null,
+        locationType: "0"
+      },
+      {
+        id: "bhr-lagos",
+        jobOpeningName: "Lagos Dealer Manager",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-lagos",
+        location: {
+          city: "Ikeja",
+          state: "Lagos"
+        },
+        isRemote: null,
+        locationType: "0"
       }
     ]
   }, company);
@@ -996,6 +1040,42 @@ test("bamboohr source module maps locationType and country-token structured loca
   assert.equal(netherlands.remote_type, "onsite");
   assert.equal(netherlands.source_evidence.location_rule_name, "bamboohr_country_token_location");
   assert.equal(source.validatePublic(netherlands).status, "accepted");
+
+  const leeds = byId.get("bhr-leeds");
+  assert.equal(leeds.location_text, "Leeds, West Yorkshire, United Kingdom");
+  assert.equal(leeds.country, "United Kingdom");
+  assert.equal(leeds.region, "EMEA");
+  assert.equal(leeds.city, "Leeds");
+  assert.equal(leeds.remote_type, "onsite");
+  assert.equal(leeds.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(leeds).status, "accepted");
+
+  const westernCape = byId.get("bhr-western-cape");
+  assert.equal(westernCape.location_text, "Bellville, Western Cape, South Africa");
+  assert.equal(westernCape.country, "South Africa");
+  assert.equal(westernCape.region, "EMEA");
+  assert.equal(westernCape.city, "Bellville");
+  assert.equal(westernCape.remote_type, "onsite");
+  assert.equal(westernCape.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(westernCape).status, "accepted");
+
+  const hokkaido = byId.get("bhr-hokkaido");
+  assert.equal(hokkaido.location_text, "Kutchan-cho, Abuta-gun, Hokkaido, Japan");
+  assert.equal(hokkaido.country, "Japan");
+  assert.equal(hokkaido.region, "APAC");
+  assert.equal(hokkaido.city, "Kutchan-cho, Abuta-gun");
+  assert.equal(hokkaido.remote_type, "onsite");
+  assert.equal(hokkaido.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(hokkaido).status, "accepted");
+
+  const lagos = byId.get("bhr-lagos");
+  assert.equal(lagos.location_text, "Ikeja, Lagos, Nigeria");
+  assert.equal(lagos.country, "Nigeria");
+  assert.equal(lagos.region, "EMEA");
+  assert.equal(lagos.city, "Ikeja");
+  assert.equal(lagos.remote_type, "onsite");
+  assert.equal(lagos.source_evidence.location_rule_name, "bamboohr_admin_region_location");
+  assert.equal(source.validatePublic(lagos).status, "accepted");
 });
 
 function zohoFixtureContext() {
