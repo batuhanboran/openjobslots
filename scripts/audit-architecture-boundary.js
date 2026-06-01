@@ -20,6 +20,8 @@ const SOURCE_MODULE_FORBIDDEN_IMPORT_PATTERNS = Object.freeze([
   { name: "server_index_import", regex: /require\(["'](?:\.\.\/){2,3}index["']\)/ }
 ]);
 const SOURCE_COMMON_SOURCE_LOCAL_OWNERSHIP_PATTERNS = Object.freeze([
+  { name: "ashby_parser_import", regex: /require\(["']\.\/ashby\/parse["']\)/ },
+  { name: "ashby_parser_spec", regex: /ashby:\s*{[\s\S]*?parser:\s*parseAshbyPostingsFromApi/ },
   { name: "applytojob_parser_import", regex: /require\(["']\.\/applytojob\/parse["']\)/ },
   { name: "applytojob_parser_spec", regex: /applytojob:\s*{[\s\S]*?parser:\s*\([^)]*\)\s*=>\s*parseApplyToJobPostingsFromHtml/ },
   { name: "bamboohr_parser_import", regex: /require\(["']\.\/bamboohr\/parse["']\)/ },

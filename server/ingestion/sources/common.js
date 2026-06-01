@@ -1,4 +1,3 @@
-const { parseAshbyPostingsFromApi } = require("./ashby/parse");
 const { validateNormalizedPostingContract } = require("../parserContract");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../publicPostingGate");
 const { decideDetailEscalation } = require("../parserEvidence");
@@ -246,7 +245,7 @@ const SOURCE_SPECS = Object.freeze({
   ashby: {
     sourceFamily: "direct_json",
     confidence: 0.75,
-    parser: parseAshbyPostingsFromApi,
+    parser: () => [],
     officialDocs: "https://developers.ashbyhq.com/docs/public-job-posting-api",
     discover(company) {
       const organizationHostedJobsPageName = firstPathSegment(company.url_string);
