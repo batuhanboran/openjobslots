@@ -79,6 +79,7 @@ const BAMBOOHR_ADMIN_REGION_COUNTRY_HINTS = Object.freeze({
   "east sussex": "United Kingdom",
   fife: "United Kingdom",
   gloucestershire: "United Kingdom",
+  "greater london": "United Kingdom",
   hampshire: "United Kingdom",
   hertfordshire: "United Kingdom",
   highland: "United Kingdom",
@@ -254,6 +255,11 @@ function isAmbiguousBambooHrCity(value) {
   return /^(multiple|various|several|many)\b/.test(text) || /\bmultiple bases\b/.test(text);
 }
 
+function isCountryScopeBroadBambooHrCity(value) {
+  const text = normalizeHintKey(value);
+  return text === "various" || text === "various locations" || text === "various location";
+}
+
 function buildStructuredLocation(parts) {
   const values = [];
   pushUniqueText(values, parts.city);
@@ -277,39 +283,55 @@ function hasStructuredLocationValue(locationObject) {
 function bambooHrStructuredLocationParts(parts) {
   const rawCity = cleanLocationPart(parts.city);
   const hasAmbiguousCity = isAmbiguousBambooHrCity(rawCity);
+  const countryScopeBroadCity = isCountryScopeBroadBambooHrCity(rawCity);
   let city = isRemoteOnlyLocationValue(rawCity) || hasAmbiguousCity ? "" : rawCity;
   let state = cleanLocationPart(parts.state);
-  let country = cleanLocationPart(parts.country);
+  const explicitCountryRaw = cleanLocationPart(parts.country);
+  let country = explicitCountryRaw;
   let ruleName = "bamboohr_structured_location";
+  let countryScopeEligible = false;
 
   const explicitCountry = normalizeBambooHrCountry(country);
-  if (explicitCountry) country = explicitCountry;
+  if (explicitCountry) {
+    country = explicitCountry;
+    countryScopeEligible = true;
+  }
 
   const cityCountry = normalizeBambooHrCountry(city);
   const stateCountry = normalizeBambooHrCountry(state);
   const stateAdminCountry = city ? normalizeBambooHrAdminRegionCountry(state) : "";
   const cityAdminCountry = !state ? normalizeBambooHrAdminRegionCountry(city) : "";
+  const broadStateAdminCountry = countryScopeBroadCity ? normalizeBambooHrAdminRegionCountry(state) : "";
 
   if (!country && cityCountry && state && !stateCountry) {
     country = cityCountry;
     city = state;
     state = "";
     ruleName = "bamboohr_country_token_location";
+    countryScopeEligible = true;
   } else if (!country && stateCountry) {
     country = stateCountry;
     state = "";
     ruleName = "bamboohr_country_token_location";
+    countryScopeEligible = true;
   } else if (!country && cityCountry) {
     country = cityCountry;
     city = "";
     state = "";
     ruleName = "bamboohr_country_token_location";
+    countryScopeEligible = true;
   } else if (!country && cityAdminCountry) {
     country = cityAdminCountry;
     ruleName = "bamboohr_admin_region_location";
+    countryScopeEligible = true;
   } else if (!country && stateAdminCountry) {
     country = stateAdminCountry;
     ruleName = "bamboohr_admin_region_location";
+    countryScopeEligible = true;
+  } else if (!country && broadStateAdminCountry) {
+    country = broadStateAdminCountry;
+    ruleName = "bamboohr_admin_region_location";
+    countryScopeEligible = true;
   } else if (country && stateCountry === country) {
     state = "";
     ruleName = "bamboohr_country_token_location";
@@ -333,11 +355,19 @@ function bambooHrStructuredLocationParts(parts) {
     if (country) ruleName = "bamboohr_sparse_structured_location";
   }
 
+  const countryScopeLocation = countryScopeBroadCity && country && countryScopeEligible;
+  if (countryScopeLocation) {
+    ruleName = "bamboohr_country_scope_location";
+  }
+
   return {
     city,
     state,
     country,
-    location: buildStructuredLocation({ city: hasAmbiguousCity ? rawCity : city, state, country }),
+    location: countryScopeLocation
+      ? country
+      : buildStructuredLocation({ city: hasAmbiguousCity ? rawCity : city, state, country }),
+    rawLocation: buildStructuredLocation({ city: rawCity, state, country: explicitCountryRaw || country }),
     ruleName
   };
 }
@@ -457,7 +487,7 @@ function parseBambooHrPostingsFromApi(companyNameForPostings, config, responseJs
             (!countryRaw || locationPath === "result[].atsLocation")
               ? "bamboohr_sparse_structured_location"
               : structured.ruleName,
-          location_raw: location
+          location_raw: structured.rawLocation || location
         }
       : undefined;
 

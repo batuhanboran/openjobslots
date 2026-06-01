@@ -36,6 +36,13 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Live read-only proof moved two current `NORTHSTAR-BEHAVIORAL-HEALTH-NETWORK-LLC` rows and one `Empire-Marketing-Strategies` row to public-gate accepted country-scope rows while preserving concrete Paylocity city rows unchanged.
 - Verification covered Paylocity syntax checks, enterprise source-module tests with the new fixture, and live read-only parser probes. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
+## BambooHR Country-Scope Broad City - June 1, 2026
+
+- Fresh read-only cache evidence had `resurgo.bamboohr.com/careers` row `Development Coach` quarantined as `ambiguous_location` because BambooHR supplied `result[].location.city="Various"` with `state="Greater London"` and `country="United Kingdom"`.
+- BambooHR now collapses exact source broad city values `Various` / `Various Location(s)` to country-scope location text only when deterministic source country/admin-region evidence is present. The raw source label remains in `source_evidence.location_raw`; no city, tenant, title, or body inference was added.
+- Live read-only proof on Resurgo parsed `6` rows and moved `Development Coach` to public-gate accepted with `location_text="United Kingdom"`, blank city, `country="United Kingdom"`, `remote_type="onsite"`, and `bamboohr_country_scope_location` evidence.
+- Verification covered BambooHR direct source-module tests, `npm.cmd run test:backend`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --json`, `npm.cmd run ats:workbench -- --source=bamboohr --json`, `git diff --check`, and changed-file sensitive-string scanning. `release:ats-recovery:check -- --source=bamboohr --json` correctly remained blocked because no production before/after reports, guard report, preflight report, or Meili parity report were supplied. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
 - Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.

@@ -1210,6 +1210,18 @@ test("bamboohr source module maps locationType and country-token structured loca
         },
         isRemote: null,
         locationType: "0"
+      },
+      {
+        id: "bhr-various-london",
+        jobOpeningName: "London Development Coach",
+        applicationUrl: "https://fixtureco.bamboohr.com/careers/bhr-various-london",
+        location: {
+          city: "Various",
+          state: "Greater London",
+          country: "United Kingdom"
+        },
+        isRemote: null,
+        locationType: "0"
       }
     ]
   }, company);
@@ -1292,6 +1304,16 @@ test("bamboohr source module maps locationType and country-token structured loca
   assert.equal(lagos.remote_type, "onsite");
   assert.equal(lagos.source_evidence.location_rule_name, "bamboohr_admin_region_location");
   assert.equal(source.validatePublic(lagos).status, "accepted");
+
+  const variousLondon = byId.get("bhr-various-london");
+  assert.equal(variousLondon.location_text, "United Kingdom");
+  assert.equal(variousLondon.country, "United Kingdom");
+  assert.equal(variousLondon.region, "EMEA");
+  assert.equal(variousLondon.city, "");
+  assert.equal(variousLondon.remote_type, "onsite");
+  assert.equal(variousLondon.source_evidence.location_rule_name, "bamboohr_country_scope_location");
+  assert.equal(variousLondon.source_evidence.location_raw, "Various, Greater London, United Kingdom");
+  assert.equal(source.validatePublic(variousLondon).status, "accepted");
 });
 
 test("bamboohr source module maps observed source-local admin and city geo hints", () => {

@@ -165,5 +165,18 @@
     "posting_date": null,
     "industry": "Sales",
     "parser_confidence": 0.75
+  },
+  {
+    "ats_key": "bamboohr",
+    "source_job_id": "1013",
+    "company_name": "Fixture BambooHR",
+    "position_name": "London Development Coach",
+    "job_posting_url": "https://fixtureco.bamboohr.com/careers/1013",
+    "country": "United Kingdom",
+    "region": "EMEA",
+    "remote_type": "onsite",
+    "posting_date": null,
+    "industry": "Programmes",
+    "parser_confidence": 0.75
   }
 ]
