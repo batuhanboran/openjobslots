@@ -113,6 +113,21 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.ok(missingPlanGate.missing.includes("--planned-batch=<report>"));
   assert.ok(missingPlanGate.missing.includes("--predicted-guard-result=pass"));
 
+  const canaryMissingSafety = parseArgs(["--mode=canary", "--source=greenhouse"]);
+  const canaryMissingSafetyGate = getSafetyGate(canaryMissingSafety);
+  assert.equal(canaryMissingSafetyGate.apply_requested, false);
+  assert.equal(canaryMissingSafetyGate.canary_requested, true);
+  assert.equal(canaryMissingSafetyGate.production_operation_requested, true);
+  assert.equal(canaryMissingSafetyGate.operation_authorized, false);
+  assert.equal(canaryMissingSafetyGate.authorized, false);
+  assert.deepEqual(canaryMissingSafetyGate.missing, [
+    "--confirm-production",
+    "--backup-confirmed",
+    "--worker-isolated",
+    "--planned-batch=<report>",
+    "--predicted-guard-result=pass"
+  ]);
+
   const failedPrediction = parseArgs([
     "--mode=apply",
     "--source=greenhouse",
@@ -204,6 +219,24 @@ test("source runner apply requires explicit production safety flags", () => {
   assert.equal(gate.planned_batch_report_selected_tenant_count, 1);
   assert.equal(gate.planned_batch_report_selected_gain, 25);
   assert.equal(gate.predicted_guard_ok, true);
+
+  const canary = getSafetyGate({
+    ...parseArgs([
+      "--mode=canary",
+      "--source=greenhouse",
+      "--confirm-production",
+      "--backup-confirmed",
+      "--worker-isolated",
+      "--planned-batch=inline",
+      "--predicted-guard-result=pass"
+    ]),
+    plannedBatchReport: plannedBatchReport()
+  });
+  assert.equal(canary.canary_requested, true);
+  assert.equal(canary.apply_requested, false);
+  assert.equal(canary.operation_authorized, true);
+  assert.equal(canary.authorized, false);
+  assert.deepEqual(canary.missing, []);
 });
 
 test("source runner validates inline planned batch reports for unit callers", () => {
@@ -337,6 +370,44 @@ test("source runner blocks authorized writes when planned batch matches no disco
   );
 });
 
+test("source runner blocks canary operations when planned batch matches no discovered target", async () => {
+  const options = {
+    ...parseArgs([
+      "--mode=canary",
+      "--source=greenhouse",
+      "--confirm-production",
+      "--backup-confirmed",
+      "--worker-isolated",
+      "--planned-batch=inline",
+      "--predicted-guard-result=pass"
+    ]),
+    plannedBatchReport: plannedBatchReport(),
+    pool: {
+      async query(sql) {
+        if (/FROM companies c/i.test(sql)) {
+          return {
+            rows: [{
+              id: 1,
+              company_name: "Other Tenant",
+              url_string: "https://other.greenhouse.io/jobs",
+              ats_key: "greenhouse",
+              enabled: true,
+              protection_status: "normal",
+              disabled_reason: "",
+              rate_limit_ms: 0
+            }]
+          };
+        }
+        throw new Error(`unexpected query: ${sql}`);
+      }
+    }
+  };
+  await assert.rejects(
+    () => runSourceJob(options),
+    /planned batch target scope blocked: planned_batch_no_matching_discovered_targets/
+  );
+});
+
 test("source runner requires recovery readiness for canary and apply operations", async () => {
   const dryRun = parseArgs(["--mode=dry-run", "--source=dayforcehcm"]);
   assert.equal(getRecoveryReadinessGate(dryRun).required, false);
@@ -346,6 +417,18 @@ test("source runner requires recovery readiness for canary and apply operations"
   assert.equal(dayforceGate.required, true);
   assert.equal(dayforceGate.ok, true);
   assert.deepEqual(dayforceGate.blockers, []);
+
+  await assert.rejects(
+    () => runSourceJob({
+      ...parseArgs(["--mode=canary", "--source=greenhouse"]),
+      pool: {
+        async query() {
+          throw new Error("blocked canary safety should not query");
+        }
+      }
+    }),
+    /source operation safety blocked: --confirm-production, --backup-confirmed, --worker-isolated, --planned-batch=<report>, --predicted-guard-result=pass/
+  );
 
   const blockedCanary = parseArgs(["--mode=canary", "--source=not_configured_ats"]);
   const canaryGate = getRecoveryReadinessGate(blockedCanary);

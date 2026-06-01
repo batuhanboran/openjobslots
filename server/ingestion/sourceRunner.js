@@ -213,7 +213,7 @@ function scopeTargetsToPlannedBatch(targets = [], safetyGate = {}) {
     ? safetyGate.planned_batch_selected_tenants
     : [];
   const scope = selectedTenantScope(selectedTenants);
-  if (!safetyGate.authorized) {
+  if (!safetyGate.planned_batch_required) {
     return {
       required: false,
       ok: true,
@@ -250,10 +250,15 @@ function scopeTargetsToPlannedBatch(targets = [], safetyGate = {}) {
   };
 }
 
+function sourceProductionOperationRequested(options = {}) {
+  const mode = clean(options.mode || "dry-run", 40);
+  return Boolean(options.apply || mode === "canary" || mode === "apply");
+}
+
 function evaluatePlannedBatchGate(options = {}) {
-  const applyRequested = Boolean(options.apply);
+  const productionOperationRequested = sourceProductionOperationRequested(options);
   const plannedBatch = clean(options.plannedBatch || "", 2000);
-  if (!applyRequested) {
+  if (!productionOperationRequested) {
     return {
       required: false,
       ok: true,
@@ -412,29 +417,36 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
 }
 
 function getSafetyGate(options = {}) {
+  const mode = clean(options.mode || "dry-run", 40);
   const applyRequested = Boolean(options.apply);
+  const canaryRequested = mode === "canary";
+  const productionOperationRequested = sourceProductionOperationRequested(options);
   const readinessGate = getRecoveryReadinessGate(options);
   const plannedBatch = clean(options.plannedBatch || "", 2000);
   const predictedGuardResult = clean(options.predictedGuardResult || "", 80).toLowerCase();
   const plannedBatchGate = evaluatePlannedBatchGate(options);
   const predictedGuardOk = predictedGuardPassed(predictedGuardResult) && plannedBatchGate.predicted_guard_ok;
+  const operationAuthorized =
+    productionOperationRequested &&
+    Boolean(options.confirmProduction) &&
+    Boolean(options.backupConfirmed) &&
+    Boolean(options.workerIsolated) &&
+    (!applyRequested || Number(options.maxUpdates || 0) > 0) &&
+    readinessGate.ok &&
+    plannedBatch.length > 0 &&
+    plannedBatchGate.ok &&
+    predictedGuardOk;
   return {
     apply_requested: applyRequested,
-    authorized:
-      applyRequested &&
-      Boolean(options.confirmProduction) &&
-      Boolean(options.backupConfirmed) &&
-      Boolean(options.workerIsolated) &&
-      Number(options.maxUpdates || 0) > 0 &&
-      readinessGate.ok &&
-      plannedBatch.length > 0 &&
-      plannedBatchGate.ok &&
-      predictedGuardOk,
-    planned_batch_required: applyRequested,
+    canary_requested: canaryRequested,
+    production_operation_requested: productionOperationRequested,
+    operation_authorized: operationAuthorized,
+    authorized: applyRequested && operationAuthorized,
+    planned_batch_required: productionOperationRequested,
     backup_confirmed: Boolean(options.backupConfirmed),
     worker_isolated: Boolean(options.workerIsolated),
-    planned_batch_present: !applyRequested || plannedBatch.length > 0,
-    planned_batch_report_ok: !applyRequested || plannedBatchGate.ok,
+    planned_batch_present: !productionOperationRequested || plannedBatch.length > 0,
+    planned_batch_report_ok: !productionOperationRequested || plannedBatchGate.ok,
     planned_batch_report_status: plannedBatchGate.status,
     planned_batch_report_source_type: plannedBatchGate.source_type,
     planned_batch_report_source: plannedBatchGate.report_source,
@@ -445,17 +457,17 @@ function getSafetyGate(options = {}) {
     planned_batch_predicted_guard_result: plannedBatchGate.predicted_guard_result,
     planned_batch_selected_tenants: plannedBatchGate.selected_tenants || [],
     predicted_guard_result: predictedGuardResult || "",
-    predicted_guard_ok: !applyRequested || predictedGuardOk,
+    predicted_guard_ok: !productionOperationRequested || predictedGuardOk,
     recovery_readiness_gate: readinessGate,
     missing: [
-      applyRequested && !options.confirmProduction ? "--confirm-production" : "",
-      applyRequested && !options.backupConfirmed ? "--backup-confirmed" : "",
-      applyRequested && !options.workerIsolated ? "--worker-isolated" : "",
+      productionOperationRequested && !options.confirmProduction ? "--confirm-production" : "",
+      productionOperationRequested && !options.backupConfirmed ? "--backup-confirmed" : "",
+      productionOperationRequested && !options.workerIsolated ? "--worker-isolated" : "",
       applyRequested && Number(options.maxUpdates || 0) <= 0 ? "--max-updates=N" : "",
-      applyRequested && !readinessGate.ok ? "recovery-readiness-ok" : "",
-      applyRequested && plannedBatch.length <= 0 ? "--planned-batch=<report>" : "",
-      applyRequested && plannedBatch.length > 0 && !plannedBatchGate.ok ? "planned-batch-report-valid" : "",
-      applyRequested && !predictedGuardOk ? "--predicted-guard-result=pass" : ""
+      productionOperationRequested && !readinessGate.ok ? "recovery-readiness-ok" : "",
+      productionOperationRequested && plannedBatch.length <= 0 ? "--planned-batch=<report>" : "",
+      productionOperationRequested && plannedBatch.length > 0 && !plannedBatchGate.ok ? "planned-batch-report-valid" : "",
+      productionOperationRequested && !predictedGuardOk ? "--predicted-guard-result=pass" : ""
     ].filter(Boolean)
   };
 }
@@ -1451,6 +1463,16 @@ async function runSourceJob(options = parseArgs(), env = process.env) {
     summary.error_message = `source recovery readiness blocked: ${summary.recovery_readiness_gate.blockers.join(", ")}`;
     const error = new Error(summary.error_message);
     error.recoveryReadinessGate = summary.recovery_readiness_gate;
+    error.sourceRunSummary = summary;
+    throw error;
+  }
+
+  if (safetyGate.production_operation_requested && !safetyGate.operation_authorized) {
+    summary.ok = false;
+    summary.stop_reason = "source_operation_safety_blocked";
+    summary.error_message = `source operation safety blocked: ${safetyGate.missing.join(", ") || "safety gate failed"}`;
+    const error = new Error(summary.error_message);
+    error.safetyGate = safetyGate;
     error.sourceRunSummary = summary;
     throw error;
   }

@@ -3,6 +3,13 @@ const path = require("node:path");
 const { parseArgs, runSourceJob } = require("../server/ingestion/sourceRunner");
 
 function writeOutput(report, options = {}) {
+  const safetyGate = report.safety_gate || {};
+  const disabledSafetyLabel = safetyGate.production_operation_requested ? "operation" : "apply";
+  const safetyLine = safetyGate.authorized
+    ? "  apply: authorized"
+    : safetyGate.operation_authorized
+      ? "  operation: authorized; apply writes disabled"
+      : `  ${disabledSafetyLabel}: disabled${safetyGate.missing?.length ? `; missing ${safetyGate.missing.join(", ")}` : ""}`;
   if (options.output) {
     const outputPath = path.resolve(options.output);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
@@ -27,9 +34,7 @@ function writeOutput(report, options = {}) {
       `  quarantine_writes: ${report.quarantine_write_count || 0}`,
       `  stop_reason: ${report.stop_reason || ""}`,
       `  errors: ${(report.errors || []).length}`,
-      report.safety_gate?.authorized
-        ? "  apply: authorized"
-        : `  apply: disabled${report.safety_gate?.missing?.length ? `; missing ${report.safety_gate.missing.join(", ")}` : ""}`
+      safetyLine
     ].join("\n") + "\n"
   );
 }
