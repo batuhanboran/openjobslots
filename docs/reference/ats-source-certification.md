@@ -5,10 +5,10 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 ## Current Coverage
 
 - Configured ATS keys: 60.
-- Fixture-backed ATS keys: 59.
-- Strict saved raw or source-module parser-fixture-backed ATS keys: 59. Every configured ATS except `dayforcehcm` has source-backed raw/list fixtures, expected normalized fixtures, and parser rejection coverage recorded by the generated workbench.
+- Fixture-backed ATS keys: 60.
+- Strict saved raw or source-module parser-fixture-backed ATS keys: 60. Every configured ATS has source-backed raw/list fixtures, expected normalized fixtures, and parser rejection coverage recorded by the generated workbench.
 - Configured enabled ATS still pending strict raw/source-module parser fixtures: 0.
-- Disabled unsupported ATS: `dayforcehcm`.
+- Disabled after parser certification: `dayforcehcm` remains off by default until bounded live canary/direct-fetch evidence is approved.
 
 The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw or source-module parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires that parser fixture, but certification is not production promotion. Registry status, live canary quality, accepted-row volume, and Postgres/Meili parity still gate public writes.
 
@@ -80,7 +80,7 @@ npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreb
 
 The command is read-only and includes every configured ATS key, including sources with no visible rows. The generated fields now include wave priority, certification blockers, exact next parser action, public-enabled recommendation, source-id reliability, canonical URL reliability, and detail-refetch requirement.
 
-Current workbench counts: 60 configured ATS, 59 strict parser-fixture-backed, 0 partial, 0 fallback/pending, and 1 unsupported/disabled (`dayforcehcm`).
+Current workbench counts: 60 configured ATS, 60 strict parser-fixture-backed, 0 partial, 0 fallback/pending, and 1 disabled-after-certification source (`dayforcehcm`).
 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 
@@ -93,7 +93,7 @@ Subagent/work-packet findings in this certification pass:
 - Direct/hosted boards: `teamtailor`, `getro`, `freshteam`, `fountain`, `pinpointhq`, and `recruitcrm` are parser-fixture-backed; the next work is broader tenant variants, live inventory, and bounded canary proof.
 - Enterprise/brittle: `workday`, `icims`, `taleo`, `oracle`, `paylocity`, `adp_workforcenow`, `adp_myjobs`, `eightfold`, `ultipro`, `pageup`, `saphrcloud`, and `brassring` have source-module or strict raw fixtures plus invalid-shape tests. Brittle sources remain low-confidence or registry-disabled until live canaries prove tenant variants.
 - Embedded/HTML: `icims` and `applitrack` are certified but need detail-refetch-backed field repair for live data gaps. `careerplug`, `applicantpro`, `applytojob`, `breezy`, `hirebridge`, `hrmdirect`, `isolvisolvedhire`, `jobvite`, `talentreef`, `theapplicantmanager`, and `zoho` have parser fixtures; disabled sources still require live canary evidence before promotion.
-- Vendor/public-sector: all configured vendor-specific and public-sector ATS except unsupported `dayforcehcm` are parser-fixture-backed. The remaining work is live quality, source-specific field repair, canary/apply safety, and Postgres/Meili parity.
+- Vendor/public-sector: all configured vendor-specific and public-sector ATS are parser-fixture-backed. The remaining work is live quality, source-specific field repair, canary/apply safety, and Postgres/Meili parity.
 
 | ATS | Current source/parser path | Field gaps seen | Certification action |
 | --- | --- | --- | --- |
@@ -114,7 +114,7 @@ Subagent/work-packet findings in this certification pass:
 | `adp_myjobs` | ADP MyJobs token then `apply-custom-filters`. | Token discovery can silently empty; tenant arrays vary. | Parser now exports through source module, emits `reqId`, and preserves structured city/state/country; add token-missing, pagination, and multi-location variants. |
 | `adp_workforcenow` | ADP Workforce Now content links and requisitions. | Department absent and source company inference can vary. | Parser now carries `itemID` and structured city/state/country; add multi-location/no-content-links fixtures. |
 | `paylocity` | Paylocity embedded `window.pageData.Jobs`. | Missing `PublishedDate` can drop rows; embedded shape can drift. | Parser now carries `JobId`; add remote, country-only, malformed Jobs fixtures. |
-| `dayforcehcm` | Configured only; no collector implementation. | Unsupported by design. | Keep disabled until a parser, raw fixture, and validation tests exist. |
+| `dayforcehcm` | Dayforce public job board API at `jobs.dayforcehcm.com/api/geo/{clientNamespace}/jobposting/search`. | Parser fixture covers `jobPostingId`, `jobReqId`, `postingStartTimestampUTC`, `postingLocations[]`, and `hasVirtualLocation`; direct live fetch may still hit 401/403/429 until canary/fetch strategy is approved. | Keep disabled until bounded live canary and source-quality evidence prove safe direct fetch behavior. |
 | `eightfold` | Careers HTML plus Eightfold search API. | No pagination beyond start zero; group-id extraction brittle; source id absent. | Export parser, add API fixture, source id, pagination, missing group-id test. |
 | `saphrcloud` | SAP SuccessFactors API/HTML parser. | Locale/date/location brittle; live tenant variants still need canary evidence. | Source-local module owns parse behavior and keeps parser ownership out of `common.js`. Source-owned board HTML fetch plus API fixture parser carry stable source ids; add broader pagination/API fallback fixtures before promotion. |
 | `ultipro` | UKG/UltiPro search results API. | Tenant/board id parsing varies; remote weak. | Source-local module owns parse behavior and keeps parser ownership out of `common.js`. Source module carries `Id`/`opportunityId`; add pagination/count and remote/hybrid variants. |

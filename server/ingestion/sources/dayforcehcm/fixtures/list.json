@@ -1,0 +1,60 @@
+{
+  "jobPostings": [
+    {
+      "clientNamespace": "fixtureco",
+      "jobBoardId": 1,
+      "jobPostingId": 3121,
+      "jobReqId": 536,
+      "jobTitle": "Technical Project Manager",
+      "jobDescription": "Technical Project Manager (Remote)",
+      "hasVirtualLocation": true,
+      "postingStartTimestampUTC": "2026-05-29T07:00:00+00:00",
+      "postingExpiryTimestampUTC": "2026-07-30T06:59:00+00:00",
+      "postingLocations": [
+        {
+          "formattedAddress": "United States",
+          "locationId": 4,
+          "locationType": 2,
+          "isoCountryCode": "US",
+          "stateCode": null,
+          "cityName": null,
+          "coordinates": "lat:38.7945952;lng:-106.5348379"
+        }
+      ]
+    },
+    {
+      "clientNamespace": "fixtureco",
+      "jobBoardId": 1,
+      "jobPostingId": 2551,
+      "jobReqId": 225,
+      "jobTitle": "Health Economics Research Officer",
+      "jobDescription": "Status: Full time, indefinite",
+      "hasVirtualLocation": false,
+      "postingStartTimestampUTC": "2026-05-28T04:00:00+00:00",
+      "postingExpiryTimestampUTC": "2026-06-05T03:59:00+00:00",
+      "postingLocations": [
+        {
+          "formattedAddress": "154 University Ave, Toronto, ON M5H 3Y9, Canada",
+          "locationId": 2,
+          "locationType": 2,
+          "isoCountryCode": "CA",
+          "stateCode": "ON",
+          "cityName": "Toronto",
+          "coordinates": "lat:43.648414;lng:-79.3854968"
+        },
+        {
+          "formattedAddress": "865 Carling Ave, Ottawa, ON K1S 5S8, Canada",
+          "locationId": 3,
+          "locationType": 2,
+          "isoCountryCode": "CA",
+          "stateCode": "ON",
+          "cityName": "Ottawa",
+          "coordinates": "lat:45.3904;lng:-75.7223"
+        }
+      ]
+    }
+  ],
+  "maxCount": 2,
+  "offset": 0,
+  "count": 2
+}

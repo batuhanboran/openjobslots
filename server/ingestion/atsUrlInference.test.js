@@ -7,5 +7,7 @@ test("infers ATS keys from public posting URL shapes", () => {
   assert.equal(inferAtsFromJobPostingUrl("https://jobs.ashbyhq.com/example/abc"), "ashby");
   assert.equal(inferAtsFromJobPostingUrl("https://boards.greenhouse.io/example/jobs/123"), "greenhouse");
   assert.equal(inferAtsFromJobPostingUrl("https://example.myworkdayjobs.com/example/job/US/job"), "workday");
+  assert.equal(inferAtsFromJobPostingUrl("https://jobs.dayforcehcm.com/en-US/vitu/candidateportal/jobs/3121"), "dayforcehcm");
+  assert.equal(inferAtsFromJobPostingUrl("https://jobs.dayforcehcm.com/en-US/cadth/CANDIDATEPORTAL"), "dayforcehcm");
   assert.equal(inferAtsFromJobPostingUrl("https://example.com/not-an-ats"), "");
 });

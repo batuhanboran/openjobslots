@@ -1,0 +1,43 @@
+{
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture Dayforce",
+        "source_job_id": "df-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://jobs.dayforcehcm.com/en-US/fixtureco/candidateportal/jobs/df-missing-title",
+        "location": "Virtual, United States",
+        "country": "United States",
+        "remote_type": "remote"
+      }
+    },
+    {
+      "name": "missing canonical url",
+      "expected": "rejected",
+      "reason": "missing canonical_url|missing job_posting_url|invalid canonical_url",
+      "posting": {
+        "company_name": "Fixture Dayforce",
+        "source_job_id": "df-missing-url",
+        "position_name": "Missing URL Role",
+        "job_posting_url": "",
+        "location": "Virtual, United States",
+        "country": "United States",
+        "remote_type": "remote"
+      }
+    },
+    {
+      "name": "no geo and no remote evidence",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "company_name": "Fixture Dayforce",
+        "source_job_id": "df-no-geo",
+        "position_name": "Source Limited Role",
+        "job_posting_url": "https://jobs.dayforcehcm.com/en-US/fixtureco/candidateportal/jobs/df-no-geo"
+      }
+    }
+  ]
+}

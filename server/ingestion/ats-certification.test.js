@@ -53,13 +53,13 @@ test("date certification never allows invented URL or title inference", () => {
   }
 });
 
-test("unsupported dayforcehcm stays disabled until a real parser exists", () => {
+test("dayforcehcm parser certification stays disabled by sync defaults", () => {
   const records = buildAtsCertificationRecords(ATS_FILTER_OPTION_ITEMS.map((item) => item.value));
-  assert.equal(records.dayforcehcm.certificationStatus, "unsupported");
-  assert.equal(records.dayforcehcm.fieldDecisions.geo.status, "unsupported");
-  assert.equal(records.dayforcehcm.fieldDecisions.date.status, "unsupported");
-  assert.equal(records.dayforcehcm.fieldDecisions.remote.status, "unsupported");
-  assert.equal(records.dayforcehcm.fieldDecisions.sourceId.status, "unsupported");
+  assert.equal(records.dayforcehcm.certificationStatus, "parser-fixture-backed");
+  assert.equal(records.dayforcehcm.fieldDecisions.geo.status, "list-payload");
+  assert.equal(records.dayforcehcm.fieldDecisions.date.status, "list-payload");
+  assert.equal(records.dayforcehcm.fieldDecisions.remote.status, "list-payload");
+  assert.equal(records.dayforcehcm.fieldDecisions.sourceId.status, "list-payload");
   assert.equal(normalizeSyncEnabledAts().includes("dayforcehcm"), false);
 });
 

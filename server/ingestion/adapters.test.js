@@ -218,15 +218,16 @@ test("strict parser-backed metadata is separate from normalized fixture coverage
   assert.equal(getAdapterMetadata("teamtailor").parserFixtureStatus, "parser-fixture-backed");
 });
 
-test("dayforcehcm is configured but disabled until parser certification exists", () => {
+test("dayforcehcm is parser-fixture-backed but disabled until live fetch canary is approved", () => {
   const adapter = adapters.get("dayforcehcm");
   const metadata = getAdapterMetadata("dayforcehcm", "Dayforce");
   assert.ok(adapter, "dayforcehcm remains discoverable for admin diagnostics");
-  assert.equal(UNSUPPORTED_LEGACY_FETCH_ATS.has("dayforcehcm"), true);
+  assert.equal(UNSUPPORTED_LEGACY_FETCH_ATS.has("dayforcehcm"), false);
   assert.equal(isAtsEnabledByDefault("dayforcehcm"), false);
   assert.equal(metadata.enabledByDefault, false);
-  assert.equal(metadata.fixtureStatus, "unsupported");
-  assert.equal(metadata.confidence, "unsupported");
+  assert.equal(metadata.fixtureStatus, "fixture-backed");
+  assert.equal(metadata.parserFixtureStatus, "parser-fixture-backed");
+  assert.equal(metadata.confidence, "medium-low");
   assert.equal(normalizeSyncEnabledAts().includes("dayforcehcm"), false);
   assert.deepEqual(normalizeSyncEnabledAts(["dayforcehcm"]), []);
 });

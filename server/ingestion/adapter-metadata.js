@@ -76,7 +76,8 @@ const PUBLIC_SECTOR_EDUCATION = [
 ];
 
 const BRITTLE_HIGH_RISK = ["taleo", "brassring"];
-const UNSUPPORTED_ATS = new Set(["dayforcehcm"]);
+const UNSUPPORTED_ATS = new Set([]);
+const DISABLED_BY_DEFAULT_ATS = new Set(["dayforcehcm"]);
 
 const SOURCE_FIXTURE_BACKED_ATS = [
   "adp_myjobs",
@@ -94,6 +95,7 @@ const SOURCE_FIXTURE_BACKED_ATS = [
   "careerplug",
   "careerpuck",
   "careerspage",
+  "dayforcehcm",
   "eightfold",
   "fountain",
   "freshteam",
@@ -204,6 +206,18 @@ const ADAPTER_CERTIFICATION_DETAILS = Object.freeze({
     expectedFailureModes: ["missing externalPath", "blank title", "generic postedOn text without exact date"],
     fixtureCoverageCount: 2,
     confidenceLevel: "medium"
+  },
+  dayforcehcm: {
+    sourceEndpointPattern: "POST https://jobs.dayforcehcm.com/api/geo/{clientNamespace}/jobposting/search",
+    paginationBehavior: "Search body carries paginationStart; response exposes offset, count, maxCount, and jobPostings[].",
+    detailPageRequirement: "Not required for core fields when the search API returns jobPostingId, title, locations, virtual flag, and posting timestamp.",
+    dateParsingRule: "Use postingStartTimestampUTC when present; do not infer dates from canonical URL or title.",
+    locationParsingRule: "Use postingLocations[].isoCountryCode, stateCode, cityName, and formattedAddress; virtual rows may only expose country.",
+    remoteParsingRule: "hasVirtualLocation true maps to remote; structured physical locations with one concrete country map to onsite.",
+    canonicalUrlRule: "Build {boardUrl}/jobs/{jobPostingId} from the discovered culture/clientNamespace/jobBoardCode route.",
+    expectedFailureModes: ["401/403/429 bot or rate-limit response", "missing jobPostingId", "missing board route", "blank title"],
+    fixtureCoverageCount: 2,
+    confidenceLevel: "medium-low"
   },
   taleo: {
     sourceEndpointPattern: "Taleo careersection REST/AJAX jobsearch endpoints.",
@@ -325,7 +339,8 @@ function getParserFixtureStatus(atsKey) {
 }
 
 function isAtsEnabledByDefault(atsKey) {
-  return !UNSUPPORTED_ATS.has(String(atsKey || "").trim().toLowerCase());
+  const key = String(atsKey || "").trim().toLowerCase();
+  return !UNSUPPORTED_ATS.has(key) && !DISABLED_BY_DEFAULT_ATS.has(key);
 }
 
 function getDefaultConfidence(atsKey) {
@@ -374,6 +389,7 @@ module.exports = {
   AGGREGATOR_SOURCE_CANDIDATES,
   BRITTLE_HIGH_RISK,
   DIRECT_JSON_STABLE,
+  DISABLED_BY_DEFAULT_ATS,
   EMBEDDED_OR_SEMI_STRUCTURED,
   ENTERPRISE_DIRECT,
   FIXTURE_BACKED,

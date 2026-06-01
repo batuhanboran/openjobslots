@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-01T08:54:17.550Z",
+  "generated_at": "2026-06-01T10:58:40.520Z",
   "ats_count": 60,
   "status_counts": {
     "certified": 59,
-    "unsupported": 1
+    "disabled": 1
   },
   "source_family_counts": {
     "enterprise_api": 10,
@@ -346,10 +346,10 @@
     },
     {
       "ats_key": "dayforcehcm",
-      "status": "unsupported",
-      "registry_status": "unsupported",
+      "status": "disabled",
+      "registry_status": "disabled",
       "public_enabled_recommendation": false,
-      "reason": "unsupported source; no implemented adapter"
+      "reason": "disabled until live canary and source-quality evidence are approved"
     },
     {
       "ats_key": "eightfold",
@@ -576,17 +576,7 @@
       "reason": "registry status is canary; parser certification is not production promotion"
     }
   ],
-  "fixture_gaps": [
-    {
-      "ats_key": "dayforcehcm",
-      "missing": [
-        "raw source fixture",
-        "expected normalized fixture",
-        "parser rejection tests"
-      ],
-      "next_action": "keep disabled; implement source-backed adapter only with raw fixtures"
-    }
-  ],
+  "fixture_gaps": [],
   "sources": [
     {
       "ats_key": "adp_myjobs",
@@ -741,9 +731,9 @@
     {
       "ats_key": "dayforcehcm",
       "file": "sources/dayforcehcm.json",
-      "current_status": "unsupported",
+      "current_status": "disabled",
       "source_family": "enterprise_api",
-      "registry_status": "unsupported",
+      "registry_status": "disabled",
       "public_enabled_recommendation": false,
       "public_enabled": false,
       "risk_score": -65

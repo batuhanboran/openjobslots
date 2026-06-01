@@ -37,9 +37,9 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("icims").registry_status, "registry-backed-enabled");
 
   assert.equal(byKey.get("dayforcehcm").family, "enterprise-direct");
-  assert.equal(byKey.get("dayforcehcm").registry_status, "unsupported");
-  assert.equal(byKey.get("dayforcehcm").recovery_readiness.status, "blocked");
-  assert.ok(byKey.get("dayforcehcm").recovery_readiness.blockers.includes("unsupported source"));
+  assert.equal(byKey.get("dayforcehcm").registry_status, "registry-backed-disabled");
+  assert.equal(byKey.get("dayforcehcm").recovery_readiness.status, "ready-for-read-only-recovery");
+  assert.deepEqual(byKey.get("dayforcehcm").recovery_readiness.blockers, []);
 
   assert.equal(byKey.get("zoho").registry_status, "registry-backed-canary");
   assert.equal(byKey.get("peopleforce").registry_status, "registry-backed-disabled");
@@ -53,12 +53,12 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("paycomonline").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").registry_status, "research-only");
   assert.equal(byKey.get("paycomonline").recovery_readiness.status, "research-only");
-  assert.ok(payload.summary.read_only_recovery_ready_count >= 59);
+  assert.ok(payload.summary.read_only_recovery_ready_count >= 60);
   assert.deepEqual(
     payload.summary.recovery_readiness_blockers
       .filter((item) => item.status === "blocked")
       .map((item) => item.ats_key),
-    ["dayforcehcm"]
+    []
   );
 }
 

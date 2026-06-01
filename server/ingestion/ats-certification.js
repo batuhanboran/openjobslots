@@ -11,7 +11,7 @@ const {
   getParserFixtureStatus
 } = require("./adapter-metadata");
 
-const CERTIFICATION_VERSION = "ats-field-certification-v1.5.21";
+const CERTIFICATION_VERSION = "ats-field-certification-v1.5.22";
 
 const CERTIFICATION_STATUSES = new Set([
   "parser-fixture-backed",
@@ -368,11 +368,17 @@ const ATS_CERTIFICATION_OVERRIDES = {
     }
   },
   dayforcehcm: {
-    priority: "P4",
-    sourcePattern: "Unsupported until a stable public Dayforce source is certified.",
-    parserPath: "none",
-    certificationStatus: "unsupported",
-    requiredFixtures: ["collector implementation", "raw source fixture", "validation fixture"]
+    priority: "P2",
+    sourcePattern: "Dayforce public job board API at jobs.dayforcehcm.com/api/geo/{clientNamespace}/jobposting/search.",
+    parserPath: "server/ingestion/sources/dayforcehcm/parse.js parseDayforceHcmPostingsFromApi",
+    requiredFixtures: ["jobposting search API response fixture", "expected normalized fixture", "invalid shape fixture"],
+    notes: "Parser is fixture-backed and disabled by default; direct live fetch may return 401/403/429 until canary/fetch strategy is approved.",
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved API fixture covers postingLocations[].isoCountryCode, stateCode, cityName, and formattedAddress evidence."),
+      date: decision("list-payload", "Saved API fixture preserves postingStartTimestampUTC as the source posting date when exposed."),
+      remote: decision("list-payload", "Saved API fixture maps hasVirtualLocation true to remote and structured physical locations to onsite."),
+      sourceId: decision("list-payload", "Saved API fixture covers jobPostings[].jobPostingId as source_job_id while preserving jobReqId as evidence.")
+    }
   }
 };
 
@@ -391,6 +397,7 @@ const ATS_SOURCE_PATTERNS = {
   careerplug: "CareerPlug public jobs HTML.",
   careerpuck: "CareerPuck public board JSON.",
   careerspage: "CareersPage public HTML.",
+  dayforcehcm: "Dayforce public job board API.",
   eightfold: "Eightfold careers HTML plus search API.",
   fountain: "Fountain board .json openings.",
   freshteam: "Freshteam public board HTML.",
@@ -448,6 +455,7 @@ const PARSER_PATHS = {
   careerplug: "server/ingestion/sources/careerplug/parse.js parseCareerplugPostingsFromHtml",
   careerpuck: "server/ingestion/sources/careerpuck/parse.js parseCareerpuckPostingsFromApi",
   careerspage: "server/ingestion/sources/careerspage/parse.js parseCareerspagePostingsFromHtml",
+  dayforcehcm: "server/ingestion/sources/dayforcehcm/parse.js parseDayforceHcmPostingsFromApi",
   eightfold: "server/ingestion/sources/eightfold/parse.js parseEightfoldPostingsFromApi",
   fountain: "server/ingestion/sources/fountain/parse.js parseFountainPostingsFromApi",
   freshteam: "server/ingestion/sources/freshteam/parse.js parseFreshteamPostingsFromHtml",

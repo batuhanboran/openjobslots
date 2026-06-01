@@ -62,7 +62,7 @@ The v1.6 hardening batch promoted:
 - `hrmdirect` still has normalized fixture coverage but no strict saved raw fixture.
 - `teamtailor`, `freshteam`, `getro`, `jobvite`, and most vendor/public-sector boards still need raw fixtures.
 - `taleo` has raw REST coverage but remains low-confidence until AJAX and tenant-specific column variants are saved.
-- `dayforcehcm` stays disabled/unsupported until a public source, parser, fixtures, and rate-limit policy exist.
+- `dayforcehcm` has source-local parser fixtures but stays disabled until bounded live canary/direct-fetch evidence and rate-limit policy are approved.
 
 ## Validation Commands
 

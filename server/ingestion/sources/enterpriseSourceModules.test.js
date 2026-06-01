@@ -11,6 +11,7 @@ const ENTERPRISE_SOURCES = Object.freeze([
   "taleo",
   "oracle",
   "paylocity",
+  "dayforcehcm",
   "adp_workforcenow",
   "adp_myjobs",
   "eightfold",
@@ -214,6 +215,124 @@ test("paylocity source fetchList rejects redirect to unexpected host", async () 
     }),
     /Paylocity URL redirected to unexpected host:/
   );
+});
+
+test("dayforcehcm discovery builds board and search API routes", () => {
+  const source = getSourceModule("dayforcehcm");
+  const sourceDir = path.join(__dirname, "dayforcehcm");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+
+  const discovered = source.discover(company);
+
+  assert.equal(discovered.ats_key, "dayforcehcm");
+  assert.equal(discovered.source_family, "enterprise_api");
+  assert.equal(discovered.list_url, "https://jobs.dayforcehcm.com/api/geo/fixtureco/jobposting/search");
+  assert.equal(discovered.config.cultureCode, "en-US");
+  assert.equal(discovered.config.clientNamespace, "fixtureco");
+  assert.equal(discovered.config.jobBoardCode, "candidateportal");
+  assert.equal(discovered.config.boardUrl, "https://jobs.dayforcehcm.com/en-US/fixtureco/candidateportal");
+});
+
+test("dayforcehcm fetchList posts search body, paginates, and keeps source metadata", async () => {
+  const source = getSourceModule("dayforcehcm");
+  const sourceDir = path.join(__dirname, "dayforcehcm");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const fixture = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const requests = [];
+
+  const raw = await source.fetchList(company, {
+    maxPages: 2,
+    fetcher: async (url, request) => {
+      requests.push({ url, requestBody: JSON.parse(request.body), page: request.page });
+      if (request.page === 1) {
+        return {
+          status: 200,
+          url,
+          body: JSON.stringify({
+            ...fixture,
+            jobPostings: fixture.jobPostings.slice(0, 1),
+            maxCount: 2,
+            offset: 0,
+            count: 1
+          })
+        };
+      }
+      return {
+        status: 200,
+        url,
+        body: JSON.stringify({
+          ...fixture,
+          jobPostings: fixture.jobPostings.slice(1),
+          maxCount: 2,
+          offset: 1,
+          count: 1
+        })
+      };
+    }
+  });
+
+  assert.deepEqual(requests.map((request) => request.url), [
+    "https://jobs.dayforcehcm.com/api/geo/fixtureco/jobposting/search",
+    "https://jobs.dayforcehcm.com/api/geo/fixtureco/jobposting/search"
+  ]);
+  assert.deepEqual(requests.map((request) => request.requestBody.paginationStart), [0, 1]);
+  assert.deepEqual(requests[0].requestBody, {
+    clientNamespace: "fixtureco",
+    jobBoardCode: "candidateportal",
+    cultureCode: "en-US",
+    distanceUnit: 0,
+    paginationStart: 0
+  });
+  assert.equal(raw.pages.length, 2);
+  assert.equal(raw.__sourceFetchFinalUrl, "https://jobs.dayforcehcm.com/api/geo/fixtureco/jobposting/search");
+  assert.equal(raw.__sourceRequest.boardUrl, "https://jobs.dayforcehcm.com/en-US/fixtureco/candidateportal");
+  assert.equal(raw.__sourceRequest.rateLimitMs, 60 * 1000);
+
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 2);
+  assert.deepEqual(parsed.map((posting) => posting.source_job_id), ["3121", "2551"]);
+});
+
+test("dayforcehcm fetchList rejects redirect to unexpected host", async () => {
+  const source = getSourceModule("dayforcehcm");
+  const sourceDir = path.join(__dirname, "dayforcehcm");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async (url) => ({
+        status: 200,
+        url: "https://malicious.example.com/api/geo/fixtureco/jobposting/search",
+        body: JSON.stringify({ jobPostings: [], maxCount: 0, offset: 0, count: 0 })
+      })
+    }),
+    /Dayforce URL redirected to unexpected host:/
+  );
+});
+
+test("dayforcehcm preserves virtual and structured physical location evidence", () => {
+  const source = getSourceModule("dayforcehcm");
+  const sourceDir = path.join(__dirname, "dayforcehcm");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const remoteUs = byId.get("3121");
+  assert.equal(remoteUs.country, "United States");
+  assert.equal(remoteUs.remote_type, "remote");
+  assert.equal(remoteUs.source_evidence.country_path, "jobPostings[].postingLocations[].isoCountryCode");
+  assert.equal(remoteUs.source_evidence.remote_path, "jobPostings[].hasVirtualLocation");
+  assert.equal(remoteUs.source_evidence.remote_rule_name, "dayforce_virtual_location_true");
+  assert.equal(source.validatePublic(remoteUs).status, "accepted");
+
+  const onsiteCanada = byId.get("2551");
+  assert.equal(onsiteCanada.country, "Canada");
+  assert.equal(onsiteCanada.remote_type, "onsite");
+  assert.equal(onsiteCanada.source_evidence.location_path, "jobPostings[].postingLocations[]");
+  assert.equal(onsiteCanada.source_evidence.remote_rule_name, "dayforce_structured_physical_location");
+  assert.equal(source.validatePublic(onsiteCanada).status, "accepted");
 });
 
 test("oracle source module preserves structured work-location and country-hint evidence", () => {

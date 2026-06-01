@@ -168,7 +168,7 @@ function wavePriority(row) {
 
 function blockerFor(row) {
   if (row.current_status === "unsupported") return "unsupported source; no implemented adapter";
-  if (row.current_status === "disabled") return "disabled until fixtures and parser exist";
+  if (row.current_status === "disabled") return "disabled until live canary and source-quality evidence are approved";
   const blockers = [];
   if (row.current_status !== "certified") blockers.push("missing strict raw parser fixture");
   if (row.missing_any_geo_pct >= 50) blockers.push("high missing normalized geo");
@@ -180,7 +180,7 @@ function blockerFor(row) {
 
 function nextActionFor(row) {
   if (row.current_status === "unsupported") return "keep disabled; implement source-backed adapter only with raw fixtures";
-  if (row.current_status === "disabled") return "keep disabled until direct parser, fixtures, and rate-limit policy exist";
+  if (row.current_status === "disabled") return "keep disabled until bounded live canary and source-quality evidence are approved";
   if (row.detail_refetch_needed) return "add or run bounded detail-refetch certification for missing geo/remote evidence";
   if (row.current_status !== "certified") return "add saved raw response fixture, expected normalized fixture, invalid-shape rejection test";
   if (row.missing_any_geo_pct >= 20 || row.weak_remote_pct >= 20) return "audit raw payloads and add field-specific parser/backfill fixture";

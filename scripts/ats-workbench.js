@@ -232,7 +232,9 @@ function qualityThresholdFor(row) {
     return {
       mode: "disabled",
       minimum_confidence: 1,
-      public_write_rule: "no public writes until adapter and fixtures exist"
+      public_write_rule: row.current_status === "unsupported"
+        ? "no public writes until adapter and fixtures exist"
+        : "no public writes until bounded live canary, source-quality evidence, and recovery guard pass"
     };
   }
   if (row.current_status !== "certified") {

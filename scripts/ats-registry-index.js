@@ -427,7 +427,7 @@ function buildSummary(targets) {
       "registry-backed enabled sources with ready recovery contracts",
       "registry-backed canary or quarantine sources with read-only inventory first",
       "registry-backed disabled sources after fixture and canary evidence",
-      "unsupported source modules after parser certification exists",
+      "sources blocked by missing parser certification after source-backed fixtures exist",
       "future-candidate research packets"
     ]
   };

@@ -43,7 +43,7 @@ function testScoreboardIncludesConfiguredAtsWithoutRows() {
   assert.equal(rows.length, 2);
   assert.equal(find(rows, "greenhouse").current_production_row_count, 10);
   assert.equal(find(rows, "greenhouse").parser_fixture_status, "parser-fixture-backed");
-  assert.equal(find(rows, "dayforcehcm").current_status, "unsupported");
+  assert.equal(find(rows, "dayforcehcm").current_status, "disabled");
   assert.equal(find(rows, "dayforcehcm").should_be_public_enabled, false);
 }
 
@@ -117,7 +117,7 @@ function testSummaryCountsAndRecommendations() {
   const summary = buildSummary(rows);
 
   assert.equal(summary.configured_ats_count, 3);
-  assert.equal(summary.status_counts.unsupported, 1);
+  assert.equal(summary.status_counts.disabled, 1);
   assert.ok(summary.top_15_quality_risk.some((row) => row.ats_key === "brassring"));
   assert.ok(summary.disabled_or_quarantine_recommendations.some((row) => row.ats_key === "dayforcehcm"));
 }

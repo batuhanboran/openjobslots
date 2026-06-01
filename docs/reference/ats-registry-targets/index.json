@@ -1,33 +1,22 @@
 {
   "ok": true,
-  "generated_at": "2026-05-31T23:43:20.198Z",
+  "generated_at": "2026-06-01T10:58:46.437Z",
   "summary": {
     "configured_ats_count": 60,
     "future_candidate_count": 30,
     "registry_status_counts": {
       "research-only": 30,
-      "registry-backed-disabled": 35,
+      "registry-backed-disabled": 36,
       "registry-backed-enabled": 20,
       "registry-backed-quarantine": 3,
-      "unsupported": 1,
       "registry-backed-canary": 1
     },
     "recovery_readiness_counts": {
       "research-only": 30,
-      "ready-for-read-only-recovery": 59,
-      "blocked": 1
+      "ready-for-read-only-recovery": 60
     },
-    "read_only_recovery_ready_count": 59,
-    "recovery_readiness_blockers": [
-      {
-        "ats_key": "dayforcehcm",
-        "registry_status": "unsupported",
-        "status": "blocked",
-        "blockers": [
-          "unsupported source"
-        ]
-      }
-    ],
+    "read_only_recovery_ready_count": 60,
+    "recovery_readiness_blockers": [],
     "family_counts": {
       "future-candidate": 30,
       "enterprise-direct": 10,
@@ -41,7 +30,7 @@
       "registry-backed enabled sources with ready recovery contracts",
       "registry-backed canary or quarantine sources with read-only inventory first",
       "registry-backed disabled sources after fixture and canary evidence",
-      "unsupported source modules after parser certification exists",
+      "sources blocked by missing parser certification after source-backed fixtures exist",
       "future-candidate research packets"
     ]
   },
@@ -175,6 +164,13 @@
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
         {
+          "ats_key": "dayforcehcm",
+          "registry_status": "registry-backed-disabled",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/dayforcehcm/index.js",
+          "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
+        },
+        {
           "ats_key": "eightfold",
           "registry_status": "registry-backed-disabled",
           "recovery_readiness": "ready-for-read-only-recovery",
@@ -208,13 +204,6 @@
           "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/workday/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
-        },
-        {
-          "ats_key": "dayforcehcm",
-          "registry_status": "unsupported",
-          "recovery_readiness": "blocked",
-          "source_module": "server/ingestion/sources/dayforcehcm/index.js",
-          "next_action": "Do not run live sync; add raw fixtures, parser certification, and source module before registry enablement."
         }
       ]
     },
@@ -795,7 +784,7 @@
       "display_name": "ADP MyJobs",
       "family": "enterprise-direct",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -808,8 +797,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -993,7 +982,7 @@
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/applicantai/index.js",
@@ -1005,7 +994,7 @@
         "missing_city_pct": 97.26,
         "missing_any_geo_pct": 98.63,
         "weak_remote_pct": 4.79,
-        "risk_score": 178.83,
+        "risk_score": 143.83,
         "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
@@ -1483,7 +1472,7 @@
       "display_name": "BrassRing",
       "family": "brittle-high-risk",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -1496,7 +1485,7 @@
         "missing_city_pct": 73.74,
         "missing_any_geo_pct": 100,
         "weak_remote_pct": 98.04,
-        "risk_score": 218.54,
+        "risk_score": 183.54,
         "wave_priority": "wave-1-live-gap",
         "detail_refetch_needed": true
       },
@@ -1693,8 +1682,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -1767,8 +1756,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -1902,7 +1891,7 @@
       "display_name": "CareerPuck",
       "family": "vendor-specific",
       "registry_status": "registry-backed-enabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": true,
       "source_module": {
         "present": true,
@@ -1915,8 +1904,8 @@
         "missing_city_pct": 38.09,
         "missing_any_geo_pct": 41.46,
         "weak_remote_pct": 6.38,
-        "risk_score": 104.23,
-        "wave_priority": "wave-3-certification",
+        "risk_score": 69.23,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -1976,8 +1965,8 @@
       "display_name": "CareersPage",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/careerspage/index.js",
@@ -1989,8 +1978,8 @@
         "missing_city_pct": 73.71,
         "missing_any_geo_pct": 94.03,
         "weak_remote_pct": 32.37,
-        "risk_score": 182.88,
-        "wave_priority": "wave-1-live-gap",
+        "risk_score": 147.88,
+        "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -2147,8 +2136,8 @@
       "ats_key": "dayforcehcm",
       "display_name": "Dayforce",
       "family": "enterprise-direct",
-      "registry_status": "unsupported",
-      "current_status": "unsupported",
+      "registry_status": "registry-backed-disabled",
+      "current_status": "disabled",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -2179,20 +2168,28 @@
         "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "blocked",
+        "status": "ready-for-read-only-recovery",
         "source_contract_ok": true,
-        "public_gate": false,
-        "quality_threshold": false,
-        "rate_limit": false,
+        "public_gate": true,
+        "quality_threshold": true,
+        "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/dayforcehcm/fixtures/company.json",
+            "server/ingestion/sources/dayforcehcm/fixtures/list.json",
+            "server/ingestion/sources/dayforcehcm/fixtures/expected-normalized.json",
+            "server/ingestion/sources/dayforcehcm/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/dayforcehcm/fixtures/company.json",
+            "server/ingestion/sources/dayforcehcm/fixtures/list.json",
+            "server/ingestion/sources/dayforcehcm/fixtures/expected-normalized.json",
+            "server/ingestion/sources/dayforcehcm/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "unsupported source"
-        ],
+        "blockers": [],
         "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
         "required_gate_sequence": [
           "source_test",
@@ -2208,7 +2205,7 @@
           "release_check"
         ]
       },
-      "next_action": "Do not run live sync; add raw fixtures, parser certification, and source module before registry enablement.",
+      "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first.",
       "work_packet": "docs/reference/ats-workbench/sources/dayforcehcm.json"
     },
     {
@@ -2265,8 +2262,8 @@
       "display_name": "Eightfold",
       "family": "enterprise-direct",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/eightfold/index.js",
@@ -2278,8 +2275,8 @@
         "missing_city_pct": 45.59,
         "missing_any_geo_pct": 45.59,
         "weak_remote_pct": 4.49,
-        "risk_score": 102.75,
-        "wave_priority": "wave-3-certification",
+        "risk_score": 67.75,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -2462,8 +2459,8 @@
       "display_name": "Freshteam",
       "family": "direct-json-stable",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/freshteam/index.js",
@@ -2475,8 +2472,8 @@
         "missing_city_pct": 83.59,
         "missing_any_geo_pct": 83.59,
         "weak_remote_pct": 1.22,
-        "risk_score": 142.85,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 107.85,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -2536,8 +2533,8 @@
       "display_name": "Gem",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/gem/index.js",
@@ -2549,7 +2546,7 @@
         "missing_city_pct": 96.36,
         "missing_any_geo_pct": 96.54,
         "weak_remote_pct": 19.24,
-        "risk_score": 165.68,
+        "risk_score": 130.68,
         "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
@@ -2610,8 +2607,8 @@
       "display_name": "Getro",
       "family": "direct-json-stable",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/getro/index.js",
@@ -2623,8 +2620,8 @@
         "missing_city_pct": 30.72,
         "missing_any_geo_pct": 31.25,
         "weak_remote_pct": 22.71,
-        "risk_score": 105.03,
-        "wave_priority": "wave-3-certification",
+        "risk_score": 70.03,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -2684,7 +2681,7 @@
       "display_name": "GovernmentJobs",
       "family": "public-sector-education",
       "registry_status": "registry-backed-enabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": true,
       "source_module": {
         "present": true,
@@ -2697,8 +2694,8 @@
         "missing_city_pct": 100,
         "missing_any_geo_pct": 100,
         "weak_remote_pct": 14.05,
-        "risk_score": 157.35,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 122.35,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -2845,8 +2842,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -2919,8 +2916,8 @@
         "missing_city_pct": 66.63,
         "missing_any_geo_pct": 95.43,
         "weak_remote_pct": 77.5,
-        "risk_score": 202.61,
-        "wave_priority": "wave-1-live-gap",
+        "risk_score": 167.61,
+        "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -3140,8 +3137,8 @@
         "missing_city_pct": 75.64,
         "missing_any_geo_pct": 75.92,
         "weak_remote_pct": 8.14,
-        "risk_score": 131.72,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 113.72,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -3275,7 +3272,7 @@
       "display_name": "isolvedhire",
       "family": "embedded-or-semi-structured",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -3288,8 +3285,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -3398,8 +3395,8 @@
       "display_name": "JobAps",
       "family": "public-sector-education",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/jobaps/index.js",
@@ -3411,8 +3408,8 @@
         "missing_city_pct": 37.82,
         "missing_any_geo_pct": 67.12,
         "weak_remote_pct": 60.83,
-        "risk_score": 161.03,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 126.03,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -3571,7 +3568,7 @@
       "family": "embedded-or-semi-structured",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/jobvite/index.js",
@@ -3583,8 +3580,8 @@
         "missing_city_pct": 95.41,
         "missing_any_geo_pct": 95.64,
         "weak_remote_pct": 12.71,
-        "risk_score": 162.33,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 127.33,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -3644,8 +3641,8 @@
       "display_name": "JOIN",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/join/index.js",
@@ -3657,8 +3654,8 @@
         "missing_city_pct": 28.78,
         "missing_any_geo_pct": 28.78,
         "weak_remote_pct": 0.72,
-        "risk_score": 80.06,
-        "wave_priority": "wave-3-certification",
+        "risk_score": 45.06,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -3731,8 +3728,8 @@
         "missing_city_pct": 100,
         "missing_any_geo_pct": 100,
         "weak_remote_pct": 0,
-        "risk_score": 137.3,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 102.3,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -3866,8 +3863,8 @@
       "display_name": "Loxo",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/loxo/index.js",
@@ -3879,8 +3876,8 @@
         "missing_city_pct": 68.51,
         "missing_any_geo_pct": 68.93,
         "weak_remote_pct": 9.75,
-        "risk_score": 137.66,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 102.66,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -3941,7 +3938,7 @@
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/manatal/index.js",
@@ -4137,7 +4134,7 @@
       "display_name": "PageUp",
       "family": "enterprise-direct",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -4150,8 +4147,8 @@
         "missing_city_pct": 80.09,
         "missing_any_geo_pct": 93.94,
         "weak_remote_pct": 71.43,
-        "risk_score": 190.78,
-        "wave_priority": "wave-1-live-gap",
+        "risk_score": 155.78,
+        "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -4432,7 +4429,7 @@
       "display_name": "PeopleForce",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -4445,8 +4442,8 @@
         "missing_city_pct": 84.82,
         "missing_any_geo_pct": 92.19,
         "weak_remote_pct": 65.94,
-        "risk_score": 192.07,
-        "wave_priority": "wave-1-live-gap",
+        "risk_score": 157.07,
+        "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -4558,7 +4555,7 @@
       "family": "direct-json-stable",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/pinpointhq/index.js",
@@ -4631,7 +4628,7 @@
       "display_name": "PoliceApp",
       "family": "public-sector-education",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -4644,8 +4641,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -4757,7 +4754,7 @@
       "family": "direct-json-stable",
       "registry_status": "registry-backed-quarantine",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/recruitcrm/index.js",
@@ -4831,7 +4828,7 @@
       "family": "direct-json-stable",
       "registry_status": "registry-backed-quarantine",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/recruitee/index.js",
@@ -5002,8 +4999,8 @@
       "display_name": "Rippling",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/rippling/index.js",
@@ -5015,8 +5012,8 @@
         "missing_city_pct": 94.12,
         "missing_any_geo_pct": 94.12,
         "weak_remote_pct": 2.32,
-        "risk_score": 151.53,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 116.53,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -5076,7 +5073,7 @@
       "display_name": "SageHR",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -5089,8 +5086,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -5152,7 +5149,7 @@
       "display_name": "SAP HR Cloud",
       "family": "enterprise-direct",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -5165,8 +5162,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -5228,7 +5225,7 @@
       "display_name": "SchoolSpring",
       "family": "public-sector-education",
       "registry_status": "registry-backed-enabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": true,
       "source_module": {
         "present": true,
@@ -5241,8 +5238,8 @@
         "missing_city_pct": 100,
         "missing_any_geo_pct": 100,
         "weak_remote_pct": 0.6,
-        "risk_score": 142.44,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 107.44,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -5351,7 +5348,7 @@
       "display_name": "Simplicant",
       "family": "vendor-specific",
       "registry_status": "registry-backed-enabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": true,
       "source_module": {
         "present": true,
@@ -5364,8 +5361,8 @@
         "missing_city_pct": 6.56,
         "missing_any_geo_pct": 13.35,
         "weak_remote_pct": 3.98,
-        "risk_score": 74.96,
-        "wave_priority": "wave-3-certification",
+        "risk_score": 39.96,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -5561,8 +5558,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -5624,8 +5621,8 @@
       "display_name": "Talentlyft",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/talentlyft/index.js",
@@ -5637,7 +5634,7 @@
         "missing_city_pct": 92.75,
         "missing_any_geo_pct": 94.12,
         "weak_remote_pct": 3.04,
-        "risk_score": 166.89,
+        "risk_score": 131.89,
         "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
@@ -5699,7 +5696,7 @@
       "family": "embedded-or-semi-structured",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/talentreef/index.js",
@@ -5711,8 +5708,8 @@
         "missing_city_pct": 83.51,
         "missing_any_geo_pct": 83.51,
         "weak_remote_pct": 0,
-        "risk_score": 144.81,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 109.81,
+        "wave_priority": "monitor",
         "detail_refetch_needed": true
       },
       "scripts": {
@@ -5773,7 +5770,7 @@
       "family": "brittle-high-risk",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/taleo/index.js",
@@ -5846,8 +5843,8 @@
       "display_name": "Talexio",
       "family": "vendor-specific",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/talexio/index.js",
@@ -5859,8 +5856,8 @@
         "missing_city_pct": 78.63,
         "missing_any_geo_pct": 85.88,
         "weak_remote_pct": 27.86,
-        "risk_score": 158.86,
-        "wave_priority": "wave-2-live-gap",
+        "risk_score": 123.86,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -5922,7 +5919,7 @@
       "display_name": "Teamtailor",
       "family": "direct-json-stable",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
+      "current_status": "certified",
       "public_enabled": false,
       "source_module": {
         "present": true,
@@ -5935,8 +5932,8 @@
         "missing_city_pct": 98.87,
         "missing_any_geo_pct": 99.33,
         "weak_remote_pct": 66.11,
-        "risk_score": 209.81,
-        "wave_priority": "wave-1-live-gap",
+        "risk_score": 174.81,
+        "wave_priority": "wave-2-live-gap",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -6009,8 +6006,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -6168,8 +6165,8 @@
       "display_name": "UltiPro",
       "family": "enterprise-direct",
       "registry_status": "registry-backed-disabled",
-      "current_status": "fallback",
-      "public_enabled": true,
+      "current_status": "certified",
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/ultipro/index.js",
@@ -6181,8 +6178,8 @@
         "missing_city_pct": 50.57,
         "missing_any_geo_pct": 50.93,
         "weak_remote_pct": 0.03,
-        "risk_score": 111.63,
-        "wave_priority": "wave-3-certification",
+        "risk_score": 76.63,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -6255,8 +6252,8 @@
         "missing_city_pct": 0,
         "missing_any_geo_pct": 0,
         "weak_remote_pct": 0,
-        "risk_score": 35,
-        "wave_priority": "wave-4-fixture",
+        "risk_score": 0,
+        "wave_priority": "monitor",
         "detail_refetch_needed": false
       },
       "scripts": {
@@ -6415,7 +6412,7 @@
       "family": "enterprise-direct",
       "registry_status": "registry-backed-disabled",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/workday/index.js",
@@ -6587,7 +6584,7 @@
       "family": "embedded-or-semi-structured",
       "registry_status": "registry-backed-canary",
       "current_status": "certified",
-      "public_enabled": true,
+      "public_enabled": false,
       "source_module": {
         "present": true,
         "path": "server/ingestion/sources/zoho/index.js",

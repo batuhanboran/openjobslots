@@ -283,8 +283,13 @@ test("registry returns contract-valid pilot source modules", () => {
   const dayforceHcm = getRegistrySourceModule("dayforcehcm");
   assert.equal(dayforceHcm.atsKey, "dayforcehcm");
   assert.equal(dayforceHcm.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(dayforceHcm.status, SOURCE_STATUSES.unsupported);
+  assert.equal(dayforceHcm.status, SOURCE_STATUSES.disabled);
   assert.equal(dayforceHcm.collectWhenDisabled, false);
+  assert.equal(typeof dayforceHcm.discover, "function");
+  assert.equal(typeof dayforceHcm.fetchList, "function");
+  assert.equal(typeof dayforceHcm.parse, "function");
+  assert.equal(typeof dayforceHcm.normalize, "function");
+  assert.equal(typeof dayforceHcm.validate, "function");
   assert.deepEqual(validateSourceContract(dayforceHcm), { ok: true, failures: [] });
 
   const eightfold = getRegistrySourceModule("eightfold");

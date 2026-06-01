@@ -1,3 +1,15 @@
+function isDayforceUrl(value) {
+  try {
+    const parsed = new URL(value);
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "jobs.dayforcehcm.com" && host !== "careers.dayforcehcm.com") return false;
+    const parts = parsed.pathname.toLowerCase().split("/").filter(Boolean);
+    return parts.includes("candidateportal") || parts.includes("jobs");
+  } catch {
+    return false;
+  }
+}
+
 function inferAtsFromJobPostingUrl(value) {
   const url = String(value || "").trim().toLowerCase();
   if (!url) return "";
@@ -20,8 +32,7 @@ function inferAtsFromJobPostingUrl(value) {
   if (url.includes("applicantai.com/")) return "applicantai";
   if (url.includes(".bamboohr.com/careers")) return "bamboohr";
   if (url.includes("app.careerpuck.com/job-board/")) return "careerpuck";
-  if (url.includes("dayforcehcm.com/candidateportal/")) return "dayforcehcm";
-  if (url.includes("careers.dayforcehcm.com/")) return "dayforcehcm";
+  if (isDayforceUrl(url)) return "dayforcehcm";
   if (url.includes("web.fountain.com/c/")) return "fountain";
   if (url.includes(".getro.com/jobs")) return "getro";
   if (url.includes("governmentjobs.com/jobs/")) return "governmentjobs";

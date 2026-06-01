@@ -62,7 +62,13 @@ test("source runner requires recovery readiness for canary and apply operations"
   const dryRun = parseArgs(["--mode=dry-run", "--source=dayforcehcm"]);
   assert.equal(getRecoveryReadinessGate(dryRun).required, false);
 
-  const blockedCanary = parseArgs(["--mode=canary", "--source=dayforcehcm"]);
+  const dayforceCanary = parseArgs(["--mode=canary", "--source=dayforcehcm"]);
+  const dayforceGate = getRecoveryReadinessGate(dayforceCanary);
+  assert.equal(dayforceGate.required, true);
+  assert.equal(dayforceGate.ok, true);
+  assert.deepEqual(dayforceGate.blockers, []);
+
+  const blockedCanary = parseArgs(["--mode=canary", "--source=not_configured_ats"]);
   const canaryGate = getRecoveryReadinessGate(blockedCanary);
   assert.equal(canaryGate.required, true);
   assert.equal(canaryGate.ok, false);
@@ -70,7 +76,7 @@ test("source runner requires recovery readiness for canary and apply operations"
 
   const blockedApply = parseArgs([
     "--mode=apply",
-    "--source=dayforcehcm",
+    "--source=not_configured_ats",
     "--confirm-production",
     "--max-updates=1"
   ]);

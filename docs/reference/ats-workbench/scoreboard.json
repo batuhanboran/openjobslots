@@ -7,7 +7,7 @@
       "fallback": 36,
       "certified": 22,
       "partial": 1,
-      "unsupported": 1
+      "disabled": 1
     },
     "top_15_quality_risk": [
       {
@@ -266,9 +266,9 @@
       },
       {
         "ats_key": "dayforcehcm",
-        "status": "unsupported",
-        "reason": "unsupported source; no implemented adapter",
-        "next_action": "keep disabled; implement source-backed adapter only with raw fixtures"
+        "status": "disabled",
+        "reason": "disabled until live canary and source-quality evidence are approved",
+        "next_action": "keep disabled until bounded live canary and source-quality evidence are approved"
       }
     ]
   },
@@ -2242,33 +2242,33 @@
     {
       "ats_key": "dayforcehcm",
       "display_name": "Dayforce",
-      "current_status": "unsupported",
+      "current_status": "disabled",
       "source_type": "enterprise API",
-      "public_api_or_html_detail_strategy": "Disabled until a direct parser and fixture set exist; do not include in active sync.",
+      "public_api_or_html_detail_strategy": "Extract tenant/site identifiers, prefer direct candidate API responses, normalize product-specific location/date fields.",
       "current_production_row_count": 0,
       "missing_country_pct": 0,
       "missing_city_pct": 0,
       "missing_any_geo_pct": 0,
       "weak_remote_pct": 0,
-      "source_id_reliability": "unsupported",
-      "canonical_url_reliability": "unsupported",
+      "source_id_reliability": "fixture-backed",
+      "canonical_url_reliability": "fixture-backed",
       "detail_refetch_needed": false,
       "should_be_public_enabled": false,
-      "reason": "unsupported source; no implemented adapter",
+      "reason": "disabled until live canary and source-quality evidence are approved",
       "parser_versions": [],
       "parser_attention_count_24h": 0,
       "rejected_count": 0,
       "quarantined_count": 0,
       "latest_parser_error": "",
-      "fixture_status": "unsupported",
-      "parser_fixture_status": "unsupported",
-      "parser_confidence": "unsupported",
+      "fixture_status": "fixture-backed",
+      "parser_fixture_status": "parser-fixture-backed",
+      "parser_confidence": "medium-low",
       "adapter_tier": "enterprise-direct",
       "enabled_by_default": false,
       "risk_score": -65,
       "wave_priority": "disabled",
-      "certification_blockers": "unsupported source; no implemented adapter",
-      "exact_next_parser_action": "keep disabled; implement source-backed adapter only with raw fixtures"
+      "certification_blockers": "disabled until live canary and source-quality evidence are approved",
+      "exact_next_parser_action": "keep disabled until bounded live canary and source-quality evidence are approved"
     }
   ],
   "count": 60

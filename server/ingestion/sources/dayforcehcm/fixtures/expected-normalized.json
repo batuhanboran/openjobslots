@@ -1,0 +1,20 @@
+[
+  {
+    "source_job_id": "3121",
+    "company_name": "Fixture Dayforce",
+    "position_name": "Technical Project Manager",
+    "country": "United States",
+    "remote_type": "remote",
+    "posting_date": "2026-05-29T07:00:00+00:00",
+    "parser_confidence": 0.62
+  },
+  {
+    "source_job_id": "2551",
+    "company_name": "Fixture Dayforce",
+    "position_name": "Health Economics Research Officer",
+    "country": "Canada",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-28T04:00:00+00:00",
+    "parser_confidence": 0.62
+  }
+]
