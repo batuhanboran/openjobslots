@@ -6,5 +6,29 @@
     "job_posting_url": "https://jobs.gem.com/fixtureco/6001",
     "country": "United States",
     "remote_type": "onsite"
+  },
+  {
+    "source_job_id": "6002",
+    "company_name": "Fixture Gem",
+    "position_name": "Remote Account Executive",
+    "job_posting_url": "https://jobs.gem.com/fixtureco/6002",
+    "country": "United States",
+    "remote_type": "remote"
+  },
+  {
+    "source_job_id": "6003",
+    "company_name": "Fixture Gem",
+    "position_name": "Hybrid Data Instructor",
+    "job_posting_url": "https://jobs.gem.com/fixtureco/6003",
+    "country": "Italy",
+    "remote_type": "hybrid"
+  },
+  {
+    "source_job_id": "6004",
+    "company_name": "Fixture Gem",
+    "position_name": "Global Remote SDK Engineer",
+    "job_posting_url": "https://jobs.gem.com/fixtureco/6004",
+    "country": "",
+    "remote_type": "remote"
   }
 ]

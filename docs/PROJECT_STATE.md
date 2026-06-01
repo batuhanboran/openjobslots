@@ -14,6 +14,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Architecture boundary is improved and currently warning-free. ATS filter options, legacy host aliases, and sync-enabled ATS normalization live in `server/ingestion/atsFilters.js`, with `server/ingestion/adapters.js`, `server/ingestion/worker.js`, and `server/index.js` consuming that module. Legacy SQLite dynamic sync bootstrap targets and their estimated company counts now live in `server/ingestion/legacySyncTargets.js`. `audit:architecture-boundary -- --json` passes with `server/index.js` at `2554/3000` lines, and `npm.cmd run test:backend` covers the new boundary tests.
 - This checkpoint ran no production source apply, canary/apply, data backfill, public-row delete/hide, Meili replace reindex, deploy, or worker-budget increase.
 
+## Gem GraphQL Location Country And Work-Mode Evidence - June 1, 2026
+
+- Fresh read-only production snapshot for Gem showed `31` visible rows, `22` missing country/region rows, `3` weak/unknown remote rows, `31` missing posting dates, and no missing source ids.
+- Gem public GraphQL batch payloads expose `locations[].isoCountry`, `locations[].city`, `locations[].isRemote`, and `job.locationType`. The parser now carries those fields as source-local evidence instead of relying only on `locations[].name`.
+- `Remote (US)`, `Remote - US`, and `Remote` rows with `isoCountry=USA` now normalize to `United States` with explicit remote evidence. Hybrid rows with a concrete non-remote country such as `Bari` / `ITA` now keep Italy and `hybrid`. Broad `Global` remote rows are accepted as explicit remote but remain countryless and no longer store `Global` as city.
+- Live read-only proof across `codesignal`, `credit-key`, `cloudx`, `data-masters`, and `clarity`: current local parser parsed `33` rows with `33` accepted, reduced accepted missing country/region from the earlier sampled `22` to `11`, reduced weak/unknown remote from `3` to `0`, and preserved country evidence paths such as `jobPostings[].locations[].isoCountry`.
+- Posting dates remain null because observed Gem list payloads do not expose posting-date fields. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
+
 ## RecruitCRM Source-Local City Country Evidence - June 1, 2026
 
 - Fresh read-only production baseline for this lane had RecruitCRM at `522` visible rows, `475` missing country/region rows, `10` weak/unknown remote rows, and `522` missing posting dates. Top missing-country boards included `somewhere`, `Talentbank_1_jobs`, `rcrm`, `TLNT_Group_jobs`, `talentsource`, `Ensitech_Careers`, and `Golabs_Tech_jobs`.

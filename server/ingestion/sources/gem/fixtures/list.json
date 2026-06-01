@@ -26,6 +26,85 @@
               "locationType": "ONSITE",
               "employmentType": "FULL_TIME"
             }
+          },
+          {
+            "id": "6002",
+            "extId": "fixture-6002",
+            "title": "Remote Account Executive",
+            "locations": [
+              {
+                "id": "loc-remote-us",
+                "name": "Remote (US)",
+                "city": "San Francisco",
+                "isoCountry": "USA",
+                "isRemote": true
+              }
+            ],
+            "job": {
+              "id": "job-6002",
+              "department": {
+                "id": "dept-sales",
+                "name": "Sales",
+                "extId": "sales"
+              },
+              "locationType": "REMOTE",
+              "employmentType": "FULL_TIME"
+            }
+          },
+          {
+            "id": "6003",
+            "extId": "fixture-6003",
+            "title": "Hybrid Data Instructor",
+            "locations": [
+              {
+                "id": "loc-bari",
+                "name": "Bari",
+                "city": "Bari",
+                "isoCountry": "ITA",
+                "isRemote": false
+              },
+              {
+                "id": "loc-remote",
+                "name": "Remote",
+                "city": "Remote",
+                "isoCountry": "USA",
+                "isRemote": true
+              }
+            ],
+            "job": {
+              "id": "job-6003",
+              "department": {
+                "id": "dept-training",
+                "name": "Training",
+                "extId": "training"
+              },
+              "locationType": "HYBRID",
+              "employmentType": "CONTRACT"
+            }
+          },
+          {
+            "id": "6004",
+            "extId": "fixture-6004",
+            "title": "Global Remote SDK Engineer",
+            "locations": [
+              {
+                "id": "loc-global",
+                "name": "Global",
+                "city": "Global",
+                "isoCountry": null,
+                "isRemote": true
+              }
+            ],
+            "job": {
+              "id": "job-6004",
+              "department": {
+                "id": "dept-eng",
+                "name": "Engineering",
+                "extId": "eng"
+              },
+              "locationType": "REMOTE",
+              "employmentType": "FULL_TIME"
+            }
           }
         ]
       }

@@ -172,6 +172,26 @@ test("gem source module parses list fixture and emits strict normalized evidence
     const gate = evaluatePublicPosting(row, { parserVersion: source.parserVersion });
     assert.equal(gate.status, "accepted", "gem valid fixture should pass public gate");
   }
+
+  const byId = new Map(normalized.map((row) => [row.source_job_id, row]));
+  const remoteUs = byId.get("6002");
+  assert.equal(remoteUs.country, "United States");
+  assert.equal(remoteUs.city, "");
+  assert.equal(remoteUs.remote_type, "remote");
+  assert.equal(remoteUs.evidence.country.evidence_path, "jobPostings[].locations[].isoCountry");
+  assert.equal(remoteUs.evidence.remote_type.evidence_path, "jobPostings[].job.locationType");
+
+  const hybridItaly = byId.get("6003");
+  assert.equal(hybridItaly.country, "Italy");
+  assert.equal(hybridItaly.city, "Bari");
+  assert.equal(hybridItaly.remote_type, "hybrid");
+  assert.equal(hybridItaly.evidence.city.evidence_path, "jobPostings[].locations[].city");
+
+  const globalRemote = byId.get("6004");
+  assert.equal(globalRemote.location_text, "Remote");
+  assert.equal(globalRemote.city, "");
+  assert.equal(globalRemote.country, "");
+  assert.equal(globalRemote.remote_type, "remote");
 });
 
 test("gem source module rejects or quarantines invalid-shape fixtures", () => {
