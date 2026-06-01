@@ -133,6 +133,123 @@ function firstMeaningful(...values) {
   return undefined;
 }
 
+function normalizeScopeValue(value, max = 2000) {
+  return clean(value || "", max).toLowerCase();
+}
+
+function normalizeScopeUrl(value) {
+  const input = clean(value || "", 2000);
+  if (!input) return "";
+  try {
+    const parsed = new URL(input);
+    parsed.hash = "";
+    parsed.protocol = parsed.protocol.toLowerCase();
+    parsed.hostname = parsed.hostname.toLowerCase();
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return normalizeScopeValue(input).replace(/\/+$/, "");
+  }
+}
+
+function normalizeScopeHost(value) {
+  const input = clean(value || "", 2000);
+  if (!input) return "";
+  const urlHost = sourceHost(input);
+  if (urlHost) return urlHost;
+  return input
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+    .split(/[/?#]/)[0]
+    .trim()
+    .toLowerCase();
+}
+
+function selectedTenantScope(selectedTenants = []) {
+  return selectedTenants.map((tenant) => {
+    const targetUrl = normalizeScopeUrl(firstMeaningful(
+      tenant?.target_url,
+      tenant?.source_url,
+      tenant?.url,
+      tenant?.company_url
+    ));
+    const tenantHost = normalizeScopeHost(firstMeaningful(
+      tenant?.tenant_host,
+      tenant?.source_host,
+      tenant?.host,
+      targetUrl
+    ));
+    return {
+      tenant_key: normalizeScopeValue(tenant?.tenant_key, 500),
+      tenant_host: tenantHost,
+      target_url: targetUrl,
+      company: normalizeScopeValue(tenant?.company || tenant?.company_name, 500)
+    };
+  }).filter((tenant) => tenant.tenant_key || tenant.tenant_host || tenant.target_url || tenant.company);
+}
+
+function targetScopeIdentities(target = {}) {
+  const companyUrl = target.companyUrl || target.company?.url_string || "";
+  const normalizedUrl = normalizeScopeUrl(companyUrl);
+  const host = normalizeScopeHost(firstMeaningful(target.host, companyUrl));
+  const company = normalizeScopeValue(target.company?.company_name || target.company?.name, 500);
+  return {
+    url: normalizedUrl,
+    host,
+    company,
+    keys: new Set([normalizedUrl, host, company].filter(Boolean))
+  };
+}
+
+function targetMatchesPlannedTenant(target = {}, tenant = {}) {
+  const identities = targetScopeIdentities(target);
+  if (tenant.target_url) return identities.url === tenant.target_url;
+  if (tenant.tenant_key && identities.keys.has(tenant.tenant_key)) return true;
+  if (tenant.tenant_host && identities.host === tenant.tenant_host) return true;
+  if (tenant.company && identities.company === tenant.company) return true;
+  return false;
+}
+
+function scopeTargetsToPlannedBatch(targets = [], safetyGate = {}) {
+  const selectedTenants = Array.isArray(safetyGate.planned_batch_selected_tenants)
+    ? safetyGate.planned_batch_selected_tenants
+    : [];
+  const scope = selectedTenantScope(selectedTenants);
+  if (!safetyGate.authorized) {
+    return {
+      required: false,
+      ok: true,
+      targets,
+      discovered_target_count: targets.length,
+      selected_tenant_count: scope.length,
+      matched_target_count: targets.length,
+      skipped_target_count: 0,
+      failures: []
+    };
+  }
+  const matched = [];
+  const skipped = [];
+  for (const target of targets) {
+    if (scope.some((tenant) => targetMatchesPlannedTenant(target, tenant))) matched.push(target);
+    else skipped.push(target);
+  }
+  const failures = [];
+  if (scope.length <= 0) failures.push("planned_batch_target_scope_missing");
+  if (matched.length <= 0) failures.push("planned_batch_no_matching_discovered_targets");
+  return {
+    required: true,
+    ok: failures.length === 0,
+    targets: matched,
+    discovered_target_count: targets.length,
+    selected_tenant_count: scope.length,
+    matched_target_count: matched.length,
+    skipped_target_count: skipped.length,
+    failures,
+    skipped_targets_sample: skipped.slice(0, 10).map((target) => ({
+      source_url: clean(target.companyUrl || target.company?.url_string || "", 500),
+      source_host: clean(target.host || sourceHost(target.companyUrl), 200)
+    }))
+  };
+}
+
 function evaluatePlannedBatchGate(options = {}) {
   const applyRequested = Boolean(options.apply);
   const plannedBatch = clean(options.plannedBatch || "", 2000);
@@ -160,6 +277,7 @@ function evaluatePlannedBatchGate(options = {}) {
     : Array.isArray(report?.selected_tenants)
       ? report.selected_tenants
       : [];
+  const targetScope = selectedTenantScope(selectedTenants);
   const reportSource = normalizeAtsKey(firstMeaningful(report?.source, selectedPlan?.source));
   const expectedSource = normalizeAtsKey(options.source);
   const predictedGuardResult = clean(firstMeaningful(
@@ -193,6 +311,7 @@ function evaluatePlannedBatchGate(options = {}) {
       failures.push("planned_batch_selected_plan_missing");
     }
     if (selectedTenants.length <= 0) failures.push("planned_batch_selected_tenants_missing");
+    if (targetScope.length <= 0) failures.push("planned_batch_selected_tenant_scope_missing");
     if (selectedTenants.some((tenant) => !predictedGuardPassed(tenant?.predicted_guard_result))) {
       failures.push("planned_batch_selected_tenant_guard_not_pass");
     }
@@ -214,7 +333,9 @@ function evaluatePlannedBatchGate(options = {}) {
     predicted_guard_result: predictedGuardResult || "",
     predicted_guard_ok: predictedGuardPassed(predictedGuardResult),
     selected_tenant_count: selectedTenants.length,
-    selected_gain: selectedGain
+    selected_gain: selectedGain,
+    selected_scope_count: targetScope.length,
+    selected_tenants: targetScope.slice(0, 1000)
   };
 }
 
@@ -314,6 +435,7 @@ function getSafetyGate(options = {}) {
     planned_batch_report_selected_gain: plannedBatchGate.selected_gain,
     planned_batch_report_failures: plannedBatchGate.failures,
     planned_batch_predicted_guard_result: plannedBatchGate.predicted_guard_result,
+    planned_batch_selected_tenants: plannedBatchGate.selected_tenants || [],
     predicted_guard_result: predictedGuardResult || "",
     predicted_guard_ok: !applyRequested || predictedGuardOk,
     recovery_readiness_gate: readinessGate,
@@ -1341,7 +1463,28 @@ async function runSourceJob(options = parseArgs(), env = process.env) {
       await ensurePostgresSchema(pool);
       lock = await acquireHeavyJobLock(pool, `ats-source-${summary.source}-${options.mode || "dry-run"}`);
     }
-    const targets = await discoverSourceTargets(pool, options);
+    let targets = await discoverSourceTargets(pool, options);
+    const plannedBatchTargetScope = scopeTargetsToPlannedBatch(targets, safetyGate);
+    summary.planned_batch_target_scope = {
+      required: plannedBatchTargetScope.required,
+      ok: plannedBatchTargetScope.ok,
+      discovered_target_count: plannedBatchTargetScope.discovered_target_count,
+      selected_tenant_count: plannedBatchTargetScope.selected_tenant_count,
+      matched_target_count: plannedBatchTargetScope.matched_target_count,
+      skipped_target_count: plannedBatchTargetScope.skipped_target_count,
+      failures: plannedBatchTargetScope.failures,
+      skipped_targets_sample: plannedBatchTargetScope.skipped_targets_sample || []
+    };
+    if (plannedBatchTargetScope.required && !plannedBatchTargetScope.ok) {
+      summary.ok = false;
+      summary.stop_reason = "planned_batch_target_scope_blocked";
+      summary.error_message = `planned batch target scope blocked: ${plannedBatchTargetScope.failures.join(", ")}`;
+      const error = new Error(summary.error_message);
+      error.plannedBatchTargetScope = summary.planned_batch_target_scope;
+      error.sourceRunSummary = summary;
+      throw error;
+    }
+    targets = plannedBatchTargetScope.targets;
     summary.scanned_targets = targets.length;
     summary.source_host_count = new Set(targets.map((target) => target.host).filter(Boolean)).size;
     if (options.mode !== "dry-run" || safetyGate.authorized) {
@@ -1403,6 +1546,7 @@ module.exports = {
   getSafetyGate,
   parseArgs,
   runSourceJob,
+  scopeTargetsToPlannedBatch,
   sourceHost,
   sourceRunnerInterface,
   discoverSourceTargets,

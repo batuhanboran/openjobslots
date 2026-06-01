@@ -16,6 +16,7 @@ const {
   parseArgs,
   discoverSourceTargets,
   runSourceJob,
+  scopeTargetsToPlannedBatch,
   runWithLimitedConcurrency,
   sourceHost
 } = require("./sourceRunner");
@@ -28,6 +29,7 @@ function plannedBatchReport(overrides = {}) {
       source: "greenhouse",
       tenant_key: "tenant-a",
       tenant_host: "tenant-a.greenhouse.io",
+      target_url: "https://tenant-a.greenhouse.io/jobs",
       net_new_clean_public_candidates: 25,
       predicted_guard_result: "pass"
     }],
@@ -195,6 +197,118 @@ test("source runner validates inline planned batch reports for unit callers", ()
   assert.equal(gate.status, "pass");
   assert.equal(gate.source_type, "inline");
   assert.equal(gate.predicted_guard_result, "pass");
+});
+
+test("source runner scopes authorized writes to selected planned-batch targets", () => {
+  const gate = getSafetyGate({
+    ...parseArgs([
+      "--mode=apply",
+      "--source=greenhouse",
+      "--apply",
+      "--confirm-production",
+      "--max-updates=25",
+      "--planned-batch=inline",
+      "--predicted-guard-result=pass"
+    ]),
+    plannedBatchReport: plannedBatchReport()
+  });
+  const scoped = scopeTargetsToPlannedBatch([
+    {
+      companyUrl: "https://tenant-a.greenhouse.io/jobs",
+      host: "tenant-a.greenhouse.io",
+      company: { company_name: "Tenant A", url_string: "https://tenant-a.greenhouse.io/jobs" }
+    },
+    {
+      companyUrl: "https://tenant-b.greenhouse.io/jobs",
+      host: "tenant-b.greenhouse.io",
+      company: { company_name: "Tenant B", url_string: "https://tenant-b.greenhouse.io/jobs" }
+    }
+  ], gate);
+  assert.equal(scoped.ok, true);
+  assert.equal(scoped.matched_target_count, 1);
+  assert.equal(scoped.skipped_target_count, 1);
+  assert.equal(scoped.targets[0].company.company_name, "Tenant A");
+});
+
+test("source runner uses exact target URL before shared-host fallback", () => {
+  const report = plannedBatchReport({
+    selected_plan: {
+      ...plannedBatchReport().selected_plan,
+      selected_tenants: [{
+        source: "greenhouse",
+        tenant_key: "shared.example.com",
+        tenant_host: "shared.example.com",
+        target_url: "https://shared.example.com/company-a/jobs",
+        net_new_clean_public_candidates: 25,
+        predicted_guard_result: "pass"
+      }]
+    }
+  });
+  const gate = getSafetyGate({
+    ...parseArgs([
+      "--mode=apply",
+      "--source=greenhouse",
+      "--apply",
+      "--confirm-production",
+      "--max-updates=25",
+      "--planned-batch=inline",
+      "--predicted-guard-result=pass"
+    ]),
+    plannedBatchReport: report
+  });
+  const scoped = scopeTargetsToPlannedBatch([
+    {
+      companyUrl: "https://shared.example.com/company-a/jobs",
+      host: "shared.example.com",
+      company: { company_name: "Company A", url_string: "https://shared.example.com/company-a/jobs" }
+    },
+    {
+      companyUrl: "https://shared.example.com/company-b/jobs",
+      host: "shared.example.com",
+      company: { company_name: "Company B", url_string: "https://shared.example.com/company-b/jobs" }
+    }
+  ], gate);
+  assert.equal(scoped.ok, true);
+  assert.equal(scoped.matched_target_count, 1);
+  assert.equal(scoped.targets[0].company.company_name, "Company A");
+});
+
+test("source runner blocks authorized writes when planned batch matches no discovered target", async () => {
+  const options = {
+    ...parseArgs([
+      "--mode=apply",
+      "--source=greenhouse",
+      "--apply",
+      "--confirm-production",
+      "--max-updates=25",
+      "--planned-batch=inline",
+      "--predicted-guard-result=pass"
+    ]),
+    plannedBatchReport: plannedBatchReport(),
+    pool: {
+      async query(sql) {
+        if (/FROM companies c/i.test(sql)) {
+          return {
+            rows: [{
+              id: 1,
+              company_name: "Other Tenant",
+              url_string: "https://other.greenhouse.io/jobs",
+              ats_key: "greenhouse",
+              enabled: true,
+              protection_status: "normal",
+              disabled_reason: "",
+              rate_limit_ms: 0
+            }]
+          };
+        }
+        throw new Error(`unexpected query: ${sql}`);
+      }
+    }
+  };
+  await assert.rejects(
+    () => runSourceJob(options),
+    /planned batch target scope blocked: planned_batch_no_matching_discovered_targets/
+  );
 });
 
 test("source runner requires recovery readiness for canary and apply operations", async () => {
