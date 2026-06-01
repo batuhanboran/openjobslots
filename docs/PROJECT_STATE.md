@@ -30,6 +30,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Fixture coverage includes remote-USA and onsite-USA rows plus an enterprise source-module test for country evidence and explicit remote evidence. Live read-only proof across six sampled production boards parsed `182` rows with `182` accepted, `0` missing country/region, `0` weak/unknown remote, `182` source-country rows, and `182` explicit remote-mode rows.
 - Verification covered Paylocity syntax checks, enterprise source-module tests, `npm.cmd run test:parsers`, and `npm.cmd run audit:architecture-boundary`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
 
+## Oracle Structured Work Location - June 1, 2026
+
+- Oracle production quality baseline: `3,679` visible rows, `147` missing country/region rows, `368` weak/unknown remote rows, and `0` missing posting dates or source ids.
+- Oracle API samples split into country-only `PrimaryLocation` rows and structured physical `requisitionList[].workLocation[]` rows. The parser now infers `onsite` only for structured physical work locations, not for country-only records without source work-mode evidence.
+- Oracle now preserves work-location city/country evidence, uses `WorkplaceType` when present, and maps observed country hints such as Afghanistan, Algeria, Djibouti, and Kazakhstan through the shared country/region normalizer.
+- Fixture coverage includes a structured Jordan work-location row and a Djibouti primary-location row. Live read-only proof across `EEHO`, `Airtel Africa`, `Al Bardi Paper Mill`, and `United Nations Development Programme` parsed `84` rows with `84` accepted, `33` structured-work-location onsite rows, and `45` primary-location country-hint rows.
+- Remaining Oracle weak remote rows are mostly country-only records without explicit source work-mode evidence. Verification covered Oracle/posting syntax checks, enterprise source-module tests, parser fixture tests, `npm.cmd run test:parsers`, and `npm.cmd run audit:architecture-boundary`. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, or worker-budget change was run.
+
 ## UltiPro Source Geo and Payload Drift Checkpoint - June 1, 2026
 
 - Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab` with app/worker/Postgres/Meili running. Public health reported `331,490` visible job slots. `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,484`/`331,484`) but remained `ok=false` because remote facets drift by `22` onsite vs unknown documents. No Meili repair or replace reindex was run.

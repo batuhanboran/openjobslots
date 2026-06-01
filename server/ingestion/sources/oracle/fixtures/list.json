@@ -14,6 +14,34 @@
               "Country": "Turkiye"
             }
           ]
+        },
+        {
+          "Id": "REQ-5002",
+          "Title": "Branch Accountant",
+          "PostedDate": "2026-05-09T08:00:00+03:00",
+          "Department": "Finance",
+          "WorkplaceType": "",
+          "PrimaryLocation": "Jordan",
+          "workLocation": [
+            {
+              "TownOrCity": "Amman",
+              "Country": "JO"
+            }
+          ]
+        },
+        {
+          "Id": "REQ-5003",
+          "Title": "Field Coordinator",
+          "PostedDate": "2026-05-10T08:00:00+03:00",
+          "Department": "Operations",
+          "WorkplaceType": "",
+          "PrimaryLocation": "Djibouti",
+          "workLocation": [
+            {
+              "TownOrCity": null,
+              "Country": null
+            }
+          ]
         }
       ]
     }

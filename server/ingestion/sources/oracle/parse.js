@@ -1,6 +1,19 @@
 "use strict";
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
+const {
+  normalizeCountryFromLocation,
+  normalizeCountryName,
+  normalizeRegionFromCountry,
+  normalizeRemoteType
+} = require("../../posting");
+
+const ORACLE_COUNTRY_HINTS = Object.freeze({
+  afghanistan: { country: "Afghanistan", region: "APAC" },
+  algeria: { country: "Algeria", region: "EMEA" },
+  djibouti: { country: "Djibouti", region: "EMEA" },
+  kazakhstan: { country: "Kazakhstan", region: "APAC" }
+});
 
 function cleanOracleText(value) {
   return decodeHtmlEntities(String(value || ""))
@@ -72,6 +85,136 @@ function extractOracleLocationFromRequisition(item) {
   return values.length > 0 ? values.join(" / ") : null;
 }
 
+function normalizeOracleCountry(value) {
+  const text = cleanOracleText(value);
+  if (!text) return "";
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return normalizeCountryName(text) ||
+    normalizeCountryFromLocation(text) ||
+    ORACLE_COUNTRY_HINTS[normalized]?.country ||
+    "";
+}
+
+function normalizeOracleRegion(country) {
+  const normalized = String(country || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return normalizeRegionFromCountry(country) || ORACLE_COUNTRY_HINTS[normalized]?.region || "";
+}
+
+function extractOracleLocationEvidence(item) {
+  const requisition = item && typeof item === "object" ? item : {};
+  const primaryLocation = cleanOracleText(requisition?.PrimaryLocation || requisition?.primaryLocation || "");
+  const workLocations = Array.isArray(requisition?.workLocation) ? requisition.workLocation : [];
+
+  for (const workLocation of workLocations) {
+    const location = workLocation && typeof workLocation === "object" ? workLocation : {};
+    const city = cleanOracleText(location?.TownOrCity || location?.townOrCity || "");
+    const state = cleanOracleText(location?.Region2 || location?.region2 || "");
+    const countryRaw = cleanOracleText(location?.Country || location?.country || "");
+    const country = normalizeOracleCountry(countryRaw);
+    const locationName = cleanOracleText(location?.LocationName || location?.locationName || "");
+    if (!city && !state && !country && !locationName) continue;
+    const locationText = [city, state, country].filter(Boolean).join(", ") || primaryLocation || locationName;
+    return {
+      location: locationText,
+      city,
+      state,
+      country,
+      region: normalizeOracleRegion(country),
+      hasStructuredPhysicalLocation: Boolean(city || state || country),
+      source_evidence: {
+        location_source: "list_api",
+        location_path: "requisitionList[].workLocation[]",
+        location_rule_name: "oracle_work_location",
+        location_raw: locationText,
+        ...(city
+          ? {
+              city_source: "list_api",
+              city_path: "requisitionList[].workLocation[].TownOrCity",
+              city_rule_name: "oracle_work_location_city"
+            }
+          : {}),
+        ...(country
+          ? {
+              country_source: "list_api",
+              country_path: "requisitionList[].workLocation[].Country",
+              country_rule_name: "oracle_work_location_country"
+            }
+          : {})
+      }
+    };
+  }
+
+  const country = normalizeOracleCountry(primaryLocation);
+  return {
+    location: primaryLocation || null,
+    city: "",
+    state: "",
+    country,
+    region: normalizeOracleRegion(country),
+    hasStructuredPhysicalLocation: false,
+    source_evidence: primaryLocation
+      ? {
+          location_source: "list_api",
+          location_path: "requisitionList[].PrimaryLocation",
+          location_rule_name: "oracle_primary_location",
+          location_raw: primaryLocation,
+          ...(country
+            ? {
+                country_source: "list_api",
+                country_path: "requisitionList[].PrimaryLocation",
+                country_rule_name: "oracle_primary_location_country"
+              }
+            : {})
+        }
+      : {}
+  };
+}
+
+function inferOracleRemoteType(row, locationEvidence) {
+  const workplaceType = cleanOracleText(row?.WorkplaceType || row?.workplaceType || "");
+  const workplaceRemoteType = normalizeRemoteType(workplaceType);
+  if (workplaceRemoteType !== "unknown") {
+    return {
+      value: workplaceRemoteType,
+      path: "requisitionList[].WorkplaceType",
+      ruleName: "oracle_workplace_type"
+    };
+  }
+
+  const locationRemoteType = normalizeRemoteType(locationEvidence?.location || "");
+  if (locationRemoteType === "remote" || locationRemoteType === "hybrid") {
+    return {
+      value: locationRemoteType,
+      path: locationEvidence?.source_evidence?.location_path || "requisitionList[].PrimaryLocation",
+      ruleName: "oracle_location_remote_text"
+    };
+  }
+
+  if (locationEvidence?.hasStructuredPhysicalLocation) {
+    return {
+      value: "onsite",
+      path: "requisitionList[].workLocation[]",
+      ruleName: "oracle_structured_work_location"
+    };
+  }
+
+  return {
+    value: "",
+    path: "",
+    ruleName: ""
+  };
+}
+
 function buildOraclePostingUrl(config, requisitionId) {
   const id = String(requisitionId || "").trim();
   if (!id) return String(config?.boardUrl || "").trim();
@@ -127,6 +270,8 @@ function parseOraclePostingsFromApi(companyNameForPostings, config, responseJson
       const uniqueEmploymentTypes = Array.from(
         new Set(employmentTypeValues.map((value) => value.toLowerCase()))
       ).map((lowered) => employmentTypeValues.find((value) => value.toLowerCase() === lowered) || lowered);
+      const locationEvidence = extractOracleLocationEvidence(row);
+      const remoteType = inferOracleRemoteType(row, locationEvidence);
 
       postings.push({
         company_name: effectiveCompanyName,
@@ -135,9 +280,30 @@ function parseOraclePostingsFromApi(companyNameForPostings, config, responseJson
         position_name: cleanOracleText(row?.Title || row?.title || "") || "Untitled Position",
         job_posting_url: postingUrl,
         posting_date: postingDate,
-        location: extractOracleLocationFromRequisition(row),
+        location: locationEvidence.location || extractOracleLocationFromRequisition(row),
+        city: locationEvidence.city || null,
+        state: locationEvidence.state || null,
+        country: locationEvidence.country || null,
+        region: locationEvidence.region || null,
+        remote_type: remoteType.value || null,
+        remote: remoteType.value === "remote",
+        is_remote: remoteType.value === "remote" || remoteType.value === "hybrid",
+        workplaceType: remoteType.value || null,
         department: uniqueDepartments.length > 0 ? uniqueDepartments.join(" / ") : null,
-        employment_type: uniqueEmploymentTypes.length > 0 ? uniqueEmploymentTypes.join(" / ") : null
+        employment_type: uniqueEmploymentTypes.length > 0 ? uniqueEmploymentTypes.join(" / ") : null,
+        source_evidence: {
+          ...(locationEvidence.source_evidence || {}),
+          ...(remoteType.value
+            ? {
+                remote_source: "list_api",
+                remote_path: remoteType.path,
+                remote_rule_name: remoteType.ruleName
+              }
+            : {}),
+          posting_date_source: "list_api",
+          posting_date_path: "requisitionList[].PostedDate",
+          posting_date_rule_name: "oracle_posted_date"
+        }
       });
 
       seenUrls.add(postingUrl);

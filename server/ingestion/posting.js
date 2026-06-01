@@ -106,6 +106,10 @@ const COUNTRY_ALIAS_GROUPS = Object.freeze([
   ["Israel", ["il", "isr", "israel"]],
   ["United Arab Emirates", ["ae", "are", "uae", "united arab emirates", "dubai", "abu dhabi"]],
   ["Saudi Arabia", ["sa", "sau", "saudi arabia"]],
+  ["Afghanistan", ["af", "afg", "afghanistan"]],
+  ["Algeria", ["dz", "dza", "algeria"]],
+  ["Djibouti", ["dj", "dji", "djibouti"]],
+  ["Kazakhstan", ["kz", "kaz", "kazakhstan"]],
   ["Guam", ["gu", "gum", "guam"]],
   ["Luxembourg", ["lu", "lux", "luxembourg"]],
   ["Malta", ["mt", "mlt", "malta"]],
@@ -447,6 +451,8 @@ function normalizeRegionFromCountry(country) {
     "zambia",
     "north macedonia",
     "morocco",
+    "algeria",
+    "djibouti",
     "malta",
     "qatar",
     "kuwait",
@@ -481,6 +487,8 @@ function normalizeRegionFromCountry(country) {
     "thailand",
     "vietnam",
     "pakistan",
+    "afghanistan",
+    "kazakhstan",
     "solomon islands",
     "guam"
   ].includes(normalized)) {

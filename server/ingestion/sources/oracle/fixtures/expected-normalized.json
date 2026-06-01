@@ -8,5 +8,24 @@
     "remote_type": "remote",
     "posting_date": "2026-05-08T08:00:00+03:00",
     "parser_confidence": 0.65
+  },
+  {
+    "source_job_id": "REQ-5002",
+    "company_name": "Fixture Oracle",
+    "position_name": "Branch Accountant",
+    "country": "Jordan",
+    "city": "Amman",
+    "remote_type": "onsite",
+    "posting_date": "2026-05-09T08:00:00+03:00",
+    "parser_confidence": 0.65
+  },
+  {
+    "source_job_id": "REQ-5003",
+    "company_name": "Fixture Oracle",
+    "position_name": "Field Coordinator",
+    "country": "Djibouti",
+    "remote_type": "unknown",
+    "posting_date": "2026-05-10T08:00:00+03:00",
+    "parser_confidence": 0.65
   }
 ]

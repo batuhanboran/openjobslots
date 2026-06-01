@@ -216,6 +216,34 @@ test("paylocity source fetchList rejects redirect to unexpected host", async () 
   );
 });
 
+test("oracle source module preserves structured work-location and country-hint evidence", () => {
+  const source = getSourceModule("oracle");
+  const sourceDir = path.join(__dirname, "oracle");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "list.json"));
+  const parsed = source.parse(rawList, company);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  const byId = new Map(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const structured = byId.get("REQ-5002");
+  assert.equal(structured.location_text, "Amman, Jordan");
+  assert.equal(structured.city, "Amman");
+  assert.equal(structured.country, "Jordan");
+  assert.equal(structured.region, "EMEA");
+  assert.equal(structured.remote_type, "onsite");
+  assert.equal(structured.source_evidence.country_path, "requisitionList[].workLocation[].Country");
+  assert.equal(structured.source_evidence.remote_rule_name, "oracle_structured_work_location");
+  assert.equal(source.validatePublic(structured).status, "accepted");
+
+  const countryHint = byId.get("REQ-5003");
+  assert.equal(countryHint.location_text, "Djibouti");
+  assert.equal(countryHint.country, "Djibouti");
+  assert.equal(countryHint.region, "EMEA");
+  assert.equal(countryHint.remote_type, "unknown");
+  assert.equal(countryHint.source_evidence.country_rule_name, "oracle_primary_location_country");
+  assert.equal(source.validatePublic(countryHint).status, "accepted");
+});
+
 test("brassring discovery normalizes preload board URLs to source-local config", () => {
   const source = getSourceModule("brassring");
   const sourceDir = path.join(__dirname, "brassring");
