@@ -26,6 +26,8 @@
       "server/ingestion/sources/breezy/fixtures/expected-normalized.json",
       "server/ingestion/sources/breezy/fixtures/invalid-shapes.json",
       "server/ingestion/sources/breezy/fixtures/list.json",
+      "server/ingestion/sources/breezy/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/breezy/fixtures/missing-geo-list.json",
       "server/ingestion/sources/breezy/fixtures/route-detection.json"
     ],
     "present": [
@@ -36,6 +38,8 @@
       "server/ingestion/sources/breezy/fixtures/expected-normalized.json",
       "server/ingestion/sources/breezy/fixtures/invalid-shapes.json",
       "server/ingestion/sources/breezy/fixtures/list.json",
+      "server/ingestion/sources/breezy/fixtures/malformed-list-shapes.json",
+      "server/ingestion/sources/breezy/fixtures/missing-geo-list.json",
       "server/ingestion/sources/breezy/fixtures/route-detection.json"
     ],
     "missing": []

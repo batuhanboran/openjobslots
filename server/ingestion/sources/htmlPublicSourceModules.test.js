@@ -1687,6 +1687,41 @@ test("breezy source module does not publish state codes or placeholders as citie
   assert.equal(normalized["BRZ6002-placeholder-locality"].source_evidence.city_source || "", "");
 });
 
+test("breezy source module quarantines raw JSON rows with missing geo and no remote evidence", () => {
+  const source = getSourceModule("breezy");
+  const sourceDir = path.join(__dirname, "breezy");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const rawList = readJson(path.join(sourceDir, "fixtures", "missing-geo-list.json"));
+  const parsed = source.parse(rawList, company);
+  assert.equal(parsed.length, 1);
+
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(source.validate(normalized).ok, true);
+  assert.equal(normalized.source_job_id, "brz7001-unlocated-generalist");
+  assert.equal(normalized.position_name, "Unlocated Generalist");
+  assert.equal(normalized.location_text, null);
+  assert.equal(normalized.country, "");
+  assert.equal(normalized.remote_type, "unknown");
+  assert.ok(normalized.source_failure_reasons.includes("no_structured_location"));
+  assert.ok(normalized.source_failure_reasons.includes("no_explicit_remote_evidence"));
+
+  const gate = source.validatePublic(normalized);
+  assert.equal(gate.status, "quarantined");
+  assert.ok(gate.reason_codes.includes("no_geo_no_remote"));
+});
+
+test("breezy source module ignores malformed or unsupported raw list shapes", () => {
+  const source = getSourceModule("breezy");
+  const sourceDir = path.join(__dirname, "breezy");
+  const company = readJson(path.join(sourceDir, "fixtures", "company.json"));
+  const malformed = readJson(path.join(sourceDir, "fixtures", "malformed-list-shapes.json"));
+
+  for (const item of malformed.cases) {
+    const parsed = source.parse(item.payload, company);
+    assert.equal(parsed.length, item.expected_count, item.name);
+  }
+});
+
 test("hrmdirect source module enriches title-only rows from deterministic detail pages", async () => {
   const source = getSourceModule("hrmdirect");
   const sourceDir = path.join(__dirname, "hrmdirect");

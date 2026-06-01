@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const { WORKER_BUDGET_DEFAULTS } = require("../server/ingestion/workerConfig");
 const {
   attachBacklogDiagnostics,
   buildAutoSyncBudgetUsageQuery,
@@ -807,11 +808,26 @@ test("summarizeBacklogRows uses live worker v2 defaults when audit env omits wor
     { env: {} }
   );
 
-  assert.equal(report.daily_budget_projection.auto_sync_daily_target_budget, 6000);
-  assert.equal(report.daily_budget_projection.auto_sync_targets_per_run, 100);
-  assert.equal(report.daily_budget_projection.source_daily_target_budget, 500);
-  assert.equal(report.daily_budget_projection.source_budget_limited_due_count, 500);
-  assert.equal(report.daily_budget_projection.effective_daily_target_budget, 500);
+  assert.equal(
+    report.daily_budget_projection.auto_sync_daily_target_budget,
+    WORKER_BUDGET_DEFAULTS.autoSyncDailyTargetBudget
+  );
+  assert.equal(
+    report.daily_budget_projection.auto_sync_targets_per_run,
+    WORKER_BUDGET_DEFAULTS.autoSyncTargetsPerRun
+  );
+  assert.equal(
+    report.daily_budget_projection.source_daily_target_budget,
+    WORKER_BUDGET_DEFAULTS.sourceDailyTargetBudget
+  );
+  assert.equal(
+    report.daily_budget_projection.source_budget_limited_due_count,
+    WORKER_BUDGET_DEFAULTS.sourceDailyTargetBudget
+  );
+  assert.equal(
+    report.daily_budget_projection.effective_daily_target_budget,
+    WORKER_BUDGET_DEFAULTS.sourceDailyTargetBudget
+  );
 });
 
 test("runPostgresBacklogAudit performs one read-only query", async () => {
@@ -1060,13 +1076,19 @@ test("runPostgresBacklogAudit diagnostics reports latest run success rate", asyn
   assert.equal(report.diagnostics.target_failure_pressure.top_targets[0].ats_key, "applytojob");
   assert.equal(report.diagnostics.target_failure_pressure.top_targets[0].dominant_failure_reason, "parser_bug");
   assert.equal(report.diagnostics.auto_sync_budget_usage.targets_started_today, 2000);
-  assert.equal(report.diagnostics.auto_sync_budget_usage.remaining_daily_budget, 4000);
+  assert.equal(
+    report.diagnostics.auto_sync_budget_usage.remaining_daily_budget,
+    WORKER_BUDGET_DEFAULTS.autoSyncDailyTargetBudget - 2000
+  );
   assert.equal(report.diagnostics.auto_sync_budget_usage.daily_budget_exhausted, false);
 
   const applytojob = report.items.find((item) => item.ats_key === "applytojob");
   assert.equal(applytojob.recent_run_trend.success_rate_pct, 21.43);
   assert.equal(applytojob.source_daily_budget_usage.successful_targets_today, 200);
-  assert.equal(applytojob.source_daily_budget_usage.remaining_daily_budget, 300);
+  assert.equal(
+    applytojob.source_daily_budget_usage.remaining_daily_budget,
+    WORKER_BUDGET_DEFAULTS.sourceDailyTargetBudget - 200
+  );
   assert.equal(applytojob.source_daily_budget_usage.daily_budget_exhausted, false);
 });
 

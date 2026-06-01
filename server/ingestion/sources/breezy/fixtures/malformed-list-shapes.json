@@ -1,0 +1,45 @@
+{
+  "ats_key": "breezy",
+  "description": "Malformed or unsupported Breezy list payload shapes should parse to no postings instead of fabricating rows.",
+  "cases": [
+    {
+      "name": "null payload",
+      "payload": null,
+      "expected_count": 0
+    },
+    {
+      "name": "unsupported jobs key from another source family",
+      "payload": {
+        "jobs": [
+          {
+            "id": "brz8001",
+            "title": "Unsupported Jobs Payload",
+            "url": "https://fixture.breezy.hr/jobs/brz8001"
+          }
+        ]
+      },
+      "expected_count": 0
+    },
+    {
+      "name": "json row missing canonical url",
+      "payload": {
+        "html": "",
+        "__json": [
+          {
+            "id": "brz8002",
+            "name": "Missing URL"
+          }
+        ]
+      },
+      "expected_count": 0
+    },
+    {
+      "name": "portal html without breezy posting links",
+      "payload": {
+        "html": "<a href=\"/jobs/brz8003\"><h2>Unsupported HTML Link</h2></a>",
+        "__listUrl": "https://fixture.breezy.hr/"
+      },
+      "expected_count": 0
+    }
+  ]
+}
