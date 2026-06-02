@@ -7075,6 +7075,7 @@ export default function App() {
     cancelPendingSearchSuggestion();
     dismissSearchKeyboard(searchInputRef);
     resetNativeSearchFocus();
+    setLanguageMenuOpen(false);
     const nextSearch = String(value || "").trim();
     searchRef.current = nextSearch;
     lastSearchInputAtRef.current = Date.now();

@@ -2870,6 +2870,40 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
   });
 
+  test("submitting a mobile search closes an open language menu without duplicate requests", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile submit overlay coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    await page.getByTestId("language-selector").click();
+    await expect(page.getByTestId("language-options")).toBeVisible();
+    await input.fill("remote jobs");
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+
+    await expect(page.getByTestId("language-options")).toHaveCount(0);
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings.filter((search) => search === "remote jobs")).toHaveLength(1);
+    expect(calls.filterOptions.filter((search) => search === "remote jobs")).toHaveLength(0);
+  });
+
   test("changing language after a submitted mobile search does not refetch the same query", async ({ page }) => {
     const calls = await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
