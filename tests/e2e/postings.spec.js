@@ -3150,6 +3150,47 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions.filter((search) => search === "remote jobs")).toHaveLength(0);
   });
 
+  test("clearing a mobile result closes an open language menu without blank-query fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile clear overlay coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    await expect.poll(() => calls.popular.length).toBeGreaterThanOrEqual(1);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    await page.getByTestId("language-selector").click();
+    await expect(page.getByTestId("language-options")).toBeVisible();
+    await expectMobileTapTarget(page, "postings-search-clear");
+    await page.getByTestId("postings-search-clear").click();
+
+    await expect(page.getByTestId("language-options")).toHaveCount(0);
+    await expect(page.getByTestId("search-input")).toHaveValue("");
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
+    await expect(page.getByTestId("result-count")).toHaveCount(0);
+    await expectNoFilterChrome(page);
+    await page.waitForTimeout(2600);
+
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(calls.suggestions).toEqual([]);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("changing language after a submitted mobile search does not refetch the same query", async ({ page }) => {
     const calls = await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
