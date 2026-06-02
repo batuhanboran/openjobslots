@@ -1850,6 +1850,13 @@ test.describe("postings page QA", () => {
 
     await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
+    await page.getByTestId("language-selector").click();
+    const renderedLanguageOptionIds = await page
+      .locator('[data-testid^="language-option-"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-testid")).filter(Boolean).sort());
+    expect(renderedLanguageOptionIds).toEqual(languages.map(([languageCode]) => `language-option-${languageCode}`).sort());
+    await page.getByTestId("language-option-en").click();
+    await expect(page.getByTestId("language-options")).toHaveCount(0);
 
     for (const [languageCode, shortCode] of languages) {
       await page.getByTestId("language-selector").click();
@@ -1871,6 +1878,22 @@ test.describe("postings page QA", () => {
       await expect(page.getByTestId("search-input")).toBeVisible();
       await expect(page.getByTestId("seo-landing-links")).toBeVisible();
       await expect(page.getByTestId("public-version-label")).toContainText(APP_VERSION);
+      const searchInput = page.getByTestId("search-input");
+      const ariaLabel = await searchInput.getAttribute("aria-label");
+      const placeholder = await searchInput.getAttribute("placeholder");
+      expect(String(placeholder || "").trim(), `${languageCode} search placeholder should render`).not.toBe("");
+      if (languageCode !== "en") {
+        const visibleText = await page.getByTestId("search-shell").innerText();
+        expect(ariaLabel, `${languageCode} search label should not fall back to English`).not.toBe("Search openings");
+        expect(placeholder, `${languageCode} search placeholder should not fall back to English`).not.toBe(
+          "Search title, company, location, or country"
+        );
+        expect(visibleText, `${languageCode} should not show the English hero`).not.toContain("Search open job slots");
+        expect(visibleText, `${languageCode} should not show the English lead`).not.toContain(
+          "Find fresh openings across public ATS job boards."
+        );
+        expect(visibleText, `${languageCode} should not show the English popular-search label`).not.toContain("Popular searches");
+      }
       await expectNoHorizontalOverflow(page);
     }
   });
