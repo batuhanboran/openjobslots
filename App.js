@@ -6265,12 +6265,32 @@ export default function App() {
       // Non-critical attribution link; ignore platform/browser launch failures.
     }
   }, []);
+  const closeSearchWorkForUtilityMenu = useCallback(() => {
+    if (autoSearchTimerRef.current) {
+      clearTimeout(autoSearchTimerRef.current);
+      autoSearchTimerRef.current = null;
+    }
+    if (searchSuggestionTimerRef.current) {
+      clearTimeout(searchSuggestionTimerRef.current);
+      searchSuggestionTimerRef.current = null;
+    }
+    suppressedSuggestionQueryRef.current = String(searchRef.current || "").trim();
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+  }, []);
+  const togglePublicLanguageMenu = useCallback(() => {
+    if (!languageMenuOpen) {
+      closeSearchWorkForUtilityMenu();
+    }
+    setLanguageMenuOpen((previousOpen) => !previousOpen);
+  }, [closeSearchWorkForUtilityMenu, languageMenuOpen]);
   const selectPublicLanguage = useCallback((languageCode) => {
     const nextLanguage = normalizePublicLanguageCode(languageCode) || DEFAULT_PUBLIC_LANGUAGE;
+    closeSearchWorkForUtilityMenu();
     setPublicLanguageCode(nextLanguage);
     setLanguageMenuOpen(false);
     writeWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY, nextLanguage);
-  }, []);
+  }, [closeSearchWorkForUtilityMenu]);
   const togglePublicTheme = useCallback(() => {
     setPublicTheme((previousTheme) => {
       const nextTheme = previousTheme === "dark" ? "light" : "dark";
@@ -8735,7 +8755,7 @@ export default function App() {
         <LanguageSelector
           languageCode={publicLanguageCode}
           menuOpen={languageMenuOpen}
-          onToggleMenu={() => setLanguageMenuOpen((prev) => !prev)}
+          onToggleMenu={togglePublicLanguageMenu}
           onSelectLanguage={selectPublicLanguage}
           t={t}
           compact={!isDesktopViewport}
