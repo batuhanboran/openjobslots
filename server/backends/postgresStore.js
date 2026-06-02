@@ -772,6 +772,64 @@ async function listPostgresPostingsSql(pool, options = {}, limit = 500, offset =
   };
 }
 
+async function listPostgresPostingsApproximateSql(pool, options = {}, limit = 500, offset = 0, sortBy = "recent") {
+  const filter = buildFilterSql(options, 1);
+  const rank = sortBy === "relevance"
+    ? buildSearchRankSql(options.search, filter.nextIndex)
+    : { sql: "", values: [], nextIndex: filter.nextIndex };
+  const limitIndex = rank.nextIndex;
+  const offsetIndex = rank.nextIndex + 1;
+  const orderBy = getPostgresOrderBy(sortBy);
+  const rankedOrderBy = rank.sql ? `${rank.sql} DESC, ${orderBy}` : orderBy;
+  const pageLimit = Math.max(1, Number(limit || 500)) + 1;
+  const result = await pool.query(
+    `
+      SELECT
+        row_number() OVER (ORDER BY ${rankedOrderBy}) AS id,
+        p.*,
+        COALESCE(s.applied, false) AS applied,
+        COALESCE(s.ignored, false) AS ignored,
+        s.applied_by_type,
+        s.applied_by_label,
+        s.applied_at_epoch,
+        s.last_application_id,
+        s.ignored_at_epoch,
+        s.ignored_by_label
+      FROM postings p
+      LEFT JOIN posting_application_state s
+        ON s.canonical_url = p.canonical_url
+      WHERE ${filter.where.join(" AND ")}
+      ORDER BY ${rankedOrderBy}
+      LIMIT $${limitIndex} OFFSET $${offsetIndex};
+    `,
+    [...filter.values, ...rank.values, pageLimit, offset]
+  );
+  const rows = (Array.isArray(result.rows) ? result.rows : []).map(rowToPosting);
+  const items = rows.slice(0, limit);
+  const loadedThrough = offset + items.length;
+  const hasMore = rows.length > limit;
+  return {
+    items,
+    count: hasMore ? loadedThrough + 1 : loadedThrough,
+    count_exact: false,
+    source_facets: [],
+    limit,
+    offset,
+    filters: {
+      search: String(options.search || "").trim(),
+      sort_by: sortBy,
+      freshness_days: normalizeFreshnessDays(options.freshness_days),
+      ats: parseCsv(options.ats).map(normalizeAtsKey),
+      countries: parseCsv(options.countries).map(normalizeCountryFilterValue),
+      regions: parseCsv(options.regions),
+      industries: parseCsv(options.industries),
+      remote: String(options.remote || "all").trim().toLowerCase() || "all",
+      hide_no_date: Boolean(options.hide_no_date),
+      include_ignored: Boolean(options.include_ignored)
+    }
+  };
+}
+
 async function listPostgresPostings(pool, options = {}) {
   const page = resolvePublicPostingsPage(options);
   const limit = page.limit;
@@ -893,6 +951,11 @@ async function listPostgresPostings(pool, options = {}) {
         offset,
         error: String(error?.message || error).slice(0, 240)
       });
+      const fallback = await listPostgresPostingsApproximateSql(pool, options, limit, offset, sortBy);
+      return {
+        ...fallback,
+        page_capped: page.limit_capped || page.offset_capped
+      };
     }
   }
 

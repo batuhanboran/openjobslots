@@ -806,6 +806,99 @@ async function testUnderfilledMeiliHydrationFallsBackToPostgres() {
   }
 }
 
+async function testMeiliTimeoutUsesBoundedPostgresFallback() {
+  const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousFetch = global.fetch;
+  const previousWarn = console.warn;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  const warnings = [];
+  const aggregateCalls = [];
+  let fallbackSelectLimit = null;
+
+  global.fetch = async () => {
+    throw new Error("timeout exceeded when trying to connect");
+  };
+  console.warn = (...args) => warnings.push(args);
+
+  const pool = {
+    async query(sql, params = []) {
+      if (isExactResultSummaryQuery(sql) || isSourceFacetQuery(sql)) {
+        aggregateCalls.push(sql);
+        throw new Error("Meili timeout fallback should not run exact count or facet aggregates");
+      }
+      fallbackSelectLimit = params[params.length - 2];
+      return {
+        rows: [
+          {
+            canonical_url: "https://example.com/remote-1",
+            company_name: "Remote Co",
+            position_name: "Remote Support Engineer",
+            location_text: "Remote - United States",
+            country: "United States",
+            region: "North America",
+            remote_type: "remote",
+            ats_key: "greenhouse",
+            last_seen_epoch: 300
+          },
+          {
+            canonical_url: "https://example.com/remote-2",
+            company_name: "Remote Co",
+            position_name: "Remote Product Engineer",
+            location_text: "Remote - Turkey",
+            country: "Turkey",
+            region: "EMEA",
+            remote_type: "remote",
+            ats_key: "lever",
+            last_seen_epoch: 200
+          },
+          {
+            canonical_url: "https://example.com/remote-3",
+            company_name: "Remote Co",
+            position_name: "Remote Platform Engineer",
+            location_text: "Remote - Germany",
+            country: "Germany",
+            region: "Europe",
+            remote_type: "remote",
+            ats_key: "ashby",
+            last_seen_epoch: 100
+          }
+        ]
+      };
+    }
+  };
+
+  try {
+    const result = await listPostgresPostings(pool, {
+      search: "remote engineer",
+      limit: 2,
+      offset: 0,
+      include_applied: true,
+      include_ignored: true
+    });
+
+    assert.equal(fallbackSelectLimit, 3);
+    assert.equal(aggregateCalls.length, 0);
+    assert.equal(result.count, 3);
+    assert.equal(result.count_exact, false);
+    assert.equal(result.visible_company_count, undefined);
+    assert.equal(result.visible_ats_count, undefined);
+    assert.deepEqual(result.source_facets, []);
+    assert.deepEqual(result.items.map((item) => item.job_posting_url), [
+      "https://example.com/remote-1",
+      "https://example.com/remote-2"
+    ]);
+    assert.ok(warnings.some((entry) => String(entry[0]).includes("search_backend_fallback") && String(entry[1]).includes("meili_error")));
+  } finally {
+    console.warn = previousWarn;
+    global.fetch = previousFetch;
+    if (previousSearchBackend === undefined) {
+      delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    } else {
+      process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousSearchBackend;
+    }
+  }
+}
+
 async function testEmptyMeiliSearchReturnsExactPostgresZero() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousFetch = global.fetch;
@@ -2836,6 +2929,7 @@ async function main() {
   await testMeiliPostgresPathHydratesBeforeCounting();
   await testMeiliPostgresPathUsesMeiliEstimatedAggregates();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
+  await testMeiliTimeoutUsesBoundedPostgresFallback();
   await testEmptyMeiliSearchReturnsExactPostgresZero();
   await testEmptyMeiliSearchFallsBackWhenPostgresExactIsPositive();
   await testPostgresStructuredFiltersUseConservativeLocationFallbacks();
