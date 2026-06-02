@@ -97,16 +97,24 @@ assert.ok(
   "Native search results should not leave a visible caret after submission"
 );
 assert.ok(
-  appSource.includes("const showNativeSearchDisplay = Platform.OS !== \"web\" && hideNativeSearchCaret && searchLength > 0;"),
-  "Native search results should render submitted queries without an editable caret"
+  !appSource.includes("showNativeSearchDisplay"),
+  "Native search results should keep the TextInput mounted so a real tap can reopen Android IME"
 );
 assert.ok(
-  appSource.includes("onPress={activateNativeSearchEditing}"),
-  "Native submitted search text should let users tap back into editing"
+  !appSource.includes("activateNativeSearchEditing"),
+  "Native submitted search text should not rely on programmatic focus from a remounted display control"
 );
 assert.ok(
   appSource.includes('submitBehavior: "blurAndSubmit"'),
   "Native search submit should blur the search input before showing refreshed results"
+);
+assert.ok(
+  appSource.includes("showSoftInputOnFocus: true"),
+  "Native search edit mode should explicitly allow the soft keyboard to reopen"
+);
+assert.ok(
+  appSource.includes("onPressIn={handleSearchPressIn}"),
+  "Native submitted search text should re-enable caret state before the tapped TextInput receives focus"
 );
 assert.ok(
   appSource.includes("dismissSearchKeyboard(searchInputRef);"),

@@ -253,7 +253,7 @@ const ACCESSIBILITY_STATUS_PROPS = Platform.OS === "web"
 const ANDROID_STATUS_BAR_OFFSET = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
 const SEARCH_SUBMIT_BEHAVIOR_PROPS = Platform.OS === "web"
   ? { blurOnSubmit: false }
-  : { blurOnSubmit: true, submitBehavior: "blurAndSubmit" };
+  : { blurOnSubmit: true, submitBehavior: "blurAndSubmit", showSoftInputOnFocus: true };
 
 function dismissSearchKeyboard(inputRef) {
   if (Platform.OS !== "web") {
@@ -7183,14 +7183,6 @@ export default function App() {
     setSearchFocused(true);
   }, []);
 
-  const activateNativeSearchEditing = useCallback(() => {
-    if (Platform.OS === "web") return;
-    suppressNativeSearchFocusRef.current = false;
-    setHideNativeSearchCaret(false);
-    setSearchFocused(true);
-    setTimeout(() => searchInputRef.current?.focus?.(), 0);
-  }, []);
-
   const focusSearch = useCallback(() => {
     setActivePage(PAGE_KEYS.POSTINGS);
     setDrawerOpen(false);
@@ -8503,7 +8495,6 @@ export default function App() {
       const searchLength = String(search || "").trim().length;
       const searchLengthStyle =
         searchLength >= 34 ? styles.yahooSearchInputVeryLong : searchLength >= 22 ? styles.yahooSearchInputLong : null;
-      const showNativeSearchDisplay = Platform.OS !== "web" && hideNativeSearchCaret && searchLength > 0;
       const showSearchFocusedFrame = searchFocused && !(Platform.OS !== "web" && hideNativeSearchCaret);
       return (
         <View style={[styles.searchBoxRow, styles.yahooSearchBoxRow, compact ? styles.yahooSearchBoxRowResults : null]}>
@@ -8527,63 +8518,36 @@ export default function App() {
               testID="search-box-frame"
             >
               {!compact ? <SearchGlyph isDark={isDarkPublicTheme} /> : null}
-              {showNativeSearchDisplay ? (
-                <Pressable
-                  onPress={activateNativeSearchEditing}
-                  style={({ pressed }) => [
-                    styles.search,
-                    isDarkPublicTheme ? styles.searchDark : null,
-                    styles.yahooSearchInput,
-                    styles.yahooSearchInputDisplay,
-                    pressed ? styles.yahooSearchInputDisplayPressed : null
-                  ]}
-                  testID="search-input"
-                  accessibilityRole="button"
-                  accessibilityLabel={t("search.label", "Search openings")}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.yahooSearchInputDisplayText,
-                      searchLengthStyle,
-                      isDarkPublicTheme ? styles.yahooSearchInputDisplayTextDark : null
-                    ]}
-                  >
-                    {search}
-                  </Text>
-                </Pressable>
-              ) : (
-                <TextInput
-                  ref={searchInputRef}
-                  style={[
-                    styles.search,
-                    isDarkPublicTheme ? styles.searchDark : null,
-                    styles.yahooSearchInput,
-                    searchLengthStyle,
-                    isDarkPublicTheme ? styles.yahooSearchInputDark : null
-                  ]}
-                  value={search}
-                  onChangeText={handleSearchChange}
-                  onFocus={handleSearchFocus}
-                  onBlur={handleSearchBlur}
-                  onPressIn={handleSearchPressIn}
-                  onSubmitEditing={() => submitSearch(search)}
-                  onKeyPress={handleSearchKeyPress}
-                  caretHidden={Platform.OS !== "web" && hideNativeSearchCaret}
-                  placeholder={
-                    !String(search || "").trim()
-                      ? emptySearchPlaceholder
-                      : defaultSearchPlaceholder
-                  }
-                  placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
-                  autoCapitalize="none"
-                  returnKeyType="search"
-                  numberOfLines={1}
-                  {...SEARCH_SUBMIT_BEHAVIOR_PROPS}
-                  testID="search-input"
-                  accessibilityLabel={t("search.label", "Search openings")}
-                />
-              )}
+              <TextInput
+                ref={searchInputRef}
+                style={[
+                  styles.search,
+                  isDarkPublicTheme ? styles.searchDark : null,
+                  styles.yahooSearchInput,
+                  searchLengthStyle,
+                  isDarkPublicTheme ? styles.yahooSearchInputDark : null
+                ]}
+                value={search}
+                onChangeText={handleSearchChange}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
+                onPressIn={handleSearchPressIn}
+                onSubmitEditing={() => submitSearch(search)}
+                onKeyPress={handleSearchKeyPress}
+                caretHidden={Platform.OS !== "web" && hideNativeSearchCaret}
+                placeholder={
+                  !String(search || "").trim()
+                    ? emptySearchPlaceholder
+                    : defaultSearchPlaceholder
+                }
+                placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
+                autoCapitalize="none"
+                returnKeyType="search"
+                numberOfLines={1}
+                {...SEARCH_SUBMIT_BEHAVIOR_PROPS}
+                testID="search-input"
+                accessibilityLabel={t("search.label", "Search openings")}
+              />
               {compact && String(search || "").trim() ? (
                 <Pressable
                   onPress={clearSearchAndSuggestions}
