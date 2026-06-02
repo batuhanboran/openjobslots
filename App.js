@@ -6299,6 +6299,10 @@ export default function App() {
       return nextTheme;
     });
   }, [closeSearchWorkForUtilityMenu]);
+  const openPublicReleaseNotes = useCallback(() => {
+    closeSearchWorkForUtilityMenu();
+    setReleaseNotesOpen(true);
+  }, [closeSearchWorkForUtilityMenu]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
     const root = document.documentElement;
@@ -8806,7 +8810,7 @@ export default function App() {
         testID="public-footer-meta"
       >
         <Pressable
-          onPress={() => setReleaseNotesOpen(true)}
+          onPress={openPublicReleaseNotes}
           style={({ pressed }) => [
             styles.publicVersionButton,
             styles.publicFooterVersionButton,

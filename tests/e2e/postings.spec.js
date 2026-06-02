@@ -2797,6 +2797,33 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions).toEqual([]);
   });
 
+  test("opening mobile release notes while typing cancels pending query work", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile release notes coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("soft", { delay: 20 });
+    await page.getByTestId("public-version-button").scrollIntoViewIfNeeded();
+    await page.getByTestId("public-version-button").click();
+
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await expect(page.getByTestId("search-input")).toHaveValue("soft");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2200);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+  });
+
   test("pressing Enter cancels pending auto-search instead of duplicating result requests", async ({ page }) => {
     const calls = await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
