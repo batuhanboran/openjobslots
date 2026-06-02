@@ -7025,6 +7025,25 @@ export default function App() {
     setSearchFocused(false);
   }, []);
 
+  const resetPostingsHomeState = useCallback((filters = createDefaultPostingsFilters()) => {
+    postingsRequestSequenceRef.current += 1;
+    postingsRef.current = [];
+    postingsNextOffsetRef.current = 0;
+    postingsHasMoreRef.current = false;
+    postingsLoadingMoreRef.current = false;
+    setLoading(false);
+    setPostingsLoadingMore(false);
+    setPostings([]);
+    setSourceFacets([]);
+    setPostingsTotalCount(0);
+    setPostingsResultCoverage(null);
+    setPostingsResultQuery("");
+    setPostingsResultFiltersSignature(getPostingsFiltersSignature(filters));
+    setPostingsNextOffset(0);
+    setPostingsHasMore(false);
+    setSearchNotice("");
+  }, []);
+
   const submitSearch = useCallback((value = searchRef.current, analytics = {}) => {
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
@@ -7055,13 +7074,10 @@ export default function App() {
       setSearchResultsMode(false);
       setSearch("");
       replacePublicSearchUrlQuery("");
-      setPostingsResultCoverage(null);
-      setPostingsResultQuery("");
-      setPostingsResultFiltersSignature(filtersSignature);
+      resetPostingsHomeState(filters);
       setSearchSuggestionsOpen(false);
       setActiveSuggestionIndex(-1);
       scrollPostingsToTop();
-      void loadPostings("", { filters });
       return;
     }
     setSearchResultsMode(true);
@@ -7077,7 +7093,7 @@ export default function App() {
       if (nextSearch) trackPublicSearch(nextSearch, { source: analyticsSource });
       void loadPostings(nextSearch, { filters });
     }
-  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, resetPostingsHomeState, scrollPostingsToTop]);
 
   const selectPopularSearch = useCallback((route) => {
     const nextQuery = String(
@@ -7108,14 +7124,11 @@ export default function App() {
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
-    setPostingsResultCoverage(null);
-    setPostingsResultQuery("");
-    setPostingsResultFiltersSignature(getPostingsFiltersSignature(defaultFilters));
+    resetPostingsHomeState(defaultFilters);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
-    void loadPostings("", { filters: defaultFilters });
-  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, resetNativeSearchFocus, resetPostingsHomeState, scrollPostingsToTop]);
 
   const applySearchSuggestionFilter = useCallback((suggestion) => {
     const filterPatch = getSearchSuggestionFilterPatch(suggestion);
@@ -7165,9 +7178,7 @@ export default function App() {
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
-    setPostingsResultCoverage(null);
-    setPostingsResultQuery("");
-    setPostingsResultFiltersSignature(getPostingsFiltersSignature(defaultFilters));
+    resetPostingsHomeState(defaultFilters);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     suppressedSuggestionQueryRef.current = "";
@@ -7177,9 +7188,8 @@ export default function App() {
       at: Date.now()
     };
     scrollPostingsToTop();
-    void loadPostings("", { filters: defaultFilters });
     setTimeout(() => searchInputRef.current?.focus?.(), 0);
-  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, resetPostingsHomeState, scrollPostingsToTop]);
 
   const handleSearchChange = useCallback((value) => {
     cancelPendingSearchSuggestion();

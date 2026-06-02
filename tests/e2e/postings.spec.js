@@ -2841,6 +2841,60 @@ test.describe("postings page QA", () => {
     expect(calls.popular).toEqual([]);
   });
 
+  test("returning home after a mobile search does not refetch blank results", async ({ page }) => {
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    await expect.poll(() => calls.popular.length).toBeGreaterThanOrEqual(1);
+    await page.waitForTimeout(500);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    await page.getByTestId("app-logo").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("");
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
+    await expect(page.getByTestId("result-count")).toHaveCount(0);
+    await expectNoFilterChrome(page);
+    await page.waitForTimeout(2600);
+
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(calls.suggestions).toEqual([]);
+
+    await input.click();
+    await input.pressSequentially("remote jobs", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "remote jobs")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    await page.getByTestId("search-input").press("Escape");
+    await expect(page.getByTestId("search-input")).toHaveValue("");
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
+    await expect(page.getByTestId("result-count")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(calls.suggestions).toEqual([]);
+  });
+
   test("keyboard shortcuts and brand home keep search fast", async ({ page }) => {
     await openJobSlots(page);
 
