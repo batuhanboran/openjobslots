@@ -3072,6 +3072,42 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("double-tapping a mobile intent chip keeps the active filter request deduped", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile intent double-tap coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.postingRequests.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("remote qa", { delay: 20 });
+    const chip = page.getByTestId("intent-chip-remote");
+    await expect(chip).toBeVisible();
+    await expectMobileTapTarget(page, "intent-chip-remote");
+
+    await chip.evaluate((node) => {
+      node.click();
+      node.click();
+    });
+    await expect(page.getByTestId("search-input")).toHaveValue("remote qa");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(
+      calls.postingRequests.filter((request) => request.search === "remote qa" && request.remote === "remote")
+    ).toHaveLength(1);
+    expect(calls.postings.filter((search) => search === "remote qa")).toHaveLength(1);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("tapping a mobile hybrid intent chip applies filters once without query fanout", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile hybrid intent fanout coverage is covered by the mobile project");

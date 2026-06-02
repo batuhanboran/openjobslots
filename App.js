@@ -7171,20 +7171,30 @@ export default function App() {
     };
     const query = String(searchRef.current || "").trim();
     const filtersSignature = getPostingsFiltersSignature(nextFilters);
+    const now = Date.now();
+    const lastSubmit = lastSearchSubmitRef.current || { value: "", at: 0 };
+    const duplicateSubmit =
+      lastSubmit.value === query &&
+      lastSubmit.filtersSignature === filtersSignature &&
+      now - lastSubmit.at < SEARCH_SUBMIT_DEDUPE_MS;
     lastSearchSubmitRef.current = {
       value: query,
       filtersSignature,
-      at: Date.now()
+      at: now
     };
     suppressedSuggestionQueryRef.current = query;
     setPostingsFilters(nextFilters);
     setSearchResultsMode(true);
-    setPostingsResultCoverage(null);
+    if (!duplicateSubmit) {
+      setPostingsResultCoverage(null);
+    }
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
-    trackPublicFilterChange("suggestion");
-    void loadPostings(query, { filters: nextFilters });
+    if (!duplicateSubmit) {
+      trackPublicFilterChange("suggestion");
+      void loadPostings(query, { filters: nextFilters });
+    }
     return true;
   }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, scrollPostingsToTop]);
 
