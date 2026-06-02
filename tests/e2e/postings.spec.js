@@ -3038,6 +3038,38 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("mobile release notes closes an open language menu and backdrop dismisses cleanly", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile release notes overlay coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    await expect.poll(() => calls.popular.length).toBeGreaterThanOrEqual(1);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    await page.getByTestId("language-selector").click();
+    await expect(page.getByTestId("language-options")).toBeVisible();
+
+    await page.getByTestId("public-version-button").scrollIntoViewIfNeeded();
+    await page.getByTestId("public-version-button").click();
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+    await expect(page.getByTestId("language-options")).toHaveCount(0);
+    await expectMobileTapTarget(page, "release-notes-close");
+    await page.waitForTimeout(700);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(calls.popular).toEqual([]);
+
+    await page.getByTestId("release-notes-backdrop").click({ position: { x: 4, y: 4 }, force: true });
+    await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("opening mobile release notes while typing cancels pending query work", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile release notes coverage is covered by the mobile project");
