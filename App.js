@@ -6275,6 +6275,7 @@ export default function App() {
       searchSuggestionTimerRef.current = null;
     }
     suppressedSuggestionQueryRef.current = String(searchRef.current || "").trim();
+    setLanguageMenuOpen(false);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
   }, []);

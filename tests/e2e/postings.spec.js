@@ -2797,6 +2797,19 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions).toEqual([]);
   });
 
+  test("mobile utility toggles do not leave the language menu over the page", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile utility overlay coverage is covered by the mobile project");
+
+    await openJobSlots(page);
+    await page.getByTestId("language-selector").click();
+    await expect(page.getByTestId("language-options")).toBeVisible();
+
+    await page.getByTestId("theme-toggle").click();
+    await expect(page.getByTestId("language-options")).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("opening mobile release notes while typing cancels pending query work", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile release notes coverage is covered by the mobile project");
