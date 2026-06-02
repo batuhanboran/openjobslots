@@ -474,8 +474,8 @@ async function expectMobileTapTarget(page, testId) {
   await expect
     .poll(async () => {
       const box = await target.boundingBox();
-      return box?.height || 0;
-    }, `${testId} should be at least 44px tall on mobile`)
+      return Math.min(box?.width || 0, box?.height || 0);
+    }, `${testId} should be at least 44px wide and tall on mobile`)
     .toBeGreaterThanOrEqual(44);
 }
 
