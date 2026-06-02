@@ -7260,6 +7260,7 @@ export default function App() {
         };
         setSearch(nextValue);
         replacePublicSearchUrlQuery("");
+        setLanguageMenuOpen(false);
         setPostingsFilterPanelOpen(false);
         setSearchResultsMode(false);
         resetPostingsHomeState(defaultFilters);
