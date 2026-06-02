@@ -256,6 +256,110 @@ function registerPublicRoutes(app, context) {
     );
   }
 
+  function escapePrivacyPolicyHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function getPrivacyPolicySiteOrigin(req) {
+    const configuredOrigin = String(publicSiteUrl || "").trim().replace(/\/+$/, "");
+    if (/^https?:\/\//i.test(configuredOrigin)) return configuredOrigin;
+
+    const host = String(
+      typeof req?.get === "function"
+        ? req.get("x-forwarded-host") || req.get("host")
+        : req?.headers?.["x-forwarded-host"] || req?.headers?.host || ""
+    ).split(",")[0].trim();
+    if (!host) return "https://openjobslots.com";
+
+    const protocol = String(
+      typeof req?.get === "function"
+        ? req.get("x-forwarded-proto")
+        : req?.headers?.["x-forwarded-proto"] || req?.protocol || "https"
+    ).split(",")[0].trim().replace(/:$/, "") || "https";
+    return `${protocol}://${host}`.replace(/\/+$/, "");
+  }
+
+  function buildPrivacyPolicyHtml(req) {
+    const siteOrigin = getPrivacyPolicySiteOrigin(req);
+    const canonicalUrl = `${siteOrigin}/privacy`;
+    const effectiveDate = "June 3, 2026";
+    const title = "Privacy Policy | OpenJobSlots";
+    return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapePrivacyPolicyHtml(title)}</title>
+  <meta name="description" content="OpenJobSlots privacy policy for the public job search website and Android app." />
+  <link rel="canonical" href="${escapePrivacyPolicyHtml(canonicalUrl)}" />
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f7f8fb; color: #20262e; line-height: 1.58; }
+    main { max-width: 820px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.05; letter-spacing: 0; }
+    h2 { margin: 32px 0 8px; font-size: 1.15rem; }
+    p, li { font-size: 1rem; color: #374151; }
+    a { color: #4b39ef; }
+    .updated { margin: 0 0 28px; color: #667085; }
+    .panel { background: #fff; border: 1px solid #e4e7ec; border-radius: 8px; padding: 28px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #08130e; color: #f4f7f2; }
+      .panel { background: #111a15; border-color: #2b3a32; }
+      p, li, .updated { color: #cbd5cf; }
+      a { color: #b79cff; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OpenJobSlots Privacy Policy</h1>
+    <p class="updated">Effective date: ${escapePrivacyPolicyHtml(effectiveDate)}</p>
+    <section class="panel" aria-label="Privacy policy">
+      <p>OpenJobSlots is a public job search service for finding job openings from public employer career pages and applicant tracking system job boards. This policy explains how the OpenJobSlots website and Android app handle information.</p>
+
+      <h2>Information we process</h2>
+      <p>OpenJobSlots does not require an account and does not ask users to upload resumes, submit applications, enter payment details, provide government identifiers, or provide health or financial information.</p>
+      <p>When you use the service, we may process search text, selected filters, selected language and theme preferences, anonymous session or preference identifiers, approximate request location signals such as country headers, device or browser information, IP address, timestamps, pages viewed, and technical diagnostics.</p>
+
+      <h2>How we use information</h2>
+      <ul>
+        <li>To return public job search results and suggestions.</li>
+        <li>To remember basic preferences such as language and theme.</li>
+        <li>To measure aggregate usage, reliability, and performance.</li>
+        <li>To prevent abuse, investigate outages, and keep the service secure.</li>
+        <li>To improve public job search quality and coverage.</li>
+      </ul>
+
+      <h2>Third-party job links</h2>
+      <p>OpenJobSlots links to employer career pages and third-party ATS websites. If you apply for a job or share information on those external sites, their own privacy policies and terms apply. OpenJobSlots does not control those third-party application forms.</p>
+
+      <h2>Cookies and analytics</h2>
+      <p>The service may use limited cookies or local identifiers for anonymous sessions, preferences, and aggregate analytics. You can clear cookies or browser storage through your browser or device settings.</p>
+
+      <h2>Sharing</h2>
+      <p>OpenJobSlots does not sell personal information. Information may be processed by infrastructure, hosting, analytics, security, and app distribution providers only as needed to operate and protect the service.</p>
+
+      <h2>Retention</h2>
+      <p>Preference identifiers may be retained for up to 30 days. Operational logs and analytics are retained only as long as reasonably needed for reliability, security, debugging, abuse prevention, legal compliance, or aggregate reporting.</p>
+
+      <h2>Children</h2>
+      <p>OpenJobSlots is not directed to children under 13 and does not knowingly collect personal information from children under 13.</p>
+
+      <h2>Your choices</h2>
+      <p>You can avoid entering personal information in search queries, clear local cookies or app data, and use the employer or ATS website directly when applying for jobs.</p>
+
+      <h2>Contact</h2>
+      <p>For privacy questions, contact the OpenJobSlots operator through <a href="https://batuhanboran.com" rel="noopener">batuhanboran.com</a>.</p>
+    </section>
+  </main>
+</body>
+</html>`;
+  }
+
   function setPublicLanguageHintCookie(req, res) {
     if (typeof buildPublicPreferences !== "function" || !res || res.headersSent || typeof res.cookie !== "function") return;
     const preferences = buildPublicPreferences(req);
@@ -877,6 +981,13 @@ function registerPublicRoutes(app, context) {
     };
 
     app.get(["/", "/index.html"], sendSeoIndex);
+    app.get("/privacy", (req, res) => {
+      setPublicSeoCacheHeaders(res, 300, 3600);
+      res.type("html").send(buildPrivacyPolicyHtml(req));
+    });
+    app.get("/privacy-policy", (req, res) => {
+      res.redirect(301, "/privacy");
+    });
     app.get("/robots.txt", (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("text/plain").send(buildRobotsTxt(req));
