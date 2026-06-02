@@ -997,7 +997,8 @@ async function installSearchRequestThrottleRoutes(page) {
   const calls = {
     postings: [],
     filterOptions: [],
-    suggestions: []
+    suggestions: [],
+    popular: []
   };
 
   await page.route("**/*", async (route) => {
@@ -1071,6 +1072,7 @@ async function installSearchRequestThrottleRoutes(page) {
       return;
     }
     if (url.pathname.endsWith("/search/popular")) {
+      calls.popular.push(`${url.searchParams.get("language") || ""}:${url.searchParams.get("country") || ""}`);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -2724,6 +2726,7 @@ test.describe("postings page QA", () => {
     calls.postings.length = 0;
     calls.filterOptions.length = 0;
     calls.suggestions.length = 0;
+    calls.popular.length = 0;
 
     const input = page.getByTestId("search-input");
     await input.click();
@@ -2741,6 +2744,7 @@ test.describe("postings page QA", () => {
     calls.postings.length = 0;
     calls.filterOptions.length = 0;
     calls.suggestions.length = 0;
+    calls.popular.length = 0;
 
     const input = page.getByTestId("search-input");
     await input.click();
@@ -2756,9 +2760,12 @@ test.describe("postings page QA", () => {
   test("changing language after a submitted mobile search does not refetch the same query", async ({ page }) => {
     const calls = await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
+    await expect.poll(() => calls.popular.length).toBeGreaterThanOrEqual(1);
+    await page.waitForTimeout(500);
     calls.postings.length = 0;
     calls.filterOptions.length = 0;
     calls.suggestions.length = 0;
+    calls.popular.length = 0;
 
     const input = page.getByTestId("search-input");
     await input.click();
@@ -2770,6 +2777,7 @@ test.describe("postings page QA", () => {
     calls.postings.length = 0;
     calls.filterOptions.length = 0;
     calls.suggestions.length = 0;
+    calls.popular.length = 0;
 
     await page.getByTestId("language-selector").click();
     await page.getByTestId("language-option-tr").click();
@@ -2779,6 +2787,7 @@ test.describe("postings page QA", () => {
     expect(calls.postings).toEqual([]);
     expect(calls.filterOptions).toEqual([]);
     expect(calls.suggestions).toEqual([]);
+    expect(calls.popular).toEqual([]);
     await expectNoHorizontalOverflow(page);
   });
 

@@ -7956,6 +7956,7 @@ export default function App() {
       countryCode: publicLanguageCountryCode
     });
     setPopularSearchItems(fallbackItems);
+    if (showResultsSurface) return undefined;
 
     let cancelled = false;
     const loadPopularSearches = async () => {
@@ -7978,7 +7979,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activePage, publicLanguageCode, publicLanguageCountryCode, queueFrontendLog]);
+  }, [activePage, publicLanguageCode, publicLanguageCountryCode, queueFrontendLog, showResultsSurface]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || !window.matchMedia) return undefined;
