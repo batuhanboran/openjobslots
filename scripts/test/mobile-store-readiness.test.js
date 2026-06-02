@@ -60,5 +60,17 @@ assert.ok(
   appSource.includes("if (showResultsSurface) return undefined;"),
   "Search placeholder timer should stay off while the compact results surface is active"
 );
+assert.ok(
+  appSource.includes("Keyboard,"),
+  "Native search flows should import Keyboard for submit-time dismissal"
+);
+assert.ok(
+  appSource.includes("function dismissSearchKeyboard()"),
+  "Native search flows should centralize keyboard dismissal"
+);
+assert.ok(
+  appSource.includes("dismissSearchKeyboard();"),
+  "Native search submit/clear flows should dismiss the soft keyboard so results are not covered"
+);
 
 console.log("mobile store readiness checks passed");

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Animated,
+  Keyboard,
   Linking,
   Modal,
   Platform,
@@ -250,6 +251,13 @@ const ACCESSIBILITY_STATUS_PROPS = Platform.OS === "web"
   ? { accessibilityRole: "status" }
   : { accessibilityLiveRegion: "polite" };
 const ANDROID_STATUS_BAR_OFFSET = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
+
+function dismissSearchKeyboard() {
+  if (Platform.OS !== "web") {
+    Keyboard.dismiss();
+  }
+}
+
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
 const PUBLIC_LANGUAGE_HINT_COOKIE = "ojs_public_language_hint";
@@ -6962,6 +6970,7 @@ export default function App() {
   const submitSearch = useCallback((value = searchRef.current, analytics = {}) => {
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
+    dismissSearchKeyboard();
     const nextSearch = String(value || "").trim();
     searchRef.current = nextSearch;
     lastSearchInputAtRef.current = Date.now();
@@ -7026,6 +7035,7 @@ export default function App() {
   const clearSearchAndSuggestions = useCallback(() => {
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
+    dismissSearchKeyboard();
     const defaultFilters = createDefaultPostingsFilters();
     lastSearchSubmitRef.current = {
       value: "",
@@ -7052,6 +7062,7 @@ export default function App() {
     if (!filterPatch) return false;
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
+    dismissSearchKeyboard();
     const nextFilters = {
       ...postingsFiltersRef.current,
       ...filterPatch
