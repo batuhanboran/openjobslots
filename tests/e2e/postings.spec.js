@@ -2344,7 +2344,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("posting-card").first()).toContainText("Technical Support Engineer");
     await expect.poll(() => requestedPostings).toEqual([query]);
-    await expect.poll(() => requestedFilterOptions).toEqual([query]);
+    await expect.poll(() => requestedFilterOptions).toEqual([]);
     await expect(page.getByTestId("public-footer-meta")).toHaveCount(0);
     await expectNoRawErrors(page);
   });
@@ -2724,7 +2724,7 @@ test.describe("postings page QA", () => {
 
     expect(calls.suggestions).toEqual(["software"]);
     expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
-    expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(1);
+    expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
   });
 
   test("pressing Enter cancels pending auto-search instead of duplicating result requests", async ({ page }) => {

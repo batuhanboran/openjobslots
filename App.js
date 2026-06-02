@@ -6152,7 +6152,6 @@ export default function App() {
   const postingsRequestSequenceRef = useRef(0);
   const postingsRef = useRef([]);
   const postingFilterOptionsRef = useRef(postingFilterOptions);
-  const didRunInitialPostingFilterOptionsEffectRef = useRef(false);
   const postingsHasMoreRef = useRef(false);
   const postingsNextOffsetRef = useRef(0);
   const postingsLoadingMoreRef = useRef(false);
@@ -6723,6 +6722,10 @@ export default function App() {
 
   const loadPostingFilterOptions = useCallback(async (options = {}) => {
     const silent = Boolean(options.silent);
+    const force = Boolean(options.force);
+    if (isPublicNativeStoreSurface || !force) {
+      return;
+    }
     const q = Object.prototype.hasOwnProperty.call(options, "search") ? options.search : searchRef.current;
     const filters = options.filters || postingsFiltersRef.current;
     if (!silent) {
@@ -6754,7 +6757,7 @@ export default function App() {
         setPostingFilterOptionsLoading(false);
       }
     }
-  }, [publicLanguageCode, publicLanguageCountryCode, queueFrontendLog]);
+  }, [isPublicNativeStoreSurface, publicLanguageCode, publicLanguageCountryCode, queueFrontendLog]);
 
   const loadMorePostings = useCallback(() => {
     if (initializing || loading) return;
@@ -8330,12 +8333,8 @@ export default function App() {
   }, [activePage, isPublicNativeStoreSurface, loadMcpSettings]);
 
   useEffect(() => {
-    if (activePage !== PAGE_KEYS.POSTINGS) return;
-    if (!didRunInitialPostingFilterOptionsEffectRef.current) {
-      didRunInitialPostingFilterOptionsEffectRef.current = true;
-      return;
-    }
-    loadPostingFilterOptions();
+    if (activePage !== PAGE_KEYS.SETTINGS_MCP) return;
+    loadPostingFilterOptions({ force: true });
   }, [activePage, loadPostingFilterOptions]);
 
   const renderSyncStatusPanel = () => {
