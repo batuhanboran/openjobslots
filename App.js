@@ -4150,6 +4150,13 @@ function getSeoLandingLinkLabel(route) {
   return String(route?.label || "").trim() || getPublicSeoRouteLabel(route);
 }
 
+function getSeoLandingCompactLabel(label) {
+  const normalized = String(label || "").replace(/\s+/g, " ").trim();
+  const chars = Array.from(normalized);
+  if (chars.length <= 22) return normalized;
+  return `${chars.slice(0, 19).join("").trim()}...`;
+}
+
 function getSeoLandingLinkTestId(route) {
   return `seo-landing-link-${String(route?.path || "route").replace(/^\/+/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}`;
 }
@@ -4168,6 +4175,7 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
       <View style={[styles.seoLandingLinksList, compact ? styles.seoLandingLinksListCompact : null]}>
         {links.map((route, index) => {
           const label = getSeoLandingLinkLabel(route);
+          const displayLabel = compact ? getSeoLandingCompactLabel(label) : label;
           const key = String(route?.path || route?.searchQuery || route?.localizedSearchQuery || label || index);
           if (Platform.OS === "web") {
             return (
@@ -4184,7 +4192,7 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
                 testID={getSeoLandingLinkTestId(route)}
                 accessibilityRole="link"
               >
-                {label}
+                {displayLabel}
               </Text>
             );
           }
@@ -4210,7 +4218,7 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
                   isDarkTheme ? styles.seoLandingLinkButtonTextDark : null
                 ]}
               >
-                {label}
+                {displayLabel}
               </Text>
             </Pressable>
           );
@@ -11223,8 +11231,8 @@ const styles = StyleSheet.create({
   },
   seoLandingLinksListCompact: {
     alignSelf: "center",
-    maxWidth: 340,
-    gap: 4
+    maxWidth: 360,
+    gap: 6
   },
   seoLandingLink: {
     color: YAHOO_COLORS.purple,
@@ -11244,7 +11252,8 @@ const styles = StyleSheet.create({
   },
   seoLandingLinkCompact: {
     width: "48%",
-    maxWidth: 160,
+    maxWidth: 174,
+    minWidth: 0,
     paddingHorizontal: 8,
     paddingVertical: 8,
     fontSize: 11,
@@ -11252,9 +11261,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     ...(Platform.OS === "web"
       ? {
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
+          boxSizing: "border-box",
+          display: "block",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap"
@@ -11281,7 +11289,8 @@ const styles = StyleSheet.create({
   },
   seoLandingLinkButtonCompact: {
     width: "48%",
-    maxWidth: 160,
+    maxWidth: 174,
+    minWidth: 0,
     paddingHorizontal: 8,
     paddingVertical: 8
   },

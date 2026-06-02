@@ -551,7 +551,10 @@ async function expectMobileHomePopularSearchesStayCompact(page, languageCode = "
         height: rect.height,
         right: rect.right,
         bottom: rect.bottom,
-        text: String(node.textContent || "").trim()
+        text: String(node.textContent || "").trim(),
+        clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+        overflowsInline: node.scrollWidth > node.clientWidth + 1
       };
     });
     const rows = Array.from(new Set(links.map((link) => Math.round(link.y))));
@@ -563,6 +566,7 @@ async function expectMobileHomePopularSearchesStayCompact(page, languageCode = "
       linkCount: links.length,
       linkRows: rows.length,
       maxLinkBottom: links.reduce((max, link) => Math.max(max, link.bottom), 0),
+      overflowingLinks: links.filter((link) => link.overflowsInline),
       linksSample: links.slice(0, 6)
     };
   });
@@ -576,6 +580,7 @@ async function expectMobileHomePopularSearchesStayCompact(page, languageCode = "
   expect(metrics.maxLinkBottom, `${languageCode} popular links should not overlap the version footer: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(
     metrics.footer.y - 4
   );
+  expect(metrics.overflowingLinks, `${languageCode} mobile popular links should not clip text: ${JSON.stringify(metrics)}`).toEqual([]);
   expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
 }
 
