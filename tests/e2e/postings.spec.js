@@ -14,6 +14,28 @@ const PROTECTED_PUBLIC_ROUTE_PREFIXES = ["/settings", "/mcp", "/applications"];
 const PROTECTED_PUBLIC_ROUTE_EXACT = ["/sync/start", "/sync/stop", "/postings/ignore"];
 const VISITED_POSTING_URLS_STORAGE_KEY = "openjobslots.visitedPostingUrls.v1";
 const VISITED_POSTING_COLOR_RGB = "rgb(104, 29, 168)";
+const PUBLIC_LANGUAGE_TEST_OPTIONS = [
+  ["en", "EN"],
+  ["tr", "TR"],
+  ["de", "DE"],
+  ["fr", "FR"],
+  ["es", "ES"],
+  ["pt-BR", "BR"],
+  ["pt-PT", "PT"],
+  ["it", "IT"],
+  ["nl", "NL"],
+  ["pl", "PL"],
+  ["ja", "JA"],
+  ["ko", "KO"],
+  ["zh-CN", "CN"],
+  ["hi", "HI"],
+  ["ar", "AR"],
+  ["id", "ID"],
+  ["sv", "SV"],
+  ["da", "DA"],
+  ["no", "NO"],
+  ["fi", "FI"]
+];
 
 function protectedPublicRouteLabel(rawUrl) {
   const url = new URL(rawUrl);
@@ -1827,40 +1849,17 @@ test.describe("postings page QA", () => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile language selector coverage is covered by the mobile project");
 
-    const languages = [
-      ["en", "EN"],
-      ["tr", "TR"],
-      ["de", "DE"],
-      ["fr", "FR"],
-      ["es", "ES"],
-      ["pt-BR", "BR"],
-      ["pt-PT", "PT"],
-      ["it", "IT"],
-      ["nl", "NL"],
-      ["pl", "PL"],
-      ["ja", "JA"],
-      ["ko", "KO"],
-      ["zh-CN", "CN"],
-      ["hi", "HI"],
-      ["ar", "AR"],
-      ["id", "ID"],
-      ["sv", "SV"],
-      ["da", "DA"],
-      ["no", "NO"],
-      ["fi", "FI"]
-    ];
-
     await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
     await page.getByTestId("language-selector").click();
     const renderedLanguageOptionIds = await page
       .locator('[data-testid^="language-option-"]')
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-testid")).filter(Boolean).sort());
-    expect(renderedLanguageOptionIds).toEqual(languages.map(([languageCode]) => `language-option-${languageCode}`).sort());
+    expect(renderedLanguageOptionIds).toEqual(PUBLIC_LANGUAGE_TEST_OPTIONS.map(([languageCode]) => `language-option-${languageCode}`).sort());
     await page.getByTestId("language-option-en").click();
     await expect(page.getByTestId("language-options")).toHaveCount(0);
 
-    for (const [languageCode, shortCode] of languages) {
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
       await page.getByTestId("language-selector").click();
       const languageMenu = page.getByTestId("language-options");
       await expect(languageMenu).toBeVisible();
@@ -2789,6 +2788,57 @@ test.describe("postings page QA", () => {
     expect(calls.suggestions).toEqual([]);
     expect(calls.popular).toEqual([]);
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("mobile result language changes cover every public language without request fanout", async ({ page }) => {
+    test.setTimeout(120_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile result language coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    await expect.poll(() => calls.popular.length).toBeGreaterThanOrEqual(1);
+    await page.waitForTimeout(500);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
+      await page.getByTestId("language-selector").click();
+      const languageMenu = page.getByTestId("language-options");
+      await expect(languageMenu).toBeVisible();
+      const menuBox = await languageMenu.boundingBox();
+      expect(menuBox.x, `${languageCode} result menu should not open off-screen: ${JSON.stringify(menuBox)}`).toBeGreaterThanOrEqual(0);
+      expect(menuBox.x + menuBox.width, `${languageCode} result menu should fit viewport: ${JSON.stringify(menuBox)}`).toBeLessThanOrEqual(
+        viewport.width + 1
+      );
+      const option = page.getByTestId(`language-option-${languageCode}`);
+      await option.scrollIntoViewIfNeeded();
+      await expectMobileTapTarget(page, `language-option-${languageCode}`);
+      await option.click();
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expect(page.getByTestId("search-input")).toHaveValue("software");
+      await expectNoHorizontalOverflow(page);
+    }
+    await page.waitForTimeout(2600);
+
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.popular).toEqual([]);
   });
 
   test("keyboard shortcuts and brand home keep search fast", async ({ page }) => {

@@ -12126,21 +12126,26 @@ const styles = StyleSheet.create({
     gap: 5
   },
   mobileResultsHeaderBand: {
+    position: "relative",
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8
+    gap: 8,
+    zIndex: 140,
+    elevation: 18
   },
   mobileResultsStatsBand: {
+    position: "relative",
     width: "100%",
     alignItems: "stretch",
-    justifyContent: "center"
+    justifyContent: "center",
+    zIndex: 1
   },
   languageSelectorWrap: {
     position: "relative",
-    zIndex: 80,
-    elevation: 10
+    zIndex: 180,
+    elevation: 20
   },
   languageSelectorWrapCompact: {
     width: 48,
