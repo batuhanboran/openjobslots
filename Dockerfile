@@ -4,7 +4,7 @@ RUN apk add --no-cache python3 make g++ sqlite
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 
 COPY . .
