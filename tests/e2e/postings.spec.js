@@ -1015,7 +1015,11 @@ async function installNoResultsRoute(page, searchValue = "__openjobslots_empty_p
   });
 }
 
-async function installSearchRequestThrottleRoutes(page) {
+async function installSearchRequestThrottleRoutes(page, options = {}) {
+  const makeSuggestionItems =
+    typeof options.makeSuggestionItems === "function"
+      ? options.makeSuggestionItems
+      : (search) => (search ? [{ type: "search", value: search, label: search }] : []);
   const calls = {
     postings: [],
     filterOptions: [],
@@ -1027,14 +1031,15 @@ async function installSearchRequestThrottleRoutes(page) {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith("/search/suggest")) {
       const search = url.searchParams.get("search") || "";
+      const items = makeSuggestionItems(search);
       calls.suggestions.push(search);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
-          count: search ? 1 : 0,
-          items: search ? [{ type: "search", value: search, label: search }] : []
+          count: items.length,
+          items
         })
       });
       return;
@@ -2987,6 +2992,41 @@ test.describe("postings page QA", () => {
     expect(calls.suggestions).toEqual(["software"]);
     expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
     expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
+  });
+
+  test("tapping a mobile autocomplete suggestion submits once without fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile suggestion submit coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page, {
+      makeSuggestionItems: (search) => (search ? [{ type: "role", value: search, label: search }] : [])
+    });
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await expect.poll(() => calls.suggestions, { timeout: 2000 }).toEqual(["software"]);
+    await expect(page.getByTestId("search-suggestions-panel")).toBeVisible({ timeout: 1000 });
+    await expectMobileTapTarget(page, "search-suggestion-0");
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    await page.getByTestId("search-suggestion-0").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("software");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+    expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
+    await expectNoHorizontalOverflow(page);
   });
 
   test("opening the mobile language menu closes suggestions and cancels pending query work", async ({ page }) => {
