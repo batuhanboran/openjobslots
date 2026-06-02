@@ -2055,6 +2055,110 @@ test.describe("postings page QA", () => {
     expect(backgrounds.body).toBe(backgrounds.scroll);
   });
 
+  test("mobile dark mode keeps every public language control readable and contained", async ({ page }) => {
+    test.setTimeout(150_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile dark language chrome is covered by the mobile project");
+
+    await openJobSlots(page);
+    await page.getByTestId("theme-toggle").click();
+
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
+      await page.getByTestId("language-selector").click();
+      const languageMenu = page.getByTestId("language-options");
+      await expect(languageMenu).toBeVisible();
+      const menuBox = await languageMenu.boundingBox();
+      expect(menuBox.x, `${languageCode} dark menu should not open off-screen: ${JSON.stringify(menuBox)}`).toBeGreaterThanOrEqual(0);
+      expect(menuBox.x + menuBox.width, `${languageCode} dark menu should fit viewport: ${JSON.stringify(menuBox)}`).toBeLessThanOrEqual(
+        viewport.width + 1
+      );
+      const option = page.getByTestId(`language-option-${languageCode}`);
+      await option.scrollIntoViewIfNeeded();
+      await expectMobileTapTarget(page, `language-option-${languageCode}`);
+      await option.click();
+
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expectMobileTapTarget(page, "theme-toggle");
+      await expectMobileTapTarget(page, "language-selector");
+
+      const darkState = await page.evaluate(() => {
+        const parseRgba = (value) => {
+          const match = String(value || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/i);
+          if (!match) return null;
+          return {
+            r: Number(match[1]),
+            g: Number(match[2]),
+            b: Number(match[3]),
+            a: match[4] === undefined ? 1 : Number(match[4])
+          };
+        };
+        const relativeLuminance = ({ r, g, b }) => {
+          const toLinear = (channel) => {
+            const value = channel / 255;
+            return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+          };
+          return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+        };
+        const contrastRatio = (foreground, background) => {
+          const fg = relativeLuminance(foreground);
+          const bg = relativeLuminance(background);
+          return Number(((Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)).toFixed(2));
+        };
+        const nearestSolidBackground = (node) => {
+          let current = node;
+          while (current) {
+            const background = parseRgba(window.getComputedStyle(current).backgroundColor);
+            if (background && background.a > 0.01) return background;
+            current = current.parentElement;
+          }
+          return parseRgba(window.getComputedStyle(document.body).backgroundColor) || { r: 0, g: 0, b: 0, a: 1 };
+        };
+        const readControl = (selector) => {
+          const root = document.querySelector(selector);
+          if (!root) return null;
+          const textNode = Array.from(root.querySelectorAll("*"))
+            .filter((node) => String(node.textContent || "").trim())
+            .find((node) => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0) || root;
+          const box = root.getBoundingClientRect();
+          const style = window.getComputedStyle(textNode);
+          const foreground = parseRgba(style.color) || { r: 0, g: 0, b: 0, a: 1 };
+          const background = nearestSolidBackground(textNode);
+          return {
+            text: String(root.textContent || "").trim(),
+            x: box.x,
+            right: box.right,
+            width: box.width,
+            height: box.height,
+            contrast: contrastRatio(foreground, background)
+          };
+        };
+        return {
+          dir: document.documentElement.getAttribute("dir"),
+          lang: document.documentElement.getAttribute("lang"),
+          theme: readControl('[data-testid="theme-toggle"]'),
+          language: readControl('[data-testid="language-selector"]'),
+          rootWidth: document.documentElement.scrollWidth,
+          viewportWidth: document.documentElement.clientWidth
+        };
+      });
+
+      expect(darkState.lang, `${languageCode} should keep document lang in dark mode`).toBe(languageCode);
+      expect(darkState.dir, `${languageCode} should keep document direction in dark mode`).toBe(languageCode === "ar" ? "rtl" : "ltr");
+      for (const [label, state] of [["theme", darkState.theme], ["language", darkState.language]]) {
+        expect(state, `${languageCode} ${label} control should render`).toBeTruthy();
+        expect(state.x, `${languageCode} dark ${label} should not start off-screen: ${JSON.stringify(state)}`).toBeGreaterThanOrEqual(0);
+        expect(state.right, `${languageCode} dark ${label} should fit viewport: ${JSON.stringify(state)}`).toBeLessThanOrEqual(viewport.width + 1);
+        expect(Math.min(state.width, state.height), `${languageCode} dark ${label} should stay 44x44: ${JSON.stringify(state)}`).toBeGreaterThanOrEqual(44);
+        expect(state.contrast, `${languageCode} dark ${label} text should pass contrast: ${JSON.stringify(state)}`).toBeGreaterThanOrEqual(4.5);
+      }
+      if (languageCode !== "en") {
+        expect(darkState.theme.text, `${languageCode} dark theme label should not fall back to English`).not.toContain("Dark");
+      }
+      expect(darkState.rootWidth).toBeLessThanOrEqual(darkState.viewportWidth + 1);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("localized desktop header controls stay aligned in dark mode", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width < 768, "desktop language header alignment is covered by the desktop project");
