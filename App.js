@@ -6292,12 +6292,13 @@ export default function App() {
     writeWebStorageValue(PUBLIC_LANGUAGE_STORAGE_KEY, nextLanguage);
   }, [closeSearchWorkForUtilityMenu]);
   const togglePublicTheme = useCallback(() => {
+    closeSearchWorkForUtilityMenu();
     setPublicTheme((previousTheme) => {
       const nextTheme = previousTheme === "dark" ? "light" : "dark";
       writeWebStorageValue(PUBLIC_THEME_STORAGE_KEY, nextTheme);
       return nextTheme;
     });
-  }, []);
+  }, [closeSearchWorkForUtilityMenu]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
     const root = document.documentElement;
