@@ -1,12 +1,14 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  assertSearchParityRuntime,
   buildPostingsUrl,
   checkFilterViolations,
   compareTopUrls,
   isSortedByLastSeen,
   parseParityArgs,
   requiredFieldIssues,
+  runSearchParity,
   shouldAssertLastSeenOrder
 } = require("./check-search-parity");
 
@@ -34,6 +36,17 @@ test("parity args support case override, API base URL, and fail-on-mismatch", ()
   assert.equal(options.limit, 7);
   assert.equal(options.offset, 3);
   assert.equal(options.failOnMismatch, true);
+});
+
+test("search parity fails clearly when local Postgres runtime is unavailable", async () => {
+  assert.throws(
+    () => assertSearchParityRuntime(null),
+    /requires a local Postgres pool/
+  );
+  await assert.rejects(
+    () => runSearchParity(null, parseParityArgs(["--api-base-url=https://openjobslots.com", "--case=remote"], {})),
+    /--api-base-url only adds public API comparison/
+  );
 });
 
 test("postings URL includes filters used by public API", () => {

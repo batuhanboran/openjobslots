@@ -233,6 +233,15 @@ async function seedFixtureRows(db) {
     });
   }
 
+  const companyUrls = companies.map((company) => company.url_string);
+  await db.run(
+    `
+      DELETE FROM companies
+      WHERE url_string IN (${companyUrls.map(() => "?").join(", ")});
+    `,
+    companyUrls
+  );
+
   for (const company of companies) {
     await db.run(
       `

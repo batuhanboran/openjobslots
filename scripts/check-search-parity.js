@@ -339,7 +339,16 @@ async function runParityCase(pool, caseSpec, options) {
   };
 }
 
+function assertSearchParityRuntime(pool) {
+  if (!pool || typeof pool.query !== "function") {
+    throw new Error(
+      "search:parity requires a local Postgres pool. Set OPENJOBSLOTS_DB_BACKEND=postgres and DATABASE_URL/POSTGRES_URL, or run it inside the production app container. --api-base-url only adds public API comparison; it does not replace local Postgres/Meili checks."
+    );
+  }
+}
+
 async function runSearchParity(pool, options = parseParityArgs()) {
+  assertSearchParityRuntime(pool);
   const dbConfig = getPostgresConfig();
   const meiliConfig = getMeiliConfig();
   const cases = [];
@@ -372,13 +381,18 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(error);
+    if (String(process.env.OPENJOBSLOTS_PARITY_DEBUG || "").trim() === "1") {
+      console.error(error);
+    } else {
+      console.error(`Error: ${String(error?.message || error)}`);
+    }
     process.exit(1);
   });
 }
 
 module.exports = {
   DEFAULT_CASES,
+  assertSearchParityRuntime,
   buildPostingsUrl,
   checkFilterViolations,
   compareTopUrls,
