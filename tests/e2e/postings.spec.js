@@ -181,8 +181,19 @@ async function expectSearchEngineVisualContract(page) {
     expect(panel.width).toBeGreaterThan(viewport.width * 0.96);
     expect(Math.abs(searchBox.x + searchBox.width / 2 - viewport.width / 2)).toBeLessThan(viewport.width * 0.08);
   } else {
+    const footer = await page.getByTestId("public-footer-meta").boundingBox();
+    const brand = await page.getByTestId("app-logo").boundingBox();
+    const theme = await page.getByTestId("theme-toggle").boundingBox();
+    const language = await page.getByTestId("language-selector").boundingBox();
+    const topChromeBottom = Math.max(brand.y + brand.height, theme.y + theme.height, language.y + language.height);
+    const targetCenter = (topChromeBottom + footer.y) / 2;
+    const inputCenter = searchBox.y + searchBox.height / 2;
     expect(panel.width).toBeLessThanOrEqual(viewport.width);
-    expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
+    expect(Math.abs(inputCenter - targetCenter), `mobile search should sit near the usable viewport center`).toBeLessThan(
+      viewport.height * 0.22
+    );
+    expect(searchBox.y, `mobile search should not sit directly under the header`).toBeGreaterThan(topChromeBottom + 72);
+    expect(searchBox.y + searchBox.height, `mobile search should stay clear of the fixed footer`).toBeLessThan(footer.y - 112);
   }
   await expect(page.getByTestId("sync-status-panel")).toHaveCount(0);
   if (viewport.width >= 768) {
@@ -561,6 +572,10 @@ async function expectMobileHomePopularSearchesStayCompact(page, languageCode = "
     return {
       links: box('[data-testid="seo-landing-links"]'),
       footer: box('[data-testid="public-footer-meta"]'),
+      searchInput: box('[data-testid="search-input"]'),
+      brand: box('[data-testid="app-logo"]'),
+      theme: box('[data-testid="theme-toggle"]'),
+      language: box('[data-testid="language-selector"]'),
       rootWidth: document.documentElement.scrollWidth,
       viewportWidth: document.documentElement.clientWidth,
       linkCount: links.length,
@@ -573,10 +588,21 @@ async function expectMobileHomePopularSearchesStayCompact(page, languageCode = "
 
   expect(metrics.links, `${languageCode} popular links should render`).toBeTruthy();
   expect(metrics.footer, `${languageCode} mobile footer should render`).toBeTruthy();
+  expect(metrics.searchInput, `${languageCode} mobile search input should render`).toBeTruthy();
   expect(metrics.linkCount, `${languageCode} should keep the mobile popular cloud focused`).toBeGreaterThanOrEqual(1);
   expect(metrics.linkCount, `${languageCode} should not render an oversized popular cloud`).toBeLessThanOrEqual(6);
   expect(metrics.linkRows, `${languageCode} popular links should stay compact: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(3);
   expect(metrics.links.height, `${languageCode} popular links block should not push under the footer: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(176);
+  const topChromeBottom = Math.max(metrics.brand?.bottom || 0, metrics.theme?.bottom || 0, metrics.language?.bottom || 0);
+  const targetCenter = (topChromeBottom + metrics.footer.y) / 2;
+  const clusterCenter = (metrics.searchInput.y + metrics.maxLinkBottom) / 2;
+  expect(
+    Math.abs(clusterCenter - targetCenter),
+    `${languageCode} home cluster should be centered in the usable mobile viewport: ${JSON.stringify(metrics)}`
+  ).toBeLessThan(viewport.height * 0.12);
+  expect(metrics.searchInput.y, `${languageCode} search should not hug the mobile header: ${JSON.stringify(metrics)}`).toBeGreaterThan(
+    topChromeBottom + 72
+  );
   expect(metrics.maxLinkBottom, `${languageCode} popular links should not overlap the version footer: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(
     metrics.footer.y - 4
   );
@@ -2436,7 +2462,12 @@ test.describe("postings page QA", () => {
       viewport.width + 1
     );
     const searchBox = await page.getByTestId("search-input").boundingBox();
-    expect(searchBox.y).toBeLessThan(viewport.height * 0.42);
+    expect(searchBox.y, `mobile search should be vertically centered, not pinned high: ${JSON.stringify(searchBox)}`).toBeGreaterThan(
+      viewport.height * 0.3
+    );
+    expect(searchBox.y, `mobile search should still fit above the lower content: ${JSON.stringify(searchBox)}`).toBeLessThan(
+      viewport.height * 0.5
+    );
 
     await page.getByTestId("language-selector").click();
     await expect(page.getByTestId("language-options")).toBeVisible();

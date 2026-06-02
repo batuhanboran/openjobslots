@@ -6059,7 +6059,7 @@ function ToggleRow({ label, value, onValueChange }) {
 }
 
 export default function App() {
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const isDesktopViewport = Platform.OS === "web" && Number(viewportWidth || 0) >= 768;
   const isPublicNativeStoreSurface = isNativeStorePlatform(Platform.OS);
   const initialPublicSearchQuery = useMemo(readInitialPublicSearchQuery, []);
@@ -6573,6 +6573,14 @@ export default function App() {
   const showResultsSurface = searchResultsMode || hasActivePostingFilters;
   const searchUiMode = showResultsSurface ? "results" : searchQueryText ? "suggest" : "home";
   const searchShellCompact = searchUiMode === "results";
+  const mobileHomeSearchShellLayout = useMemo(() => {
+    if (Platform.OS === "web" || isDesktopViewport || showResultsSurface) return null;
+    const height = Number(viewportHeight || 0);
+    if (!Number.isFinite(height) || height <= 0) return null;
+    const topReserve = ANDROID_STATUS_BAR_OFFSET + 76;
+    const bottomReserve = isPublicNativeStoreSurface ? 156 : 112;
+    return { minHeight: Math.max(500, height - topReserve - bottomReserve) };
+  }, [isDesktopViewport, isPublicNativeStoreSurface, showResultsSurface, viewportHeight]);
   const suggestionsVisible = searchSuggestionsOpen && searchSuggestions.length > 0;
   const searchIntentChips = useMemo(
     () => buildSearchIntentSuggestions(search, SEARCH_INTENT_CHIP_LIMIT, { postingFilterOptions }),
@@ -8922,6 +8930,7 @@ export default function App() {
           styles.searchPanel,
           styles.yahooSearchPanel,
           isDesktopViewport ? styles.searchPanelDesktop : styles.searchPanelMobile,
+          !isDesktopViewport && !showResultsSurface ? styles.searchPanelHomeMobile : null,
           showResultsSurface ? styles.yahooSearchPanelResults : null,
           showResultsSurface && isDesktopViewport ? styles.searchPanelSticky : null,
           isDarkPublicTheme ? styles.searchPanelDark : null
@@ -8996,6 +9005,8 @@ export default function App() {
           styles.yahooSearchShell,
           showResultsSurface ? styles.yahooSearchShellCompact : styles.yahooSearchShellHome,
           !isDesktopViewport ? styles.yahooSearchShellMobile : null,
+          !isDesktopViewport && !showResultsSurface ? styles.yahooSearchShellHomeMobile : null,
+          mobileHomeSearchShellLayout,
           Platform.OS === "web" ? styles.webSmoothMotion : null
         ]}
         testID="search-controls"
@@ -10543,6 +10554,10 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 32
   },
+  searchPanelHomeMobile: {
+    paddingTop: Platform.OS === "web" ? "max(24px, calc(env(safe-area-inset-top) + 16px))" : ANDROID_STATUS_BAR_OFFSET + 16,
+    paddingBottom: Platform.OS === "web" ? 24 : 88
+  },
   searchPanelSticky: {
     ...(Platform.OS === "web"
       ? {
@@ -10781,6 +10796,12 @@ const styles = StyleSheet.create({
     minHeight: Platform.OS === "web" ? "min(360px, calc(100svh - 220px))" : 260,
     paddingTop: 18,
     paddingBottom: 22
+  },
+  yahooSearchShellHomeMobile: {
+    minHeight: Platform.OS === "web" ? "max(500px, calc(100svh - 178px))" : 520,
+    paddingTop: 34,
+    paddingBottom: Platform.OS === "web" ? 112 : 116,
+    justifyContent: "center"
   },
   yahooSearchShellCompact: {
     minHeight: Platform.OS === "web" ? 170 : 160,
