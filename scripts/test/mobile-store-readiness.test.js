@@ -52,5 +52,13 @@ assert.ok(
   appSource.includes("if (!animatedSearchPlaceholderEnabled) return undefined;"),
   "Search placeholder timer must be gated away from native mobile"
 );
+assert.ok(
+  appSource.includes("const emptySearchPlaceholder = compact ? compactSearchPlaceholder : exampleSearchPlaceholder;"),
+  "Compact result search should use the short mobile-safe placeholder"
+);
+assert.ok(
+  appSource.includes("if (showResultsSurface) return undefined;"),
+  "Search placeholder timer should stay off while the compact results surface is active"
+);
 
 console.log("mobile store readiness checks passed");

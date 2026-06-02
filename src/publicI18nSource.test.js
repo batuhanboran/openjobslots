@@ -228,6 +228,27 @@ test("non-English language packs do not inherit broad English search/result/vers
   }
 });
 
+test("mobile search placeholders stay compact in every public language", () => {
+  const state = extractAppI18nState();
+
+  for (const language of state.languages) {
+    const messages = mergedMessagesForLanguage(state, language.code);
+    const fullPlaceholder = messages["search.placeholder"];
+    const shortPlaceholder = messages["search.placeholderShort"];
+    assert.equal(typeof shortPlaceholder, "string", `${language.code} missing search.placeholderShort`);
+    assert.ok(shortPlaceholder.trim(), `${language.code} has blank search.placeholderShort`);
+    assert.ok(!/[\r\n]/.test(shortPlaceholder), `${language.code} short placeholder should fit on one line`);
+    assert.ok(
+      Array.from(shortPlaceholder).length <= Array.from(fullPlaceholder).length,
+      `${language.code} short placeholder should not be longer than the default placeholder`
+    );
+    assert.ok(
+      Array.from(shortPlaceholder).length <= 30,
+      `${language.code} short placeholder is too long for compact mobile search: ${shortPlaceholder}`
+    );
+  }
+});
+
 test("release notes never collapse to one repeated generic summary", () => {
   const state = extractAppI18nState();
   const topVersions = state.releases.slice(0, 6);

@@ -7895,6 +7895,7 @@ export default function App() {
   useEffect(() => {
     if (!animatedSearchPlaceholderEnabled) return undefined;
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
+    if (showResultsSurface) return undefined;
     if (String(search || "").trim()) return undefined;
     const text = SEARCH_PLACEHOLDER_EXAMPLES[searchExampleTypeState.index % SEARCH_PLACEHOLDER_EXAMPLES.length] || "";
     const atEnd = !searchExampleTypeState.deleting && searchExampleTypeState.length >= text.length;
@@ -7926,7 +7927,7 @@ export default function App() {
       });
     }, delay);
     return () => clearTimeout(timer);
-  }, [activePage, animatedSearchPlaceholderEnabled, search, searchExampleTypeState]);
+  }, [activePage, animatedSearchPlaceholderEnabled, search, searchExampleTypeState, showResultsSurface]);
 
   useEffect(() => {
     Animated.timing(searchMotionRef.current, {
@@ -8431,6 +8432,7 @@ export default function App() {
       const compact = mode === "results";
       const showAttachedSuggestions = suggestionsVisible && searchSuggestions.length > 0;
       const showResultsMobileSuggestions = compact && !isDesktopViewport && showAttachedSuggestions;
+      const emptySearchPlaceholder = compact ? compactSearchPlaceholder : exampleSearchPlaceholder;
       const searchLength = String(search || "").trim().length;
       const searchLengthStyle =
         searchLength >= 34 ? styles.yahooSearchInputVeryLong : searchLength >= 22 ? styles.yahooSearchInputLong : null;
@@ -8473,7 +8475,7 @@ export default function App() {
                 onKeyPress={handleSearchKeyPress}
                 placeholder={
                   !String(search || "").trim()
-                    ? exampleSearchPlaceholder
+                    ? emptySearchPlaceholder
                     : defaultSearchPlaceholder
                 }
                 placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
