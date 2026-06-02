@@ -1022,6 +1022,7 @@ async function installSearchRequestThrottleRoutes(page, options = {}) {
       : (search) => (search ? [{ type: "search", value: search, label: search }] : []);
   const calls = {
     postings: [],
+    postingRequests: [],
     filterOptions: [],
     suggestions: [],
     popular: []
@@ -1063,7 +1064,15 @@ async function installSearchRequestThrottleRoutes(page, options = {}) {
       return;
     }
     if (url.pathname.endsWith("/postings")) {
-      calls.postings.push(url.searchParams.get("search") || "");
+      const search = url.searchParams.get("search") || "";
+      calls.postings.push(search);
+      calls.postingRequests.push({
+        search,
+        remote: url.searchParams.get("remote") || "",
+        ats: url.searchParams.get("ats") || "",
+        freshnessDays: url.searchParams.get("freshness_days") || "",
+        sortBy: url.searchParams.get("sort_by") || ""
+      });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -3026,6 +3035,40 @@ test.describe("postings page QA", () => {
     expect(calls.suggestions).toEqual([]);
     expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
     expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("tapping a mobile intent chip applies filters once without query fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile intent chip fanout coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.postingRequests.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("remote software engineer", { delay: 20 });
+    await expect(page.getByTestId("intent-chip-remote")).toBeVisible();
+    await expectMobileTapTarget(page, "intent-chip-remote");
+
+    await page.getByTestId("intent-chip-remote").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("remote software engineer");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(
+      calls.postingRequests.filter(
+        (request) => request.search === "remote software engineer" && request.remote === "remote"
+      )
+    ).toHaveLength(1);
+    expect(calls.postings.filter((search) => search === "remote software engineer")).toHaveLength(1);
     await expectNoHorizontalOverflow(page);
   });
 
