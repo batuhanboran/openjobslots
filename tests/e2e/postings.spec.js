@@ -1907,6 +1907,72 @@ test.describe("postings page QA", () => {
     }
   });
 
+  test("mobile popular search links cover every public language without small targets or suggestion fanout", async ({ page }) => {
+    test.setTimeout(180_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile popular search coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
+      await page.getByTestId("language-selector").click();
+      const option = page.getByTestId(`language-option-${languageCode}`);
+      await option.scrollIntoViewIfNeeded();
+      await option.click();
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expect(page.getByTestId("seo-landing-links")).toBeVisible();
+      await expect
+        .poll(async () => page.locator('[data-testid^="seo-landing-link-"]').count())
+        .toBeGreaterThan(0);
+
+      const links = await page.locator('[data-testid^="seo-landing-link-"]').evaluateAll((nodes) => nodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          testId: node.getAttribute("data-testid") || "",
+          href: node.getAttribute("href") || "",
+          text: String(node.textContent || "").trim(),
+          x: rect.x,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height
+        };
+      }));
+      expect(links.length, `${languageCode} should render popular search links`).toBeGreaterThanOrEqual(1);
+      for (const link of links) {
+        expect(link.text, `${languageCode} ${link.testId} should have visible label`).not.toBe("");
+        expect(link.href, `${languageCode} ${link.testId} should keep a crawlable href`).toMatch(new RegExp(`^/${languageCode}(?:[/?]|$)`, "i"));
+        expect(link.x, `${languageCode} ${link.testId} should not start off-screen: ${JSON.stringify(link)}`).toBeGreaterThanOrEqual(0);
+        expect(link.right, `${languageCode} ${link.testId} should fit viewport: ${JSON.stringify(link)}`).toBeLessThanOrEqual(viewport.width + 1);
+        expect(
+          Math.min(link.width, link.height),
+          `${languageCode} ${link.testId} should be at least 44px wide and tall on mobile: ${JSON.stringify(link)}`
+        ).toBeGreaterThanOrEqual(44);
+      }
+
+      calls.postings.length = 0;
+      calls.filterOptions.length = 0;
+      calls.suggestions.length = 0;
+      calls.popular.length = 0;
+
+      await page.locator('[data-testid^="seo-landing-link-"]').first().click();
+      await expect.poll(() => calls.postings.length).toBe(1);
+      await expect(page.getByTestId("search-input")).not.toHaveValue("");
+      await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+      await page.waitForTimeout(700);
+
+      expect(calls.suggestions).toEqual([]);
+      expect(calls.filterOptions).toEqual([]);
+      expect(calls.popular).toEqual([]);
+      await expectNoHorizontalOverflow(page);
+
+      if (languageCode !== PUBLIC_LANGUAGE_TEST_OPTIONS[PUBLIC_LANGUAGE_TEST_OPTIONS.length - 1][0]) {
+        await page.goto("/");
+        await expect(page.getByTestId("search-shell")).toBeVisible();
+      }
+    }
+  });
+
   test("mobile release notes localize every public language without viewport overflow", async ({ page }) => {
     test.setTimeout(150_000);
     const viewport = page.viewportSize() || { width: 1440, height: 900 };

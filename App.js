@@ -11168,8 +11168,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(100, 79, 240, 0.16)",
     borderRadius: 999,
+    minWidth: 44,
+    minHeight: 44,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 10,
     fontFamily: YAHOO_FONT_STACK,
     fontSize: 13,
     lineHeight: 18,
@@ -11179,7 +11181,7 @@ const styles = StyleSheet.create({
   seoLandingLinkCompact: {
     maxWidth: "100%",
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 9,
     fontSize: 12,
     lineHeight: 16
   },
@@ -11190,7 +11192,8 @@ const styles = StyleSheet.create({
   },
   seoLandingLinkButton: {
     maxWidth: "100%",
-    minHeight: 34,
+    minWidth: 44,
+    minHeight: 44,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(100, 79, 240, 0.08)",
@@ -11198,11 +11201,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(100, 79, 240, 0.16)",
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 7
+    paddingVertical: 10
   },
   seoLandingLinkButtonCompact: {
     paddingHorizontal: 10,
-    paddingVertical: 6
+    paddingVertical: 9
   },
   seoLandingLinkButtonDark: {
     backgroundColor: "rgba(183, 158, 255, 0.14)",
