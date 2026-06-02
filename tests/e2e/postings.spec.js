@@ -2572,6 +2572,44 @@ test.describe("postings page QA", () => {
     await expectNoRawErrors(page);
   });
 
+  test("mobile direct query routes cover every public language without request fanout", async ({ page }) => {
+    test.setTimeout(180_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile direct query language coverage is covered by the mobile project");
+
+    const query = "Technical Support Engineer";
+    const calls = await installSearchRequestThrottleRoutes(page);
+
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
+      calls.postings.length = 0;
+      calls.filterOptions.length = 0;
+      calls.suggestions.length = 0;
+      calls.popular.length = 0;
+
+      await page.goto(`/${languageCode}?q=${encodeURIComponent(query)}`);
+      await expect(page.getByTestId("app-logo")).toContainText("openjobslots", { timeout: 15_000 });
+      await expect(page.getByTestId("search-input")).toHaveValue(query, { timeout: 5000 });
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expect.poll(() => calls.postings).toEqual([query]);
+      await page.waitForTimeout(2600);
+
+      const documentLanguageState = await page.evaluate(() => ({
+        dir: document.documentElement.getAttribute("dir"),
+        lang: document.documentElement.getAttribute("lang")
+      }));
+      expect(documentLanguageState.lang, `${languageCode} direct query should set document language`).toBe(languageCode);
+      expect(documentLanguageState.dir, `${languageCode} direct query should set document direction`).toBe(
+        languageCode === "ar" ? "rtl" : "ltr"
+      );
+      expect(calls.postings, `${languageCode} direct query should issue exactly one postings request`).toEqual([query]);
+      expect(calls.filterOptions, `${languageCode} direct query should not fan out filter options`).toEqual([]);
+      expect(calls.suggestions, `${languageCode} direct query should not request suggestions`).toEqual([]);
+      expect(calls.popular, `${languageCode} direct query should not refetch popular searches`).toEqual([]);
+      await expectNoFilterChrome(page);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("submitted searches clear stale cards, hide result footer, and request newest-first ordering", async ({ page }) => {
     const requestedPostings = [];
     await page.route("**/postings**", async (route) => {
