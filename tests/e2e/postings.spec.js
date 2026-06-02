@@ -3072,6 +3072,40 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("tapping a mobile hybrid intent chip applies filters once without query fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile hybrid intent fanout coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.postingRequests.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("hybrid designer", { delay: 20 });
+    await expect(page.getByTestId("intent-chip-hybrid")).toBeVisible();
+    await expectMobileTapTarget(page, "intent-chip-hybrid");
+
+    await page.getByTestId("intent-chip-hybrid").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("hybrid designer");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(
+      calls.postingRequests.filter(
+        (request) => request.search === "hybrid designer" && request.remote === "hybrid"
+      )
+    ).toHaveLength(1);
+    expect(calls.postings.filter((search) => search === "hybrid designer")).toHaveLength(1);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("tapping a mobile source intent chip applies the ATS filter once without query fanout", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile source intent fanout coverage is covered by the mobile project");
