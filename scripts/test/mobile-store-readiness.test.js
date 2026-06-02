@@ -65,11 +65,51 @@ assert.ok(
   "Native search flows should import Keyboard for submit-time dismissal"
 );
 assert.ok(
-  appSource.includes("function dismissSearchKeyboard()"),
+  appSource.includes("function dismissSearchKeyboard(inputRef)"),
   "Native search flows should centralize keyboard dismissal"
 );
 assert.ok(
-  appSource.includes("dismissSearchKeyboard();"),
+  appSource.includes("inputRef?.current?.blur?.();"),
+  "Native search submit/clear flows should blur the search input after submission"
+);
+assert.ok(
+  appSource.includes("setTimeout(dismissInput, 350);"),
+  "Native search submit should retry blur after the results input remounts"
+);
+assert.ok(
+  appSource.includes("const suppressNativeSearchFocusRef = useRef(false);"),
+  "Native search submit should suppress remount focus until the user edits again"
+);
+assert.ok(
+  appSource.includes("resetNativeSearchFocus();"),
+  "Native search submit/clear flows should clear the focused search frame once results are visible"
+);
+assert.ok(
+  appSource.includes("const [hideNativeSearchCaret, setHideNativeSearchCaret] = useState(false);"),
+  "Native search submit should track submitted presentation separately from TextInput focus"
+);
+assert.ok(
+  appSource.includes("setHideNativeSearchCaret(true);"),
+  "Native search submit should hide the caret after submission"
+);
+assert.ok(
+  appSource.includes('caretHidden={Platform.OS !== "web" && hideNativeSearchCaret}'),
+  "Native search results should not leave a visible caret after submission"
+);
+assert.ok(
+  appSource.includes("const showNativeSearchDisplay = Platform.OS !== \"web\" && hideNativeSearchCaret && searchLength > 0;"),
+  "Native search results should render submitted queries without an editable caret"
+);
+assert.ok(
+  appSource.includes("onPress={activateNativeSearchEditing}"),
+  "Native submitted search text should let users tap back into editing"
+);
+assert.ok(
+  appSource.includes('submitBehavior: "blurAndSubmit"'),
+  "Native search submit should blur the search input before showing refreshed results"
+);
+assert.ok(
+  appSource.includes("dismissSearchKeyboard(searchInputRef);"),
   "Native search submit/clear flows should dismiss the soft keyboard so results are not covered"
 );
 

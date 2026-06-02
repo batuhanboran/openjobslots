@@ -251,10 +251,19 @@ const ACCESSIBILITY_STATUS_PROPS = Platform.OS === "web"
   ? { accessibilityRole: "status" }
   : { accessibilityLiveRegion: "polite" };
 const ANDROID_STATUS_BAR_OFFSET = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
+const SEARCH_SUBMIT_BEHAVIOR_PROPS = Platform.OS === "web"
+  ? { blurOnSubmit: false }
+  : { blurOnSubmit: true, submitBehavior: "blurAndSubmit" };
 
-function dismissSearchKeyboard() {
+function dismissSearchKeyboard(inputRef) {
   if (Platform.OS !== "web") {
-    Keyboard.dismiss();
+    const dismissInput = () => {
+      inputRef?.current?.blur?.();
+      Keyboard.dismiss();
+    };
+    dismissInput();
+    setTimeout(dismissInput, 120);
+    setTimeout(dismissInput, 350);
   }
 }
 
@@ -6093,6 +6102,7 @@ export default function App() {
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const [popularSearchItems, setPopularSearchItems] = useState([]);
   const [searchResultsMode, setSearchResultsMode] = useState(Boolean(initialPublicSearchQuery));
+  const [hideNativeSearchCaret, setHideNativeSearchCaret] = useState(false);
   const [coverageDetailsOpen, setCoverageDetailsOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const [statusError, setStatusError] = useState("");
@@ -6124,6 +6134,7 @@ export default function App() {
   const [mcpSettingsSaving, setMcpSettingsSaving] = useState(false);
   const [mcpSettingsNotice, setMcpSettingsNotice] = useState("");
   const searchInputRef = useRef(null);
+  const suppressNativeSearchFocusRef = useRef(false);
   const postingsListRef = useRef(null);
   const searchRef = useRef(initialPublicSearchQuery);
   const lastSearchSubmitRef = useRef({
@@ -6967,10 +6978,18 @@ export default function App() {
     }
   }, []);
 
+  const resetNativeSearchFocus = useCallback(() => {
+    if (Platform.OS === "web") return;
+    suppressNativeSearchFocusRef.current = true;
+    setHideNativeSearchCaret(true);
+    setSearchFocused(false);
+  }, []);
+
   const submitSearch = useCallback((value = searchRef.current, analytics = {}) => {
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
-    dismissSearchKeyboard();
+    dismissSearchKeyboard(searchInputRef);
+    resetNativeSearchFocus();
     const nextSearch = String(value || "").trim();
     searchRef.current = nextSearch;
     lastSearchInputAtRef.current = Date.now();
@@ -7018,7 +7037,7 @@ export default function App() {
       if (nextSearch) trackPublicSearch(nextSearch, { source: analyticsSource });
       void loadPostings(nextSearch, { filters });
     }
-  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, scrollPostingsToTop]);
 
   const selectPopularSearch = useCallback((route) => {
     const nextQuery = String(
@@ -7035,7 +7054,8 @@ export default function App() {
   const clearSearchAndSuggestions = useCallback(() => {
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
-    dismissSearchKeyboard();
+    dismissSearchKeyboard(searchInputRef);
+    resetNativeSearchFocus();
     const defaultFilters = createDefaultPostingsFilters();
     lastSearchSubmitRef.current = {
       value: "",
@@ -7055,14 +7075,15 @@ export default function App() {
     setActiveSuggestionIndex(-1);
     scrollPostingsToTop();
     void loadPostings("", { filters: defaultFilters });
-  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, scrollPostingsToTop]);
 
   const applySearchSuggestionFilter = useCallback((suggestion) => {
     const filterPatch = getSearchSuggestionFilterPatch(suggestion);
     if (!filterPatch) return false;
     cancelPendingAutoSearch();
     cancelPendingSearchSuggestion();
-    dismissSearchKeyboard();
+    dismissSearchKeyboard(searchInputRef);
+    resetNativeSearchFocus();
     const nextFilters = {
       ...postingsFiltersRef.current,
       ...filterPatch
@@ -7084,7 +7105,7 @@ export default function App() {
     trackPublicFilterChange("suggestion");
     void loadPostings(query, { filters: nextFilters });
     return true;
-  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, scrollPostingsToTop]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, scrollPostingsToTop]);
 
   const selectSearchSuggestion = useCallback((suggestion) => {
     if (applySearchSuggestionFilter(suggestion)) return;
@@ -7122,6 +7143,10 @@ export default function App() {
 
   const handleSearchChange = useCallback((value) => {
     cancelPendingSearchSuggestion();
+    if (Platform.OS !== "web") {
+      suppressNativeSearchFocusRef.current = false;
+      setHideNativeSearchCaret(false);
+    }
     const nextValue = String(value || "");
     const previousResultQuery = String(postingsResultQuery || "").trim();
     searchRef.current = nextValue;
@@ -7134,6 +7159,37 @@ export default function App() {
     }
     setSearch(nextValue);
   }, [cancelPendingSearchSuggestion, postingsResultQuery, showResultsSurface]);
+
+  const handleSearchFocus = useCallback(() => {
+    if (Platform.OS !== "web" && suppressNativeSearchFocusRef.current) {
+      setSearchFocused(false);
+      return;
+    }
+    if (Platform.OS !== "web") setHideNativeSearchCaret(false);
+    setSearchFocused(true);
+  }, []);
+
+  const handleSearchBlur = useCallback(() => {
+    if (Platform.OS !== "web") {
+      suppressNativeSearchFocusRef.current = false;
+    }
+    setSearchFocused(false);
+  }, []);
+
+  const handleSearchPressIn = useCallback(() => {
+    if (Platform.OS === "web") return;
+    suppressNativeSearchFocusRef.current = false;
+    setHideNativeSearchCaret(false);
+    setSearchFocused(true);
+  }, []);
+
+  const activateNativeSearchEditing = useCallback(() => {
+    if (Platform.OS === "web") return;
+    suppressNativeSearchFocusRef.current = false;
+    setHideNativeSearchCaret(false);
+    setSearchFocused(true);
+    setTimeout(() => searchInputRef.current?.focus?.(), 0);
+  }, []);
 
   const focusSearch = useCallback(() => {
     setActivePage(PAGE_KEYS.POSTINGS);
@@ -8447,6 +8503,8 @@ export default function App() {
       const searchLength = String(search || "").trim().length;
       const searchLengthStyle =
         searchLength >= 34 ? styles.yahooSearchInputVeryLong : searchLength >= 22 ? styles.yahooSearchInputLong : null;
+      const showNativeSearchDisplay = Platform.OS !== "web" && hideNativeSearchCaret && searchLength > 0;
+      const showSearchFocusedFrame = searchFocused && !(Platform.OS !== "web" && hideNativeSearchCaret);
       return (
         <View style={[styles.searchBoxRow, styles.yahooSearchBoxRow, compact ? styles.yahooSearchBoxRowResults : null]}>
           <View
@@ -8463,40 +8521,69 @@ export default function App() {
                 compact ? styles.yahooSearchBoxFrameResults : null,
                 showAttachedSuggestions ? styles.yahooSearchBoxFrameWithSuggestions : null,
                 isDarkPublicTheme ? styles.yahooSearchBoxFrameDark : null,
-                searchFocused ? styles.yahooSearchBoxFrameFocused : null,
-                searchFocused && isDarkPublicTheme ? styles.yahooSearchBoxFrameFocusedDark : null
+                showSearchFocusedFrame ? styles.yahooSearchBoxFrameFocused : null,
+                showSearchFocusedFrame && isDarkPublicTheme ? styles.yahooSearchBoxFrameFocusedDark : null
               ]}
               testID="search-box-frame"
             >
               {!compact ? <SearchGlyph isDark={isDarkPublicTheme} /> : null}
-              <TextInput
-                ref={searchInputRef}
-                style={[
-                  styles.search,
-                  isDarkPublicTheme ? styles.searchDark : null,
-                  styles.yahooSearchInput,
-                  searchLengthStyle,
-                  isDarkPublicTheme ? styles.yahooSearchInputDark : null
-                ]}
-                value={search}
-                onChangeText={handleSearchChange}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                onSubmitEditing={() => submitSearch(search)}
-                onKeyPress={handleSearchKeyPress}
-                placeholder={
-                  !String(search || "").trim()
-                    ? emptySearchPlaceholder
-                    : defaultSearchPlaceholder
-                }
-                placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
-                autoCapitalize="none"
-                returnKeyType="search"
-                numberOfLines={1}
-                blurOnSubmit={false}
-                testID="search-input"
-                accessibilityLabel={t("search.label", "Search openings")}
-              />
+              {showNativeSearchDisplay ? (
+                <Pressable
+                  onPress={activateNativeSearchEditing}
+                  style={({ pressed }) => [
+                    styles.search,
+                    isDarkPublicTheme ? styles.searchDark : null,
+                    styles.yahooSearchInput,
+                    styles.yahooSearchInputDisplay,
+                    pressed ? styles.yahooSearchInputDisplayPressed : null
+                  ]}
+                  testID="search-input"
+                  accessibilityRole="button"
+                  accessibilityLabel={t("search.label", "Search openings")}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.yahooSearchInputDisplayText,
+                      searchLengthStyle,
+                      isDarkPublicTheme ? styles.yahooSearchInputDisplayTextDark : null
+                    ]}
+                  >
+                    {search}
+                  </Text>
+                </Pressable>
+              ) : (
+                <TextInput
+                  ref={searchInputRef}
+                  style={[
+                    styles.search,
+                    isDarkPublicTheme ? styles.searchDark : null,
+                    styles.yahooSearchInput,
+                    searchLengthStyle,
+                    isDarkPublicTheme ? styles.yahooSearchInputDark : null
+                  ]}
+                  value={search}
+                  onChangeText={handleSearchChange}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
+                  onPressIn={handleSearchPressIn}
+                  onSubmitEditing={() => submitSearch(search)}
+                  onKeyPress={handleSearchKeyPress}
+                  caretHidden={Platform.OS !== "web" && hideNativeSearchCaret}
+                  placeholder={
+                    !String(search || "").trim()
+                      ? emptySearchPlaceholder
+                      : defaultSearchPlaceholder
+                  }
+                  placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
+                  autoCapitalize="none"
+                  returnKeyType="search"
+                  numberOfLines={1}
+                  {...SEARCH_SUBMIT_BEHAVIOR_PROPS}
+                  testID="search-input"
+                  accessibilityLabel={t("search.label", "Search openings")}
+                />
+              )}
               {compact && String(search || "").trim() ? (
                 <Pressable
                   onPress={clearSearchAndSuggestions}
@@ -10720,6 +10807,22 @@ const styles = StyleSheet.create({
   yahooSearchInputDark: {
     color: OJS_DARK_COLORS.ink,
     ...(Platform.OS === "web" ? { outlineStyle: "none", outlineWidth: 0 } : {})
+  },
+  yahooSearchInputDisplay: {
+    justifyContent: "center"
+  },
+  yahooSearchInputDisplayPressed: {
+    opacity: 0.72
+  },
+  yahooSearchInputDisplayText: {
+    color: YAHOO_COLORS.ink,
+    fontFamily: YAHOO_FONT_STACK,
+    fontSize: 18,
+    lineHeight: 24,
+    includeFontPadding: false
+  },
+  yahooSearchInputDisplayTextDark: {
+    color: OJS_DARK_COLORS.ink
   },
   yahooSearchInputLong: {
     fontSize: 16,
