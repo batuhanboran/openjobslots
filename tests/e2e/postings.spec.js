@@ -524,6 +524,61 @@ async function expectMobileResultsHeaderStacksCleanly(page) {
   expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
 }
 
+async function expectMobileHomePopularSearchesStayCompact(page, languageCode = "en") {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  if (viewport.width >= 768) return;
+  const metrics = await page.evaluate(() => {
+    const box = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        right: rect.right,
+        bottom: rect.bottom
+      };
+    };
+    const links = Array.from(document.querySelectorAll('[data-testid^="seo-landing-link-"]')).map((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        testId: node.getAttribute("data-testid") || "",
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        right: rect.right,
+        bottom: rect.bottom,
+        text: String(node.textContent || "").trim()
+      };
+    });
+    const rows = Array.from(new Set(links.map((link) => Math.round(link.y))));
+    return {
+      links: box('[data-testid="seo-landing-links"]'),
+      footer: box('[data-testid="public-footer-meta"]'),
+      rootWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+      linkCount: links.length,
+      linkRows: rows.length,
+      maxLinkBottom: links.reduce((max, link) => Math.max(max, link.bottom), 0),
+      linksSample: links.slice(0, 6)
+    };
+  });
+
+  expect(metrics.links, `${languageCode} popular links should render`).toBeTruthy();
+  expect(metrics.footer, `${languageCode} mobile footer should render`).toBeTruthy();
+  expect(metrics.linkCount, `${languageCode} should keep the mobile popular cloud focused`).toBeGreaterThanOrEqual(1);
+  expect(metrics.linkCount, `${languageCode} should not render an oversized popular cloud`).toBeLessThanOrEqual(6);
+  expect(metrics.linkRows, `${languageCode} popular links should stay compact: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(3);
+  expect(metrics.links.height, `${languageCode} popular links block should not push under the footer: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(176);
+  expect(metrics.maxLinkBottom, `${languageCode} popular links should not overlap the version footer: ${JSON.stringify(metrics)}`).toBeLessThanOrEqual(
+    metrics.footer.y - 4
+  );
+  expect(metrics.rootWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+}
+
 async function expectMobileResultSuggestionsPushHeaderDown(page) {
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
   if (viewport.width >= 768) return;
@@ -1294,7 +1349,8 @@ test.describe("postings page QA", () => {
     await page.getByTestId("search-input").fill("Technical");
     await page.getByTestId("search-input").press("Enter");
     await expect(page.getByTestId("posting-card").first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("result-count")).toContainText(/1,000\+\s+job slots/i);
+    await expect(page.getByTestId("result-count")).toHaveCount(0);
+    await expect(page.getByTestId("public-stats-chips")).toHaveCount(0);
     await expect(page.getByTestId("public-stat-ats")).toHaveCount(0);
     await expect(page.getByTestId("public-stat-companies")).toHaveCount(0);
     await expect(page.getByTestId("postings-pagination-status")).toContainText(/1,000\+/);
@@ -1963,6 +2019,7 @@ test.describe("postings page QA", () => {
           `${languageCode} ${link.testId} should be at least 44px wide and tall on mobile: ${JSON.stringify(link)}`
         ).toBeGreaterThanOrEqual(44);
       }
+      await expectMobileHomePopularSearchesStayCompact(page, languageCode);
 
       calls.postings.length = 0;
       calls.filterOptions.length = 0;
@@ -2367,6 +2424,7 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("filters-panel")).toHaveCount(0);
     await expect(page.getByText(/Enter to search|Esc to clear/i)).toHaveCount(0);
     await expect(page.getByTestId("seo-landing-links")).toBeVisible();
+    await expectMobileHomePopularSearchesStayCompact(page);
     const popularLinks = await page.getByTestId("seo-landing-links").boundingBox();
     expect(popularLinks.x, `popular links should not open off-screen: ${JSON.stringify(popularLinks)}`).toBeGreaterThanOrEqual(0);
     expect(popularLinks.x + popularLinks.width, `popular links should fit viewport: ${JSON.stringify(popularLinks)}`).toBeLessThanOrEqual(

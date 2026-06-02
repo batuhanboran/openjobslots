@@ -42,11 +42,10 @@ function testBuildsApproximateSearchStatsWithoutIncompleteFacets() {
   assert.deepEqual(buildPublicStatsChips({
     job_slot_count: 1000,
     job_slot_count_label: "1,000+",
+    omit_job_slot_count: true,
     omit_ats_count: true,
     omit_company_count: true
-  }), [
-    { key: "job-slots", value: "1,000+", label: "job slots" }
-  ]);
+  }), []);
 }
 
 testFormatsExactNumbers();

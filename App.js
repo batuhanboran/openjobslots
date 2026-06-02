@@ -3961,6 +3961,7 @@ function buildFrontendResultCoverage(response = {}, items = [], sourceFacets = [
     job_slot_count: jobSlotCount,
     job_slot_count_label: approximateJobSlotCount ? `${formatExactNumberLabel(jobSlotCount)}+` : undefined,
     job_slot_count_approximate: approximateJobSlotCount,
+    omit_job_slot_count: approximateJobSlotCount,
     count_exact: countExact,
     configured_ats_count: atsCount,
     configured_enabled_ats_count: atsCount,
@@ -4154,9 +4155,10 @@ function getSeoLandingLinkTestId(route) {
 }
 
 function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, compact = false, onSelectPopularSearch }) {
-  const links = Array.isArray(popularSearchItems) && popularSearchItems.length > 0
+  const allLinks = Array.isArray(popularSearchItems) && popularSearchItems.length > 0
     ? popularSearchItems
     : getPublicSeoPopularSearchItems(languageCode, [], SEO_LANDING_LINK_LIMIT);
+  const links = compact ? allLinks.slice(0, 6) : allLinks;
   if (links.length === 0) return null;
   return (
     <View style={[styles.seoLandingLinks, compact ? styles.seoLandingLinksCompact : null]} testID="seo-landing-links">
@@ -4173,6 +4175,7 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
                 key={key}
                 href={route.path}
                 hrefAttrs={{ rel: "bookmark" }}
+                numberOfLines={compact ? 1 : undefined}
                 style={[
                   styles.seoLandingLink,
                   compact ? styles.seoLandingLinkCompact : null,
@@ -8852,6 +8855,7 @@ export default function App() {
           style={({ pressed }) => [
             styles.publicVersionButton,
             styles.publicFooterVersionButton,
+            isDarkPublicTheme ? styles.publicFooterVersionButtonDark : null,
             pressed ? styles.publicVersionButtonPressed : null,
             pressed && isDarkPublicTheme ? styles.publicVersionButtonPressedDark : null
           ]}
@@ -10711,21 +10715,45 @@ const styles = StyleSheet.create({
   },
   publicFooterMetaMobile: {
     position: Platform.OS === "web" ? "fixed" : "absolute",
-    left: Platform.OS === "web" ? 18 : 20,
-    right: Platform.OS === "web" ? 18 : 20,
-    bottom: Platform.OS === "web" ? 14 : 76,
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 6,
+    left: Platform.OS === "web" ? 14 : 18,
+    right: Platform.OS === "web" ? 14 : 18,
+    bottom: Platform.OS === "web" ? 16 : 84,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
     marginTop: 0,
-    paddingBottom: 0
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(100, 79, 240, 0.14)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    ...(Platform.OS === "web"
+      ? {
+          backdropFilter: "blur(12px)",
+          boxShadow: "0 8px 20px rgba(35, 42, 49, 0.08)"
+        }
+      : {})
   },
   publicFooterMetaDark: {
-    color: OJS_DARK_COLORS.muted
+    color: OJS_DARK_COLORS.muted,
+    borderColor: "rgba(216, 204, 255, 0.2)",
+    backgroundColor: "rgba(24, 21, 31, 0.94)",
+    ...(Platform.OS === "web" ? { boxShadow: "0 8px 24px rgba(0, 0, 0, 0.32)" } : {})
   },
   publicFooterVersionButton: {
     alignSelf: "flex-start",
-    maxWidth: "100%"
+    maxWidth: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(100, 79, 240, 0.14)",
+    backgroundColor: "rgba(100, 79, 240, 0.08)",
+    paddingHorizontal: 9,
+    paddingVertical: 5
+  },
+  publicFooterVersionButtonDark: {
+    borderColor: "rgba(216, 204, 255, 0.24)",
+    backgroundColor: "rgba(183, 158, 255, 0.14)"
   },
   publicFooterCredit: {
     maxWidth: 360,
@@ -11173,9 +11201,9 @@ const styles = StyleSheet.create({
     gap: 10
   },
   seoLandingLinksCompact: {
-    marginTop: 12,
+    marginTop: 8,
     paddingHorizontal: 0,
-    gap: 8
+    gap: 6
   },
   seoLandingLinksTitle: {
     color: OJS_COLORS.muted,
@@ -11194,7 +11222,9 @@ const styles = StyleSheet.create({
     gap: 8
   },
   seoLandingLinksListCompact: {
-    gap: 6
+    alignSelf: "center",
+    maxWidth: 340,
+    gap: 4
   },
   seoLandingLink: {
     color: YAHOO_COLORS.purple,
@@ -11213,11 +11243,23 @@ const styles = StyleSheet.create({
     textDecorationLine: "none"
   },
   seoLandingLinkCompact: {
-    maxWidth: "100%",
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    fontSize: 12,
-    lineHeight: 16
+    width: "48%",
+    maxWidth: 160,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: "center",
+    ...(Platform.OS === "web"
+      ? {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      : {})
   },
   seoLandingLinkDark: {
     color: "#D8CCFF",
@@ -11238,8 +11280,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   seoLandingLinkButtonCompact: {
-    paddingHorizontal: 10,
-    paddingVertical: 9
+    width: "48%",
+    maxWidth: 160,
+    paddingHorizontal: 8,
+    paddingVertical: 8
   },
   seoLandingLinkButtonDark: {
     backgroundColor: "rgba(183, 158, 255, 0.14)",
@@ -11253,8 +11297,9 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   seoLandingLinkButtonTextCompact: {
-    fontSize: 12,
-    lineHeight: 16
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: "center"
   },
   seoLandingLinkButtonTextDark: {
     color: "#D8CCFF"

@@ -19,13 +19,14 @@ function firstPositiveNumber(...values) {
 
 function buildPublicStatsChips(status = {}) {
   const source = status || {};
-  const chips = [
-    {
+  const chips = [];
+  if (!source.omit_job_slot_count) {
+    chips.push({
       key: "job-slots",
       value: source.job_slot_count_label || formatExactNumberLabel(firstPositiveNumber(source.job_slot_count, source.posting_count)),
       label: "job slots"
-    }
-  ];
+    });
+  }
   if (!source.omit_ats_count) {
     chips.push({
       key: "ats",
