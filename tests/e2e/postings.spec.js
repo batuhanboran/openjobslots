@@ -3617,38 +3617,59 @@ test.describe("postings page QA", () => {
   });
 
   test("manually clearing a localized mobile direct query removes query params without blank search fanout", async ({ page }) => {
+    test.setTimeout(240_000);
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile localized manual clear URL coverage is covered by the mobile project");
 
     const calls = await installSearchRequestThrottleRoutes(page);
     const query = "Technical Support Engineer";
-    await page.goto(`/tr?q=${encodeURIComponent(query)}`);
-    await expect(page.getByTestId("app-logo")).toContainText("openjobslots", { timeout: 15_000 });
-    await expect(page.getByTestId("search-input")).toHaveValue(query, { timeout: 5000 });
-    await expect(page.getByTestId("language-selector")).toContainText("TR");
-    await expect.poll(() => calls.postings).toEqual([query]);
+    const resetCalls = () => {
+      calls.postings.length = 0;
+      calls.postingRequests.length = 0;
+      calls.filterOptions.length = 0;
+      calls.suggestions.length = 0;
+      calls.popular.length = 0;
+    };
 
-    calls.postings.length = 0;
-    calls.filterOptions.length = 0;
-    calls.suggestions.length = 0;
-    calls.popular.length = 0;
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
+      resetCalls();
 
-    await page.getByTestId("search-input").fill("");
-    await expect(page.getByTestId("search-input")).toHaveValue("");
-    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
-    await page.waitForTimeout(2600);
+      await page.goto(`/${languageCode}?q=${encodeURIComponent(query)}`);
+      await expect(page.getByTestId("app-logo")).toContainText("openjobslots", { timeout: 15_000 });
+      await expect(page.getByTestId("search-input")).toHaveValue(query, { timeout: 5000 });
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expect.poll(() => calls.postings).toEqual([query]);
+      await page.waitForTimeout(2600);
 
-    const urlState = await page.evaluate(() => ({
-      pathname: window.location.pathname,
-      search: window.location.search
-    }));
-    expect(urlState.pathname).toBe("/tr");
-    expect(urlState.search).not.toContain("q=");
-    expect(urlState.search).not.toContain("search=");
-    expect(calls.suggestions).toEqual([]);
-    expect(calls.postings).toEqual([]);
-    expect(calls.filterOptions).toEqual([]);
-    await expectNoHorizontalOverflow(page);
+      expect(calls.postings, `${languageCode} localized direct query should issue exactly one postings request`).toEqual([query]);
+      expect(calls.filterOptions, `${languageCode} localized direct query should not fan out filter options`).toEqual([]);
+      expect(calls.suggestions, `${languageCode} localized direct query should not request suggestions`).toEqual([]);
+      expect(calls.popular, `${languageCode} localized direct query should not refetch popular searches`).toEqual([]);
+
+      resetCalls();
+
+      await page.getByTestId("search-input").fill("");
+      await expect(page.getByTestId("search-input")).toHaveValue("");
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+      await page.waitForTimeout(2600);
+
+      const urlState = await page.evaluate(() => ({
+        pathname: window.location.pathname,
+        search: window.location.search,
+        dir: document.documentElement.getAttribute("dir"),
+        lang: document.documentElement.getAttribute("lang")
+      }));
+      expect(urlState.pathname, `${languageCode} manual clear should preserve the localized route`).toBe(`/${languageCode}`);
+      expect(urlState.search, `${languageCode} manual clear should remove q from the URL`).not.toContain("q=");
+      expect(urlState.search, `${languageCode} manual clear should remove search from the URL`).not.toContain("search=");
+      expect(urlState.lang, `${languageCode} manual clear should preserve document language`).toBe(languageCode);
+      expect(urlState.dir, `${languageCode} manual clear should preserve document direction`).toBe(languageCode === "ar" ? "rtl" : "ltr");
+      expect(calls.suggestions, `${languageCode} manual clear should not request blank suggestions`).toEqual([]);
+      expect(calls.postings, `${languageCode} manual clear should not request blank postings`).toEqual([]);
+      expect(calls.filterOptions, `${languageCode} manual clear should not request blank filter options`).toEqual([]);
+      await expectNoHorizontalOverflow(page);
+    }
   });
 
   test("changing language after a submitted mobile search does not refetch the same query", async ({ page }) => {
