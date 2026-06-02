@@ -197,4 +197,4 @@ Search/public field behavior changes also require the relevant search/API parity
 - No `search:reindex:replace`.
 - No source-quality threshold lowering.
 - No worker budget change.
-- No copying code from `batuhanboran/OpenJobSlots`.
+- No copying code from `third-party template repositories`.

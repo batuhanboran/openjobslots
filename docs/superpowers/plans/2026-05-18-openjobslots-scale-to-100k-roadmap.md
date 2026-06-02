@@ -141,7 +141,7 @@ Expected: `main` points to the same commit as the recovery branch and tag `v1.9.
 Run on production:
 
 ```bash
-cd /root/OpenJobSlots
+cd /app
 npm run search:parity -- --json
 npm run audit:data-quality -- --json --by-source --by-parser --last-seen-days=30
 npm run audit:source-freshness -- --json --last-seen-days=30

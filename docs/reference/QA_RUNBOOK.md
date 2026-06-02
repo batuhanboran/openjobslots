@@ -127,7 +127,7 @@ Do not point local tests at:
 
 - production Postgres `DATABASE_URL`;
 - production Meili `MEILI_HOST` and key;
-- `/root/OpenJobSlots/data/jobs.db`;
+- `/app/data/jobs.db`;
 - the local repo `data/jobs.db` unless it is a disposable copy.
 
 Preferred local DB roots:

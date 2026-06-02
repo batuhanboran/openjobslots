@@ -17,7 +17,7 @@ This design extends `docs/superpowers/specs/2026-05-24-openjobslots-architecture
 - Do not change public quality thresholds, source apply behavior, worker budget, retention, Meili indexing, or public API contracts in this architecture phase.
 - Do not run production write backfills, canary/apply jobs, cleanup, or replace-mode Meili reindexing.
 - Do not certify unsupported or future ATS sources from normalized output alone. Certification still requires raw fixtures, expected normalized fixtures, parser metadata, and documented nullable fields.
-- Do not fetch or copy code from `batuhanboran/OpenJobSlots`; this remains an independent private repository implementation.
+- Do not fetch or copy code from `third-party template repositories`; this remains an independent private repository implementation.
 
 ## Core Source Contract
 

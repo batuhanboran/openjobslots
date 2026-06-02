@@ -22,7 +22,7 @@ Load `README.md` or `docs/reference/` only when the task needs architecture, dep
 - Public product name: `openjobslots`.
 - Public domain target: `openjobslots.com`.
 - Main repository: `https://github.com/batuhanboran/openjobslots`.
-- Production host: production / `public-services`, checkout `/root/OpenJobSlots`.
+- Production host: production / `public-services`, checkout `/app`.
 - Expected production services: `openjobslots-app`, `openjobslots-worker`, `openjobslots-postgres`, `openjobslots-meilisearch`.
 - Current production architecture: Node API/static web app, separate ingestion worker, Postgres source-of-truth DB, Meilisearch public search index.
 - SQLite remains useful for local fallback, migration/import paths, and isolated tests. Do not treat it as the intended production source of truth unless `docs/PROJECT_STATE.md` says the backend changed.
@@ -54,8 +54,8 @@ Current production state lives in `handoff.md`, `docs/PROJECT_STATE.md`, and the
 - Use the existing branch unless the user asks for a hardening branch or the task instructions name one.
 - Do not depend on GitHub CLI. Normal `git` commands are enough unless a GitHub-specific task requires the connector.
 - After a successful push intended for production, verify production alignment with the deployment runbook:
-  - `git -C /root/OpenJobSlots rev-parse HEAD`
-  - `docker compose --project-directory /root/OpenJobSlots ps`
+  - `git -C /app rev-parse HEAD`
+  - `docker compose --project-directory /app ps`
   - `curl -fsS http://127.0.0.1:8081/health`
 - The production auto-deploy timer is `openjobslots-deploy.timer`; the deploy log is `/var/log/openjobslots-deploy.log`.
 

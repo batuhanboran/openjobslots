@@ -13,7 +13,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## ATS Architecture & Recovery v2 Baseline - June 1, 2026
 
-- Read-only production baseline was refreshed from `proxmox-lxc100` / `public-services`; production `/root/OpenJobSlots` is at `6660eab`, while local `main` is ahead with source-local parser ownership and v2 architecture guard commits.
+- Read-only production baseline was refreshed from `proxmox-lxc100` / `public-services`; production `/app` is at `6660eab`, while local `main` is ahead with source-local parser ownership and v2 architecture guard commits.
 - Public health: `331,778` visible job slots, `40,860` companies, `29,767` sync-enabled companies, `37` visible ATS, and `69,489` rows seen in 24h. Source state split is `13` full-enabled, `31` canary, `8` quarantine-only, `10` disabled, and `44` worker-auto-eligible ATS.
 - Latest sync status was idle. Worker run `1016` completed with errors: `44/45` target success, `911` postings stored, `1` rejected, queue depth about `24.2k`, and public status parser attention `282`.
 - Production data quality: `331,778` visible rows; missing country `21,122` (`6.37%`), missing any normalized geo `44,060` (`13.28%`), weak/unknown remote `9,299` (`2.8%`), and missing-all-geo plus weak/unknown remote `95` (`0.03%`).
@@ -25,7 +25,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Source Module Inventory - June 1, 2026
 
-- Local architecture checkpoint after commit `836d6c2`: production is still `/root/OpenJobSlots` `6660eab`, public rows were freshly observed at `332,539`, and source freshness stayed on `hold` with `160` unresolved parser-attention events. Existing parser fixes remain local until an explicit deploy/source refresh.
+- Local architecture checkpoint after commit `836d6c2`: production is still `/app` `6660eab`, public rows were freshly observed at `332,539`, and source freshness stayed on `hold` with `160` unresolved parser-attention events. Existing parser fixes remain local until an explicit deploy/source refresh.
 - `server/ingestion/sources/index.js` now builds startup source-module inventory from every source-local directory with an `index.js`. This removes the transitional `LOCAL_ONLY_SOURCE_ATS_KEYS` exception and makes all `60` contract modules visible through `DIRECT_SOURCE_ATS_KEYS` and `sourceModules`, not just the `35` legacy `SOURCE_SPECS`/exception modules.
 - `server/ingestion/sources/directSourceModules.test.js` now asserts that every source-local module directory is registered and exposes the required source contract. `ats:registry-index -- --json --no-write` reports `configured_ats_count: 60`, `read_only_recovery_ready_count: 60`, and no recovery readiness blockers.
 - Follow-up boundary cleanup moved Breezy's `__json` optional-enrichment payload-shape policy out of `server/ingestion/sources/common.js` and into `server/ingestion/sources/breezy/index.js`; `audit:architecture-boundary` now fails if that source-local policy drifts back into `common.js`.
@@ -115,7 +115,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## ATS Recovery Release Batch-Plan Gate - June 1, 2026
 
-- Fresh read-only production check still has `/root/OpenJobSlots` at `6660eab`; app, worker, Postgres, and Meili are running, `/health` is `ok`, and public visible/job-slot count is `332,629`. Local recovery commits remain undeployed until explicit approval.
+- Fresh read-only production check still has `/app` at `6660eab`; app, worker, Postgres, and Meili are running, `/health` is `ok`, and public visible/job-slot count is `332,629`. Local recovery commits remain undeployed until explicit approval.
 - `scripts/release-ats-recovery-check.js` now requires final source recovery proof to include the tenant batch plan used before canary/apply, a passing predicted guard result, and the audited source rollback command in addition to inventory, dedupe-aware net-new estimate, duplicate accounting, bounded outbox/upsert status, preflight, recovery guard, tests, and Meili/Postgres parity.
 - The gate accepts either `planned_tenant_batch_file_path` or a structured `planned_batch_report`, and can read the predicted guard result from the report alias. A release now fails if canary/apply evidence skipped batch planning, predicted a failed guard, or cannot show the rollback command.
 - Verification covered `node --check scripts\release-ats-recovery-check.js` and `node scripts\release-ats-recovery-check.test.js` with new negative tests for missing batch proof, failed predicted guard, and missing rollback command. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, backup, cleanup, or worker-budget change was run.
@@ -130,14 +130,14 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## ATS Recovery v2 Edge-Shape Hardening - June 1, 2026
 
-- Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/root/OpenJobSlots` was last verified separately at `6660eab` during the refreshed baseline.
+- Local `main` now includes the ATS recovery proof-gate and edge-shape commits `401720b`, `5392e04`, `5613703`, `f98d75d`, `ed501f4`, and `9a6da08`. These are local-only until deploy/source refresh; production `/app` was last verified separately at `6660eab` during the refreshed baseline.
 - Release proof gates now reject hand-wavy recovery claims: `scripts/release-ats-recovery-check.js` requires explicit before/after net-new evidence, search parity, field-quality deltas, source-local fixture coverage, rollback notes, and no missing production proof before a recovery release can be called ready.
 - Breezy, ADP Workforce Now, UltiPro, BambooHR, HiBob, and TalentReef now have stricter edge-shape coverage for empty boards, malformed raw rows, missing list geo, and source-backed title handling. The parsers skip raw rows without source titles instead of inventing `Untitled Position`, and no-geo/no-explicit-remote rows stay quarantined instead of being promoted.
 - Verification across these local checkpoints covered focused parser/source tests, live read-only parser probes where useful, `npm.cmd run test:backend`, `npm.cmd run test:api`, `npm.cmd run audit:architecture-boundary`, `npm.cmd run ats:registry-index -- --no-write`, `git diff --check`, and changed-file secret scans. No production source apply, canary/apply, data backfill, public-row delete/hide, Meili repair/reindex, deploy, cleanup, or worker-budget change was run.
 
 ## Breezy State-Scope City Evidence - June 1, 2026
 
-- Fresh read-only production evidence kept production at `/root/OpenJobSlots` `6660eab` with `332,387` visible job slots and source freshness still on `hold`. Breezy was the top current parser-attention source with `88` recent parser-bug events and `4,045` quarantined cache rows, mostly `no_geo_no_remote` or ambiguous multi-location labels.
+- Fresh read-only production evidence kept production at `/app` `6660eab` with `332,387` visible job slots and source freshness still on `hold`. Breezy was the top current parser-attention source with `88` recent parser-bug events and `4,045` quarantined cache rows, mostly `no_geo_no_remote` or ambiguous multi-location labels.
 - Breezy public JSON can place state/province scopes or comma-separated multi-locality labels in `location.city` while country evidence is still present, such as `location.city="Maryland"` with `country.name="United States"`.
 - The Breezy parser now treats US state names/codes, Canadian province names/codes, values equal to state/country, source country aliases, and comma-separated multi-locality labels as non-city evidence unless the text has explicit city/town/county/parish cues. It preserves source-backed country evidence and leaves `city` blank; no tenant/title/body inference was added.
 - Live read-only proof on `prep-academy-tutors`: current local parser accepted `200/200` rows with `0` state-scope city rows and `0` multi-city city rows. The sampled `Maryland, US` row now normalizes to `United States` with blank city.
@@ -210,7 +210,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Greenhouse Large Board Content Fallback - June 1, 2026
 
-- Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,698` visible job slots and Meili/Postgres count parity with the known `40` document remote-facet drift still unresolved. No Meili repair or replace reindex was run.
+- Fresh read-only production checks kept `/app` at `6660eab`; public health reported `331,698` visible job slots and Meili/Postgres count parity with the known `40` document remote-facet drift still unresolved. No Meili repair or replace reindex was run.
 - Greenhouse production quality baseline remained `5,373` visible rows, `289` missing country/region rows, and `630` weak/unknown remote rows. The top Greenhouse gap board `fever-up` had `597` rows and failed local live fetches because `jobs?content=true` exceeded the source response-size guard.
 - Greenhouse fetch now keeps `jobs?content=true` as the default canonical list request but retries `jobs` without content only when the first API payload fails with `response_too_large`. Source metadata records the canonical board URL, actual requested URL, `contentIncluded=false`, and the two payload fetches.
 - Live read-only proof on `feverup`: fallback fetched and parsed `597` current rows with `597` public-gate accepted, `0` rejected/quarantined, `83` missing country/region rows but `0` missing-all-geo rows, `132` unknown remote-type rows, and `0` `no_geo_no_remote` or `weak_remote_evidence` gate reasons.
@@ -219,7 +219,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 ## RecruitCRM Source-Local City Country Evidence - June 1, 2026
 
 - Fresh read-only production baseline for this lane had RecruitCRM at `522` visible rows, `475` missing country/region rows, `10` weak/unknown remote rows, and `522` missing posting dates. Top missing-country boards included `somewhere`, `Talentbank_1_jobs`, `rcrm`, `TLNT_Group_jobs`, `talentsource`, `Ensitech_Careers`, and `Golabs_Tech_jobs`.
-- Fresh production health during this lane kept `/root/OpenJobSlots` at `6660eab` with app/worker/Postgres/Meili running and public health at `331,640` visible job slots. `search:reindex:check -- --json --sample-limit=25` had Postgres/Meili count parity (`331,653`/`331,653`) but remained `ok=false` because remote facets drifted by `40` onsite vs unknown documents. No Meili repair or replace reindex was run.
+- Fresh production health during this lane kept `/app` at `6660eab` with app/worker/Postgres/Meili running and public health at `331,640` visible job slots. `search:reindex:check -- --json --sample-limit=25` had Postgres/Meili count parity (`331,653`/`331,653`) but remained `ok=false` because remote facets drifted by `40` onsite vs unknown documents. No Meili repair or replace reindex was run.
 - RecruitCRM public API payloads expose structured `city`, `locality`, `postalcode`, and `remote` fields. The parser now maps only source-local deterministic city/country hints observed in those API fields, including Malaysia, Philippines, South Africa, Colombia, Argentina, India, France, and UK labels.
 - No tenant/title/body inference was added. Broad or ambiguous values such as `Remote`, `Global`, `LATAM`, `Somewhere`, `San José`, `San Pedro`, and title-only country hints remain unresolved. `remote=2` stays `unknown` until the source semantics are proven. Posting dates remain null because sampled payloads did not expose a date field.
 - Follow-up architecture cleanup keeps RecruitCRM parser ownership out of `server/ingestion/sources/common.js`; `audit:architecture-boundary` now fails if RecruitCRM parser imports or parser specs drift back into common.
@@ -320,7 +320,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Greenhouse Office Geo And Work-Mode Evidence - June 1, 2026
 
-- Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,524` visible job slots and Meili/Postgres document counts remained aligned with the known `22` document remote-facet drift unresolved.
+- Fresh read-only production checks kept `/app` at `6660eab`; public health reported `331,524` visible job slots and Meili/Postgres document counts remained aligned with the known `22` document remote-facet drift unresolved.
 - Greenhouse production quality baseline from the broad source sample: `5,373` visible rows, `289` missing-any-geo rows, and `630` weak/unknown remote rows.
 - Greenhouse now uses source office country evidence when location labels carry remote/hybrid city text, rewrites safe `Country - City` labels to `City, Country`, and limits office-level `Remote` evidence to country-only or generic multi-location rows so city rows do not become false remote jobs.
 - Fixture coverage includes Motive-style Pakistan remote/hybrid rows, Natera-style country-only US remote-office evidence, a South Jersey office-country row with unknown remote, a `Washington D.C` false-positive guard, and a `Pakistan - Islamabad` city rewrite.
@@ -338,7 +338,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## Ashby Structured Postal Address Checkpoint - June 1, 2026
 
-- Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`; public health reported `331,515` visible job slots. Meili/Postgres document counts were still aligned at `331,509` each, with the known `22` document remote-facet drift still unresolved. No Meili repair or replace reindex was run.
+- Fresh read-only production checks kept `/app` at `6660eab`; public health reported `331,515` visible job slots. Meili/Postgres document counts were still aligned at `331,509` each, with the known `22` document remote-facet drift still unresolved. No Meili repair or replace reindex was run.
 - Ashby production quality baseline: `27,962` visible rows, `657` missing country/region rows, `200` weak/unknown remote rows, and `0` missing posting dates or source ids.
 - Ashby now treats `jobs[].address.postalAddress` as primary source geo evidence. When that structured postal address is present and the source does not expose an explicit remote/hybrid signal, the parser emits source-backed `onsite` evidence via `ashby_structured_physical_location`.
 - Fixture coverage includes a production-shaped Malmo postal-address row and a direct source-module test for city/country evidence paths plus explicit remote evidence. Live read-only parser proof for `roadsurfer.com` parsed `289` rows with `289` accepted, `0` missing country/region, `0` weak/unknown remote, and `242` structured-address onsite rows. A top-25 affected Ashby board sample parsed `1,066` rows with `1,066` accepted and `164` structured-address onsite rows.
@@ -362,7 +362,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## iSolvedHire ISO3 And Workplace Evidence - June 1, 2026
 
-- Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab`, all four services running, public health at `331,524` visible job slots, and `search:reindex:check -- --json --sample-limit=25` at Postgres/Meili count parity (`331,518`/`331,518`) with the known `22` document remote-facet drift. No Meili repair or replace reindex was run.
+- Fresh read-only production checks kept `/app` at `6660eab`, all four services running, public health at `331,524` visible job slots, and `search:reindex:check -- --json --sample-limit=25` at Postgres/Meili count parity (`331,518`/`331,518`) with the known `22` document remote-facet drift. No Meili repair or replace reindex was run.
 - iSolvedHire production quality baseline: `7,008` visible rows, `32` missing country/region rows, `87` weak/unknown remote rows, and `0` missing posting dates or source ids.
 - Live API samples showed source-backed `iso3`, `city`, `stateName`, `abbreviation`, `streetAddress`, and `workplaceType` fields while the parser only emitted `jobLocation`. This left rows such as `00000, US`, Spanish `EE. UU.` labels, `USVI`, and tab-delimited street addresses with missing geo or weak remote.
 - iSolvedHire now carries source `iso3` country evidence, structured city/state evidence, and exact source `workplaceType` labels. `Fully remote` maps to `remote`, `Work from home flexibility` maps to `hybrid`, and `Onsite` maps to `onsite`; placeholder country-only locations such as `00000, US` become source-backed `Remote, USA` or country-only geo without fake city values.
@@ -372,7 +372,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 
 ## UltiPro Source Geo and Payload Drift Checkpoint - June 1, 2026
 
-- Fresh read-only production checks kept `/root/OpenJobSlots` at `6660eab` with app/worker/Postgres/Meili running. Public health reported `331,490` visible job slots. `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,484`/`331,484`) but remained `ok=false` because remote facets drift by `22` onsite vs unknown documents. No Meili repair or replace reindex was run.
+- Fresh read-only production checks kept `/app` at `6660eab` with app/worker/Postgres/Meili running. Public health reported `331,490` visible job slots. `search:reindex:check -- --json --sample-limit=25` still had Postgres/Meili count parity (`331,484`/`331,484`) but remained `ok=false` because remote facets drift by `22` onsite vs unknown documents. No Meili repair or replace reindex was run.
 - Source freshness selected UltiPro as a focused source-local lane: `43` unresolved parser-attention events, `388` new missing-any-geo rows, and `22` new weak/unknown remote rows in the 24h window. Production visible UltiPro rows were `35,050`, with `288` missing-any-geo rows, `73` weak/unknown remote rows, and `0` missing posting dates or source ids.
 - UltiPro parsing now preserves unique `Locations[].Address.City` and `Locations[].Address.Country` as explicit source evidence. Remote/hybrid labels such as `Remote` are country-qualified when the same source location object carries a country, preventing `Remote` rows from losing country evidence and preventing `La Paz, Bolivia` from being misread as Louisiana/United States by generic fallback normalization.
 - UltiPro now marks its top-level `locations` facet as payload-shape drift noise while keeping the real `opportunities` job list as required core. The shared payload-drift guard now treats ignored stems as prefixes, so source-local `ignored_stems: ["locations"]` covers populated and empty facet variants without hiding missing `opportunities` payloads.
@@ -454,9 +454,9 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - Zoho is the current first source target from live evidence: `463` source-quality failures in 24h, `686` new missing-any-geo rows, `64` new weak/unknown remote rows, and `0` new public no-geo/no-remote rows.
 - Zoho production quality baseline: `14,561` visible rows, `2,516` missing-any-geo (`17.28%`), `235` weak/unknown remote (`1.61%`), and `1` missing-all-geo plus weak/unknown remote row.
 - Read-only reports:
-  - Inventory: `/root/OpenJobSlots/reports/zoho-v2-readonly-inventory-small-20260531T221402Z.json`.
-  - Net-new estimate: `/root/OpenJobSlots/reports/zoho-v2-readonly-estimate-small-20260531T221544Z.json`.
-  - Batch plan: `/root/OpenJobSlots/reports/zoho-v2-readonly-plan-small-20260531T221901Z.json`.
+  - Inventory: `/app/reports/zoho-v2-readonly-inventory-small-20260531T221402Z.json`.
+  - Net-new estimate: `/app/reports/zoho-v2-readonly-estimate-small-20260531T221544Z.json`.
+  - Batch plan: `/app/reports/zoho-v2-readonly-plan-small-20260531T221901Z.json`.
 - The scanned Zoho window covered `25/1,751` targets, parsed `70` rows, found `57` clean candidates, only `4` net-new clean public candidates, and `52` already-public duplicates. Candidate pool remains unproven and low-confidence; this is not a 5k apply candidate.
 - The only guard-safe selected tenant in the small plan is `zenfreed.zohorecruit.com` with `4` clean net-new rows and predicted guard `pass`. Rows from tenants such as `gotocme` and `basecodetech` without deterministic geo or explicit remote evidence remain no-geo/no-remote quarantines.
 - `server/ingestion/inventoryScanner.js` now enforces remaining `--max-fetches` before choosing a scan window and forwards `--source-timeout-ms` / `OPENJOBSLOTS_ATS_INVENTORY_SOURCE_TIMEOUT_MS` into each net-new estimate window. This supports safer future inventory/resume work for Zoho and other slow sources.
@@ -610,7 +610,7 @@ This is the short current-state document for future Codex runs. Detailed runbook
 - At this checkpoint, repo source-module coverage was `60/60` configured ATS directories with `index.js` and `parse.js`, and `dayforcehcm` was still represented by an explicit unsupported source stub. The June 1 DayforceHCM parser certification above supersedes that stub state.
 - Public release line is prepared as `v2.0.0`: public release notes are public-safe, the result count says exact `job slots`, and the search header also exposes public ATS and company coverage chips. `/sync/status` now carries the same public count fields as `/health` for both Postgres and SQLite paths.
 - Previous v2 canary stage increased from the live `4000/50/300` posture to `6000` automatic targets/day, `100` targets/run, and `500` successful targets/source/day while keeping worker concurrency `2` and interval `900000` ms; the adaptive scale prep above supersedes those defaults after deploy.
-- Production canary enablement opened the disabled-normal ATS batch as `canary_only` after a fresh Postgres backup at `/root/OpenJobSlots/backups/v2-ats-canary-enable-20260527T134552Z.dump`. At that time Dayforce stayed disabled/unsupported; the June 1 DayforceHCM parser certification above supersedes that classification while still keeping Dayforce disabled. Auto-disabled `manatal`, `pinpointhq`, `taleo`, and `workday` remain blocked by their recorded failure reasons.
+- Production canary enablement opened the disabled-normal ATS batch as `canary_only` after a fresh Postgres backup at `/app/backups/v2-ats-canary-enable-20260527T134552Z.dump`. At that time Dayforce stayed disabled/unsupported; the June 1 DayforceHCM parser certification above supersedes that classification while still keeping Dayforce disabled. Auto-disabled `manatal`, `pinpointhq`, `taleo`, and `workday` remain blocked by their recorded failure reasons.
 - Post-enable live state before the v2 code deploy: `57` configured-enabled ATS, `39` canary-only sources, `14` normal enabled sources, `4` quarantine-only sources, `4` auto-disabled sources, `37,534` sync-enabled companies, `62` configured ATS, and about `159.3k` visible job slots. Worker runs moved to `100` targets/run; run `622` completed with `62` successes, `38` failures, and `1,082` posting upserts, and run `623` was active during verification.
 - Release blocker to keep watching: Meili/Postgres validation drift was already nonzero before this work. Do not call the source-quality recovery complete until parity is repaired through the documented Meili repair order, even though the public v2 UI/release metadata is prepared.
 
@@ -624,7 +624,7 @@ This update records the ATS parser modularization decision. It is architecture-o
 - `server/ingestion/sources/common.js`, `server/ingestion/direct-parser-fixtures.test.js`, and detail-refetch planning now import parser modules directly where possible.
 - The only intentional remaining source-layer dependency on `server/index.js` is the legacy `collectPostingsForCompany` fallback. The next architecture phase is to move collector/discovery/fetch orchestration into ATS source modules, then shrink `server/index.js` again.
 - Future parser/source fixes must target the relevant source module plus raw/expected fixtures. Do not fix ATS parser behavior by adding new parser code to `server/index.js`.
-- Production deployment posture after this architecture update is `main` on production `/root/OpenJobSlots`; app and worker should be rebuilt/recreated when parser modules change.
+- Production deployment posture after this architecture update is `main` on production `/app`; app and worker should be rebuilt/recreated when parser modules change.
 - Active ATS quality target: HRMDirect. The May 24 live baseline is `24,384` visible HRMDirect rows with good geo/remote opportunity but `0%` posting-date evidence; keep improving route discovery, source ids, geo/location, remote type, source-failure thresholds, fixtures, and index evidence inside the HRMDirect source/parser lane.
 - HRMDirect source parsing should use `search=true` list routes for `job-openings.php` and `openings.php`, source-backed `td.custSort1` work-mode/location values, exact `Apply Today`/`HERE` placeholder-title skipping, grouped div list rows with detail `Location:` escalation, `td.cities` remote-scope labels such as `Remote - Colorado` or `Remote, Continental U.S.` as explicit remote evidence without storing `Remote` as city, exact US state abbreviations from list `td.state` or detail `Location:` as United States country evidence without publishing the state code as city, detail `Location:` remote-scope labels such as `Remote - Arizona, AZ` or `Remote Texas` as explicit remote evidence plus scoped location text after stripping the remote prefix, `req`-only labeled detail pages when list-filter params suppress detail `Location:` values, duplicate-`req` `req_loc` detail pages when the location-specific URL exposes labeled `Location:` evidence, duplicate-`req` source ids as `req:req_loc` for stable index identity, exact labeled detail `Location: Remote/Hybrid` values as remote evidence without storing them as geo/location evidence, labeled detail `Workplace Type: Remote/Hybrid` values, exact detail `#LI-Remote/#LI-Hybrid` tags, detail body `Location:` labels that directly say remote/hybrid role, exact detail body `Work Arrangement` / `Work Environment` / `Full-time/Remote` tags and exact body work-mode tags such as `100% remote - work from home` as explicit remote evidence, detail body `Location:` labels with US street address plus city/state/ZIP as `City, ST` geo evidence, exact full-state/Canadian province/country `Office:` values, exact list/detail `Office: Remote/Hybrid`, and list/detail HRMDirect office prefixes/scopes such as `Corporate Poland`, `Field UK Onshore`, `Corporate US Remote`, `WA - Remote`, or `Remote - Texas` as labeled geo/remote evidence, optional `rss.php?search=true` item `pubDate` values as posting-date evidence for `job-openings.php` and `openings.php` when the RSS item `link` or `guid` exposes a matching base `req`, labeled detail `Date Posted/Posted Date/Posting Date/Open Date` values as posting-date evidence only when list/RSS dates are absent, stale/removed detail pages as `detail_404_or_410` quarantine evidence, ambiguous multi-location labels such as `Multiple Cities, SC` as `ambiguous_location` without fake city values, and bounded adaptive detail budget for sparse boards. Title-only `Remote` or `Virtual` text, department labels, and generic body prose are not enough evidence for public geo/remote classification; source-backed `onsite` is preserved but does not make a no-geo row indexable.
 - May 25 read-only HRMDirect probe: ABSC parsed `41` rows and accepted `41`, including `3` rows recovered from `Office: Maryland/Virginia`; Vivo Infusion parsed `33` and accepted `30`, leaving `3` rows quarantined because no deterministic labeled geo/remote evidence exists. A top-20 tenant RSS probe parsed `10,256` rows and found `10,256` RSS `pubDate` matches. A top-40 risk-host probe after sparse-budget and `req_loc` fallback changes parsed `3,425`, accepted `3,328`, quarantined `97`, and found RSS dates for `3,425/3,425`. Duplicate-`req` rows now use `req:req_loc` source ids, while RSS date matching remains base-`req` keyed. A later targeted 20-tenant probe parsed `1,488`, accepted `1,477`, quarantined `11`, found RSS dates for `1,488/1,488`, moved Fisher Phillips to `51/51` accepted, kept HSB `Multiple Cities, SC` quarantined as `ambiguous_location`, and found `0` suspicious fake city/country/remote-prefix rows. RMI office-prefix probing moved from `12/33` accepted to `32/33` accepted with `33/33` RSS posting dates; only `Unassigned Office` plus blank detail evidence remains quarantined. A 21-name follow-up probe had 3 current 404 routes and, across successful routes, parsed `1,283`, accepted `1,271`, quarantined `12`, found posting dates for `1,283/1,283`, and found `0` suspicious fake city/country/office evidence rows. Catalyst `openings.php` probing moved posting-date coverage from `0/2` to `2/2` through `rss.php?search=true` while keeping both rows accepted. LaserAway probing moved from `332/334` accepted to `333/334` accepted through exact body `100% remote - work from home` evidence; the remaining row is title-only remote and stays quarantined. Capital Vacations moved to `271/271` parsed/accepted through exact labeled `Office: Remote` plus exact `Apply Today!` placeholder skipping; more specific `Apply Today--...` rows with source location evidence remain parsed. Brightway moved to `328/328` accepted through labeled `td.offices` remote-region scopes such as `Remote - Texas` and `Remote - North Carolina`. A top-24 HRMDirect probe then parsed `11,925`, accepted `11,913`, quarantined `12`, and found posting dates for `11,925/11,925`; a residual evidence pass over those `12` rows found blank detail `Location:` fields with only department/title/body hints, so they remain threshold-guarded quarantines. A top-55 follow-up outside that first group parsed `5,693`, accepted `5,657`, quarantined `36`, and found dates for `5,692/5,693`; an Oberweis targeted recheck then skipped the exact `HERE` placeholder and moved that tenant from `105` parsed/`4` quarantined to `104` parsed/`3` quarantined. Production remains at `0` HRMDirect posting-date rows until the new parser commits are pushed/deployed and source rows are refreshed.
@@ -662,7 +662,7 @@ This section supersedes older v1.9.0 recovery notes below when the two conflict.
 - Latest deployed production code before this docs/version refresh: `89a997036257a9a162014a9f8e3f68ffcab8833c` on `codex/production-baseline-audit`.
 - Production branch before this refresh: `codex/production-baseline-audit`, aligned with `origin/codex/production-baseline-audit`.
 - Public domain: `openjobslots.com`.
-- Production host/path: production / `public-services`, `/root/OpenJobSlots`.
+- Production host/path: production / `public-services`, `/app`.
 - Auto-deploy timer: `openjobslots-deploy.timer` inactive.
 - Services observed running: app, worker, Postgres, and Meilisearch.
 - Worker auto sync is enabled with `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=1000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=25`, and `INGESTION_WORKER_INTERVAL_MS=1800000`.
@@ -733,7 +733,7 @@ Scale posture:
 ## Deployment Status
 
 - Production host: production / `public-services`.
-- Production checkout: `/root/OpenJobSlots`.
+- Production checkout: `/app`.
 - Deployment source: private GitHub repository `batuhanboran/openjobslots`.
 - Auto-deploy: `openjobslots-deploy.timer`, active and checking `origin/main`.
 - Deploy log: `/var/log/openjobslots-deploy.log`.
@@ -787,15 +787,15 @@ Keep public UI calls on public routes only unless an admin flow is explicitly op
 ## Last Recorded Data Quality State
 
 The last production audit was recorded on May 12, 2026 after the certified-source public dataset rebuild, threshold indexing cleanup, and final replace-mode Meili reindex.
-Reports were written on production under `/root/OpenJobSlots/reports/`.
+Reports were written on production under `/app/reports/`.
 
-- Certified rebuild backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`.
-- Final data-quality audit JSON: `/root/OpenJobSlots/reports/v180-final-20260512-175855-data-quality.json`.
-- Final ATS quality audit JSON: `/root/OpenJobSlots/reports/v180-final-20260512-175855-ats-quality.json`.
-- Final source quality JSON: `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_source-quality.json`.
-- Final quarantine summary JSON: `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_quarantine-summary.json`.
-- Final Meili replace report: `/root/OpenJobSlots/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`.
-- Final Meili post-check JSON: `/root/OpenJobSlots/reports/v180-postdeploy-20260512-181223-meili-check.json`.
+- Certified rebuild backup: `/app/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`.
+- Final data-quality audit JSON: `/app/reports/v180-final-20260512-175855-data-quality.json`.
+- Final ATS quality audit JSON: `/app/reports/v180-final-20260512-175855-ats-quality.json`.
+- Final source quality JSON: `/app/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_source-quality.json`.
+- Final quarantine summary JSON: `/app/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_quarantine-summary.json`.
+- Final Meili replace report: `/app/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`.
+- Final Meili post-check JSON: `/app/reports/v180-postdeploy-20260512-181223-meili-check.json`.
 - Visible postings: `47,396`.
 - Indexable postings: `47,395`.
 - Missing country: `3,113` / `6.57%`.
@@ -829,10 +829,10 @@ Important interpretation:
 Recruitee recovery was applied on May 12, 2026 after a fresh production baseline and backup.
 
 - Deployed recovery code commit: `aa94cae`.
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-recruitee-recovery-20260512-203839.dump`.
-- Baseline reports: `/root/OpenJobSlots/reports/recruitee-recovery-before-20260512-203621-*`.
-- Write/canary reports: `/root/OpenJobSlots/reports/recruitee-recovery-write-20260512-203839-*`.
-- After/guard reports: `/root/OpenJobSlots/reports/recruitee-recovery-final2-20260512-204443-*`.
+- Backup: `/app/backups/postgres-openjobslots-pre-recruitee-recovery-20260512-203839.dump`.
+- Baseline reports: `/app/reports/recruitee-recovery-before-20260512-203621-*`.
+- Write/canary reports: `/app/reports/recruitee-recovery-write-20260512-203839-*`.
+- After/guard reports: `/app/reports/recruitee-recovery-final2-20260512-204443-*`.
 - Visible postings: `47,938 -> 48,042`.
 - Recruitee accepted public rows: `0 -> 76`.
 - Recruitee source state: `canary_only`.
@@ -846,8 +846,8 @@ Recruitee recovery was applied on May 12, 2026 after a fresh production baseline
 
 Recruitee expansion was applied on May 13, 2026 after a fresh production baseline and backup.
 
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-recruitee-expansion-20260513-085800.dump`.
-- Reports: `/root/OpenJobSlots/reports/recruitee-expansion-20260513-085800-*`.
+- Backup: `/app/backups/postgres-openjobslots-pre-recruitee-expansion-20260513-085800.dump`.
+- Reports: `/app/reports/recruitee-expansion-20260513-085800-*`.
 - Visible postings for the expansion write window: `48,296 -> 48,721`.
 - Recruitee accepted public rows: `85 -> 510`.
 - Public row gain: `425`.
@@ -864,10 +864,10 @@ Recruitee is recovered to canary-only public writes, while old quarantine cache 
 Applitrack recovery was applied on May 13, 2026 after a fresh production baseline and backup.
 
 - Deployed recovery code commit: `f93147a`.
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-applitrack-recovery-20260513-070709.dump`.
-- Baseline reports: `/root/OpenJobSlots/reports/applitrack-recovery-baseline-20260513-064311-*` and `/root/OpenJobSlots/reports/applitrack-recovery-before-write-20260513-070641-*`.
-- Dry-run/canary/apply reports: `/root/OpenJobSlots/reports/applitrack-recovery-postdeploy-dry-run-20260513-070339.json`, `/root/OpenJobSlots/reports/applitrack-recovery-canary-apply-20260513-070858.json`, and `/root/OpenJobSlots/reports/applitrack-recovery-bounded-apply-20260513-071028.json`.
-- After/guard reports: `/root/OpenJobSlots/reports/applitrack-recovery-after-apply-20260513-071241-*`, `/root/OpenJobSlots/reports/applitrack-recovery-meili-check-20260513-071259.json`, and `/root/OpenJobSlots/reports/applitrack-recovery-final3-20260513-071850-guard.json`.
+- Backup: `/app/backups/postgres-openjobslots-pre-applitrack-recovery-20260513-070709.dump`.
+- Baseline reports: `/app/reports/applitrack-recovery-baseline-20260513-064311-*` and `/app/reports/applitrack-recovery-before-write-20260513-070641-*`.
+- Dry-run/canary/apply reports: `/app/reports/applitrack-recovery-postdeploy-dry-run-20260513-070339.json`, `/app/reports/applitrack-recovery-canary-apply-20260513-070858.json`, and `/app/reports/applitrack-recovery-bounded-apply-20260513-071028.json`.
+- After/guard reports: `/app/reports/applitrack-recovery-after-apply-20260513-071241-*`, `/app/reports/applitrack-recovery-meili-check-20260513-071259.json`, and `/app/reports/applitrack-recovery-final3-20260513-071850-guard.json`.
 - Visible postings for the Applitrack write window: `48,091 -> 48,176`.
 - Applitrack accepted public rows: `0 -> 85`.
 - Applitrack source state: `canary_only`.
@@ -880,9 +880,9 @@ Applitrack recovery was applied on May 13, 2026 after a fresh production baselin
 
 Applitrack expansion was applied on May 13, 2026 after a fresh production baseline and backup.
 
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-applitrack-expansion-20260513-101744.dump`.
-- Report prefix: `/root/OpenJobSlots/reports/applitrack-expansion-20260513-101744-*`.
-- Source recovery report: `/root/OpenJobSlots/reports/applitrack-expansion-20260513-101744-source-recovery-report.json`.
+- Backup: `/app/backups/postgres-openjobslots-pre-applitrack-expansion-20260513-101744.dump`.
+- Report prefix: `/app/reports/applitrack-expansion-20260513-101744-*`.
+- Source recovery report: `/app/reports/applitrack-expansion-20260513-101744-source-recovery-report.json`.
 - Visible postings for the Applitrack expansion window: `48,721 -> 48,873`.
 - Applitrack accepted public rows: `85 -> 237`.
 - Public row gain: `152`.
@@ -899,9 +899,9 @@ Applitrack expansion was applied on May 13, 2026 after a fresh production baseli
 
 Zoho recovery was applied on May 13, 2026 after a fresh production baseline and backup.
 
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-zoho-recovery-20260513-104733.dump`.
-- Report prefix: `/root/OpenJobSlots/reports/zoho-recovery-20260513-104733-*`.
-- Source recovery report: `/root/OpenJobSlots/reports/zoho-recovery-20260513-104733-source-recovery-report.json`.
+- Backup: `/app/backups/postgres-openjobslots-pre-zoho-recovery-20260513-104733.dump`.
+- Report prefix: `/app/reports/zoho-recovery-20260513-104733-*`.
+- Source recovery report: `/app/reports/zoho-recovery-20260513-104733-source-recovery-report.json`.
 - Visible postings for the Zoho write window: `48,873 -> 49,277`.
 - Zoho accepted public rows: `0 -> 404`.
 - Public row gain: `404`.
@@ -919,9 +919,9 @@ Zoho recovery was applied on May 13, 2026 after a fresh production baseline and 
 RecruitCRM recovery was applied on May 13, 2026 after a fresh production backup and source-specific public API inspection.
 
 - Deployed recovery code commits: `c4e815b` and `46e2f3e`.
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-recruitcrm-recovery-20260513-113654.dump`.
-- Report prefix: `/root/OpenJobSlots/reports/recruitcrm-recovery-20260513-112731-*`.
-- Source recovery report: `/root/OpenJobSlots/reports/recruitcrm-recovery-20260513-112731-source-recovery-report.json`.
+- Backup: `/app/backups/postgres-openjobslots-pre-recruitcrm-recovery-20260513-113654.dump`.
+- Report prefix: `/app/reports/recruitcrm-recovery-20260513-112731-*`.
+- Source recovery report: `/app/reports/recruitcrm-recovery-20260513-112731-source-recovery-report.json`.
 - Visible postings for the whole observed run after auto-deploy interruptions: `49,277 -> 50,130`.
 - RecruitCRM write-window visible postings after the deployment auto-sync interruption: `49,310 -> 49,832`.
 - RecruitCRM accepted public rows: `0 -> 522`.
@@ -944,9 +944,9 @@ The worker is currently stopped to prevent further out-of-scope automatic source
 Taleo recovery ran on May 13, 2026 after a fresh production backup and source-specific REST/AJAX career-section parser hardening.
 
 - Deployed recovery code commits: `3b01427` and `5a59375`.
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-taleo-recovery-20260513-121337.dump`.
-- Report prefix: `/root/OpenJobSlots/reports/taleo-recovery-20260513-121337-*`.
-- Source recovery report: `/root/OpenJobSlots/reports/taleo-recovery-20260513-121337-source-recovery-report.json`.
+- Backup: `/app/backups/postgres-openjobslots-pre-taleo-recovery-20260513-121337.dump`.
+- Report prefix: `/app/reports/taleo-recovery-20260513-121337-*`.
+- Source recovery report: `/app/reports/taleo-recovery-20260513-121337-source-recovery-report.json`.
 - Global visible postings for the Taleo canary window: `50,130 -> 50,241`.
 - Taleo accepted public rows: `0 -> 111`.
 - Public row gain: `111`.
@@ -967,9 +967,9 @@ The worker remains stopped, app/Postgres/Meili were healthy in the Taleo final c
 
 Public-enabled source growth ran on May 13, 2026 after a fresh production audit and backup.
 
-- Backup: `/root/OpenJobSlots/backups/postgres-openjobslots-pre-public-enabled-growth-20260513-160152.dump`.
-- Report prefix: `/root/OpenJobSlots/reports/public-enabled-growth-20260513-160152-*`.
-- Source recovery report: `/root/OpenJobSlots/reports/public-enabled-growth-20260513-160152-source-recovery-report.json`.
+- Backup: `/app/backups/postgres-openjobslots-pre-public-enabled-growth-20260513-160152.dump`.
+- Report prefix: `/app/reports/public-enabled-growth-20260513-160152-*`.
+- Source recovery report: `/app/reports/public-enabled-growth-20260513-160152-source-recovery-report.json`.
 - Scope was limited to already normal/public-enabled sources; quarantine-only and auto-disabled sources were not processed except read-only comparison.
 - Selected sources: `applytojob`, `bamboohr`, `lever`, `greenhouse`, and `careerplug`.
 - Selection basis: public-enabled source state, fixture-backed parser confidence, high accepted dry-run volume, existing row count or quality debt, and stable source evidence.
@@ -991,12 +991,12 @@ The worker remains stopped, app/Postgres/Meili were healthy in the public-enable
 
 The recovery cycle was closed on May 13, 2026 after final production audits, live endpoint checks, test validation, and a safe derived-index repair.
 
-- Report prefix: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-*`.
-- Final data quality: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-data-quality.json`.
-- Final ATS quality: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-ats-quality.json`.
-- Final source quality: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-source-quality.json`.
-- Final quarantine summary: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-quarantine-summary.json`.
-- Final Meili check: `/root/OpenJobSlots/reports/cycle-close-20260513-133740-meili-check-final.json`.
+- Report prefix: `/app/reports/cycle-close-20260513-133740-*`.
+- Final data quality: `/app/reports/cycle-close-20260513-133740-data-quality.json`.
+- Final ATS quality: `/app/reports/cycle-close-20260513-133740-ats-quality.json`.
+- Final source quality: `/app/reports/cycle-close-20260513-133740-source-quality.json`.
+- Final quarantine summary: `/app/reports/cycle-close-20260513-133740-quarantine-summary.json`.
+- Final Meili check: `/app/reports/cycle-close-20260513-133740-meili-check-final.json`.
 - Visible postings: `47,396 -> 50,300` since the v1.8.0 prompt-1 baseline.
 - Accepted/public rows: `47,396 -> 50,300`.
 - Public row gain: `2,904`.

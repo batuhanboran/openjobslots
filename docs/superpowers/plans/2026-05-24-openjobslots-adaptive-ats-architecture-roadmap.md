@@ -63,7 +63,7 @@ The architecture audit currently protects:
 - Some ATS-specific domain/pattern bans inside `server/index.js`.
 - Source-module import bans against importing `server/index.js`.
 - Public surface leak scan over selected public files.
-- Private repo remote boundary against `batuhanboran/OpenJobSlots`.
+- Repository remote boundary against third-party templates.
 
 Audit gaps to close next:
 
@@ -72,20 +72,14 @@ Audit gaps to close next:
 - `sourceRegistry.js` is pilot-only, so green registry tests do not prove all source modules use the contract.
 - Public leak scan is useful but intentionally narrow; admin/source diagnostics still need route-level discipline.
 
-## Upstream Divergence
+## Repository Independence
 
-Read-only upstream check:
-
-- `batuhanboran/OpenJobSlots` HEAD: `8375353ca90b6981e184a2a11097a91bb677abfe`
-- Upstream `server/index.js` line count observed in a temporary read-only clone: `16835`
-- No upstream remote is configured in the private worktree.
-
-OpenJobSlots must continue to diverge architecturally from upstream:
+OpenJobSlots must continue to avoid third-party template dependencies:
 
 - Use upstream only as conceptual prior art for god-file risk.
 - Do not copy source code, endpoint implementations, parser behavior, or deployment assumptions.
 - Do not make upstream a runtime dependency, sync source, submodule, package dependency, or deploy source.
-- Keep production deployment tied to `batuhanboran/openjobslots` and production `/root/OpenJobSlots`.
+- Keep production deployment tied to `batuhanboran/openjobslots` and production `/app`.
 
 ## Supported, Partial, And Unsupported Distinction
 
@@ -549,7 +543,7 @@ Stop the active thread and report if any of these become true:
 - A parser behavior change is required but no raw fixture, expected normalized fixture, and invalid-shape fixture are in scope.
 - Public UI/API/docs would expose private paths, secrets, stack traces, raw parser payloads, or internal diagnostics.
 - A source can only be made to pass by inventing geo, remote state, source id, or posting date.
-- A thread needs to copy code from `batuhanboran/OpenJobSlots`.
+- A thread proposes copying code from third-party templates.
 
 ## Completion Criteria For The Whole Architecture Program
 

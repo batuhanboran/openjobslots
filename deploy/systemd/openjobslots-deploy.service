@@ -5,8 +5,8 @@ After=network-online.target docker.service
 
 [Service]
 Type=oneshot
-Environment=APP_DIR=/root/OpenJobSlots
+Environment=APP_DIR=/app
 Environment=REMOTE=origin
 Environment=BRANCH=main
 Environment=HEALTH_URL=http://127.0.0.1:8081/health
-ExecStart=/bin/bash /root/OpenJobSlots/scripts/deploy.sh
+ExecStart=/bin/bash /app/scripts/deploy.sh

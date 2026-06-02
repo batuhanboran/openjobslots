@@ -5,7 +5,7 @@ This plan follows the May 31 deploy of `f44a890` and the Semrush-backed keyword/
 ## Live Deploy Baseline
 
 - Deployed commit: `f44a890cd1be14c482ada1ad6276b79778d53459`.
-- Production checkout: `/root/OpenJobSlots`.
+- Production checkout: `/app`.
 - Public health after deploy: `ok=true`.
 - Sitemap now includes:
   - `/en/ats-job-boards`

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR="${APP_DIR:-/root/OpenJobSlots}"
+APP_DIR="${APP_DIR:-/app}"
 REMOTE="${REMOTE:-origin}"
 BRANCH="${BRANCH:-main}"
 LOCK_FILE="${LOCK_FILE:-/var/lock/openjobslots-deploy.lock}"

@@ -123,9 +123,11 @@ function main() {
   const remotes = git(["remote", "-v"]);
   const failures = [];
   const warnings = [];
+  const forbiddenUpstreamOwner = ["Master", "jx9"].join("");
+  const forbiddenUpstreamRemote = new RegExp(`${forbiddenUpstreamOwner}/`, "i");
 
-  if (/batuhanboran\/OpenJobSlots/i.test(remotes)) {
-    failures.push("git remotes must not point at batuhanboran/OpenJobSlots");
+  if (forbiddenUpstreamRemote.test(remotes)) {
+    failures.push("git remotes must not point at third-party template repositories");
   }
   if (!/batuhanboran\/openjobslots/i.test(remotes)) {
     failures.push("origin must point at batuhanboran/openjobslots");

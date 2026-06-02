@@ -75,7 +75,7 @@ function preflightReport(overrides = {}) {
       heavy_job_active: false,
       long_running_postgres_queries: 0,
       meili_postgres_delta: 0,
-      backup_path: "/root/OpenJobSlots/backups/postgres-openjobslots-pre-greenhouse-recovery.dump",
+      backup_path: "/app/backups/postgres-openjobslots-pre-greenhouse-recovery.dump",
       backup_parent_exists: true,
       backup_file_exists: true,
       backup_size_bytes: 1024

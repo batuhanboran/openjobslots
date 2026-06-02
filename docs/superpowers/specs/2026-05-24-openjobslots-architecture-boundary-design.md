@@ -2,9 +2,9 @@
 
 ## Status - May 24, 2026
 
-This design starts from the aligned production branch, not the older local `codex/ats-parser-modularization` checkout. The implementation worktree is based on `origin/main` at `197e8f93185e6582aea2766c6d6ffc5acb13747d`, matching the live `/root/OpenJobSlots` deployment on production at the start of this thread.
+This design starts from the aligned production branch, not the older local `codex/ats-parser-modularization` checkout. The implementation worktree is based on `origin/main` at `197e8f93185e6582aea2766c6d6ffc5acb13747d`, matching the live `/app` deployment on production at the start of this thread.
 
-The GitHub repository `batuhanboran/openjobslots` is private. The upstream inspiration repository `batuhanboran/OpenJobSlots` is public and must not be treated as a runtime dependency, sync source, or place to fetch code from. The public website remains public by design, so this boundary protects private source, deployment details, and server-side behavior rather than trying to hide public HTML, bundled client assets, or public API responses.
+The GitHub repository `batuhanboran/openjobslots` is the source of truth. Third-party template repositories must not be treated as runtime dependencies, sync sources, or places to fetch code from. The public website remains public by design, so this boundary protects private source, deployment details, and server-side behavior rather than trying to hide public HTML, bundled client assets, or public API responses.
 
 Current architecture facts:
 
@@ -16,11 +16,11 @@ Current architecture facts:
 
 ## Goal
 
-Make OpenJobSlots a private, independent production codebase that no longer depends architecturally on upstream OpenJobSlots, while shrinking `server/index.js` into a 2-3k line app bootstrap/orchestration file.
+Make OpenJobSlots an independent production codebase that no longer depends architecturally on external templates, while shrinking `server/index.js` into a 2-3k line app bootstrap/orchestration file.
 
 ## Non-Goals
 
-- Do not import, copy, or synchronize new code from `batuhanboran/OpenJobSlots`.
+- Do not import, copy, or synchronize new code from `third-party template repositories`.
 - Do not change public search ranking, parser quality thresholds, source apply behavior, worker budget, data retention, or Meili indexing as part of architecture extraction.
 - Do not expose deployment paths, private hostnames, tokens, stack traces, raw parser payloads, `.env` values, or source-only diagnostics in public UI/routes.
 - Do not repair the known Meili extra-document drift unless explicitly approved as a separate production write/reindex task.
@@ -29,11 +29,11 @@ Make OpenJobSlots a private, independent production codebase that no longer depe
 
 The private boundary has three layers:
 
-1. Repository boundary: `origin` must point at `batuhanboran/openjobslots`, not `batuhanboran/OpenJobSlots`; production must deploy from the private repository.
+1. Repository boundary: `origin` must point at `batuhanboran/openjobslots`; production must deploy from the OpenJobSlots repository.
 2. Public surface boundary: public HTML, bundled client JS, docs site content, and public API responses must not reveal private paths, secrets, production-only diagnostics, or stack traces.
 3. Architecture boundary: source ingestion, parsing, worker, data-quality, and deployment logic must live in OpenJobSlots-owned modules. Upstream can be compared as prior art, but not consumed as code or runtime state.
 
-This should be enforced with a local audit script that checks remotes, public-source strings, and god-file thresholds. The script should start as a ratchet rather than a final gate: fail on privacy leaks and upstream remotes immediately, then lower `server/index.js` line caps as extraction phases land.
+This should be enforced with a local audit script that checks remotes, public-source strings, and god-file thresholds. The script should start as a ratchet rather than a final gate: fail on privacy leaks and third-party template remotes immediately, then lower `server/index.js` line caps as extraction phases land.
 
 ## Target Server Shape
 
@@ -135,8 +135,8 @@ git diff --check
 Production verification, only after explicit deployment approval:
 
 ```bash
-git -C /root/OpenJobSlots rev-parse HEAD
-docker compose --project-directory /root/OpenJobSlots ps
+git -C /app rev-parse HEAD
+docker compose --project-directory /app ps
 curl -fsS http://127.0.0.1:8081/health
 docker exec openjobslots-app npm run search:reindex:check -- --json
 ```
@@ -146,7 +146,7 @@ The known extra Meili placeholder document may keep `search:reindex:check` at `o
 ## Success Criteria
 
 - `batuhanboran/openjobslots` remains private and production deploys from that private repo.
-- No upstream `batuhanboran/OpenJobSlots` remote or code-fetch dependency exists in the active implementation/deploy lane.
+- No third-party template remote or code-fetch dependency exists in the active implementation/deploy lane.
 - Public UI/docs/routes do not expose secrets, `.env` values, private host paths, production stack traces, or source-only diagnostics.
 - `server/ingestion/sources/common.js` no longer imports `../../index`.
 - `collectPostingsForCompany` lives outside `server/index.js`.

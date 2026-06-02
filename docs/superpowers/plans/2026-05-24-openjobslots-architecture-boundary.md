@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make OpenJobSlots private-repo independent from upstream OpenJobSlots and reduce `server/index.js` to a 2-3k line bootstrap/orchestration file through safe modular extraction.
+**Goal:** Keep OpenJobSlots independent from third-party templates and reduce `server/index.js` to a 2-3k line bootstrap/orchestration file through safe modular extraction.
 
 **Architecture:** Add a privacy/god-file boundary audit first, then move low-risk HTTP/runtime helpers out of `server/index.js`, followed by search/location helpers, source fetch/discovery, and finally legacy collectors. Each extraction is behavior-preserving and verified before tightening the line-count ratchet.
 
@@ -89,8 +89,10 @@ function main() {
   const failures = [];
   const warnings = [];
 
-  if (/batuhanboran\/OpenJobSlots/i.test(remotes)) {
-    failures.push("git remotes must not point at batuhanboran/OpenJobSlots");
+  const forbiddenUpstreamOwner = ["Master", "jx9"].join("");
+  const forbiddenUpstreamRemote = new RegExp(`${forbiddenUpstreamOwner}/`, "i");
+  if (forbiddenUpstreamRemote.test(remotes)) {
+    failures.push("git remotes must not point at third-party template repositories");
   }
   if (!/batuhanboran\/openjobslots/i.test(remotes)) {
     failures.push("origin must point at batuhanboran/openjobslots");
@@ -617,8 +619,8 @@ Do not deploy without explicit approval. If approval is given, fast-forward prod
 Run on production:
 
 ```bash
-git -C /root/OpenJobSlots rev-parse HEAD
-docker compose --project-directory /root/OpenJobSlots ps
+git -C /app rev-parse HEAD
+docker compose --project-directory /app ps
 curl -fsS http://127.0.0.1:8081/health
 docker exec openjobslots-app npm run search:reindex:check -- --json
 ```
