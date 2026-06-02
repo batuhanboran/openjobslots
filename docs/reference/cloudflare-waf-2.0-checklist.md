@@ -12,7 +12,7 @@ Use this checklist before any 2.0.0 deployment. Do not apply Cloudflare changes 
 - Admin routes under `/admin/*` require the application admin token and should have WAF visibility.
 - Detailed diagnostics routes `/postings/diagnostics` and `/postings/:id/diagnostics` require the application admin token.
 - Mutation routes such as sync start/stop, source apply, canary apply, and settings writes should be rate-limited and monitored.
-- Public routes `/health`, `/postings`, `/postings/filter-options`, `/search/suggest`, `/sync/status`, and `/ingestion/status` should remain reachable without admin credentials.
+- Public routes `/health`, `/postings`, `/postings/filter-options`, `/search/popular`, `/search/suggest`, `/sync/status`, and `/ingestion/status` should remain reachable without admin credentials.
 
 ## Rate Limits
 

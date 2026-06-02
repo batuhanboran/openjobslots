@@ -8,7 +8,9 @@ const SAFE_PUBLIC_GET_PATHS = new Set([
   "/health",
   "/postings",
   "/postings/filter-options",
+  "/ingestion/status",
   "/public/preferences",
+  "/search/popular",
   "/search/suggest",
   "/sync/status"
 ]);

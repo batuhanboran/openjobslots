@@ -763,6 +763,7 @@ Expected OpenJobSlots services:
 - `GET /health`
 - `GET /postings`
 - `GET /postings/filter-options`
+- `GET /search/popular`
 - `GET /search/suggest`
 - `GET /sync/status`
 - `GET /ingestion/status`

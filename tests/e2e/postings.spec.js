@@ -1820,6 +1820,61 @@ test.describe("postings page QA", () => {
     }
   });
 
+  test("mobile language selector supports every public language without viewport overflow", async ({ page }) => {
+    test.setTimeout(120_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile language selector coverage is covered by the mobile project");
+
+    const languages = [
+      ["en", "EN"],
+      ["tr", "TR"],
+      ["de", "DE"],
+      ["fr", "FR"],
+      ["es", "ES"],
+      ["pt-BR", "BR"],
+      ["pt-PT", "PT"],
+      ["it", "IT"],
+      ["nl", "NL"],
+      ["pl", "PL"],
+      ["ja", "JA"],
+      ["ko", "KO"],
+      ["zh-CN", "CN"],
+      ["hi", "HI"],
+      ["ar", "AR"],
+      ["id", "ID"],
+      ["sv", "SV"],
+      ["da", "DA"],
+      ["no", "NO"],
+      ["fi", "FI"]
+    ];
+
+    await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+
+    for (const [languageCode, shortCode] of languages) {
+      await page.getByTestId("language-selector").click();
+      const languageMenu = page.getByTestId("language-options");
+      await expect(languageMenu).toBeVisible();
+      const menuBox = await languageMenu.boundingBox();
+      expect(menuBox.x, `${languageCode} menu should not open off-screen: ${JSON.stringify(menuBox)}`).toBeGreaterThanOrEqual(0);
+      expect(menuBox.x + menuBox.width, `${languageCode} menu should fit viewport: ${JSON.stringify(menuBox)}`).toBeLessThanOrEqual(
+        viewport.width + 1
+      );
+
+      const option = page.getByTestId(`language-option-${languageCode}`);
+      await option.scrollIntoViewIfNeeded();
+      await expectMobileTapTarget(page, `language-option-${languageCode}`);
+      await option.click();
+
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      await expect(page.getByTestId("language-options")).toHaveCount(0);
+      await expect(page.getByTestId("search-input")).toBeVisible();
+      await expect(page.getByTestId("seo-landing-links")).toBeVisible();
+      await expect(page.getByTestId("public-version-label")).toContainText(APP_VERSION);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("dark mode paints the top viewport strip with the public dark background", async ({ page }) => {
     await openJobSlots(page);
     await enableDarkMode(page);

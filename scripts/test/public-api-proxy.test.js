@@ -19,7 +19,9 @@ assertProxy(
 );
 assertProxy("GET", "/postings/filter-options?search=engineer", "/postings/filter-options?search=engineer");
 assertProxy("GET", "/sync/status?_ts=1", "/sync/status?_ts=1");
+assertProxy("GET", "/ingestion/status?_ts=1", "/ingestion/status?_ts=1");
 assertProxy("GET", "/health", "/health");
+assertProxy("GET", "/search/popular?language=en&limit=4&country=US", "/search/popular?language=en&limit=4&country=US");
 assertProxy("GET", "/search/suggest?search=engineer&limit=4", "/search/suggest?search=engineer&limit=4");
 assertProxy("HEAD", "/postings?limit=1", "/postings?limit=1");
 

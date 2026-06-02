@@ -35,6 +35,7 @@ for (const profileName of ["development", "preview", "production"]) {
 assert.deepStrictEqual(PUBLIC_MOBILE_ENDPOINTS, [
   "/postings",
   "/postings/filter-options",
+  "/search/popular",
   "/search/suggest",
   "/sync/status",
   "/ingestion/status"

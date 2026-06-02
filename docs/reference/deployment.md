@@ -122,6 +122,7 @@ Live endpoints checked after deployment:
 
 - `/health`
 - `/postings/filter-options`
+- `/search/popular`
 - `/sync/status`
 - `/ingestion/status`
 - `/postings?search=turkish%20jobs`
@@ -213,6 +214,7 @@ Live endpoints checked after final reindex:
 
 - `/health`
 - `/postings/filter-options`
+- `/search/popular`
 - `/sync/status`
 - `/ingestion/status`
 - `/ingestion/quality/summary`
