@@ -3216,6 +3216,41 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions.filter((search) => search === "remote jobs")).toHaveLength(0);
   });
 
+  test("tapping the mobile result search button submits once without fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile compact submit coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    await input.fill("remote jobs");
+    await expectMobileTapTarget(page, "postings-search-submit");
+    await page.getByTestId("postings-search-submit").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("remote jobs");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings.filter((search) => search === "remote jobs")).toHaveLength(1);
+    expect(calls.filterOptions.filter((search) => search === "remote jobs")).toHaveLength(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("clearing a mobile result closes an open language menu without blank-query fanout", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile clear overlay coverage is covered by the mobile project");
