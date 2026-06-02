@@ -3616,6 +3616,41 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("manually clearing a localized mobile direct query removes query params without blank search fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile localized manual clear URL coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    const query = "Technical Support Engineer";
+    await page.goto(`/tr?q=${encodeURIComponent(query)}`);
+    await expect(page.getByTestId("app-logo")).toContainText("openjobslots", { timeout: 15_000 });
+    await expect(page.getByTestId("search-input")).toHaveValue(query, { timeout: 5000 });
+    await expect(page.getByTestId("language-selector")).toContainText("TR");
+    await expect.poll(() => calls.postings).toEqual([query]);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    await page.getByTestId("search-input").fill("");
+    await expect(page.getByTestId("search-input")).toHaveValue("");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    const urlState = await page.evaluate(() => ({
+      pathname: window.location.pathname,
+      search: window.location.search
+    }));
+    expect(urlState.pathname).toBe("/tr");
+    expect(urlState.search).not.toContain("q=");
+    expect(urlState.search).not.toContain("search=");
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("changing language after a submitted mobile search does not refetch the same query", async ({ page }) => {
     const calls = await installSearchRequestThrottleRoutes(page);
     await openJobSlots(page);
