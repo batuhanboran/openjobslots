@@ -3049,6 +3049,34 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions).toEqual([]);
   });
 
+  test("pressing Escape while typing on mobile cancels pending query work", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile pending clear coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("soft", { delay: 20 });
+    await input.press("Escape");
+
+    await expect(input).toHaveValue("");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await expect(page.getByTestId("posting-card")).toHaveCount(0);
+    await expect(page.getByTestId("result-count")).toHaveCount(0);
+    await page.waitForTimeout(2200);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("mobile utility toggles do not leave the language menu over the page", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile utility overlay coverage is covered by the mobile project");
