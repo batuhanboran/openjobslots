@@ -3072,6 +3072,40 @@ test.describe("postings page QA", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("tapping a mobile source intent chip applies the ATS filter once without query fanout", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile source intent fanout coverage is covered by the mobile project");
+
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.postingRequests.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+    calls.popular.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("greenhouse engineer", { delay: 20 });
+    await expect(page.getByTestId("intent-chip-source-greenhouse")).toBeVisible();
+    await expectMobileTapTarget(page, "intent-chip-source-greenhouse");
+
+    await page.getByTestId("intent-chip-source-greenhouse").click();
+    await expect(page.getByTestId("search-input")).toHaveValue("greenhouse engineer");
+    await expect(page.getByTestId("search-suggestions-panel")).toHaveCount(0);
+    await page.waitForTimeout(2600);
+
+    expect(calls.suggestions).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(
+      calls.postingRequests.filter(
+        (request) => request.search === "greenhouse engineer" && request.ats === "greenhouse"
+      )
+    ).toHaveLength(1);
+    expect(calls.postings.filter((search) => search === "greenhouse engineer")).toHaveLength(1);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("opening the mobile language menu closes suggestions and cancels pending query work", async ({ page }) => {
     const viewport = page.viewportSize() || { width: 1440, height: 900 };
     test.skip(viewport.width >= 768, "mobile utility menu coverage is covered by the mobile project");
