@@ -3984,6 +3984,10 @@ function normalizePublicLanguageCode(value) {
   return PUBLIC_LANGUAGE_PRIMARY_FALLBACK_BY_CODE.get(primary) || "";
 }
 
+function getPublicDocumentDirection(languageCode) {
+  return normalizePublicLanguageCode(languageCode) === "ar" ? "rtl" : "ltr";
+}
+
 function readWebStorageValue(key) {
   if (Platform.OS !== "web" || typeof window === "undefined" || !window.localStorage) return "";
   try {
@@ -5821,6 +5825,7 @@ function CountryBall({ language, selected = false, size = 30 }) {
 
 function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLanguage, t, compact = false }) {
   const selectedLanguage = PUBLIC_LANGUAGE_BY_CODE.get(languageCode) || PUBLIC_LANGUAGE_BY_CODE.get(DEFAULT_PUBLIC_LANGUAGE);
+  const isRtlLanguage = getPublicDocumentDirection(languageCode) === "rtl";
   return (
     <View style={[styles.languageSelectorWrap, compact ? styles.languageSelectorWrapCompact : null]}>
       <Pressable
@@ -5840,7 +5845,14 @@ function LanguageSelector({ languageCode, menuOpen, onToggleMenu, onSelectLangua
         <Text style={[styles.languageSelectorCode, compact ? styles.languageSelectorCodeCompact : null]}>{selectedLanguage.shortLabel}</Text>
       </Pressable>
       {menuOpen ? (
-        <View style={[styles.languageOptions, compact ? styles.languageOptionsCompact : null]} testID="language-options">
+        <View
+          style={[
+            styles.languageOptions,
+            isRtlLanguage ? styles.languageOptionsRtl : null,
+            compact ? styles.languageOptionsCompact : null
+          ]}
+          testID="language-options"
+        >
           <ScrollView
             style={styles.languageOptionsScroll}
             contentContainerStyle={styles.languageOptionsContent}
@@ -6265,6 +6277,30 @@ export default function App() {
       return nextTheme;
     });
   }, []);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
+    const root = document.documentElement;
+    if (!root) return undefined;
+    const previousDirection = root.getAttribute("dir");
+    const previousLanguage = root.getAttribute("lang");
+    const documentLanguage = normalizePublicLanguageCode(publicLanguageCode) || DEFAULT_PUBLIC_LANGUAGE;
+
+    root.setAttribute("dir", getPublicDocumentDirection(documentLanguage));
+    root.setAttribute("lang", documentLanguage);
+
+    return () => {
+      if (previousDirection === null) {
+        root.removeAttribute("dir");
+      } else {
+        root.setAttribute("dir", previousDirection);
+      }
+      if (previousLanguage === null) {
+        root.removeAttribute("lang");
+      } else {
+        root.setAttribute("lang", previousLanguage);
+      }
+    };
+  }, [publicLanguageCode]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
     const backgroundColor = activePage === PAGE_KEYS.POSTINGS && isDarkPublicTheme
@@ -12174,6 +12210,12 @@ const styles = StyleSheet.create({
         }
       : {})
   },
+  languageOptionsRtl: Platform.OS === "web"
+    ? {
+        left: 0,
+        right: "auto"
+      }
+    : {},
   languageOptionsCompact: {
     top: 48,
     minWidth: 158,

@@ -1874,6 +1874,14 @@ test.describe("postings page QA", () => {
       await option.click();
 
       await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+      const documentLanguageState = await page.evaluate(() => ({
+        dir: document.documentElement.getAttribute("dir"),
+        lang: document.documentElement.getAttribute("lang")
+      }));
+      expect(documentLanguageState.lang, `${languageCode} should update the document language`).toBe(languageCode);
+      expect(documentLanguageState.dir, `${languageCode} should update the document direction`).toBe(
+        languageCode === "ar" ? "rtl" : "ltr"
+      );
       await expect(page.getByTestId("language-options")).toHaveCount(0);
       await expect(page.getByTestId("search-input")).toBeVisible();
       await expect(page.getByTestId("seo-landing-links")).toBeVisible();
