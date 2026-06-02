@@ -6159,6 +6159,7 @@ export default function App() {
   const autoSyncInFlightRef = useRef(false);
   const statusPollInFlightRef = useRef(false);
   const postingsRefreshInFlightRef = useRef(false);
+  const didRunInitialPostingsBootstrapRef = useRef(false);
   const lastPostingRefreshAtRef = useRef(0);
   const wasSyncRunningRef = useRef(false);
   const postingsRequestSequenceRef = useRef(0);
@@ -8207,6 +8208,8 @@ export default function App() {
   }, [flushFrontendLogs]);
 
   useEffect(() => {
+    if (didRunInitialPostingsBootstrapRef.current) return undefined;
+    didRunInitialPostingsBootstrapRef.current = true;
     const bootstrap = async () => {
       setInitializing(true);
       setError("");
@@ -8238,8 +8241,7 @@ export default function App() {
     const lastSubmit = lastSearchSubmitRef.current || {};
     if (
       lastSubmit.value === query &&
-      lastSubmit.filtersSignature === filtersSignature &&
-      Date.now() - Number(lastSubmit.at || 0) < 1900
+      lastSubmit.filtersSignature === filtersSignature
     ) {
       return undefined;
     }

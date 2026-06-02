@@ -2753,6 +2753,35 @@ test.describe("postings page QA", () => {
     expect(calls.filterOptions.filter((search) => search === "software")).toHaveLength(0);
   });
 
+  test("changing language after a submitted mobile search does not refetch the same query", async ({ page }) => {
+    const calls = await installSearchRequestThrottleRoutes(page);
+    await openJobSlots(page);
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    const input = page.getByTestId("search-input");
+    await input.click();
+    await input.pressSequentially("software", { delay: 20 });
+    await input.press("Enter");
+    await page.waitForTimeout(2600);
+    expect(calls.postings.filter((search) => search === "software")).toHaveLength(1);
+
+    calls.postings.length = 0;
+    calls.filterOptions.length = 0;
+    calls.suggestions.length = 0;
+
+    await page.getByTestId("language-selector").click();
+    await page.getByTestId("language-option-tr").click();
+    await expect(page.getByTestId("language-selector")).toContainText("TR");
+    await page.waitForTimeout(2600);
+
+    expect(calls.postings).toEqual([]);
+    expect(calls.filterOptions).toEqual([]);
+    expect(calls.suggestions).toEqual([]);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("keyboard shortcuts and brand home keep search fast", async ({ page }) => {
     await openJobSlots(page);
 
