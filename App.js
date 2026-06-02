@@ -7150,6 +7150,7 @@ export default function App() {
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
+    setLanguageMenuOpen(false);
     resetPostingsHomeState(defaultFilters);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
@@ -7204,6 +7205,7 @@ export default function App() {
     setPostingsFilters(defaultFilters);
     setPostingsFilterPanelOpen(false);
     setSearchResultsMode(false);
+    setLanguageMenuOpen(false);
     resetPostingsHomeState(defaultFilters);
     setSearchSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
