@@ -1907,6 +1907,50 @@ test.describe("postings page QA", () => {
     }
   });
 
+  test("mobile release notes localize every public language without viewport overflow", async ({ page }) => {
+    test.setTimeout(150_000);
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile release notes language coverage is covered by the mobile project");
+
+    await openJobSlots(page);
+
+    for (const [languageCode, shortCode] of PUBLIC_LANGUAGE_TEST_OPTIONS) {
+      await page.getByTestId("language-selector").click();
+      const option = page.getByTestId(`language-option-${languageCode}`);
+      await option.scrollIntoViewIfNeeded();
+      await option.click();
+      await expect(page.getByTestId("language-selector")).toContainText(shortCode);
+
+      await page.getByTestId("public-version-button").scrollIntoViewIfNeeded();
+      await page.getByTestId("public-version-button").click();
+      const releaseModal = page.getByTestId("release-notes-modal");
+      await expect(releaseModal).toBeVisible();
+      const modalBox = await releaseModal.boundingBox();
+      expect(modalBox.x, `${languageCode} release modal should not open off-screen: ${JSON.stringify(modalBox)}`).toBeGreaterThanOrEqual(0);
+      expect(modalBox.y, `${languageCode} release modal should start inside the viewport: ${JSON.stringify(modalBox)}`).toBeGreaterThanOrEqual(0);
+      expect(modalBox.x + modalBox.width, `${languageCode} release modal should fit viewport width: ${JSON.stringify(modalBox)}`).toBeLessThanOrEqual(
+        viewport.width + 1
+      );
+      expect(modalBox.y + modalBox.height, `${languageCode} release modal should fit viewport height: ${JSON.stringify(modalBox)}`).toBeLessThanOrEqual(
+        viewport.height + 1
+      );
+
+      await expect(page.getByTestId("release-notes-scroll")).toBeVisible();
+      await expect(page.getByTestId("release-note-title-2.1.0")).toBeVisible();
+      const modalText = await releaseModal.innerText();
+      expect(String(modalText || "").trim(), `${languageCode} release notes should not be blank`).not.toBe("");
+      if (languageCode !== "en") {
+        await expect(page.getByTestId("release-notes-title")).not.toHaveText("Release notes");
+        await expect(page.getByTestId("release-notes-close")).not.toHaveText("Close");
+      }
+
+      await expectMobileTapTarget(page, "release-notes-close");
+      await page.getByTestId("release-notes-close").click();
+      await expect(releaseModal).toHaveCount(0);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("dark mode paints the top viewport strip with the public dark background", async ({ page }) => {
     await openJobSlots(page);
     await enableDarkMode(page);

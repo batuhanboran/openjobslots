@@ -13376,7 +13376,7 @@ const styles = StyleSheet.create({
     backgroundColor: OJS_COLORS.surfaceMuted,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    minHeight: 40,
+    minHeight: 44,
     justifyContent: "center"
   },
   releaseNotesCloseText: {
