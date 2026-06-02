@@ -7246,8 +7246,31 @@ export default function App() {
     if (showResultsSurface && nextValue.trim() !== previousResultQuery) {
       setPostingsResultCoverage(null);
     }
+    if (!nextValue.trim() && showResultsSurface) {
+      const defaultFilters = createDefaultPostingsFilters();
+      const defaultFiltersSignature = getPostingsFiltersSignature(defaultFilters);
+      const currentFiltersSignature = getPostingsFiltersSignature(postingsFiltersRef.current);
+      if (currentFiltersSignature === defaultFiltersSignature) {
+        cancelPendingAutoSearch();
+        suppressedSuggestionQueryRef.current = "";
+        lastSearchSubmitRef.current = {
+          value: "",
+          filtersSignature: defaultFiltersSignature,
+          at: Date.now()
+        };
+        setSearch(nextValue);
+        replacePublicSearchUrlQuery("");
+        setPostingsFilterPanelOpen(false);
+        setSearchResultsMode(false);
+        resetPostingsHomeState(defaultFilters);
+        setSearchSuggestions([]);
+        setSearchSuggestionsOpen(false);
+        setActiveSuggestionIndex(-1);
+        return;
+      }
+    }
     setSearch(nextValue);
-  }, [cancelPendingSearchSuggestion, postingsResultQuery, showResultsSurface]);
+  }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, postingsResultQuery, resetPostingsHomeState, showResultsSurface]);
 
   const handleSearchFocus = useCallback(() => {
     if (Platform.OS !== "web" && suppressNativeSearchFocusRef.current) {
