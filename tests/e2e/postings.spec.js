@@ -2909,6 +2909,71 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("posting-card-block-company")).toHaveCount(0);
   });
 
+  test("mobile posting cards keep dates and links scan-friendly", async ({ page }) => {
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width >= 768, "mobile card metadata coverage is covered by the mobile project");
+
+    await page.route("**/sync/status**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          running: false,
+          status: "idle",
+          job_slot_count: 1,
+          posting_count: 1,
+          configured_ats_count: 35,
+          visible_company_count: 1,
+          ingestion_worker: { latest_status: "idle" }
+        })
+      });
+    });
+    await page.route("**/postings**", async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.pathname.endsWith("/postings")) {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            {
+              id: 9001,
+              company_name: "QA Metadata Company",
+              position_name: "Mobile Metadata Designer",
+              job_posting_url: "https://boards.greenhouse.io/openjobslotsqa/jobs/mobile-metadata",
+              location: "Remote",
+              posting_date: "2026-05-20T12:34:56.000Z",
+              ats: "greenhouse"
+            }
+          ],
+          count: 1,
+          count_exact: true,
+          visible_ats_count: 1,
+          visible_company_count: 1,
+          limit: Number(url.searchParams.get("limit") || 80),
+          offset: Number(url.searchParams.get("offset") || 0),
+          has_more: false,
+          next_offset: null,
+          filters: { search: url.searchParams.get("search") || "" }
+        })
+      });
+    });
+
+    await openJobSlots(page);
+    await submitSearchAndExpectResults(page, "metadata");
+
+    const firstCard = page.getByTestId("posting-card").first();
+    await expect(firstCard).toContainText("QA Metadata Company");
+    await expect(firstCard).toContainText("boards.greenhouse.io");
+    await expect(firstCard).toContainText("May 20, 2026");
+    await expect(firstCard).not.toContainText("https://");
+    await expect(firstCard).not.toContainText("2026-05-20T12:34:56.000Z");
+  });
+
   test("posting cards do not expose source diagnostics on the public page", async ({ page }) => {
     await openJobSlots(page);
     await submitSearchAndExpectResults(page, "remote jobs");

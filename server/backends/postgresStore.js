@@ -783,20 +783,20 @@ async function listPostgresPostings(pool, options = {}) {
 
   if (useMeili) {
     try {
-      const exactSummaryPromise = getPostgresPostingResultSummary(pool, options);
       const searchLimit = Math.min(2000, offset + Math.max(limit * 2, limit + 40));
       const normalizedOptions = {
         ...options,
         sort_by: sortBy,
         limit: searchLimit,
         offset: 0,
+        facets: ["ats_key"],
         attributesToRetrieve: ["canonical_url"]
       };
       const searchResult = await searchMeiliPostings(normalizedOptions, meiliConfig);
       const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
       const estimatedTotalHits = getMeiliEstimatedTotalHits(searchResult, urls.length);
       if (urls.length === 0 && estimatedTotalHits === 0) {
-        const exactSummary = await exactSummaryPromise;
+        const exactSummary = await getPostgresPostingResultSummary(pool, options);
         if (exactSummary.count > 0) {
           logSearchFallback("meili_zero_postgres_exact_positive", {
             limit,
@@ -865,15 +865,13 @@ async function listPostgresPostings(pool, options = {}) {
         });
         return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
       }
-      const exactSummary = await exactSummaryPromise;
+      const sourceFacets = buildMeiliSourceFacets(searchResult);
       return {
         items: items.slice(0, limit),
-        count: Math.max(exactSummary.count, loadedThrough),
-        count_exact: true,
+        count: Math.max(estimatedTotalHits, loadedThrough),
+        count_exact: false,
         page_capped: page.limit_capped || page.offset_capped,
-        visible_company_count: exactSummary.visible_company_count,
-        visible_ats_count: exactSummary.visible_ats_count,
-        source_facets: exactSummary.source_facets,
+        source_facets: sourceFacets,
         limit,
         offset,
         filters: {

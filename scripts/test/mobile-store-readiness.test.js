@@ -11,6 +11,7 @@ const {
   PUBLIC_MOBILE_ENDPOINTS
 } = require(path.join(repoRoot, "src", "mobile", "publicSurface"));
 
+const appSource = fs.readFileSync(path.join(repoRoot, "App.js"), "utf8");
 const easJsonPath = path.join(repoRoot, "eas.json");
 assert.ok(fs.existsSync(easJsonPath), "eas.json must exist for store build profiles");
 const easJson = JSON.parse(fs.readFileSync(easJsonPath, "utf8"));
@@ -43,5 +44,13 @@ assert.deepStrictEqual(PUBLIC_MOBILE_ENDPOINTS, [
 assert.strictEqual(FLYONUI_NATIVE_POLICY.allowedInNativeApp, false);
 assert.ok(!packageJson.dependencies?.flyonui, "FlyonUI must not be a native app dependency");
 assert.ok(!packageJson.devDependencies?.flyonui, "FlyonUI must not be a native app devDependency");
+assert.ok(
+  appSource.includes('const animatedSearchPlaceholderEnabled = Platform.OS === "web";'),
+  "Native mobile search placeholder should stay static to avoid idle render timers"
+);
+assert.ok(
+  appSource.includes("if (!animatedSearchPlaceholderEnabled) return undefined;"),
+  "Search placeholder timer must be gated away from native mobile"
+);
 
 console.log("mobile store readiness checks passed");

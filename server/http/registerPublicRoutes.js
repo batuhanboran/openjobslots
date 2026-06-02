@@ -831,6 +831,12 @@ function registerPublicRoutes(app, context) {
       const publicCount = hasMore
         ? Math.max(resultCount, loadedThrough + 1)
         : Math.max(resultCount, loadedThrough);
+      const visibleAtsCount = Number.isFinite(Number(result?.visible_ats_count))
+        ? Math.max(0, Number(result.visible_ats_count))
+        : undefined;
+      const visibleCompanyCount = Number.isFinite(Number(result?.visible_company_count))
+        ? Math.max(0, Number(result.visible_company_count))
+        : undefined;
 
       return {
         items: sanitizeFrontendValue(sanitizePublicPostings(resultItems)),
@@ -838,8 +844,8 @@ function registerPublicRoutes(app, context) {
         count_exact: result?.count_exact === false ? false : true,
         count_capped: Boolean(result?.count_capped),
         page_capped: Boolean(result?.page_capped),
-        visible_ats_count: Math.max(0, Number(result?.visible_ats_count || 0)),
-        visible_company_count: Math.max(0, Number(result?.visible_company_count || 0)),
+        ...(visibleAtsCount === undefined ? {} : { visible_ats_count: visibleAtsCount }),
+        ...(visibleCompanyCount === undefined ? {} : { visible_company_count: visibleCompanyCount }),
         source_facets: sanitizeFrontendValue(sanitizePublicSourceFacets(result?.source_facets)),
         limit: resultLimit,
         offset: resultOffset,

@@ -12,6 +12,9 @@
       "android",
       "web"
     ],
+    "plugins": [
+      "./plugins/withOpenJobSlotsAndroidSigning"
+    ],
     "ios": {
       "bundleIdentifier": "com.openjobslots.app",
       "buildNumber": "1",

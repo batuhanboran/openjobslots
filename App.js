@@ -459,6 +459,8 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Find fresh openings across public ATS job boards.",
     "search.label": "Search openings",
     "search.placeholder": "Search title, company, location, or country",
+
+    "search.placeholderShort": "Search jobs or companies",
     "search.examplePrefix": "Try",
     "search.shortcut": "Enter to search · Esc to clear",
     "seo.popularSearches": "Popular searches",
@@ -585,6 +587,8 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Herkese açık ATS iş panolarındaki güncel ilanları bul.",
     "search.label": "İlan ara",
     "search.placeholder": "Ünvan, şirket, konum veya ülke ara",
+
+    "search.placeholderShort": "İş veya şirket ara",
     "search.examplePrefix": "Orn.",
     "search.shortcut": "Aramak için Enter · Temizlemek için Esc",
     "seo.popularSearches": "Popüler aramalar",
@@ -711,6 +715,8 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Finde aktuelle Stellen auf öffentlichen ATS-Jobbörsen.",
     "search.label": "Stellen suchen",
     "search.placeholder": "Titel, Firma, Ort oder Land suchen",
+
+    "search.placeholderShort": "Jobs oder Firmen suchen",
     "search.examplePrefix": "Beispiel",
     "search.shortcut": "Enter zum Suchen · Esc zum Leeren",
     "seo.popularSearches": "Beliebte Suchen",
@@ -837,6 +843,8 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Trouvez des offres récentes sur les jobboards ATS publics.",
     "search.label": "Rechercher",
     "search.placeholder": "Titre, entreprise, lieu ou pays",
+
+    "search.placeholderShort": "Rechercher jobs ou entreprises",
     "search.examplePrefix": "Essayez",
     "search.shortcut": "Entrer pour rechercher · Esc pour vider",
     "seo.popularSearches": "Recherches populaires",
@@ -963,6 +971,8 @@ const PUBLIC_MESSAGES = {
     "search.lead": "Encuentra ofertas recientes en bolsas ATS públicas.",
     "search.label": "Buscar empleos",
     "search.placeholder": "Título, empresa, ubicación o país",
+
+    "search.placeholderShort": "Buscar empleos o empresas",
     "search.examplePrefix": "Prueba",
     "search.shortcut": "Enter para buscar · Esc para limpiar",
     "seo.popularSearches": "Búsquedas populares",
@@ -1099,6 +1109,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Encontre vagas recentes em quadros ATS públicos.",
     "search.label": "Buscar vagas",
     "search.placeholder": "Busque cargo, empresa, local ou país",
+    "search.placeholderShort": "Buscar vagas ou empresas",
     "search.examplePrefix": "Tente",
     "search.shortcut": "Enter para buscar · Esc para limpar",
     "seo.popularSearches": "Buscas populares",
@@ -1181,6 +1192,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Encontra vagas recentes em quadros ATS públicos.",
     "search.label": "Pesquisar vagas",
     "search.placeholder": "Pesquisa cargo, empresa, local ou país",
+    "search.placeholderShort": "Pesquisar vagas ou empresas",
     "search.examplePrefix": "Experimenta",
     "search.shortcut": "Enter para pesquisar · Esc para limpar",
     "seo.popularSearches": "Pesquisas populares",
@@ -1254,6 +1266,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Trova offerte recenti nei job board ATS pubblici.",
     "search.label": "Cerca offerte",
     "search.placeholder": "Cerca ruolo, azienda, località o paese",
+    "search.placeholderShort": "Cerca lavori o aziende",
     "search.shortcut": "Invio per cercare · Esc per cancellare",
     "seo.popularSearches": "Ricerche popolari",
     "search.clear": "Cancella",
@@ -1321,6 +1334,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Vind recente vacatures op publieke ATS-jobboards.",
     "search.label": "Vacatures zoeken",
     "search.placeholder": "Zoek titel, bedrijf, plaats of land",
+    "search.placeholderShort": "Zoek jobs of bedrijven",
     "search.shortcut": "Enter om te zoeken · Esc om te wissen",
     "seo.popularSearches": "Populaire zoekopdrachten",
     "search.clear": "Wissen",
@@ -1388,6 +1402,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Znajdź świeże oferty z publicznych tablic ATS.",
     "search.label": "Szukaj ofert",
     "search.placeholder": "Szukaj stanowiska, firmy, lokalizacji lub kraju",
+    "search.placeholderShort": "Szukaj ofert lub firm",
     "search.shortcut": "Enter, aby szukać · Esc, aby wyczyścić",
     "seo.popularSearches": "Popularne wyszukiwania",
     "search.clear": "Wyczyść",
@@ -1455,6 +1470,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "公開ATS求人ボードから新しい求人を見つけます。",
     "search.label": "求人を検索",
     "search.placeholder": "職種、会社、地域、国で検索",
+    "search.placeholderShort": "求人または企業を検索",
     "search.shortcut": "Enterで検索 · Escでクリア",
     "seo.popularSearches": "人気の検索",
     "search.clear": "クリア",
@@ -1522,6 +1538,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "공개 ATS 채용 보드의 최신 공고를 찾습니다.",
     "search.label": "공고 검색",
     "search.placeholder": "직무, 회사, 지역 또는 국가 검색",
+    "search.placeholderShort": "채용공고 또는 회사 검색",
     "search.shortcut": "Enter로 검색 · Esc로 지우기",
     "seo.popularSearches": "인기 검색어",
     "search.clear": "지우기",
@@ -1589,6 +1606,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "从公开 ATS 招聘板查找最新职位。",
     "search.label": "搜索职位",
     "search.placeholder": "搜索职位、公司、地点或国家",
+    "search.placeholderShort": "搜索职位或公司",
     "search.shortcut": "Enter 搜索 · Esc 清除",
     "seo.popularSearches": "热门搜索",
     "search.clear": "清除",
@@ -1656,6 +1674,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "सार्वजनिक ATS job boards से ताज़ा openings खोजें।",
     "search.label": "नौकरियां खोजें",
     "search.placeholder": "पद, कंपनी, स्थान या देश खोजें",
+    "search.placeholderShort": "नौकरी या कंपनी खोजें",
     "search.shortcut": "Enter से खोजें · Esc से साफ करें",
     "seo.popularSearches": "लोकप्रिय खोजें",
     "search.clear": "साफ करें",
@@ -1723,6 +1742,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "اعثر على وظائف حديثة من لوحات ATS العامة.",
     "search.label": "بحث عن وظائف",
     "search.placeholder": "ابحث عن المسمى أو الشركة أو الموقع أو الدولة",
+    "search.placeholderShort": "ابحث عن وظيفة أو شركة",
     "search.shortcut": "Enter للبحث · Esc للمسح",
     "seo.popularSearches": "عمليات بحث شائعة",
     "search.clear": "مسح",
@@ -1790,6 +1810,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Temukan lowongan terbaru dari papan ATS publik.",
     "search.label": "Cari lowongan",
     "search.placeholder": "Cari jabatan, perusahaan, lokasi, atau negara",
+    "search.placeholderShort": "Cari lowongan atau perusahaan",
     "search.shortcut": "Enter untuk mencari · Esc untuk menghapus",
     "seo.popularSearches": "Pencarian populer",
     "search.clear": "Hapus",
@@ -1857,6 +1878,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Hitta färska jobb från publika ATS-jobbtavlor.",
     "search.label": "Sök jobb",
     "search.placeholder": "Sök titel, företag, plats eller land",
+    "search.placeholderShort": "Sök jobb eller företag",
     "search.shortcut": "Enter för sök · Esc för att rensa",
     "seo.popularSearches": "Populära sökningar",
     "search.clear": "Rensa",
@@ -1924,6 +1946,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Find friske opslag fra offentlige ATS-jobboards.",
     "search.label": "Søg job",
     "search.placeholder": "Søg titel, virksomhed, sted eller land",
+    "search.placeholderShort": "Søg job eller firmaer",
     "search.shortcut": "Enter for søgning · Esc for at rydde",
     "seo.popularSearches": "Populære søgninger",
     "search.clear": "Ryd",
@@ -1991,6 +2014,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Finn ferske stillinger fra offentlige ATS-jobbtavler.",
     "search.label": "Søk jobber",
     "search.placeholder": "Søk tittel, selskap, sted eller land",
+    "search.placeholderShort": "Søk jobber eller selskaper",
     "search.shortcut": "Enter for å søke · Esc for å tømme",
     "seo.popularSearches": "Populære søk",
     "search.clear": "Tøm",
@@ -2058,6 +2082,7 @@ Object.assign(PUBLIC_MESSAGES, {
     "search.lead": "Löydä tuoreet ilmoitukset julkisilta ATS-työpaikkasivuilta.",
     "search.label": "Etsi työpaikkoja",
     "search.placeholder": "Etsi nimike, yritys, sijainti tai maa",
+    "search.placeholderShort": "Hae työpaikkoja tai yrityksiä",
     "search.shortcut": "Enter hakee · Esc tyhjentää",
     "seo.popularSearches": "Suositut haut",
     "search.clear": "Tyhjennä",
@@ -4456,6 +4481,29 @@ function formatDateTimeSafe(value, fallback = "Unknown time") {
   )}:${pad(date.getSeconds())}`;
 }
 
+function formatPostingDateLabel(value, languageCode, fallback = "Posting date unavailable") {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  try {
+    return new Intl.DateTimeFormat(getPublicLocale(languageCode), {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    }).format(date);
+  } catch {
+    return formatDateTimeSafe(date, fallback).slice(0, 10);
+  }
+}
+
+function formatPostingUrlHostLabel(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    return parsed.hostname.replace(/^www\./i, "");
+  } catch {
+    return "";
+  }
+}
+
 function formatTimeSafe(value, fallback = "Unknown time") {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -5299,6 +5347,7 @@ function PostingCard({
   showAdminActions = false,
   isDarkTheme = false,
   compact = false,
+  languageCode = DEFAULT_PUBLIC_LANGUAGE,
   t = (key, fallback) => fallback || key
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -5327,9 +5376,13 @@ function PostingCard({
   const positionName = sanitizeDisplayText(item?.position_name, "Unknown position");
   const locationLabel = sanitizeDisplayText(item?.location, "Location unavailable");
   const companyLabel = sanitizeDisplayText(item?.company_name, "Unknown company");
-  const postingDateLabel = sanitizeDisplayText(item?.posting_date, t("posting.dateUnavailable", "Posting date unavailable"));
+  const postingDateLabel = formatPostingDateLabel(
+    item?.posting_date,
+    languageCode,
+    t("posting.dateUnavailable", "Posting date unavailable")
+  );
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
-  const postingUrlLabel = sanitizeDisplayText(item?.job_posting_url, "");
+  const postingUrlLabel = sanitizeDisplayText(formatPostingUrlHostLabel(item?.job_posting_url), "");
   return (
     <View style={[styles.card, compact ? styles.cardMobile : null, isDarkTheme ? styles.cardDark : null]} testID="posting-card">
       <View style={styles.postingCardTopRow}>
@@ -5359,9 +5412,11 @@ function PostingCard({
           {isApplied ? (
             <Text style={styles.postingAppliedNotice}>{appliedByLabel}</Text>
           ) : null}
-          <Text numberOfLines={1} style={[styles.url, compact ? styles.urlMobile : null, isDarkTheme ? styles.urlDark : null]}>
-            {postingUrlLabel}
-          </Text>
+          {postingUrlLabel ? (
+            <Text numberOfLines={1} style={[styles.url, compact ? styles.urlMobile : null, isDarkTheme ? styles.urlDark : null]}>
+              {postingUrlLabel}
+            </Text>
+          ) : null}
         </Pressable>
 
         {showAdminActions ? (
@@ -6111,10 +6166,15 @@ export default function App() {
     SEARCH_PLACEHOLDER_EXAMPLES[searchExampleTypeState.index % SEARCH_PLACEHOLDER_EXAMPLES.length] ||
     SEARCH_PLACEHOLDER_EXAMPLES[0] ||
     "";
-  const exampleSearchPlaceholder = currentSearchExample.slice(
-    0,
-    Math.max(1, Math.min(currentSearchExample.length, searchExampleTypeState.length))
-  );
+  const animatedSearchPlaceholderEnabled = Platform.OS === "web";
+  const defaultSearchPlaceholder = t("search.placeholder", "Search title, company, location, or country");
+  const compactSearchPlaceholder = t("search.placeholderShort", "Search jobs or companies");
+  const exampleSearchPlaceholder = animatedSearchPlaceholderEnabled
+    ? currentSearchExample.slice(
+        0,
+        Math.max(1, Math.min(currentSearchExample.length, searchExampleTypeState.length))
+      )
+    : compactSearchPlaceholder;
   const flushFrontendLogs = useCallback(async () => {
     if (isPublicNativeStoreSurface) return;
     if (frontendLogFlushInFlightRef.current) return;
@@ -7833,6 +7893,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!animatedSearchPlaceholderEnabled) return undefined;
     if (activePage !== PAGE_KEYS.POSTINGS) return undefined;
     if (String(search || "").trim()) return undefined;
     const text = SEARCH_PLACEHOLDER_EXAMPLES[searchExampleTypeState.index % SEARCH_PLACEHOLDER_EXAMPLES.length] || "";
@@ -7865,7 +7926,7 @@ export default function App() {
       });
     }, delay);
     return () => clearTimeout(timer);
-  }, [activePage, search, searchExampleTypeState]);
+  }, [activePage, animatedSearchPlaceholderEnabled, search, searchExampleTypeState]);
 
   useEffect(() => {
     Animated.timing(searchMotionRef.current, {
@@ -8413,7 +8474,7 @@ export default function App() {
                 placeholder={
                   !String(search || "").trim()
                     ? exampleSearchPlaceholder
-                    : t("search.placeholder", "Search title, company, location, or country")
+                    : defaultSearchPlaceholder
                 }
                 placeholderTextColor={isDarkPublicTheme ? OJS_DARK_COLORS.muted : YAHOO_COLORS.muted}
                 autoCapitalize="none"
@@ -9157,6 +9218,7 @@ export default function App() {
                     blockingCompanyNames={blockingCompanyNamesSet}
                     compact={!isDesktopViewport}
                     isDarkTheme={isDarkPublicTheme}
+                    languageCode={publicLanguageCode}
                     t={t}
                   />
                 ))

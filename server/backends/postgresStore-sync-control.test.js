@@ -544,13 +544,13 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
     assert.match(searchBody.filter, /posting_date IS NOT EMPTY/);
     assert.equal(searchBody.q, "engineer");
     assert.equal(searchBody.matchingStrategy, "all");
-    assert.equal(searchBody.facets, undefined);
+    assert.deepEqual(searchBody.facets, ["ats_key"]);
     assert.deepEqual(searchBody.attributesToRetrieve, ["canonical_url"]);
     assert.equal(result.items.length, 1);
     assert.equal(result.count, 2);
-    assert.equal(result.count_exact, true);
-    assert.equal(result.visible_ats_count, 1);
-    assert.equal(result.visible_company_count, 1);
+    assert.equal(result.count_exact, false);
+    assert.equal(result.visible_ats_count, undefined);
+    assert.equal(result.visible_company_count, undefined);
     assert.equal(result.items[0].job_posting_url, "https://example.com/visible");
   } finally {
     global.fetch = previousFetch;
@@ -562,7 +562,7 @@ async function testMeiliPostgresPathHydratesBeforeCounting() {
   }
 }
 
-async function testMeiliPostgresPathUsesPostgresExactAggregates() {
+async function testMeiliPostgresPathUsesMeiliEstimatedAggregates() {
   const previousSearchBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousFetch = global.fetch;
   process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
@@ -668,15 +668,15 @@ async function testMeiliPostgresPathUsesPostgresExactAggregates() {
       include_ignored: true
     });
 
-    assert.equal(searchBody.facets, undefined);
-    assert.equal(postgresAggregateCalls.length, 2);
+    assert.deepEqual(searchBody.facets, ["ats_key"]);
+    assert.equal(postgresAggregateCalls.length, 0);
     assert.equal(result.count, 37);
-    assert.equal(result.count_exact, true);
-    assert.equal(result.visible_company_count, 21);
-    assert.equal(result.visible_ats_count, 2);
+    assert.equal(result.count_exact, false);
+    assert.equal(result.visible_company_count, undefined);
+    assert.equal(result.visible_ats_count, undefined);
     assert.deepEqual(result.source_facets.map((facet) => [facet.value, facet.count]), [
-      ["greenhouse", 20],
-      ["lever", 17]
+      ["greenhouse", 31],
+      ["lever", 6]
     ]);
     assert.deepEqual(result.items.map((item) => item.job_posting_url), [
       "https://example.com/product-1",
@@ -2834,7 +2834,7 @@ async function main() {
   await testIngestionSourcesReportDueAndFailurePressure();
   await testHydratePostgresPostingsKeepsSafetyAndFilterGuards();
   await testMeiliPostgresPathHydratesBeforeCounting();
-  await testMeiliPostgresPathUsesPostgresExactAggregates();
+  await testMeiliPostgresPathUsesMeiliEstimatedAggregates();
   await testUnderfilledMeiliHydrationFallsBackToPostgres();
   await testEmptyMeiliSearchReturnsExactPostgresZero();
   await testEmptyMeiliSearchFallsBackWhenPostgresExactIsPositive();
