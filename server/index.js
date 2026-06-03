@@ -923,6 +923,15 @@ async function sendCachedPublicJson(req, res, cache, producer, options = {}) {
   }
 }
 
+function isPlayConsoleDeletionValidationRequest(req) {
+  const origin = normalizeOrigin(req.get ? req.get("origin") : "");
+  const pathname = String(req.path || "").toLowerCase();
+  return (
+    origin === "https://play.google.com" &&
+    (pathname === "/data-deletion" || pathname === "/google-play-data-deletion")
+  );
+}
+
 function ensureFrontendLogDirectory() {
   fs.mkdirSync(BACKEND_LOG_DIRECTORY_PATH, { recursive: true });
 }
@@ -2515,6 +2524,16 @@ function createServer() {
   app.disable("x-powered-by");
   if (TRUST_PROXY) app.set("trust proxy", 1);
   app.use(securityHeadersMiddleware);
+  app.use((req, res, next) => {
+    if (!isPlayConsoleDeletionValidationRequest(req)) return next();
+    res.setHeader("Access-Control-Allow-Origin", "https://play.google.com");
+    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Max-Age", "600");
+    res.setHeader("Vary", "Origin");
+    if (req.method === "OPTIONS") return res.status(204).send("");
+    return next();
+  });
   app.use(cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
