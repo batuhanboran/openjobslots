@@ -1052,10 +1052,12 @@ function registerPublicRoutes(app, context) {
     app.get("/privacy-policy", (req, res) => {
       res.redirect(301, "/privacy");
     });
-    app.get(["/data-deletion", "/google-play-data-deletion"], (req, res) => {
+    const sendDataDeletionPage = (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("html").send(buildDataDeletionHtml(req));
-    });
+    };
+    app.get(["/data-deletion", "/google-play-data-deletion"], sendDataDeletionPage);
+    app.delete(["/data-deletion", "/google-play-data-deletion"], sendDataDeletionPage);
     app.get("/robots.txt", (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("text/plain").send(buildRobotsTxt(req));
