@@ -925,7 +925,9 @@ async function sendCachedPublicJson(req, res, cache, producer, options = {}) {
 
 function isPlayConsoleDeletionValidationRequest(req) {
   const origin = normalizeOrigin(req.get ? req.get("origin") : "");
-  const pathname = String(req.path || "").toLowerCase();
+  const pathname = String(req.path || "")
+    .toLowerCase()
+    .replace(/\/+$/, "");
   return (
     origin === "https://play.google.com" &&
     (pathname === "/data-deletion" || pathname === "/google-play-data-deletion")
