@@ -2527,7 +2527,7 @@ function createServer() {
   app.use((req, res, next) => {
     if (!isPlayConsoleDeletionValidationRequest(req)) return next();
     res.setHeader("Access-Control-Allow-Origin", "https://play.google.com");
-    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,DELETE");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.setHeader("Access-Control-Max-Age", "600");
     res.setHeader("Vary", "Origin");
