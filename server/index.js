@@ -790,7 +790,8 @@ function getAllowedOrigins() {
     "https://openjobslots.com",
     "http://www.openjobslots.com",
     "http://internal-host:8081",
-    "https://www.openjobslots.com"
+    "https://www.openjobslots.com",
+    "https://play.google.com"
   ];
   return new Set([...configured, ...defaults.map(normalizeOrigin)].filter(Boolean));
 }
