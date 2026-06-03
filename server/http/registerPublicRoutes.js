@@ -363,7 +363,8 @@ function registerPublicRoutes(app, context) {
 
   function buildDataDeletionHtml(req) {
     const siteOrigin = getPrivacyPolicySiteOrigin(req);
-    const canonicalUrl = `${siteOrigin}/data-deletion`;
+    const dataDeletionPath = req?.path === "/google-play-data-deletion" ? "/google-play-data-deletion" : "/data-deletion";
+    const canonicalUrl = `${siteOrigin}${dataDeletionPath}`;
     const privacyUrl = `${siteOrigin}/privacy`;
     const effectiveDate = "June 3, 2026";
     const title = "Data Deletion | OpenJobSlots";
