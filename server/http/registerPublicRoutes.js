@@ -1051,7 +1051,7 @@ function registerPublicRoutes(app, context) {
     app.get("/privacy-policy", (req, res) => {
       res.redirect(301, "/privacy");
     });
-    app.get("/data-deletion", (req, res) => {
+    app.get(["/data-deletion", "/google-play-data-deletion"], (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("html").send(buildDataDeletionHtml(req));
     });
