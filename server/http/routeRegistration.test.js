@@ -83,6 +83,7 @@ function testPublicRoutes() {
     "GET /index.html",
     "GET /privacy",
     "GET /privacy-policy",
+    "GET /data-deletion",
     "GET /robots.txt",
     "GET /llms.txt",
     "GET /sitemap.xml",

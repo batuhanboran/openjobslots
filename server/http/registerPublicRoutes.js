@@ -286,6 +286,7 @@ function registerPublicRoutes(app, context) {
   function buildPrivacyPolicyHtml(req) {
     const siteOrigin = getPrivacyPolicySiteOrigin(req);
     const canonicalUrl = `${siteOrigin}/privacy`;
+    const dataDeletionUrl = `${siteOrigin}/data-deletion`;
     const effectiveDate = "June 3, 2026";
     const title = "Privacy Policy | OpenJobSlots";
     return `<!doctype html>
@@ -350,10 +351,72 @@ function registerPublicRoutes(app, context) {
       <p>OpenJobSlots is not directed to children under 13 and does not knowingly collect personal information from children under 13.</p>
 
       <h2>Your choices</h2>
-      <p>You can avoid entering personal information in search queries, clear local cookies or app data, and use the employer or ATS website directly when applying for jobs.</p>
+      <p>You can avoid entering personal information in search queries, clear local cookies or app data, use the employer or ATS website directly when applying for jobs, and request deletion of OpenJobSlots app data through <a href="${escapePrivacyPolicyHtml(dataDeletionUrl)}">OpenJobSlots data deletion</a>.</p>
 
       <h2>Contact</h2>
       <p>For privacy questions, contact the OpenJobSlots operator through <a href="https://batuhanboran.com" rel="noopener">batuhanboran.com</a>.</p>
+    </section>
+  </main>
+</body>
+</html>`;
+  }
+
+  function buildDataDeletionHtml(req) {
+    const siteOrigin = getPrivacyPolicySiteOrigin(req);
+    const canonicalUrl = `${siteOrigin}/data-deletion`;
+    const privacyUrl = `${siteOrigin}/privacy`;
+    const effectiveDate = "June 3, 2026";
+    const title = "Data Deletion | OpenJobSlots";
+    return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapePrivacyPolicyHtml(title)}</title>
+  <meta name="description" content="How to request deletion of OpenJobSlots Android app and website data." />
+  <link rel="canonical" href="${escapePrivacyPolicyHtml(canonicalUrl)}" />
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f7f8fb; color: #20262e; line-height: 1.58; }
+    main { max-width: 820px; margin: 0 auto; padding: 48px 20px 72px; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.05; letter-spacing: 0; }
+    h2 { margin: 32px 0 8px; font-size: 1.15rem; }
+    p, li { font-size: 1rem; color: #374151; }
+    a { color: #4b39ef; }
+    .updated { margin: 0 0 28px; color: #667085; }
+    .panel { background: #fff; border: 1px solid #e4e7ec; border-radius: 8px; padding: 28px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #08130e; color: #f4f7f2; }
+      .panel { background: #111a15; border-color: #2b3a32; }
+      p, li, .updated { color: #cbd5cf; }
+      a { color: #b79cff; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OpenJobSlots Data Deletion</h1>
+    <p class="updated">Effective date: ${escapePrivacyPolicyHtml(effectiveDate)}</p>
+    <section class="panel" aria-label="Data deletion instructions">
+      <p>OpenJobSlots does not require users to create an account and does not store resumes, job applications, payment details, government identifiers, health information, or financial information in the public Android app or website.</p>
+
+      <h2>How to request deletion</h2>
+      <p>To request deletion of OpenJobSlots app or website data associated with your use of the service, contact the OpenJobSlots operator through <a href="https://batuhanboran.com" rel="noopener">batuhanboran.com</a> and include the subject line "OpenJobSlots data deletion request".</p>
+      <p>Include the email address where you want to receive the response and any details that help identify the data to delete, such as approximate dates of use or search terms you want removed. Do not send resumes, government IDs, payment information, health information, or other sensitive documents.</p>
+
+      <h2>Data that can be deleted</h2>
+      <ul>
+        <li>OpenJobSlots search activity and filter activity that can be associated with your request.</li>
+        <li>Anonymous session or preference identifiers that can be associated with your request.</li>
+        <li>Operational diagnostics that can reasonably be located and removed without affecting security, legal, or aggregate reporting obligations.</li>
+      </ul>
+
+      <h2>Data kept or not controlled by OpenJobSlots</h2>
+      <p>OpenJobSlots links to employer career pages and third-party applicant tracking system websites. If you apply for a job or share information on those external sites, you must contact that employer or ATS provider for deletion requests related to their systems.</p>
+      <p>OpenJobSlots may retain limited records when needed for security, abuse prevention, legal compliance, backup integrity, or aggregate reporting. Aggregated analytics that no longer identify a user or session may be kept.</p>
+
+      <h2>More information</h2>
+      <p>Read the <a href="${escapePrivacyPolicyHtml(privacyUrl)}">OpenJobSlots Privacy Policy</a> for more details about information processed by the Android app and website.</p>
     </section>
   </main>
 </body>
@@ -987,6 +1050,10 @@ function registerPublicRoutes(app, context) {
     });
     app.get("/privacy-policy", (req, res) => {
       res.redirect(301, "/privacy");
+    });
+    app.get("/data-deletion", (req, res) => {
+      setPublicSeoCacheHeaders(res, 300, 3600);
+      res.type("html").send(buildDataDeletionHtml(req));
     });
     app.get("/robots.txt", (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
