@@ -4096,6 +4096,21 @@ function replacePublicSearchUrlQuery(query) {
   }
 }
 
+function replacePublicSearchUrlPath(pathname) {
+  if (Platform.OS !== "web" || typeof window === "undefined" || !window.history || typeof URL === "undefined") return;
+  const rawPath = String(pathname || "").trim();
+  if (!rawPath || !rawPath.startsWith("/") || rawPath.startsWith("//")) return;
+  try {
+    const url = new URL(rawPath, window.location.origin);
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    if (nextUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState({}, "", nextUrl);
+    }
+  } catch {
+    // URL path state is best-effort; search remains functional without History API.
+  }
+}
+
 function getBrowserLanguageCode(fallback = DEFAULT_PUBLIC_LANGUAGE) {
   if (Platform.OS !== "web" || typeof window === "undefined") return fallback;
   const candidates = [
@@ -4177,12 +4192,14 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
           const label = getSeoLandingLinkLabel(route);
           const displayLabel = compact ? getSeoLandingCompactLabel(label) : label;
           const key = String(route?.path || route?.searchQuery || route?.localizedSearchQuery || label || index);
+          const isQueryLandingPath = String(route?.path || "").includes("?");
           if (Platform.OS === "web") {
             return (
               <Text
                 key={key}
-                href={route.path}
-                hrefAttrs={{ rel: String(route?.path || "").includes("?") ? "nofollow" : "bookmark" }}
+                href={isQueryLandingPath ? undefined : route.path}
+                hrefAttrs={isQueryLandingPath ? undefined : { rel: "bookmark" }}
+                onPress={isQueryLandingPath ? () => onSelectPopularSearch?.(route) : undefined}
                 numberOfLines={compact ? 1 : undefined}
                 style={[
                   styles.seoLandingLink,
@@ -4190,7 +4207,8 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
                   isDarkTheme ? styles.seoLandingLinkDark : null
                 ]}
                 testID={getSeoLandingLinkTestId(route)}
-                accessibilityRole="link"
+                accessibilityRole={isQueryLandingPath ? "button" : "link"}
+                accessibilityLabel={label}
               >
                 {displayLabel}
               </Text>
@@ -7150,6 +7168,9 @@ export default function App() {
       ""
     ).trim();
     if (!nextQuery) return;
+    if (String(route?.path || "").includes("?")) {
+      replacePublicSearchUrlPath(route.path);
+    }
     submitSearch(nextQuery, { source: "popular_search" });
   }, [submitSearch]);
 

@@ -1573,32 +1573,29 @@ test.describe("postings page QA", () => {
     await expect.poll(() => requestedSearch).toBe(expectedQuery);
   });
 
-  test("home exposes crawlable SEO landing links for search engines", async ({ page }) => {
+  test("home keeps popular query actions out of crawler hrefs", async ({ page }) => {
     await openJobSlots(page);
 
     await expect(page.getByTestId("seo-landing-links")).toBeVisible();
-    const englishPopularOrRouteLink = page.locator('a[href="/en/remote-job-openings"], a[href="/en?q=remote%20jobs%20US"]').first();
-    await expect(englishPopularOrRouteLink).toBeVisible();
-    await expect(englishPopularOrRouteLink).toHaveAttribute("href", /\/en(?:\/remote-job-openings|\?q=remote%20jobs%20US)/);
+    await expect(page.getByTestId("seo-landing-links").locator('a[href*="?q="]')).toHaveCount(0);
+    await expect(page.getByTestId("seo-landing-links")).toContainText(/Remote jobs US|Remote job openings/i);
 
     await page.getByTestId("language-selector").click();
     await page.getByTestId("language-option-tr").click();
 
-    const turkishPopularOrRouteLink = page.locator('a[href="/tr/uzaktan-calisma-ilanlari"], a[href="/tr?q=remote%20Turkiye"]').first();
-    await expect(turkishPopularOrRouteLink).toBeVisible();
-    await expect(turkishPopularOrRouteLink).toHaveAttribute("href", /\/tr(?:\/uzaktan-calisma-ilanlari|\?q=remote%20Turkiye)/);
+    await expect(page.getByTestId("seo-landing-links").locator('a[href*="?q="]')).toHaveCount(0);
+    await expect(page.getByTestId("seo-landing-links")).toContainText(/Uzaktan iş ilanları/i);
   });
 
-  test("popular search labels follow selected language while keeping result-safe query links", async ({ page }) => {
+  test("popular search labels follow selected language while keeping query actions non-crawlable", async ({ page }) => {
     await openJobSlots(page);
 
     await page.getByTestId("language-selector").click();
     await page.getByTestId("language-option-es").click();
 
     await expect(page.getByTestId("language-selector")).toContainText("ES");
-    const spanishPopularLink = page.locator('a[href="/es?q=remote%20Spain"]').first();
-    await expect(spanishPopularLink).toBeVisible({ timeout: 15_000 });
-    await expect(spanishPopularLink).toContainText("Trabajos remotos en Espa\u00f1a");
+    await expect(page.getByTestId("seo-landing-links").locator('a[href="/es?q=remote%20Spain"]')).toHaveCount(0);
+    await expect(page.getByTestId("seo-landing-links")).toContainText("Trabajos remotos en Espa\u00f1a", { timeout: 15_000 });
     await expect(page.getByTestId("seo-landing-links")).toContainText("Empleo en Madrid");
     await expect(page.getByTestId("seo-landing-links")).toContainText("Ingeniero de software en Espa\u00f1a");
     await expect(page.getByTestId("seo-landing-links")).not.toContainText(/Empleos en Espa\u00f1a|Empleos de ingeniero en Espa\u00f1a|Software engineer en Espa\u00f1a|Data analyst en Espa\u00f1a|Product manager en Espa\u00f1a|France Jobs|Remote France/);
@@ -1614,12 +1611,11 @@ test.describe("postings page QA", () => {
     });
 
     await openJobSlots(page);
-    const popularLink = page.locator('a[href="/en?q=remote%20jobs%20US"]').first();
+    await expect(page.getByTestId("seo-landing-links").locator('a[href="/en?q=remote%20jobs%20US"]')).toHaveCount(0);
+    const popularLink = page.getByTestId("seo-landing-links").getByText(/Remote jobs US/i).first();
     await expect(popularLink).toBeVisible();
-    await expect(popularLink).toContainText(/Remote jobs US/i);
-    await expect(popularLink).toHaveAttribute("rel", /nofollow/);
     await Promise.all([
-      page.waitForURL(/\/en\?q=remote%20jobs%20US/),
+      page.waitForURL(/\/en\?q=remote(?:%20|\+)jobs(?:%20|\+)US/),
       popularLink.click()
     ]);
     await expect(page.getByTestId("search-input")).toHaveValue("remote jobs US");
