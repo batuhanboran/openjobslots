@@ -108,6 +108,10 @@ function countWords(value) {
   return words + Math.ceil(cjkCharacters / 2);
 }
 
+function countConservativeCrawlerWords(value) {
+  return (String(value || "").match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)?/gu) || []).length;
+}
+
 function testRenderSeoIndexHtmlAddsOrganizationAndWebsiteJsonLd() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com",
@@ -491,6 +495,22 @@ function testAllCuratedSeoPagesExposeCrawlerVisibleWordCount() {
   }
 }
 
+function testCjkSeoPagesKeepConservativeCrawlerWordBuffer() {
+  const { renderSeoIndexHtml } = createSeoHelpers({
+    publicSiteUrl: "https://openjobslots.com",
+    seoTitle: "OpenJobSlots | Fresh Job Openings",
+    seoDescription: "Find fresh job openings from public employer ATS boards."
+  });
+  const indexHtml = "<html><head><title>Old</title></head><body><div id=\"root\"></div></body></html>";
+  const routes = PUBLIC_SEO_ROUTES.filter((route) => ["ja", "ko", "zh-CN"].includes(route.languageCode));
+
+  for (const route of routes) {
+    const html = renderSeoIndexHtml(indexHtml, createRequest({ path: route.path }));
+    const wordCount = countConservativeCrawlerWords(extractStaticSeoContentText(html));
+    assert.ok(wordCount >= 220, `expected ${route.path} conservative crawler word count >= 220, got ${wordCount}`);
+  }
+}
+
 function testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData() {
   const { renderSeoIndexHtml } = createSeoHelpers({
     publicSiteUrl: "https://openjobslots.com"
@@ -576,6 +596,7 @@ testRobotsAndSitemapStayCrawlSafe();
 testRootFallbackLinksEveryCuratedSitemapRoute();
 testAllCuratedSeoFallbacksClearLowWordCountThreshold();
 testAllCuratedSeoPagesExposeCrawlerVisibleWordCount();
+testCjkSeoPagesKeepConservativeCrawlerWordBuffer();
 testSeoLandingPagesExposeCollectionAndBreadcrumbStructuredData();
 testSitemapIgnoresRequestQueryAndOnlyUsesCuratedPublicLandingPages();
 testBuildLlmsTxtUsesPlainMarkdownFormat();

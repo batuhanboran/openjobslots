@@ -177,7 +177,10 @@ function createAdditionalSeoFallbackCopy(copy) {
     paragraphIntro: ({ heading, description }) =>
       `${heading} ${copy.intro} ${description}`,
     paragraphCoverage: ({ searchQuery }) =>
-      `${copy.coverageStart} ${searchQuery || copy.defaultSearch}. ${copy.coverageDetail}`,
+      [
+        `${copy.coverageStart} ${searchQuery || copy.defaultSearch}. ${copy.coverageDetail}`,
+        copy.crawlerContext
+      ].filter(Boolean).join(" "),
     paragraphQuality: () => copy.quality,
     paragraphNavigation: () => copy.navigation,
     faqLabel: copy.faqLabel,
@@ -285,6 +288,7 @@ const SEO_ADDITIONAL_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     coverageStart: "OpenJobSlots は次の検索から始められます:",
     defaultSearch: "公開求人",
     coverageDetail: "その後、職種、会社、地域、国、リージョン、リモート条件、ソースプラットフォーム、掲載の新しさで結果を絞り込めます。公開求人フィールドだけを使います。",
+    crawlerContext: "Crawler context: job title, company, location, country, region, remote mode, ATS source, posting freshness, direct employer link, canonical source evidence, parser evidence, public search filters, localized landing page, sitemap route.",
     quality: "インデックスは雇用主リンクを正規ソースとして扱い、Meilisearch を派生検索レイヤーとして使い、Postgres を真実のソースにします。不明確なデータを架空の場所、日付、会社、リモート状態として公開しません。",
     navigation: "下のリンクは、ローカライズされた検索意図と重要な ATS ソースページをシンプルな HTML でつなぎます。JavaScript が使える場合、UI は提案、フィルター、件数、最新カードを追加します。",
     faqLabel: "検索 FAQ",
@@ -301,6 +305,7 @@ const SEO_ADDITIONAL_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     coverageStart: "OpenJobSlots는 다음 검색으로 시작할 수 있습니다:",
     defaultSearch: "공개 채용 공고",
     coverageDetail: "이후 직무, 회사, 위치, 국가, 지역, 원격 방식, 출처 플랫폼, 게시 신선도로 결과를 좁힐 수 있으며 공개 채용 필드만 사용합니다.",
+    crawlerContext: "Crawler context: job title, company, location, country, region, remote mode, ATS source, posting freshness, direct employer link, canonical source evidence, parser evidence, public search filters, localized landing page, sitemap route.",
     quality: "인덱스는 고용주 링크를 정식 출처로 유지하고 Meilisearch를 파생 검색 계층으로 사용하며 Postgres를 source of truth로 둡니다. 불명확한 데이터는 가짜 위치, 날짜, 회사 또는 원격 상태로 공개하지 않습니다.",
     navigation: "아래 링크는 현지화된 검색 의도와 주요 ATS 출처 페이지를 단순 HTML로 연결합니다. JavaScript가 있으면 UI가 제안, 필터, 개수, 최신 카드를 추가합니다.",
     faqLabel: "검색 FAQ",
@@ -317,6 +322,7 @@ const SEO_ADDITIONAL_FALLBACK_COPY_BY_LANGUAGE = Object.freeze({
     coverageStart: "OpenJobSlots 可以从以下搜索开始:",
     defaultSearch: "开放职位",
     coverageDetail: "之后可按职位、公司、地点、国家、地区、远程方式、来源平台和发布时间新鲜度筛选结果，并且只使用公开职位字段。",
+    crawlerContext: "Crawler context: job title, company, location, country, region, remote mode, ATS source, posting freshness, direct employer link, canonical source evidence, parser evidence, public search filters, localized landing page, sitemap route.",
     quality: "索引将雇主链接保留为规范来源，Meilisearch 是派生搜索层，Postgres 仍是事实来源。不明确数据不会被发布为虚构地点、日期、公司或远程状态。",
     navigation: "下面的链接用简单 HTML 连接本地化搜索意图和重要 ATS 来源页面。启用 JavaScript 后，界面会添加建议、筛选、数量和最新职位卡片。",
     faqLabel: "搜索 FAQ",
