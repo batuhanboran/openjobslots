@@ -1617,6 +1617,7 @@ test.describe("postings page QA", () => {
     const popularLink = page.locator('a[href="/en?q=remote%20jobs%20US"]').first();
     await expect(popularLink).toBeVisible();
     await expect(popularLink).toContainText(/Remote jobs US/i);
+    await expect(popularLink).toHaveAttribute("rel", /nofollow/);
     await Promise.all([
       page.waitForURL(/\/en\?q=remote%20jobs%20US/),
       popularLink.click()

@@ -4182,7 +4182,7 @@ function SeoLandingLinks({ languageCode, t, isDarkTheme, popularSearchItems, com
               <Text
                 key={key}
                 href={route.path}
-                hrefAttrs={{ rel: "bookmark" }}
+                hrefAttrs={{ rel: String(route?.path || "").includes("?") ? "nofollow" : "bookmark" }}
                 numberOfLines={compact ? 1 : undefined}
                 style={[
                   styles.seoLandingLink,

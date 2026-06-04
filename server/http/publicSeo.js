@@ -447,6 +447,56 @@ function getSeoHeadingFromTitle(value) {
   return stripOpenJobSlotsTitleSuffix(normalized);
 }
 
+function hasJobIntentTerm(value) {
+  return /\b(?:job|jobs|openings?|stellen|trabajos|empleos|emplois|empregos|vagas|offerte|vacatures|oferty|lowongan|jobb|jobber|työpaikat)\b|求人|채용|职位|職位|नौकर|وظائف/i.test(String(value || ""));
+}
+
+const SEO_LANGUAGE_TITLE_CONTEXT_BY_CODE = Object.freeze({
+  en: "English",
+  tr: "Turkish",
+  de: "German",
+  fr: "French",
+  es: "Spanish",
+  "pt-BR": "Brazilian Portuguese",
+  "pt-PT": "European Portuguese",
+  it: "Italian",
+  nl: "Dutch",
+  pl: "Polish",
+  ja: "Japanese",
+  ko: "Korean",
+  "zh-CN": "Chinese",
+  hi: "Hindi",
+  ar: "Arabic",
+  id: "Indonesian",
+  sv: "Swedish",
+  da: "Danish",
+  no: "Norwegian",
+  fi: "Finnish"
+});
+
+function getSeoLanguageTitleContext(languageCode) {
+  return SEO_LANGUAGE_TITLE_CONTEXT_BY_CODE[String(languageCode || "").trim()] || "";
+}
+
+function getSearchQueryTitleLabel(value) {
+  const acronyms = new Set(["ai", "api", "qa", "ui", "uae", "uk", "us", "usa", "ux"]);
+  return normalizeInlineText(value)
+    .split(" ")
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (acronyms.has(lower)) return lower.toUpperCase();
+      return lower.slice(0, 1).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
+function getSearchQueryMetaLabel(searchQuery) {
+  const rawLabel = getSearchQueryTitleLabel(searchQuery);
+  const candidate = rawLabel || normalizeInlineText(searchQuery);
+  if (!candidate) return "";
+  return hasJobIntentTerm(candidate) ? candidate : `${candidate} jobs`;
+}
+
 function escapeMarkdownLinkText(value) {
   return normalizeInlineText(value).replace(/[\[\]]/g, "");
 }
@@ -543,6 +593,18 @@ function createPublicSeoHelpers(dependencies = {}) {
 
   function getSeoMeta(req) {
     const seoRoute = getSeoRoute(req);
+    const searchQuery = getRequestSearchQuery(req);
+    if (searchQuery) {
+      const languageCode = seoRoute?.languageCode || "en";
+      const queryLabel = getSearchQueryMetaLabel(searchQuery) || `${searchQuery} jobs`;
+      const languageContext = seoRoute ? getSeoLanguageTitleContext(languageCode) : "";
+      const scopedQueryLabel = languageContext ? `${queryLabel} in ${languageContext}` : queryLabel;
+      return {
+        title: `${scopedQueryLabel} | OpenJobSlots`,
+        description: `Search fresh ${scopedQueryLabel} from public employer ATS boards.`,
+        languageCode
+      };
+    }
     if (seoRoute) {
       return {
         title: seoRoute.title,
@@ -550,17 +612,9 @@ function createPublicSeoHelpers(dependencies = {}) {
         languageCode: seoRoute.languageCode || "en"
       };
     }
-    const searchQuery = getRequestSearchQuery(req);
-    if (!searchQuery) {
-      return {
-        title: String(seoTitle || "OpenJobSlots").trim(),
-        description: String(seoDescription || "").trim(),
-        languageCode: "en"
-      };
-    }
     return {
-      title: `${searchQuery} jobs | OpenJobSlots`,
-      description: `Search fresh ${searchQuery} job slots from public employer ATS boards.`,
+      title: String(seoTitle || "OpenJobSlots").trim(),
+      description: String(seoDescription || "").trim(),
       languageCode: "en"
     };
   }
@@ -757,7 +811,8 @@ function createPublicSeoHelpers(dependencies = {}) {
     const seoRoute = getSeoRoute(req);
     const languageCode = seoMeta.languageCode || "en";
     const copy = getSeoFallbackCopy(languageCode);
-    const searchQuery = normalizeInlineText(seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
+    const requestSearchQuery = getRequestSearchQuery(req);
+    const searchQuery = normalizeInlineText(requestSearchQuery || seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
     const values = { heading, description, searchQuery };
     return [
       copy.paragraphIntro(values),
@@ -773,7 +828,8 @@ function createPublicSeoHelpers(dependencies = {}) {
     const seoRoute = getSeoRoute(req);
     const languageCode = seoMeta.languageCode || "en";
     const copy = getSeoFallbackCopy(languageCode);
-    const searchQuery = normalizeInlineText(seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
+    const requestSearchQuery = getRequestSearchQuery(req);
+    const searchQuery = normalizeInlineText(requestSearchQuery || seoRoute?.canonicalSearchQuery || seoRoute?.searchQuery || heading);
     const values = { heading, description, searchQuery };
     const routeItems = getRouteSpecificSeoFaqItems(seoRoute);
     const genericItems = typeof copy.faqItems === "function" ? copy.faqItems(values) : SEO_FALLBACK_COPY_BY_LANGUAGE.en.faqItems(values);

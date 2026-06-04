@@ -260,7 +260,7 @@ function testSearchQueryPagesGetSpecificMetadataAndCanonical() {
   assert.ok(html.includes("<title>Frontend Engineer jobs | OpenJobSlots</title>"));
   assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/?q=Frontend%20Engineer" />'));
   assert.ok(html.includes('<meta name="robots" content="noindex, follow" />'));
-  assert.ok(html.includes("Search fresh Frontend Engineer job slots from public employer ATS boards."));
+  assert.ok(html.includes("Search fresh Frontend Engineer jobs from public employer ATS boards."));
   assert.ok(html.includes('<meta property="og:url" content="https://openjobslots.com/?q=Frontend%20Engineer" />'));
   assert.doesNotMatch(html, /<link rel="alternate"/i);
 
@@ -280,6 +280,8 @@ function testCuratedPathSearchQueryPagesStayOutOfHreflangClusters() {
   );
 
   assert.ok(html.includes('<link rel="canonical" href="https://openjobslots.com/en" />'));
+  assert.ok(html.includes("<title>Technical Support US jobs in English | OpenJobSlots</title>"));
+  assert.ok(html.includes("Search fresh Technical Support US jobs in English from public employer ATS boards."));
   assert.ok(html.includes('<meta name="robots" content="noindex, follow" />'));
   assert.doesNotMatch(html, /<link rel="alternate"/i);
 

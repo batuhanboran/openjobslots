@@ -46,6 +46,23 @@ test("SEO route hints keep localized labels but expose canonical indexed search"
   assert.equal(getPublicSeoCanonicalSearchQuery(spanishRemote), "remote");
 });
 
+test("SEO route titles stay unique across indexed public landing pages", () => {
+  const byTitle = new Map();
+  for (const route of PUBLIC_SEO_ROUTES) {
+    const paths = byTitle.get(route.title) || [];
+    paths.push(route.path);
+    byTitle.set(route.title, paths);
+  }
+
+  const duplicates = [...byTitle.entries()]
+    .filter(([, paths]) => paths.length > 1)
+    .map(([title, paths]) => `${title}: ${paths.join(", ")}`);
+  assert.deepEqual(duplicates, []);
+
+  assert.equal(getPublicSeoRouteHintByPath("/pt-pt/job-openings").title, "Ofertas de emprego | OpenJobSlots");
+  assert.equal(getPublicSeoRouteHintByPath("/hi/devops-engineer-jobs").title, "DevOps engineer नौकरियां | OpenJobSlots");
+});
+
 test("popular SEO searches order localized landing links by canonical analytics terms", () => {
   const items = getPublicSeoPopularSearchItems("es", [
     { query: "software engineer", count: 9 },

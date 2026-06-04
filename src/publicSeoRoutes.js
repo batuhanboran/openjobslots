@@ -65,14 +65,14 @@ const PUBLIC_SEO_ADDITIONAL_LANGUAGE_CONFIGS = Object.freeze([
     homeDescription: "Encontra vagas recentes em quadros ATS públicos por cargo, empresa, local, modo remoto e atualidade.",
     landingDescription: "Pesquisa vagas recentes em quadros ATS públicos por empresa, localidade, modo remoto e atualidade.",
     landingLabels: {
-      "job-search": "Vagas abertas",
-      remote: "Vagas remotas",
-      "software-engineer": "Vagas de software engineer",
-      "product-manager": "Vagas de product manager",
-      "technical-support": "Vagas de suporte técnico",
-      "data-analyst": "Vagas de data analyst",
-      "customer-success": "Vagas de customer success manager",
-      "devops-engineer": "Vagas de DevOps engineer"
+      "job-search": "Ofertas de emprego",
+      remote: "Empregos remotos",
+      "software-engineer": "Empregos de software engineer",
+      "product-manager": "Empregos de product manager",
+      "technical-support": "Empregos de suporte técnico",
+      "data-analyst": "Empregos de data analyst",
+      "customer-success": "Empregos de customer success manager",
+      "devops-engineer": "Empregos de DevOps engineer"
     }
   },
   {
@@ -185,13 +185,13 @@ const PUBLIC_SEO_ADDITIONAL_LANGUAGE_CONFIGS = Object.freeze([
     landingDescription: "सार्वजनिक ATS job boards से कंपनी, स्थान, remote mode और freshness के आधार पर jobs खोजें।",
     landingLabels: {
       "job-search": "खुली नौकरियां",
-      remote: "remote jobs",
-      "software-engineer": "software engineer jobs",
-      "product-manager": "product manager jobs",
-      "technical-support": "technical support jobs",
-      "data-analyst": "data analyst jobs",
-      "customer-success": "customer success manager jobs",
-      "devops-engineer": "DevOps engineer jobs"
+      remote: "रिमोट नौकरियां",
+      "software-engineer": "software engineer नौकरियां",
+      "product-manager": "product manager नौकरियां",
+      "technical-support": "technical support नौकरियां",
+      "data-analyst": "data analyst नौकरियां",
+      "customer-success": "customer success manager नौकरियां",
+      "devops-engineer": "DevOps engineer नौकरियां"
     }
   },
   {
