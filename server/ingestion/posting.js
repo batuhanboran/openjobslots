@@ -920,8 +920,7 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     extractLocationText(posting?.locations),
     posting?.employment_type,
     posting?.job_type,
-    location,
-    positionName
+    location
   ].map((value) => (value === true ? "remote" : normalizePostingValue(value))).filter(Boolean).join(" ");
   const remoteType = normalizeRemoteTypeFromEvidence(remoteSignal, location);
   const explicitCountry = firstValue([

@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name",
+      "posting": {
+        "source_job_id": "missing-title",
+        "company_name": "Fixture Personio",
+        "position_name": "",
+        "job_posting_url": "https://fixtureco.jobs.personio.de/job/missing-title",
+        "location": "Berlin, Germany"
+      }
+    },
+    {
+      "name": "missing geo and remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "source_job_id": "no-geo",
+        "company_name": "Fixture Personio",
+        "position_name": "Open Role",
+        "job_posting_url": "https://fixtureco.jobs.personio.de/job/no-geo"
+      }
+    }
+  ]
+}

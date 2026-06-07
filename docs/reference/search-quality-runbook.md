@@ -49,6 +49,15 @@ npm run search:reindex:check
 npm run search:parity -- --limit=20 --query="turkish jobs" --query="turkyie" --query="remote jobs"
 ```
 
+When check mode reports missing Meili documents or stale facet documents, prefer a bounded upsert repair before replace mode:
+
+```bash
+npm run reindex:meili -- --repair-document-upserts --document-repair-limit=100 --json
+npm run reindex:meili -- --repair-document-upserts --document-repair-limit=100 --apply --confirm-production --preflight-report=<fresh_preflight_report> --json
+```
+
+The first command is the default dry-run plan. Apply mode requires the production-safety preflight report path. For this document-upsert repair, a preflight whose only unsafe finding is the current Meili/Postgres delta is acceptable because the repair targets that drift; backup proof, worker isolation, autodeploy safety, no active heavy-job lock, no unsafe long-running queries, production commit proof, and saved before metrics are still required. The remote-facet inspection samples overrepresented facets through search first, then falls back to filtered Meili `/documents` scans when search hit caps hide enough stale facet rows. The repair refuses apply when the missing-document or remote-facet mismatch sample is incomplete or the candidate set exceeds the bounded repair limit.
+
 Only run a replace reindex after parser/backfill/refetch changes have been tested and the check command reports settings mismatches, stale documents, count drift, or remote facet drift that a normal outbox catch-up cannot fix. Replace mode builds a temporary index, applies the production settings, loads Postgres-visible/indexable rows, validates count/facets/sample searches, and swaps only after validation passes. The previous live index remains preserved at the temporary UID after the swap.
 
 ```bash

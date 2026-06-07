@@ -42,6 +42,28 @@ function extractPageupPostingDateFromListingRow(rowHtml) {
   return "";
 }
 
+function normalizePageupWorkMode(value) {
+  const text = cleanPageupText(value).toLowerCase();
+  if (!text) return "";
+  if (/\bhybrid\b/.test(text)) return "hybrid";
+  if (/\b(remote|work from home|wfh|virtual|telework|telecommute)\b/.test(text)) return "remote";
+  if (/^(?:on[- ]?site|onsite|in[- ]?person|office based|in office)$/i.test(text)) return "onsite";
+  return "";
+}
+
+function extractPageupWorkModeFromListingRow(rowHtml) {
+  const source = String(rowHtml || "");
+  const patterns = [
+    /<span[^>]*class=['"][^'"]*\b(?:work-mode|workmode|work-type|worktype|workplace-type|workplace)\b[^'"]*['"][^>]*>([\s\S]*?)<\/span>/i,
+    /<td[^>]*class=['"][^'"]*\b(?:work-mode|workmode|work-type|worktype|workplace-type|workplace)\b[^'"]*['"][^>]*>([\s\S]*?)<\/td>/i
+  ];
+  for (const pattern of patterns) {
+    const mode = normalizePageupWorkMode(source.match(pattern)?.[1] || "");
+    if (mode) return mode;
+  }
+  return "";
+}
+
 function extractPageupPostingDateFromDetailHtml(pageHtml) {
   const source = String(pageHtml || "");
   const patterns = [
@@ -106,6 +128,7 @@ function parsePageupPostingsFromResults(companyNameForPostings, config, resultsH
 
     const title = cleanPageupText(linkMatch?.[2] || "") || "Untitled Position";
     const location = cleanPageupText(rowHtml.match(locationPattern)?.[1] || "");
+    const remoteType = extractPageupWorkModeFromListingRow(rowHtml);
     const postingDate = extractPageupPostingDateFromListingRow(rowHtml);
     const postingId = extractPageupPostingId(absoluteUrl);
 
@@ -114,8 +137,16 @@ function parsePageupPostingsFromResults(companyNameForPostings, config, resultsH
       position_name: title,
       job_posting_url: absoluteUrl,
       posting_date: postingDate || null,
+      remote_type: remoteType || null,
       location: location || null,
-      external_id: postingId || null
+      external_id: postingId || null,
+      source_evidence: remoteType
+        ? {
+            remote_source: "pageup_listing_html",
+            remote_path: "tr .work-mode",
+            remote_rule_name: "pageup_listing_work_mode"
+          }
+        : undefined
     });
 
     seenUrls.add(absoluteUrl);

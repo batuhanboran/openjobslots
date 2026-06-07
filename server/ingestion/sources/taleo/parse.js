@@ -90,6 +90,28 @@ function pickTaleoLocation(columns, title = "") {
   return null;
 }
 
+function normalizeTaleoWorkMode(value) {
+  const text = cleanTaleoText(value).toLowerCase();
+  if (!text) return "";
+  if (/\bhybrid\b/.test(text)) return "hybrid";
+  if (/\b(remote|fully remote|work from home|wfh|virtual|telework|telecommute)\b/.test(text)) return "remote";
+  if (/^(?:on[- ]?site|onsite|in[- ]?person|office based|in office)$/i.test(text)) return "onsite";
+  return "";
+}
+
+function pickTaleoWorkMode(columns, title = "", location = "") {
+  const normalizedTitle = cleanTaleoText(title).toLowerCase();
+  const normalizedLocation = cleanTaleoText(location).toLowerCase();
+  for (const value of columns) {
+    const text = cleanTaleoText(value);
+    const normalized = text.toLowerCase();
+    if (!text || normalized === normalizedTitle || normalized === normalizedLocation) continue;
+    const mode = normalizeTaleoWorkMode(text);
+    if (mode) return mode;
+  }
+  return "";
+}
+
 function pickTaleoTitle(requisition, columns) {
   const direct = String(
     requisition?.title ||
@@ -121,6 +143,7 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
     const columns = Array.isArray(requisition?.column) ? requisition.column : [];
     const title = pickTaleoTitle(requisition, columns) || "Untitled Position";
     const location = pickTaleoLocation(columns, title);
+    const remoteType = pickTaleoWorkMode(columns, title, location);
     const postingDate = pickTaleoDate(columns);
     const contestNo = String(requisition?.contestNo || "").trim();
     const detailRef = contestNo || jobId;
@@ -136,6 +159,7 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
       position_name: title,
       job_posting_url: jobUrl,
       posting_date: postingDate,
+      remote_type: remoteType || null,
       location
     });
   }
@@ -180,6 +204,7 @@ function extractTaleoPostingsFromAjax(companyNameForPostings, config, ajaxText) 
     const title = titleFromApply || fallbackTitle || "Untitled Position";
     const detailRef = jobNumber || jobId;
     const location = extractTaleoLocationLabel(locationRaw);
+    const remoteType = normalizeTaleoWorkMode(location);
     const dedupeKey = `${detailRef}|${title}|${location || ""}`.toLowerCase();
     if (!detailRef || seenKeys.has(dedupeKey)) continue;
 
@@ -192,6 +217,7 @@ function extractTaleoPostingsFromAjax(companyNameForPostings, config, ajaxText) 
         detailRef
       )}&lang=${encodeURIComponent(config.lang)}`,
       posting_date: isLikelyTaleoDateValue(postedDate) ? postedDate : null,
+      remote_type: remoteType || null,
       location
     });
   }

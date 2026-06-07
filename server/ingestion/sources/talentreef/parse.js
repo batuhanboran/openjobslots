@@ -69,6 +69,36 @@ function buildTalentreefSearchPayload(clientId, brand = "", from = 0, size = 100
   };
 }
 
+function normalizeTalentreefRemoteType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (normalized === "true") return "remote";
+  if (/\bhybrid\b/.test(normalized)) return "hybrid";
+  if (/\b(remote|work from home|wfh|virtual|telecommute|telework)\b/.test(normalized)) return "remote";
+  if (/\b(on[-\s]?site|onsite|in[-\s]?person|office)\b/.test(normalized)) return "onsite";
+  return "";
+}
+
+function extractTalentreefRemoteType(source) {
+  if (!source || typeof source !== "object") return "";
+  if (source.remote === true || source.isRemote === true) return "remote";
+  const values = [
+    source.remoteType,
+    source.workplaceType,
+    source.workplace_type,
+    source.workMode,
+    source.work_mode,
+    source.locationType,
+    source.location_type,
+    source.workLocationType
+  ];
+  for (const value of values) {
+    const remoteType = normalizeTalentreefRemoteType(value);
+    if (remoteType) return remoteType;
+  }
+  return "";
+}
+
 function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, config, responseJson) {
   const hits = Array.isArray(responseJson?.hits?.hits) ? responseJson.hits.hits : [];
   const postings = [];
@@ -91,6 +121,7 @@ function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, confi
     const location = [city, state].filter(Boolean).join(", ");
     const department = String(source?.department?.name || source?.category || "").trim();
     const postingDate = String(source?.createdDate || source?.startDate || source?.updatedDate || "").trim() || null;
+    const remoteType = extractTalentreefRemoteType(source);
     const sourceJobId =
       String(source?.jobId || source?.id || hit?._id || "").trim() ||
       extractSourceIdFromPostingUrl(postingUrl, "talentreef");
@@ -105,8 +136,16 @@ function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, confi
       job_posting_url: postingUrl,
       posting_date: postingDate,
       location: location || null,
+      remote_type: remoteType || null,
       department: department || null,
-      employment_type: String(source?.contractType || "").trim() || null
+      employment_type: String(source?.contractType || "").trim() || null,
+      source_evidence: remoteType
+        ? {
+            remote_source: "talentreef_search_payload",
+            remote_path: "hits.hits[]._source.remoteType",
+            remote_rule_name: "talentreef_source_remote_field"
+          }
+        : undefined
     });
     seenUrls.add(postingUrl);
   }

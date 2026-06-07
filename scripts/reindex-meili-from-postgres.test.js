@@ -5,8 +5,10 @@ const os = require("node:os");
 const path = require("node:path");
 const { toMeiliPostingDocument, upsertMeiliPostings } = require("../server/search/meili");
 const {
+  buildDocumentUpsertRepairPlan,
   ensureMeiliIndex,
   getExtraDocumentRepairSafetyGate,
+  getDocumentUpsertRepairSafetyGate,
   getReplaceSafetyGate,
   inspectRemoteFacetMismatches,
   compareSettingList,
@@ -47,26 +49,122 @@ function posting(overrides = {}) {
   };
 }
 
+function documentRepairPreflightReport(overrides = {}) {
+  const checks = {
+    production_checkout_commit: "abcdef1234567890",
+    expected_commit: "abcdef1234567890",
+    worker_state: "stopped",
+    worker_isolated: true,
+    autodeploy_timer_state: "inactive",
+    autodeploy_recovery_safe: false,
+    heavy_job_active: false,
+    long_running_postgres_queries: 0,
+    meili_postgres_delta: 6,
+    backup_path: "/app/backups/postgres-openjobslots-pre-document-repair.dump",
+    backup_file_exists: true,
+    backup_size_bytes: 1024,
+    ...(overrides.checks || {})
+  };
+  return {
+    ok: false,
+    unsafe: true,
+    generated_at: new Date().toISOString(),
+    checks,
+    failures: [
+      { code: "meili_postgres_delta_nonzero", message: "Meili/Postgres delta is expected before document repair.", delta: checks.meili_postgres_delta }
+    ],
+    ...overrides,
+    checks
+  };
+}
+
+function writeDocumentRepairPreflight(overrides = {}) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openjobslots-preflight-"));
+  const filePath = path.join(tmpDir, "preflight.json");
+  fs.writeFileSync(filePath, `${JSON.stringify(documentRepairPreflightReport(overrides), null, 2)}\n`);
+  return {
+    path: filePath,
+    cleanup() {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  };
+}
+
 test("reindex check mode is explicit and non-mutating", () => {
-  assert.equal(parseReindexArgs(["--check"], {}).check, true);
-  assert.equal(parseReindexArgs(["--dry-run"], {}).check, true);
-  assert.equal(parseReindexArgs([], {}).check, false);
-  assert.equal(parseReindexArgs(["--replace"], {}).replaceIndex, true);
-  assert.equal(parseReindexArgs(["--replace-mode"], {}).replaceMode, true);
-  assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).replaceMode, true);
-  assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).dryRun, true);
-  assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).json, true);
-  assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).output, "reports/meili.json");
-  assert.equal(parseReindexArgs(["--facet-drift-max-inspected=250"], {}).facetDriftMaxInspectedHits, 250);
-  assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).apply, true);
-  assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).confirmProduction, true);
-  assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).repairExtraDocuments, true);
-  assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).check, true);
-  assert.equal(parseReindexArgs(["--delete-extra-documents"], {}).repairExtraDocuments, true);
-  assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
-  assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
-  assert.equal(getExtraDocumentRepairSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
-  assert.equal(getExtraDocumentRepairSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
+  const preflight = writeDocumentRepairPreflight();
+  try {
+    assert.equal(parseReindexArgs(["--check"], {}).check, true);
+    assert.equal(parseReindexArgs(["--dry-run"], {}).check, true);
+    assert.equal(parseReindexArgs([], {}).check, false);
+    assert.equal(parseReindexArgs(["--replace"], {}).replaceIndex, true);
+    assert.equal(parseReindexArgs(["--replace-mode"], {}).replaceMode, true);
+    assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).replaceMode, true);
+    assert.equal(parseReindexArgs(["--replace-mode", "--dry-run"], {}).dryRun, true);
+    assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).json, true);
+    assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).output, "reports/meili.json");
+    assert.equal(parseReindexArgs(["--facet-drift-max-inspected=250"], {}).facetDriftMaxInspectedHits, 250);
+    assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).apply, true);
+    assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).confirmProduction, true);
+    assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).repairExtraDocuments, true);
+    assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).check, true);
+    assert.equal(parseReindexArgs(["--delete-extra-documents"], {}).repairExtraDocuments, true);
+    assert.equal(parseReindexArgs(["--repair-document-upserts"], {}).repairDocumentUpserts, true);
+    assert.equal(parseReindexArgs(["--repair-missing-documents"], {}).repairDocumentUpserts, true);
+    assert.equal(parseReindexArgs(["--repair-document-upserts", "--document-repair-limit=50"], {}).documentRepairLimit, 50);
+    const parsedPreflight = parseReindexArgs([
+      "--repair-document-upserts",
+      `--preflight-report=${preflight.path}`,
+      "--preflight-max-age-minutes=30",
+      "--max-long-running-queries=2"
+    ], {});
+    assert.equal(parsedPreflight.preflightReport, preflight.path);
+    assert.equal(parsedPreflight.preflightMaxAgeMinutes, 30);
+    assert.equal(parsedPreflight.maxLongRunningQueries, 2);
+    assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
+    assert.equal(getReplaceSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
+    assert.equal(getExtraDocumentRepairSafetyGate({ apply: true, confirmProduction: true, dryRun: false }).authorized, true);
+    assert.equal(getExtraDocumentRepairSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
+    const missingPreflightGate = getDocumentUpsertRepairSafetyGate({ apply: true, confirmProduction: true, dryRun: false });
+    assert.equal(missingPreflightGate.authorized, false);
+    assert.ok(missingPreflightGate.missing.includes("--preflight-report=<report>"));
+    const approvedDocumentRepairGate = getDocumentUpsertRepairSafetyGate({
+      apply: true,
+      confirmProduction: true,
+      dryRun: false,
+      preflightReport: preflight.path
+    });
+    assert.equal(approvedDocumentRepairGate.authorized, true);
+    assert.equal(approvedDocumentRepairGate.preflight_status.checks.allowed_meili_delta_nonzero, true);
+    assert.equal(getDocumentUpsertRepairSafetyGate({ apply: true, confirmProduction: false, dryRun: false }).authorized, false);
+  } finally {
+    preflight.cleanup();
+  }
+});
+
+test("reindex argument parsing rejects unknown flags before any write path can run", () => {
+  assert.throws(
+    () => parseReindexArgs(["--repair-document-upsertz", "--json"], {}),
+    /Unknown Meili reindex argument: --repair-document-upsertz/
+  );
+});
+
+test("document upsert repair preflight blocks stale production-safety reports", () => {
+  const preflight = writeDocumentRepairPreflight({
+    generated_at: new Date(Date.now() - (90 * 60 * 1000)).toISOString()
+  });
+  try {
+    const gate = getDocumentUpsertRepairSafetyGate({
+      apply: true,
+      confirmProduction: true,
+      dryRun: false,
+      preflightReport: preflight.path,
+      preflightMaxAgeMinutes: 60
+    });
+    assert.equal(gate.authorized, false);
+    assert.ok(gate.missing.includes("preflight_report_stale"));
+  } finally {
+    preflight.cleanup();
+  }
 });
 
 test("reindex check can write JSON output without mutating", async () => {
@@ -747,6 +845,242 @@ test("extra Meili document repair only deletes non-indexable extras when approve
   }
 });
 
+test("document upsert repair plan combines missing documents and stale remote facet samples", () => {
+  const plan = buildDocumentUpsertRepairPlan({
+    missing_meili_document_count: 1,
+    missing_meili_documents: [
+      { id: "missing-id", canonical_url: "https://example.com/jobs/missing" }
+    ],
+    remote_facet_delta: {
+      remote: { expected: 2, actual: 1, delta: 1 },
+      unknown: { expected: 0, actual: 1, delta: -1 }
+    },
+    remote_facet_mismatch_inspection: {
+      inspection_truncated: false,
+      samples: [
+        {
+          canonical_url: "https://example.com/jobs/stale-remote",
+          title: "Remote Engineer",
+          company: "Example Co",
+          meili_remote_type: "unknown",
+          postgres_remote_type: "remote",
+          postgres_hidden: false,
+          inspected_meili_facet: "unknown"
+        }
+      ]
+    }
+  }, { documentRepairLimit: 10 });
+
+  assert.equal(plan.sample_complete, true);
+  assert.equal(plan.total_missing_document_count, 1);
+  assert.equal(plan.remote_overrepresented_document_count, 1);
+  assert.equal(plan.upsert_candidate_count, 2);
+  assert.deepEqual(plan.upsert_candidates.map((candidate) => candidate.reasons), [
+    ["missing_meili_document"],
+    ["remote_facet_mismatch"]
+  ]);
+});
+
+test("document upsert repair defaults to dry-run without writing Meili documents", async () => {
+  const missingRow = posting({
+    canonical_url: "https://example.com/jobs/missing",
+    remote_type: "remote"
+  });
+  const staleRemoteRow = posting({
+    canonical_url: "https://example.com/jobs/stale-remote",
+    remote_type: "remote"
+  });
+  const staleRemoteDocument = {
+    id: toMeiliPostingDocument(staleRemoteRow).id,
+    canonical_url: staleRemoteRow.canonical_url,
+    title: "Software Engineer",
+    company: "Example Co",
+    remote_type: "unknown",
+    hidden: false
+  };
+  const mock = installFetchMock((url, options = {}) => {
+    if (url.endsWith("/indexes/postings")) return createResponse(200, { uid: "postings", primaryKey: "id" });
+    if (url.endsWith("/indexes/postings/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings/stats")) return createResponse(200, { numberOfDocuments: 1 });
+    if (url.endsWith("/indexes/postings/search")) {
+      const body = JSON.parse(options.body || "{}");
+      if (Array.isArray(body.facets)) {
+        return createResponse(200, { facetDistribution: { remote_type: { unknown: 1 } }, hits: [], estimatedTotalHits: 0 });
+      }
+      if (body.filter === "hidden = false") {
+        return createResponse(200, { hits: [], estimatedTotalHits: 0 });
+      }
+      assert.match(body.filter, /remote_type = "unknown"/);
+      return createResponse(200, {
+        hits: [
+          {
+            canonical_url: staleRemoteRow.canonical_url,
+            title: "Software Engineer",
+            company: "Example Co",
+            remote_type: "unknown"
+          }
+        ],
+        estimatedTotalHits: 1
+      });
+    }
+    if (url.includes("/indexes/postings/documents?")) {
+      return createResponse(200, { results: [staleRemoteDocument] });
+    }
+    if (url.endsWith("/indexes/postings/documents") && options.method === "POST") {
+      throw new Error("dry-run must not upsert documents");
+    }
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await withSilencedConsole(() =>
+      runReindex(
+        makePool({
+          count: 2,
+          facet: { remote: 2 },
+          rows: [missingRow, staleRemoteRow],
+          driftRows: [staleRemoteRow]
+        }),
+        {
+          repairDocumentUpserts: true,
+          check: true,
+          apply: false,
+          confirmProduction: false,
+          dryRun: false,
+          batchSize: 100,
+          sampleLimit: 0,
+          documentRepairLimit: 10,
+          taskTimeoutMs: 1000,
+          writeStatus: false
+        },
+        { OPENJOBSLOTS_SEARCH_BACKEND: "meili", MEILI_HOST: "http://meili.test" }
+      )
+    );
+
+    assert.equal(result.repair_document_upserts, true);
+    assert.equal(result.dry_run, true);
+    assert.equal(result.safety_gate.authorized, false);
+    assert.equal(result.upserted_count, 0);
+    assert.equal(result.repair_plan.upsert_candidate_count, 2);
+    assert.equal(mock.calls.some((call) => call.url.endsWith("/indexes/postings/documents") && call.options.method === "POST"), false);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("document upsert repair upserts bounded Postgres-indexable candidates when approved", async () => {
+  const missingRow = posting({
+    canonical_url: "https://example.com/jobs/missing",
+    remote_type: "remote"
+  });
+  const staleRemoteRow = posting({
+    canonical_url: "https://example.com/jobs/stale-remote",
+    remote_type: "remote"
+  });
+  let statsCallCount = 0;
+  let facetCallCount = 0;
+  let documentsCallCount = 0;
+  const preflight = writeDocumentRepairPreflight();
+  const mock = installFetchMock((url, options = {}) => {
+    if (url.endsWith("/indexes/postings")) return createResponse(200, { uid: "postings", primaryKey: "id" });
+    if (url.endsWith("/indexes/postings/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings/stats")) {
+      statsCallCount += 1;
+      return createResponse(200, { numberOfDocuments: statsCallCount === 1 ? 1 : 2 });
+    }
+    if (url.endsWith("/indexes/postings/search")) {
+      const body = JSON.parse(options.body || "{}");
+      if (Array.isArray(body.facets)) {
+        facetCallCount += 1;
+        return createResponse(200, {
+          facetDistribution: { remote_type: facetCallCount === 1 ? { unknown: 1 } : { remote: 2 } },
+          hits: [],
+          estimatedTotalHits: 0
+        });
+      }
+      return createResponse(200, {
+        hits: facetCallCount === 1
+          ? [
+            {
+              canonical_url: staleRemoteRow.canonical_url,
+              title: "Software Engineer",
+              company: "Example Co",
+              remote_type: "unknown"
+            }
+          ]
+          : [],
+        estimatedTotalHits: facetCallCount === 1 ? 1 : 0
+      });
+    }
+    if (url.includes("/indexes/postings/documents?")) {
+      documentsCallCount += 1;
+      return createResponse(200, {
+        results: documentsCallCount === 1
+          ? [{
+            id: toMeiliPostingDocument(staleRemoteRow).id,
+            canonical_url: staleRemoteRow.canonical_url,
+            title: "Software Engineer",
+            company: "Example Co",
+            remote_type: "unknown",
+            hidden: false
+          }]
+          : [
+            toMeiliPostingDocument(missingRow),
+            toMeiliPostingDocument(staleRemoteRow)
+          ]
+      });
+    }
+    if (url.endsWith("/indexes/postings/documents") && options.method === "POST") {
+      const body = JSON.parse(options.body || "[]");
+      assert.deepEqual(body.map((document) => document.canonical_url).sort(), [
+        missingRow.canonical_url,
+        staleRemoteRow.canonical_url
+      ].sort());
+      assert.deepEqual([...new Set(body.map((document) => document.remote_type))], ["remote"]);
+      return createResponse(202, { taskUid: 40 });
+    }
+    if (url.endsWith("/tasks/40")) return createResponse(200, { uid: 40, status: "succeeded" });
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await withSilencedConsole(() =>
+      runReindex(
+        makePool({
+          count: 2,
+          facet: { remote: 2 },
+          rows: [missingRow, staleRemoteRow],
+          driftRows: [missingRow, staleRemoteRow]
+        }),
+        {
+          repairDocumentUpserts: true,
+          check: true,
+          apply: true,
+          confirmProduction: true,
+          dryRun: false,
+          preflightReport: preflight.path,
+          batchSize: 100,
+          sampleLimit: 0,
+          documentRepairLimit: 10,
+          taskTimeoutMs: 1000,
+          writeStatus: false
+        },
+        { OPENJOBSLOTS_SEARCH_BACKEND: "meili", MEILI_HOST: "http://meili.test" }
+      )
+    );
+
+    assert.equal(result.dry_run, false);
+    assert.equal(result.upserted_count, 2);
+    assert.deepEqual(result.upserted_documents.map((document) => document.canonical_url).sort(), [
+      missingRow.canonical_url,
+      staleRemoteRow.canonical_url
+    ].sort());
+    assert.equal(result.post_repair_check.count_delta, 0);
+    assert.equal(result.post_repair_check.ok, true);
+  } finally {
+    mock.restore();
+    preflight.cleanup();
+  }
+});
+
 test("replace validation catches remote facet mismatch", async () => {
   assert.deepEqual(compareFacetDistributions({ remote: 2 }, { remote: 1, unknown: 1 }).deltas, {
     remote: { expected: 2, actual: 1, delta: 1 },
@@ -834,6 +1168,96 @@ test("remote facet inspection samples Meili-overrepresented facet documents with
   }
 });
 
+test("remote facet inspection uses filtered documents scan when search cap misses stale facet documents", async () => {
+  const pool = {
+    queries: [],
+    async query(sql, params = []) {
+      this.queries.push({ sql: String(sql), params });
+      if (/canonical_url = ANY/i.test(sql)) {
+        return {
+          rows: (params[0] || []).map((canonicalUrl) => ({
+            canonical_url: canonicalUrl,
+            remote_type: "onsite",
+            hidden: false
+          }))
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    }
+  };
+  const mock = installFetchMock((url, options = {}) => {
+    if (url.endsWith("/indexes/postings/search")) {
+      const body = JSON.parse(options.body || "{}");
+      assert.equal(options.method, "POST");
+      assert.match(body.filter, /remote_type = "unknown"/);
+      return createResponse(200, {
+        hits: [
+          {
+            canonical_url: "https://example.com/jobs/stale-1",
+            title: "Stale 1",
+            company: "Example Co",
+            remote_type: "unknown"
+          }
+        ],
+        estimatedTotalHits: 1000
+      });
+    }
+    if (url.includes("/indexes/postings/documents?")) {
+      const parsed = new URL(url);
+      assert.match(parsed.searchParams.get("filter"), /remote_type = "unknown"/);
+      const offset = Number(parsed.searchParams.get("offset") || 0);
+      const pages = {
+        0: [
+          {
+            canonical_url: "https://example.com/jobs/stale-1",
+            title: "Stale 1",
+            company: "Example Co",
+            remote_type: "unknown"
+          },
+          {
+            canonical_url: "https://example.com/jobs/stale-2",
+            title: "Stale 2",
+            company: "Example Co",
+            remote_type: "unknown"
+          }
+        ],
+        2: [
+          {
+            canonical_url: "https://example.com/jobs/stale-3",
+            title: "Stale 3",
+            company: "Example Co",
+            remote_type: "unknown"
+          }
+        ]
+      };
+      return createResponse(200, { results: pages[offset] || [] });
+    }
+    throw new Error(`Unexpected fetch ${options.method || "GET"} ${url}`);
+  });
+  try {
+    const result = await inspectRemoteFacetMismatches(
+      pool,
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
+      "postings",
+      { onsite: { expected: 3, actual: 0, delta: 3 }, unknown: { expected: 0, actual: 3, delta: -3 } },
+      { sampleLimit: 3, pageSize: 2, maxInspectedHits: 10 }
+    );
+
+    assert.equal(result.target_sample_count, 3);
+    assert.equal(result.sampled, 3);
+    assert.equal(result.documents_endpoint_used, true);
+    assert.equal(result.document_scan_hits, 3);
+    assert.deepEqual(result.samples.map((sample) => sample.canonical_url), [
+      "https://example.com/jobs/stale-1",
+      "https://example.com/jobs/stale-2",
+      "https://example.com/jobs/stale-3"
+    ]);
+    assert.ok(pool.queries.every((query) => !/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i.test(query.sql)));
+  } finally {
+    mock.restore();
+  }
+});
+
 test("remote facet inspection caps sorted read-only scans", async () => {
   const pool = {
     queries: [],
@@ -882,6 +1306,7 @@ test("remote facet inspection caps sorted read-only scans", async () => {
     assert.equal(result.inspected_hits, 100);
     assert.equal(result.max_inspected_hits, 100);
     assert.equal(result.inspection_truncated, true);
+    assert.equal(result.documents_endpoint_used, false);
     assert.equal(mock.calls.length, 1);
     assert.ok(pool.queries.every((query) => !/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)\b/i.test(query.sql)));
   } finally {

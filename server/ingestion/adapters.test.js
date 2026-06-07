@@ -251,7 +251,7 @@ test("dayforcehcm is parser-fixture-backed but disabled until live fetch canary 
 test("future ATS and aggregator candidates are research-only until certified", () => {
   assert.deepEqual(
     FUTURE_DIRECT_SOURCE_CANDIDATES.map((item) => item.key),
-    ["personio", "recruiterbox", "jobscore", "workable", "bullhorn", "comeet"]
+    ["recruiterbox", "jobscore", "bullhorn", "comeet"]
   );
   for (const candidate of FUTURE_DIRECT_SOURCE_CANDIDATES) {
     assert.ok(candidate.docsUrl, `${candidate.key} should have source docs`);

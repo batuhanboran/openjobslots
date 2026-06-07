@@ -81,6 +81,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.equal(isRegistryPilotSource("pinpointhq"), true);
   assert.equal(isRegistryPilotSource("paylocity"), true);
   assert.equal(isRegistryPilotSource("peopleforce"), true);
+  assert.equal(isRegistryPilotSource("personio"), true);
   assert.equal(isRegistryPilotSource("policeapp"), true);
   assert.equal(isRegistryPilotSource("recruitcrm"), true);
   assert.equal(isRegistryPilotSource("schoolspring"), true);
@@ -100,6 +101,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.equal(isRegistryPilotSource("ultipro"), true);
   assert.equal(isRegistryPilotSource("usajobs"), true);
   assert.equal(isRegistryPilotSource("workday"), true);
+  assert.equal(isRegistryPilotSource("workable"), true);
   assert.equal(isRegistryPilotSource("zoho"), true);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
@@ -143,6 +145,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
     "pageup",
     "paylocity",
     "peopleforce",
+    "personio",
     "pinpointhq",
     "policeapp",
     "recruitcrm",
@@ -162,6 +165,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
     "theapplicantmanager",
     "ultipro",
     "usajobs",
+    "workable",
     "workday",
     "zoho"
   ]);
@@ -321,7 +325,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const dayforceHcm = getRegistrySourceModule("dayforcehcm");
   assert.equal(dayforceHcm.atsKey, "dayforcehcm");
   assert.equal(dayforceHcm.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(dayforceHcm.status, SOURCE_STATUSES.disabled);
+  assert.equal(dayforceHcm.status, SOURCE_STATUSES.canary);
   assert.equal(dayforceHcm.collectWhenDisabled, false);
   assert.equal(typeof dayforceHcm.discover, "function");
   assert.equal(typeof dayforceHcm.fetchList, "function");
@@ -345,7 +349,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const gem = getRegistrySourceModule("gem");
   assert.equal(gem.atsKey, "gem");
   assert.equal(gem.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(gem.status, SOURCE_STATUSES.disabled);
+  assert.equal(gem.status, SOURCE_STATUSES.canary);
   assert.equal(gem.collectWhenDisabled, false);
   assert.equal(typeof gem.discover, "function");
   assert.equal(typeof gem.fetchList, "function");
@@ -536,7 +540,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const manatal = getRegistrySourceModule("manatal");
   assert.equal(manatal.atsKey, "manatal");
   assert.equal(manatal.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(manatal.status, SOURCE_STATUSES.disabled);
+  assert.equal(manatal.status, SOURCE_STATUSES.canary);
   assert.equal(typeof manatal.discover, "function");
   assert.equal(typeof manatal.fetchList, "function");
   assert.equal(typeof manatal.parse, "function");
@@ -798,7 +802,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const workday = getRegistrySourceModule("workday");
   assert.equal(workday.atsKey, "workday");
   assert.equal(workday.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(workday.status, SOURCE_STATUSES.disabled);
+  assert.equal(workday.status, SOURCE_STATUSES.canary);
   assert.equal(typeof workday.discover, "function");
   assert.equal(typeof workday.fetchList, "function");
   assert.equal(typeof workday.parse, "function");
@@ -816,6 +820,30 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.equal(typeof zoho.normalize, "function");
   assert.equal(typeof zoho.validate, "function");
   assert.deepEqual(validateSourceContract(zoho), { ok: true, failures: [] });
+});
+
+test("target disabled-source recovery modules stay canary-runnable until production proof", () => {
+  const canaryRecoveryTargets = [
+    "workday",
+    "manatal",
+    "dayforcehcm",
+    "gem",
+    "personio",
+    "workable"
+  ];
+
+  for (const atsKey of canaryRecoveryTargets) {
+    assert.equal(
+      getRegistrySourceModule(atsKey).status,
+      SOURCE_STATUSES.canary,
+      `${atsKey} should be canary-runnable, not public-enabled by default`
+    );
+  }
+
+  assert.equal(
+    getRegistrySourceModule("adp_workforcenow").status,
+    SOURCE_STATUSES.enabled
+  );
 });
 
 test("registry returns typed unsupported module for unknown sources", async () => {

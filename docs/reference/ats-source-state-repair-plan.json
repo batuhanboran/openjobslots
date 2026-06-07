@@ -1,0 +1,501 @@
+{
+  "ok": true,
+  "read_only": true,
+  "generated_at": "2026-06-05T00:36:08.744Z",
+  "source_recovery_plan_generated_at": "2026-06-04T23:16:50.116Z",
+  "plan_hash": "fe452eadb3a03192",
+  "summary": {
+    "target_count": 7,
+    "action_count": 17,
+    "approval_gated_action_count": 7,
+    "seed_source_row_count": 2,
+    "reset_protection_count": 4,
+    "alias_canonicalization_count": 1,
+    "read_only_next_step_count": 10
+  },
+  "required_write_gates": [
+    "explicit user approval for production writes",
+    "production deploy or expected commit alignment verified",
+    "fresh non-empty Postgres backup under backups/",
+    "worker isolated or paused",
+    "fresh passing ats:recovery:preflight report",
+    "planned tenant batch report for any source canary/apply",
+    "bounded canary before apply",
+    "recovery guard pass",
+    "Meili/Postgres parity delta 0"
+  ],
+  "targets": [
+    {
+      "ats_key": "workday",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "canary",
+      "production_state": {
+        "source_row_present": true,
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "legacy_alias_rows": []
+      },
+      "actions": [
+        {
+          "type": "reset_source_protection_to_canary",
+          "ats_key": "workday",
+          "status": "approval_gated",
+          "reason": "production protection blocks sync: auto_disabled",
+          "current_state": {
+            "enabled": "false",
+            "protection_status": "auto_disabled",
+            "disabled_reason": "http_blocked: http_failure_pct 100% >= 50%"
+          },
+          "desired_state": {
+            "enabled": true,
+            "protection_status": "canary_only",
+            "disabled_reason": "pending bounded canary proof",
+            "disabled_at": null
+          },
+          "sql_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = true,",
+            "    protection_status = 'canary_only',",
+            "    disabled_reason = 'pending bounded canary proof',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'workday'",
+            "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+          ],
+          "rollback_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = false,",
+            "    protection_status = 'auto_disabled',",
+            "    disabled_reason = 'http_blocked: http_failure_pct 100% >= 50%',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'workday';"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "workday",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=workday --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=workday --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=workday --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=workday --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    },
+    {
+      "ats_key": "manatal",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "canary",
+      "production_state": {
+        "source_row_present": true,
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "legacy_alias_rows": []
+      },
+      "actions": [
+        {
+          "type": "reset_source_protection_to_canary",
+          "ats_key": "manatal",
+          "status": "approval_gated",
+          "reason": "production protection blocks sync: auto_disabled",
+          "current_state": {
+            "enabled": "false",
+            "protection_status": "auto_disabled",
+            "disabled_reason": "http_blocked: http_failure_pct 100% >= 50%"
+          },
+          "desired_state": {
+            "enabled": true,
+            "protection_status": "canary_only",
+            "disabled_reason": "pending bounded canary proof",
+            "disabled_at": null
+          },
+          "sql_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = true,",
+            "    protection_status = 'canary_only',",
+            "    disabled_reason = 'pending bounded canary proof',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'manatal'",
+            "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+          ],
+          "rollback_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = false,",
+            "    protection_status = 'auto_disabled',",
+            "    disabled_reason = 'http_blocked: http_failure_pct 100% >= 50%',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'manatal';"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "manatal",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=manatal --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=manatal --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=manatal --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=manatal --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    },
+    {
+      "ats_key": "dayforcehcm",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "canary",
+      "production_state": {
+        "source_row_present": true,
+        "enabled": "false",
+        "protection_status": "canary_only",
+        "legacy_alias_rows": []
+      },
+      "actions": [
+        {
+          "type": "keep_canary_excluded_from_default_sync",
+          "ats_key": "dayforcehcm",
+          "status": "read_only_next_step",
+          "reason": "source is intentionally excluded from default sync until live canary proof exists",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=dayforcehcm --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=dayforcehcm --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=dayforcehcm --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=dayforcehcm --include-disabled --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "dayforcehcm",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=dayforcehcm --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=dayforcehcm --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=dayforcehcm --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=dayforcehcm --include-disabled --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    },
+    {
+      "ats_key": "gem",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "canary",
+      "production_state": {
+        "source_row_present": true,
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "legacy_alias_rows": []
+      },
+      "actions": [
+        {
+          "type": "reset_source_protection_to_canary",
+          "ats_key": "gem",
+          "status": "approval_gated",
+          "reason": "production protection blocks sync: auto_disabled",
+          "current_state": {
+            "enabled": "false",
+            "protection_status": "auto_disabled",
+            "disabled_reason": "parser_drift: parser_drift_pct 16.95% >= 10%"
+          },
+          "desired_state": {
+            "enabled": true,
+            "protection_status": "canary_only",
+            "disabled_reason": "pending bounded canary proof",
+            "disabled_at": null
+          },
+          "sql_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = true,",
+            "    protection_status = 'canary_only',",
+            "    disabled_reason = 'pending bounded canary proof',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'gem'",
+            "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+          ],
+          "rollback_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = false,",
+            "    protection_status = 'auto_disabled',",
+            "    disabled_reason = 'parser_drift: parser_drift_pct 16.95% >= 10%',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'gem';"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "gem",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=gem --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=gem --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=gem --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=gem --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    },
+    {
+      "ats_key": "adp_workforcenow",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "enabled",
+      "production_state": {
+        "source_row_present": true,
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "legacy_alias_rows": [
+          "adpworkforcenow"
+        ]
+      },
+      "actions": [
+        {
+          "type": "canonicalize_legacy_alias",
+          "ats_key": "adp_workforcenow",
+          "status": "manual_conflict_review_required",
+          "reason": "legacy alias rows present: adpworkforcenow",
+          "legacy_alias_rows": [
+            "adpworkforcenow"
+          ],
+          "tables_to_review": [
+            "companies",
+            "company_sync_state",
+            "posting_cache",
+            "postings",
+            "ingestion_run_errors",
+            "source_quality_events",
+            "source_payload_shapes",
+            "parser_drift_events",
+            "ats_source_runs",
+            "ats_source_run_errors",
+            "ats_source_run_metrics",
+            "ats_source_run_rollbacks",
+            "ats_source_run_posting_changes"
+          ],
+          "conflict_check_sql": [
+            "SELECT 'companies' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM companies WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'company_sync_state' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM company_sync_state WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'posting_cache' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM posting_cache WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'postings' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM postings WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'ingestion_run_errors' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM ingestion_run_errors WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'source_quality_events' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM source_quality_events WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'source_payload_shapes' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM source_payload_shapes WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'parser_drift_events' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM parser_drift_events WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'ats_source_runs' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM ats_source_runs WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'ats_source_run_errors' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM ats_source_run_errors WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'ats_source_run_metrics' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM ats_source_run_metrics WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'ats_source_run_rollbacks' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM ats_source_run_rollbacks WHERE ats_key = 'adpworkforcenow';",
+            "SELECT 'ats_source_run_posting_changes' AS table_name, 'adpworkforcenow' AS legacy_alias, count(*) AS rows FROM ats_source_run_posting_changes WHERE ats_key = 'adpworkforcenow';"
+          ],
+          "sql_preview": [
+            "-- Run only after conflict_check_sql proves no unique-key conflict or a merge plan exists.",
+            "UPDATE companies SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE company_sync_state SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE posting_cache SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE postings SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE ingestion_run_errors SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE source_quality_events SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE source_payload_shapes SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE parser_drift_events SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE ats_source_runs SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE ats_source_run_errors SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE ats_source_run_metrics SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE ats_source_run_rollbacks SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "UPDATE ats_source_run_posting_changes SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+            "DELETE FROM ats_sources WHERE ats_key = 'adpworkforcenow';"
+          ],
+          "rollback_preview": [
+            "No automatic rollback preview is safe for alias canonicalization after row merges.",
+            "Use the mandatory Postgres backup if alias migration has to be reverted."
+          ]
+        },
+        {
+          "type": "reset_source_protection_to_canary",
+          "ats_key": "adp_workforcenow",
+          "status": "approval_gated",
+          "reason": "production protection blocks sync: auto_disabled",
+          "current_state": {
+            "enabled": "false",
+            "protection_status": "auto_disabled",
+            "disabled_reason": "parser_drift: parser_drift_pct 20.83% >= 10%"
+          },
+          "desired_state": {
+            "enabled": true,
+            "protection_status": "canary_only",
+            "disabled_reason": "pending bounded canary proof",
+            "disabled_at": null
+          },
+          "sql_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = true,",
+            "    protection_status = 'canary_only',",
+            "    disabled_reason = 'pending bounded canary proof',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'adp_workforcenow'",
+            "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+          ],
+          "rollback_preview": [
+            "UPDATE ats_sources",
+            "SET enabled = false,",
+            "    protection_status = 'auto_disabled',",
+            "    disabled_reason = 'parser_drift: parser_drift_pct 20.83% >= 10%',",
+            "    disabled_at = NULL,",
+            "    updated_at = now()",
+            "WHERE ats_key = 'adp_workforcenow';"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "adp_workforcenow",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=adp_workforcenow --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=adp_workforcenow --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=adp_workforcenow --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=adp_workforcenow --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    },
+    {
+      "ats_key": "personio",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "canary",
+      "production_state": {
+        "source_row_present": false,
+        "enabled": "missing",
+        "protection_status": "missing",
+        "legacy_alias_rows": []
+      },
+      "actions": [
+        {
+          "type": "seed_source_row",
+          "ats_key": "personio",
+          "display_name": "Personio",
+          "status": "approval_gated",
+          "reason": "production ats_sources row is missing",
+          "desired_state": {
+            "enabled": false,
+            "protection_status": "canary_only",
+            "disabled_reason": "pending bounded canary proof",
+            "disabled_at": null
+          },
+          "sql_preview": [
+            "INSERT INTO ats_sources (ats_key, display_name, enabled, protection_status, disabled_reason, disabled_at, updated_at)",
+            "VALUES ('personio', 'Personio', false, 'canary_only', 'pending bounded canary proof', NULL, now())",
+            "ON CONFLICT (ats_key) DO NOTHING;"
+          ],
+          "rollback_preview": [
+            "DELETE FROM ats_sources",
+            "WHERE ats_key = 'personio'",
+            "  AND NOT EXISTS (SELECT 1 FROM companies WHERE ats_key = 'personio')",
+            "  AND NOT EXISTS (SELECT 1 FROM postings WHERE ats_key = 'personio');"
+          ]
+        },
+        {
+          "type": "keep_canary_excluded_from_default_sync",
+          "ats_key": "personio",
+          "status": "read_only_next_step",
+          "reason": "source is intentionally excluded from default sync until live canary proof exists",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=personio --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=personio --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=personio --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=personio --include-disabled --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "personio",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=personio --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=personio --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=personio --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=personio --include-disabled --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    },
+    {
+      "ats_key": "workable",
+      "threshold_state": "production_gated",
+      "production_gated": true,
+      "local_registry_status": "canary",
+      "production_state": {
+        "source_row_present": false,
+        "enabled": "missing",
+        "protection_status": "missing",
+        "legacy_alias_rows": []
+      },
+      "actions": [
+        {
+          "type": "seed_source_row",
+          "ats_key": "workable",
+          "display_name": "Workable",
+          "status": "approval_gated",
+          "reason": "production ats_sources row is missing",
+          "desired_state": {
+            "enabled": false,
+            "protection_status": "canary_only",
+            "disabled_reason": "pending bounded canary proof",
+            "disabled_at": null
+          },
+          "sql_preview": [
+            "INSERT INTO ats_sources (ats_key, display_name, enabled, protection_status, disabled_reason, disabled_at, updated_at)",
+            "VALUES ('workable', 'Workable', false, 'canary_only', 'pending bounded canary proof', NULL, now())",
+            "ON CONFLICT (ats_key) DO NOTHING;"
+          ],
+          "rollback_preview": [
+            "DELETE FROM ats_sources",
+            "WHERE ats_key = 'workable'",
+            "  AND NOT EXISTS (SELECT 1 FROM companies WHERE ats_key = 'workable')",
+            "  AND NOT EXISTS (SELECT 1 FROM postings WHERE ats_key = 'workable');"
+          ]
+        },
+        {
+          "type": "keep_canary_excluded_from_default_sync",
+          "ats_key": "workable",
+          "status": "read_only_next_step",
+          "reason": "source is intentionally excluded from default sync until live canary proof exists",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=workable --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=workable --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=workable --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=workable --include-disabled --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        },
+        {
+          "type": "prove_inventory_and_batch_quality",
+          "ats_key": "workable",
+          "status": "read_only_next_step",
+          "reason": "source state repair alone is not threshold success",
+          "next_commands": [
+            "npm.cmd run ats:inventory:scan -- --source=workable --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<inventory_report>",
+            "npm.cmd run ats:estimate-net-new -- --source=workable --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+            "npm.cmd run ats:plan-batches -- --source=workable --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<planned_batch_report>",
+            "npm.cmd run ats:source:canary -- --source=workable --include-disabled --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --predicted-guard-result=pass --json --output=<source_report>"
+          ]
+        }
+      ]
+    }
+  ]
+}

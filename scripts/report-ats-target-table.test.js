@@ -78,6 +78,23 @@ test("thresholdProfileFor uses fixture-first policy for uncertified live ATS", (
   assert.match(profile.public_write_rule, /raw parser fixture/i);
 });
 
+test("buildTargetRows canonicalizes legacy ATS aliases in read-only reports", () => {
+  const rows = buildTargetRows([
+    {
+      ats_key: "adpworkforcenow",
+      display_name: "adpworkforcenow",
+      visible_rows: 0,
+      configured_companies: 231,
+      source_enabled: true,
+      protection_status: "canary_only"
+    }
+  ]);
+
+  assert.equal(rows[0].ats_key, "adp_workforcenow");
+  assert.equal(rows[0].display_name, "ADP Workforce Now");
+  assert.equal(rows[0].threshold_profile, "no_live_rows_fixture_target");
+});
+
 test("buildMarkdown includes target conditions and field coverage columns", () => {
   const rows = buildTargetRows([
     {

@@ -15,7 +15,7 @@ test("ATS field certification registry covers every configured ATS", () => {
   const atsKeys = ATS_FILTER_OPTION_ITEMS.map((item) => item.value).sort();
   const records = buildAtsCertificationRecords(atsKeys);
   assert.deepEqual(Object.keys(records).sort(), atsKeys);
-  assert.equal(Object.keys(records).length, 60);
+  assert.equal(Object.keys(records).length, 62);
 
   const errors = [];
   for (const atsKey of atsKeys) {
@@ -63,7 +63,15 @@ test("dayforcehcm parser certification stays disabled by sync defaults", () => {
   assert.equal(normalizeSyncEnabledAts().includes("dayforcehcm"), false);
 });
 
-test("lane documentation exists for the 60-source certification program", () => {
+test("configured-disabled direct sources document title-only remote quarantine", () => {
+  const records = buildAtsCertificationRecords(ATS_FILTER_OPTION_ITEMS.map((item) => item.value));
+  for (const atsKey of ["personio", "workable"]) {
+    assert.equal(records[atsKey].fieldDecisions.remote.status, "list-payload");
+    assert.match(records[atsKey].fieldDecisions.remote.evidence, /title-only remote text is quarantined/i);
+  }
+});
+
+test("lane documentation exists for the configured-source certification program", () => {
   const repoRoot = path.resolve(__dirname, "..", "..");
   const requiredDocs = [
     "docs/reference/ats-certification/README.md",
@@ -82,7 +90,7 @@ test("lane documentation exists for the 60-source certification program", () => 
   const directJson = JSON.parse(
     fs.readFileSync(path.join(repoRoot, "docs/direct-json-api-ats-field-certification.json"), "utf8")
   );
-  assert.equal(Object.keys(directJson.records || {}).length, 12);
+  assert.equal(Object.keys(directJson.records || {}).length, 14);
   assert.deepEqual(
     Object.keys(directJson.records || {}).sort(),
     [
@@ -93,11 +101,13 @@ test("lane documentation exists for the 60-source certification program", () => 
       "getro",
       "greenhouse",
       "lever",
+      "personio",
       "pinpointhq",
       "recruitcrm",
       "recruitee",
       "smartrecruiters",
-      "teamtailor"
+      "teamtailor",
+      "workable"
     ].sort()
   );
 });

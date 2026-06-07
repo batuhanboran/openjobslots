@@ -1,0 +1,23 @@
+[
+  {
+    "source_job_id": "SHOP123",
+    "company_name": "Fixture Workable",
+    "position_name": "Shopify Developer",
+    "job_posting_url": "https://fixtureco.workable.com/jobs/3949357",
+    "country": "Turkey",
+    "city": "Istanbul",
+    "remote_type": "onsite",
+    "posting_date": "2026-06-01T00:00:00Z",
+    "parser_confidence": 0.72
+  },
+  {
+    "source_job_id": "FLOW456",
+    "company_name": "Fixture Workable",
+    "position_name": "Workflow Engineer",
+    "job_posting_url": "https://fixtureco.workable.com/jobs/3949358",
+    "country": "United Kingdom",
+    "remote_type": "remote",
+    "posting_date": "2026-06-02T00:00:00Z",
+    "parser_confidence": 0.72
+  }
+]

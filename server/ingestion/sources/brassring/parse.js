@@ -56,6 +56,33 @@ function extractBrassringLocation(item) {
   return null;
 }
 
+function normalizeBrassringWorkMode(value) {
+  const normalized = cleanBrassringText(value).toLowerCase();
+  if (!normalized) return "";
+  if (/\bhybrid\b/.test(normalized)) return "hybrid";
+  if (/\b(remote|work from home|wfh|virtual|telework|telecommute)\b/.test(normalized)) return "remote";
+  if (/^(?:on[- ]?site|onsite|in[- ]?person|office based|in office)$/i.test(normalized)) return "onsite";
+  return "";
+}
+
+function extractBrassringWorkMode(item) {
+  const questionNames = [
+    "workmode",
+    "work_mode",
+    "work mode",
+    "work arrangement",
+    "workarrangement",
+    "workplace",
+    "workplace type",
+    "workplacetype"
+  ];
+  for (const name of questionNames) {
+    const mode = normalizeBrassringWorkMode(extractBrassringQuestionValue(item, name));
+    if (mode) return mode;
+  }
+  return "";
+}
+
 function buildBrassringPostingUrl(config, item) {
   const itemUrl = cleanBrassringText(item?.Link || "");
   if (itemUrl) return itemUrl;
@@ -91,6 +118,7 @@ function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJ
       job_posting_url: jobUrl,
       posting_date: extractBrassringQuestionValue(item, "lastupdated") || null,
       location: extractBrassringLocation(item),
+      remote_type: extractBrassringWorkMode(item) || null,
       department: extractBrassringQuestionValue(item, "department") || null
     });
     seenUrls.add(jobUrl);

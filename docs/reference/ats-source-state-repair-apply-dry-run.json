@@ -1,0 +1,150 @@
+{
+  "ok": true,
+  "dry_run": true,
+  "generated_at": "2026-06-05T00:46:08.956Z",
+  "plan_hash": "fe452eadb3a03192",
+  "expected_plan_hash": "",
+  "selected_action_count": 7,
+  "selected_actions": [
+    {
+      "type": "reset_source_protection_to_canary",
+      "ats_key": "workday",
+      "status": "approval_gated",
+      "sql_preview": [
+        "UPDATE ats_sources",
+        "SET enabled = true,",
+        "    protection_status = 'canary_only',",
+        "    disabled_reason = 'pending bounded canary proof',",
+        "    disabled_at = NULL,",
+        "    updated_at = now()",
+        "WHERE ats_key = 'workday'",
+        "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+      ]
+    },
+    {
+      "type": "reset_source_protection_to_canary",
+      "ats_key": "manatal",
+      "status": "approval_gated",
+      "sql_preview": [
+        "UPDATE ats_sources",
+        "SET enabled = true,",
+        "    protection_status = 'canary_only',",
+        "    disabled_reason = 'pending bounded canary proof',",
+        "    disabled_at = NULL,",
+        "    updated_at = now()",
+        "WHERE ats_key = 'manatal'",
+        "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+      ]
+    },
+    {
+      "type": "reset_source_protection_to_canary",
+      "ats_key": "gem",
+      "status": "approval_gated",
+      "sql_preview": [
+        "UPDATE ats_sources",
+        "SET enabled = true,",
+        "    protection_status = 'canary_only',",
+        "    disabled_reason = 'pending bounded canary proof',",
+        "    disabled_at = NULL,",
+        "    updated_at = now()",
+        "WHERE ats_key = 'gem'",
+        "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+      ]
+    },
+    {
+      "type": "canonicalize_legacy_alias",
+      "ats_key": "adp_workforcenow",
+      "status": "manual_conflict_review_required",
+      "sql_preview": [
+        "-- Run only after conflict_check_sql proves no unique-key conflict or a merge plan exists.",
+        "UPDATE companies SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE company_sync_state SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE posting_cache SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE postings SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE ingestion_run_errors SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE source_quality_events SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE source_payload_shapes SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE parser_drift_events SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE ats_source_runs SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE ats_source_run_errors SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE ats_source_run_metrics SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE ats_source_run_rollbacks SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "UPDATE ats_source_run_posting_changes SET ats_key = 'adp_workforcenow' WHERE ats_key = 'adpworkforcenow';",
+        "DELETE FROM ats_sources WHERE ats_key = 'adpworkforcenow';"
+      ]
+    },
+    {
+      "type": "reset_source_protection_to_canary",
+      "ats_key": "adp_workforcenow",
+      "status": "approval_gated",
+      "sql_preview": [
+        "UPDATE ats_sources",
+        "SET enabled = true,",
+        "    protection_status = 'canary_only',",
+        "    disabled_reason = 'pending bounded canary proof',",
+        "    disabled_at = NULL,",
+        "    updated_at = now()",
+        "WHERE ats_key = 'adp_workforcenow'",
+        "  AND COALESCE(NULLIF(protection_status, ''), 'normal') IN ('disabled', 'auto_disabled');"
+      ]
+    },
+    {
+      "type": "seed_source_row",
+      "ats_key": "personio",
+      "status": "approval_gated",
+      "sql_preview": [
+        "INSERT INTO ats_sources (ats_key, display_name, enabled, protection_status, disabled_reason, disabled_at, updated_at)",
+        "VALUES ('personio', 'Personio', false, 'canary_only', 'pending bounded canary proof', NULL, now())",
+        "ON CONFLICT (ats_key) DO NOTHING;"
+      ]
+    },
+    {
+      "type": "seed_source_row",
+      "ats_key": "workable",
+      "status": "approval_gated",
+      "sql_preview": [
+        "INSERT INTO ats_sources (ats_key, display_name, enabled, protection_status, disabled_reason, disabled_at, updated_at)",
+        "VALUES ('workable', 'Workable', false, 'canary_only', 'pending bounded canary proof', NULL, now())",
+        "ON CONFLICT (ats_key) DO NOTHING;"
+      ]
+    }
+  ],
+  "alias_conflict_report": "",
+  "alias_conflict_review_required": [
+    {
+      "ats_key": "adp_workforcenow",
+      "legacy_alias_rows": [
+        "adpworkforcenow"
+      ],
+      "tables_to_review": [
+        "companies",
+        "company_sync_state",
+        "posting_cache",
+        "postings",
+        "ingestion_run_errors",
+        "source_quality_events",
+        "source_payload_shapes",
+        "parser_drift_events",
+        "ats_source_runs",
+        "ats_source_run_errors",
+        "ats_source_run_metrics",
+        "ats_source_run_rollbacks",
+        "ats_source_run_posting_changes"
+      ]
+    }
+  ],
+  "safety": {
+    "ok": false,
+    "operation_requested": false,
+    "operation_authorized": false,
+    "failures": [
+      "dry_run_mode"
+    ],
+    "preflight_status": {
+      "ok": false,
+      "failures": [
+        "preflight_not_required_for_dry_run"
+      ]
+    }
+  }
+}

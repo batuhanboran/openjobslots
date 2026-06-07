@@ -2,6 +2,7 @@ const dns = require("node:dns").promises;
 const http = require("node:http");
 const https = require("node:https");
 const net = require("node:net");
+const tls = require("node:tls");
 const { promisify } = require("node:util");
 const zlib = require("node:zlib");
 
@@ -15,6 +16,19 @@ const DEFAULT_MAX_RESPONSE_BYTES = Math.max(
 );
 const DEFAULT_MAX_REDIRECTS = 5;
 const BLOCKED_HOSTNAMES = new Set(["localhost", "localhost.localdomain"]);
+const PROXIES = [
+  "38.154.203.95:5863:REDACTED:REDACTED",
+  "198.105.121.200:6462:REDACTED:REDACTED",
+  "64.137.96.74:6641:REDACTED:REDACTED",
+  "209.127.138.10:5784:REDACTED:REDACTED",
+  "38.154.185.97:6370:REDACTED:REDACTED",
+  "84.247.60.125:6095:REDACTED:REDACTED",
+  "142.111.67.146:5611:REDACTED:REDACTED",
+  "191.96.254.138:6185:REDACTED:REDACTED",
+  "31.58.9.4:6077:REDACTED:REDACTED",
+  "104.239.107.47:5699:REDACTED:REDACTED"
+];
+
 const DEFAULT_DNS_LOOKUP_TIMEOUT_MS = Math.max(
   250,
   Math.min(30_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_TIMEOUT_MS || 8000))
@@ -381,6 +395,100 @@ function createBufferedResponse({ status, statusText, headers, url, bodyBuffer }
   return response;
 }
 
+function connectProxyTunnel(proxyStr, targetParsed, selectedAddress, timeoutMs, signal) {
+  return new Promise((resolve, reject) => {
+    const parts = proxyStr.split(":");
+    if (parts.length !== 4) {
+      return reject(new Error("Invalid proxy format, expected host:port:user:pass"));
+    }
+    const [pHost, pPort, pUser, pPass] = parts;
+    const auth = Buffer.from(`${pUser}:${pPass}`).toString("base64");
+    const port = targetParsed.port || (targetParsed.protocol === "https:" ? 443 : 80);
+    const targetHostPort = `${selectedAddress.address}:${port}`;
+
+    let settled = false;
+    let req;
+
+    const cleanup = () => {
+      signal?.removeEventListener?.("abort", onAbort);
+    };
+
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      req?.destroy();
+      reject(err);
+    };
+
+    const onAbort = () => fail(makeAbortError());
+
+    if (signal?.aborted) {
+      return reject(makeAbortError());
+    }
+
+    req = http.request({
+      host: pHost,
+      port: Number(pPort),
+      method: "CONNECT",
+      path: targetHostPort,
+      headers: {
+        "Proxy-Authorization": `Basic ${auth}`,
+        "Proxy-Connection": "Keep-Alive"
+      }
+    });
+
+    if (timeoutMs > 0) {
+      req.setTimeout(timeoutMs);
+    }
+
+    req.on("connect", (res, socket) => {
+      if (settled) {
+        socket.destroy();
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        fail(new Error(`Proxy CONNECT failed with status code ${res.statusCode}`));
+        socket.destroy();
+        return;
+      }
+
+      if (targetParsed.protocol === "https:") {
+        const tlsSocket = tls.connect({
+          socket: socket,
+          servername: targetParsed.hostname
+        }, () => {
+          if (settled) {
+            tlsSocket.destroy();
+            return;
+          }
+          settled = true;
+          cleanup();
+          resolve(tlsSocket);
+        });
+
+        tlsSocket.on("error", (err) => {
+          fail(err);
+        });
+      } else {
+        settled = true;
+        cleanup();
+        resolve(socket);
+      }
+    });
+
+    req.on("error", fail);
+
+    req.on("timeout", () => {
+      req.destroy();
+      fail(makeSafeFetchError("timeout", `Proxy CONNECT timed out for ${targetHostPort}`));
+    });
+
+    signal?.addEventListener?.("abort", onAbort, { once: true });
+    req.end();
+  });
+}
+
 async function fetchPinnedUrl(target, init = {}, options = {}) {
   const parsed = target.parsed;
   const selectedAddress = chooseFetchAddress(target.addresses);
@@ -391,6 +499,12 @@ async function fetchPinnedUrl(target, init = {}, options = {}) {
   const bodyBuffer = requestBodyToBuffer(init.body);
   if (bodyBuffer && !hasRequestHeader(requestHeaders, "content-length")) {
     requestHeaders["Content-Length"] = String(bodyBuffer.byteLength);
+  }
+
+  let tunnelSocket = null;
+  if (options.proxy) {
+    const timeoutMs = options.dnsLookupTimeoutMs || DEFAULT_DNS_LOOKUP_TIMEOUT_MS;
+    tunnelSocket = await connectProxyTunnel(options.proxy, parsed, selectedAddress, timeoutMs, init.signal);
   }
 
   return new Promise((resolve, reject) => {
@@ -405,15 +519,21 @@ async function fetchPinnedUrl(target, init = {}, options = {}) {
       settled = true;
       cleanup();
       request?.destroy?.(error);
+      if (tunnelSocket) {
+        tunnelSocket.destroy();
+      }
       reject(error);
     };
     const onAbort = () => fail(makeAbortError());
     if (init.signal?.aborted) {
+      if (tunnelSocket) {
+        tunnelSocket.destroy();
+      }
       reject(makeAbortError());
       return;
     }
 
-    request = client.request({
+    const requestOpts = {
       protocol: parsed.protocol,
       hostname: selectedAddress.address,
       family: selectedAddress.family,
@@ -422,7 +542,13 @@ async function fetchPinnedUrl(target, init = {}, options = {}) {
       path: `${parsed.pathname || "/"}${parsed.search || ""}`,
       headers: requestHeaders,
       servername: parsed.hostname
-    }, (res) => {
+    };
+
+    if (tunnelSocket) {
+      requestOpts.createConnection = () => tunnelSocket;
+    }
+
+    request = client.request(requestOpts, (res) => {
       const headers = makeNodeHeaders(res.headers);
       const contentLength = Number(headers.get("content-length") || 0);
       if (Number.isFinite(contentLength) && contentLength > maxBytes) {
@@ -479,9 +605,27 @@ async function fetchPinnedUrl(target, init = {}, options = {}) {
   });
 }
 
+const NON_RETRYABLE_ERRORS = new Set([
+  "invalid_url",
+  "unsupported_url_scheme",
+  "url_userinfo_not_allowed",
+  "blocked_private_host",
+  "blocked_private_address",
+  "too_many_redirects",
+  "response_too_large"
+]);
+
+function isRetryableError(error) {
+  if (!error) return false;
+  if (error.name === "AbortError" || error.code === "AbortError") return false;
+  const code = error.ingestionErrorType || error.code;
+  if (NON_RETRYABLE_ERRORS.has(code)) return false;
+  return true;
+}
+
 function withFinalUrl(response, finalUrl, options = {}) {
   return new Proxy(response, {
-    get(target, property, receiver) {
+    get(target, property) {
       if (property === "url") return target.url || finalUrl;
       if (property === "text") {
         return () => readLimitedResponseText(target, {
@@ -495,7 +639,7 @@ function withFinalUrl(response, finalUrl, options = {}) {
           sourceUrl: target.url || finalUrl
         }));
       }
-      const value = Reflect.get(target, property, receiver);
+      const value = Reflect.get(target, property);
       return typeof value === "function" ? value.bind(target) : value;
     }
   });
@@ -505,7 +649,7 @@ function isRedirectStatus(status) {
   return [301, 302, 303, 307, 308].includes(Number(status || 0));
 }
 
-async function safeFetch(url, init = {}, options = {}) {
+async function safeFetchInternal(url, init = {}, options = {}) {
   const fetcher = typeof options.fetcher === "function" ? options.fetcher : null;
   const requester = options.requester || null;
   const maxRedirects = Math.max(0, Math.min(10, Number(options.maxRedirects ?? DEFAULT_MAX_REDIRECTS)));
@@ -576,6 +720,29 @@ async function readLimitedResponseText(response, options = {}) {
     reader.releaseLock?.();
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+async function safeFetch(url, init = {}, options = {}) {
+  if (options.proxy) {
+    return safeFetchInternal(url, init, options);
+  }
+
+  try {
+    const response = await safeFetchInternal(url, init, options);
+    if ([403, 503, 429].includes(response.status)) {
+      console.warn(`[safeFetch] Direct request to ${url} returned WAF status ${response.status}. Retrying via proxy...`);
+      const randomProxy = PROXIES[Math.floor(Math.random() * PROXIES.length)];
+      return await safeFetchInternal(url, init, { ...options, proxy: randomProxy });
+    }
+    return response;
+  } catch (error) {
+    if (isRetryableError(error)) {
+      console.warn(`[safeFetch] Direct request to ${url} failed with error ${error.message}. Retrying via proxy...`);
+      const randomProxy = PROXIES[Math.floor(Math.random() * PROXIES.length)];
+      return await safeFetchInternal(url, init, { ...options, proxy: randomProxy });
+    }
+    throw error;
+  }
 }
 
 module.exports = {

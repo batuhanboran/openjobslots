@@ -59,11 +59,7 @@
   "public_enabled": false,
   "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
-    "known_failure_modes": [
-      "empty hits.hits arrays are valid no-job boards, not parser drift",
-      "search hits without source titles are skipped instead of inventing placeholder titles",
-      "rows without list geo or explicit remote evidence stay quarantined"
-    ],
+    "known_failure_modes": [],
     "parser_attention_count_24h": 0,
     "rejected_count": 0,
     "quarantined_count": 0,
@@ -95,6 +91,6 @@
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "run bounded canary planning after deploy; keep empty-board and malformed-row handling source-local before detail-refetch certification",
+  "next_action": "add or run bounded detail-refetch certification for missing geo/remote evidence",
   "certification_blockers": "high missing normalized geo"
 }

@@ -16,6 +16,9 @@ const DEFAULT_RATE_LIMIT = Object.freeze({
   requestsPerMinute: 30,
   strategy: "direct-json-api-per-host-serialized"
 });
+const payloadShapePolicy = Object.freeze({
+  empty_job_list_stems: Object.freeze(["[].data.oatsExternalJobPostings.jobPostings"])
+});
 
 function clean(value) {
   return String(value || "").trim();
@@ -119,5 +122,6 @@ module.exports = {
   rateLimit,
   qualityThreshold,
   fixtures,
+  payloadShapePolicy,
   ...parser
 };

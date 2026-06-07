@@ -48,14 +48,17 @@ function testBuildExternalMethodMap() {
   assert.match(targets.get("icims").recommended_action, /detail/i);
   assert.equal(targets.get("applitrack").target_type, "existing-detail-evidence-repair");
 
-  assert.equal(targets.get("personio").target_type, "expansion-candidate");
+  assert.equal(targets.get("personio").target_type, "configured-disabled-source-hardening");
+  assert.equal(targets.get("personio").internal_source_module, "server/ingestion/sources/personio");
   assert.match(targets.get("personio").recommended_action, /XML/i);
   assert.equal(targets.get("recruiterbox").target_type, "expansion-candidate");
-  assert.equal(targets.get("workable").target_type, "expansion-candidate");
+  assert.equal(targets.get("workable").target_type, "configured-disabled-source-hardening");
+  assert.equal(targets.get("workable").internal_source_module, "server/ingestion/sources/workable");
 
   assert.ok(payload.phase_targets.phase_1.includes("teamtailor"));
   assert.ok(payload.phase_targets.phase_2.includes("teamtailor"));
   assert.ok(payload.phase_targets.phase_3.includes("personio"));
+  assert.ok(payload.phase_targets.phase_3.includes("workable"));
   assert.ok(payload.phase_targets.phase_4.includes("crawlee-sidecar"));
 }
 

@@ -133,9 +133,11 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 function uniqueFutureCandidates() {
   const byKey = new Map();
+  const configuredKeys = new Set(FAMILY_TARGETS.flatMap((item) => item.configured));
   for (const item of [...FUTURE_DIRECT_SOURCE_CANDIDATES, ...REQUESTED_FUTURE_ATS_CANDIDATES]) {
     const key = String(item.key || "").trim().toLowerCase();
     if (!key) continue;
+    if (configuredKeys.has(key)) continue;
     byKey.set(key, {
       ats_key: key,
       display_name: String(item.displayName || key).trim(),

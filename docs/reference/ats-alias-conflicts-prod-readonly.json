@@ -1,0 +1,115 @@
+{
+  "ok": false,
+  "read_only": true,
+  "generated_at": "2026-06-05T00:43:32.629627+00:00",
+  "plan_hash": "fe452eadb3a03192",
+  "alias_action_count": 1,
+  "legacy_rows_total": 416,
+  "conflict_count": 1,
+  "safe_to_canonicalize_without_merge": false,
+  "reports": [
+    {
+      "ats_key": "adp_workforcenow",
+      "legacy_alias_rows": [
+        "adpworkforcenow"
+      ],
+      "legacy_rows_total": 416,
+      "conflict_count": 1,
+      "safe_to_canonicalize_without_merge": false,
+      "tables": [
+        {
+          "table": "ats_source_run_errors",
+          "legacy_rows": 0,
+          "canonical_rows": 0,
+          "conflict_count": 0
+        },
+        {
+          "table": "ats_source_run_metrics",
+          "legacy_rows": 0,
+          "canonical_rows": 6,
+          "conflict_count": 0
+        },
+        {
+          "table": "ats_source_run_posting_changes",
+          "legacy_rows": 0,
+          "canonical_rows": 0,
+          "conflict_count": 0
+        },
+        {
+          "table": "ats_source_run_rollbacks",
+          "legacy_rows": 0,
+          "canonical_rows": 0,
+          "conflict_count": 0
+        },
+        {
+          "table": "ats_source_runs",
+          "legacy_rows": 0,
+          "canonical_rows": 1,
+          "conflict_count": 0
+        },
+        {
+          "table": "companies",
+          "legacy_rows": 231,
+          "canonical_rows": 1,
+          "conflict_count": 0
+        },
+        {
+          "table": "company_sync_state",
+          "legacy_rows": 185,
+          "canonical_rows": 22,
+          "conflict_count": 1
+        },
+        {
+          "table": "ingestion_run_errors",
+          "legacy_rows": 0,
+          "canonical_rows": 552,
+          "conflict_count": 0
+        },
+        {
+          "table": "parser_drift_events",
+          "legacy_rows": 0,
+          "canonical_rows": 392,
+          "conflict_count": 0
+        },
+        {
+          "table": "posting_cache",
+          "legacy_rows": 0,
+          "canonical_rows": 28,
+          "conflict_count": 0
+        },
+        {
+          "table": "postings",
+          "legacy_rows": 0,
+          "canonical_rows": 26,
+          "conflict_count": 0
+        },
+        {
+          "table": "source_payload_shapes",
+          "legacy_rows": 0,
+          "canonical_rows": 1,
+          "conflict_count": 0
+        },
+        {
+          "table": "source_quality_events",
+          "legacy_rows": 0,
+          "canonical_rows": 1,
+          "conflict_count": 0
+        }
+      ]
+    }
+  ],
+  "conflict_details": [
+    {
+      "table": "company_sync_state",
+      "company_url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=9f16667e-93e9-453a-b7cc-2bfeb3eda460&ccId=19000101_000003&jwId=SYS:JW:001&source=IN&lang=en_US&ittk=LMITZTVUWE&selectedMenuKey=CareerCenter",
+      "legacy_company": "Circular Action Alliance",
+      "canonical_company": "Circular Action Alliance",
+      "legacy_last_success_epoch": 1778071556,
+      "canonical_last_success_epoch": 1779896037,
+      "legacy_next_sync_epoch": 1810072654,
+      "canonical_next_sync_epoch": 1779982544,
+      "legacy_consecutive_failures": 0,
+      "canonical_consecutive_failures": 0
+    }
+  ]
+}

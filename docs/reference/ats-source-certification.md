@@ -4,11 +4,11 @@ OpenJobSlots should add ATS breadth only after parser correctness is proven. Thi
 
 ## Current Coverage
 
-- Configured ATS keys: 60.
-- Fixture-backed ATS keys: 60.
-- Strict saved raw or source-module parser-fixture-backed ATS keys: 60. Every configured ATS has source-backed raw/list fixtures, expected normalized fixtures, and parser rejection coverage recorded by the generated workbench.
+- Configured ATS keys: 62.
+- Fixture-backed ATS keys: 62.
+- Strict saved raw or source-module parser-fixture-backed ATS keys: 62. Every configured ATS has source-backed raw/list fixtures, expected normalized fixtures, and parser rejection coverage recorded by the generated workbench.
 - Configured enabled ATS still pending strict raw/source-module parser fixtures: 0.
-- Disabled after parser certification: `dayforcehcm` remains off by default until bounded live canary/direct-fetch evidence is approved.
+- Canary but not public-enabled-by-default after parser/source certification: `dayforcehcm`, `personio`, and `workable` remain excluded from default sync until bounded live canary/direct-fetch evidence is approved.
 
 The difference matters: a normalized fixture proves that a sample posting can fit the DB shape. A raw or source-module parser fixture proves that the ATS response parser still works when the upstream HTML or JSON response changes. Certification requires that parser fixture, but certification is not production promotion. Registry status, live canary quality, accepted-row volume, and Postgres/Meili parity still gate public writes.
 
@@ -50,7 +50,6 @@ Keep detail certification in source-family lanes such as direct JSON/API, enterp
 
 | ATS | Source | Endpoint pattern | Notes |
 | --- | --- | --- | --- |
-| Personio | https://developer.personio.de/v1.0/reference/get_xml | `https://{company}.jobs.personio.de/xml?language=en` | Official XML feed; strong EU coverage. |
 | Trakstar Hire / Recruiterbox | https://apiv1.recruiterbox.com/frontend_api.html | `https://jsapi.recruiterbox.com/v1/openings?client_name={client}` | Official frontend openings API. |
 | JobScore | https://support.jobscore.com/hc/en-us/articles/202001320-Developers-Guide-to-Job-Feed-APIs | `https://careers.jobscore.com/jobs/{company}/feed.json` | Official JSON/XML feed. |
 
@@ -58,15 +57,16 @@ Keep detail certification in source-family lanes such as direct JSON/API, enterp
 
 | ATS | Source | Gate before enabling |
 | --- | --- | --- |
-| Workable | https://help.workable.com/hc/en-us/articles/115012771647-Using-the-Workable-API-to-create-a-careers-page | Review public widget config or API token handling. |
 | Bullhorn | https://bullhorn.github.io/Public-API/ | Document `cls` and `corpToken` discovery/config. |
 | Comeet / Spark Hire Recruit | https://developers.comeet.com/reference | Review public token handling and company UID discovery. |
+
+Personio and Workable are now configured canary source modules, not future-only candidates. Both remain excluded from default sync and public promotion until live inventory, bounded canary/apply evidence, field-quality, and Postgres/Meili search parity are proven.
 
 ## Aggregator Boundary
 
 Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must stay separate from direct ATS adapters. They require stronger canonical URL dedupe and may have attribution or link-back requirements.
 
-## 60-Source Certification Backlog
+## Configured-Source Certification Backlog
 
 ### v1.6.2 ATS Workbench
 
@@ -80,7 +80,7 @@ npm run audit:ats-quality -- --json --output=docs/reference/ats-workbench/scoreb
 
 The command is read-only and includes every configured ATS key, including sources with no visible rows. The generated fields now include wave priority, certification blockers, exact next parser action, public-enabled recommendation, source-id reliability, canonical URL reliability, and detail-refetch requirement.
 
-Current workbench counts: 60 configured ATS, 60 strict parser-fixture-backed, 0 partial, 0 fallback/pending, and 1 disabled-after-certification source (`dayforcehcm`).
+Current workbench counts: 62 configured ATS, 62 strict parser-fixture-backed, 0 partial, 0 fallback/pending, and 1 disabled-after-certification source (`dayforcehcm`).
 
 Current source-disable/quarantine recommendations are evidence-based, not permanent removals:
 

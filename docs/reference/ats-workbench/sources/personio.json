@@ -1,0 +1,86 @@
+{
+  "ats_key": "personio",
+  "display_name": "Personio",
+  "current_status": "disabled",
+  "source_family": "direct_json",
+  "official_public_docs_or_observed_endpoint": "Personio official public XML feed at https://{company}.jobs.personio.de/xml?language={language}.",
+  "source_discovery_method": "derive tenant/board identifier from company ATS URL, then use the public JSON endpoint when available",
+  "list_fetch_method": "bounded GET/POST to source JSON list endpoint through the source runner",
+  "detail_fetch_method": "not required for core fields unless the list payload omits description or normalized geo evidence",
+  "pagination_method": "use source offset/limit/page cursor when documented; otherwise cap single-list fetches",
+  "canonical_url_rule": "use source canonical/apply URL, absolutize relative URLs, strip tracking noise, and keep stable path identity",
+  "source_job_id_rule": "list-payload: Use XML position id when present, with stable canonical URL id fallback.",
+  "title_company_rule": "reject rows missing title, company context, or usable canonical/apply URL; reject placeholders and blank titles",
+  "location_text_rule": "list-payload: Saved raw XML fixture covers office, location, city, and country fields.",
+  "country_region_city_rule": "list-payload: Saved raw XML fixture covers office, location, city, and country fields.",
+  "remote_type_rule": "list-payload: Use XML workplace/remote fields or explicit office/location remote labels only; title-only remote text is quarantined.",
+  "posting_date_rule": "list-payload: Use created_at/updated_at XML fields only when source exposes them.",
+  "rate_limit": "default per-host serialization plus source daily budget; lower for uncertified tenants",
+  "parser_fixtures": {
+    "status": "parser-fixture-backed",
+    "files": [
+      "server/ingestion/sources/personio/fixtures/company.json",
+      "server/ingestion/sources/personio/fixtures/expected-normalized.json",
+      "server/ingestion/sources/personio/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/personio/fixtures/list.json"
+    ],
+    "present": [
+      "server/ingestion/sources/personio/fixtures/company.json",
+      "server/ingestion/sources/personio/fixtures/expected-normalized.json",
+      "server/ingestion/sources/personio/fixtures/invalid-shapes.json",
+      "server/ingestion/sources/personio/fixtures/list.json"
+    ],
+    "missing": []
+  },
+  "source_module": {
+    "present": true,
+    "path": "server/ingestion/sources/personio/index.js",
+    "fixtures_dir": "server/ingestion/sources/personio/fixtures",
+    "parser_version": "source-personio-v1",
+    "registry_status": "canary",
+    "collect_when_disabled": false
+  },
+  "quality_threshold": {
+    "mode": "disabled",
+    "minimum_confidence": 1,
+    "public_write_rule": "no public writes until bounded live canary, source-quality evidence, and recovery guard pass"
+  },
+  "public_enabled_recommendation": false,
+  "public_enabled": false,
+  "quarantine_reason": "disabled until live canary and source-quality evidence are approved",
+  "failure_log": {
+    "known_failure_modes": [],
+    "parser_attention_count_24h": 0,
+    "rejected_count": 0,
+    "quarantined_count": 0,
+    "latest_parser_error": ""
+  },
+  "production_quality": {
+    "rows": 0,
+    "missing_country_pct": 0,
+    "missing_city_pct": 0,
+    "missing_any_geo_pct": 0,
+    "weak_remote_pct": 0,
+    "risk_score": -65,
+    "wave_priority": "disabled",
+    "detail_refetch_needed": false
+  },
+  "parser_method": {
+    "path": "server/ingestion/sources/personio/parse.js parsePersonioPostingsFromXml",
+    "parser_version_status": "parser-fixture-backed",
+    "confidence": "medium"
+  },
+  "runner_interface": {
+    "discover": "server/ingestion/sources/personio/discover.js",
+    "fetchList": "server/ingestion/sources/personio/fetchList.js",
+    "fetchDetail": "server/ingestion/sources/personio/fetchDetail.js",
+    "parseList": "server/ingestion/sources/personio/parse.js",
+    "parseDetail": "server/ingestion/sources/personio/parse.js",
+    "normalize": "server/ingestion/sources/personio/normalize.js",
+    "validate": "server/ingestion/sources/personio/validate.js",
+    "writeAccepted": "source runner accepted path updates public read model only after validation",
+    "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
+  },
+  "next_action": "keep disabled until bounded live canary and source-quality evidence are approved",
+  "certification_blockers": "disabled until live canary and source-quality evidence are approved"
+}

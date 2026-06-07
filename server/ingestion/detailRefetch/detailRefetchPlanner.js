@@ -20,7 +20,7 @@ const {
 } = require("../sources/icims/parse");
 
 const DETAIL_REFETCH_SCHEMA_VERSION = "detail-refetch-audit-v1";
-const SUPPORTED_SOURCES = new Set(["icims", "applitrack"]);
+const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho"]);
 const WRITABLE_FIELDS = Object.freeze([
   "location_text",
   "country",
@@ -122,7 +122,7 @@ function parseArgs(argv = []) {
     else if (arg.startsWith("--fixture-dir=")) options.fixtureDir = clean(arg.slice("--fixture-dir=".length));
   }
 
-  options.sources = Array.from(new Set((options.sources.length ? options.sources : ["icims", "applitrack"])
+  options.sources = Array.from(new Set((options.sources.length ? options.sources : ["icims", "applitrack", "taleo", "talentreef", "zoho"])
     .filter((source) => SUPPORTED_SOURCES.has(source))));
   return options;
 }
@@ -170,6 +170,15 @@ function extractSourceJobIdFromUrl(row) {
   if (atsKey === "applitrack") {
     return clean(parsed.searchParams.get("JobID") || parsed.searchParams.get("jobid") || parsed.searchParams.get("AppliTrackJobId"));
   }
+  if (atsKey === "taleo") {
+    return clean(parsed.searchParams.get("job") || parsed.searchParams.get("jobid") || "");
+  }
+  if (atsKey === "talentreef") {
+    return parsed.pathname.match(/\/jobs\/([^\/]+)/i)?.[1] || "";
+  }
+  if (atsKey === "zoho") {
+    return parsed.pathname.split("/").filter(Boolean).pop() || "";
+  }
   return "";
 }
 
@@ -203,6 +212,9 @@ function detailUrlForRow(row) {
   if (atsKey === "applitrack") {
     return buildApplitrackDetailUrl(applitrackSiteRootFromUrl(url), extractSourceJobIdFromUrl(row), url);
   }
+  if (["taleo", "talentreef", "zoho"].includes(atsKey)) {
+    return url;
+  }
   return "";
 }
 
@@ -212,6 +224,9 @@ function isAllowedDetailUrl(atsKey, urlValue) {
   const hostname = parsed.hostname.toLowerCase();
   if (atsKey === "icims") return hostname.endsWith(".icims.com");
   if (atsKey === "applitrack") return hostname.endsWith(".applitrack.com");
+  if (atsKey === "taleo") return hostname.endsWith(".taleo.net") || hostname.endsWith(".oraclecloud.com");
+  if (atsKey === "talentreef") return hostname.endsWith(".jobappnetwork.com") || hostname.endsWith(".talentreef.com");
+  if (atsKey === "zoho") return hostname.endsWith(".zohorecruit.com") || hostname.endsWith(".zoho.com");
   return false;
 }
 
@@ -255,6 +270,9 @@ function summarizeCandidates(rows, options = {}) {
     by_host: {},
     rows_requiring_icims_detail_refetch: 0,
     rows_requiring_applitrack_detail_refetch: 0,
+    rows_requiring_taleo_detail_refetch: 0,
+    rows_requiring_talentreef_detail_refetch: 0,
+    rows_requiring_zoho_detail_refetch: 0,
     samples: []
   };
   for (const row of rows) {
@@ -264,6 +282,9 @@ function summarizeCandidates(rows, options = {}) {
     summary.by_host[host] = (summary.by_host[host] || 0) + 1;
     if (source === "icims") summary.rows_requiring_icims_detail_refetch += 1;
     if (source === "applitrack") summary.rows_requiring_applitrack_detail_refetch += 1;
+    if (source === "taleo") summary.rows_requiring_taleo_detail_refetch += 1;
+    if (source === "talentreef") summary.rows_requiring_talentreef_detail_refetch += 1;
+    if (source === "zoho") summary.rows_requiring_zoho_detail_refetch += 1;
     if (summary.samples.length < sampleLimit) {
       summary.samples.push({
         source_ats: source,
@@ -277,6 +298,88 @@ function summarizeCandidates(rows, options = {}) {
     }
   }
   return summary;
+}
+
+function extractJsonLdObjectsFromHtml(html) {
+  const objects = [];
+  if (!html) return objects;
+  const regex = /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const jsonText = match[1].trim();
+    if (!jsonText) continue;
+    try {
+      const cleaned = jsonText
+        .replace(/^\s*<!--/, "")
+        .replace(/-->\s*$/, "")
+        .trim();
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed)) {
+        objects.push(...parsed);
+      } else if (parsed && typeof parsed === "object") {
+        objects.push(parsed);
+      }
+    } catch {
+      // Ignore parse errors from malformed JSON-LD in target pages
+    }
+  }
+  return objects;
+}
+
+function extractFieldsFromJsonLd(html, row) {
+  const objects = extractJsonLdObjectsFromHtml(html);
+  const jobPosting = objects.find(obj => {
+    const type = String(obj?.["@type"] || "").toLowerCase();
+    return type === "jobposting" || type.includes("jobposting");
+  });
+
+  if (!jobPosting) {
+    return {};
+  }
+
+  const detail = {};
+
+  const loc = jobPosting.jobLocation;
+  if (loc) {
+    const address = Array.isArray(loc) ? loc[0]?.address : loc.address;
+    if (address) {
+      const parts = [];
+      if (address.streetAddress) parts.push(clean(address.streetAddress));
+      if (address.addressLocality) parts.push(clean(address.addressLocality));
+      if (address.addressRegion) parts.push(clean(address.addressRegion));
+      if (address.addressCountry) {
+        const country = clean(address.addressCountry);
+        if (typeof address.addressCountry === "object") {
+          parts.push(clean(address.addressCountry.name || address.addressCountry.code));
+        } else {
+          parts.push(country);
+        }
+      }
+      if (parts.length > 0) {
+        detail.location = parts.join(", ");
+      }
+    }
+  }
+
+  if (jobPosting.datePosted) {
+    detail.posting_date = clean(jobPosting.datePosted);
+  }
+
+  const locType = String(jobPosting.jobLocationType || "").toLowerCase();
+  const desc = String(jobPosting.description || "").toLowerCase();
+  if (locType.includes("telecommute") || desc.includes("telecommute")) {
+    detail.remote_type = "remote";
+  } else if (desc.includes("work from home") || desc.includes("wfh") || desc.includes("remote option")) {
+    detail.remote_type = "remote";
+  }
+
+  if (jobPosting.department) {
+    detail.department = clean(jobPosting.department.name || jobPosting.department);
+  } else if (jobPosting.industry) {
+    detail.department = clean(jobPosting.industry);
+  }
+
+  return detail;
 }
 
 function extractDetailFields(row, html) {
@@ -297,6 +400,14 @@ function extractDetailFields(row, html) {
       remote_type: explicitRemote || detail.remote_type,
       source_job_id: extractSourceJobIdFromUrl(row)
     };
+  }
+  if (["taleo", "talentreef", "zoho"].includes(atsKey)) {
+    const detail = extractFieldsFromJsonLd(html, row);
+    if (!detail.remote_type) {
+      detail.remote_type = extractRemoteLabelFromHtml(html);
+    }
+    detail.source_job_id = extractSourceJobIdFromUrl(row);
+    return detail;
   }
   return {};
 }

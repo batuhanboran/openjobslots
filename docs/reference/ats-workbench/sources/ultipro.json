@@ -55,11 +55,7 @@
   "public_enabled": false,
   "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
   "failure_log": {
-    "known_failure_modes": [
-      "empty opportunities payloads are valid no-job boards, not parser drift",
-      "raw opportunities without a source title are skipped instead of inventing placeholder titles",
-      "rows without list geo or explicit remote evidence stay quarantined"
-    ],
+    "known_failure_modes": [],
     "parser_attention_count_24h": 0,
     "rejected_count": 0,
     "quarantined_count": 0,
@@ -91,6 +87,6 @@
     "writeAccepted": "source runner accepted path updates public read model only after validation",
     "writeQuarantine": "source runner quarantine path records reason and keeps row out of public index"
   },
-  "next_action": "run bounded inventory/net-new canary planning after deploy; keep empty-board and malformed-row handling source-local",
+  "next_action": "audit raw payloads and add field-specific parser/backfill fixture",
   "certification_blockers": "high missing normalized geo"
 }

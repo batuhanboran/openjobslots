@@ -1,29 +1,29 @@
 {
   "ok": true,
-  "generated_at": "2026-06-01T15:50:27.617Z",
+  "generated_at": "2026-06-04T23:06:10.096Z",
   "summary": {
-    "configured_ats_count": 60,
-    "future_candidate_count": 30,
+    "configured_ats_count": 62,
+    "future_candidate_count": 28,
     "registry_status_counts": {
-      "research-only": 30,
-      "registry-backed-disabled": 36,
+      "research-only": 28,
+      "registry-backed-disabled": 32,
       "registry-backed-enabled": 20,
       "registry-backed-quarantine": 3,
-      "registry-backed-canary": 1
+      "registry-backed-canary": 7
     },
     "recovery_readiness_counts": {
-      "research-only": 30,
-      "ready-for-read-only-recovery": 60
+      "research-only": 28,
+      "ready-for-read-only-recovery": 62
     },
-    "read_only_recovery_ready_count": 60,
+    "read_only_recovery_ready_count": 62,
     "recovery_readiness_blockers": [],
     "family_counts": {
-      "future-candidate": 30,
+      "future-candidate": 28,
       "enterprise-direct": 10,
       "vendor-specific": 14,
       "embedded-or-semi-structured": 12,
       "public-sector-education": 10,
-      "direct-json-stable": 12,
+      "direct-json-stable": 14,
       "brittle-high-risk": 2
     },
     "next_execution_order": [
@@ -83,6 +83,20 @@
           "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/smartrecruiters/index.js",
           "next_action": "Keep registry dispatch enabled; use read-only inventory, net-new estimate, batch planning, recovery guard, and parity checks before any approved write."
+        },
+        {
+          "ats_key": "personio",
+          "registry_status": "registry-backed-canary",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/personio/index.js",
+          "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes."
+        },
+        {
+          "ats_key": "workable",
+          "registry_status": "registry-backed-canary",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/workable/index.js",
+          "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes."
         },
         {
           "ats_key": "recruitcrm",
@@ -157,17 +171,24 @@
           "next_action": "Keep registry dispatch enabled; use read-only inventory, net-new estimate, batch planning, recovery guard, and parity checks before any approved write."
         },
         {
+          "ats_key": "dayforcehcm",
+          "registry_status": "registry-backed-canary",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/dayforcehcm/index.js",
+          "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes."
+        },
+        {
+          "ats_key": "workday",
+          "registry_status": "registry-backed-canary",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/workday/index.js",
+          "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes."
+        },
+        {
           "ats_key": "adp_myjobs",
           "registry_status": "registry-backed-disabled",
           "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/adp_myjobs/index.js",
-          "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
-        },
-        {
-          "ats_key": "dayforcehcm",
-          "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "ready-for-read-only-recovery",
-          "source_module": "server/ingestion/sources/dayforcehcm/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
         {
@@ -196,13 +217,6 @@
           "registry_status": "registry-backed-disabled",
           "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/ultipro/index.js",
-          "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
-        },
-        {
-          "ats_key": "workday",
-          "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "ready-for-read-only-recovery",
-          "source_module": "server/ingestion/sources/workday/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         }
       ]
@@ -322,6 +336,20 @@
           "next_action": "Keep registry dispatch enabled; use read-only inventory, net-new estimate, batch planning, recovery guard, and parity checks before any approved write."
         },
         {
+          "ats_key": "gem",
+          "registry_status": "registry-backed-canary",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/gem/index.js",
+          "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes."
+        },
+        {
+          "ats_key": "manatal",
+          "registry_status": "registry-backed-canary",
+          "recovery_readiness": "ready-for-read-only-recovery",
+          "source_module": "server/ingestion/sources/manatal/index.js",
+          "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes."
+        },
+        {
           "ats_key": "applicantai",
           "registry_status": "registry-backed-disabled",
           "recovery_readiness": "ready-for-read-only-recovery",
@@ -333,13 +361,6 @@
           "registry_status": "registry-backed-disabled",
           "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/careerspage/index.js",
-          "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
-        },
-        {
-          "ats_key": "gem",
-          "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "ready-for-read-only-recovery",
-          "source_module": "server/ingestion/sources/gem/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
         {
@@ -361,13 +382,6 @@
           "registry_status": "registry-backed-disabled",
           "recovery_readiness": "ready-for-read-only-recovery",
           "source_module": "server/ingestion/sources/loxo/index.js",
-          "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
-        },
-        {
-          "ats_key": "manatal",
-          "registry_status": "registry-backed-disabled",
-          "recovery_readiness": "ready-for-read-only-recovery",
-          "source_module": "server/ingestion/sources/manatal/index.js",
           "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first."
         },
         {
@@ -643,13 +657,6 @@
           "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
         },
         {
-          "ats_key": "personio",
-          "registry_status": "research-only",
-          "recovery_readiness": "research-only",
-          "source_module": "",
-          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
-        },
-        {
           "ats_key": "prismhr",
           "registry_status": "research-only",
           "recovery_readiness": "research-only",
@@ -700,13 +707,6 @@
         },
         {
           "ats_key": "webcruiter",
-          "registry_status": "research-only",
-          "recovery_readiness": "research-only",
-          "source_module": "",
-          "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata."
-        },
-        {
-          "ats_key": "workable",
           "registry_status": "research-only",
           "recovery_readiness": "research-only",
           "source_module": "",
@@ -1105,12 +1105,16 @@
         "rate_limit": true,
         "fixtures": {
           "paths": [
-            "server/ingestion/fixtures/applicantpro-direct.json",
-            "server/ingestion/fixtures/applicantpro-failures.json"
+            "server/ingestion/sources/applicantpro/fixtures/company.json",
+            "server/ingestion/sources/applicantpro/fixtures/list.json",
+            "server/ingestion/sources/applicantpro/fixtures/expected-normalized.json",
+            "server/ingestion/sources/applicantpro/fixtures/invalid-shapes.json"
           ],
           "present": [
-            "server/ingestion/fixtures/applicantpro-direct.json",
-            "server/ingestion/fixtures/applicantpro-failures.json"
+            "server/ingestion/sources/applicantpro/fixtures/company.json",
+            "server/ingestion/sources/applicantpro/fixtures/list.json",
+            "server/ingestion/sources/applicantpro/fixtures/expected-normalized.json",
+            "server/ingestion/sources/applicantpro/fixtures/invalid-shapes.json"
           ],
           "missing": [],
           "errors": []
@@ -2178,7 +2182,7 @@
       "ats_key": "dayforcehcm",
       "display_name": "Dayforce",
       "family": "enterprise-direct",
-      "registry_status": "registry-backed-disabled",
+      "registry_status": "registry-backed-canary",
       "current_status": "disabled",
       "public_enabled": false,
       "source_module": {
@@ -2249,7 +2253,7 @@
           "release_check"
         ]
       },
-      "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first.",
+      "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.",
       "work_packet": "docs/reference/ats-workbench/sources/dayforcehcm.json"
     },
     {
@@ -2586,7 +2590,7 @@
       "ats_key": "gem",
       "display_name": "Gem",
       "family": "vendor-specific",
-      "registry_status": "registry-backed-disabled",
+      "registry_status": "registry-backed-canary",
       "current_status": "certified",
       "public_enabled": false,
       "source_module": {
@@ -2655,7 +2659,7 @@
           "release_check"
         ]
       },
-      "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first.",
+      "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.",
       "work_packet": "docs/reference/ats-workbench/sources/gem.json"
     },
     {
@@ -4032,7 +4036,7 @@
       "ats_key": "manatal",
       "display_name": "Manatal",
       "family": "vendor-specific",
-      "registry_status": "registry-backed-disabled",
+      "registry_status": "registry-backed-canary",
       "current_status": "certified",
       "public_enabled": false,
       "source_module": {
@@ -4101,7 +4105,7 @@
           "release_check"
         ]
       },
-      "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first.",
+      "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.",
       "work_packet": "docs/reference/ats-workbench/sources/manatal.json"
     },
     {
@@ -4617,53 +4621,80 @@
     {
       "ats_key": "personio",
       "display_name": "Personio",
-      "family": "future-candidate",
-      "registry_status": "research-only",
-      "current_status": "future-candidate",
+      "family": "direct-json-stable",
+      "registry_status": "registry-backed-canary",
+      "current_status": "disabled",
       "public_enabled": false,
       "source_module": {
-        "present": false,
-        "path": "",
-        "fixtures_dir": ""
+        "present": true,
+        "path": "server/ingestion/sources/personio/index.js",
+        "fixtures_dir": "server/ingestion/sources/personio/fixtures"
       },
-      "quality": {},
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": -65,
+        "wave_priority": "disabled",
+        "detail_refetch_needed": false
+      },
       "scripts": {
-        "workbench": "not available until configured as an ATS adapter",
-        "source_test": "not available until source module exists",
-        "dry_run": "not available until adapter and source target exist",
-        "inventory_scan": "not available until adapter and source target exist",
-        "estimate_net_new": "not available until adapter and source target exist",
-        "plan_batches": "not available until adapter and source target exist",
-        "source_canary": "not available until adapter and source target exist",
-        "source_apply": "not available until adapter and source target exist and canary/release proof passes",
-        "recovery_preflight": "not available until adapter and source target exist",
-        "recovery_guard": "not available until adapter and source target exist",
-        "release_check": "not available until recovery guard reports exist",
+        "workbench": "npm.cmd run ats:workbench -- --source=personio --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=personio --limit=10 --json",
+        "inventory_scan": "npm.cmd run ats:inventory:scan -- --source=personio --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>",
+        "estimate_net_new": "npm.cmd run ats:estimate-net-new -- --source=personio --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+        "plan_batches": "npm.cmd run ats:plan-batches -- --source=personio --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>",
+        "source_canary": "npm.cmd run ats:source:canary -- --source=personio --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --preflight-max-age-minutes=60 --predicted-guard-result=pass --json --output=<source_report>",
+        "source_apply": "npm.cmd run ats:source:apply -- --source=personio --limit=<safe_limit> --max-updates=<safe_max_updates> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --preflight-max-age-minutes=60 --predicted-guard-result=pass --json --output=<source_report>",
+        "recovery_preflight": "npm.cmd run ats:recovery:preflight -- --json --system-report=<system_report> --expected-commit=<sha> --backup-path=<backup> --output=<fresh_preflight_report>",
+        "recovery_guard": "npm.cmd run ats:recovery:guard -- --json --before=<before_data_quality> --after=<after_data_quality> --source-report=<source_report> --meili-check=<meili_check> --ingestion-status=<ingestion_status> --service-stats=<service_stats> --output=<guard_report>",
+        "release_check": "npm.cmd run release:ats-recovery:check -- --json --before=<before_data_quality> --after=<after_data_quality> --source-report=<source_report> --meili-check=<meili_check> --guard-report=<guard_report> --tests-report=<tests_report> --preflight-report=<fresh_preflight_report> --output=<release_report>",
         "parity_check": "npm.cmd run search:reindex:check -- --json --sample-limit=25",
-        "registry_check": "node scripts/ats-registry-index.test.js"
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "research-only",
-        "source_contract_ok": false,
-        "public_gate": false,
-        "quality_threshold": false,
-        "rate_limit": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
+        "public_gate": true,
+        "quality_threshold": true,
+        "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/personio/fixtures/company.json",
+            "server/ingestion/sources/personio/fixtures/list.json",
+            "server/ingestion/sources/personio/fixtures/expected-normalized.json",
+            "server/ingestion/sources/personio/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/personio/fixtures/company.json",
+            "server/ingestion/sources/personio/fixtures/list.json",
+            "server/ingestion/sources/personio/fixtures/expected-normalized.json",
+            "server/ingestion/sources/personio/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "adapter metadata and source module required before recovery"
-        ],
-        "required_gate_sequence": []
+        "blockers": [],
+        "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
+        "required_gate_sequence": [
+          "source_test",
+          "workbench",
+          "dry_run",
+          "inventory_scan",
+          "estimate_net_new",
+          "plan_batches",
+          "recovery_preflight",
+          "source_canary_or_apply_after_explicit_approval",
+          "recovery_guard",
+          "parity_check",
+          "release_check"
+        ]
       },
-      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
-      "work_packet": "",
-      "docs_url": "",
-      "endpoint_pattern": "",
-      "notes": "research-only candidate; public endpoint and raw fixtures required before enabling"
+      "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.",
+      "work_packet": "docs/reference/ats-workbench/sources/personio.json"
     },
     {
       "ats_key": "pinpointhq",
@@ -6530,59 +6561,86 @@
     {
       "ats_key": "workable",
       "display_name": "Workable",
-      "family": "future-candidate",
-      "registry_status": "research-only",
-      "current_status": "future-candidate",
+      "family": "direct-json-stable",
+      "registry_status": "registry-backed-canary",
+      "current_status": "disabled",
       "public_enabled": false,
       "source_module": {
-        "present": false,
-        "path": "",
-        "fixtures_dir": ""
+        "present": true,
+        "path": "server/ingestion/sources/workable/index.js",
+        "fixtures_dir": "server/ingestion/sources/workable/fixtures"
       },
-      "quality": {},
+      "quality": {
+        "rows": 0,
+        "missing_country_pct": 0,
+        "missing_city_pct": 0,
+        "missing_any_geo_pct": 0,
+        "weak_remote_pct": 0,
+        "risk_score": -65,
+        "wave_priority": "disabled",
+        "detail_refetch_needed": false
+      },
       "scripts": {
-        "workbench": "not available until configured as an ATS adapter",
-        "source_test": "not available until source module exists",
-        "dry_run": "not available until adapter and source target exist",
-        "inventory_scan": "not available until adapter and source target exist",
-        "estimate_net_new": "not available until adapter and source target exist",
-        "plan_batches": "not available until adapter and source target exist",
-        "source_canary": "not available until adapter and source target exist",
-        "source_apply": "not available until adapter and source target exist and canary/release proof passes",
-        "recovery_preflight": "not available until adapter and source target exist",
-        "recovery_guard": "not available until adapter and source target exist",
-        "release_check": "not available until recovery guard reports exist",
+        "workbench": "npm.cmd run ats:workbench -- --source=workable --json",
+        "source_test": "node server/ingestion/sources/directSourceModules.test.js",
+        "dry_run": "npm.cmd run ats:source:dry-run -- --source=workable --limit=10 --json",
+        "inventory_scan": "npm.cmd run ats:inventory:scan -- --source=workable --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>",
+        "estimate_net_new": "npm.cmd run ats:estimate-net-new -- --source=workable --limit=<safe_limit> --company-limit=<safe_company_limit> --json",
+        "plan_batches": "npm.cmd run ats:plan-batches -- --source=workable --target-gain=<gain> --company-limit=<safe_limit> --row-limit=<safe_row_limit> --json --output=<report>",
+        "source_canary": "npm.cmd run ats:source:canary -- --source=workable --limit=<safe_limit> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --preflight-max-age-minutes=60 --predicted-guard-result=pass --json --output=<source_report>",
+        "source_apply": "npm.cmd run ats:source:apply -- --source=workable --limit=<safe_limit> --max-updates=<safe_max_updates> --confirm-production --backup-confirmed --worker-isolated --planned-batch=<planned_batch_report> --preflight-report=<fresh_preflight_report> --preflight-max-age-minutes=60 --predicted-guard-result=pass --json --output=<source_report>",
+        "recovery_preflight": "npm.cmd run ats:recovery:preflight -- --json --system-report=<system_report> --expected-commit=<sha> --backup-path=<backup> --output=<fresh_preflight_report>",
+        "recovery_guard": "npm.cmd run ats:recovery:guard -- --json --before=<before_data_quality> --after=<after_data_quality> --source-report=<source_report> --meili-check=<meili_check> --ingestion-status=<ingestion_status> --service-stats=<service_stats> --output=<guard_report>",
+        "release_check": "npm.cmd run release:ats-recovery:check -- --json --before=<before_data_quality> --after=<after_data_quality> --source-report=<source_report> --meili-check=<meili_check> --guard-report=<guard_report> --tests-report=<tests_report> --preflight-report=<fresh_preflight_report> --output=<release_report>",
         "parity_check": "npm.cmd run search:reindex:check -- --json --sample-limit=25",
-        "registry_check": "node scripts/ats-registry-index.test.js"
+        "registry_check": "node server/ingestion/sourceRegistry.test.js"
       },
       "recovery_readiness": {
-        "status": "research-only",
-        "source_contract_ok": false,
-        "public_gate": false,
-        "quality_threshold": false,
-        "rate_limit": false,
+        "status": "ready-for-read-only-recovery",
+        "source_contract_ok": true,
+        "public_gate": true,
+        "quality_threshold": true,
+        "rate_limit": true,
         "fixtures": {
-          "paths": [],
-          "present": [],
+          "paths": [
+            "server/ingestion/sources/workable/fixtures/company.json",
+            "server/ingestion/sources/workable/fixtures/list.json",
+            "server/ingestion/sources/workable/fixtures/expected-normalized.json",
+            "server/ingestion/sources/workable/fixtures/invalid-shapes.json"
+          ],
+          "present": [
+            "server/ingestion/sources/workable/fixtures/company.json",
+            "server/ingestion/sources/workable/fixtures/list.json",
+            "server/ingestion/sources/workable/fixtures/expected-normalized.json",
+            "server/ingestion/sources/workable/fixtures/invalid-shapes.json"
+          ],
           "missing": [],
           "errors": []
         },
-        "blockers": [
-          "adapter metadata and source module required before recovery"
-        ],
-        "required_gate_sequence": []
+        "blockers": [],
+        "production_write_policy": "canary/apply/backfill/reindex/deploy require explicit approval, backup, worker isolation, recovery guard, and parity proof",
+        "required_gate_sequence": [
+          "source_test",
+          "workbench",
+          "dry_run",
+          "inventory_scan",
+          "estimate_net_new",
+          "plan_batches",
+          "recovery_preflight",
+          "source_canary_or_apply_after_explicit_approval",
+          "recovery_guard",
+          "parity_check",
+          "release_check"
+        ]
       },
-      "next_action": "Research public endpoint, capture raw fixture, define parser contract, then add adapter metadata.",
-      "work_packet": "",
-      "docs_url": "https://help.workable.com/hc/en-us/articles/115012771647-Using-the-Workable-API-to-create-a-careers-page",
-      "endpoint_pattern": "Requires reviewed public widget config or r_jobs token.",
-      "notes": "High-value source; enable only after token/config handling is reviewed."
+      "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.",
+      "work_packet": "docs/reference/ats-workbench/sources/workable.json"
     },
     {
       "ats_key": "workday",
       "display_name": "Workday",
       "family": "enterprise-direct",
-      "registry_status": "registry-backed-disabled",
+      "registry_status": "registry-backed-canary",
       "current_status": "certified",
       "public_enabled": false,
       "source_module": {
@@ -6651,7 +6709,7 @@
           "release_check"
         ]
       },
-      "next_action": "Keep disabled until bounded live canary and source-quality evidence are approved; use read-only workbench and inventory first.",
+      "next_action": "Keep recovery canary/quarantine-scoped; prove clean net-new candidates with read-only inventory and batch planning before requesting writes.",
       "work_packet": "docs/reference/ats-workbench/sources/workday.json"
     },
     {

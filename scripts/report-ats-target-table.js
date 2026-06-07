@@ -2,6 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const { createPostgresPool } = require("../server/backends/postgres");
 const { getAdapterMetadata, isAtsEnabledByDefault } = require("../server/ingestion/adapter-metadata");
+const {
+  ATS_FILTER_LABEL_BY_VALUE,
+  buildPostgresAtsFilterCanonicalExpression,
+  normalizeAtsFilterValue
+} = require("../server/ingestion/atsFilters");
 
 const DEFAULT_JSON_OUTPUT = path.join("docs", "reference", "ats-workbench", "target-table.json");
 const DEFAULT_MARKDOWN_OUTPUT = path.join("docs", "reference", "ats-workbench", "target-table.md");
@@ -174,13 +179,19 @@ function priorityScore(row, profile) {
 }
 
 function normalizeRawRow(raw = {}) {
-  const atsKey = clean(raw.ats_key || "unknown").toLowerCase() || "unknown";
-  const metadata = getAdapterMetadata(atsKey, clean(raw.display_name || atsKey));
+  const rawAtsKey = clean(raw.ats_key || "unknown").toLowerCase() || "unknown";
+  const atsKey = normalizeAtsFilterValue(rawAtsKey) || rawAtsKey;
+  const metadata = getAdapterMetadata(atsKey);
+  const rawDisplayName = clean(raw.display_name || "");
+  const canonicalDisplayName = ATS_FILTER_LABEL_BY_VALUE.get(atsKey) || metadata.displayName || atsKey;
+  const displayName = rawDisplayName && normalizeAtsFilterValue(rawDisplayName) !== atsKey
+    ? rawDisplayName
+    : canonicalDisplayName;
   const visibleRows = toNumber(raw.visible_rows);
   const sourceEnabled = raw.source_enabled === false ? false : true;
   const row = {
     ats_key: atsKey,
-    display_name: clean(raw.display_name || metadata.displayName || atsKey),
+    display_name: displayName,
     adapter_tier: metadata.tier,
     parser_fixture_status: metadata.parserFixtureStatus,
     fixture_status: metadata.fixtureStatus,
@@ -366,13 +377,45 @@ function buildMarkdown(rows = [], options = {}) {
 
 async function loadRawRowsFromPostgres(pool, options = {}) {
   const limit = Math.max(1, Math.min(1000, Math.floor(Number(options.limit || 1000))));
+  const sourceAtsSql = buildPostgresAtsFilterCanonicalExpression("s.ats_key");
+  const sourceRawAtsSql = "LOWER(BTRIM(s.ats_key))";
+  const postingAtsSql = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const companyAtsSql = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const syncAtsSql = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const sourceRunAtsSql = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const targetFailureAtsSql = buildPostgresAtsFilterCanonicalExpression("ats_key");
+  const parserErrorAtsSql = buildPostgresAtsFilterCanonicalExpression("ats_key");
   const result = await pool.query(`
     WITH now_value AS (
       SELECT EXTRACT(EPOCH FROM now())::bigint AS now_epoch
     ),
+    source_metrics AS (
+      SELECT
+        canonical_ats_key AS ats_key,
+        COALESCE(
+          (ARRAY_AGG(NULLIF(display_name, '') ORDER BY is_canonical_row DESC, raw_ats_key ASC))[1],
+          canonical_ats_key
+        ) AS display_name,
+        COALESCE((ARRAY_AGG(enabled ORDER BY is_canonical_row DESC, raw_ats_key ASC))[1], false) AS source_enabled,
+        COALESCE(
+          (ARRAY_AGG(NULLIF(protection_status, '') ORDER BY is_canonical_row DESC, raw_ats_key ASC))[1],
+          'missing'
+        ) AS protection_status
+      FROM (
+        SELECT
+          COALESCE(NULLIF(${sourceAtsSql}, ''), 'unknown') AS canonical_ats_key,
+          ${sourceRawAtsSql} AS raw_ats_key,
+          ${sourceRawAtsSql} = COALESCE(NULLIF(${sourceAtsSql}, ''), 'unknown') AS is_canonical_row,
+          display_name,
+          COALESCE(enabled, false) AS enabled,
+          COALESCE(protection_status, 'missing') AS protection_status
+        FROM ats_sources s
+      ) source_rows
+      GROUP BY canonical_ats_key
+    ),
     visible AS (
       SELECT
-        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+        COALESCE(NULLIF(${postingAtsSql}, ''), 'unknown') AS ats_key,
         company_name,
         location_text,
         country,
@@ -419,23 +462,23 @@ async function loadRawRowsFromPostgres(pool, options = {}) {
     ),
     company_metrics AS (
       SELECT
-        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+        COALESCE(NULLIF(${companyAtsSql}, ''), 'unknown') AS ats_key,
         COUNT(*)::bigint AS configured_companies
       FROM companies
-      GROUP BY ats_key
+      GROUP BY ${companyAtsSql}
     ),
     sync_metrics AS (
       SELECT
-        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+        COALESCE(NULLIF(${syncAtsSql}, ''), 'unknown') AS ats_key,
         COUNT(*)::bigint AS sync_targets,
         COUNT(*) FILTER (WHERE next_sync_epoch <= (SELECT now_epoch FROM now_value))::bigint AS targets_due,
         COUNT(*) FILTER (WHERE COALESCE(last_success_epoch, 0) >= (SELECT now_epoch FROM now_value) - 86400)::bigint AS targets_success_24h
       FROM company_sync_state
-      GROUP BY ats_key
+      GROUP BY ${syncAtsSql}
     ),
     source_run_metrics AS (
       SELECT
-        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+        COALESCE(NULLIF(${sourceRunAtsSql}, ''), 'unknown') AS ats_key,
         COUNT(*) FILTER (WHERE COALESCE(finished_at, started_at, created_at) >= now() - interval '24 hours')::bigint AS source_runs_24h,
         MAX(EXTRACT(EPOCH FROM COALESCE(finished_at, started_at, created_at)))::bigint AS latest_source_run_epoch,
         COALESCE(SUM(fetch_count) FILTER (WHERE COALESCE(finished_at, started_at, created_at) >= now() - interval '24 hours'), 0)::bigint AS source_fetch_count_24h,
@@ -443,20 +486,20 @@ async function loadRawRowsFromPostgres(pool, options = {}) {
         COALESCE(SUM(accepted_count) FILTER (WHERE COALESCE(finished_at, started_at, created_at) >= now() - interval '24 hours'), 0)::bigint AS source_accepted_count_24h,
         COALESCE(SUM(rejected_count) FILTER (WHERE COALESCE(finished_at, started_at, created_at) >= now() - interval '24 hours'), 0)::bigint AS source_rejected_count_24h
       FROM ats_source_runs
-      GROUP BY ats_key
+      GROUP BY ${sourceRunAtsSql}
     ),
     target_failures AS (
       SELECT
-        COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key,
+        COALESCE(NULLIF(${targetFailureAtsSql}, ''), 'unknown') AS ats_key,
         COUNT(*)::bigint AS target_failures_24h
       FROM ingestion_run_errors
       WHERE created_at >= now() - interval '24 hours'
-      GROUP BY ats_key
+      GROUP BY ${targetFailureAtsSql}
     ),
     parser_attention AS (
       SELECT ats_key, COUNT(*)::bigint AS parser_attention_24h
       FROM (
-        SELECT COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key
+        SELECT COALESCE(NULLIF(${parserErrorAtsSql}, ''), 'unknown') AS ats_key
         FROM ingestion_run_errors
         WHERE created_at >= now() - interval '24 hours'
           AND lower(COALESCE(error_type, '')) IN (
@@ -469,14 +512,14 @@ async function loadRawRowsFromPostgres(pool, options = {}) {
             'parser_normalize'
           )
         UNION ALL
-        SELECT COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS ats_key
+        SELECT COALESCE(NULLIF(${parserErrorAtsSql}, ''), 'unknown') AS ats_key
         FROM parser_drift_events
         WHERE created_at >= now() - interval '24 hours'
       ) events
       GROUP BY ats_key
     ),
     all_ats AS (
-      SELECT ats_key FROM ats_sources
+      SELECT ats_key FROM source_metrics
       UNION SELECT ats_key FROM posting_metrics
       UNION SELECT ats_key FROM company_metrics
       UNION SELECT ats_key FROM sync_metrics
@@ -485,7 +528,7 @@ async function loadRawRowsFromPostgres(pool, options = {}) {
     SELECT
       a.ats_key,
       COALESCE(s.display_name, a.ats_key) AS display_name,
-      COALESCE(s.enabled, false) AS source_enabled,
+      COALESCE(s.source_enabled, false) AS source_enabled,
       COALESCE(s.protection_status, 'missing') AS protection_status,
       COALESCE(pm.visible_rows, 0)::bigint AS visible_rows,
       COALESCE(cm.configured_companies, 0)::bigint AS configured_companies,
@@ -513,7 +556,7 @@ async function loadRawRowsFromPostgres(pool, options = {}) {
       COALESCE(tf.target_failures_24h, 0)::bigint AS target_failures_24h,
       COALESCE(pa.parser_attention_24h, 0)::bigint AS parser_attention_24h
     FROM all_ats a
-    LEFT JOIN ats_sources s ON s.ats_key = a.ats_key
+    LEFT JOIN source_metrics s ON s.ats_key = a.ats_key
     LEFT JOIN posting_metrics pm ON pm.ats_key = a.ats_key
     LEFT JOIN company_metrics cm ON cm.ats_key = a.ats_key
     LEFT JOIN sync_metrics sm ON sm.ats_key = a.ats_key

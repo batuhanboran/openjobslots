@@ -15,7 +15,7 @@ This report is read-only. It ranks current ATS families by visible live postings
 
 ## Summary
 
-- ATS count: 62
+- ATS count: 60
 - Visible rows: 107947
 - Configured companies: 40860
 - Rows seen in 24h: 32244
@@ -48,15 +48,13 @@ This report is read-only. It ranks current ATS families by visible live postings
 | `pinpointhq` | 12 | 416 | 0 | 110 | 0 | 0 | 0 | 100 | 100 | 25 | 100 | 0 | 100 | disabled | -91.09 | keep disabled until source-backed parser and safety policy exist |
 | `oracle` | 0 | 90 | 0 | 0 | 0 | 100 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | no_live_rows_fixture_target | 59.65 | review ATS individually; add raw response fixture, expected normalized fixture, invalid-shape test, and source module threshold |
 | `paylocity` | 0 | 291 | 0 | 42 | 229 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | no_live_rows_fixture_target | 50.65 | review ATS individually; add raw response fixture, expected normalized fixture, invalid-shape test, and source module threshold |
-| `adp_workforcenow` | 0 | 1 | 0 | 21 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | no_live_rows_fixture_target | 34.65 | review ATS individually; add raw response fixture, expected normalized fixture, invalid-shape test, and source module threshold |
+| `adp_workforcenow` | 0 | 232 | 0 | 21 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | no_live_rows_fixture_target | 34.65 | review ATS individually; add raw response fixture, expected normalized fixture, invalid-shape test, and source module threshold |
 | `smartrecruiters` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | no_live_rows_fixture_target | 34.65 | review ATS individually; add raw response fixture, expected normalized fixture, invalid-shape test, and source module threshold |
-| `adp_myjobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `adpmyjobs` | 0 | 544 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `adpworkforcenow` | 0 | 231 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
+| `adp_myjobs` | 0 | 544 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `applicantai` | 0 | 179 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `brassring` | 0 | 136 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `calcareers` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until bounded live canary and source quality evidence are approved |
-| `calopps` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until bounded live canary and source quality evidence are approved |
+| `calcareers` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
+| `calopps` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `careerpuck` | 0 | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `careerspage` | 0 | 132 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `dayforcehcm` | 0 | 226 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
@@ -65,7 +63,7 @@ This report is read-only. It ranks current ATS families by visible live postings
 | `gem` | 0 | 364 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `getro` | 0 | 61 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `governmentjobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `hibob` | 0 | 227 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | source-local registry module; keep disabled until bounded live canary and source quality evidence are approved |
+| `hibob` | 0 | 227 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `hirebridge` | 0 | 169 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `isolvisolvedhire` | 0 | 494 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `jobaps` | 0 | 15 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
@@ -89,5 +87,5 @@ This report is read-only. It ranks current ATS families by visible live postings
 | `teamtailor` | 0 | 1019 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `theapplicantmanager` | 0 | 156 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `ultipro` | 0 | 936 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
-| `usajobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | source-local registry module; keep disabled until bounded live canary and source quality evidence are approved |
+| `usajobs` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |
 | `workday` | 0 | 892 | 0 | 108 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | disabled | -65.35 | keep disabled until source-backed parser and safety policy exist |

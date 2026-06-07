@@ -25,6 +25,8 @@ test("normalizeAtsFilterValue maps legacy host aliases to canonical ATS keys", (
   assert.equal(normalizeAtsFilterValue("ats.rippling.com"), "rippling");
   assert.equal(normalizeAtsFilterValue("workforcenow.adp.com"), "adp_workforcenow");
   assert.equal(normalizeAtsFilterValue("jobappnetwork.com"), "talentreef");
+  assert.equal(normalizeAtsFilterValue("jobs.personio.de"), "personio");
+  assert.equal(normalizeAtsFilterValue("apply.workable.com"), "workable");
 });
 
 test("ATS alias helpers expose canonical source target lookups", () => {
@@ -48,7 +50,10 @@ test("normalizeAtsFilters dedupes configured canonical keys and ignores unsuppor
 
 test("default sync ATS excludes sources that are not enabled by default", () => {
   assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("dayforcehcm"), false);
+  assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("personio"), false);
+  assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("workable"), false);
   assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("greenhouse"), true);
   assert.equal(normalizeSyncEnabledAts(["dayforcehcm"]).length, 0);
+  assert.deepEqual(normalizeSyncEnabledAts(["personio", "workable"]), []);
   assert.deepEqual(normalizeSyncEnabledAts("[\"greenhouse.io\",\"lever.co\"]"), ["greenhouse", "lever"]);
 });

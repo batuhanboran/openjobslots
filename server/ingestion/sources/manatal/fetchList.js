@@ -67,23 +67,45 @@ async function fetchTextPayload(url, target, fetcher, label) {
   if (typeof fetcher === "function") {
     const payload = await fetcher(url, target);
     const status = responseStatus(payload);
+    const finalUrl = clean(payload?.url || payload?.__sourceFetchFinalUrl || url);
+    if ((status === 404 || status === 410) && label === "Manatal careers page") {
+      assertCareersPageFinalHost(finalUrl, url);
+      return {
+        pageHtml: "",
+        finalUrl,
+        sourceUnavailable: true,
+        sourceUnavailableReason: "manatal_careers_page_not_found"
+      };
+    }
     if (status < 200 || status >= 300) {
       throw makeSourceFetchError("fetch_failed", `${label} request failed (${status})`, {
         status,
         url
       });
     }
-    assertCareersPageFinalHost(payload?.url || payload?.__sourceFetchFinalUrl || url, url);
+    assertCareersPageFinalHost(finalUrl, url);
     return {
       pageHtml: await payloadToText(payload),
-      finalUrl: clean(payload?.url || payload?.__sourceFetchFinalUrl || url)
+      finalUrl
     };
   }
 
   const res = await safeFetch(url, target);
+  if ((res.status === 404 || res.status === 410) && label === "Manatal careers page") {
+    assertCareersPageFinalHost(res.url || url, url);
+    return {
+      pageHtml: "",
+      finalUrl: clean(res.url || url),
+      sourceUnavailable: true,
+      sourceUnavailableReason: "manatal_careers_page_not_found"
+    };
+  }
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`${label} request failed (${res.status}): ${body.slice(0, 180)}`);
+    throw makeSourceFetchError("fetch_failed", `${label} request failed (${res.status}): ${body.slice(0, 180)}`, {
+      status: res.status,
+      url: res.url || url
+    });
   }
   assertCareersPageFinalHost(res.url || url, url);
   return {
@@ -152,6 +174,16 @@ function createFetchList(dependencies = {}) {
       method: "GET",
       headers: buildLandingHeaders()
     }, options.fetcher, "Manatal careers page");
+    if (landing?.sourceUnavailable) {
+      return {
+        html: "",
+        results: [],
+        __sourceConfig: config,
+        __sourceFetchFinalUrl: clean(landing?.finalUrl || boardUrl),
+        __sourceUnavailable: true,
+        __sourceUnavailableReason: landing.sourceUnavailableReason
+      };
+    }
     const pageHtml = String(landing?.pageHtml || "");
     const runtimeConfig = extractManatalPageRuntimeConfig(pageHtml, config, landing?.finalUrl || boardUrl);
     const jobsApiUrl = clean(runtimeConfig?.jobsApiUrl);

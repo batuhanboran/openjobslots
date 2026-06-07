@@ -59,7 +59,24 @@ const CAREERSPAGE_CITY_COUNTRY_HINTS = Object.freeze({
   teterboro: "United States",
   torrance: "United States",
   "winter park": "United States",
-  winder: "United States"
+  winder: "United States",
+  nsw: "Australia",
+  "new south wales": "Australia",
+  bavaria: "Germany",
+  maharashtra: "India",
+  "ile de france": "France",
+  "ile-de-france": "France",
+  ontario: "Canada",
+  quebec: "Canada",
+  "british columbia": "Canada",
+  alberta: "Canada",
+  victoria: "Australia",
+  queensland: "Australia",
+  "western australia": "Australia",
+  tokyo: "Japan",
+  england: "United Kingdom",
+  scotland: "United Kingdom",
+  wales: "United Kingdom"
 });
 
 function cleanCareerspageText(value) {

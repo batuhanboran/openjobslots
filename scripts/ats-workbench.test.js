@@ -52,10 +52,12 @@ function testBuildFullIndex() {
     write: false
   });
   assert.equal(payload.ok, true);
-  assert.equal(payload.sources.length, 60);
-  assert.equal(payload.summary.ats_count, 60);
+  assert.equal(payload.sources.length, 62);
+  assert.equal(payload.summary.ats_count, 62);
   assert.ok(payload.summary.public_enabled_sources.includes("greenhouse"));
   assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "dayforcehcm"));
+  assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "personio"));
+  assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "workable"));
   assert.equal(payload.summary.fixture_gaps.some((row) => row.ats_key === "teamtailor"), false);
   const teamtailor = payload.sources.find((row) => row.ats_key === "teamtailor");
   assert.equal(teamtailor.current_status, "certified");

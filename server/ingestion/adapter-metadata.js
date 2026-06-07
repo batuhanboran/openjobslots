@@ -14,7 +14,9 @@ const DIRECT_JSON_STABLE = [
   "pinpointhq",
   "recruitcrm",
   "fountain",
-  "getro"
+  "getro",
+  "personio",
+  "workable"
 ];
 
 const ENTERPRISE_DIRECT = [
@@ -77,7 +79,7 @@ const PUBLIC_SECTOR_EDUCATION = [
 
 const BRITTLE_HIGH_RISK = ["taleo", "brassring"];
 const UNSUPPORTED_ATS = new Set([]);
-const DISABLED_BY_DEFAULT_ATS = new Set(["dayforcehcm"]);
+const DISABLED_BY_DEFAULT_ATS = new Set(["dayforcehcm", "personio", "workable"]);
 
 const SOURCE_FIXTURE_BACKED_ATS = [
   "adp_myjobs",
@@ -119,6 +121,7 @@ const SOURCE_FIXTURE_BACKED_ATS = [
   "pageup",
   "paylocity",
   "peopleforce",
+  "personio",
   "pinpointhq",
   "policeapp",
   "recruitcrm",
@@ -138,6 +141,7 @@ const SOURCE_FIXTURE_BACKED_ATS = [
   "theapplicantmanager",
   "ultipro",
   "usajobs",
+  "workable",
   "workday",
   "zoho"
 ];
@@ -235,15 +239,6 @@ const ADAPTER_CERTIFICATION_DETAILS = Object.freeze({
 
 const FUTURE_DIRECT_SOURCE_CANDIDATES = Object.freeze([
   {
-    key: "personio",
-    displayName: "Personio",
-    priority: "wave-1",
-    sourceType: "direct-public-feed",
-    docsUrl: "https://developer.personio.de/v1.0/reference/get_xml",
-    endpointPattern: "https://{company}.jobs.personio.de/xml?language=en",
-    notes: "Official XML open positions feed. Strong candidate for EU coverage."
-  },
-  {
     key: "recruiterbox",
     displayName: "Trakstar Hire / Recruiterbox",
     priority: "wave-1",
@@ -260,15 +255,6 @@ const FUTURE_DIRECT_SOURCE_CANDIDATES = Object.freeze([
     docsUrl: "https://support.jobscore.com/hc/en-us/articles/202001320-Developers-Guide-to-Job-Feed-APIs",
     endpointPattern: "https://careers.jobscore.com/jobs/{company}/feed.json",
     notes: "Official JSON/XML job feed with clear polling guidance."
-  },
-  {
-    key: "workable",
-    displayName: "Workable",
-    priority: "wave-2",
-    sourceType: "direct-or-public-widget",
-    docsUrl: "https://help.workable.com/hc/en-us/articles/115012771647-Using-the-Workable-API-to-create-a-careers-page",
-    endpointPattern: "Requires reviewed public widget config or r_jobs token.",
-    notes: "High-value source; enable only after token/config handling is reviewed."
   },
   {
     key: "bullhorn",

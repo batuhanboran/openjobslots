@@ -177,9 +177,7 @@ function hasExplicitRemoteEvidence(posting = {}) {
   const evidence = posting.source_evidence || {};
   if (hasValue(evidence.remote_source) || hasValue(evidence.remote_path) || hasValue(evidence.remote_selector)) return true;
   const textEvidence = [
-    getLocationText(posting),
-    posting.title,
-    posting.position_name
+    getLocationText(posting)
   ].map(asLower).join(" ");
   if (remoteType === "remote") return /\b(remote|work from home|wfh|virtual)\b/.test(textEvidence);
   if (remoteType === "hybrid") return /\bhybrid\b/.test(textEvidence);

@@ -47,7 +47,7 @@ Enterprise/brittle source modules now follow the same runtime contract as the di
 - Cache key includes ATS key and company URL; posting key is canonical URL.
 - New ATS cannot be enabled by default until raw fixture tests and production parity tests pass.
 
-## Required 60-ATS Adapter Matrix (v1.6.0)
+## Required Configured-ATS Adapter Matrix (v1.6.0)
 
 This hand-authored table preserves source-specific notes. The canonical current status, registry state, public-enabled recommendation, fixture gaps, and risk ordering are generated under `docs/reference/ats-workbench/`; when a row below conflicts with the generated workbench, the generated workbench is the source of truth. `certified` means the ATS has raw or source-module parser-fixture-backed tests in this repo. Production promotion still requires registry enablement plus live canary and search-parity proof.
 
@@ -72,13 +72,13 @@ This hand-authored table preserves source-specific notes. The canonical current 
 | `careerplug` | HTML scrape | source-local registry module | raw fixture present | fixture-backed | Source can omit `.job-title` and expose the real title only through `aria-label`; generic `Untitled Position` and blank-title cards must be rejected. | Parser now uses class title first, then cleaned `aria-label`; URL id from `/jobs/{id}` is preserved; source-local fetch/detail/parse ownership lives in `server/ingestion/sources/careerplug/`, while `common.js` keeps only the generic spec shell. | Monitor live parser attention by grouped rejection reason; add detail fixture only if CareerPlug detail pages expose posting dates. |
 | `bamboohr` | public JSON API | source-local registry module | raw fixture present | fixture-backed | Public API fixture covers location/date/source id when source exposes fields; rows without id and URL are skipped. | Source id comes from API id or `/careers/{id}` URL; object/string locations, city, dates, department, and remote fields persist when present. Remote-only labels are not stored as city. Source-local admin-region hints fill country from deterministic city + state/province evidence; source-local parse ownership lives in `server/ingestion/sources/bamboohr/`, while `common.js` keeps only the generic spec shell. | Add tenant variants for sparse string-only locations before backfill; do not invent posting dates when BambooHR list JSON omits them. |
 | `adp_myjobs` | enterprise API | partial | raw source-module fixture-backed | medium-low | Tenant discovery, pagination, and field nesting vary by customer. | Parser now emits `reqId` as source id and preserves structured city/state/country when source arrays expose them. | Run bounded canary before public promotion; add pagination/count variants. |
-| `adp_workforcenow` | enterprise API | certified | raw source-module fixture-backed | medium | Raw direct fixture exists. | Parser now emits `itemID` as source id and preserves structured city/state/country separately from office labels. | Track legacy alias adpworkforcenow in DB separately; add more sparse location variants. |
+| `adp_workforcenow` | enterprise API | certified | raw source-module fixture-backed | medium | Raw direct fixture exists. | Parser now emits `itemID` as source id and preserves structured city/state/country separately from office labels. | Do not track legacy alias `adpworkforcenow` as a separate source; canonicalize/migrate legacy rows into `adp_workforcenow` before promotion and add more sparse location variants. |
 | `oracle` | enterprise API | certified | raw source-module fixture-backed | medium | Raw parser fixture for CandidateExperience API. | Parser now carries requisition `Id` into source id; tenant discovery still brittle. | Add pagination and language variants. |
 | `paylocity` | enterprise API | certified | raw source-module fixture-backed | medium | Raw fixture for page-data jobs JSON. | Parser now carries `JobId` into source id; embedded data can change shape. | Add more missing-field failure fixtures. |
 | `eightfold` | enterprise API | fallback | missing raw fixture | medium-low-pending-fixture | Tenant discovery, pagination, and field nesting vary by customer. | Keep nullable geo/date/remote/source fields unless raw source evidence proves values. | Add source docs/pattern, raw fixture, expected normalized fixture, and parser test. |
 | `manatal` | public JSON API / vendor endpoint | source-local registry module | raw fixture present | fixture-backed | Public jobs API can omit posting dates; rows without hash/url are skipped and blank titles are rejected. | Parser carries city/state/country, department, employment type, description text, remote/hybrid evidence, source id from hash/id, and date fields when `published_at`/`last_published_at` are present. HTML fallback now preserves source id and explicit remote/hybrid location prefixes. Source-local parse ownership lives in `server/ingestion/sources/manatal/`, while `common.js` keeps only the generic spec shell. | Backfill source-evidenced fields for existing Manatal rows, then reindex. |
 | `careerspage` | CareersPage public board HTML | source-local registry module | raw fixture present | fixture-backed | Source-local fixtures prove `/job/{id}` source ids, board-list request metadata, final-host guard, location/employment type preservation, and date-null behavior when source dates are absent. | `careerspage.io/<board>` discovery/fetch/parse now lives in `server/ingestion/sources/careerspage/`; `common.js` keeps only the generic spec shell. City/country hints are source-local and no title/body/tenant inference is used. | Keep disabled/canary-first until live inventory, net-new estimate, and canary quality prove source safety. |
-| `dayforcehcm` | enterprise API | source-local registry module | raw fixture present | medium-low | Browser-observed jobposting search API may return 401/403/429 to direct fetches; missing board routes, blank titles, and missing `jobPostingId` are rejected. | Source id comes from `jobPostingId`, `jobReqId` is preserved as evidence, `postingStartTimestampUTC` is the source date, `postingLocations[].isoCountryCode/stateCode/cityName` provide geo, and `hasVirtualLocation` maps to remote. | Keep disabled/collect-when-disabled off until bounded live canary and source-quality evidence prove safe direct fetch behavior. |
+| `dayforcehcm` | enterprise API | source-local registry module | raw fixture present | medium-low | Browser-observed jobposting search API may return 401/403/429 to direct fetches; missing board routes, blank titles, and missing `jobPostingId` are rejected. | Source id comes from `jobPostingId`, `jobReqId` is preserved as evidence, `postingStartTimestampUTC` is the source date, `postingLocations[].isoCountryCode/stateCode/cityName` provide geo, and `hasVirtualLocation` maps to remote. | Keep canary/collect-when-disabled off until bounded live canary and source-quality evidence prove safe direct fetch behavior. |
 | `pageup` | enterprise API / HTML results | partial | raw source-module fixture-backed | medium-low | Tenant discovery, pagination, and field nesting vary by customer. | Source module certifies list-row title/url/location/date parsing and URL id preservation. | Add paired detail-page fixture before broad backfill. |
 | `hirebridge` | embedded JSON / HTML scrape | fallback | missing raw fixture | pending-fixture | HTML/embedded payload variants can hide location/date/source id. | Keep nullable geo/date/remote/source fields unless raw source evidence proves values. | Add source docs/pattern, raw fixture, expected normalized fixture, and parser test. |
 | `brassring` | HTML scrape / brittle enterprise board | partial | raw source-module fixture-backed | low | Brittle board shape; parser drift likely even with fixtures. | Parser now emits `reqid` as source id and quarantines ambiguous rows through source-module gate. | Keep low confidence; run source canary before public promotion. |
@@ -116,13 +116,13 @@ This hand-authored table preserves source-specific notes. The canonical current 
 
 ## Current Coverage Snapshot
 
-- Configured ATS keys: 60.
-- Fixture-backed parser output: 60 configured ATS. The generated workbench lists every configured ATS as parser-fixture-backed.
-- Strict raw/source-module parser-backed adapters/tests: 60 configured ATS.
+- Configured ATS keys: 62.
+- Fixture-backed parser output: 62 configured ATS. The generated workbench lists every configured ATS as parser-fixture-backed.
+- Strict raw/source-module parser-backed adapters/tests: 62 configured ATS.
 - Parser-certified but still registry disabled/canary/quarantine: many sources. This is intentional; parser certification is not public promotion.
 - Certification blockers: none at the parser-fixture/read-only recovery-contract layer. Remaining blockers are live inventory, field-quality repair, canary/apply safety, direct-fetch behavior, and Postgres/Meili parity rather than missing parser fixtures.
 - Legacy fetch dispatcher gaps found: canonical `ashby` did not map to the legacy Ashby collector; the adapter now fetches as `ashbyhq`.
-- Known disabled configured source: `dayforcehcm` is parser-fixture-backed and visible as an ATS, but remains disabled by default for sync until live canary/direct-fetch evidence is approved.
+- Known canary configured source: `dayforcehcm` is parser-fixture-backed and visible as an ATS, but remains excluded from default sync until live canary/direct-fetch evidence is approved.
 - Parser attention should count typed parser errors only: `parser_validation`, `parser_parse`, `parser_normalize`, and `parser_adapter_not_implemented`. Fetch/network failures remain run errors but should not inflate parser attention.
 
 ## Wave 2 Certification Notes
@@ -165,7 +165,7 @@ This hand-authored table preserves source-specific notes. The canonical current 
 
 ## Expansion Priority
 
-Wave 1 candidates must be certified before enabling: Personio XML feed, Trakstar Hire / Recruiterbox frontend API, and JobScore feed API. Wave 2 candidates are Workable, Bullhorn, and Comeet after public token/config handling is reviewed. Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must stay separate from direct ATS adapters.
+Personio XML feed and Workable public account API are now configured canary source modules but remain excluded from default sync and public promotion until inventory, bounded canary/apply evidence, field-quality, and Postgres/Meili search parity are proven. Remaining Wave 1 candidates must be certified before enabling: Trakstar Hire / Recruiterbox frontend API and JobScore feed API. Remaining Wave 2 candidates are Bullhorn and Comeet after public token/config handling is reviewed. Remote/job-board aggregators such as Remotive, Himalayas, and Arbeitnow must stay separate from direct ATS adapters.
 
 Detailed certification requirements live in [ATS Source Certification](./ats-source-certification.md). Data freshness and pruning rules live in [Data Retention](./data-retention.md).
 
@@ -181,11 +181,11 @@ The workbench is read-only. It merges configured adapter metadata with productio
 
 Current generated status counts:
 
-- Configured ATS keys: 60.
+- Configured ATS keys: 62.
 - Certified: 59.
 - Partial: 0.
 - Fallback/pending: 0.
-- Disabled after parser certification: 1 (`dayforcehcm`).
+- Canary but not public-enabled-by-default after parser/source certification: 3 (`dayforcehcm`, `personio`, `workable`).
 
 ATS-specific fetch/parser work packets are generated with `npm run ats:workbench`; the canonical index is `docs/reference/ats-workbench/index.json` and per-source records live under `docs/reference/ats-workbench/sources/`. For the direct JSON/API repair wave, source module paths are also recorded under each source's `source_module` and `runner_interface` fields.
 
@@ -209,7 +209,7 @@ Top quality-risk sources from the latest read-only production snapshot:
 | 14 | `workday` | certified | 20356 | 83.85 | 46.96 | yes, quality debt | wave-1-live-gap | Audit raw payloads and add field-specific parser/backfill fixture. |
 | 15 | `zoho` | certified | 9114 | 87.16 | 22.02 | yes, quality debt | wave-2-live-gap | Add or run bounded detail-refetch certification for missing geo/remote evidence. |
 
-Quarantine/disable recommendation until source-backed live evidence improves: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`, plus no-row sources that need broader live canary proof (`adp_myjobs`, `policeapp`, `sagehr`, `saphrcloud`, `talexio`). `calcareers`, `calopps`, `hibob`, `statejobsny`, `theapplicantmanager`, `usajobs`, and `dayforcehcm` have strict raw/source fixtures but stay disabled/collect-when-disabled off until live canary evidence proves source quality and direct-fetch behavior.
+Quarantine/disable recommendation until source-backed live evidence improves: `brassring`, `teamtailor`, `applitrack`, `hirebridge`, `peopleforce`, `pageup`, plus no-row sources that need broader live canary proof (`adp_myjobs`, `policeapp`, `sagehr`, `saphrcloud`, `talexio`). `calcareers`, `calopps`, `hibob`, `statejobsny`, `theapplicantmanager`, and `usajobs` have strict raw/source fixtures but stay disabled/collect-when-disabled off until live canary evidence proves source quality and direct-fetch behavior. `dayforcehcm`, `personio`, and `workable` are canary registry modules, but still require bounded live canary proof before default sync or public promotion.
 
 Work-packet review notes from this pass:
 

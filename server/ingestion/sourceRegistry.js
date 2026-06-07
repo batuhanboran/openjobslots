@@ -64,7 +64,7 @@ const PILOT_SOURCE_METADATA = Object.freeze({
   }),
   dayforcehcm: Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled,
+    status: SOURCE_STATUSES.canary,
     collectWhenDisabled: false
   }),
   careerpuck: Object.freeze({
@@ -82,7 +82,7 @@ const PILOT_SOURCE_METADATA = Object.freeze({
   }),
   gem: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled,
+    status: SOURCE_STATUSES.canary,
     collectWhenDisabled: false
   }),
   fountain: Object.freeze({
@@ -153,11 +153,16 @@ const PILOT_SOURCE_METADATA = Object.freeze({
   }),
   manatal: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.canary
   }),
   oracle: Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.enabled
+  }),
+  personio: Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.canary,
+    collectWhenDisabled: false
   }),
   peopleforce: Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
@@ -254,7 +259,12 @@ const PILOT_SOURCE_METADATA = Object.freeze({
   }),
   workday: Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.canary
+  }),
+  workable: Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.canary,
+    collectWhenDisabled: false
   }),
   zoho: Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
@@ -352,6 +362,10 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   pageuppeoplecom: "pageup",
   "paylocity.com": "paylocity",
   paylocitycom: "paylocity",
+  "jobs.personio.de": "personio",
+  "personio.de": "personio",
+  personio: "personio",
+  personiode: "personio",
   "peopleforce.io": "peopleforce",
   peopleforceio: "peopleforce",
   "pinpointhq.com": "pinpointhq",
@@ -398,6 +412,11 @@ const REGISTRY_SOURCE_ALIASES = Object.freeze({
   usajobsgov: "usajobs",
   "workforcenow.adp.com": "adp_workforcenow",
   workforcenowadpcom: "adp_workforcenow",
+  workable: "workable",
+  "workable.com": "workable",
+  workablecom: "workable",
+  "apply.workable.com": "workable",
+  applyworkablecom: "workable",
   "www.calcareers.ca.gov": "calcareers",
   wwwcalcareerscagov: "calcareers",
   "www.calopps.org": "calopps",

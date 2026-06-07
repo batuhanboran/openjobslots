@@ -176,14 +176,14 @@
     },
     {
       "ats_key": "personio",
-      "target_type": "expansion-candidate",
-      "internal_source_module": "",
+      "target_type": "configured-disabled-source-hardening",
+      "internal_source_module": "server/ingestion/sources/personio",
       "external_refs": [
         "kalil0321/ats-scrapers:personio.py",
         "Personio XML feed"
       ],
-      "current_gap": "Not configured in this repo, but existing docs already identify it as a Wave 1 expansion candidate.",
-      "recommended_action": "Add a new source only after endpoint review for the public XML feed, raw XML fixture, expected normalized fixture, and invalid-shape fixture.",
+      "current_gap": "Configured source module exists, but it remains disabled until live inventory, bounded canary, field-quality, and search parity evidence are proven.",
+      "recommended_action": "Use the Personio XML method only for fixture-backed canary hardening before public writes are considered.",
       "phases": [
         "phase_1",
         "phase_3"
@@ -208,13 +208,13 @@
     },
     {
       "ats_key": "workable",
-      "target_type": "expansion-candidate",
-      "internal_source_module": "",
+      "target_type": "configured-disabled-source-hardening",
+      "internal_source_module": "server/ingestion/sources/workable",
       "external_refs": [
         "kalil0321/ats-scrapers:workable.py"
       ],
-      "current_gap": "Not configured; repo docs list Workable as a Wave 2 candidate because public token/config handling needs review.",
-      "recommended_action": "Do not implement until public widget/API token handling is documented and fixture-backed.",
+      "current_gap": "Configured source module exists, but it remains disabled until live inventory, bounded canary, field-quality, and search parity evidence are proven.",
+      "recommended_action": "Use the public account API method only for fixture-backed canary hardening; keep private token routes out until separately reviewed.",
       "phases": [
         "phase_1",
         "phase_3"

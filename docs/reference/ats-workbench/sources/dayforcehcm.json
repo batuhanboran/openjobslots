@@ -37,7 +37,7 @@
     "path": "server/ingestion/sources/dayforcehcm/index.js",
     "fixtures_dir": "server/ingestion/sources/dayforcehcm/fixtures",
     "parser_version": "source-dayforcehcm-v1",
-    "registry_status": "disabled",
+    "registry_status": "canary",
     "collect_when_disabled": false
   },
   "quality_threshold": {

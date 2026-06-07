@@ -22,6 +22,7 @@
           "url": "/fixture/jobs/TR1002",
           "address": { "city": "" },
           "stateOrProvinceFull": "",
+          "remoteType": "Remote",
           "department": { "name": "Support" },
           "createdDate": "2026-05-08"
         }

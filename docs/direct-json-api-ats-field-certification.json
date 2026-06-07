@@ -10,6 +10,78 @@
     "inferable": "Field is derived from another source field such as URL, title, location, or workplace text."
   },
   "records": {
+    "personio": {
+      "source_endpoint": "GET https://{company}.jobs.personio.de/xml?language=en",
+      "parser_location": [
+        "server/ingestion/sources/personio/fetchList.js",
+        "server/ingestion/sources/personio/parse.js",
+        "server/ingestion/sources/personio/index.js"
+      ],
+      "raw_fixture_status": {
+        "status": "saved-raw-direct-fixture",
+        "paths": [
+          "server/ingestion/sources/personio/fixtures/list.json",
+          "server/ingestion/sources/personio/fixtures/expected-normalized.json",
+          "server/ingestion/sources/personio/fixtures/invalid-shapes.json"
+        ],
+        "gap": "Needs more tenant variants for language, sparse office fields, and remote-only location labels before promotion."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses office, workplace, location, city, state, and country values exposed by the XML feed."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses source date fields such as created_at or updated_at only when present."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses explicit remote/workplace text from XML location fields."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses the XML position id when present, with canonical URL fallback."
+        }
+      },
+      "priority": "P2: keep disabled until inventory, bounded canary, field-quality, and search parity prove clean public writes."
+    },
+    "workable": {
+      "source_endpoint": "GET https://www.workable.com/api/accounts/{subdomain}?details=true",
+      "parser_location": [
+        "server/ingestion/sources/workable/fetchList.js",
+        "server/ingestion/sources/workable/parse.js",
+        "server/ingestion/sources/workable/index.js"
+      ],
+      "raw_fixture_status": {
+        "status": "saved-raw-direct-fixture",
+        "paths": [
+          "server/ingestion/sources/workable/fixtures/list.json",
+          "server/ingestion/sources/workable/fixtures/expected-normalized.json",
+          "server/ingestion/sources/workable/fixtures/invalid-shapes.json"
+        ],
+        "gap": "Needs pagination and account-shape variants plus token-handling review if private API routes are introduced."
+      },
+      "field_decisions": {
+        "geo": {
+          "decision": "list",
+          "basis": "Uses the public account jobs location object and string fallbacks."
+        },
+        "date": {
+          "decision": "list",
+          "basis": "Uses published, created, or updated timestamps when the public account payload exposes them."
+        },
+        "remote": {
+          "decision": "list",
+          "basis": "Uses telecommuting, workplace_type, or explicit remote location text."
+        },
+        "source_id": {
+          "decision": "list",
+          "basis": "Uses shortcode/id/source id from the public account jobs payload."
+        }
+      },
+      "priority": "P2: keep disabled until inventory, bounded canary, field-quality, and search parity prove clean public writes."
+    },
     "greenhouse": {
       "source_endpoint": "GET https://boards-api.greenhouse.io/v1/boards/{boardToken}/jobs?content=true",
       "parser_location": [

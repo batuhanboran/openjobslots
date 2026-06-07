@@ -39,7 +39,7 @@
     "path": "server/ingestion/sources/gem/index.js",
     "fixtures_dir": "server/ingestion/sources/gem/fixtures",
     "parser_version": "source-gem-v1",
-    "registry_status": "disabled",
+    "registry_status": "canary",
     "collect_when_disabled": false
   },
   "quality_threshold": {
@@ -49,7 +49,7 @@
   },
   "public_enabled_recommendation": true,
   "public_enabled": false,
-  "quarantine_reason": "registry status is disabled; parser certification is not production promotion",
+  "quarantine_reason": "registry status is canary; parser certification is not production promotion",
   "failure_log": {
     "known_failure_modes": [],
     "parser_attention_count_24h": 0,

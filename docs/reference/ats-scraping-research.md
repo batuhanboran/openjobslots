@@ -23,7 +23,7 @@ This document converts external scraping research into the OpenJobSlots ATS sour
 2. Phase 2: method profile and experiment runner.
    Add source method profiles and make `ats:method:experiment` work across selected sources instead of the current narrow source allowlist.
 3. Phase 3: pilot source hardening.
-   Apply the method map to `teamtailor`, `icims`, `applitrack`, and the expansion candidates `personio`, `recruiterbox`, and `workable` only after fixture-backed gates are ready.
+   Apply the method map to `teamtailor`, `icims`, `applitrack`, configured-disabled `personio`/`workable`, and the remaining expansion candidate `recruiterbox` only after fixture-backed gates are ready.
 4. Phase 4: external evidence provider sidecar.
    Add Crawlee, Firecrawl, or Crawl4AI only as optional evidence providers behind source caps, response limits, and deterministic parser fixtures. The repo-side abstraction is `server/ingestion/externalEvidenceProviders.js`; it is disabled by default and requires explicit injected adapters.
 
@@ -34,9 +34,9 @@ This document converts external scraping research into the OpenJobSlots ATS sour
 | 1 | `teamtailor` | existing source method repair | Use Teamtailor RSS as the preferred method and keep HTML fixture parsing as a fallback guard. |
 | 2 | `icims` | existing detail evidence repair | Compare list, paged iframe, and bounded detail fetch evidence without weakening parser gates. |
 | 3 | `applitrack` | existing detail evidence repair | Profile `Output.asp` list fetch versus bounded detail fetches and keep detail output as parser evidence. |
-| 4 | `personio` | expansion candidate | Review the public XML feed, then add raw XML and expected normalized fixtures before implementation. |
+| 4 | `personio` | configured-disabled source hardening | Use the public XML feed only for fixture-backed canary hardening before public writes are considered. |
 | 5 | `recruiterbox` | expansion candidate | Review the Trakstar Hire frontend openings API and tenant discovery before implementation. |
-| 6 | `workable` | expansion candidate | Hold until public widget/API token handling is documented and fixture-backed. |
+| 6 | `workable` | configured-disabled source hardening | Use the public account API only for fixture-backed canary hardening; keep private token routes out until separately reviewed. |
 
 ## Backend Boundary
 

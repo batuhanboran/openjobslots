@@ -247,6 +247,30 @@ const ATS_CERTIFICATION_OVERRIDES = {
       sourceId: decision("list-payload", "JobId is available and must be preserved.")
     }
   },
+  personio: {
+    priority: "P2",
+    sourcePattern: "Personio official public XML feed at https://{company}.jobs.personio.de/xml?language={language}.",
+    parserPath: "server/ingestion/sources/personio/parse.js parsePersonioPostingsFromXml",
+    requiredFixtures: ["Personio XML feed fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw XML fixture covers office, location, city, and country fields."),
+      date: decision("list-payload", "Use created_at/updated_at XML fields only when source exposes them."),
+      remote: decision("list-payload", "Use XML workplace/remote fields or explicit office/location remote labels only; title-only remote text is quarantined."),
+      sourceId: decision("list-payload", "Use XML position id when present, with stable canonical URL id fallback.")
+    }
+  },
+  workable: {
+    priority: "P2",
+    sourcePattern: "Workable public account API at https://www.workable.com/api/accounts/{subdomain}?details=true.",
+    parserPath: "server/ingestion/sources/workable/parse.js parseWorkablePostingsFromApi",
+    requiredFixtures: ["Workable public account API fixture", "expected normalized fixture", "invalid shape fixture"],
+    fieldDecisions: {
+      geo: decision("list-payload", "Saved raw API fixture covers jobs[].location city, region, country, country_code, and location_str."),
+      date: decision("list-payload", "Use created_at/published_at/updated_at API fields only when source exposes them."),
+      remote: decision("list-payload", "Use jobs[].location workplace_type/telecommuting, top-level workplace/remote fields, or explicit location_str remote labels only; title-only remote text is quarantined."),
+      sourceId: decision("list-payload", "Use shortcode/id from the public account jobs payload, with stable canonical URL id fallback.")
+    }
+  },
   k12jobspot: {
     priority: "P2",
     sourcePattern: "K12JobSpot public Jobs/Search JSON API.",
@@ -418,6 +442,7 @@ const ATS_SOURCE_PATTERNS = {
   pageup: "PageUp search/list HTML plus detail pages.",
   paylocity: "Paylocity embedded pageData Jobs JSON.",
   peopleforce: "PeopleForce public careers HTML.",
+  personio: "Personio official public XML feed.",
   pinpointhq: "PinpointHQ postings.json API.",
   policeapp: "PoliceApp public AJAX/list endpoint.",
   recruitcrm: "RecruitCRM public jobs API.",
@@ -437,6 +462,7 @@ const ATS_SOURCE_PATTERNS = {
   theapplicantmanager: "The Applicant Manager public careers HTML.",
   ultipro: "UKG/UltiPro opportunities JSON.",
   usajobs: "USAJobs official Search API with Host/User-Agent/Authorization-Key headers.",
+  workable: "Workable public accounts API.",
   zoho: "Zoho Recruit hidden jobs JSON in careers page."
 };
 
@@ -476,6 +502,7 @@ const PARSER_PATHS = {
   pageup: "server/ingestion/sources/pageup/parse.js parsePageupPostingsFromResults",
   paylocity: "server/ingestion/sources/paylocity/parse.js parsePaylocityPostingsFromPageData",
   peopleforce: "server/ingestion/sources/peopleforce/parse.js parsePeopleforcePostingsFromHtml",
+  personio: "server/ingestion/sources/personio/parse.js parsePersonioPostingsFromXml",
   pinpointhq: "server/ingestion/sources/pinpointhq/parse.js parsePinpointHqPostingsFromApi",
   policeapp: "server/ingestion/sources/policeapp/parse.js parsePoliceappPostingsFromHtml",
   recruitcrm: "server/ingestion/sources/recruitcrm/parse.js parseRecruitCrmPostingsFromApi",
@@ -495,6 +522,7 @@ const PARSER_PATHS = {
   theapplicantmanager: "server/ingestion/sources/theapplicantmanager/parse.js parseTheApplicantManagerPostingsFromHtml",
   ultipro: "server/ingestion/sources/ultipro/parse.js parseUltiProPostingsFromApi",
   usajobs: "server/ingestion/sources/usajobs/parse.js parseUsajobsPostingsFromPayload",
+  workable: "server/ingestion/sources/workable/parse.js parseWorkablePostingsFromApi",
   zoho: "server/ingestion/sources/zoho/parse.js parseZohoPostingsFromHtml"
 };
 

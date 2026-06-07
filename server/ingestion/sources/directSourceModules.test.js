@@ -16,6 +16,8 @@ const PRIMARY_DIRECT_SOURCES = Object.freeze([
   "recruitcrm",
   "pinpointhq",
   "fountain",
+  "personio",
+  "workable",
   "isolvisolvedhire",
   "talexio",
   "zoho"
@@ -726,6 +728,112 @@ test("manatal source module fetches landing runtime config and paginated jobs AP
     }),
     /unexpected host/
   );
+});
+
+test("manatal source module treats closed careers pages as source-unavailable empty boards", async () => {
+  const source = getSourceModule("manatal");
+  const company = {
+    company_name: "Closed Manatal",
+    url_string: "https://www.careers-page.com/closed-fixture"
+  };
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => ({
+      status: 404,
+      url,
+      body: "<html>not found</html>"
+    })
+  });
+
+  assert.equal(raw.__sourceUnavailable, true);
+  assert.equal(raw.__sourceUnavailableReason, "manatal_careers_page_not_found");
+  assert.deepEqual(raw.results, []);
+  assert.deepEqual(source.parse(raw, company), []);
+});
+
+test("gem source module marks empty jobPostings GraphQL boards as empty-list payloads", () => {
+  const source = getSourceModule("gem");
+  assert.deepEqual(source.payloadShapePolicy.empty_job_list_stems, ["[].data.oatsExternalJobPostings.jobPostings"]);
+  const company = readJson(path.join(__dirname, "gem", "fixtures", "company.json"));
+  const raw = [
+    {
+      data: {
+        oatsExternalJobPostings: {
+          jobPostings: []
+        }
+      }
+    }
+  ];
+  raw.__sourceConfig = source.discover(company).config;
+  assert.deepEqual(source.parse(raw, company), []);
+});
+
+test("workable source module discovers the public accounts endpoint without token handling", () => {
+  const source = getSourceModule("workable");
+  const discovered = source.discover({
+    company_name: "Fixture Workable",
+    url_string: "https://www.workable.com/api/accounts/fixtureco?details=true"
+  });
+  assert.equal(discovered.ats_key, "workable");
+  assert.equal(discovered.config.subdomain, "fixtureco");
+  assert.equal(discovered.list_url, "https://www.workable.com/api/accounts/fixtureco?details=true");
+});
+
+test("personio and workable source modules do not accept title-only remote evidence", () => {
+  const cases = [
+    {
+      atsKey: "personio",
+      company: {
+        company_name: "Fixture Personio",
+        url_string: "https://fixtureco.jobs.personio.de/"
+      },
+      raw: {
+        xml: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workzag-jobs><position><id>title-remote</id><name>Remote Integration Engineer</name><jobUrl>https://fixtureco.jobs.personio.de/job/title-remote</jobUrl></position></workzag-jobs>"
+      }
+    },
+    {
+      atsKey: "workable",
+      company: {
+        company_name: "Fixture Workable",
+        url_string: "https://fixtureco.workable.com/"
+      },
+      raw: {
+        jobs: [
+          {
+            id: "title-remote",
+            title: "Remote Integration Engineer",
+            shortcode: "TITLE_REMOTE",
+            state: "published",
+            url: "https://fixtureco.workable.com/jobs/title-remote"
+          }
+        ]
+      }
+    }
+  ];
+
+  for (const item of cases) {
+    const source = getSourceModule(item.atsKey);
+    const parsed = source.parse(item.raw, item.company);
+    assert.equal(parsed.length, 1);
+    const normalized = source.normalize(parsed[0], item.company);
+    const gate = evaluatePublicPosting(normalized, { parserVersion: source.parserVersion });
+    assert.equal(normalized.remote_type, "unknown", `${item.atsKey} title-only remote should stay unknown`);
+    assert.equal(normalized.evidence.remote_type.present, false, `${item.atsKey} should not emit remote evidence`);
+    assert.equal(gate.status, "quarantined", `${item.atsKey} title-only remote should not pass public gate`);
+    assert.ok(gate.reason_codes.includes("no_geo_no_remote"), `${item.atsKey} should require source geo or remote evidence`);
+  }
+
+  const personio = getSourceModule("personio");
+  const personioCompany = readJson(path.join(__dirname, "personio", "fixtures", "company.json"));
+  const personioRows = personio.parse(readJson(path.join(__dirname, "personio", "fixtures", "list.json")), personioCompany)
+    .map((posting) => personio.normalize(posting, personioCompany));
+  assert.equal(personioRows.find((row) => row.source_job_id === "992").evidence.remote_type.evidence_path, "workzag-jobs.position.office");
+
+  const workable = getSourceModule("workable");
+  const workableCompany = readJson(path.join(__dirname, "workable", "fixtures", "company.json"));
+  const workableRows = workable.parse(readJson(path.join(__dirname, "workable", "fixtures", "list.json")), workableCompany)
+    .map((posting) => workable.normalize(posting, workableCompany));
+  assert.equal(workableRows.find((row) => row.source_job_id === "FLOW456").evidence.remote_type.evidence_path, "jobs[].location.workplace_type");
 });
 
 test("isolvisolvedhire source module fetches board HTML before jobs API", async () => {

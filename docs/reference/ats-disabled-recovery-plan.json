@@ -1,0 +1,445 @@
+{
+  "ok": true,
+  "read_only": true,
+  "summary": {
+    "generated_at": "2026-06-04T23:16:50.116Z",
+    "production_available": true,
+    "target_count": 7,
+    "by_threshold_state": {
+      "production_gated": 7
+    },
+    "local_ready_count": 7,
+    "production_gated_count": 7
+  },
+  "items": [
+    {
+      "ats_key": "workday",
+      "display_name": "Workday",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "workday",
+        "display_name": "Workday",
+        "registry_status": "canary",
+        "collect_when_disabled": true,
+        "enabled_by_default": true,
+        "adapter_tier": "enterprise-direct",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/workday/fixtures/list.json",
+          "server/ingestion/sources/workday/fixtures/expected-normalized.json",
+          "server/ingestion/sources/workday/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "workday",
+        "source_row_present": true,
+        "raw_source_rows": [
+          "workday"
+        ],
+        "legacy_alias_rows": [],
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "disabled_reason": "http_blocked: http_failure_pct 100% >= 50%",
+        "disabled_at": "2026-05-12 20:42:51",
+        "visible_rows": 0,
+        "missing_any_geo": 0,
+        "weak_remote": 0,
+        "cache_rows": 0,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "completed_with_errors",
+        "last_run_mode": "apply",
+        "last_fetch": 0,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "http_blocked: http_failure_pct 100% >= 50%",
+        "latest_quality_action": "disable"
+      },
+      "blockers": [
+        "production protection blocks sync: auto_disabled"
+      ],
+      "recommended_actions": [
+        "after explicit approval, backup, preflight, and worker isolation, reset source protection to a bounded canary state",
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    },
+    {
+      "ats_key": "manatal",
+      "display_name": "Manatal",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "manatal",
+        "display_name": "Manatal",
+        "registry_status": "canary",
+        "collect_when_disabled": true,
+        "enabled_by_default": true,
+        "adapter_tier": "vendor-specific",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/manatal/fixtures/list.json",
+          "server/ingestion/sources/manatal/fixtures/expected-normalized.json",
+          "server/ingestion/sources/manatal/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "manatal",
+        "source_row_present": true,
+        "raw_source_rows": [
+          "manatal"
+        ],
+        "legacy_alias_rows": [],
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "disabled_reason": "http_blocked: http_failure_pct 100% >= 50%",
+        "disabled_at": "2026-05-12 20:42:51",
+        "visible_rows": 0,
+        "missing_any_geo": 0,
+        "weak_remote": 0,
+        "cache_rows": 0,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "completed_with_errors",
+        "last_run_mode": "apply",
+        "last_fetch": 0,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "http_blocked: http_failure_pct 100% >= 50%",
+        "latest_quality_action": "disable"
+      },
+      "blockers": [
+        "production protection blocks sync: auto_disabled"
+      ],
+      "recommended_actions": [
+        "after explicit approval, backup, preflight, and worker isolation, reset source protection to a bounded canary state",
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    },
+    {
+      "ats_key": "dayforcehcm",
+      "display_name": "Dayforce",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "dayforcehcm",
+        "display_name": "Dayforce",
+        "registry_status": "canary",
+        "collect_when_disabled": false,
+        "enabled_by_default": false,
+        "adapter_tier": "enterprise-direct",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium-low",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/dayforcehcm/fixtures/company.json",
+          "server/ingestion/sources/dayforcehcm/fixtures/list.json",
+          "server/ingestion/sources/dayforcehcm/fixtures/expected-normalized.json",
+          "server/ingestion/sources/dayforcehcm/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "dayforcehcm",
+        "source_row_present": true,
+        "raw_source_rows": [
+          "dayforcehcm"
+        ],
+        "legacy_alias_rows": [],
+        "enabled": "false",
+        "protection_status": "canary_only",
+        "disabled_reason": "",
+        "disabled_at": "",
+        "visible_rows": 0,
+        "missing_any_geo": 0,
+        "weak_remote": 0,
+        "cache_rows": 0,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "",
+        "last_run_mode": "",
+        "last_fetch": 0,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "",
+        "latest_quality_action": ""
+      },
+      "blockers": [
+        "excluded from default sync"
+      ],
+      "recommended_actions": [
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    },
+    {
+      "ats_key": "gem",
+      "display_name": "Gem",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "gem",
+        "display_name": "Gem",
+        "registry_status": "canary",
+        "collect_when_disabled": false,
+        "enabled_by_default": true,
+        "adapter_tier": "vendor-specific",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/gem/fixtures/list.json",
+          "server/ingestion/sources/gem/fixtures/expected-normalized.json",
+          "server/ingestion/sources/gem/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "gem",
+        "source_row_present": true,
+        "raw_source_rows": [
+          "gem"
+        ],
+        "legacy_alias_rows": [],
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "disabled_reason": "parser_drift: parser_drift_pct 16.95% >= 10%",
+        "disabled_at": "2026-05-27 19:15:55",
+        "visible_rows": 31,
+        "missing_any_geo": 29,
+        "weak_remote": 3,
+        "cache_rows": 39,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "",
+        "last_run_mode": "",
+        "last_fetch": 0,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "parser_drift: parser_drift_pct 16.95% >= 10%",
+        "latest_quality_action": "disable"
+      },
+      "blockers": [
+        "production protection blocks sync: auto_disabled"
+      ],
+      "recommended_actions": [
+        "after explicit approval, backup, preflight, and worker isolation, reset source protection to a bounded canary state",
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    },
+    {
+      "ats_key": "adp_workforcenow",
+      "display_name": "ADP Workforce Now",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "adp_workforcenow",
+        "display_name": "ADP Workforce Now",
+        "registry_status": "enabled",
+        "collect_when_disabled": true,
+        "enabled_by_default": true,
+        "adapter_tier": "enterprise-direct",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/adp_workforcenow/fixtures/list.json",
+          "server/ingestion/sources/adp_workforcenow/fixtures/expected-normalized.json",
+          "server/ingestion/sources/adp_workforcenow/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "adp_workforcenow",
+        "source_row_present": true,
+        "raw_source_rows": [
+          "adp_workforcenow",
+          "adpworkforcenow"
+        ],
+        "legacy_alias_rows": [
+          "adpworkforcenow"
+        ],
+        "enabled": "false",
+        "protection_status": "auto_disabled",
+        "disabled_reason": "parser_drift: parser_drift_pct 20.83% >= 10%",
+        "disabled_at": "2026-05-27 19:23:34",
+        "visible_rows": 26,
+        "missing_any_geo": 6,
+        "weak_remote": 0,
+        "cache_rows": 28,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "completed",
+        "last_run_mode": "apply",
+        "last_fetch": 1,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "parser_drift: parser_drift_pct 20.83% >= 10%",
+        "latest_quality_action": "disable"
+      },
+      "blockers": [
+        "legacy alias rows present: adpworkforcenow",
+        "production protection blocks sync: auto_disabled"
+      ],
+      "recommended_actions": [
+        "canonicalize legacy production ATS aliases into the canonical source key before promotion",
+        "after explicit approval, backup, preflight, and worker isolation, reset source protection to a bounded canary state",
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    },
+    {
+      "ats_key": "personio",
+      "display_name": "Personio",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "personio",
+        "display_name": "Personio",
+        "registry_status": "canary",
+        "collect_when_disabled": false,
+        "enabled_by_default": false,
+        "adapter_tier": "direct-json-stable",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/personio/fixtures/company.json",
+          "server/ingestion/sources/personio/fixtures/list.json",
+          "server/ingestion/sources/personio/fixtures/expected-normalized.json",
+          "server/ingestion/sources/personio/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "personio",
+        "source_row_present": false,
+        "raw_source_rows": [
+          "personio"
+        ],
+        "legacy_alias_rows": [],
+        "enabled": "missing",
+        "protection_status": "missing",
+        "disabled_reason": "",
+        "disabled_at": "",
+        "visible_rows": 0,
+        "missing_any_geo": 0,
+        "weak_remote": 0,
+        "cache_rows": 0,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "",
+        "last_run_mode": "",
+        "last_fetch": 0,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "",
+        "latest_quality_action": ""
+      },
+      "blockers": [
+        "production source row missing",
+        "excluded from default sync"
+      ],
+      "recommended_actions": [
+        "deploy/seed local source registry so production creates the disabled source row",
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    },
+    {
+      "ats_key": "workable",
+      "display_name": "Workable",
+      "threshold_state": "production_gated",
+      "local": {
+        "ats_key": "workable",
+        "display_name": "Workable",
+        "registry_status": "canary",
+        "collect_when_disabled": false,
+        "enabled_by_default": false,
+        "adapter_tier": "direct-json-stable",
+        "parser_fixture_status": "parser-fixture-backed",
+        "parser_confidence": "medium",
+        "source_module_present": true,
+        "recovery_contract_ok": true,
+        "fixture_files_all_present": true,
+        "fixture_paths": [
+          "server/ingestion/sources/workable/fixtures/company.json",
+          "server/ingestion/sources/workable/fixtures/list.json",
+          "server/ingestion/sources/workable/fixtures/expected-normalized.json",
+          "server/ingestion/sources/workable/fixtures/invalid-shapes.json"
+        ],
+        "local_blockers": []
+      },
+      "production": {
+        "ats_key": "workable",
+        "source_row_present": false,
+        "raw_source_rows": [
+          "workable"
+        ],
+        "legacy_alias_rows": [],
+        "enabled": "missing",
+        "protection_status": "missing",
+        "disabled_reason": "",
+        "disabled_at": "",
+        "visible_rows": 0,
+        "missing_any_geo": 0,
+        "weak_remote": 0,
+        "cache_rows": 0,
+        "cache_public": 0,
+        "cache_quarantined": 0,
+        "last_run_status": "",
+        "last_run_mode": "",
+        "last_fetch": 0,
+        "last_parse": 0,
+        "last_accepted": 0,
+        "last_quarantine": 0,
+        "last_rejected": 0,
+        "latest_quality_reason": "",
+        "latest_quality_action": ""
+      },
+      "blockers": [
+        "production source row missing",
+        "excluded from default sync"
+      ],
+      "recommended_actions": [
+        "deploy/seed local source registry so production creates the disabled source row",
+        "run read-only inventory scan, net-new estimate, and tenant batch plan",
+        "run bounded canary/apply only after planned-batch and recovery preflight pass",
+        "finish with recovery guard plus Meili/Postgres parity delta 0 before claiming threshold success"
+      ]
+    }
+  ]
+}

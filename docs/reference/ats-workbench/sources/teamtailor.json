@@ -21,6 +21,7 @@
     "files": [
       "server/ingestion/sources/teamtailor/fixtures/company.json",
       "server/ingestion/sources/teamtailor/fixtures/expected-normalized.json",
+      "server/ingestion/sources/teamtailor/fixtures/georgia-rss.json",
       "server/ingestion/sources/teamtailor/fixtures/invalid-shapes.json",
       "server/ingestion/sources/teamtailor/fixtures/list.json",
       "server/ingestion/sources/teamtailor/fixtures/rss.json"
@@ -28,6 +29,7 @@
     "present": [
       "server/ingestion/sources/teamtailor/fixtures/company.json",
       "server/ingestion/sources/teamtailor/fixtures/expected-normalized.json",
+      "server/ingestion/sources/teamtailor/fixtures/georgia-rss.json",
       "server/ingestion/sources/teamtailor/fixtures/invalid-shapes.json",
       "server/ingestion/sources/teamtailor/fixtures/list.json",
       "server/ingestion/sources/teamtailor/fixtures/rss.json"

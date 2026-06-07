@@ -47,6 +47,22 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     output: String(env.OPENJOBSLOTS_REINDEX_OUTPUT || "").trim(),
     repairExtraDocuments: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPAIR_EXTRA_DOCUMENTS) ||
       parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_DELETE_EXTRA_DOCUMENTS),
+    repairDocumentUpserts: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPAIR_DOCUMENT_UPSERTS) ||
+      parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_REPAIR_MISSING_DOCUMENTS),
+    documentRepairLimit: parseNumberOption(env.OPENJOBSLOTS_REINDEX_DOCUMENT_REPAIR_LIMIT || 100, 100, 1, 500),
+    preflightReport: String(env.OPENJOBSLOTS_REINDEX_PREFLIGHT_REPORT || "").trim(),
+    preflightMaxAgeMinutes: parseNumberOption(
+      env.OPENJOBSLOTS_REINDEX_PREFLIGHT_MAX_AGE_MINUTES || 60,
+      60,
+      1,
+      1440
+    ),
+    maxLongRunningQueries: parseNumberOption(
+      env.OPENJOBSLOTS_REINDEX_MAX_LONG_RUNNING_QUERIES || 0,
+      0,
+      0,
+      100
+    ),
     facetDriftMaxInspectedHits: parseNumberOption(
       env.OPENJOBSLOTS_REINDEX_FACET_DRIFT_MAX_INSPECTED_HITS || DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
       DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
@@ -62,32 +78,64 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
   };
 
   for (const arg of argv) {
-    if (arg === "--apply") options.apply = true;
-    if (arg === "--check") options.check = true;
-    if (arg === "--confirm-production") options.confirmProduction = true;
+    let handled = false;
+    if (arg === "--apply") {
+      options.apply = true;
+      handled = true;
+    }
+    if (arg === "--check") {
+      options.check = true;
+      handled = true;
+    }
+    if (arg === "--confirm-production") {
+      options.confirmProduction = true;
+      handled = true;
+    }
     if (arg === "--dry-run") {
       options.check = true;
       options.dryRun = true;
+      handled = true;
     }
     if (arg === "--repair-extra-documents" || arg === "--repair-extra-docs" || arg === "--delete-extra-documents") {
       options.check = true;
       options.repairExtraDocuments = true;
+      handled = true;
+    }
+    if (
+      arg === "--repair-document-upserts" ||
+      arg === "--repair-document-upsert" ||
+      arg === "--repair-missing-documents" ||
+      arg === "--upsert-missing-documents"
+    ) {
+      options.check = true;
+      options.repairDocumentUpserts = true;
+      handled = true;
     }
     if (arg === "--replace" || arg === "--replace-mode") {
       options.replaceMode = true;
       options.replaceIndex = true;
+      handled = true;
     }
-    if (arg === "--json") options.json = true;
+    if (arg === "--json") {
+      options.json = true;
+      handled = true;
+    }
     if (arg === "--validate-only") {
       options.check = true;
       options.validateOnly = true;
+      handled = true;
     }
-    if (arg === "--skip-outbox-update") options.skipOutboxUpdate = true;
+    if (arg === "--skip-outbox-update") {
+      options.skipOutboxUpdate = true;
+      handled = true;
+    }
     if (arg.startsWith("--batch-size=")) {
       options.batchSize = parseNumberOption(arg.slice("--batch-size=".length), options.batchSize, 100, 5000);
+      handled = true;
     }
     if (arg.startsWith("--sample-limit=")) {
       options.sampleLimit = parseNumberOption(arg.slice("--sample-limit=".length), options.sampleLimit, 0, 200);
+      handled = true;
     }
     if (arg.startsWith("--facet-drift-max-inspected=")) {
       options.facetDriftMaxInspectedHits = parseNumberOption(
@@ -96,15 +144,53 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
         100,
         50000
       );
+      handled = true;
+    }
+    if (arg.startsWith("--document-repair-limit=")) {
+      options.documentRepairLimit = parseNumberOption(
+        arg.slice("--document-repair-limit=".length),
+        options.documentRepairLimit,
+        1,
+        500
+      );
+      handled = true;
+    }
+    if (arg.startsWith("--preflight-report=")) {
+      options.preflightReport = String(arg.slice("--preflight-report=".length) || "").trim();
+      handled = true;
+    }
+    if (arg.startsWith("--preflight-max-age-minutes=")) {
+      options.preflightMaxAgeMinutes = parseNumberOption(
+        arg.slice("--preflight-max-age-minutes=".length),
+        options.preflightMaxAgeMinutes,
+        1,
+        1440
+      );
+      handled = true;
+    }
+    if (arg.startsWith("--max-long-running-queries=")) {
+      options.maxLongRunningQueries = parseNumberOption(
+        arg.slice("--max-long-running-queries=".length),
+        options.maxLongRunningQueries,
+        0,
+        100
+      );
+      handled = true;
     }
     if (arg.startsWith("--temp-index-suffix=")) {
       options.tempIndexSuffix = String(arg.slice("--temp-index-suffix=".length) || "").trim();
+      handled = true;
     }
     if (arg.startsWith("--output=")) {
       options.output = String(arg.slice("--output=".length) || "").trim();
+      handled = true;
+    }
+    if (!handled) {
+      throw new Error(`Unknown Meili reindex argument: ${arg}`);
     }
   }
   if (options.repairExtraDocuments) options.check = true;
+  if (options.repairDocumentUpserts) options.check = true;
   return options;
 }
 
@@ -659,6 +745,7 @@ async function getPostgresRemoteTypesByCanonicalUrl(pool, canonicalUrls = []) {
 
 async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacetDeltas = {}, options = {}) {
   const sampleLimit = Math.max(0, Math.min(100, Number(options.sampleLimit ?? 20)));
+  const targetSampleCount = Math.min(sampleLimit, remoteFacetOverrepresentedCount(remoteFacetDeltas) || sampleLimit);
   const maxInspectedHits = parseNumberOption(
     options.maxInspectedHits ?? DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
     DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
@@ -671,6 +758,7 @@ async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacet
       inspected_hits: 0,
       max_inspected_hits: maxInspectedHits,
       inspection_truncated: false,
+      target_sample_count: targetSampleCount,
       samples: []
     };
   }
@@ -681,18 +769,24 @@ async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacet
       inspected_hits: 0,
       max_inspected_hits: maxInspectedHits,
       inspection_truncated: false,
+      target_sample_count: targetSampleCount,
       samples: []
     };
   }
   const samples = [];
+  const sampledCanonicalUrls = new Set();
   let inspectedHits = 0;
+  let searchInspectedHits = 0;
+  let documentScanHits = 0;
+  let documents_endpoint_used = false;
+  let documents_endpoint_error = "";
   const perRequestLimit = Math.max(1, Math.min(100, Number(options.pageSize || 50)));
   const sort = Array.isArray(options.sort) && options.sort.length > 0
     ? options.sort.map((item) => String(item || "").trim()).filter(Boolean)
     : ["last_seen_epoch:desc"];
   for (const remoteType of remoteTypes) {
     let offset = 0;
-    while (samples.length < sampleLimit && inspectedHits < maxInspectedHits) {
+    while (samples.length < targetSampleCount && inspectedHits < maxInspectedHits) {
       const requestBody = {
         q: "",
         filter: `hidden = false AND remote_type = ${quoteMeiliFilterValue(remoteType)}`,
@@ -708,6 +802,7 @@ async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacet
       const hits = Array.isArray(result?.hits) ? result.hits : [];
       if (hits.length === 0) break;
       inspectedHits += hits.length;
+      searchInspectedHits += hits.length;
       const postgresRows = await getPostgresRemoteTypesByCanonicalUrl(
         pool,
         hits.map((hit) => hit?.canonical_url)
@@ -715,6 +810,7 @@ async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacet
       for (const hit of hits) {
         const canonicalUrl = String(hit?.canonical_url || "").trim();
         if (!canonicalUrl) continue;
+        if (sampledCanonicalUrls.has(canonicalUrl)) continue;
         const postgresRow = postgresRows.get(canonicalUrl);
         const postgresRemoteType = String(postgresRow?.remote_type || "").trim();
         const meiliRemoteType = String(hit?.remote_type || "").trim();
@@ -728,18 +824,76 @@ async function inspectRemoteFacetMismatches(pool, config, indexName, remoteFacet
           postgres_hidden: postgresRow?.hidden === true,
           inspected_meili_facet: remoteType
         });
-        if (samples.length >= sampleLimit) break;
+        sampledCanonicalUrls.add(canonicalUrl);
+        if (samples.length >= targetSampleCount) break;
       }
       offset += hits.length;
       if (hits.length < perRequestLimit) break;
     }
-    if (samples.length >= sampleLimit) break;
+    if (samples.length >= targetSampleCount) break;
+  }
+
+  if (samples.length < targetSampleCount && inspectedHits < maxInspectedHits) {
+    try {
+      for (const remoteType of remoteTypes) {
+        let offset = 0;
+        while (samples.length < targetSampleCount && inspectedHits < maxInspectedHits) {
+          const params = new URLSearchParams({
+            limit: String(perRequestLimit),
+            offset: String(offset),
+            filter: `hidden = false AND remote_type = ${quoteMeiliFilterValue(remoteType)}`
+          });
+          const result = await meiliRequest(
+            config,
+            `/indexes/${encodeIndex(indexName)}/documents?${params.toString()}`
+          );
+          documents_endpoint_used = true;
+          const documents = Array.isArray(result?.results) ? result.results : [];
+          if (documents.length === 0) break;
+          inspectedHits += documents.length;
+          documentScanHits += documents.length;
+          const postgresRows = await getPostgresRemoteTypesByCanonicalUrl(
+            pool,
+            documents.map((document) => document?.canonical_url)
+          );
+          for (const document of documents) {
+            const canonicalUrl = String(document?.canonical_url || "").trim();
+            if (!canonicalUrl || sampledCanonicalUrls.has(canonicalUrl)) continue;
+            const postgresRow = postgresRows.get(canonicalUrl);
+            const postgresRemoteType = String(postgresRow?.remote_type || "").trim();
+            const meiliRemoteType = String(document?.remote_type || "").trim();
+            if (postgresRemoteType === meiliRemoteType && postgresRow?.hidden !== true) continue;
+            samples.push({
+              canonical_url: canonicalUrl,
+              title: String(document?.title || "").trim(),
+              company: String(document?.company || "").trim(),
+              meili_remote_type: meiliRemoteType,
+              postgres_remote_type: postgresRemoteType,
+              postgres_hidden: postgresRow?.hidden === true,
+              inspected_meili_facet: remoteType
+            });
+            sampledCanonicalUrls.add(canonicalUrl);
+            if (samples.length >= targetSampleCount) break;
+          }
+          offset += documents.length;
+          if (documents.length < perRequestLimit) break;
+        }
+        if (samples.length >= targetSampleCount) break;
+      }
+    } catch (error) {
+      documents_endpoint_error = String(error?.message || error).slice(0, 500);
+    }
   }
   return {
     sampled: samples.length,
     inspected_hits: inspectedHits,
+    search_inspected_hits: searchInspectedHits,
+    document_scan_hits: documentScanHits,
     max_inspected_hits: maxInspectedHits,
-    inspection_truncated: samples.length < sampleLimit && inspectedHits >= maxInspectedHits,
+    target_sample_count: targetSampleCount,
+    inspection_truncated: samples.length < targetSampleCount && inspectedHits >= maxInspectedHits,
+    documents_endpoint_used,
+    documents_endpoint_error,
     inspected_meili_remote_types: remoteTypes,
     sort,
     samples
@@ -905,6 +1059,9 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
 async function checkMeiliParity(pool, config, options) {
   const result = await validateMeiliIndexAgainstPostgres(pool, config, config.indexName, {
     sampleLimit: options.sampleLimit,
+    driftSampleLimit: options.driftSampleLimit,
+    facetDriftSampleLimit: options.facetDriftSampleLimit,
+    facetDriftMaxInspectedHits: options.facetDriftMaxInspectedHits,
     sampleSearches: true
   });
   return {
@@ -955,6 +1112,166 @@ function tempIndexUid(config, options) {
   return uid;
 }
 
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function firstMeaningful(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim().length === 0) continue;
+    return value;
+  }
+  return undefined;
+}
+
+function toNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function preflightCommitMatches(actual, expected) {
+  const actualClean = clean(actual);
+  const expectedClean = clean(expected);
+  if (!actualClean || !expectedClean) return false;
+  return actualClean.startsWith(expectedClean) || expectedClean.startsWith(actualClean);
+}
+
+function preflightWorkerSafe(checks = {}, report = {}) {
+  if (checks.worker_isolated === true || report.worker_isolated === true || report.worker?.isolated === true) return true;
+  const state = clean(firstMeaningful(checks.worker_state, report.worker_state, report.worker?.state)).toLowerCase();
+  return ["stopped", "exited", "paused", "not_running", "not running", "disabled", "inactive", "dead"].includes(state);
+}
+
+function preflightAutodeploySafe(checks = {}, report = {}) {
+  if (checks.autodeploy_recovery_safe === true || report.autodeploy_recovery_safe === true || report.autodeploy?.recovery_safe === true) {
+    return true;
+  }
+  const state = clean(firstMeaningful(checks.autodeploy_timer_state, report.autodeploy_timer_state, report.autodeploy?.timer_state)).toLowerCase();
+  return ["inactive", "disabled", "stopped", "not_found", "not-found", "failed", "dead"].includes(state);
+}
+
+function preflightFailureCode(failure) {
+  if (typeof failure === "string") return clean(failure);
+  return clean(failure?.code || failure?.failure || failure?.reason);
+}
+
+function preflightReportSafeForDocumentRepair(report = {}) {
+  const failures = Array.isArray(report.failures) ? report.failures : [];
+  if (report.ok === true && report.unsafe !== true && failures.length === 0) {
+    return { ok: true, allowed_meili_delta_nonzero: false };
+  }
+  const codes = failures.map(preflightFailureCode).filter(Boolean);
+  const allowedCodes = new Set(["meili_postgres_delta_nonzero", "preflight_meili_postgres_delta_nonzero"]);
+  const onlyAllowedMeiliDelta = codes.length > 0 && codes.every((code) => allowedCodes.has(code));
+  return {
+    ok: onlyAllowedMeiliDelta,
+    allowed_meili_delta_nonzero: onlyAllowedMeiliDelta
+  };
+}
+
+function readPreflightReport(filePath) {
+  const resolved = path.resolve(filePath);
+  const raw = fs.readFileSync(resolved, "utf8").replace(/^\uFEFF/, "");
+  return {
+    resolved_path: resolved,
+    report: JSON.parse(raw)
+  };
+}
+
+function documentUpsertRepairPreflightStatus(options = {}) {
+  const failures = [];
+  const preflightPath = clean(options.preflightReport);
+  if (!preflightPath) {
+    return {
+      ok: false,
+      required: true,
+      path: null,
+      failures: ["--preflight-report=<report>"],
+      checks: {}
+    };
+  }
+
+  let report = {};
+  let resolvedPath = path.resolve(preflightPath);
+  try {
+    const loaded = readPreflightReport(preflightPath);
+    report = loaded.report || {};
+    resolvedPath = loaded.resolved_path;
+  } catch (error) {
+    return {
+      ok: false,
+      required: true,
+      path: resolvedPath,
+      failures: ["preflight_report_read_error"],
+      read_error: String(error?.message || error).slice(0, 500),
+      checks: {}
+    };
+  }
+
+  const checks = report?.checks && typeof report.checks === "object" && !Array.isArray(report.checks)
+    ? report.checks
+    : {};
+  const generatedAt = clean(firstMeaningful(report.generated_at, report.generatedAt, report.timestamp));
+  const generatedMs = generatedAt ? Date.parse(generatedAt) : NaN;
+  const productionCommit = clean(firstMeaningful(checks.production_checkout_commit, report.production_checkout_commit, report.checkout_commit, report.git?.commit));
+  const expectedCommit = clean(firstMeaningful(checks.expected_commit, report.expected_commit));
+  const backupPath = clean(firstMeaningful(checks.backup_path, report.backup_path));
+  const backupFileExists = firstMeaningful(checks.backup_file_exists, report.backup_file_exists, report.backup_exists, report.backup?.exists);
+  const backupSizeBytes = toNumber(firstMeaningful(checks.backup_size_bytes, report.backup_size_bytes, report.backup_bytes, report.backup?.size_bytes));
+  const longRunningQueries = toNumber(firstMeaningful(checks.long_running_postgres_queries, report.long_running_postgres_queries, report.postgres?.long_running_queries));
+  const meiliPostgresDelta = toNumber(firstMeaningful(checks.meili_postgres_delta, report.meili_postgres_delta, report.meili?.postgres_delta, report.search?.meili_postgres_delta));
+  const heavyJobActive = firstMeaningful(checks.heavy_job_active, report.heavy_job_active, report.heavy_job?.active);
+  const safeForDocumentRepair = preflightReportSafeForDocumentRepair(report);
+
+  if (!report || Object.keys(report).length === 0) failures.push("preflight_report_missing");
+  if (!safeForDocumentRepair.ok) failures.push("preflight_report_not_safe_for_document_upsert_repair");
+  if (!generatedAt) failures.push("preflight_generated_at_missing");
+  else if (!Number.isFinite(generatedMs)) failures.push("preflight_generated_at_invalid");
+  else if (Date.now() - generatedMs > Number(options.preflightMaxAgeMinutes || 60) * 60 * 1000) {
+    failures.push("preflight_report_stale");
+  }
+  if (!productionCommit) failures.push("preflight_production_commit_missing");
+  if (!expectedCommit) failures.push("preflight_expected_commit_missing");
+  if (productionCommit && expectedCommit && !preflightCommitMatches(productionCommit, expectedCommit)) {
+    failures.push("preflight_production_commit_mismatch");
+  }
+  if (!preflightWorkerSafe(checks, report)) failures.push("preflight_worker_not_isolated");
+  if (!preflightAutodeploySafe(checks, report)) failures.push("preflight_autodeploy_timer_unsafe");
+  if (heavyJobActive !== false) failures.push("preflight_heavy_job_lock_not_clear");
+  if (longRunningQueries === null) failures.push("preflight_long_running_queries_missing");
+  else if (longRunningQueries > Number(options.maxLongRunningQueries || 0)) failures.push("preflight_long_running_queries_active");
+  if (meiliPostgresDelta === null) failures.push("preflight_meili_postgres_delta_missing");
+  if (!backupPath) failures.push("preflight_backup_path_missing");
+  else if (!/[/\\]backups[/\\]/.test(backupPath)) failures.push("preflight_backup_path_not_under_backups");
+  if (backupFileExists !== true) failures.push("preflight_backup_file_missing");
+  if (backupSizeBytes === null || backupSizeBytes <= 0) failures.push("preflight_backup_file_empty");
+
+  return {
+    ok: failures.length === 0,
+    required: true,
+    path: resolvedPath,
+    failures: Array.from(new Set(failures)),
+    checks: {
+      report_ok: report.ok === true,
+      report_unsafe: report.unsafe === true,
+      allowed_meili_delta_nonzero: safeForDocumentRepair.allowed_meili_delta_nonzero,
+      generated_at: generatedAt || null,
+      production_checkout_commit: productionCommit || null,
+      expected_commit: expectedCommit || null,
+      worker_safe: preflightWorkerSafe(checks, report),
+      autodeploy_safe: preflightAutodeploySafe(checks, report),
+      heavy_job_active: heavyJobActive,
+      long_running_postgres_queries: longRunningQueries,
+      meili_postgres_delta: meiliPostgresDelta,
+      backup_path: backupPath || null,
+      backup_file_exists: backupFileExists === true,
+      backup_size_bytes: backupSizeBytes
+    }
+  };
+}
+
 function getReplaceSafetyGate(options) {
   const missing = [];
   if (!options.apply) missing.push("--apply");
@@ -984,6 +1301,27 @@ function getExtraDocumentRepairSafetyGate(options) {
   };
 }
 
+function getDocumentUpsertRepairSafetyGate(options) {
+  const missing = [];
+  const preflightStatus = options.apply
+    ? documentUpsertRepairPreflightStatus(options)
+    : { ok: false, required: false, failures: ["preflight_not_required_without_apply"], checks: {} };
+  if (!options.apply) missing.push("--apply");
+  if (!options.confirmProduction) missing.push("--confirm-production");
+  if (options.dryRun) missing.push("remove --dry-run");
+  if (options.apply && !preflightStatus.ok) missing.push(...preflightStatus.failures);
+  return {
+    repair_requested: Boolean(options.repairDocumentUpserts),
+    apply_requested: Boolean(options.apply),
+    confirm_production: Boolean(options.confirmProduction),
+    dry_run: Boolean(options.dryRun),
+    preflight_required: Boolean(options.apply),
+    preflight_status: preflightStatus,
+    authorized: missing.length === 0,
+    missing: Array.from(new Set(missing))
+  };
+}
+
 function compactRepairDocument(document) {
   return {
     id: String(document?.id || "").trim(),
@@ -996,6 +1334,25 @@ function compactRepairDocument(document) {
     postgres_exclusion_reasons: Array.isArray(document?.postgres_exclusion_reasons)
       ? document.postgres_exclusion_reasons.map((reason) => String(reason || "").trim()).filter(Boolean)
       : []
+  };
+}
+
+function compactMissingDocument(document) {
+  return {
+    id: String(document?.id || "").trim(),
+    canonical_url: String(document?.canonical_url || "").trim()
+  };
+}
+
+function compactRemoteFacetMismatch(sample) {
+  return {
+    canonical_url: String(sample?.canonical_url || "").trim(),
+    title: String(sample?.title || "").trim(),
+    company: String(sample?.company || "").trim(),
+    meili_remote_type: String(sample?.meili_remote_type || "").trim(),
+    postgres_remote_type: String(sample?.postgres_remote_type || "").trim(),
+    postgres_hidden: sample?.postgres_hidden === true,
+    inspected_meili_facet: String(sample?.inspected_meili_facet || "").trim()
   };
 }
 
@@ -1022,6 +1379,98 @@ function buildExtraDocumentRepairPlan(checkResult = {}) {
     skipped_count: skippedDocuments.length,
     skipped_documents: skippedDocuments
   };
+}
+
+function remoteFacetOverrepresentedCount(remoteFacetDelta = {}) {
+  return Object.values(remoteFacetDelta || {}).reduce((total, value) => {
+    const delta = Number(value?.delta || 0);
+    return delta < 0 ? total + Math.abs(delta) : total;
+  }, 0);
+}
+
+function addUpsertCandidate(candidatesByUrl, candidate, reason) {
+  const canonicalUrl = String(candidate?.canonical_url || "").trim();
+  if (!canonicalUrl) return;
+  const existing = candidatesByUrl.get(canonicalUrl) || {
+    canonical_url: canonicalUrl,
+    id: String(candidate?.id || "").trim(),
+    title: String(candidate?.title || "").trim(),
+    company: String(candidate?.company || "").trim(),
+    meili_remote_type: String(candidate?.meili_remote_type || "").trim(),
+    postgres_remote_type: String(candidate?.postgres_remote_type || "").trim(),
+    reasons: []
+  };
+  if (candidate?.id && !existing.id) existing.id = String(candidate.id || "").trim();
+  if (candidate?.title && !existing.title) existing.title = String(candidate.title || "").trim();
+  if (candidate?.company && !existing.company) existing.company = String(candidate.company || "").trim();
+  if (candidate?.meili_remote_type && !existing.meili_remote_type) {
+    existing.meili_remote_type = String(candidate.meili_remote_type || "").trim();
+  }
+  if (candidate?.postgres_remote_type && !existing.postgres_remote_type) {
+    existing.postgres_remote_type = String(candidate.postgres_remote_type || "").trim();
+  }
+  if (!existing.reasons.includes(reason)) existing.reasons.push(reason);
+  candidatesByUrl.set(canonicalUrl, existing);
+}
+
+function buildDocumentUpsertRepairPlan(checkResult = {}, options = {}) {
+  const limit = Math.max(1, Math.min(500, Number(options.documentRepairLimit || 100)));
+  const missingDocuments = (Array.isArray(checkResult.missing_meili_documents) ? checkResult.missing_meili_documents : [])
+    .map(compactMissingDocument)
+    .filter((document) => document.id && document.canonical_url);
+  const missingTotal = Number(checkResult.missing_meili_document_count || missingDocuments.length || 0);
+  const remoteMismatchInspection = checkResult.remote_facet_mismatch_inspection || {};
+  const remoteMismatchSamples = (Array.isArray(remoteMismatchInspection.samples) ? remoteMismatchInspection.samples : [])
+    .map(compactRemoteFacetMismatch)
+    .filter((sample) => (
+      sample.canonical_url &&
+      sample.postgres_hidden !== true &&
+      sample.postgres_remote_type &&
+      sample.meili_remote_type !== sample.postgres_remote_type
+    ));
+  const remoteOverrepresentedTotal = remoteFacetOverrepresentedCount(checkResult.remote_facet_delta);
+  const candidatesByUrl = new Map();
+  for (const document of missingDocuments) addUpsertCandidate(candidatesByUrl, document, "missing_meili_document");
+  for (const sample of remoteMismatchSamples) addUpsertCandidate(candidatesByUrl, sample, "remote_facet_mismatch");
+  const allCandidates = Array.from(candidatesByUrl.values()).sort((left, right) => left.canonical_url.localeCompare(right.canonical_url));
+  const upsertCandidates = allCandidates.slice(0, limit);
+  const missingSampleComplete = missingDocuments.length >= missingTotal;
+  const remoteSampleComplete = remoteOverrepresentedTotal === 0 ||
+    (remoteMismatchSamples.length >= remoteOverrepresentedTotal && remoteMismatchInspection.inspection_truncated !== true);
+  return {
+    repair_type: "document_upsert",
+    limit,
+    total_missing_document_count: missingTotal,
+    sampled_missing_document_count: missingDocuments.length,
+    missing_sample_complete: missingSampleComplete,
+    remote_overrepresented_document_count: remoteOverrepresentedTotal,
+    sampled_remote_mismatch_count: remoteMismatchSamples.length,
+    remote_sample_complete: remoteSampleComplete,
+    inspection_truncated: remoteMismatchInspection.inspection_truncated === true,
+    candidate_count_before_limit: allCandidates.length,
+    candidate_count_over_limit: allCandidates.length > limit,
+    upsert_candidate_count: upsertCandidates.length,
+    upsert_candidates: upsertCandidates,
+    sample_complete: missingSampleComplete && remoteSampleComplete && allCandidates.length <= limit
+  };
+}
+
+async function getPostgresIndexableRowsByCanonicalUrls(pool, canonicalUrls = []) {
+  const urls = Array.from(new Set((Array.isArray(canonicalUrls) ? canonicalUrls : [])
+    .map((url) => String(url || "").trim())
+    .filter(Boolean)));
+  if (urls.length === 0) return [];
+  const result = await pool.query(
+    `
+      SELECT ${postingSelectColumns()}
+      FROM postings
+      WHERE ${indexablePostingsWhereClause()}
+        AND canonical_url = ANY($1::text[])
+      ORDER BY canonical_url ASC;
+    `,
+    [urls]
+  );
+  return result.rows || [];
 }
 
 function latestFacetDeltaSummary(delta) {
@@ -1270,6 +1719,113 @@ async function runExtraDocumentRepair(pool, config, options, env = process.env) 
   };
 }
 
+async function runDocumentUpsertRepair(pool, config, options, env = process.env) {
+  const repairOptions = {
+    ...options,
+    driftSampleLimit: Math.max(Number(options.driftSampleLimit || 0), Number(options.documentRepairLimit || 100)),
+    facetDriftSampleLimit: Math.max(Number(options.facetDriftSampleLimit || 0), Number(options.documentRepairLimit || 100))
+  };
+  const gate = getDocumentUpsertRepairSafetyGate(options);
+  const checkResult = await checkMeiliParity(pool, config, repairOptions);
+  const repairPlan = buildDocumentUpsertRepairPlan(checkResult, repairOptions);
+
+  writeStatusSafe({
+    ok: checkResult.ok,
+    current_index_uid: config.indexName,
+    last_count_delta: checkResult.count_delta,
+    last_facet_delta: latestFacetDeltaSummary(checkResult.remote_facet_delta),
+    last_task_error: checkResult.ok ? "" : "Meili/Postgres validation mismatch."
+  }, options, env);
+
+  if (!gate.authorized) {
+    return {
+      ok: checkResult.ok,
+      check: true,
+      repair_document_upserts: true,
+      dry_run: true,
+      approval_required: true,
+      safety_gate: gate,
+      validation: checkResult,
+      repair_plan: repairPlan,
+      upserted_count: 0,
+      upserted_documents: [],
+      message: "Document upsert repair not executed; required safety flags are missing."
+    };
+  }
+
+  if (!config.enabled) {
+    throw new Error("OPENJOBSLOTS_SEARCH_BACKEND=meili is required for document upsert repair.");
+  }
+
+  if (!repairPlan.sample_complete) {
+    return {
+      ok: false,
+      check: true,
+      repair_document_upserts: true,
+      dry_run: false,
+      approval_required: true,
+      safety_gate: gate,
+      validation: checkResult,
+      repair_plan: repairPlan,
+      upserted_count: 0,
+      upserted_documents: [],
+      error: "Refusing to apply document upsert repair because the drift sample is incomplete or exceeds the bounded repair limit."
+    };
+  }
+
+  const candidateUrls = repairPlan.upsert_candidates.map((candidate) => candidate.canonical_url).filter(Boolean);
+  const rows = await getPostgresIndexableRowsByCanonicalUrls(pool, candidateUrls);
+  const foundUrls = new Set(rows.map((row) => String(row.canonical_url || "").trim()));
+  const missingPostgresRows = candidateUrls.filter((url) => !foundUrls.has(url));
+  if (missingPostgresRows.length > 0) {
+    return {
+      ok: false,
+      check: true,
+      repair_document_upserts: true,
+      dry_run: false,
+      approval_required: true,
+      safety_gate: gate,
+      validation: checkResult,
+      repair_plan: repairPlan,
+      upserted_count: 0,
+      upserted_documents: [],
+      missing_postgres_rows: missingPostgresRows,
+      error: "Refusing to apply document upsert repair because some sampled candidates are no longer indexable in Postgres."
+    };
+  }
+
+  if (rows.length > 0) {
+    const task = await upsertMeiliPostings(rows, configForIndex(config, config.indexName));
+    await waitForMeiliTask(config, task, options.taskTimeoutMs);
+  }
+
+  const postRepairCheck = await checkMeiliParity(pool, config, repairOptions);
+  writeStatusSafe({
+    ok: postRepairCheck.ok,
+    current_index_uid: config.indexName,
+    last_count_delta: postRepairCheck.count_delta,
+    last_facet_delta: latestFacetDeltaSummary(postRepairCheck.remote_facet_delta),
+    last_task_error: postRepairCheck.ok ? "" : "Post-repair Meili/Postgres validation mismatch."
+  }, options, env);
+
+  return {
+    ok: postRepairCheck.ok,
+    check: true,
+    repair_document_upserts: true,
+    dry_run: false,
+    approval_required: false,
+    safety_gate: gate,
+    validation: checkResult,
+    repair_plan: repairPlan,
+    upserted_count: rows.length,
+    upserted_documents: rows.map((row) => ({
+      canonical_url: String(row.canonical_url || "").trim(),
+      remote_type: String(row.remote_type || "").trim()
+    })),
+    post_repair_check: postRepairCheck
+  };
+}
+
 async function runIncrementalReindex(pool, config, options) {
   await ensurePostgresSchema(pool);
   await ensureMeiliIndex(config, config.indexName, options.taskTimeoutMs);
@@ -1294,6 +1850,15 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
         pool,
         "meili-extra-document-repair",
         () => runExtraDocumentRepair(pool, config, options, env)
+      );
+      return writeResultOutput(result, options);
+    }
+
+    if (options.repairDocumentUpserts) {
+      const result = await withHeavyJobLock(
+        pool,
+        "meili-document-upsert-repair",
+        () => runDocumentUpsertRepair(pool, config, options, env)
       );
       return writeResultOutput(result, options);
     }
@@ -1344,6 +1909,7 @@ if (require.main === module) {
 module.exports = {
   applyMeiliSettings,
   buildIndexFromPostgres,
+  buildDocumentUpsertRepairPlan,
   checkMeiliParity,
   comparableDocumentFields,
   compareFacetDistributions,
@@ -1351,8 +1917,10 @@ module.exports = {
   compareSettingList,
   ensureMeiliIndex,
   getExtraDocumentRepairSafetyGate,
+  getDocumentUpsertRepairSafetyGate,
   getMeiliRemoteFacet,
   getPostgresRemoteFacet,
+  getPostgresIndexableRowsByCanonicalUrls,
   getReplaceSafetyGate,
   inspectRemoteFacetMismatches,
   indexablePostingsWhereClause,

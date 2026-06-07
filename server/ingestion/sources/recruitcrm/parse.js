@@ -33,7 +33,24 @@ const RECRUITCRM_LOCATION_COUNTRY_HINTS = Object.freeze({
   sarcelles: "France",
   "shah alam": "Malaysia",
   toulon: "France",
-  yorkshire: "United Kingdom"
+  yorkshire: "United Kingdom",
+  nsw: "Australia",
+  "new south wales": "Australia",
+  bavaria: "Germany",
+  maharashtra: "India",
+  "ile de france": "France",
+  "ile-de-france": "France",
+  ontario: "Canada",
+  quebec: "Canada",
+  "british columbia": "Canada",
+  alberta: "Canada",
+  victoria: "Australia",
+  queensland: "Australia",
+  "western australia": "Australia",
+  tokyo: "Japan",
+  england: "United Kingdom",
+  scotland: "United Kingdom",
+  wales: "United Kingdom"
 });
 
 function normalizeRecruitCrmLookupText(value) {

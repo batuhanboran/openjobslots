@@ -16,6 +16,10 @@
             "Value": "Toronto, ON, Canada"
           },
           {
+            "QuestionName": "workmode",
+            "Value": "Hybrid"
+          },
+          {
             "QuestionName": "lastupdated",
             "Value": "2026-05-08"
           },
