@@ -6,269 +6,653 @@ const {
 } = require("./sourceContracts");
 
 const PILOT_SOURCE_METADATA = Object.freeze({
-  adp_myjobs: Object.freeze({
-    family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled
-  }),
-  adp_workforcenow: Object.freeze({
+  "adp_myjobs": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.enabled
   }),
-  applicantpro: Object.freeze({
+  "adp_workforcenow": Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "applicantpro": Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
     status: SOURCE_STATUSES.enabled
   }),
-  applicantai: Object.freeze({
+  "applicantai": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  applitrack: Object.freeze({
+  "applitrack": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.quarantine
+    status: SOURCE_STATUSES.enabled
   }),
-  applytojob: Object.freeze({
+  "applytojob": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
-  ashby: Object.freeze({
+  "ashby": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  bamboohr: Object.freeze({
+  "bamboohr": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  brassring: Object.freeze({
+  "brassring": Object.freeze({
     family: SOURCE_FAMILIES.brittleHighRisk,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  breezy: Object.freeze({
+  "breezy": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
-  calcareers: Object.freeze({
+  "calcareers": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  calopps: Object.freeze({
+  "calopps": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  careerplug: Object.freeze({
+  "careerplug": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
-  dayforcehcm: Object.freeze({
+  "dayforcehcm": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.canary,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  careerpuck: Object.freeze({
+  "careerpuck": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  careerspage: Object.freeze({
+  "careerspage": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  eightfold: Object.freeze({
+  "eightfold": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  gem: Object.freeze({
+  "gem": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.canary,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  fountain: Object.freeze({
+  "fountain": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  freshteam: Object.freeze({
+  "freshteam": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  getro: Object.freeze({
+  "getro": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  governmentjobs: Object.freeze({
+  "governmentjobs": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
     status: SOURCE_STATUSES.enabled
   }),
-  greenhouse: Object.freeze({
+  "greenhouse": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  hibob: Object.freeze({
-    family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
-  }),
-  hirebridge: Object.freeze({
-    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
-  }),
-  hrmdirect: Object.freeze({
+  "hibob": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
-  icims: Object.freeze({
+  "hirebridge": Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
     status: SOURCE_STATUSES.enabled
   }),
-  isolvisolvedhire: Object.freeze({
+  "hrmdirect": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  jobvite: Object.freeze({
+  "icims": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "isolvisolvedhire": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  k12jobspot: Object.freeze({
+  "jobvite": Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "k12jobspot": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
     status: SOURCE_STATUSES.enabled
   }),
-  jobaps: Object.freeze({
+  "jobaps": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  join: Object.freeze({
+  "join": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  lever: Object.freeze({
+  "lever": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  loxo: Object.freeze({
+  "loxo": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  manatal: Object.freeze({
+  "manatal": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.canary
+    status: SOURCE_STATUSES.enabled
   }),
-  oracle: Object.freeze({
+  "oracle": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.enabled
   }),
-  personio: Object.freeze({
-    family: SOURCE_FAMILIES.directJsonStable,
-    status: SOURCE_STATUSES.canary,
-    collectWhenDisabled: false
-  }),
-  peopleforce: Object.freeze({
-    family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
-  }),
-  pinpointhq: Object.freeze({
-    family: SOURCE_FAMILIES.directJsonStable,
-    status: SOURCE_STATUSES.disabled
-  }),
-  policeapp: Object.freeze({
-    family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.disabled
-  }),
-  recruitcrm: Object.freeze({
-    family: SOURCE_FAMILIES.directJsonStable,
-    status: SOURCE_STATUSES.quarantine
-  }),
-  smartrecruiters: Object.freeze({
+  "personio": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
     status: SOURCE_STATUSES.enabled
   }),
-  statejobsny: Object.freeze({
-    family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
-  }),
-  schoolspring: Object.freeze({
-    family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.enabled
-  }),
-  simplicant: Object.freeze({
+  "peopleforce": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
     status: SOURCE_STATUSES.enabled
   }),
-  recruitee: Object.freeze({
+  "pinpointhq": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
-    status: SOURCE_STATUSES.quarantine
+    status: SOURCE_STATUSES.enabled
   }),
-  rippling: Object.freeze({
+  "policeapp": Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "recruitcrm": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "smartrecruiters": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "statejobsny": Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "schoolspring": Object.freeze({
+    family: SOURCE_FAMILIES.publicSectorEducation,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "simplicant": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  sagehr: Object.freeze({
+  "recruitee": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "rippling": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  saphrcloud: Object.freeze({
+  "sagehr": Object.freeze({
+    family: SOURCE_FAMILIES.vendorSpecific,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "saphrcloud": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  taleo: Object.freeze({
+  "taleo": Object.freeze({
     family: SOURCE_FAMILIES.brittleHighRisk,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  talentreef: Object.freeze({
+  "talentreef": Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  theapplicantmanager: Object.freeze({
+  "theapplicantmanager": Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  talentlyft: Object.freeze({
+  "talentlyft": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  talexio: Object.freeze({
+  "talexio": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  teamtailor: Object.freeze({
+  "teamtailor": Object.freeze({
     family: SOURCE_FAMILIES.vendorSpecific,
-    status: SOURCE_STATUSES.disabled
+    status: SOURCE_STATUSES.enabled
   }),
-  ultipro: Object.freeze({
-    family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled
-  }),
-  paylocity: Object.freeze({
+  "ultipro": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
     status: SOURCE_STATUSES.enabled
   }),
-  pageup: Object.freeze({
+  "paylocity": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  usajobs: Object.freeze({
+  "pageup": Object.freeze({
+    family: SOURCE_FAMILIES.enterpriseDirect,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "usajobs": Object.freeze({
     family: SOURCE_FAMILIES.publicSectorEducation,
-    status: SOURCE_STATUSES.disabled,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  workday: Object.freeze({
+  "workday": Object.freeze({
     family: SOURCE_FAMILIES.enterpriseDirect,
-    status: SOURCE_STATUSES.canary
+    status: SOURCE_STATUSES.enabled
   }),
-  workable: Object.freeze({
+  "workable": Object.freeze({
     family: SOURCE_FAMILIES.directJsonStable,
-    status: SOURCE_STATUSES.canary,
-    collectWhenDisabled: false
+    status: SOURCE_STATUSES.enabled
   }),
-  zoho: Object.freeze({
+  "zoho": Object.freeze({
     family: SOURCE_FAMILIES.embeddedOrSemiStructured,
-    status: SOURCE_STATUSES.canary
+    status: SOURCE_STATUSES.enabled
+  }),
+  "100hires": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobylon": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobsoid": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hirehive": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "phenom": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "gohire": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "paradox": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "sympa": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "flatchr": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentnest": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hiringthing": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "oleeo": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobadder": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "brightmove": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobdiva": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "tribepad": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "akkencloud": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "aviont": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "exelare": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "dvinci": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "onlyfy": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "vultus": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "naukrirms": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "ismartrecruit": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "logicmelon": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "broadbean": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "idibu": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "seekout": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "fetcher": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hired": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "targetrecruit": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobscience": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "cornerstoneondemand": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "sabasoftware": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "sumtotalsystems": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "prescreen": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hirex": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "turbohire": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "cegid": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "apli": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "smartsearch": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "erecruit": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "easyrecrue": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentwunder": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "cvat": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "engagesoftware": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hireserve": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hiretrace": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "skeeled": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentadore": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jazzhr": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "clearcompany": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "firefish": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "recruitive": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentera": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "atsondemand": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "tracker": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "invenias": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "beamery": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "humi": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "collagehr": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "risepeople": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "eploy": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "networx": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "recooty": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobilla": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "tempworks": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "coats": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "lumesse": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "meta4": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentsoft": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "haufe": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "coview": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "kenjo": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "kiwihr": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hrworks": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "beetween": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "jobaffinity": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "sentrient": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentum": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "wocoats": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "pitchnhire": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hrmantra": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "neogov": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "cleverconnect": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "talentlink": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "hiringopps": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "vireup": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "webrecruit": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "vacancyfiller": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "gorecruit": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "rapidrecruit": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "symphonytalent": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "inrecruit": Object.freeze({
+    family: SOURCE_FAMILIES.embeddedOrSemiStructured,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "staffsuite": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "pcrecruiter": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "ceipal": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "applicantstack": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "beetween_new": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
+  }),
+  "kenjo_new": Object.freeze({
+    family: SOURCE_FAMILIES.directJsonStable,
+    status: SOURCE_STATUSES.enabled
   })
 });
 

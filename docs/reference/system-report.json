@@ -1,0 +1,14 @@
+{
+  "production_checkout_commit": "f96bac8b57c4673a1ffd8921baa8f27e50a906b5",
+  "worker_state": "stopped",
+  "worker_isolated": true,
+  "autodeploy_timer_state": "inactive",
+  "autodeploy_recovery_safe": true,
+  "heavy_job_active": false,
+  "long_running_postgres_queries": 0,
+  "meili_postgres_delta": 0,
+  "backup_path": "/app/backups/pre-repair-backup.dump",
+  "backup_parent_exists": true,
+  "backup_file_exists": true,
+  "backup_size_bytes": 3250873682
+}
