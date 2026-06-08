@@ -47,7 +47,17 @@ const SEARCH_STOP_WORDS_LIST = Object.freeze([
   "pozisyon",
   "pozisyonlar",
   "pozisyonlari",
-  "calisma"
+  "calisma",
+  "in",
+  "at",
+  "for",
+  "near",
+  "of",
+  "to",
+  "within",
+  "and",
+  "or",
+  "with"
 ]);
 
 const SEARCH_STOP_WORDS = new Set(SEARCH_STOP_WORDS_LIST);
@@ -393,6 +403,130 @@ function getRemoteLocationFallbackTerms(remoteType) {
   return uniqueNormalizedTerms(REMOTE_LOCATION_FALLBACK_TERMS_BY_TYPE[remoteType] || []);
 }
 
+function parseSemanticQuery(searchQuery) {
+  let search = String(searchQuery || "").trim();
+  const result = {
+    originalSearch: search,
+    cleanedSearch: search,
+    countries: [],
+    remote: null
+  };
+
+  if (!search) {
+    return result;
+  }
+
+  const remotePatterns = [
+    {
+      type: "remote",
+      regex: /\b(remote|wfh|work\s+from\s+home|work\s+from\s+anywhere|home\s+based|telecommute|telework|virtual|remoto|remotos|remota|remotas|uzaktan|uzaktan\s+calisma)\b/gi
+    },
+    {
+      type: "hybrid",
+      regex: /\b(hybrid|hybrid\s+remote|part\s+remote|partially\s+remote|hibrit)\b/gi
+    },
+    {
+      type: "onsite",
+      regex: /\b(onsite|on-site|on\s+site|office\s+based|in\s+office)\b/gi
+    }
+  ];
+
+  let matchedRemote = null;
+  for (const pattern of remotePatterns) {
+    if (pattern.regex.test(search)) {
+      matchedRemote = pattern.type;
+      search = search.replace(pattern.regex, " ");
+      break;
+    }
+  }
+  if (matchedRemote) {
+    result.remote = matchedRemote;
+  }
+
+  const ambiguousCountryAliases = new Set(["us", "uk", "gb", "ca", "can", "de", "fr"]);
+  const sortedAliases = Array.from(COUNTRY_FILTER_ALIASES.keys()).sort((a, b) => b.length - a.length);
+
+  let countryFound = null;
+  let countryTextToReplace = null;
+
+  for (const alias of sortedAliases) {
+    const isAmbiguous = ambiguousCountryAliases.has(alias);
+    const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const prepRegex = new RegExp(`\\b(in|at|for|near|of|to|within)\\s+${escapedAlias}\\b`, "gi");
+    if (prepRegex.test(search)) {
+      countryFound = COUNTRY_FILTER_ALIASES.get(alias);
+      countryTextToReplace = prepRegex;
+      break;
+    }
+
+    const endRegex = new RegExp(`\\b${escapedAlias}\\s*$`, "gi");
+    if (endRegex.test(search)) {
+      countryFound = COUNTRY_FILTER_ALIASES.get(alias);
+      countryTextToReplace = endRegex;
+      break;
+    }
+
+    if (!isAmbiguous) {
+      const anyRegex = new RegExp(`\\b${escapedAlias}\\b`, "gi");
+      if (anyRegex.test(search)) {
+        countryFound = COUNTRY_FILTER_ALIASES.get(alias);
+        countryTextToReplace = anyRegex;
+        break;
+      }
+    } else {
+      const startRegex = new RegExp(`^\\s*${escapedAlias}\\b`, "gi");
+      if (startRegex.test(search)) {
+        countryFound = COUNTRY_FILTER_ALIASES.get(alias);
+        countryTextToReplace = startRegex;
+        break;
+      }
+    }
+  }
+
+  if (countryFound) {
+    result.countries.push(countryFound);
+    search = search.replace(countryTextToReplace, " ");
+  }
+
+  search = search.replace(/\b(in|at|for|near|of|to|within)\b/gi, " ");
+  search = search.replace(/\s+/g, " ").trim();
+
+  result.cleanedSearch = search;
+  return result;
+}
+
+function parseCsv(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function preprocessSearchOptions(options = {}) {
+  const searchStr = String(options.search || "").trim();
+  if (!searchStr) return { ...options };
+
+  const parsed = parseSemanticQuery(searchStr);
+  const countries = parseCsv(options.countries || "");
+  for (const c of parsed.countries) {
+    const normalizedCountry = normalizeCountryFilterValue(c);
+    if (normalizedCountry && !countries.includes(normalizedCountry)) {
+      countries.push(normalizedCountry);
+    }
+  }
+
+  const remote = options.remote === "all" || !options.remote ? (parsed.remote || "all") : options.remote;
+
+  return {
+    ...options,
+    search: parsed.cleanedSearch,
+    countries: countries,
+    remote
+  };
+}
+
 module.exports = {
   COUNTRY_FILTER_ALIASES,
   FILTERABLE_ATTRIBUTES,
@@ -415,5 +549,7 @@ module.exports = {
   normalizeLookup,
   normalizeRegionFilterValue,
   normalizeSearchQuery,
-  normalizeText
+  normalizeText,
+  parseSemanticQuery,
+  preprocessSearchOptions
 };

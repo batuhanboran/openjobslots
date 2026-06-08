@@ -1344,9 +1344,12 @@ async function testMeiliSearchNormalizesGenericWordsAndTypos() {
       { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
     );
 
-    assert.equal(bodies[0].q, "turkish");
-    assert.equal(bodies[1].q, "turkey");
-    assert.equal(bodies[2].q, "remote");
+    assert.equal(bodies[0].q, "jobs");
+    assert.match(bodies[0].filter, /country IN \["Turkey"\]/);
+    assert.equal(bodies[1].q, "openings");
+    assert.match(bodies[1].filter, /country IN \["Turkey"\]/);
+    assert.equal(bodies[2].q, "jobs");
+    assert.match(bodies[2].filter, /remote_type = "remote"/);
   } finally {
     global.fetch = previousFetch;
   }
@@ -1399,7 +1402,7 @@ async function testMeiliSearchLeavesLocationQueriesBroad() {
       { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" }
     );
 
-    assert.equal(body.q, "product manager in berlin");
+    assert.equal(body.q, "product manager berlin");
   } finally {
     global.fetch = previousFetch;
   }

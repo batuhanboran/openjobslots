@@ -12,7 +12,8 @@ const {
   normalizeAtsKey,
   normalizeFilterValue,
   normalizeSearchQuery,
-  normalizeText
+  normalizeText,
+  preprocessSearchOptions
 } = require("./config");
 
 let meiliSettingsStatus = {
@@ -335,6 +336,7 @@ async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMei
 }
 
 async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
+  options = preprocessSearchOptions(options);
   if (!config.enabled) return { ok: true, skipped: true, hits: [], estimatedTotalHits: 0 };
   const filters = ["hidden = false"];
   const sortBy = String(options.sort_by || "relevance")

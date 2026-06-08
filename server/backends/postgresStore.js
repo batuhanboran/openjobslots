@@ -831,6 +831,7 @@ async function listPostgresPostingsApproximateSql(pool, options = {}, limit = 50
 }
 
 async function listPostgresPostings(pool, options = {}) {
+  options = searchConfig.preprocessSearchOptions(options);
   const page = resolvePublicPostingsPage(options);
   const limit = page.limit;
   const offset = page.offset;
@@ -1065,6 +1066,7 @@ async function getPostgresCounts(pool, options = {}) {
 }
 
 async function getPostgresFilterOptions(pool, atsItems = [], options = {}) {
+  options = searchConfig.preprocessSearchOptions(options);
   const filter = buildFilterSql(options, 1);
   const values = filter.values;
   const [sourceRows, countryRows, regionRows, industryRows] = await Promise.all([
@@ -1263,8 +1265,10 @@ async function addMeiliSuggestions({ query, resolvedLimit, suggestions, add }) {
 
 async function getPostgresSuggestions(pool, search, limit = 8, atsItems = []) {
   const query = String(search || "").trim();
-  const indexedQuery = searchConfig.normalizeSearchQuery(query);
-  const suggestionQuery = indexedQuery || query;
+  const parsed = searchConfig.parseSemanticQuery(query);
+  const cleanedSearch = parsed.cleanedSearch;
+  const indexedQuery = searchConfig.normalizeSearchQuery(cleanedSearch);
+  const suggestionQuery = indexedQuery || cleanedSearch;
   const resolvedLimit = Math.max(1, Math.min(20, Number(limit || 8)));
   const suggestions = [];
   const seen = new Set();

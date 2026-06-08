@@ -67,3 +67,34 @@ test("Meili settings keep title/company ahead of description and include filters
     twoTypos: 8
   });
 });
+
+test("parseSemanticQuery extracts country and remote filters", () => {
+  const { parseSemanticQuery, preprocessSearchOptions } = require("./config");
+
+  const res1 = parseSemanticQuery("Technical support engineer in turkey");
+  assert.equal(res1.cleanedSearch, "Technical support engineer");
+  assert.deepEqual(res1.countries, ["Turkey"]);
+
+  const res2 = parseSemanticQuery("remote project manager");
+  assert.equal(res2.cleanedSearch, "project manager");
+  assert.equal(res2.remote, "remote");
+
+  const res3 = parseSemanticQuery("hybrid software engineer in usa");
+  assert.equal(res3.cleanedSearch, "software engineer");
+  assert.deepEqual(res3.countries, ["United States"]);
+  assert.equal(res3.remote, "hybrid");
+
+  const res4 = parseSemanticQuery("lead us designer");
+  assert.equal(res4.cleanedSearch, "lead us designer");
+  assert.deepEqual(res4.countries, []);
+  assert.equal(res4.remote, null);
+
+  const options = preprocessSearchOptions({
+    search: "Technical support engineer in turkey",
+    countries: "Germany",
+    remote: "all"
+  });
+  assert.equal(options.search, "Technical support engineer");
+  assert.deepEqual(options.countries, ["Germany", "Turkey"]);
+  assert.equal(options.remote, "all");
+});
