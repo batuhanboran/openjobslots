@@ -133,5 +133,6 @@ module.exports = {
   discover,
   fetchList,
   parse,
-  normalize
+  normalize,
+  fetchDetail: require("./fetchDetail")
 };

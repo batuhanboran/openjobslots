@@ -8,6 +8,7 @@ const {
   detailUrlForRow,
   extractDetailFields,
   getSafetyGate,
+  isAllowedDetailUrl,
   planDetailChanges,
   runDetailRefetch
 } = require("./detailRefetchPlanner");
@@ -301,3 +302,59 @@ test("guarded apply records failed URLs and later runs skip them", async () => {
   assert.equal(second.skipped_previously_failed, 1);
   assert.ok(!second.candidate_summary.samples.some((item) => item.canonical_url === "https://example.test/jobs/404"));
 });
+
+test("new ATS sources (Greenhouse, Lever, Ashby, BambooHR, Gem, Workday, Oracle) build detail URLs and allow list checks", () => {
+  const ghRow = baseRow({ ats_key: "greenhouse", canonical_url: "https://boards.greenhouse.io/company/jobs/12345" });
+  assert.equal(detailUrlForRow(ghRow), "https://boards.greenhouse.io/company/jobs/12345");
+  assert.ok(isAllowedDetailUrl("greenhouse", "https://boards.greenhouse.io/company/jobs/12345"));
+
+  const leverRow = baseRow({ ats_key: "lever", canonical_url: "https://jobs.lever.co/company/abc-123" });
+  assert.equal(detailUrlForRow(leverRow), "https://jobs.lever.co/company/abc-123");
+  assert.ok(isAllowedDetailUrl("lever", "https://jobs.lever.co/company/abc-123"));
+
+  const ashbyRow = baseRow({ ats_key: "ashby", canonical_url: "https://jobs.ashbyhq.com/company/abc-123" });
+  assert.equal(detailUrlForRow(ashbyRow), "https://jobs.ashbyhq.com/company/abc-123");
+  assert.ok(isAllowedDetailUrl("ashby", "https://jobs.ashbyhq.com/company/abc-123"));
+
+  const bambooRow = baseRow({ ats_key: "bamboohr", canonical_url: "https://company.bamboohr.com/careers/123" });
+  assert.equal(detailUrlForRow(bambooRow), "https://company.bamboohr.com/careers/123");
+  assert.ok(isAllowedDetailUrl("bamboohr", "https://company.bamboohr.com/careers/123"));
+
+  const gemRow = baseRow({ ats_key: "gem", canonical_url: "https://jobs.gem.com/company/123" });
+  assert.equal(detailUrlForRow(gemRow), "https://jobs.gem.com/company/123");
+  assert.ok(isAllowedDetailUrl("gem", "https://jobs.gem.com/company/123"));
+
+  const workdayRow = baseRow({ ats_key: "workday", canonical_url: "https://company.myworkdayjobs.com/Careers/job/City/Title_JR1" });
+  assert.equal(detailUrlForRow(workdayRow), "https://company.myworkdayjobs.com/Careers/job/City/Title_JR1");
+  assert.ok(isAllowedDetailUrl("workday", "https://company.myworkdayjobs.com/Careers/job/City/Title_JR1"));
+
+  const oracleRow = baseRow({ ats_key: "oracle", canonical_url: "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/jobsearch/job/334912" });
+  assert.equal(detailUrlForRow(oracleRow), "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/jobsearch/job/334912");
+  assert.ok(isAllowedDetailUrl("oracle", "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/jobsearch/job/334912"));
+});
+
+test("extractDetailFields parses json-ld for new ATS sources", () => {
+  const row = baseRow({ ats_key: "greenhouse", canonical_url: "https://boards.greenhouse.io/company/jobs/12345" });
+  const html = `
+    <html>
+    <body>
+      <script type="application/ld+json">
+      {
+        "@type": "JobPosting",
+        "jobLocation": {
+          "address": {
+            "addressLocality": "Berlin",
+            "addressCountry": "Germany"
+          }
+        },
+        "description": "This is a fully remote position (work from home)."
+      }
+      </script>
+    </body>
+    </html>
+  `;
+  const detail = extractDetailFields(row, html);
+  assert.equal(detail.location, "Berlin, Germany");
+  assert.equal(detail.remote_type, "remote");
+});
+

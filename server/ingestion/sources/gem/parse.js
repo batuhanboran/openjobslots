@@ -24,10 +24,10 @@ function extractGemNumericJobId(rawId) {
 function buildGemJobPostingUrl(config, posting) {
   const boardUrl = String(config?.boardUrl || "").replace(/\/+$/, "");
   const item = posting && typeof posting === "object" ? posting : {};
-  const numericId = extractGemNumericJobId(item?.id);
   const extId = String(item?.extId || "").trim();
+  const numericId = extractGemNumericJobId(item?.id);
   const fallbackId = String(item?.id || "").trim();
-  const identifier = numericId || extId || fallbackId;
+  const identifier = extId || numericId || fallbackId;
   if (!boardUrl || !identifier) return boardUrl || "";
   return `${boardUrl}/${encodeURIComponent(identifier)}`;
 }

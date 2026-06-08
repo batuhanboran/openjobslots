@@ -220,6 +220,8 @@ function createSqliteSchemaRuntime(dependencies = {}) {
         quality_score INTEGER NOT NULL DEFAULT 0,
         quality_flags TEXT NOT NULL DEFAULT '[]',
         rejection_reason TEXT NOT NULL DEFAULT '',
+        description_html TEXT,
+        description_plain TEXT,
         hidden INTEGER NOT NULL DEFAULT 0,
         hidden_at_epoch INTEGER
       );
@@ -339,6 +341,14 @@ function createSqliteSchemaRuntime(dependencies = {}) {
   
     if (!existingColumns.has("rejection_reason")) {
       await addPostingsColumnIfMissing("rejection_reason", "TEXT NOT NULL DEFAULT ''");
+    }
+  
+    if (!existingColumns.has("description_html")) {
+      await addPostingsColumnIfMissing("description_html", "TEXT");
+    }
+  
+    if (!existingColumns.has("description_plain")) {
+      await addPostingsColumnIfMissing("description_plain", "TEXT");
     }
   
     await db.run(`UPDATE Postings SET last_seen_epoch = ? WHERE last_seen_epoch IS NULL;`, [nowEpochSeconds()]);

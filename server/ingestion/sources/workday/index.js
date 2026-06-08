@@ -28,5 +28,6 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  fetchDetail: require("./fetchDetail")
 };

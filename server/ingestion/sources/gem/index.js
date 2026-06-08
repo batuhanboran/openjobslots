@@ -65,7 +65,7 @@ function normalize(posting, company = {}, options = {}) {
   });
   normalized.detail_escalation_decision = decideDetailEscalation(normalized, {
     sourceFamily: GEM_SOURCE_FAMILY,
-    detailSupported: false
+    detailSupported: true
   });
 
   return normalized;
@@ -114,7 +114,7 @@ module.exports = {
   parserVersion: GEM_PARSER_VERSION,
   discover,
   fetchList,
-  fetchDetail: async () => null,
+  fetchDetail: require("./fetchDetail"),
   parse,
   normalize,
   validate,

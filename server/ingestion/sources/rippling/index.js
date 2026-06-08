@@ -52,7 +52,7 @@ function normalize(posting, company = {}, options = {}) {
   });
   normalized.detail_escalation_decision = decideDetailEscalation(normalized, {
     sourceFamily: RIPPLING_SOURCE_FAMILY,
-    detailSupported: false
+    detailSupported: true
   });
   return normalized;
 }
@@ -107,7 +107,7 @@ module.exports = {
   officialDocs: RIPPLING_DOCS_URL,
   discover,
   fetchList,
-  fetchDetail: async () => null,
+  fetchDetail: require("./fetchDetail"),
   parse,
   normalize,
   validate,

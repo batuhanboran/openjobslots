@@ -1860,6 +1860,8 @@ async function upsertPostings(postings, lastSeenEpoch) {
       ).trim();
       const parserVersion = String(posting.parser_version || "legacy-adapter-v1").trim();
       const confidence = Number(posting.confidence || posting.parser_confidence || 0.5);
+      const descriptionHtml = String(posting.description_html || posting.descriptionHtml || posting.description || "").trim() || null;
+      const descriptionPlain = String(posting.description_plain || posting.descriptionPlain || "").trim() || null;
       const quality = buildStoredQualityFields(
         {
           ...posting,
@@ -1893,11 +1895,13 @@ async function upsertPostings(postings, lastSeenEpoch) {
             quality_score,
             quality_flags,
             rejection_reason,
+            description_html,
+            description_plain,
             hidden,
             hidden_at_epoch,
             last_seen_epoch
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
           ON CONFLICT(job_posting_url) DO UPDATE SET
             company_name = excluded.company_name,
             position_name = excluded.position_name,
@@ -1910,6 +1914,8 @@ async function upsertPostings(postings, lastSeenEpoch) {
             quality_score = excluded.quality_score,
             quality_flags = excluded.quality_flags,
             rejection_reason = excluded.rejection_reason,
+            description_html = COALESCE(excluded.description_html, Postings.description_html),
+            description_plain = COALESCE(excluded.description_plain, Postings.description_plain),
             last_seen_epoch = excluded.last_seen_epoch
           WHERE COALESCE(Postings.hidden, 0) = 0;
         `,
@@ -1926,6 +1932,8 @@ async function upsertPostings(postings, lastSeenEpoch) {
           quality.quality_score,
           quality.quality_flags,
           quality.rejection_reason,
+          descriptionHtml,
+          descriptionPlain,
           seenEpoch
         ]
       );

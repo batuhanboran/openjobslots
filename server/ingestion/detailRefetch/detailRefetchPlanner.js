@@ -20,7 +20,7 @@ const {
 } = require("../sources/icims/parse");
 
 const DETAIL_REFETCH_SCHEMA_VERSION = "detail-refetch-audit-v1";
-const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho"]);
+const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling"]);
 const WRITABLE_FIELDS = Object.freeze([
   "location_text",
   "country",
@@ -122,7 +122,7 @@ function parseArgs(argv = []) {
     else if (arg.startsWith("--fixture-dir=")) options.fixtureDir = clean(arg.slice("--fixture-dir=".length));
   }
 
-  options.sources = Array.from(new Set((options.sources.length ? options.sources : ["icims", "applitrack", "taleo", "talentreef", "zoho"])
+  options.sources = Array.from(new Set((options.sources.length ? options.sources : ["icims", "applitrack", "taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday"])
     .filter((source) => SUPPORTED_SOURCES.has(source))));
   return options;
 }
@@ -179,7 +179,12 @@ function extractSourceJobIdFromUrl(row) {
   if (atsKey === "zoho") {
     return parsed.pathname.split("/").filter(Boolean).pop() || "";
   }
-  return "";
+  try {
+    const { extractSourceIdFromPostingUrl } = require("../parsers/shared/sourceIds");
+    return extractSourceIdFromPostingUrl(url, atsKey);
+  } catch {
+    return "";
+  }
 }
 
 function applitrackSiteRootFromUrl(urlValue) {
@@ -212,7 +217,7 @@ function detailUrlForRow(row) {
   if (atsKey === "applitrack") {
     return buildApplitrackDetailUrl(applitrackSiteRootFromUrl(url), extractSourceJobIdFromUrl(row), url);
   }
-  if (["taleo", "talentreef", "zoho"].includes(atsKey)) {
+  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling"].includes(atsKey)) {
     return url;
   }
   return "";
@@ -227,6 +232,14 @@ function isAllowedDetailUrl(atsKey, urlValue) {
   if (atsKey === "taleo") return hostname.endsWith(".taleo.net") || hostname.endsWith(".oraclecloud.com");
   if (atsKey === "talentreef") return hostname.endsWith(".jobappnetwork.com") || hostname.endsWith(".talentreef.com");
   if (atsKey === "zoho") return hostname.endsWith(".zohorecruit.com") || hostname.endsWith(".zoho.com");
+  if (atsKey === "greenhouse") return hostname.endsWith(".greenhouse.io") || hostname.endsWith(".greenhouse.co");
+  if (atsKey === "lever") return hostname.endsWith(".lever.co");
+  if (atsKey === "ashby") return hostname.endsWith(".ashbyhq.com");
+  if (atsKey === "bamboohr") return hostname.endsWith(".bamboohr.com");
+  if (atsKey === "gem") return hostname.endsWith(".jobs.gem.com") || hostname.endsWith(".gem.com");
+  if (atsKey === "workday") return hostname.endsWith(".myworkdayjobs.com");
+  if (atsKey === "oracle") return hostname.endsWith(".oraclecloud.com");
+  if (atsKey === "rippling") return hostname.endsWith(".rippling.com");
   return false;
 }
 
@@ -401,7 +414,7 @@ function extractDetailFields(row, html) {
       source_job_id: extractSourceJobIdFromUrl(row)
     };
   }
-  if (["taleo", "talentreef", "zoho"].includes(atsKey)) {
+  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling"].includes(atsKey)) {
     const detail = extractFieldsFromJsonLd(html, row);
     if (!detail.remote_type) {
       detail.remote_type = extractRemoteLabelFromHtml(html);
@@ -549,6 +562,29 @@ async function fetchDetailHtml(row, options = {}) {
   }
   if (options.detailByUrl && Object.prototype.hasOwnProperty.call(options.detailByUrl, canonicalUrlForRow(row))) {
     return { ok: true, detailUrl, status: 200, html: String(options.detailByUrl[canonicalUrlForRow(row)] || ""), fromFixture: true };
+  }
+
+  // Delegate to source module's fetchDetail if available and custom
+  let sourceModule = null;
+  try {
+    const { getSourceModule } = require("../sources");
+    sourceModule = getSourceModule(atsKey);
+  } catch {}
+  if (sourceModule && typeof sourceModule.fetchDetail === "function") {
+    try {
+      const result = await sourceModule.fetchDetail(row, options);
+      if (result && result.html) {
+        return { ok: true, detailUrl, status: result.status || 200, html: result.html };
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        detailUrl,
+        status: error.status || 0,
+        error: error.message || String(error),
+        backoff_ms: Math.max(options.delayMs || DEFAULT_DELAY_MS, 5000)
+      };
+    }
   }
   if (options.fixtureDir) {
     const sourceId = extractSourceJobIdFromUrl(row);
@@ -1445,6 +1481,7 @@ module.exports = {
   extractSourceJobIdFromUrl,
   fetchDetailHtml,
   getSafetyGate,
+  isAllowedDetailUrl,
   isCandidateRow,
   loadPostgresCandidates,
   loadSqliteCandidates,

@@ -44,6 +44,8 @@ function parse(rawPayload = {}, company = {}) {
   );
 }
 
+const fetchDetail = require("./fetchDetail");
+
 module.exports = {
   ...sourceModule,
   atsKey: "greenhouse",
@@ -52,6 +54,7 @@ module.exports = {
   status: SOURCE_STATUSES.enabled,
   discover,
   fetchList,
+  fetchDetail,
   parse,
   ...parser
 };

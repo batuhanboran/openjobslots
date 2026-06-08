@@ -44,5 +44,6 @@ module.exports = {
   discover,
   fetchList,
   parse,
-  payloadShapePolicy
+  payloadShapePolicy,
+  fetchDetail: require("./fetchDetail")
 };

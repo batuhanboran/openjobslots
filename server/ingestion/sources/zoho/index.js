@@ -117,5 +117,6 @@ function parse(rawPayload, company = {}) {
 module.exports = {
   ...baseSource,
   ...parser,
-  parse
+  parse,
+  fetchDetail: require("./fetchDetail")
 };

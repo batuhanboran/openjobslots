@@ -5,7 +5,7 @@ const { safeFetch } = require("../../safeFetch");
 async function fetchDetail(row, options = {}) {
   const url = row.canonical_url || row.job_posting_url || row.apply_url;
   if (!url) {
-    throw new Error("Cannot fetch Lever detail: missing URL");
+    throw new Error("Cannot fetch Talentreef detail: missing URL");
   }
 
   const response = await safeFetch(url, {
@@ -17,7 +17,7 @@ async function fetchDetail(row, options = {}) {
   });
 
   if (!response.ok) {
-    const error = new Error(`Lever detail fetch failed with HTTP ${response.status}`);
+    const error = new Error(`Talentreef detail fetch failed with HTTP ${response.status}`);
     error.status = response.status;
     throw error;
   }
