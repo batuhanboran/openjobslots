@@ -89,6 +89,26 @@ test("parseSemanticQuery extracts country and remote filters", () => {
   assert.deepEqual(res4.countries, []);
   assert.equal(res4.remote, null);
 
+  const res5 = parseSemanticQuery("remtoe software engineer in de");
+  assert.equal(res5.cleanedSearch, "software engineer");
+  assert.deepEqual(res5.countries, ["Germany"]);
+  assert.equal(res5.remote, "remote");
+
+  const res6 = parseSemanticQuery("rmeoe product manager in spain");
+  assert.equal(res6.cleanedSearch, "product manager");
+  assert.deepEqual(res6.countries, ["Spain"]);
+  assert.equal(res6.remote, "remote");
+
+  const res7 = parseSemanticQuery("hybrd data analyst in canada");
+  assert.equal(res7.cleanedSearch, "data analyst");
+  assert.deepEqual(res7.countries, ["Canada"]);
+  assert.equal(res7.remote, "hybrid");
+
+  const res8 = parseSemanticQuery("onsit DevOps in singapore");
+  assert.equal(res8.cleanedSearch, "DevOps");
+  assert.deepEqual(res8.countries, ["Singapore"]);
+  assert.equal(res8.remote, "onsite");
+
   const options = preprocessSearchOptions({
     search: "Technical support engineer in turkey",
     countries: "Germany",

@@ -185,7 +185,85 @@ const COUNTRY_FILTER_ALIAS_ENTRIES = Object.freeze([
   ["france", "France"],
   ["india", "India"],
   ["singapore", "Singapore"],
-  ["japan", "Japan"]
+  ["japan", "Japan"],
+  ["es", "Spain"],
+  ["spain", "Spain"],
+  ["espana", "Spain"],
+  ["españa", "Spain"],
+  ["it", "Italy"],
+  ["italy", "Italy"],
+  ["italia", "Italy"],
+  ["nl", "Netherlands"],
+  ["netherlands", "Netherlands"],
+  ["holland", "Netherlands"],
+  ["pl", "Poland"],
+  ["poland", "Poland"],
+  ["polska", "Poland"],
+  ["ua", "Ukraine"],
+  ["ukraine", "Ukraine"],
+  ["ch", "Switzerland"],
+  ["switzerland", "Switzerland"],
+  ["se", "Sweden"],
+  ["sweden", "Sweden"],
+  ["no", "Norway"],
+  ["norway", "Norway"],
+  ["dk", "Denmark"],
+  ["denmark", "Denmark"],
+  ["fi", "Finland"],
+  ["finland", "Finland"],
+  ["ie", "Ireland"],
+  ["ireland", "Ireland"],
+  ["au", "Australia"],
+  ["australia", "Australia"],
+  ["nz", "New Zealand"],
+  ["new zealand", "New Zealand"],
+  ["kr", "South Korea"],
+  ["south korea", "South Korea"],
+  ["korea", "South Korea"],
+  ["uae", "United Arab Emirates"],
+  ["united arab emirates", "United Arab Emirates"],
+  ["dubai", "United Arab Emirates"],
+  ["ar", "Argentina"],
+  ["argentina", "Argentina"],
+  ["co", "Colombia"],
+  ["colombia", "Colombia"],
+  ["mx", "Mexico"],
+  ["mexico", "Mexico"],
+  ["za", "South Africa"],
+  ["south africa", "South Africa"],
+  ["pt", "Portugal"],
+  ["portugal", "Portugal"],
+  ["be", "Belgium"],
+  ["belgium", "Belgium"],
+  ["at", "Austria"],
+  ["austria", "Austria"],
+  ["gr", "Greece"],
+  ["greece", "Greece"],
+  ["cn", "China"],
+  ["china", "China"],
+  ["hk", "Hong Kong"],
+  ["hong kong", "Hong Kong"],
+  ["tw", "Taiwan"],
+  ["taiwan", "Taiwan"],
+  ["br", "Brazil"],
+  ["brazil", "Brazil"],
+  ["brasil", "Brazil"],
+  ["sg", "Singapore"],
+  ["jp", "Japan"],
+  ["ph", "Philippines"],
+  ["philippines", "Philippines"],
+  ["my", "Malaysia"],
+  ["malaysia", "Malaysia"],
+  ["id", "Indonesia"],
+  ["indonesia", "Indonesia"],
+  ["th", "Thailand"],
+  ["thailand", "Thailand"],
+  ["vn", "Vietnam"],
+  ["vietnam", "Vietnam"],
+  ["pk", "Pakistan"],
+  ["pakistan", "Pakistan"],
+  ["bd", "Bangladesh"],
+  ["bangladesh", "Bangladesh"]
 ]);
 
 const COUNTRY_FILTER_ALIASES = new Map(COUNTRY_FILTER_ALIAS_ENTRIES);
@@ -216,7 +294,16 @@ const COUNTRY_LOCATION_FALLBACK_TERMS_BY_LABEL = new Map([
   ["France", ["france", "paris"]],
   ["India", ["india", "bangalore", "bengaluru", "mumbai", "delhi"]],
   ["Singapore", ["singapore"]],
-  ["Japan", ["japan", "tokyo"]]
+  ["Japan", ["japan", "tokyo"]],
+  ["Spain", ["spain", "madrid", "barcelona"]],
+  ["Italy", ["italy", "rome", "milan"]],
+  ["Netherlands", ["netherlands", "amsterdam", "rotterdam"]],
+  ["Poland", ["poland", "warsaw", "krakow"]],
+  ["Ukraine", ["ukraine", "kyiv"]],
+  ["Switzerland", ["switzerland", "zurich", "geneva"]],
+  ["Sweden", ["sweden", "stockholm"]],
+  ["Australia", ["australia", "sydney", "melbourne"]],
+  ["Brazil", ["brazil", "brasil", "sao paulo", "rio de janeiro"]]
 ]);
 
 const REMOTE_LOCATION_FALLBACK_TERMS_BY_TYPE = Object.freeze({
@@ -419,15 +506,15 @@ function parseSemanticQuery(searchQuery) {
   const remotePatterns = [
     {
       type: "remote",
-      regex: /\b(remote|wfh|work\s+from\s+home|work\s+from\s+anywhere|home\s+based|telecommute|telework|virtual|remoto|remotos|remota|remotas|uzaktan|uzaktan\s+calisma)\b/gi
+      regex: /\b(remote|remtoe|rmeoe|remot|remte|wfh|work\s+from\s+home|work\s+from\s+anywhere|home\s+based|telecommute|telework|virtual|remoto|remotos|remota|remotas|uzaktan|uzaktan\s+calisma)\b/gi
     },
     {
       type: "hybrid",
-      regex: /\b(hybrid|hybrid\s+remote|part\s+remote|partially\s+remote|hibrit)\b/gi
+      regex: /\b(hybrid|hybrid\s+remote|part\s+remote|partially\s+remote|hibrit|hybrd|hybird)\b/gi
     },
     {
       type: "onsite",
-      regex: /\b(onsite|on-site|on\s+site|office\s+based|in\s+office)\b/gi
+      regex: /\b(onsite|on-site|on\s+site|office\s+based|in\s+office|onsit)\b/gi
     }
   ];
 
@@ -443,7 +530,12 @@ function parseSemanticQuery(searchQuery) {
     result.remote = matchedRemote;
   }
 
-  const ambiguousCountryAliases = new Set(["us", "uk", "gb", "ca", "can", "de", "fr"]);
+  const ambiguousCountryAliases = new Set([
+    "us", "uk", "gb", "ca", "can", "de", "fr",
+    "es", "it", "pl", "ua", "se", "no", "dk", "fi", "ie", "au", "nz",
+    "kr", "ar", "co", "mx", "pt", "be", "at", "gr", "cn", "hk", "tw",
+    "br", "sg", "jp", "ph", "my", "id", "th", "vn", "pk", "bd"
+  ]);
   const sortedAliases = Array.from(COUNTRY_FILTER_ALIASES.keys()).sort((a, b) => b.length - a.length);
 
   let countryFound = null;
