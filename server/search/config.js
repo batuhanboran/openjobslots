@@ -167,6 +167,7 @@ const COUNTRY_FILTER_ALIAS_ENTRIES = Object.freeze([
   ["u.k.", "United Kingdom"],
   ["gb", "United Kingdom"],
   ["great britain", "United Kingdom"],
+  ["united kingdom", "United Kingdom"],
   ["britain", "United Kingdom"],
   ["england", "United Kingdom"],
   ["turkiye", "Turkey"],
@@ -545,7 +546,7 @@ function parseSemanticQuery(searchQuery) {
     const isAmbiguous = ambiguousCountryAliases.has(alias);
     const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const prepRegex = new RegExp(`\\b(in|at|for|near|of|to|within)\\s+${escapedAlias}\\b`, "gi");
+    const prepRegex = new RegExp(`\\b(in|at|for|near|of|to|within|from)\\s+${escapedAlias}\\b`, "gi");
     if (prepRegex.test(search)) {
       countryFound = COUNTRY_FILTER_ALIASES.get(alias);
       countryTextToReplace = prepRegex;
@@ -581,7 +582,7 @@ function parseSemanticQuery(searchQuery) {
     search = search.replace(countryTextToReplace, " ");
   }
 
-  search = search.replace(/\b(in|at|for|near|of|to|within)\b/gi, " ");
+  search = search.replace(/\b(in|at|for|near|of|to|within|from)\b/gi, " ");
   search = search.replace(/\s+/g, " ").trim();
 
   result.cleanedSearch = search;
