@@ -20,7 +20,7 @@ jobs.db-wal
 logs
 .tmp
 tests
-docs
+# docs
 README-Images
 windows
 coverage
