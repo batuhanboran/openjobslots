@@ -28,6 +28,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/App.js ./App.js
 COPY --from=build /app/app.json ./app.json
 COPY --from=build /app/favicon.ico /app/favicon.png /app/ojs-favicon.png /app/ojs-favicon.svg ./
+COPY --from=build /app/docker-compose.yml ./docker-compose.yml
 
 EXPOSE 8787
 
