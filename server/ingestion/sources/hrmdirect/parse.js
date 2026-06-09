@@ -668,17 +668,71 @@ function extractHrmDirectDetailFields(detailHtml) {
                   ? officeLocation.remoteRuleName
                   : "hrmdirect_detail_workplace_type"
     : "";
+  let finalLocation = location;
+  let finalCountry = country;
+  let finalLocationRuleName = locationRuleName;
+  let finalLocationSource = locationSource;
+  let finalLocationPath = locationPath;
+
+  if (!finalLocation) {
+    const titleMatch = detailHtml.match(/<h2>([\s\S]*?)<\/h2>/i) || detailHtml.match(/<title>([\s\S]*?)<\/title>/i);
+    let titleText = titleMatch ? cleanHrmDirectText(titleMatch[1]).replace(/\s*-\s*Careers At\s+.*$/i, "").trim() : "";
+    if (titleText) {
+      const airportMatch = titleText.match(/\b([A-Z]{3})\b\s*\)?$/i) || titleText.match(/\(([A-Z]{3})\)\s*$/i);
+      const AIRPORT_LOCATION_MAP = {
+        vny: { city: "Van Nuys", state: "CA", country: "United States" },
+        sdl: { city: "Scottsdale", state: "AZ", country: "United States" },
+        iad: { city: "Washington", state: "DC", country: "United States" },
+        cle: { city: "Cleveland", state: "OH", country: "United States" },
+        las: { city: "Las Vegas", state: "NV", country: "United States" },
+        sfo: { city: "San Francisco", state: "CA", country: "United States" },
+        slc: { city: "Salt Lake City", state: "UT", country: "United States" },
+        gjt: { city: "Grand Junction", state: "CO", country: "United States" },
+        bos: { city: "Boston", state: "MA", country: "United States" },
+        bed: { city: "Bedford", state: "MA", country: "United States" },
+        bzn: { city: "Bozeman", state: "MT", country: "United States" }
+      };
+      let mapped = null;
+      if (airportMatch) {
+        mapped = AIRPORT_LOCATION_MAP[airportMatch[1].toLowerCase()];
+      }
+      if (mapped) {
+        finalLocation = `${mapped.city}, ${mapped.state}`;
+        finalCountry = mapped.country;
+        finalLocationRuleName = "hrmdirect_detail_title_airport_code";
+        finalLocationSource = "labeled_html";
+        finalLocationPath = "h2/title";
+      } else {
+        const parts = titleText.split(/\s+-\s+|\s{2,}/);
+        if (parts.length > 1) {
+          const lastPart = parts[parts.length - 1].trim();
+          if (
+            lastPart.match(/[A-Z]{2}$/) ||
+            lastPart.match(/,\s*[A-Z]{2}$/i) ||
+            normalizeCountryFromLocation(lastPart)
+          ) {
+            finalLocation = lastPart;
+            finalCountry = normalizeCountryFromLocation(lastPart) || "United States";
+            finalLocationRuleName = "hrmdirect_detail_title_location";
+            finalLocationSource = "labeled_html";
+            finalLocationPath = "h2/title";
+          }
+        }
+      }
+    }
+  }
+
   return {
-    location,
+    location: finalLocation,
     department,
     employment_type: employmentType,
     posting_date: postingDate,
     remote_type: remoteType,
-    country,
+    country: finalCountry,
     evidence: {
-      location_source: locationSource,
-      location_path: locationPath,
-      location_rule_name: locationRuleName,
+      location_source: finalLocationSource,
+      location_path: finalLocationPath,
+      location_rule_name: finalLocationRuleName,
       department_source: department ? "labeled_detail_html" : "",
       department_path: department ? "table.viewFields Department" : "",
       employment_type_source: employmentType ? "labeled_detail_html" : "",

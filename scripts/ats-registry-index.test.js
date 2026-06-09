@@ -45,12 +45,12 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("icims").registry_status, "registry-backed-enabled");
 
   assert.equal(byKey.get("dayforcehcm").family, "enterprise-direct");
-  assert.equal(byKey.get("dayforcehcm").registry_status, "registry-backed-canary");
+  assert.equal(byKey.get("dayforcehcm").registry_status, "registry-backed-enabled");
   assert.equal(byKey.get("dayforcehcm").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.deepEqual(byKey.get("dayforcehcm").recovery_readiness.blockers, []);
 
-  assert.equal(byKey.get("zoho").registry_status, "registry-backed-canary");
-  assert.equal(byKey.get("peopleforce").registry_status, "registry-backed-disabled");
+  assert.equal(byKey.get("zoho").registry_status, "registry-backed-enabled");
+  assert.equal(byKey.get("peopleforce").registry_status, "registry-backed-enabled");
   assert.equal(byKey.get("peopleforce").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.equal(byKey.get("policeapp").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.equal(byKey.get("sagehr").recovery_readiness.status, "ready-for-read-only-recovery");
@@ -58,10 +58,10 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("talexio").recovery_readiness.status, "ready-for-read-only-recovery");
 
   assert.equal(byKey.get("personio").family, "direct-json-stable");
-  assert.equal(byKey.get("personio").registry_status, "registry-backed-canary");
+  assert.equal(byKey.get("personio").registry_status, "registry-backed-enabled");
   assert.equal(byKey.get("personio").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.equal(byKey.get("workable").family, "direct-json-stable");
-  assert.equal(byKey.get("workable").registry_status, "registry-backed-canary");
+  assert.equal(byKey.get("workable").registry_status, "registry-backed-enabled");
   assert.equal(byKey.get("workable").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.equal(byKey.get("paycomonline").family, "future-candidate");
   assert.equal(byKey.get("paycomonline").registry_status, "research-only");

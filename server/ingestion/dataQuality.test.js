@@ -26,6 +26,7 @@ test("accepted posting quality metadata is bounded and source-explainable", () =
       last_seen_epoch: 1778198400,
       parser_version: "greenhouse-v1",
       confidence: 0.9,
+      description_plain: "This is a job description",
       raw_payload_hash: "hash"
     },
     { nowEpoch: 1778198400 }
@@ -78,6 +79,7 @@ test("stored quality fields serialize stable flags", () => {
   assert.ok(stored.quality_score < 100);
   assert.deepEqual(JSON.parse(stored.quality_flags), [
     "missing_country",
+    "missing_description",
     "missing_location_text",
     "missing_posted_at",
     "missing_region",

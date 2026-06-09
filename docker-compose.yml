@@ -36,12 +36,14 @@ services:
     image: getmeili/meilisearch:v1.16
     container_name: openjobslots-meilisearch
     restart: unless-stopped
-    mem_limit: ${OPENJOBSLOTS_MEILI_MEM_LIMIT:-4096m}
-    memswap_limit: ${OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-4096m}
+    mem_limit: ${OPENJOBSLOTS_MEILI_MEM_LIMIT:-8192m}
+    memswap_limit: ${OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-8192m}
     environment:
       - MEILI_ENV=production
       - MEILI_NO_ANALYTICS=true
       - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?Set MEILI_MASTER_KEY before starting the stack}
+      - MEILI_MAX_INDEXING_MEMORY=2 GiB
+      - MEILI_MAX_INDEXING_THREADS=1
     volumes:
       - meili-data:/meili_data
 

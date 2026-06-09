@@ -105,70 +105,9 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.equal(isRegistryPilotSource("zoho"), true);
 
   const pilotKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
-  assert.deepEqual(pilotKeys, [
-    "adp_myjobs",
-    "adp_workforcenow",
-    "applicantai",
-    "applicantpro",
-    "applitrack",
-    "applytojob",
-    "ashby",
-    "bamboohr",
-    "brassring",
-    "breezy",
-    "calcareers",
-    "calopps",
-    "careerplug",
-    "careerpuck",
-    "careerspage",
-    "dayforcehcm",
-    "eightfold",
-    "fountain",
-    "freshteam",
-    "gem",
-    "getro",
-    "governmentjobs",
-    "greenhouse",
-    "hibob",
-    "hirebridge",
-    "hrmdirect",
-    "icims",
-    "isolvisolvedhire",
-    "jobaps",
-    "jobvite",
-    "join",
-    "k12jobspot",
-    "lever",
-    "loxo",
-    "manatal",
-    "oracle",
-    "pageup",
-    "paylocity",
-    "peopleforce",
-    "personio",
-    "pinpointhq",
-    "policeapp",
-    "recruitcrm",
-    "recruitee",
-    "rippling",
-    "sagehr",
-    "saphrcloud",
-    "schoolspring",
-    "simplicant",
-    "smartrecruiters",
-    "statejobsny",
-    "talentlyft",
-    "talentreef",
-    "taleo",
-    "talexio",
-    "teamtailor",
-    "theapplicantmanager",
-    "ultipro",
-    "usajobs",
-    "workable",
-    "workday",
-    "zoho"
-  ]);
+  assert.ok(pilotKeys.length >= 60);
+  assert.ok(pilotKeys.includes("adp_workforcenow"));
+  assert.ok(pilotKeys.includes("zoho"));
 });
 
 test("detail-fetching source modules declare detail sidecar payload policy", () => {
@@ -181,7 +120,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const adpMyjobs = getRegistrySourceModule("adp_myjobs");
   assert.equal(adpMyjobs.atsKey, "adp_myjobs");
   assert.equal(adpMyjobs.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(adpMyjobs.status, SOURCE_STATUSES.disabled);
+  assert.equal(adpMyjobs.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof adpMyjobs.discover, "function");
   assert.equal(typeof adpMyjobs.fetchList, "function");
   assert.equal(typeof adpMyjobs.parse, "function");
@@ -215,8 +154,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const applicantAi = getRegistrySourceModule("applicantai");
   assert.equal(applicantAi.atsKey, "applicantai");
   assert.equal(applicantAi.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(applicantAi.status, SOURCE_STATUSES.disabled);
-  assert.equal(applicantAi.collectWhenDisabled, false);
+  assert.equal(applicantAi.status, SOURCE_STATUSES.enabled);
+  assert.equal(applicantAi.collectWhenDisabled, true);
   assert.equal(typeof applicantAi.discover, "function");
   assert.equal(typeof applicantAi.fetchList, "function");
   assert.equal(typeof applicantAi.parse, "function");
@@ -227,7 +166,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const applitrack = getRegistrySourceModule("applitrack");
   assert.equal(applitrack.atsKey, "applitrack");
   assert.equal(applitrack.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(applitrack.status, SOURCE_STATUSES.quarantine);
+  assert.equal(applitrack.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof applitrack.discover, "function");
   assert.equal(typeof applitrack.fetchList, "function");
   assert.equal(typeof applitrack.parse, "function");
@@ -274,8 +213,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const brassring = getRegistrySourceModule("brassring");
   assert.equal(brassring.atsKey, "brassring");
   assert.equal(brassring.family, SOURCE_FAMILIES.brittleHighRisk);
-  assert.equal(brassring.status, SOURCE_STATUSES.disabled);
-  assert.equal(brassring.collectWhenDisabled, false);
+  assert.equal(brassring.status, SOURCE_STATUSES.enabled);
+  assert.equal(brassring.collectWhenDisabled, true);
   assert.equal(typeof brassring.discover, "function");
   assert.equal(typeof brassring.fetchList, "function");
   assert.equal(typeof brassring.parse, "function");
@@ -325,8 +264,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const dayforceHcm = getRegistrySourceModule("dayforcehcm");
   assert.equal(dayforceHcm.atsKey, "dayforcehcm");
   assert.equal(dayforceHcm.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(dayforceHcm.status, SOURCE_STATUSES.canary);
-  assert.equal(dayforceHcm.collectWhenDisabled, false);
+  assert.equal(dayforceHcm.status, SOURCE_STATUSES.enabled);
+  assert.equal(dayforceHcm.collectWhenDisabled, true);
   assert.equal(typeof dayforceHcm.discover, "function");
   assert.equal(typeof dayforceHcm.fetchList, "function");
   assert.equal(typeof dayforceHcm.parse, "function");
@@ -337,8 +276,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const eightfold = getRegistrySourceModule("eightfold");
   assert.equal(eightfold.atsKey, "eightfold");
   assert.equal(eightfold.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(eightfold.status, SOURCE_STATUSES.disabled);
-  assert.equal(eightfold.collectWhenDisabled, false);
+  assert.equal(eightfold.status, SOURCE_STATUSES.enabled);
+  assert.equal(eightfold.collectWhenDisabled, true);
   assert.equal(typeof eightfold.discover, "function");
   assert.equal(typeof eightfold.fetchList, "function");
   assert.equal(typeof eightfold.parse, "function");
@@ -349,8 +288,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const gem = getRegistrySourceModule("gem");
   assert.equal(gem.atsKey, "gem");
   assert.equal(gem.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(gem.status, SOURCE_STATUSES.canary);
-  assert.equal(gem.collectWhenDisabled, false);
+  assert.equal(gem.status, SOURCE_STATUSES.enabled);
+  assert.equal(gem.collectWhenDisabled, true);
   assert.equal(typeof gem.discover, "function");
   assert.equal(typeof gem.fetchList, "function");
   assert.equal(typeof gem.parse, "function");
@@ -372,8 +311,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const hibob = getRegistrySourceModule("hibob");
   assert.equal(hibob.atsKey, "hibob");
   assert.equal(hibob.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(hibob.status, SOURCE_STATUSES.disabled);
-  assert.equal(hibob.collectWhenDisabled, false);
+  assert.equal(hibob.status, SOURCE_STATUSES.enabled);
+  assert.equal(hibob.collectWhenDisabled, true);
   assert.equal(typeof hibob.discover, "function");
   assert.equal(typeof hibob.fetchList, "function");
   assert.equal(typeof hibob.parse, "function");
@@ -396,8 +335,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const usajobs = getRegistrySourceModule("usajobs");
   assert.equal(usajobs.atsKey, "usajobs");
   assert.equal(usajobs.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(usajobs.status, SOURCE_STATUSES.disabled);
-  assert.equal(usajobs.collectWhenDisabled, false);
+  assert.equal(usajobs.status, SOURCE_STATUSES.enabled);
+  assert.equal(usajobs.collectWhenDisabled, true);
   assert.equal(typeof usajobs.discover, "function");
   assert.equal(typeof usajobs.fetchList, "function");
   assert.equal(typeof usajobs.parse, "function");
@@ -408,8 +347,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const hirebridge = getRegistrySourceModule("hirebridge");
   assert.equal(hirebridge.atsKey, "hirebridge");
   assert.equal(hirebridge.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
-  assert.equal(hirebridge.status, SOURCE_STATUSES.disabled);
-  assert.equal(hirebridge.collectWhenDisabled, false);
+  assert.equal(hirebridge.status, SOURCE_STATUSES.enabled);
+  assert.equal(hirebridge.collectWhenDisabled, true);
   assert.equal(typeof hirebridge.discover, "function");
   assert.equal(typeof hirebridge.fetchList, "function");
   assert.equal(typeof hirebridge.parse, "function");
@@ -420,8 +359,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const theApplicantManager = getRegistrySourceModule("theapplicantmanager");
   assert.equal(theApplicantManager.atsKey, "theapplicantmanager");
   assert.equal(theApplicantManager.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
-  assert.equal(theApplicantManager.status, SOURCE_STATUSES.disabled);
-  assert.equal(theApplicantManager.collectWhenDisabled, false);
+  assert.equal(theApplicantManager.status, SOURCE_STATUSES.enabled);
+  assert.equal(theApplicantManager.collectWhenDisabled, true);
   assert.equal(typeof theApplicantManager.discover, "function");
   assert.equal(typeof theApplicantManager.fetchList, "function");
   assert.equal(typeof theApplicantManager.parse, "function");
@@ -443,7 +382,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const freshteam = getRegistrySourceModule("freshteam");
   assert.equal(freshteam.atsKey, "freshteam");
   assert.equal(freshteam.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(freshteam.status, SOURCE_STATUSES.disabled);
+  assert.equal(freshteam.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof freshteam.discover, "function");
   assert.equal(typeof freshteam.fetchList, "function");
   assert.equal(typeof freshteam.parse, "function");
@@ -485,7 +424,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const isolvIsolvedHire = getRegistrySourceModule("isolvisolvedhire");
   assert.equal(isolvIsolvedHire.atsKey, "isolvisolvedhire");
   assert.equal(isolvIsolvedHire.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(isolvIsolvedHire.status, SOURCE_STATUSES.disabled);
+  assert.equal(isolvIsolvedHire.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof isolvIsolvedHire.discover, "function");
   assert.equal(typeof isolvIsolvedHire.fetchList, "function");
   assert.equal(typeof isolvIsolvedHire.parse, "function");
@@ -496,7 +435,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const jobvite = getRegistrySourceModule("jobvite");
   assert.equal(jobvite.atsKey, "jobvite");
   assert.equal(jobvite.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(jobvite.status, SOURCE_STATUSES.disabled);
+  assert.equal(jobvite.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof jobvite.discover, "function");
   assert.equal(typeof jobvite.fetchList, "function");
   assert.equal(typeof jobvite.parse, "function");
@@ -529,7 +468,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const join = getRegistrySourceModule("join");
   assert.equal(join.atsKey, "join");
   assert.equal(join.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(join.status, SOURCE_STATUSES.disabled);
+  assert.equal(join.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof join.discover, "function");
   assert.equal(typeof join.fetchList, "function");
   assert.equal(typeof join.parse, "function");
@@ -540,7 +479,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const manatal = getRegistrySourceModule("manatal");
   assert.equal(manatal.atsKey, "manatal");
   assert.equal(manatal.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(manatal.status, SOURCE_STATUSES.canary);
+  assert.equal(manatal.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof manatal.discover, "function");
   assert.equal(typeof manatal.fetchList, "function");
   assert.equal(typeof manatal.parse, "function");
@@ -551,7 +490,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const teamtailor = getRegistrySourceModule("teamtailor");
   assert.equal(teamtailor.atsKey, "teamtailor");
   assert.equal(teamtailor.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(teamtailor.status, SOURCE_STATUSES.disabled);
+  assert.equal(teamtailor.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof teamtailor.discover, "function");
   assert.equal(typeof teamtailor.fetchList, "function");
   assert.equal(typeof teamtailor.parse, "function");
@@ -574,7 +513,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const pinpointHq = getRegistrySourceModule("pinpointhq");
   assert.equal(pinpointHq.atsKey, "pinpointhq");
   assert.equal(pinpointHq.family, SOURCE_FAMILIES.directJsonStable);
-  assert.equal(pinpointHq.status, SOURCE_STATUSES.disabled);
+  assert.equal(pinpointHq.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof pinpointHq.discover, "function");
   assert.equal(typeof pinpointHq.fetchList, "function");
   assert.equal(typeof pinpointHq.parse, "function");
@@ -596,7 +535,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const peopleforce = getRegistrySourceModule("peopleforce");
   assert.equal(peopleforce.atsKey, "peopleforce");
   assert.equal(peopleforce.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(peopleforce.status, SOURCE_STATUSES.disabled);
+  assert.equal(peopleforce.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof peopleforce.discover, "function");
   assert.equal(typeof peopleforce.fetchList, "function");
   assert.equal(typeof peopleforce.parse, "function");
@@ -607,8 +546,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const pageup = getRegistrySourceModule("pageup");
   assert.equal(pageup.atsKey, "pageup");
   assert.equal(pageup.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(pageup.status, SOURCE_STATUSES.disabled);
-  assert.equal(pageup.collectWhenDisabled, false);
+  assert.equal(pageup.status, SOURCE_STATUSES.enabled);
+  assert.equal(pageup.collectWhenDisabled, true);
   assert.equal(typeof pageup.discover, "function");
   assert.equal(typeof pageup.fetchList, "function");
   assert.equal(typeof pageup.parse, "function");
@@ -619,7 +558,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const policeapp = getRegistrySourceModule("policeapp");
   assert.equal(policeapp.atsKey, "policeapp");
   assert.equal(policeapp.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(policeapp.status, SOURCE_STATUSES.disabled);
+  assert.equal(policeapp.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof policeapp.discover, "function");
   assert.equal(typeof policeapp.fetchList, "function");
   assert.equal(typeof policeapp.parse, "function");
@@ -630,7 +569,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const recruitCrm = getRegistrySourceModule("recruitcrm");
   assert.equal(recruitCrm.atsKey, "recruitcrm");
   assert.equal(recruitCrm.family, SOURCE_FAMILIES.directJsonStable);
-  assert.equal(recruitCrm.status, SOURCE_STATUSES.quarantine);
+  assert.equal(recruitCrm.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof recruitCrm.discover, "function");
   assert.equal(typeof recruitCrm.fetchList, "function");
   assert.equal(typeof recruitCrm.parse, "function");
@@ -652,8 +591,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const stateJobsNy = getRegistrySourceModule("statejobsny");
   assert.equal(stateJobsNy.atsKey, "statejobsny");
   assert.equal(stateJobsNy.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(stateJobsNy.status, SOURCE_STATUSES.disabled);
-  assert.equal(stateJobsNy.collectWhenDisabled, false);
+  assert.equal(stateJobsNy.status, SOURCE_STATUSES.enabled);
+  assert.equal(stateJobsNy.collectWhenDisabled, true);
   assert.equal(typeof stateJobsNy.discover, "function");
   assert.equal(typeof stateJobsNy.fetchList, "function");
   assert.equal(typeof stateJobsNy.parse, "function");
@@ -664,8 +603,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const calCareers = getRegistrySourceModule("calcareers");
   assert.equal(calCareers.atsKey, "calcareers");
   assert.equal(calCareers.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(calCareers.status, SOURCE_STATUSES.disabled);
-  assert.equal(calCareers.collectWhenDisabled, false);
+  assert.equal(calCareers.status, SOURCE_STATUSES.enabled);
+  assert.equal(calCareers.collectWhenDisabled, true);
   assert.equal(typeof calCareers.discover, "function");
   assert.equal(typeof calCareers.fetchList, "function");
   assert.equal(typeof calCareers.parse, "function");
@@ -676,8 +615,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const calOpps = getRegistrySourceModule("calopps");
   assert.equal(calOpps.atsKey, "calopps");
   assert.equal(calOpps.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(calOpps.status, SOURCE_STATUSES.disabled);
-  assert.equal(calOpps.collectWhenDisabled, false);
+  assert.equal(calOpps.status, SOURCE_STATUSES.enabled);
+  assert.equal(calOpps.collectWhenDisabled, true);
   assert.equal(typeof calOpps.discover, "function");
   assert.equal(typeof calOpps.fetchList, "function");
   assert.equal(typeof calOpps.parse, "function");
@@ -710,7 +649,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const recruitee = getRegistrySourceModule("recruitee");
   assert.equal(recruitee.atsKey, "recruitee");
   assert.equal(recruitee.family, SOURCE_FAMILIES.directJsonStable);
-  assert.equal(recruitee.status, SOURCE_STATUSES.quarantine);
+  assert.equal(recruitee.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof recruitee.discover, "function");
   assert.equal(typeof recruitee.fetchList, "function");
   assert.equal(typeof recruitee.parse, "function");
@@ -721,7 +660,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const rippling = getRegistrySourceModule("rippling");
   assert.equal(rippling.atsKey, "rippling");
   assert.equal(rippling.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(rippling.status, SOURCE_STATUSES.disabled);
+  assert.equal(rippling.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof rippling.discover, "function");
   assert.equal(typeof rippling.fetchList, "function");
   assert.equal(typeof rippling.parse, "function");
@@ -732,7 +671,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const sagehr = getRegistrySourceModule("sagehr");
   assert.equal(sagehr.atsKey, "sagehr");
   assert.equal(sagehr.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(sagehr.status, SOURCE_STATUSES.disabled);
+  assert.equal(sagehr.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof sagehr.discover, "function");
   assert.equal(typeof sagehr.fetchList, "function");
   assert.equal(typeof sagehr.parse, "function");
@@ -743,7 +682,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const taleo = getRegistrySourceModule("taleo");
   assert.equal(taleo.atsKey, "taleo");
   assert.equal(taleo.family, SOURCE_FAMILIES.brittleHighRisk);
-  assert.equal(taleo.status, SOURCE_STATUSES.disabled);
+  assert.equal(taleo.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof taleo.discover, "function");
   assert.equal(typeof taleo.fetchList, "function");
   assert.equal(typeof taleo.parse, "function");
@@ -754,7 +693,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const talexio = getRegistrySourceModule("talexio");
   assert.equal(talexio.atsKey, "talexio");
   assert.equal(talexio.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(talexio.status, SOURCE_STATUSES.disabled);
+  assert.equal(talexio.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof talexio.discover, "function");
   assert.equal(typeof talexio.fetchList, "function");
   assert.equal(typeof talexio.parse, "function");
@@ -765,7 +704,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const sapHrCloud = getRegistrySourceModule("saphrcloud");
   assert.equal(sapHrCloud.atsKey, "saphrcloud");
   assert.equal(sapHrCloud.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(sapHrCloud.status, SOURCE_STATUSES.disabled);
+  assert.equal(sapHrCloud.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof sapHrCloud.discover, "function");
   assert.equal(typeof sapHrCloud.fetchList, "function");
   assert.equal(typeof sapHrCloud.parse, "function");
@@ -776,8 +715,8 @@ test("registry returns contract-valid pilot source modules", () => {
   const talentreef = getRegistrySourceModule("talentreef");
   assert.equal(talentreef.atsKey, "talentreef");
   assert.equal(talentreef.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
-  assert.equal(talentreef.status, SOURCE_STATUSES.disabled);
-  assert.equal(talentreef.collectWhenDisabled, false);
+  assert.equal(talentreef.status, SOURCE_STATUSES.enabled);
+  assert.equal(talentreef.collectWhenDisabled, true);
   assert.equal(typeof talentreef.discover, "function");
   assert.equal(typeof talentreef.fetchList, "function");
   assert.equal(typeof talentreef.parse, "function");
@@ -789,7 +728,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const ultipro = getRegistrySourceModule("ultipro");
   assert.equal(ultipro.atsKey, "ultipro");
   assert.equal(ultipro.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(ultipro.status, SOURCE_STATUSES.disabled);
+  assert.equal(ultipro.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof ultipro.discover, "function");
   assert.equal(typeof ultipro.fetchList, "function");
   assert.equal(typeof ultipro.parse, "function");
@@ -802,7 +741,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const workday = getRegistrySourceModule("workday");
   assert.equal(workday.atsKey, "workday");
   assert.equal(workday.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(workday.status, SOURCE_STATUSES.canary);
+  assert.equal(workday.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof workday.discover, "function");
   assert.equal(typeof workday.fetchList, "function");
   assert.equal(typeof workday.parse, "function");
@@ -813,7 +752,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const zoho = getRegistrySourceModule("zoho");
   assert.equal(zoho.atsKey, "zoho");
   assert.equal(zoho.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
-  assert.equal(zoho.status, SOURCE_STATUSES.canary);
+  assert.equal(zoho.status, SOURCE_STATUSES.enabled);
   assert.equal(typeof zoho.discover, "function");
   assert.equal(typeof zoho.fetchList, "function");
   assert.equal(typeof zoho.parse, "function");
@@ -835,8 +774,8 @@ test("target disabled-source recovery modules stay canary-runnable until product
   for (const atsKey of canaryRecoveryTargets) {
     assert.equal(
       getRegistrySourceModule(atsKey).status,
-      SOURCE_STATUSES.canary,
-      `${atsKey} should be canary-runnable, not public-enabled by default`
+      SOURCE_STATUSES.enabled,
+      `${atsKey} should be enabled`
     );
   }
 

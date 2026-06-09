@@ -2881,7 +2881,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         description_html: String(posting?.description_html || ""),
         ats_key: atsKey,
         last_seen_epoch: nowEpoch,
-        posted_at_epoch: posting?.posted_at_epoch || posting?.posting_date_epoch || null,
+        posted_at_epoch: posting?.posted_at_epoch || posting?.posting_date_epoch || nowEpoch,
         hidden: false
       };
       if (!validatePosting(normalizedPosting).ok) continue;
@@ -3010,8 +3010,8 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           String(posting?.description_html || ""),
           atsKey,
           String(posting?.source_job_id || ""),
-          posting?.posting_date || null,
-          posting?.posted_at_epoch || posting?.posting_date_epoch || null,
+          posting?.posting_date || new Date(nowEpoch * 1000).toISOString().split('T')[0],
+          posting?.posted_at_epoch || posting?.posting_date_epoch || nowEpoch,
           nowEpoch,
           nowEpoch,
           String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
@@ -3030,7 +3030,9 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
     client.release();
   }
 
-  await upsertMeiliPostings(normalizedForSearchIndex, getMeiliConfig());
+  if (!options.skipMeili) {
+    await upsertMeiliPostings(normalizedForSearchIndex, getMeiliConfig());
+  }
 }
 
 async function prunePostgresRetention(pool, options = {}) {

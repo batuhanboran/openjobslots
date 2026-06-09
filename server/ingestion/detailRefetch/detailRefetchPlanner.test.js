@@ -107,6 +107,8 @@ async function createTestDb() {
       posted_at_epoch INTEGER,
       first_seen_epoch INTEGER,
       last_seen_epoch INTEGER,
+      description_plain TEXT,
+      description_html TEXT,
       quality_score INTEGER NOT NULL DEFAULT 0,
       quality_flags TEXT NOT NULL DEFAULT '[]',
       hidden INTEGER NOT NULL DEFAULT 0
@@ -356,5 +358,26 @@ test("extractDetailFields parses json-ld for new ATS sources", () => {
   const detail = extractDetailFields(row, html);
   assert.equal(detail.location, "Berlin, Germany");
   assert.equal(detail.remote_type, "remote");
+  assert.equal(detail.description_html, "This is a fully remote position (work from home).");
+  assert.equal(detail.description_plain, "This is a fully remote position (work from home).");
+});
+
+test("planDetailChanges proposes description_plain and description_html changes when blank", () => {
+  const row = baseRow({
+    ats_key: "greenhouse",
+    description_plain: "",
+    description_html: ""
+  });
+  const detail = {
+    description_plain: "Plain text description",
+    description_html: "<p>Plain text description</p>"
+  };
+  const plan = planDetailChanges(row, detail);
+  const descPlain = plan.changes.find((c) => c.field === "description_plain");
+  const descHtml = plan.changes.find((c) => c.field === "description_html");
+  assert.ok(descPlain);
+  assert.equal(descPlain.after, "Plain text description");
+  assert.ok(descHtml);
+  assert.equal(descHtml.after, "<p>Plain text description</p>");
 });
 

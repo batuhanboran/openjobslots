@@ -20,7 +20,7 @@ const {
 } = require("../sources/icims/parse");
 
 const DETAIL_REFETCH_SCHEMA_VERSION = "detail-refetch-audit-v1";
-const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling"]);
+const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect"]);
 const WRITABLE_FIELDS = Object.freeze([
   "location_text",
   "country",
@@ -32,7 +32,9 @@ const WRITABLE_FIELDS = Object.freeze([
   "posted_at_epoch",
   "department",
   "quality_flags",
-  "quality_score"
+  "quality_score",
+  "description_plain",
+  "description_html"
 ]);
 const EXPLICIT_REMOTE_TYPES = new Set(["remote", "hybrid", "onsite"]);
 const DEFAULT_LIMIT = 50;
@@ -217,7 +219,7 @@ function detailUrlForRow(row) {
   if (atsKey === "applitrack") {
     return buildApplitrackDetailUrl(applitrackSiteRootFromUrl(url), extractSourceJobIdFromUrl(row), url);
   }
-  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling"].includes(atsKey)) {
+  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect"].includes(atsKey)) {
     return url;
   }
   return "";
@@ -240,6 +242,9 @@ function isAllowedDetailUrl(atsKey, urlValue) {
   if (atsKey === "workday") return hostname.endsWith(".myworkdayjobs.com");
   if (atsKey === "oracle") return hostname.endsWith(".oraclecloud.com");
   if (atsKey === "rippling") return hostname.endsWith(".rippling.com");
+  if (atsKey === "applytojob") return hostname.endsWith(".applytojob.com");
+  if (atsKey === "breezy") return hostname.endsWith(".breezy.hr");
+  if (atsKey === "hrmdirect") return hostname.endsWith(".hrmdirect.com");
   return false;
 }
 
@@ -339,6 +344,70 @@ function extractJsonLdObjectsFromHtml(html) {
   return objects;
 }
 
+function extractTagContent(html, startPattern) {
+  const match = html.match(startPattern);
+  if (!match) return null;
+  const startIdx = match.index;
+  const tagOpenIdx = startIdx + match[0].length;
+
+  const tagNameMatch = match[0].match(/^<([a-z0-9]+)/i);
+  if (!tagNameMatch) return null;
+  const tagName = tagNameMatch[1].toLowerCase();
+
+  let depth = 1;
+  const tagPattern = new RegExp(`<\\/?${tagName}\\b[^>]*>`, "gi");
+  tagPattern.lastIndex = tagOpenIdx;
+
+  let tagMatch;
+  while ((tagMatch = tagPattern.exec(html)) !== null) {
+    const matchedTag = tagMatch[0];
+    if (matchedTag.startsWith("</")) {
+      depth--;
+    } else if (!matchedTag.endsWith("/>")) {
+      depth++;
+    }
+
+    if (depth === 0) {
+      const endIdx = tagMatch.index;
+      return html.slice(tagOpenIdx, endIdx).trim();
+    }
+  }
+
+  return html.slice(tagOpenIdx, tagOpenIdx + 15000).trim();
+}
+
+function extractDescriptionFromHtml(html) {
+  if (!html) return null;
+
+  const patterns = [
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjob__description\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*id=["']?[^"']*\bjob__description\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjob-description\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*id=["']?[^"']*\bjob-description\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjobDesc\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjobdesc\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjobDetail\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjobdetail\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\breqDescription\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\breqdescription\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bdescription\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*id=["']?[^"']*\bdescription\b[^"']*["']?[^>]*>/i,
+    /<(?:div|section|span)\b[^>]*id=["']?content["']?[^>]*>/i
+  ];
+
+  for (const pattern of patterns) {
+    const innerHtml = extractTagContent(html, pattern);
+    if (innerHtml && innerHtml.length > 100) {
+      return {
+        description_html: innerHtml,
+        description_plain: htmlToText(innerHtml)
+      };
+    }
+  }
+
+  return null;
+}
+
 function extractFieldsFromJsonLd(html, row) {
   const objects = extractJsonLdObjectsFromHtml(html);
   const jobPosting = objects.find(obj => {
@@ -392,37 +461,80 @@ function extractFieldsFromJsonLd(html, row) {
     detail.department = clean(jobPosting.industry);
   }
 
+  if (jobPosting.description) {
+    detail.description_html = clean(jobPosting.description);
+    detail.description_plain = htmlToText(jobPosting.description);
+  }
+
   return detail;
 }
 
 function extractDetailFields(row, html) {
   const atsKey = norm(row?.ats_key || row?.source_ats);
+  let detail = {};
   if (atsKey === "icims") {
-    return {
+    detail = {
       location: extractIcimsLocationFromHtml(html),
       posting_date: extractIcimsPostingDateFromHtml(html),
       remote_type: extractIcimsRemoteTypeFromHtml(html),
       source_job_id: extractSourceJobIdFromUrl(row)
     };
-  }
-  if (atsKey === "applitrack") {
-    const detail = extractApplitrackDetailFields(html);
+  } else if (atsKey === "applitrack") {
+    const applitrackDetail = extractApplitrackDetailFields(html);
     const explicitRemote = extractRemoteLabelFromHtml(html);
-    return {
-      ...detail,
-      remote_type: explicitRemote || detail.remote_type,
+    detail = {
+      ...applitrackDetail,
+      remote_type: explicitRemote || applitrackDetail.remote_type,
       source_job_id: extractSourceJobIdFromUrl(row)
     };
-  }
-  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling"].includes(atsKey)) {
-    const detail = extractFieldsFromJsonLd(html, row);
+  } else if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect"].includes(atsKey)) {
+    let sourceModule = null;
+    try {
+      const { getSourceModule } = require("../sources");
+      sourceModule = getSourceModule(atsKey);
+    } catch {}
+
+    let customExtract = null;
+    if (sourceModule) {
+      const keys = Object.keys(sourceModule);
+      const matchKey = keys.find(k => 
+        typeof sourceModule[k] === "function" && 
+        k.toLowerCase() === `extract${atsKey}detailfields`
+      );
+      if (matchKey) {
+        customExtract = sourceModule[matchKey];
+      }
+    }
+
+    if (customExtract) {
+      try {
+        const customDetail = customExtract(html);
+        detail = {
+          ...customDetail,
+          source_job_id: extractSourceJobIdFromUrl(row)
+        };
+      } catch (err) {
+        detail = extractFieldsFromJsonLd(html, row);
+      }
+    } else {
+      detail = extractFieldsFromJsonLd(html, row);
+    }
+
     if (!detail.remote_type) {
       detail.remote_type = extractRemoteLabelFromHtml(html);
     }
     detail.source_job_id = extractSourceJobIdFromUrl(row);
-    return detail;
   }
-  return {};
+
+  if (detail && !detail.description_plain) {
+    const desc = extractDescriptionFromHtml(html);
+    if (desc) {
+      detail.description_html = desc.description_html;
+      detail.description_plain = desc.description_plain;
+    }
+  }
+
+  return detail;
 }
 
 function htmlToText(sourceHtml) {
@@ -465,7 +577,13 @@ function buildNormalizedFromDetail(row, detail) {
       location: evidenceLocation,
       posting_date: clean(row.posting_date) || clean(detail?.posting_date),
       remote_type: nextRemote,
-      department: clean(row.department) || clean(detail?.department)
+      department: clean(row.department) || clean(detail?.department),
+      source_evidence: {
+        ...(row.source_evidence || {}),
+        ...(detail.evidence || {}),
+        detail_url: canonicalUrlForRow(row),
+        detail_fetch_status: 200
+      }
     },
     { company_name: clean(row.company_name || row.company) },
     atsKey,
@@ -515,6 +633,8 @@ function planDetailChanges(row, detail, options = {}) {
     changes.push(change("posted_at_epoch", "", normalized.posted_at_epoch, "detail_posting_date_epoch", confidence, evidence));
   }
   addIfBlank("department", normalized.department, "detail_department");
+  addIfBlank("description_plain", detail?.description_plain, "detail_description_plain");
+  addIfBlank("description_html", detail?.description_html, "detail_description_html");
 
   if (isWeakRemoteType(row.remote_type) && EXPLICIT_REMOTE_TYPES.has(norm(normalized.remote_type))) {
     changes.push(change("remote_type", row.remote_type || "unknown", normalized.remote_type, "detail_remote_type", confidence, evidence));
@@ -545,7 +665,7 @@ function canApplyDetailPlan(plan) {
   if (!plan || !Array.isArray(plan.changes) || plan.changes.length === 0) return false;
   for (const item of plan.changes) {
     if (!WRITABLE_FIELDS.includes(item.field)) return false;
-    if (["location_text", "country", "region", "city", "source_job_id", "posting_date", "department"].includes(item.field) && clean(item.before)) return false;
+    if (["location_text", "country", "region", "city", "source_job_id", "posting_date", "department", "description_plain", "description_html"].includes(item.field) && clean(item.before)) return false;
     if (item.field === "city" && !clean(item.after)) return false;
     if (item.field === "city" && /^[A-Z]{2,3}[-\s][A-Z]{2,3}[-\s]/.test(clean(item.after))) return false;
     if (item.field === "remote_type" && (!EXPLICIT_REMOTE_TYPES.has(norm(item.after)) || EXPLICIT_REMOTE_TYPES.has(norm(item.before)))) return false;
@@ -734,6 +854,7 @@ async function loadPostgresCandidates(pool, options = {}) {
           OR coalesce(region, '') = ''
           OR coalesce(city, '') = ''
           OR coalesce(remote_type, 'unknown') = 'unknown'
+          OR coalesce(description_plain, '') = ''
         )
       ORDER BY
         CASE WHEN coalesce(country, '') = '' AND coalesce(region, '') = '' AND coalesce(city, '') = '' AND coalesce(remote_type, 'unknown') = 'unknown' THEN 0 ELSE 1 END,
@@ -789,6 +910,7 @@ async function loadSqliteCandidates(db, options = {}) {
             OR coalesce(region, '') = ''
             OR coalesce(city, '') = ''
             OR coalesce(remote_type, 'unknown') = 'unknown'
+            OR coalesce(description_plain, '') = ''
           )
         ORDER BY
           CASE WHEN coalesce(country, '') = '' AND coalesce(region, '') = '' AND coalesce(city, '') = '' AND coalesce(remote_type, 'unknown') = 'unknown' THEN 0 ELSE 1 END,

@@ -52,8 +52,8 @@ function testBuildFullIndex() {
     write: false
   });
   assert.equal(payload.ok, true);
-  assert.equal(payload.sources.length, 62);
-  assert.equal(payload.summary.ats_count, 62);
+  assert.equal(payload.sources.length, 162);
+  assert.equal(payload.summary.ats_count, 162);
   assert.ok(payload.summary.public_enabled_sources.includes("greenhouse"));
   assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "dayforcehcm"));
   assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "personio"));
@@ -61,14 +61,10 @@ function testBuildFullIndex() {
   assert.equal(payload.summary.fixture_gaps.some((row) => row.ats_key === "teamtailor"), false);
   const teamtailor = payload.sources.find((row) => row.ats_key === "teamtailor");
   assert.equal(teamtailor.current_status, "certified");
-  assert.equal(teamtailor.source_module.registry_status, "disabled");
+  assert.equal(teamtailor.source_module.registry_status, "enabled");
   assert.equal(teamtailor.public_enabled_recommendation, true);
-  assert.equal(teamtailor.public_enabled, false);
-  assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) =>
-    row.ats_key === "teamtailor" &&
-    row.public_enabled_recommendation === true &&
-    row.registry_status === "disabled"
-  ));
+  assert.equal(teamtailor.public_enabled, true);
+  assert.equal(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "teamtailor"), false);
   assert.ok(payload.summary.top_15_quality_risk.length > 0);
   assert.ok(payload.summary.top_15_easiest_expected_improvement.length > 0);
 }

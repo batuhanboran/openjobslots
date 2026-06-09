@@ -933,6 +933,7 @@ async function countPostgresDueTargets(pool) {
         ON st.ats_key = ${POSTGRES_COMPANY_ATS_KEY_SQL}
         AND st.company_url = c.url_string
       WHERE s.enabled = true
+        AND COALESCE(NULLIF(s.protection_status, ''), 'normal') NOT IN ('disabled', 'auto_disabled', 'quarantine_only')
         AND COALESCE(st.next_sync_epoch, 0) <= $1;
     `,
     [nowEpochSeconds()]
@@ -1388,12 +1389,20 @@ async function recordPostgresRunError(pool, runId, target, error, httpStatus = n
   );
 }
 
-async function writePostgresPostingCache(pool, posting, options = {}) {
+async function writePostgresPostingCache(pool, postingInput, options = {}) {
   const nowEpoch = Number(options.nowEpoch || nowEpochSeconds());
   const parserVersion = String(options.parserVersion || "unknown");
   const sourceCompanyUrl = String(options.sourceCompanyUrl || "").trim();
   const validation = options.validation || { ok: true, error: "" };
-  const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
+  const canonicalUrl = String(postingInput?.canonical_url || postingInput?.job_posting_url || "").trim();
+
+  const fallbackDate = new Date(nowEpoch * 1000).toISOString().split('T')[0];
+  const posting = {
+    ...postingInput,
+    posted_at_epoch: postingInput?.posted_at_epoch || postingInput?.posting_date_epoch || nowEpoch,
+    posting_date: postingInput?.posting_date || fallbackDate
+  };
+
   const rawPayloadHash = hashPayload(posting || {});
   if (!canonicalUrl) return { cached: false, changed: false, hash: rawPayloadHash };
   const validationStatus = String(validation.status || (validation.ok ? "valid" : "invalid"));
@@ -2011,11 +2020,14 @@ async function startWorker() {
       } else if (AUTO_SYNC_ENABLED && status === "idle") {
         const nowEpoch = nowEpochSeconds();
         const autoSyncIntervalSeconds = Math.max(60, Math.floor(WORKER_INTERVAL_MS / 1000));
-        if (nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds) {
-          const dueTargets = await countPostgresDueTargets(pool);
-          const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
-          const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
-          const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
+        const dueTargets = await countPostgresDueTargets(pool);
+        const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+        const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
+        const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
+        const hasBudgetAndBacklog = dueTargets > 0 && remainingBudget > 0;
+        const timeForIntervalCheck = nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds;
+
+        if (hasBudgetAndBacklog || timeForIntervalCheck) {
           if (dueTargets > 0 && remainingBudget > 0) {
             const targetLimit = Math.min(AUTO_SYNC_TARGETS_PER_RUN, remainingBudget);
             const summary = await runPostgresIngestionOnce(pool, {

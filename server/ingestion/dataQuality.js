@@ -104,7 +104,8 @@ function getQualityFlags(posting = {}, options = {}) {
   addFlag(flags, confidenceScore > 0 && confidenceScore < 0.55, "parser_confidence_low");
   addFlag(flags, confidenceScore <= 0, "missing_parser_confidence");
   addFlag(flags, !locationText, "missing_location_text");
-  addFlag(flags, Boolean(locationText) && (!country || !region), "suspicious_location_parsing");
+  const isGenericRemoteLoc = ["remote", "worldwide", "global", "anywhere", "work from home", "wfh"].includes(locationText.toLowerCase().trim());
+  addFlag(flags, Boolean(locationText) && !isGenericRemoteLoc && (!country || !region), "suspicious_location_parsing");
   addFlag(flags, Boolean(country || region) && !city, "missing_city");
   addFlag(flags, !country, "missing_country");
   addFlag(flags, !region, "missing_region");
@@ -120,6 +121,7 @@ function getQualityFlags(posting = {}, options = {}) {
   addFlag(flags, validationStatus === "invalid" || validationStatus === "rejected" || Boolean(validationError), "rejected");
   addFlag(flags, Boolean(options.duplicateOf || posting.duplicate_of), "duplicate");
   addFlag(flags, Boolean(posting.hidden), "hidden");
+  addFlag(flags, !asString(posting.description_plain), "missing_description");
 
   return uniqueFlags(flags);
 }
@@ -146,7 +148,8 @@ function scorePostingQuality(flagsInput, posting = {}) {
     missing_parser_version: 12,
     missing_parser_confidence: 12,
     parser_confidence_low: 10,
-    hidden: 15
+    hidden: 15,
+    missing_description: 10
   };
   const explicitScore = asNumber(posting.quality_score, NaN);
   if (Number.isFinite(explicitScore) && explicitScore > 0) {
