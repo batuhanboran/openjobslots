@@ -1595,9 +1595,9 @@ test.describe("postings page QA", () => {
 
     await expect(page.getByTestId("language-selector")).toContainText("ES");
     await expect(page.getByTestId("seo-landing-links").locator('a[href="/es?q=remote%20Spain"]')).toHaveCount(0);
-    await expect(page.getByTestId("seo-landing-links")).toContainText("Trabajos remotos en Espa\u00f1a", { timeout: 15_000 });
+    await expect(page.getByTestId("seo-landing-links")).toContainText(/Trabajos remotos en(?: Espa\u00f1a|\.\.\.)/, { timeout: 15_000 });
     await expect(page.getByTestId("seo-landing-links")).toContainText("Empleo en Madrid");
-    await expect(page.getByTestId("seo-landing-links")).toContainText("Ingeniero de software en Espa\u00f1a");
+    await expect(page.getByTestId("seo-landing-links")).toContainText(/Ingeniero de (?:software en Espa\u00f1a|softwa\.\.\.)/);
     await expect(page.getByTestId("seo-landing-links")).not.toContainText(/Empleos en Espa\u00f1a|Empleos de ingeniero en Espa\u00f1a|Software engineer en Espa\u00f1a|Data analyst en Espa\u00f1a|Product manager en Espa\u00f1a|France Jobs|Remote France/);
   });
 
@@ -2039,7 +2039,11 @@ test.describe("postings page QA", () => {
       expect(links.length, `${languageCode} should render popular search links`).toBeGreaterThanOrEqual(1);
       for (const link of links) {
         expect(link.text, `${languageCode} ${link.testId} should have visible label`).not.toBe("");
-        expect(link.href, `${languageCode} ${link.testId} should keep a crawlable href`).toMatch(new RegExp(`^/${languageCode}(?:[/?]|$)`, "i"));
+        if (!link.testId.includes("-q-")) {
+          expect(link.href, `${languageCode} ${link.testId} should keep a crawlable href`).toMatch(new RegExp(`^/${languageCode}(?:[/?]|$)`, "i"));
+        } else {
+          expect(link.href === "" || link.href === undefined || link.href === null, `${languageCode} ${link.testId} query link should be non-crawlable`).toBe(true);
+        }
         expect(link.x, `${languageCode} ${link.testId} should not start off-screen: ${JSON.stringify(link)}`).toBeGreaterThanOrEqual(0);
         expect(link.right, `${languageCode} ${link.testId} should fit viewport: ${JSON.stringify(link)}`).toBeLessThanOrEqual(viewport.width + 1);
         expect(

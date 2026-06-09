@@ -440,7 +440,7 @@ function collectCareerplugJsonLdPostings(companyNameForPostings, config, sourceH
   const jobPosting = findCareerplugJobPostingJsonLd(sourceHtml);
   if (!jobPosting) return [];
   const rawUrl =
-    cleanCareerplugStructuredValue(jobPosting.url || jobPosting.sameAs) ||
+    cleanCareerplugStructuredValue(jobPosting.url) ||
     extractCareerplugDetailJobUrlFromHtml(sourceHtml);
   const absoluteUrl = normalizeCareerplugCanonicalJobUrl(rawUrl, config);
   if (!absoluteUrl || seenUrls.has(absoluteUrl)) return [];

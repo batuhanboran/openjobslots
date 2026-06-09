@@ -329,7 +329,7 @@ function collectBreezyJsonLdPostings(companyNameForPostings, config, sourceHtml,
       : String(type || "").toLowerCase() === "jobposting";
     if (!isJobPosting) continue;
 
-    const rawUrl = String(jobPosting?.url || jobPosting?.sameAs || "").trim();
+    const rawUrl = String(jobPosting?.url || "").trim();
     if (!rawUrl) continue;
     let absoluteUrl = "";
     try {

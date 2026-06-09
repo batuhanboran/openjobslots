@@ -7,7 +7,7 @@ const parser = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
 
 const APP_PATH = path.join(__dirname, "..", "App.js");
-const source = fs.readFileSync(APP_PATH, "utf8");
+const source = fs.readFileSync(APP_PATH, "utf8").replace(/\r\n/g, "\n");
 const ast = parser.parse(source, {
   sourceType: "module",
   plugins: ["jsx"]
