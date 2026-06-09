@@ -29,7 +29,7 @@ COPY --from=build /app/App.js ./App.js
 COPY --from=build /app/app.json ./app.json
 COPY --from=build /app/favicon.ico /app/favicon.png /app/ojs-favicon.png /app/ojs-favicon.svg ./
 COPY --from=build /app/docker-compose.yml ./docker-compose.yml
-COPY --from=build /app/docs/reference/ats-workbench ./docs/reference/ats-workbench
+COPY --from=build /app/docs ./docs
 
 EXPOSE 8787
 
