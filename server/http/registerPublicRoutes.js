@@ -985,10 +985,132 @@ function registerPublicRoutes(app, context) {
       include_ignored: false
     };
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
-      const result =
-        DB_BACKEND === "postgres"
-          ? await listPostgresPostings(postgresPool, options)
-          : await listPostingsWithFilters(options);
+      const rawSearch = options.search || "";
+      let result;
+      if (/\bOR\b/i.test(rawSearch)) {
+        const subQueries = rawSearch.split(/\s+OR\s+/i).map(q => q.trim()).filter(Boolean);
+        if (subQueries.length > 1) {
+          const promises = subQueries.map(async (subQ) => {
+            const subOptions = { ...options, search: subQ };
+            try {
+              return DB_BACKEND === "postgres"
+                ? await listPostgresPostings(postgresPool, subOptions)
+                : await listPostingsWithFilters(subOptions);
+            } catch (err) {
+              console.error(`[OR Search] Subquery "${subQ}" failed:`, err);
+              return { items: [], count: 0, source_facets: [] };
+            }
+          });
+          const results = await Promise.all(promises);
+
+          const mergedMap = new Map();
+          let countExact = true;
+          let pageCapped = false;
+          let countCapped = false;
+          let visibleAtsCount = 0;
+          let visibleCompanyCount = 0;
+          const sourceFacetsMap = new Map();
+
+          results.forEach(res => {
+            const items = res?.items || [];
+            items.forEach(item => {
+              const url = item.canonical_url || item.job_posting_url || "";
+              if (url && !mergedMap.has(url)) {
+                mergedMap.set(url, item);
+              }
+            });
+
+            if (res?.count_exact === false) countExact = false;
+            if (res?.page_capped) pageCapped = true;
+            if (res?.count_capped) countCapped = true;
+            if (res?.visible_ats_count) visibleAtsCount = Math.max(visibleAtsCount, res.visible_ats_count);
+            if (res?.visible_company_count) visibleCompanyCount = Math.max(visibleCompanyCount, res.visible_company_count);
+
+            const facets = res?.source_facets || [];
+            facets.forEach(f => {
+              const val = f.value;
+              if (sourceFacetsMap.has(val)) {
+                const existing = sourceFacetsMap.get(val);
+                existing.count += f.count;
+                if (typeof f.fresh_count === "number") {
+                  existing.fresh_count = (existing.fresh_count || 0) + f.fresh_count;
+                }
+              } else {
+                sourceFacetsMap.set(val, { ...f });
+              }
+            });
+          });
+
+          let mergedItems = Array.from(mergedMap.values());
+          const sortBy = String(options.sort_by || "posted_date").trim().toLowerCase();
+          if (sortBy === "posted_date" || sortBy === "posted_at") {
+            mergedItems.sort((a, b) => {
+              const aTime = Number(a.posted_at_epoch || a.posting_date_epoch || 0);
+              const bTime = Number(b.posted_at_epoch || b.posting_date_epoch || 0);
+              if (bTime !== aTime) return bTime - aTime;
+              const aSeen = Number(a.last_seen_epoch || 0);
+              const bSeen = Number(b.last_seen_epoch || 0);
+              return bSeen - aSeen;
+            });
+          } else if (sortBy === "last_seen" || sortBy === "recent" || sortBy === "fresh_source") {
+            mergedItems.sort((a, b) => {
+              const aSeen = Number(a.last_seen_epoch || 0);
+              const bSeen = Number(b.last_seen_epoch || 0);
+              return bSeen - aSeen;
+            });
+          } else if (sortBy === "confidence") {
+            mergedItems.sort((a, b) => {
+              const aConf = Number(a.confidence || 0);
+              const bConf = Number(b.confidence || 0);
+              if (bConf !== aConf) return bConf - aConf;
+              const aQual = Number(a.quality_score || 0);
+              const bQual = Number(b.quality_score || 0);
+              return bQual - aQual;
+            });
+          }
+
+          const limit = Math.max(1, Number(options.limit || 500));
+          const offset = Math.max(0, Number(options.offset || 0));
+          const paginatedItems = mergedItems.slice(offset, offset + limit);
+
+          const sortedFacets = Array.from(sourceFacetsMap.values())
+            .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+            .slice(0, 8);
+
+          // Calculate fresh_percentage for facets
+          sortedFacets.forEach(facet => {
+            if (facet.count > 0) {
+              facet.fresh_percentage = Math.round(((facet.fresh_count || 0) / facet.count) * 100);
+            }
+          });
+
+          result = {
+            items: paginatedItems,
+            count: mergedItems.length,
+            count_exact: countExact,
+            count_capped: countCapped,
+            page_capped: pageCapped,
+            visible_ats_count: visibleAtsCount,
+            visible_company_count: visibleCompanyCount,
+            source_facets: sortedFacets,
+            limit,
+            offset,
+            filters: {
+              search: rawSearch,
+              sort_by: options.sort_by,
+              freshness_days: options.freshness_days,
+              ...(results[0]?.filters || {})
+            }
+          };
+        }
+      }
+
+      if (!result) {
+        result =
+          DB_BACKEND === "postgres"
+            ? await listPostgresPostings(postgresPool, options)
+            : await listPostingsWithFilters(options);
+      }
       const resultItems = Array.isArray(result.items) ? result.items : [];
       const resultLimit = Math.max(1, Number(result.limit || options.limit || 500));
       const resultOffset = Math.max(0, Number(result.offset || options.offset || 0));

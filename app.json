@@ -2,7 +2,7 @@
   "expo": {
     "name": "OJS",
     "slug": "openjobslots",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "scheme": "openjobslots",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",

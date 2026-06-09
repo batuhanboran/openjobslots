@@ -1,0 +1,650 @@
+{
+  "adp_myjobs": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "adp_workforcenow": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "applicantpro": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "applicantai": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "applitrack": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "applytojob": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "ashby": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bamboohr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "brassring": {
+    "family": "brittle-high-risk",
+    "status": "enabled"
+  },
+  "breezy": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "calcareers": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "calopps": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "careerplug": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "dayforcehcm": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "careerpuck": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "careerspage": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "eightfold": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "gem": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "fountain": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "freshteam": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "getro": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "governmentjobs": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "greenhouse": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hibob": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "hirebridge": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "hrmdirect": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "icims": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "isolvisolvedhire": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "jobvite": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "k12jobspot": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "jobaps": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "join": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "lever": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "loxo": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "manatal": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "oracle": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "personio": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "peopleforce": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "pinpointhq": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "policeapp": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "recruitcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "smartrecruiters": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "statejobsny": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "schoolspring": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "simplicant": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "recruitee": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "rippling": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "sagehr": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "saphrcloud": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "taleo": {
+    "family": "brittle-high-risk",
+    "status": "enabled"
+  },
+  "talentreef": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "theapplicantmanager": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "talentlyft": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "talexio": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "teamtailor": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "ultipro": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "paylocity": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "pageup": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "usajobs": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "workday": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "workable": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "zoho": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "100hires": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobylon": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobsoid": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hirehive": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "phenom": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gohire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "paradox": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sympa": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "flatchr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentnest": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hiringthing": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "oleeo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobadder": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "brightmove": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobdiva": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tribepad": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "akkencloud": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "aviont": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "exelare": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dvinci": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "onlyfy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vultus": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "naukrirms": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ismartrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "logicmelon": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "broadbean": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "idibu": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "seekout": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fetcher": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hired": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "targetrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobscience": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cornerstoneondemand": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sabasoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sumtotalsystems": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "prescreen": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hirex": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "turbohire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cegid": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "apli": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "smartsearch": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "erecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "easyrecrue": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentwunder": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cvat": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "engagesoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hireserve": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hiretrace": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "skeeled": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentadore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jazzhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "clearcompany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "firefish": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitive": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentera": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "atsondemand": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "tracker": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "invenias": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beamery": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "humi": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "collagehr": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "risepeople": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "eploy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "networx": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recooty": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobilla": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "tempworks": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "lumesse": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "meta4": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentsoft": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "haufe": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coview": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "kenjo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kiwihr": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "hrworks": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beetween": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobaffinity": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sentrient": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "talentum": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wocoats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pitchnhire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrmantra": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "neogov": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cleverconnect": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentlink": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hiringopps": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vireup": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "webrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vacancyfiller": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gorecruit": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "rapidrecruit": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "symphonytalent": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "inrecruit": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "staffsuite": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pcrecruiter": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ceipal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "applicantstack": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beetween_new": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kenjo_new": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  }
+}

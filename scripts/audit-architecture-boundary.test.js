@@ -29,7 +29,7 @@ test("architecture boundary reports ingestion orchestration line budgets", () =>
     assert.ok(entry.lines > 0, `expected positive line count for ${file}`);
     assert.ok(entry.lines <= entry.cap, `expected ${file} to stay within its cap`);
   }
-  assert.equal(result.source_local_module_dir_count, 62);
+  assert.equal(result.source_local_module_dir_count, 162);
   assert.equal(result.direct_source_ats_key_count, result.source_local_module_dir_count);
   assert.deepEqual(result.source_local_registration_missing, []);
   assert.deepEqual(result.source_local_registration_extra, []);
