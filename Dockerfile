@@ -25,6 +25,7 @@ COPY --from=build /app/server ./server
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/src ./src
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/App.js ./App.js
 COPY --from=build /app/app.json ./app.json
 COPY --from=build /app/favicon.ico /app/favicon.png /app/ojs-favicon.png /app/ojs-favicon.svg ./
 
