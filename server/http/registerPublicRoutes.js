@@ -200,6 +200,7 @@ function registerPublicRoutes(app, context) {
     appendFrontendLogEntry,
     buildPublicIngestionStatusItem,
     buildPublicPreferences,
+    buildLlmsFullTxt,
     buildLlmsTxt,
     buildRobotsTxt,
     buildSitemapSectionXml,
@@ -1066,6 +1067,10 @@ function registerPublicRoutes(app, context) {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("text/plain").send(buildLlmsTxt(req));
     });
+    app.get("/llms-full.txt", (req, res) => {
+      setPublicSeoCacheHeaders(res, 300, 3600);
+      res.type("text/plain").send(buildLlmsFullTxt(req));
+    });
     app.get("/sitemap.xml", (req, res) => {
       setPublicSeoCacheHeaders(res, 300, 3600);
       res.type("application/xml").send(buildSitemapXml(req));
@@ -1082,7 +1087,7 @@ function registerPublicRoutes(app, context) {
       maxAge: "5m"
     }));
     app.use((req, res, next) => {
-      if (req.method === "GET" && req.accepts("html")) {
+      if ((req.method === "GET" || req.method === "HEAD") && req.accepts("html")) {
         return sendSeoIndex(req, res, next);
       }
       return next();

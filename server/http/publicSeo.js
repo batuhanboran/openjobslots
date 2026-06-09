@@ -1,5 +1,6 @@
 const {
   PUBLIC_SEO_ROUTES,
+  PUBLIC_SEO_ATS_PAGES,
   getPublicSeoAlternateGroupPages,
   getPublicSeoRouteHintByPath,
   normalizePublicSeoPath
@@ -1118,6 +1119,42 @@ function createPublicSeoHelpers(dependencies = {}) {
     ].join("\n");
   }
 
+  function buildLlmsFullTxt(req) {
+    const siteOrigin = getPublicSiteOrigin(req);
+    const summary = buildLlmsTxt(req);
+    
+    const atsDetails = PUBLIC_SEO_ATS_PAGES.map((page) => {
+      const title = page.title.replace(/\s*\|\s*OpenJobSlots\s*$/i, "");
+      const paragraphs = (page.contentParagraphs || []).map(p => `> ${p}`).join("\n\n");
+      const faqs = (page.faqItems || []).map(faq => `**Q: ${faq.question}**\n\n${faq.answer}`).join("\n\n");
+      return [
+        `### ${title}`,
+        "",
+        `Path: [${page.path}](${siteOrigin}${page.path})`,
+        `ATS Source Key: \`${page.atsSourceKey}\``,
+        "",
+        paragraphs,
+        "",
+        "#### Frequently Asked Questions",
+        "",
+        faqs,
+        ""
+      ].join("\n");
+    }).join("\n---\n\n");
+
+    return [
+      summary,
+      "",
+      "---",
+      "",
+      "## Detailed ATS Source Platform Profiles",
+      "",
+      "This section provides detailed documentation for each of the public Applicant Tracking Systems (ATS) platforms indexable by OpenJobSlots.",
+      "",
+      atsDetails
+    ].join("\n");
+  }
+
   function buildRobotsTxt(req) {
     return [
       "User-agent: *",
@@ -1230,6 +1267,7 @@ function createPublicSeoHelpers(dependencies = {}) {
   }
 
   return {
+    buildLlmsFullTxt,
     buildLlmsTxt,
     buildRobotsTxt,
     buildSitemapIndexXml,

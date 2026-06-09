@@ -761,6 +761,7 @@ function normalizeOrigin(value) {
 }
 
 const {
+  buildLlmsFullTxt,
   buildLlmsTxt,
   buildRobotsTxt,
   buildSitemapSectionXml,
@@ -2580,6 +2581,7 @@ function createServer() {
     buildMcpRunbook,
     buildPublicIngestionStatusItem,
     buildPublicPreferences,
+    buildLlmsFullTxt,
     buildLlmsTxt,
     buildRobotsTxt,
     buildSitemapSectionXml,

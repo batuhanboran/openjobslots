@@ -5434,7 +5434,7 @@ function PostingCard({
   const appliedByLabel = sanitizeDisplayText(item?.applied_by_label, "Application already tracked");
   const postingUrlLabel = sanitizeDisplayText(formatPostingUrlHostLabel(item?.job_posting_url), "");
   return (
-    <View style={[styles.card, compact ? styles.cardMobile : null, isDarkTheme ? styles.cardDark : null]} testID="posting-card">
+    <View style={[styles.card, compact ? styles.cardMobile : null, isDarkTheme ? styles.cardDark : null]} testID="posting-card" accessibilityRole="article">
       <View style={styles.postingCardTopRow}>
         <Pressable
           onPress={onOpenPosting}
@@ -8932,7 +8932,7 @@ export default function App() {
     );
 
     return (
-    <View style={[styles.postingsPageFrame, isDarkPublicTheme ? styles.postingsPageFrameDark : null]}>
+    <View style={[styles.postingsPageFrame, isDarkPublicTheme ? styles.postingsPageFrameDark : null]} accessibilityRole="main">
       <ScrollView
         ref={postingsListRef}
         style={[styles.postingsPageScroll, isDarkPublicTheme ? styles.postingsPageScrollDark : null]}
@@ -10200,7 +10200,7 @@ export default function App() {
       return null;
     }
     return (
-      <View style={styles.headerNav} testID="top-nav">
+      <View style={styles.headerNav} testID="top-nav" accessibilityRole="navigation">
         <HeaderNavButton
           label="Search"
           selected={activePage === PAGE_KEYS.POSTINGS}
@@ -10239,7 +10239,7 @@ export default function App() {
       ]}
     >
       {activePage !== PAGE_KEYS.POSTINGS ? (
-      <View style={styles.header}>
+      <View style={styles.header} accessibilityRole="banner">
         <View style={styles.headerTopRow}>
           <Pressable
             onPress={handleBrandHome}
