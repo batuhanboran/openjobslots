@@ -4057,6 +4057,39 @@ test.describe("postings page QA", () => {
     await expect(page.getByTestId("search-input")).toBeVisible();
   });
 
+  test("shows release notes red dot update indicator until opened", async ({ page }) => {
+    await openJobSlots(page);
+    await page.evaluate(() => {
+      window.localStorage.removeItem("openjobslots.publicReleaseNotesSeenVersion");
+    });
+    await page.reload();
+    await expect(page.getByTestId("app-logo")).toContainText("openjobslots");
+
+    const viewport = page.viewportSize() || { width: 1440, height: 900 };
+    test.skip(viewport.width < 768, "release notes entry point is desktop-only");
+
+    // The update pulse ring should be visible initially because version is not seen
+    await expect(page.getByTestId("public-version-update-dot")).toBeVisible();
+
+    // Click the version button to open release notes
+    await page.getByTestId("public-version-button").click();
+    await expect(page.getByTestId("release-notes-modal")).toBeVisible();
+
+    // Close the release notes modal
+    await page.getByTestId("release-notes-close").click();
+    await expect(page.getByTestId("release-notes-modal")).toHaveCount(0);
+
+    // The update pulse ring should now be hidden
+    await expect(page.getByTestId("public-version-update-dot")).toHaveCount(0);
+
+    // Reload the page
+    await page.reload();
+    await expect(page.getByTestId("app-logo")).toContainText("openjobslots");
+
+    // The update pulse ring should remain hidden on reload
+    await expect(page.getByTestId("public-version-update-dot")).toHaveCount(0);
+  });
+
   test("public search does not expose legacy filter controls", async ({ page }) => {
     await openJobSlots(page);
 

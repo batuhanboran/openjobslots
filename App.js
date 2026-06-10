@@ -273,6 +273,7 @@ function dismissSearchKeyboard(inputRef) {
 
 const PUBLIC_LANGUAGE_STORAGE_KEY = "openjobslots.publicLanguage";
 const PUBLIC_THEME_STORAGE_KEY = "openjobslots.publicTheme";
+const PUBLIC_RELEASE_NOTES_SEEN_VERSION_KEY = "openjobslots.publicReleaseNotesSeenVersion";
 const PUBLIC_LANGUAGE_HINT_COOKIE = "ojs_public_language_hint";
 const VISITED_POSTING_URLS_STORAGE_KEY = "openjobslots.visitedPostingUrls.v1";
 const MAX_VISITED_POSTING_URLS = 1000;
@@ -6738,6 +6739,9 @@ export default function App() {
     deleting: false
   });
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const [releaseNotesSeenVersion, setReleaseNotesSeenVersion] = useState(() => {
+    return readWebStorageValue(PUBLIC_RELEASE_NOTES_SEEN_VERSION_KEY);
+  });
   const [cvDragOver, setCvDragOver] = useState(false);
   const [cvParsing, setCvParsing] = useState(false);
   const [cvError, setCvError] = useState("");
@@ -6980,6 +6984,8 @@ export default function App() {
   const openPublicReleaseNotes = useCallback(() => {
     closeSearchWorkForUtilityMenu();
     setReleaseNotesOpen(true);
+    writeWebStorageValue(PUBLIC_RELEASE_NOTES_SEEN_VERSION_KEY, PUBLIC_APP_VERSION);
+    setReleaseNotesSeenVersion(PUBLIC_APP_VERSION);
   }, [closeSearchWorkForUtilityMenu]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
@@ -9740,13 +9746,15 @@ export default function App() {
             >
               {translatedPublicText(t, "version.label", PUBLIC_VERSION_LABEL, { version: PUBLIC_APP_VERSION })}
             </Text>
-            {Platform.OS === "web" ? (
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444", marginLeft: 6, position: "relative" }}>
-                <View className="update-pulse-ring" style={{ position: "absolute", top: 0, left: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
-              </View>
-            ) : (
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444", marginLeft: 6 }} />
-            )}
+            {releaseNotesSeenVersion !== PUBLIC_APP_VERSION ? (
+              Platform.OS === "web" ? (
+                <View testID="public-version-update-dot" style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444", marginLeft: 6, position: "relative" }}>
+                  <View className="update-pulse-ring" style={{ position: "absolute", top: 0, left: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
+                </View>
+              ) : (
+                <View testID="public-version-update-dot" style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444", marginLeft: 6 }} />
+              )
+            ) : null}
           </View>
         </Pressable>
         {!isPublicNativeStoreSurface ? (
