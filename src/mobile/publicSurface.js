@@ -39,19 +39,17 @@ function isNativeStorePlatform(platformOs) {
 }
 
 function resolveDefaultApiBaseUrl(platformOs) {
-  const platform = String(platformOs || "").toLowerCase();
-  if (platform === "web") return "";
-  if (platform === "android") return "http://10.0.2.2:8787";
-  return "http://localhost:8787";
+  return PRODUCTION_PUBLIC_API_BASE_URL;
 }
 
 function resolveRuntimeApiBaseUrl(platformOs, configuredApiBaseUrl, options = {}) {
   const configured = String(configuredApiBaseUrl || "").trim();
-  if (configured) return configured;
-
-  const isDev = options.isDev !== false;
-  if (!isDev && isNativeStorePlatform(platformOs)) {
-    return PRODUCTION_PUBLIC_API_BASE_URL;
+  const isE2E = typeof process !== "undefined" && process?.env?.EXPO_PUBLIC_E2E === "1";
+  
+  if (configured) {
+    if (isE2E || (!configured.includes("localhost") && !configured.includes("127.0.0.1") && !configured.includes("10.0.2.2"))) {
+      return configured;
+    }
   }
 
   return resolveDefaultApiBaseUrl(platformOs);

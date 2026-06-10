@@ -68,6 +68,7 @@ async function main() {
 
   spawnChild(process.execPath, ["node_modules/expo/bin/cli", "start", "--web", "--port", webPort], {
     EXPO_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+    EXPO_PUBLIC_E2E: "1",
     BROWSER: "none",
     CI: "1"
   });

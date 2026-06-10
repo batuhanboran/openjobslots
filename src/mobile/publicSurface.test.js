@@ -40,14 +40,20 @@ assert.strictEqual(isPublicMobileApiPath("/frontend/log"), false);
 assert.strictEqual(isNativeStorePlatform("ios"), true);
 assert.strictEqual(isNativeStorePlatform("android"), true);
 assert.strictEqual(isNativeStorePlatform("web"), false);
-assert.strictEqual(resolveDefaultApiBaseUrl("web"), "");
-assert.strictEqual(resolveDefaultApiBaseUrl("android"), "http://10.0.2.2:8787");
-assert.strictEqual(resolveDefaultApiBaseUrl("ios"), "http://localhost:8787");
-assert.strictEqual(resolveRuntimeApiBaseUrl("android", "", { isDev: true }), "http://10.0.2.2:8787");
-assert.strictEqual(resolveRuntimeApiBaseUrl("ios", "", { isDev: true }), "http://localhost:8787");
+assert.strictEqual(resolveDefaultApiBaseUrl("web"), "https://openjobslots.com");
+assert.strictEqual(resolveDefaultApiBaseUrl("android"), "https://openjobslots.com");
+assert.strictEqual(resolveDefaultApiBaseUrl("ios"), "https://openjobslots.com");
+assert.strictEqual(resolveRuntimeApiBaseUrl("android", "", { isDev: true }), "https://openjobslots.com");
+assert.strictEqual(resolveRuntimeApiBaseUrl("ios", "", { isDev: true }), "https://openjobslots.com");
 assert.strictEqual(resolveRuntimeApiBaseUrl("android", "", { isDev: false }), "https://openjobslots.com");
 assert.strictEqual(resolveRuntimeApiBaseUrl("ios", "", { isDev: false }), "https://openjobslots.com");
-assert.strictEqual(resolveRuntimeApiBaseUrl("web", "", { isDev: false }), "");
+assert.strictEqual(resolveRuntimeApiBaseUrl("web", "", { isDev: false }), "https://openjobslots.com");
 assert.strictEqual(resolveRuntimeApiBaseUrl("android", "https://example.test", { isDev: false }), "https://example.test");
+assert.strictEqual(resolveRuntimeApiBaseUrl("android", "http://localhost:8787", { isDev: false }), "https://openjobslots.com");
+
+// Test E2E mode
+process.env.EXPO_PUBLIC_E2E = "1";
+assert.strictEqual(resolveRuntimeApiBaseUrl("android", "http://localhost:8787", { isDev: false }), "http://localhost:8787");
+delete process.env.EXPO_PUBLIC_E2E;
 
 console.log("public mobile surface checks passed");

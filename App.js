@@ -125,11 +125,7 @@ function hasPublicStatsOverride() {
 function applyPublicStatsOverride(status = {}) {
   const hasOverride = hasPublicStatsOverride();
   if (!hasOverride && (!status || Object.keys(status).length === 0)) {
-    return {
-      job_slot_count: 2997,
-      configured_enabled_ats_count: 159,
-      visible_company_count: 1536
-    };
+    return null;
   }
   if (!hasOverride) return status || {};
   const source = status || {};
