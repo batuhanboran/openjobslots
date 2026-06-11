@@ -3,6 +3,9 @@ const { decideDetailEscalation } = require("../../parserEvidence");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../../posting");
 const { validateNormalizedPostingContract } = require("../../parserContract");
 
+const doParse = require('./parse');
+const doNormalize = require('./normalize');
+
 const ATS_KEY = "smartsearch";
 const PARSER_VERSION = "source-smartsearch-v1";
 const PARSER_CONFIDENCE = 0.75;
@@ -32,11 +35,13 @@ async function fetchDetail() {
 }
 
 function parse(rawPayload, company = {}) {
-  return [];
+  return doParse(rawPayload, company);
 }
 
 function normalize(posting, company = {}, options = {}) {
-  const normalized = normalizePosting(posting, company, ATS_KEY, {
+  const extracted = doNormalize(posting, company);
+  const combined = { ...posting, ...extracted };
+  const normalized = normalizePosting(combined, company, ATS_KEY, {
     parserVersion: PARSER_VERSION,
     confidence: options.confidence || PARSER_CONFIDENCE,
     ...options

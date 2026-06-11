@@ -1,1 +1,8 @@
-[]
+{
+  "jobs": [
+    {
+      "id": "oleeo-123",
+      "title": "Software Engineer"
+    }
+  ]
+}

@@ -1,1 +1,9 @@
-[]
+{
+  "jobs": [
+    {
+      "id": "vacancyfiller-101",
+      "title": "Software Engineer at vacancyfiller",
+      "url": "https://vacancyfiller.com/jobs/101"
+    }
+  ]
+}

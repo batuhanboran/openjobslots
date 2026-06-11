@@ -2,11 +2,13 @@ const { buildEvidenceMetadata, evaluatePublicPosting } = require("../../publicPo
 const { decideDetailEscalation } = require("../../parserEvidence");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../../posting");
 const { validateNormalizedPostingContract } = require("../../parserContract");
+const parseJobs = require("./parse");
+const baseNormalize = require("./normalize");
 
 const ATS_KEY = "rapidrecruit";
 const PARSER_VERSION = "source-rapidrecruit-v1";
 const PARSER_CONFIDENCE = 0.75;
-const SOURCE_FAMILY = "embedded_json";
+const SOURCE_FAMILY = "direct_json";
 
 function discover(company = {}) {
   return {
@@ -32,11 +34,13 @@ async function fetchDetail() {
 }
 
 function parse(rawPayload, company = {}) {
-  return [];
+  return parseJobs(rawPayload, company);
 }
 
 function normalize(posting, company = {}, options = {}) {
-  const normalized = normalizePosting(posting, company, ATS_KEY, {
+  const extracted = baseNormalize(posting, company);
+  const combined = { ...posting, ...extracted };
+  const normalized = normalizePosting(combined, company, ATS_KEY, {
     parserVersion: PARSER_VERSION,
     confidence: options.confidence || PARSER_CONFIDENCE,
     ...options

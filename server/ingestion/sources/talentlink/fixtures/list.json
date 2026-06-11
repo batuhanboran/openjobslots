@@ -1,1 +1,9 @@
-[]
+{
+  "jobs": [
+    {
+      "id": "talentlink-123",
+      "title": "Software Engineer",
+      "url": "https://careers.company.com/talentlink/123"
+    }
+  ]
+}

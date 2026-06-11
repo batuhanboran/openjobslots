@@ -3,6 +3,9 @@ const { decideDetailEscalation } = require("../../parserEvidence");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../../posting");
 const { validateNormalizedPostingContract } = require("../../parserContract");
 
+const parseJobs = require("./parse");
+const baseNormalize = require("./normalize");
+
 const ATS_KEY = "humi";
 const PARSER_VERSION = "source-humi-v1";
 const PARSER_CONFIDENCE = 0.75;
@@ -31,31 +34,9 @@ async function fetchDetail() {
   return null;
 }
 
-function parse(rawPayload, company = {}) {
-  return [];
-}
+const parse = require('./parse');
 
-function normalize(posting, company = {}, options = {}) {
-  const normalized = normalizePosting(posting, company, ATS_KEY, {
-    parserVersion: PARSER_VERSION,
-    confidence: options.confidence || PARSER_CONFIDENCE,
-    ...options
-  });
-  normalized.parser_key = ATS_KEY;
-  normalized.parser_version = PARSER_VERSION;
-  normalized.parser_confidence = PARSER_CONFIDENCE;
-  normalized.confidence_score = PARSER_CONFIDENCE;
-  normalized.canonical_url = canonicalizePostingUrl(normalized.canonical_url || normalized.job_posting_url);
-  normalized.job_posting_url = normalized.canonical_url;
-  normalized.apply_url = canonicalizePostingUrl(normalized.apply_url || normalized.canonical_url);
-  normalized.source_family = SOURCE_FAMILY;
-  normalized.evidence = buildEvidenceMetadata(normalized, { parserVersion: PARSER_VERSION, sourceFamily: SOURCE_FAMILY });
-  normalized.detail_escalation_decision = decideDetailEscalation(normalized, {
-    sourceFamily: SOURCE_FAMILY,
-    detailSupported: false
-  });
-  return normalized;
-}
+const normalize = require('./normalize');
 
 function validate(posting) {
   const basic = validatePosting(posting);

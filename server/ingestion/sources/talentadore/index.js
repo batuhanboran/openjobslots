@@ -31,9 +31,7 @@ async function fetchDetail() {
   return null;
 }
 
-function parse(rawPayload, company = {}) {
-  return [];
-}
+const parse = require('./parse');
 
 function normalize(posting, company = {}, options = {}) {
   const normalized = normalizePosting(posting, company, ATS_KEY, {

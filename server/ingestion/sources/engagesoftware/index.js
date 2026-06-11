@@ -31,12 +31,16 @@ async function fetchDetail() {
   return null;
 }
 
+const _parse = require("./parse");
+const _normalize = require("./normalize");
+
 function parse(rawPayload, company = {}) {
-  return [];
+  return _parse(rawPayload, company);
 }
 
 function normalize(posting, company = {}, options = {}) {
-  const normalized = normalizePosting(posting, company, ATS_KEY, {
+  const extracted = _normalize(posting, company);
+  const normalized = normalizePosting(extracted, company, ATS_KEY, {
     parserVersion: PARSER_VERSION,
     confidence: options.confidence || PARSER_CONFIDENCE,
     ...options

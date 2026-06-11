@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "req_id": "ER-100",
+    "job_title": "HR Specialist",
+    "city": "New York",
+    "description": "erecruit job description",
+    "req_url": "https://careers.erecruit.com/jobs/100"
+  }
+]

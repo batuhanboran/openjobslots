@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "JobId": "EX-500",
+    "JobTitle": "Data Analyst",
+    "Location": "San Francisco",
+    "Description": "exelare job description",
+    "JobUrl": "https://careers.exelare.com/jobs/500"
+  }
+]

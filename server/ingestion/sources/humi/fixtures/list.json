@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": "job-123",
+    "title": "Software Engineer",
+    "location": "Remote",
+    "url": "https://example.com/jobs/123"
+  }
+]

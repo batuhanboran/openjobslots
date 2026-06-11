@@ -1,1 +1,9 @@
-[]
+{
+  "jobs": [
+    {
+      "id": "turbohire-101",
+      "title": "Software Engineer at turbohire",
+      "url": "https://turbohire.com/jobs/101"
+    }
+  ]
+}

@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "fetch-123",
+    "name": "Frontend Developer",
+    "location": "Remote",
+    "job_description": "fetcher job description",
+    "url": "https://careers.fetcher.com/jobs/123"
+  }
+]

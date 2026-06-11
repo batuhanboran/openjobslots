@@ -1,1 +1,8 @@
-[]
+{
+  "jobs": [
+    {
+      "id": "beetween_new-123",
+      "title": "Software Engineer"
+    }
+  ]
+}

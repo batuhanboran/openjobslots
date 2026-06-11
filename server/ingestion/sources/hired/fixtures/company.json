@@ -1,5 +1,4 @@
 {
-  "company_name": "Hired",
-  "url_string": "https://example.com/careers",
-  "ATS_name": "hired"
+  "company_name": "Mock Company",
+  "url_string": "https://example.com"
 }
