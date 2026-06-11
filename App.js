@@ -7391,7 +7391,8 @@ export default function App() {
       const analyticsFilters = {
         ...filters,
         page_language: publicLanguageCode,
-        ...(publicLanguageCountryCode ? { page_country: publicLanguageCountryCode } : {})
+        ...(publicLanguageCountryCode ? { page_country: publicLanguageCountryCode } : {}),
+        search_source: options.search_source || "search_box"
       };
       const response = await fetchPostings(requestedSearch, limit, offset, analyticsFilters);
       if (requestSequence !== postingsRequestSequenceRef.current) {
@@ -7809,7 +7810,7 @@ export default function App() {
     scrollPostingsToTop();
     if (!duplicateSubmit) {
       if (nextSearch) trackPublicSearch(nextSearch, { source: analyticsSource });
-      void loadPostings(nextSearch, { filters });
+      void loadPostings(nextSearch, { filters, search_source: analyticsSource });
     }
   }, [cancelPendingAutoSearch, cancelPendingSearchSuggestion, loadPostings, resetNativeSearchFocus, resetPostingsHomeState, scrollPostingsToTop]);
 

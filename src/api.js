@@ -135,6 +135,10 @@ export function fetchPostings(search = "", limit = 500, offset = 0, filters = {}
     include_ignored: filters?.include_ignored === undefined ? "0" : filters?.include_ignored ? "1" : "0"
   });
 
+  if (filters?.search_source) {
+    params.set("search_source", String(filters.search_source));
+  }
+
   const atsArray = Array.isArray(filters?.ats) ? filters.ats.filter(Boolean) : [];
   const atsSingle = !Array.isArray(filters?.ats) ? String(filters?.ats || "").trim().toLowerCase() : "";
   const industries = Array.isArray(filters?.industries) ? filters.industries.filter(Boolean) : [];
@@ -201,6 +205,9 @@ export function fetchPostingFilterOptions(search = "", filters = {}) {
   setPageCountryParam(params, filters?.page_country || filters?.country_scope || filters?.visitor_country);
   setPageLanguageParam(params, filters?.page_language || filters?.language || filters?.languageCode);
 
+  if (filters?.search_source) {
+    params.set("search_source", String(filters.search_source));
+  }
   if (query) params.set("search", query);
   if (atsArray.length > 0) params.set("ats", atsArray.join(","));
   else if (atsSingle && atsSingle !== "all") params.set("ats", atsSingle);

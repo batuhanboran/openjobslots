@@ -186,8 +186,17 @@ function getPublicPopularSearchCountryScope(req, languageCode) {
 
 function isInternalPublicAnalyticsProbe(req) {
   if (req?.query?._validation || req?.query?._research) return true;
-  const userAgent = getRequestHeader(req, "user-agent");
-  return /^OpenJobSlots-Codex-/i.test(userAgent);
+  const userAgent = String(getRequestHeader(req, "user-agent") || "");
+  if (/^OpenJobSlots-Codex-/i.test(userAgent)) return true;
+  if (/bot|googlebot|bingbot|yandex|baidu|crawler|spider|slurp|facebookexternalhit|ia_archiver/i.test(userAgent)) return true;
+
+  const searchSource = req?.query?.search_source || "";
+  if (searchSource === "cv_parse" || searchSource === "cv") return true;
+
+  const searchVal = String(req?.query?.search || "").trim();
+  if (/\bOR\b/i.test(searchVal)) return true;
+
+  return false;
 }
 
 function registerPublicRoutes(app, context) {
