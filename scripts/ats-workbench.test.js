@@ -52,8 +52,8 @@ function testBuildFullIndex() {
     write: false
   });
   assert.equal(payload.ok, true);
-  assert.equal(payload.sources.length, 162);
-  assert.equal(payload.summary.ats_count, 162);
+  assert.equal(payload.sources.length, 628);
+  assert.equal(payload.summary.ats_count, 628);
   assert.ok(payload.summary.public_enabled_sources.includes("greenhouse"));
   assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "dayforcehcm"));
   assert.ok(payload.summary.quarantine_or_disabled_sources.some((row) => row.ats_key === "personio"));

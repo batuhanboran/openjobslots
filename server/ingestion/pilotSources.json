@@ -1,4 +1,40 @@
 {
+  "100hires": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "aarkrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "abacushumanresources": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "accessrecruitmentportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "acquiretalentaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "adafacescreening": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "adcorpportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "adeccoportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "adeccosingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
   "adp_myjobs": {
     "family": "enterprise-direct",
     "status": "enabled"
@@ -7,27 +43,215 @@
     "family": "enterprise-direct",
     "status": "enabled"
   },
-  "applicantpro": {
-    "family": "embedded-or-semi-structured",
+  "adway": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "adzunaats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "adzunaaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "airachile": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "airswiftportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "akhtabootjordan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "akkencloud": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "alayacarehr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "allegisgroupportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "altamirarecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "alvalabs": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "amropportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "apexrecruitment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "apli": {
+    "family": "direct-json-stable",
     "status": "enabled"
   },
   "applicantai": {
     "family": "vendor-specific",
     "status": "enabled"
   },
+  "applicantpro": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "applicantstack": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "applied": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
   "applitrack": {
     "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "apploi": {
+    "family": "direct-json-stable",
     "status": "enabled"
   },
   "applytojob": {
     "family": "vendor-specific",
     "status": "enabled"
   },
+  "aresrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
   "ashby": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
+  "atsondemand": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "atsumarujapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "aurarecruitingbr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "auratalent": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "aviont": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
   "bamboohr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "barraiser": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "baytcommena": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bayzatuae": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beaconhillportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beamery": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bearclawats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beckrecruitment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beetween": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beetween_new": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "beetweenfrance": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "berlinrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bestjobsroats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bewerbermanagementat": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bewerberportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bewerbungnet": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bewerbungschweiz": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bigredskyaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bitebewerbermanager": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bizneoats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bizreachjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bluearrowrecruitment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bneempresas": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "bondadaptadaptux": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "boydenportal": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -39,263 +263,11 @@
     "family": "vendor-specific",
     "status": "enabled"
   },
-  "calcareers": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "calopps": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "careerplug": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "dayforcehcm": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "careerpuck": {
+  "breezyme": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "careerspage": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "eightfold": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "gem": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "fountain": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "freshteam": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "getro": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "governmentjobs": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "greenhouse": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "hibob": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "hirebridge": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "hrmdirect": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "icims": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "isolvisolvedhire": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "jobvite": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "k12jobspot": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "jobaps": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "join": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "lever": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "loxo": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "manatal": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "oracle": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "personio": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "peopleforce": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "pinpointhq": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "policeapp": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "recruitcrm": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "smartrecruiters": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "statejobsny": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "schoolspring": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "simplicant": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "recruitee": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "rippling": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "sagehr": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "saphrcloud": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "taleo": {
-    "family": "brittle-high-risk",
-    "status": "enabled"
-  },
-  "talentreef": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "theapplicantmanager": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "talentlyft": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "talexio": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "teamtailor": {
-    "family": "vendor-specific",
-    "status": "enabled"
-  },
-  "ultipro": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "paylocity": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "pageup": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "usajobs": {
-    "family": "public-sector-education",
-    "status": "enabled"
-  },
-  "workday": {
-    "family": "enterprise-direct",
-    "status": "enabled"
-  },
-  "workable": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "zoho": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "100hires": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "jobylon": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "jobsoid": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "hirehive": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "phenom": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "gohire": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "paradox": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "sympa": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "flatchr": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "talentnest": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "hiringthing": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "oleeo": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "jobadder": {
+  "brightermondaykenya": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -303,99 +275,83 @@
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "jobdiva": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "tribepad": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "akkencloud": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "aviont": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "exelare": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "dvinci": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "onlyfy": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "vultus": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "naukrirms": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "ismartrecruit": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "logicmelon": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
   "broadbean": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "idibu": {
+  "bryq": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "seekout": {
+  "byteboard": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "fetcher": {
+  "c1brokerrecruiting": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "hired": {
+  "cadrena": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "targetrecruit": {
+  "calcareers": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "calipercorp": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "jobscience": {
+  "calopps": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "candidator": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "cornerstoneondemand": {
+  "canditech": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "sabasoftware": {
+  "cantaloopegypt": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "sumtotalsystems": {
+  "capitaresourcing": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "prescreen": {
+  "careerjetats": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "hirex": {
+  "careerplug": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "careerpuck": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "turbohire": {
+  "careers24southafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "careerspage": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "cascadehrrecruitment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "catalystone": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cathoempresas": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -403,23 +359,123 @@
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "apli": {
+  "cegidtalent": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "smartsearch": {
+  "ceipal": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "erecruit": {
+  "charthophr": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "easyrecrue": {
+  "chaze": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "talentwunder": {
+  "cinode": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ciphrrecruitment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "clearcompany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cleverconnect": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cleverconnectfrance": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cleverstaff": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "clockworkrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coderpadrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coderspaceats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cognologyaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "collagehr": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "compleoats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "computrabajoempresas": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "connexysnowbullhorn": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "contratando": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cornerstoneondemand": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cornerstonesingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coveto": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "coview": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "coviewgermany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cpjobshongkong": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ctgoodlifehongkong": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "culinaryagents": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "cultjobssingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "curriculumcombr": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -427,7 +483,435 @@
     "family": "direct-json-stable",
     "status": "enabled"
   },
+  "darwinboxindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "datacrowdrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "datakariera": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dayforcehcm": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "deelrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "deltektalentacquisition": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "devskiller": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dhrglobalportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "digitalrecruiters": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dodajapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dossierrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "doverai": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ducknow": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dvinci": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "dvincigermany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "easycruitnowtalentech": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "easyhrturkey": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "easyrecrue": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "egonzehnderportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "eightfold": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "ejobsroats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "elemannetats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "elempleoempresas": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "elevatusjordan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "eliterecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "elmosoftwareaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "emapartnersportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "emapartnerssingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "employercombr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "employmentofficeaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "emply": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "emplydenmark": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "enboarderonboarding": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
   "engagesoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "eploy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "eployats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "erecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "erecruiterpoland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "erecruitingat": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "erecruitingch": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "erecrutement": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "eskillplatform": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "evarecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "evarecruitingmx": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "evarecruitingsg": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "exelare": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ezekiasearch": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "factorialhrspain": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fasthrbrazil": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fasthrjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fasthrmx": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fasthrsg": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fastjobssingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fetcher": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "finanzrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fircroftportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "firefish": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "flatchr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "flatchrfrance": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "flocareer": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "forasnaegypt": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "fountain": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "frankfurtrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "freshteam": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "g2recruitmentgroup": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "galehealthcarestaffing": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gatenbysandersonportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gem": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "genterecrutei": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "germantechats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gestmax": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "getro": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "giraffesouthafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gisrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "glassdoorsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "glorri": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gohire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gorecruit": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "governmentjobs": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "graderecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "graduatelandats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "graftonrecruitmentcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "greenhouse": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "greenhousejapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "greenjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gulftalentmena": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gupyadmissao": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "gupybrazil": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hackerearthindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hackerearthrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hackertrailplatform": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hansenats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "harveynashcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "haufe": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "haufetalentgermany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "haystalentsolutions": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "heidrickstruggles": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "heuronsindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hhaexchangerecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hibob": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "highermeats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hirebridge": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "hired": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hiredsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hireflix": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hirehive": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hireland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hireroadrecruiting": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -439,155 +923,27 @@
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "skeeled": {
+  "hirex": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "talentadore": {
+  "hirexturkey": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "jazzhr": {
+  "hiringbrazil": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "clearcompany": {
+  "hiringjapan": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "firefish": {
+  "hiringmx": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "recruitive": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "talentera": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "atsondemand": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "tracker": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "invenias": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "beamery": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "humi": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "collagehr": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "risepeople": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "eploy": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "networx": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "recooty": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "jobilla": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "tempworks": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "coats": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "lumesse": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "meta4": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "talentsoft": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "haufe": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "coview": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "kenjo": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "kiwihr": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "hrworks": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "beetween": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "jobaffinity": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "sentrient": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "talentum": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "wocoats": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "pitchnhire": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "hrmantra": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "neogov": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "cleverconnect": {
-    "family": "direct-json-stable",
-    "status": "enabled"
-  },
-  "talentlink": {
+  "hiringonboardaustralia": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -595,27 +951,115 @@
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "vireup": {
-    "family": "embedded-or-semi-structured",
-    "status": "enabled"
-  },
-  "webrecruit": {
+  "hiringsg": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "vacancyfiller": {
+  "hiringteam": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "gorecruit": {
+  "hiringthing": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hiringua": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hkgoodjobs": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hoganassessments": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "homecarepulsehr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "horizonseor": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrmanagernowtalentech": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrmantra": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrmdirect": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "hrmosjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hronboardaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrpeakturkey": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrsystemukraine": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrworks": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hrworksgermany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hudsonsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "humahr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "humi": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "hurmasystemukraine": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "icims": {
     "family": "embedded-or-semi-structured",
     "status": "enabled"
   },
-  "rapidrecruit": {
-    "family": "embedded-or-semi-structured",
+  "idibu": {
+    "family": "direct-json-stable",
     "status": "enabled"
   },
-  "symphonytalent": {
+  "ikaihrturkey": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "indeedaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "infojobsinfoempleo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "infortalentacquisition": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
@@ -623,27 +1067,1447 @@
     "family": "embedded-or-semi-structured",
     "status": "enabled"
   },
-  "staffsuite": {
+  "inrecruiting": {
     "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "insightglobalportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "insperityrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "intellihrplatform": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "intelycarerecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "intersearchportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "intersearchsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "interviewerai": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "interviewsjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "intervueio": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "invenias": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ismartrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "isolvisolvedhire": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "jacobrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jazzhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jisrsaudiarabia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobadder": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobaffinity": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobaps": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "jobbermannigeria": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobcanjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobconectado": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobdiva": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobfinderpoland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobijobaats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobilla": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "jobma": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobmarkethongkong": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobnakturkey": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "joboolo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobrapidoats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobsbgats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobschats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobscience": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobsciencerecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobsdbhongkong": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobsdbsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobsoid": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobstairs": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobstreetsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobtool": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobvite": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "jobwaremanager": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobylon": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jobylonsweden": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "join": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "joobleats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "joraaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "jugglehire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "juiceboxai": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "justworkspeo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "k12jobspot": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "kandidatnet": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "karattech": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "karieragrats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "karieraskats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kariyernetats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "karriereatats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kawaderqatar": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kekaindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kellyservicesportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kenjo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kenjo_new": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kenjospain": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kenobynowgupy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kerryconsulting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kforceportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kiwihr": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "kolayik": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kooltlatam": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "kornferryrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "krakowrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "krowdyperu": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "labasoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "lanopayroll": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "larsrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "lever": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "linkedinapac": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "livaatrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "lmcgiganowalmacareer": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "logicmelon": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "logiterahrflow": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "loomrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "loxo": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "luccafrance": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "lumesse": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "manatal": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "manpowerportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "manpowersingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "matchboxrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "matchtechcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "maxhirenowbullhorn": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mcquaigtalent": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mephistorecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mercermettl": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mercermettlindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mercuryxrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "meta4": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "meteojobats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mexicorecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "michaelpageportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "milanomedienats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mitularecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mokahrsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "monbewerbung": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "morsongroupportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "multiplierhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "munichrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "murexrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mycareersfuture": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "myinterview": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "mynavitenshoku": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "myrecruitmentplusaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "n2growthportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "nabbeshuae": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "namelyhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "naukrirms": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "neogov": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "nesfircroftcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "networx": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "networxats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "neuvootalentcom": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "nodeflairsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "nordichr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "odgersberndtsonportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "offerzensouthafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "oleeo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "omnipresentgroup": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "oneclickrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "onerecruitaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "onlyfy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "oracle": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "osensejapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ostendis": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "oysterhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pageexecutiveportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pageup": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "panalytanalytics": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pandapmxico": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "papayaglobalhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "paradox": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "paramaiindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "parisrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "paylocity": {
+    "family": "enterprise-direct",
     "status": "enabled"
   },
   "pcrecruiter": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "ceipal": {
+  "pennalhh": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "applicantstack": {
+  "peopleforce": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "peopleforceukraine": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "beetween_new": {
+  "perbilityhelix": {
     "family": "direct-json-stable",
     "status": "enabled"
   },
-  "kenjo_new": {
+  "persiahr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "persisbewerbermanagement": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "persolkellyapac": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "personio": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "petroplanportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "peykhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "phenom": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pingboardorg": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pinpointhq": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pitchnhire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "placementpartnersouthafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pnetsouthafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "poachedhospitality": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "policeapp": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "pontahr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pontahrcroatia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pracaplats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pracujplats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "prescreen": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "prescreenaustria": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "prevuehr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "procvlabturkey": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "profesiaatsbyalmacareer": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "profilesearch": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "prospectivemediaats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "pyjamahr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "qjumpersnewzealand": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "qualifiedio": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "quickin": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "rabotauaats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "randstadportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "randstadsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "rapidrecruit": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "reachmeenowtalentech": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recooty": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitee": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruiteefrance": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruiterboxtrakstar": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitercz": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruiterde": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruiterturkey": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitexpress": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitio": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitive": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitloopaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recruitopoland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recrutamentosimples": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "recrutimmo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "reedglobalcrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "reliasacademy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "remotecomrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "retorio": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "revelobrazil": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "rexxsystemsrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "rikunabinext": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "riorecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "rippling": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "risepeople": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "roarrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "roberthalfsingapore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "robertwalterscrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "runmyaccountsrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "russellreynoldsportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sabasoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sagehr": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "sagepeoplerecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "salexrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "saopaulorecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "saphrcloud": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "sapsuccessfactors": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sarirecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sarirecruitingbr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "schoolspring": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "seasonedrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "secretcvats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "seekaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "seekout": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "semacnorway": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sendoutsnowbullhorn": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sentrient": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "sherlockhrlatam": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "shiftkeyportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "shltalent": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "shortlistindia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "siftdirectory": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "signatureconsultants": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "signiumportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "silkroadtechnology": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "simplicant": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "simplifyhrsouthafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "singaporerecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "skeeled": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "skeeledluxembourg": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "skuademployment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "skyhiveskills": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "skyrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "smartrecruiters": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "smartsearch": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "smartstartaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "snagajobpeoplematter": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "snaphirenewzealand": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "softgardengermany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "softy": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "solidesats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "solomonpageportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sonru": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "spencerogdenportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "spencerstuartportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sprocketsai": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "staffsuite": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "stantonchaseportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "statejobsny": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "sthreeplccrm": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sumtotalsystems": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "swiftworldwide": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sympa": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "sympafinland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "symphonytalent": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentadore": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentadorefinland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentcloudjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentechsuite": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentera": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talenteramena": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentex": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentiasoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentiojapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentlink": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentlyft": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "talentlyftcroatia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentnest": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentomobi": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentplug": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentreef": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "talentsoft": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentum": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentvineaustralia": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentwunder": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "talentwundergermany": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "taleo": {
+    "family": "brittle-high-risk",
+    "status": "enabled"
+  },
+  "talexio": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "targetrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tasheeluae": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tawteenuae": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "teamiobyalmacareer": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "teamtailor": {
+    "family": "vendor-specific",
+    "status": "enabled"
+  },
+  "tecolocoempresas": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tempworks": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "testgorillaplatform": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "testportalsuite": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "theapplicantmanager": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "thomasinternational": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tokyorecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tracker": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "trackersouthafrica": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "traffitpoland": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "transearchportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tribepad": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "tribepadats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "triorecruitment": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "trovitrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "turbohire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "turirecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "ultipro": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "unit4talentmanagement": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "usajobs": {
+    "family": "public-sector-education",
+    "status": "enabled"
+  },
+  "vacancyfiller": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vagascombr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vagasforbusiness": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "varbinowgrade": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "velocityglobaleor": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "veredusportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vervoeats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vibbn": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vidcruitersuite": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "viennarecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vireup": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "vivahr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vividresourcing": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vizyonhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vultus": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vurvnowtaleo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "vurvtechnology": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wantedlyjapan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wardhowellportal": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "warpproxyats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "warsawrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wazzufegypt": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "webcruiternorway": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "webrecruit": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "webrecruitsoftware": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wehire": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wellskycareport": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "willo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "willovideo": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wocoats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "woffurecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "workable": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "workday": {
+    "family": "enterprise-direct",
+    "status": "enabled"
+  },
+  "workmotionhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "workstreamhr": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "workuaats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "wovenassessments": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "yenibirisats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "youthallats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "zalarisrecruiting": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "zapaplatabgats": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "zarpe": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "zenhrjordan": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "zoho": {
+    "family": "embedded-or-semi-structured",
+    "status": "enabled"
+  },
+  "zookeep": {
     "family": "direct-json-stable",
     "status": "enabled"
   }

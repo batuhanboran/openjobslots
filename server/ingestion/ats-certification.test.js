@@ -15,7 +15,7 @@ test("ATS field certification registry covers every configured ATS", () => {
   const atsKeys = ATS_FILTER_OPTION_ITEMS.map((item) => item.value).sort();
   const records = buildAtsCertificationRecords(atsKeys);
   assert.deepEqual(Object.keys(records).sort(), atsKeys);
-  assert.equal(Object.keys(records).length, 162);
+  assert.equal(Object.keys(records).length, 628);
 
   const errors = [];
   for (const atsKey of atsKeys) {

@@ -1,3 +1,5 @@
+const normalizeImpl = require("./normalize");
+const parseImpl = require("./parse");
 const { buildEvidenceMetadata, evaluatePublicPosting } = require("../../publicPostingGate");
 const { decideDetailEscalation } = require("../../parserEvidence");
 const { canonicalizePostingUrl, normalizePosting, validatePosting } = require("../../posting");
@@ -32,11 +34,12 @@ async function fetchDetail() {
 }
 
 function parse(rawPayload, company = {}) {
-  return [];
+  return parseImpl(rawPayload, company);
 }
 
 function normalize(posting, company = {}, options = {}) {
-  const normalized = normalizePosting(posting, company, ATS_KEY, {
+  const extracted = normalizeImpl(posting, company);
+  const normalized = normalizePosting({...posting, ...extracted}, company, ATS_KEY, {
     parserVersion: PARSER_VERSION,
     confidence: options.confidence || PARSER_CONFIDENCE,
     ...options
