@@ -574,6 +574,7 @@ async function startWorker() {
     console.log(`[${WORKER_NAME}] using Postgres primary store`);
 
     let lastAutomaticSyncEpoch = 0;
+    let lastBacklogCheckEmptyEpoch = 0;
     while (true) {
       const control = await postgresGetSyncControl(pool);
       const status = String(control?.status || "idle");
@@ -624,11 +625,12 @@ async function startWorker() {
         const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
         const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
         const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
-        const hasBudgetAndBacklog = dueTargets > 0 && remainingBudget > 0;
+        const backlogCheckCoolingDown = nowEpoch - lastBacklogCheckEmptyEpoch < 300;
+        const hasBudgetAndBacklog = dueTargets > 0 && remainingBudget > 0 && !backlogCheckCoolingDown;
         const timeForIntervalCheck = nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds;
 
         if (hasBudgetAndBacklog || timeForIntervalCheck) {
-          if (dueTargets > 0 && remainingBudget > 0) {
+          if (dueTargets > 0 && remainingBudget > 0 && !backlogCheckCoolingDown) {
             const targetLimit = Math.min(AUTO_SYNC_TARGETS_PER_RUN, remainingBudget);
             const summary = await runPostgresIngestionOnce(pool, {
               automatic: true,
@@ -640,6 +642,10 @@ async function startWorker() {
               remainingBudgetBeforeRun: remainingBudget
             })}`);
             lastAutomaticSyncEpoch = nowEpoch;
+            if (Number(summary?.totalTargets || 0) === 0) {
+              lastBacklogCheckEmptyEpoch = nowEpoch;
+              console.log(`[${WORKER_NAME}] backlog run processed 0 targets; cooling down backlog checks for 5 minutes.`);
+            }
           } else if (dueTargets > 0 && AUTO_SYNC_DAILY_TARGET_BUDGET === 0) {
             lastAutomaticSyncEpoch = nowEpoch;
           } else if (dueTargets > 0 && remainingBudget <= 0) {
