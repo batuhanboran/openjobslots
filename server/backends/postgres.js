@@ -142,6 +142,8 @@ async function ensurePostgresSchema(pool) {
       ON posting_cache(ats_key, last_seen_epoch DESC);
     CREATE INDEX IF NOT EXISTS idx_posting_cache_last_seen
       ON posting_cache(last_seen_epoch DESC);
+    CREATE INDEX IF NOT EXISTS idx_posting_cache_ats_validation
+      ON posting_cache(ats_key, validation_status);
 
     ALTER TABLE IF EXISTS posting_cache
       ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '',
