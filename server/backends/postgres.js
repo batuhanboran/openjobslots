@@ -101,8 +101,7 @@ async function ensurePostgresSchema(pool) {
       PRIMARY KEY (ats_key, company_url)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_company_sync_state_next_sync
-      ON company_sync_state(next_sync_epoch, ats_key);
+
 
     CREATE TABLE IF NOT EXISTS posting_cache (
       canonical_url TEXT PRIMARY KEY,
@@ -195,8 +194,9 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_postings_active_ats_seen
       ON postings(ats_key, last_seen_epoch DESC)
       WHERE hidden = false;
-    CREATE INDEX IF NOT EXISTS idx_postings_active_country_region_seen
-      ON postings(country, region, last_seen_epoch DESC)
+    CREATE INDEX IF NOT EXISTS idx_postings_visible_ats_geo
+      ON postings(ats_key)
+      INCLUDE (country, city, remote_type)
       WHERE hidden = false;
     CREATE INDEX IF NOT EXISTS idx_postings_active_industry_seen
       ON postings(industry, last_seen_epoch DESC)
@@ -222,8 +222,6 @@ async function ensurePostgresSchema(pool) {
       ON postings USING gin (lower(position_name) gin_trgm_ops);
     CREATE INDEX IF NOT EXISTS idx_postings_company_trgm
       ON postings USING gin (lower(company_name) gin_trgm_ops);
-    CREATE INDEX IF NOT EXISTS idx_postings_location_trgm
-      ON postings USING gin (lower(coalesce(location_text, '')) gin_trgm_ops);
 
     CREATE TABLE IF NOT EXISTS posting_application_state (
       canonical_url TEXT PRIMARY KEY,

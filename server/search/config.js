@@ -77,8 +77,7 @@ const SEARCHABLE_ATTRIBUTES = Object.freeze([
   "ats_key",
   "industry",
   "department",
-  "employment_type",
-  "description_plain"
+  "employment_type"
 ]);
 
 const FILTERABLE_ATTRIBUTES = Object.freeze([

@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     mem_limit: ${OPENJOBSLOTS_POSTGRES_MEM_LIMIT:-1536m}
     memswap_limit: ${OPENJOBSLOTS_POSTGRES_MEMSWAP_LIMIT:-1536m}
+    cpus: ${OPENJOBSLOTS_POSTGRES_CPUS:-2.0}
     shm_size: "1gb"
     command:
       - "postgres"
@@ -43,6 +44,7 @@ services:
     restart: unless-stopped
     mem_limit: ${OPENJOBSLOTS_MEILI_MEM_LIMIT:-8192m}
     memswap_limit: ${OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-8192m}
+    cpus: ${OPENJOBSLOTS_MEILI_CPUS:-2.0}
     logging:
       driver: "json-file"
       options:
@@ -56,6 +58,11 @@ services:
       - MEILI_MAX_INDEXING_THREADS=1
     volumes:
       - meili-data:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   openjobslots-app:
     build: .
@@ -63,6 +70,7 @@ services:
     restart: unless-stopped
     mem_limit: ${OPENJOBSLOTS_APP_MEM_LIMIT:-768m}
     memswap_limit: ${OPENJOBSLOTS_APP_MEMSWAP_LIMIT:-768m}
+    cpus: ${OPENJOBSLOTS_APP_CPUS:-1.5}
     dns:
       - ${OPENJOBSLOTS_DNS_PRIMARY:-8.8.4.4}
       - ${OPENJOBSLOTS_DNS_SECONDARY:-149.112.112.112}
@@ -70,7 +78,7 @@ services:
       openjobslots-postgres:
         condition: service_healthy
       openjobslots-meilisearch:
-        condition: service_started
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:
@@ -119,6 +127,7 @@ services:
     restart: unless-stopped
     mem_limit: ${OPENJOBSLOTS_WORKER_MEM_LIMIT:-768m}
     memswap_limit: ${OPENJOBSLOTS_WORKER_MEMSWAP_LIMIT:-768m}
+    cpus: ${OPENJOBSLOTS_WORKER_CPUS:-1.5}
     dns:
       - ${OPENJOBSLOTS_DNS_PRIMARY:-8.8.4.4}
       - ${OPENJOBSLOTS_DNS_SECONDARY:-149.112.112.112}
@@ -126,7 +135,7 @@ services:
       openjobslots-postgres:
         condition: service_healthy
       openjobslots-meilisearch:
-        condition: service_started
+        condition: service_healthy
     environment:
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=${OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB:-512}
