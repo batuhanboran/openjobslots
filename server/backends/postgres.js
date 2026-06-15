@@ -457,6 +457,10 @@ async function ensurePostgresSchema(pool) {
     CREATE INDEX IF NOT EXISTS idx_search_index_outbox_due
       ON search_index_outbox(processed_at, available_at);
 
+    CREATE INDEX IF NOT EXISTS idx_search_index_outbox_unprocessed
+      ON search_index_outbox(available_at)
+      WHERE processed_at IS NULL;
+
     CREATE TABLE IF NOT EXISTS public_search_events (
       id BIGSERIAL PRIMARY KEY,
       event_type TEXT NOT NULL CHECK (event_type IN ('postings', 'suggest', 'filter_options')),

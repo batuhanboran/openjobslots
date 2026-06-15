@@ -3021,6 +3021,13 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           quality.rejection_reason
         ]
       );
+      await client.query(
+        `
+          INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
+          VALUES ($1, 'upsert', $2::jsonb, now());
+        `,
+        [canonicalUrl, JSON.stringify({ canonical_url: canonicalUrl })]
+      );
     }
     await client.query("COMMIT");
   } catch (error) {
@@ -3031,7 +3038,11 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
   }
 
   if (!options.skipMeili) {
-    await upsertMeiliPostings(normalizedForSearchIndex, getMeiliConfig());
+    try {
+      await processPostgresSearchIndexOutbox(pool);
+    } catch (err) {
+      console.warn(`[postgresStore] immediate outbox sync failed (will retry in background): ${err.message}`);
+    }
   }
 }
 
@@ -3183,45 +3194,93 @@ async function prunePostgresRetention(pool, options = {}) {
 
 async function processPostgresSearchIndexOutbox(pool, options = {}) {
   const limit = Math.max(1, Math.min(1000, Number(options.limit || 250)));
-  const result = await pool.query(
-    `
-      SELECT id, canonical_url, operation, payload
-      FROM search_index_outbox
-      WHERE processed_at IS NULL
-        AND available_at <= now()
-      ORDER BY id ASC
-      LIMIT $1;
-    `,
-    [limit]
-  );
-  const rows = result.rows || [];
-  if (rows.length === 0) return { ok: true, processed: 0 };
+  let totalProcessed = 0;
+  let totalDeleted = 0;
+  let totalUpserted = 0;
+  const maxIterations = 20;
 
-  const deleteUrls = rows
-    .filter((row) => String(row.operation || "") === "delete")
-    .map((row) => String(row.canonical_url || ""))
-    .filter(Boolean);
-  const upsertPayloads = rows
-    .filter((row) => String(row.operation || "") === "upsert")
-    .map((row) => row.payload)
-    .filter(Boolean);
+  for (let iter = 0; iter < maxIterations; iter++) {
+    const result = await pool.query(
+      `
+        SELECT id, canonical_url, operation, payload
+        FROM search_index_outbox
+        WHERE processed_at IS NULL
+          AND available_at <= now()
+        ORDER BY id ASC
+        LIMIT $1;
+      `,
+      [limit]
+    );
+    const rows = result.rows || [];
+    if (rows.length === 0) break;
 
-  if (deleteUrls.length > 0) {
-    await deleteMeiliPostingsByCanonicalUrls(deleteUrls, getMeiliConfig());
+    const latestOpsMap = new Map();
+    for (const row of rows) {
+      latestOpsMap.set(row.canonical_url, row);
+    }
+
+    const deleteUrls = [];
+    const upsertUrls = [];
+
+    for (const [url, row] of latestOpsMap.entries()) {
+      if (String(row.operation || "") === "delete") {
+        deleteUrls.push(url);
+      } else if (String(row.operation || "") === "upsert") {
+        upsertUrls.push(url);
+      }
+    }
+
+    try {
+      if (deleteUrls.length > 0) {
+        await deleteMeiliPostingsByCanonicalUrls(deleteUrls, getMeiliConfig());
+        totalDeleted += deleteUrls.length;
+      }
+      if (upsertUrls.length > 0) {
+        const postingsResult = await pool.query(
+          `
+            SELECT *
+            FROM postings
+            WHERE canonical_url = ANY($1::text[]);
+          `,
+          [upsertUrls]
+        );
+        const dbPostings = postingsResult.rows || [];
+        if (dbPostings.length > 0) {
+          await upsertMeiliPostings(dbPostings, getMeiliConfig());
+          totalUpserted += dbPostings.length;
+        }
+      }
+
+      const rowIds = rows.map((row) => Number(row.id)).filter(Boolean);
+      await pool.query(
+        `
+          UPDATE search_index_outbox
+          SET processed_at = now()
+          WHERE id = ANY($1::bigint[]);
+        `,
+        [rowIds]
+      );
+      totalProcessed += rows.length;
+    } catch (batchError) {
+      console.error(`[processPostgresSearchIndexOutbox] Batch processing failed: ${batchError.message}`);
+      const rowIds = rows.map((row) => Number(row.id)).filter(Boolean);
+      await pool.query(
+        `
+          UPDATE search_index_outbox
+          SET attempts = attempts + 1,
+              last_error = $2,
+              available_at = now() + ( (attempts + 1) * interval '1 minute' )
+          WHERE id = ANY($1::bigint[]);
+        `,
+        [rowIds, batchError.message || "Unknown error"]
+      );
+      throw batchError;
+    }
+
+    if (rows.length < limit) break;
   }
-  if (upsertPayloads.length > 0) {
-    await upsertMeiliPostings(upsertPayloads, getMeiliConfig());
-  }
 
-  await pool.query(
-    `
-      UPDATE search_index_outbox
-      SET processed_at = now()
-      WHERE id = ANY($1::bigint[]);
-    `,
-    [rows.map((row) => Number(row.id)).filter(Boolean)]
-  );
-  return { ok: true, processed: rows.length, deleted: deleteUrls.length, upserted: upsertPayloads.length };
+  return { ok: true, processed: totalProcessed, deleted: totalDeleted, upserted: totalUpserted };
 }
 
 function normalizePublicSearchQuery(value) {

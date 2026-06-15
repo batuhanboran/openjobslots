@@ -113,6 +113,41 @@ function getMeiliSettingsStatus() {
   return { ...meiliSettingsStatus };
 }
 
+function arraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  for (let i = 0; i < sortedA.length; i++) {
+    if (sortedA[i] !== sortedB[i]) return false;
+  }
+  return true;
+}
+
+function settingsMatch(actual, expected) {
+  if (!actual) return false;
+  for (const key of ["searchableAttributes", "filterableAttributes", "sortableAttributes", "rankingRules", "stopWords"]) {
+    if (!arraysEqual(actual[key], expected[key])) return false;
+  }
+  const actualTypo = actual.typoTolerance || {};
+  const expectedTypo = expected.typoTolerance || {};
+  if (actualTypo.enabled !== expectedTypo.enabled) return false;
+  if (!arraysEqual(actualTypo.disableOnAttributes, expectedTypo.disableOnAttributes)) return false;
+  if (!arraysEqual(actualTypo.disableOnWords, expectedTypo.disableOnWords)) return false;
+  if (actualTypo.minWordSizeForTypos?.oneTypo !== expectedTypo.minWordSizeForTypos?.oneTypo) return false;
+  if (actualTypo.minWordSizeForTypos?.twoTypos !== expectedTypo.minWordSizeForTypos?.twoTypos) return false;
+
+  const actualSynonyms = actual.synonyms || {};
+  const expectedSynonyms = expected.synonyms || {};
+  const actualKeys = Object.keys(actualSynonyms);
+  const expectedKeys = Object.keys(expectedSynonyms);
+  if (actualKeys.length !== expectedKeys.length) return false;
+  for (const key of expectedKeys) {
+    if (!arraysEqual(actualSynonyms[key], expectedSynonyms[key])) return false;
+  }
+  return true;
+}
+
 async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
   if (!config.enabled) {
     setMeiliSettingsStatus({ ok: true, skipped: true, indexName: config.indexName, last_error: "" });
@@ -153,6 +188,20 @@ async function ensureMeiliPostingsIndex(config = getMeiliConfig()) {
           throw error;
         }
       }
+    }
+
+    let existingSettings = null;
+    if (existingIndex) {
+      try {
+        existingSettings = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/settings`);
+      } catch (err) {
+        console.warn("[openjobslots meili] failed to fetch existing settings; proceeding with PATCH:", err.message);
+      }
+    }
+
+    if (existingIndex && existingSettings && settingsMatch(existingSettings, MEILI_POSTINGS_SETTINGS)) {
+      setMeiliSettingsStatus({ ok: true, skipped: false, indexName: config.indexName, last_error: "" });
+      return { ok: true, indexName: config.indexName };
     }
 
     const settingsTask = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/settings`, {
