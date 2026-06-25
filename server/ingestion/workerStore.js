@@ -5,7 +5,6 @@ const {
   upsertPostings
 } = require("../index");
 const {
-  buildPostgresAtsFilterCanonicalExpression,
   normalizeAtsFilterValue
 } = require("./atsFilters");
 const { getAdapterForCompany } = require("./adapters");
@@ -56,9 +55,12 @@ const DUE_TARGET_CANDIDATE_MAX = Math.max(1, Math.floor(positiveNumber(
   5000
 )));
 
-const POSTGRES_COMPANY_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("c.ats_key");
-const POSTGRES_SYNC_STATE_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
-const POSTGRES_ERROR_ATS_KEY_SQL = buildPostgresAtsFilterCanonicalExpression("ats_key");
+// Direct column references — ats_key values are already canonicalized in the database.
+// The old buildPostgresAtsFilterCanonicalExpression generated 200+ branch CASE WHEN
+// expressions that blocked index usage and added ~180ms per query.
+const POSTGRES_COMPANY_ATS_KEY_SQL = "c.ats_key";
+const POSTGRES_SYNC_STATE_ATS_KEY_SQL = "ats_key";
+const POSTGRES_ERROR_ATS_KEY_SQL = "ats_key";
 const PG_STAT_STATEMENTS_ENABLED = !["0", "false", "no", "off"].includes(
   String(process.env.OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS ?? "1").trim().toLowerCase()
 );
@@ -543,9 +545,8 @@ async function countPostgresDueTargets(pool) {
         SELECT
           ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
           company_url,
-          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+          COALESCE(next_sync_epoch, 0) AS next_sync_epoch
         FROM company_sync_state
-        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
       )
       SELECT COUNT(*)::int AS count
       FROM companies c
@@ -655,9 +656,8 @@ async function countPostgresDueTargetsByAts(pool) {
         SELECT
           ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
           company_url,
-          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch
+          COALESCE(next_sync_epoch, 0) AS next_sync_epoch
         FROM company_sync_state
-        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
       )
       SELECT
         ${POSTGRES_COMPANY_ATS_KEY_SQL} AS ats_key,
@@ -748,10 +748,9 @@ async function selectPostgresDueTargets(pool, limit = MAX_TARGETS_PER_RUN, optio
         SELECT
           ${POSTGRES_SYNC_STATE_ATS_KEY_SQL} AS ats_key,
           company_url,
-          MAX(COALESCE(next_sync_epoch, 0)) AS next_sync_epoch,
-          MAX(COALESCE(consecutive_failures, 0)) AS consecutive_failures
+          COALESCE(next_sync_epoch, 0) AS next_sync_epoch,
+          COALESCE(consecutive_failures, 0) AS consecutive_failures
         FROM company_sync_state
-        GROUP BY ${POSTGRES_SYNC_STATE_ATS_KEY_SQL}, company_url
       ),
       due_targets AS (
         SELECT

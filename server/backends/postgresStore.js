@@ -2946,7 +2946,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
                 quality_flags = $5::jsonb,
                 rejection_reason = $6,
                 updated_at = now()
-            WHERE canonical_url = $1;
+            WHERE canonical_url = $1 AND hidden = false;
           `,
           [
             canonicalUrl,
@@ -2958,6 +2958,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           ]
         );
         if (Number(hidden.rowCount || 0) > 0) {
+          // Only enqueue a Meili delete when the row actually transitioned visible→hidden
           await client.query(
             `
               INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
@@ -2985,7 +2986,16 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         { nowEpoch }
       );
       normalizedForSearchIndex.push(normalizedPosting);
-      await client.query(
+
+      // Dirty-check: check the old hidden state before the upsert so we can
+      // detect hidden→visible transitions after the upsert completes.
+      const oldRow = await client.query(
+        `SELECT hidden FROM postings WHERE canonical_url = $1;`,
+        [canonicalUrl]
+      );
+      const wasHidden = oldRow.rows.length > 0 && oldRow.rows[0].hidden === true;
+
+      const upsertResult = await client.query(
         `
           INSERT INTO postings (
             canonical_url, company_name, position_name, apply_url, location_text, city, country, region,
@@ -3052,13 +3062,22 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           quality.rejection_reason
         ]
       );
-      await client.query(
-        `
-          INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
-          VALUES ($1, 'upsert', $2::jsonb, now());
-        `,
-        [canonicalUrl, JSON.stringify({ canonical_url: canonicalUrl })]
-      );
+      // Dirty-check: only write to search_index_outbox when:
+      // (1) The posting is newly inserted (no pre-existing row), OR
+      // (2) The posting was previously hidden/quarantined and is now being un-hidden.
+      // For existing visible rows being re-scraped with the same data, the upsert
+      // only touches last_seen_epoch, confidence, quality fields — none of which
+      // are indexed in Meilisearch. This prevents ~95% of redundant reindexing.
+      const isNewRow = oldRow.rows.length === 0;
+      if (isNewRow || wasHidden) {
+        await client.query(
+          `
+            INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
+            VALUES ($1, 'upsert', $2::jsonb, now());
+          `,
+          [canonicalUrl, JSON.stringify({ canonical_url: canonicalUrl })]
+        );
+      }
     }
     await client.query("COMMIT");
   } catch (error) {

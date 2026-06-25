@@ -373,7 +373,7 @@ test("postgres due target query excludes quarantine-only sources from automatic 
   assert.match(observedSql, /NOT IN \('disabled', 'auto_disabled', 'quarantine_only'\)/);
 });
 
-test("postgres due target selection folds legacy company ATS aliases into canonical source policy", async () => {
+test("postgres due target selection uses direct column references without CASE alias mapping", async () => {
   let observedSql = "";
   const pool = {
     async query(sql) {
@@ -409,9 +409,12 @@ test("postgres due target selection folds legacy company ATS aliases into canoni
 
   assert.equal(targets.length, 1);
   assert.equal(targets[0].atsKey, "adp_myjobs");
-  assert.match(observedSql, /WHEN 'adpmyjobs' THEN 'adp_myjobs'/);
-  assert.match(observedSql, /ON s\.ats_key = \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/);
-  assert.match(observedSql, /PARTITION BY \(CASE LOWER\(BTRIM\(c\.ats_key\)\)/);
+  // Verify direct column references are used (no CASE WHEN alias mapping)
+  assert.doesNotMatch(observedSql, /CASE LOWER\(BTRIM\(/);
+  assert.match(observedSql, /ON s\.ats_key = c\.ats_key/);
+  assert.match(observedSql, /PARTITION BY c\.ats_key/);
+  // Verify redundant GROUP BY is removed from sync_state CTE
+  assert.doesNotMatch(observedSql, /GROUP BY.*company_url/);
 });
 
 test("postgres due target selection uses adaptive caps for parser-risk sources", async () => {
