@@ -135,5 +135,7 @@ See `docs/PROJECT_STATE.md` for the current version, deployment state, and next 
 - **Zoho & Freshteam Fallback Parsing:** When scraping Zoho Recruit, search for `<script>JSON.parse('...')</script>` blocks and decode them. For Freshteam, extract the `<div class="job-details-content content">` container when standard description selectors fail.
 - **LLM Verification Priority:** Treat LLM-based subagent evaluations as the primary source of truth. Do not override `ineligible` classifications with simple regex matches, as boilerplate text triggers false positives.
 - **Spam Company Blacklisting:** Filter out high-volume spam duplicate postings (e.g. from `fyst`/`FYST`) during post-processing by checking the company name and canonical URL.
+- **Remote Deployment via Docker Containers:** When running `docker compose` inside a helper container via `/var/run/docker.sock`, always pass `-p openjobslots` to prevent container name conflicts with the host stack. Bind-mount `/root/.ssh` (read-only) for secure git access within the container.
+
 
 
