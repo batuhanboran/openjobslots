@@ -20,7 +20,7 @@ const {
 } = require("../sources/icims/parse");
 
 const DETAIL_REFETCH_SCHEMA_VERSION = "detail-refetch-audit-v1";
-const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect"]);
+const SUPPORTED_SOURCES = new Set(["icims", "applitrack", "taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect", "freshteam"]);
 const WRITABLE_FIELDS = Object.freeze([
   "location_text",
   "country",
@@ -219,7 +219,7 @@ function detailUrlForRow(row) {
   if (atsKey === "applitrack") {
     return buildApplitrackDetailUrl(applitrackSiteRootFromUrl(url), extractSourceJobIdFromUrl(row), url);
   }
-  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect"].includes(atsKey)) {
+  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect", "freshteam"].includes(atsKey)) {
     return url;
   }
   return "";
@@ -245,6 +245,7 @@ function isAllowedDetailUrl(atsKey, urlValue) {
   if (atsKey === "applytojob") return hostname.endsWith(".applytojob.com");
   if (atsKey === "breezy") return hostname.endsWith(".breezy.hr");
   if (atsKey === "hrmdirect") return hostname.endsWith(".hrmdirect.com");
+  if (atsKey === "freshteam") return hostname.endsWith(".freshteam.com");
   return false;
 }
 
@@ -261,7 +262,7 @@ function isCandidateRow(row) {
   if (!SUPPORTED_SOURCES.has(atsKey)) return { ok: false, reason: "unsupported_source" };
   if (Boolean(row?.hidden) || Number(row?.hidden || 0) === 1) return { ok: false, reason: "hidden" };
   if (!canonicalUrlForRow(row)) return { ok: false, reason: "missing_url" };
-  if (!rowHasMissingGeo(row) && !isWeakRemoteType(row?.remote_type)) return { ok: false, reason: "already_complete" };
+  if (!rowHasMissingGeo(row) && !isWeakRemoteType(row?.remote_type) && row?.description_plain && row?.description_plain.trim().length > 0) return { ok: false, reason: "already_complete" };
   const detailUrl = detailUrlForRow(row);
   if (!detailUrl) return { ok: false, reason: "missing_detail_url" };
   return { ok: true, reason: "" };
@@ -380,6 +381,7 @@ function extractDescriptionFromHtml(html) {
   if (!html) return null;
 
   const patterns = [
+    /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjob-details-content\b[^"']*["']?[^>]*>/i,
     /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjob__description\b[^"']*["']?[^>]*>/i,
     /<(?:div|section|span)\b[^>]*id=["']?[^"']*\bjob__description\b[^"']*["']?[^>]*>/i,
     /<(?:div|section|span)\b[^>]*class=["']?[^"']*\bjob-description\b[^"']*["']?[^>]*>/i,

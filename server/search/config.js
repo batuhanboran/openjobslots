@@ -278,6 +278,8 @@ const REGION_FILTER_ALIAS_ENTRIES = Object.freeze([
   ["emea", "EMEA"],
   ["europe", "EMEA"],
   ["europe middle east africa", "EMEA"],
+  ["european union", "EMEA"],
+  ["eu", "EMEA"],
   ["apac", "APAC"],
   ["asia", "APAC"],
   ["asia pacific", "APAC"]
@@ -496,6 +498,7 @@ function parseSemanticQuery(searchQuery) {
     originalSearch: search,
     cleanedSearch: search,
     countries: [],
+    regions: [],
     remote: null
   };
 
@@ -581,6 +584,52 @@ function parseSemanticQuery(searchQuery) {
     search = search.replace(countryTextToReplace, " ");
   }
 
+  const ambiguousRegionAliases = new Set(["na", "eu"]);
+  const sortedRegionAliases = Array.from(REGION_FILTER_ALIASES.keys()).sort((a, b) => b.length - a.length);
+
+  let regionFound = null;
+  let regionTextToReplace = null;
+
+  for (const alias of sortedRegionAliases) {
+    const isAmbiguous = ambiguousRegionAliases.has(alias);
+    const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const prepRegex = new RegExp(`\\b(in|at|for|near|of|to|within|from)\\s+${escapedAlias}\\b`, "gi");
+    if (prepRegex.test(search)) {
+      regionFound = REGION_FILTER_ALIASES.get(alias);
+      regionTextToReplace = prepRegex;
+      break;
+    }
+
+    const endRegex = new RegExp(`\\b${escapedAlias}\\s*$`, "gi");
+    if (endRegex.test(search)) {
+      regionFound = REGION_FILTER_ALIASES.get(alias);
+      regionTextToReplace = endRegex;
+      break;
+    }
+
+    if (!isAmbiguous) {
+      const anyRegex = new RegExp(`\\b${escapedAlias}\\b`, "gi");
+      if (anyRegex.test(search)) {
+        regionFound = REGION_FILTER_ALIASES.get(alias);
+        regionTextToReplace = anyRegex;
+        break;
+      }
+    } else {
+      const startRegex = new RegExp(`^\\s*${escapedAlias}\\b`, "gi");
+      if (startRegex.test(search)) {
+        regionFound = REGION_FILTER_ALIASES.get(alias);
+        regionTextToReplace = startRegex;
+        break;
+      }
+    }
+  }
+
+  if (regionFound) {
+    result.regions.push(regionFound);
+    search = search.replace(regionTextToReplace, " ");
+  }
+
   search = search.replace(/\b(in|at|for|near|of|to|within|from)\b/gi, " ");
   search = search.replace(/\s+/g, " ").trim();
 
@@ -609,12 +658,21 @@ function preprocessSearchOptions(options = {}) {
     }
   }
 
+  const regions = parseCsv(options.regions || "");
+  for (const r of parsed.regions) {
+    const normalizedRegion = normalizeRegionFilterValue(r);
+    if (normalizedRegion && !regions.includes(normalizedRegion)) {
+      regions.push(normalizedRegion);
+    }
+  }
+
   const remote = options.remote === "all" || !options.remote ? (parsed.remote || "all") : options.remote;
 
   return {
     ...options,
     search: parsed.cleanedSearch,
     countries: countries,
+    regions: regions,
     remote
   };
 }

@@ -119,3 +119,21 @@ See `docs/PROJECT_STATE.md` for the current version, deployment state, and next 
 3. Meilisearch reindex/check-mode parity after normalized fields improve.
 4. Production parity tests using realistic search corpora.
 5. Build/image/dependency cleanup after correctness is stable.
+
+## Technical Gotchas & Workarounds
+
+- **Docker multiplexing headers:** stdout from `proxmox-docker/docker_exec` may contain 8-byte binary headers (`\x01\x00\x00\x00...`) or null bytes. Clean files by slicing from the first `{` and stripping null/control bytes before parsing as JSON.
+- **SPA Crawling (Workday etc.):** Static fetch on Workday URLs (`myworkdayjobs.com`) returns empty templates. Flag these as restricted by default, or query their internal endpoints.
+- **PostgreSQL Regex boundaries:** Postgres POSIX regular expressions use `\y` instead of `\b` for word boundaries.
+
+## Job Auditing Best Practices
+
+- **Headless Browser Scraping:** Always use Playwright on the host with `page.evaluate(() => document.body.textContent)` to extract job descriptions. This ensures JSON-LD structured job postings (common on BambooHR, Workday) are fully captured even if elements are hidden or slow to render.
+- **Double Epoch Verification:** To guarantee a job is fresh (posted within the target window), ensure both `first_seen_epoch >= now - X` and `posted_at_epoch >= now - X` are satisfied. This filters out refreshed or bumped old postings.
+- **Strict Geo-Residency Validation:** Inspect scraped content for any US-only, Canada-only, or timezone-restricted keywords (e.g. EST/PST only) before classifying a job as "Worldwide/EMEA remote".
+- **Specialized Subagent Division:** For large-scale audits, split tasks into Extraction, Crawling, Company Research, and QC subagents to ensure deep quality verification over raw speed.
+- **Zoho & Freshteam Fallback Parsing:** When scraping Zoho Recruit, search for `<script>JSON.parse('...')</script>` blocks and decode them. For Freshteam, extract the `<div class="job-details-content content">` container when standard description selectors fail.
+- **LLM Verification Priority:** Treat LLM-based subagent evaluations as the primary source of truth. Do not override `ineligible` classifications with simple regex matches, as boilerplate text triggers false positives.
+- **Spam Company Blacklisting:** Filter out high-volume spam duplicate postings (e.g. from `fyst`/`FYST`) during post-processing by checking the company name and canonical URL.
+
+

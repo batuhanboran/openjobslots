@@ -54,10 +54,9 @@ test("search config keeps ADP ATS keys canonical for indexed rows", () => {
   assert.equal(normalizeAtsKey("adpworkforcenow"), "adp_workforcenow");
 });
 
-test("Meili settings keep title/company ahead of description and include filters", () => {
+test("Meili settings keep title ahead of company and include filters", () => {
   const attrs = MEILI_POSTINGS_SETTINGS.searchableAttributes;
   assert.ok(attrs.indexOf("title") < attrs.indexOf("company"));
-  assert.ok(attrs.indexOf("company") < attrs.indexOf("description_plain"));
   assert.ok(MEILI_POSTINGS_SETTINGS.filterableAttributes.includes("country"));
   assert.ok(MEILI_POSTINGS_SETTINGS.filterableAttributes.includes("city"));
   assert.ok(MEILI_POSTINGS_SETTINGS.filterableAttributes.includes("remote_type"));

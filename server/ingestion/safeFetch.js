@@ -29,6 +29,66 @@ const PROXIES = [
   "104.239.107.47:5699:REDACTED:REDACTED"
 ];
 
+function getActiveProxies() {
+  const envProxies = process.env.OPENJOBSLOTS_PROXIES;
+  if (envProxies && typeof envProxies === "string" && envProxies.trim()) {
+    return envProxies
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return PROXIES;
+}
+
+const BROWSER_USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+];
+
+function injectBrowserHeaders(url, headers) {
+  const requestHeaders = { ...headers };
+  
+  if (!hasRequestHeader(requestHeaders, "user-agent")) {
+    const randomUserAgent = BROWSER_USER_AGENTS[Math.floor(Math.random() * BROWSER_USER_AGENTS.length)];
+    requestHeaders["User-Agent"] = randomUserAgent;
+  }
+  
+  if (!hasRequestHeader(requestHeaders, "accept")) {
+    requestHeaders["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
+  }
+  if (!hasRequestHeader(requestHeaders, "accept-language")) {
+    requestHeaders["Accept-Language"] = "en-US,en;q=0.9";
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-ch-ua")) {
+    requestHeaders["sec-ch-ua"] = '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"';
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-ch-ua-mobile")) {
+    requestHeaders["sec-ch-ua-mobile"] = "?0";
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-ch-ua-platform")) {
+    requestHeaders["sec-ch-ua-platform"] = '"Windows"';
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-fetch-dest")) {
+    requestHeaders["sec-fetch-dest"] = "document";
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-fetch-mode")) {
+    requestHeaders["sec-fetch-mode"] = "navigate";
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-fetch-site")) {
+    requestHeaders["sec-fetch-site"] = "none";
+  }
+  if (!hasRequestHeader(requestHeaders, "sec-fetch-user")) {
+    requestHeaders["sec-fetch-user"] = "?1";
+  }
+  if (!hasRequestHeader(requestHeaders, "upgrade-insecure-requests")) {
+    requestHeaders["upgrade-insecure-requests"] = "1";
+  }
+
+  return requestHeaders;
+}
+
 const DEFAULT_DNS_LOOKUP_TIMEOUT_MS = Math.max(
   250,
   Math.min(30_000, Number(process.env.OPENJOBSLOTS_DNS_LOOKUP_TIMEOUT_MS || 8000))
@@ -492,7 +552,7 @@ function connectProxyTunnel(proxyStr, targetParsed, selectedAddress, timeoutMs, 
 async function fetchPinnedUrl(target, init = {}, options = {}) {
   const parsed = target.parsed;
   const selectedAddress = chooseFetchAddress(target.addresses);
-  const requestHeaders = normalizeRequestHeaders(init.headers);
+  const requestHeaders = injectBrowserHeaders(parsed.toString(), normalizeRequestHeaders(init.headers));
   if (!hasRequestHeader(requestHeaders, "host")) requestHeaders.Host = parsed.host;
   if (!hasRequestHeader(requestHeaders, "accept-encoding")) requestHeaders["Accept-Encoding"] = "gzip, deflate, br";
   const maxBytes = Math.max(1, Number(options.maxResponseBytes || options.maxBytes || DEFAULT_MAX_RESPONSE_BYTES));
@@ -727,22 +787,72 @@ async function safeFetch(url, init = {}, options = {}) {
     return safeFetchInternal(url, init, options);
   }
 
+  let lastError = null;
+  let lastResponse = null;
+  let useProxy = false;
+
   try {
     const response = await safeFetchInternal(url, init, options);
-    if ([403, 503, 429].includes(response.status)) {
-      console.warn(`[safeFetch] Direct request to ${url} returned WAF status ${response.status}. Retrying via proxy...`);
-      const randomProxy = PROXIES[Math.floor(Math.random() * PROXIES.length)];
-      return await safeFetchInternal(url, init, { ...options, proxy: randomProxy });
+    if (![403, 503, 429].includes(response.status)) {
+      return response;
     }
-    return response;
+    lastResponse = response;
+    console.warn(`[safeFetch] Direct request to ${url} returned WAF status ${response.status}. Will retry via proxy...`);
+    useProxy = true;
   } catch (error) {
-    if (isRetryableError(error)) {
-      console.warn(`[safeFetch] Direct request to ${url} failed with error ${error.message}. Retrying via proxy...`);
-      const randomProxy = PROXIES[Math.floor(Math.random() * PROXIES.length)];
-      return await safeFetchInternal(url, init, { ...options, proxy: randomProxy });
+    if (!isRetryableError(error)) {
+      throw error;
     }
-    throw error;
+    lastError = error;
+    console.warn(`[safeFetch] Direct request to ${url} failed with error: ${error.message}. Will retry via proxy...`);
+    useProxy = true;
   }
+
+  if (useProxy) {
+    const activeProxies = getActiveProxies();
+    if (!activeProxies.length) {
+      console.warn(`[safeFetch] No active proxies available for retry on ${url}`);
+      if (lastError) throw lastError;
+      return lastResponse;
+    }
+
+    const maxAttempts = Math.min(activeProxies.length, 3);
+    const attemptedProxies = new Set();
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let proxy = null;
+      const remainingProxies = activeProxies.filter((p) => !attemptedProxies.has(p));
+      if (remainingProxies.length > 0) {
+        proxy = remainingProxies[Math.floor(Math.random() * remainingProxies.length)];
+      } else {
+        proxy = activeProxies[Math.floor(Math.random() * activeProxies.length)];
+      }
+      attemptedProxies.add(proxy);
+
+      const proxyDisplay = proxy.split(":")[0];
+      console.log(`[safeFetch] Attempt ${attempt}/${maxAttempts} fetching ${url} via proxy ${proxyDisplay}...`);
+
+      try {
+        const response = await safeFetchInternal(url, init, { ...options, proxy });
+        if (![403, 503, 429].includes(response.status)) {
+          return response;
+        }
+        lastResponse = response;
+        console.warn(`[safeFetch] Proxy attempt ${attempt} returned WAF status ${response.status}`);
+      } catch (error) {
+        if (!isRetryableError(error)) {
+          throw error;
+        }
+        lastError = error;
+        console.warn(`[safeFetch] Proxy attempt ${attempt} failed with error: ${error.message}`);
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+  return lastResponse;
 }
 
 module.exports = {

@@ -427,12 +427,14 @@ async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {
 
   const normalizedQuery = normalizeSearchQuery(options.search);
   const q = buildMeiliSearchQuery(options.search);
+  const queryTokenCount = normalizedQuery ? normalizedQuery.split(/\s+/).filter(Boolean).length : 0;
+  const matchingStrategy = queryTokenCount >= 5 ? "last" : "all";
   const payload = {
     q,
     limit: Math.max(1, Math.min(2000, Number(options.limit || 500))),
     offset: Math.max(0, Number(options.offset || 0)),
     filter: filters.length > 0 ? filters.join(" AND ") : undefined,
-    matchingStrategy: "all",
+    matchingStrategy,
     ...(sort ? { sort } : {})
   };
   const facets = (Array.isArray(options.facets) ? options.facets : [])

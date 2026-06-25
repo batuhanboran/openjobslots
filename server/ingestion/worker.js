@@ -202,7 +202,26 @@ async function processTarget(db, runId, target, counters) {
       if (cacheResult.cached && !cacheResult.changed) counters.cacheHitCount += 1;
       if (visibility.publicPosting) {
         if (dedupeValidPosting(normalized, seenCanonicalUrls, counters)) {
-          validPostings.push(normalized);
+          const companyName = String(normalized.company_name || normalized.company || "").trim();
+          const positionName = String(normalized.position_name || normalized.title || "").trim();
+          const canonicalUrl = String(normalized.canonical_url || normalized.job_posting_url || "").trim();
+          const sevenDaysAgo = nowEpoch - 7 * 24 * 3600;
+          const dbDup = await db.get(
+            `
+              SELECT job_posting_url FROM Postings
+              WHERE LOWER(company_name) = LOWER(?)
+                AND LOWER(position_name) = LOWER(?)
+                AND (first_seen_epoch >= ? OR last_seen_epoch >= ?)
+                AND job_posting_url <> ?
+              LIMIT 1;
+            `,
+            [companyName, positionName, sevenDaysAgo, sevenDaysAgo, canonicalUrl]
+          );
+          if (dbDup) {
+            counters.duplicateCount += 1;
+          } else {
+            validPostings.push(normalized);
+          }
         }
       } else {
         if (validation.status === "quarantined") counters.quarantinedCount += 1;
@@ -311,7 +330,27 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
       if (cacheResult.cached && !cacheResult.changed) counters.cacheHitCount += 1;
       if (visibility.publicPosting) {
         if (dedupeValidPosting(normalized, seenCanonicalUrls, counters)) {
-          validPostings.push(normalized);
+          const companyName = String(normalized.company_name || normalized.company || "").trim();
+          const positionName = String(normalized.position_name || normalized.title || "").trim();
+          const canonicalUrl = String(normalized.canonical_url || normalized.job_posting_url || "").trim();
+          const sevenDaysAgo = nowEpoch - 7 * 24 * 3600;
+          const dbDupResult = await pool.query(
+            `
+              SELECT canonical_url FROM postings
+              WHERE LOWER(company_name) = LOWER($1)
+                AND LOWER(position_name) = LOWER($2)
+                AND (first_seen_epoch >= $3 OR last_seen_epoch >= $3)
+                AND canonical_url <> $4
+                AND hidden = false
+              LIMIT 1;
+            `,
+            [companyName, positionName, sevenDaysAgo, canonicalUrl]
+          );
+          if (dbDupResult.rows.length > 0) {
+            counters.duplicateCount += 1;
+          } else {
+            validPostings.push(normalized);
+          }
         }
       } else {
         if (validation.status === "quarantined") counters.quarantinedCount += 1;
@@ -447,11 +486,15 @@ async function runPostgresIngestionOnce(pool, options = {}) {
     await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 
     try {
-      await prunePostgresRetention(pool);
+      if (targets.length > 0) {
+        await prunePostgresRetention(pool);
+      }
       await processPostgresSearchIndexOutbox(pool);
-      await applyPostgresSourceQualityProtection(pool, {
-        atsKeys: Array.from(new Set(targets.map((target) => target.atsKey)))
-      });
+      if (targets.length > 0) {
+        await applyPostgresSourceQualityProtection(pool, {
+          atsKeys: Array.from(new Set(targets.map((target) => target.atsKey)))
+        });
+      }
     } catch (maintenanceError) {
       console.warn(`[ingestion] retention/search-index maintenance failed: ${maintenanceError.message}`);
     }

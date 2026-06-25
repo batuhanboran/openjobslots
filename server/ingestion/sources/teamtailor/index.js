@@ -14,7 +14,9 @@ const fetchList = createFetchList({ discover });
 const payloadShapePolicy = Object.freeze({
   optional_enrichment_prefixes: Object.freeze([
     "__detailHtmlByUrl",
-    "__detailStatusByUrl"
+    "__detailStatusByUrl",
+    "rss",
+    "html"
   ])
 });
 const TEAMTAILOR_CITY_COUNTRY_HINTS = Object.freeze({

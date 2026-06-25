@@ -2030,10 +2030,12 @@ async function getPostgresParserStats(pool, limit = 100) {
   });
 }
 
-async function getPostgresSourceQualityDashboard(pool, limit = 100) {
+async function getPostgresSourceQualityDashboard(pool, limit = 100, options = {}) {
   const cappedLimit = Math.max(1, Math.min(250, Number(limit || 100)));
-  const result = await pool.query(
-    `
+  const atsKeys = options.atsKeys || [];
+  const hasAtsFilter = Array.isArray(atsKeys) && atsKeys.length > 0;
+
+  const queryText = `
       WITH cache AS (
         SELECT
           ats_key,
@@ -2041,6 +2043,7 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
           COUNT(*) FILTER (WHERE validation_status = 'quarantined')::bigint AS quarantined_rows,
           COUNT(*) FILTER (WHERE COALESCE(validation_status, '') NOT IN ('valid', 'quarantined'))::bigint AS rejected_rows
         FROM posting_cache
+        ${hasAtsFilter ? 'WHERE ats_key = ANY($2)' : ''}
         GROUP BY ats_key
       ),
       visible AS (
@@ -2063,6 +2066,7 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
           COUNT(*) FILTER (WHERE lower(btrim(coalesce(remote_type, ''))) IN ('', 'unknown'))::bigint AS unknown_remote_count
         FROM postings
         WHERE hidden = false
+        ${hasAtsFilter ? 'AND ats_key = ANY($2)' : ''}
         GROUP BY ats_key
       ),
       errors AS (
@@ -2072,6 +2076,7 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
           COUNT(*) FILTER (WHERE http_status >= 400 OR error_type = 'fetch')::bigint AS http_failure_events
         FROM ingestion_run_errors
         WHERE created_at >= now() - interval '24 hours'
+        ${hasAtsFilter ? 'AND ats_key = ANY($2)' : ''}
         GROUP BY ats_key
       ),
       drift AS (
@@ -2081,6 +2086,7 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
           MAX(created_at) AS latest_drift_at
         FROM parser_drift_events
         WHERE created_at >= now() - interval '24 hours'
+        ${hasAtsFilter ? 'AND ats_key = ANY($2)' : ''}
         GROUP BY ats_key
       )
       SELECT
@@ -2108,14 +2114,16 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
       LEFT JOIN visible ON visible.ats_key = s.ats_key
       LEFT JOIN errors ON errors.ats_key = s.ats_key
       LEFT JOIN drift ON drift.ats_key = s.ats_key
+      ${hasAtsFilter ? 'WHERE s.ats_key = ANY($2)' : ''}
       ORDER BY
         COALESCE(cache.quarantined_rows, 0) DESC,
         COALESCE(visible.missing_country_count, 0) DESC,
         s.ats_key ASC
       LIMIT $1;
-    `,
-    [cappedLimit]
-  );
+  `;
+
+  const queryParams = hasAtsFilter ? [cappedLimit, atsKeys] : [cappedLimit];
+  const result = await pool.query(queryText, queryParams);
   return result.rows.map((row) => {
     const metadata = getAdapterMetadata(row.ats_key, row.display_name);
     const metrics = summarizeSourceMetrics(row);
@@ -2142,7 +2150,7 @@ async function getPostgresSourceQualityDashboard(pool, limit = 100) {
 
 async function applyPostgresSourceQualityProtection(pool, options = {}) {
   const onlyAts = new Set((options.atsKeys || []).map((item) => String(item || "").trim()).filter(Boolean));
-  const rows = await getPostgresSourceQualityDashboard(pool, 250);
+  const rows = await getPostgresSourceQualityDashboard(pool, 250, { atsKeys: options.atsKeys });
   const actions = [];
   for (const row of rows) {
     if (onlyAts.size > 0 && !onlyAts.has(row.ats_key)) continue;

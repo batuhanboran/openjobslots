@@ -4,6 +4,7 @@ const {
   getPublicSeoPopularSearchItems,
   normalizePublicSeoLanguageCode
 } = require("../../src/publicSeoRoutes");
+const { parseSemanticQuery } = require("../search/config");
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -460,9 +461,16 @@ function registerPublicRoutes(app, context) {
     return next();
   });
 
+  function resolveRemoteIntentForAnalytics(search, explicitRemote) {
+    if (explicitRemote && explicitRemote !== "all") return explicitRemote;
+    const parsed = parseSemanticQuery(search);
+    return parsed.remote || explicitRemote || "all";
+  }
+
   function recordPublicSearchEvent(req, res, eventType, search, payload, options = {}, info = {}) {
     if (DB_BACKEND !== "postgres" || typeof recordPostgresPublicSearchEvent !== "function") return;
     if (isInternalPublicAnalyticsProbe(req)) return;
+    const resolvedRemote = resolveRemoteIntentForAnalytics(search, options.remote);
     const event = {
       eventType,
       search,
@@ -471,7 +479,7 @@ function registerPublicRoutes(app, context) {
       limit: options.limit,
       offset: options.offset,
       sortBy: options.sort_by,
-      remote: options.remote,
+      remote: resolvedRemote,
       ats: options.ats,
       countries: options.countries,
       regions: options.regions,
