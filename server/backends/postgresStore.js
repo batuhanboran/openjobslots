@@ -2529,6 +2529,29 @@ async function checkAndRecordPostgresPayloadDrift(pool, target, raw, parserVersi
   if (observedPaths.length === 0) {
     return { drift: false, skipped_empty_shape: true, observed };
   }
+  if (atsKey === "gem") {
+    const payload = Array.isArray(raw) ? raw : [];
+    let hasPostings = false;
+    for (const item of payload) {
+      if (item && typeof item === "object" && item.data) {
+        const external = item.data.oatsExternalJobPostings;
+        const postings = external && typeof external === "object" ? external.jobPostings : null;
+        if (Array.isArray(postings) && postings.length > 0) {
+          hasPostings = true;
+          break;
+        }
+      }
+    }
+    if (!hasPostings) {
+      const isGemGraphQL = payload.some(item =>
+        item && typeof item === "object" && item.data &&
+        ("publicBrandingTheme" in item.data || "oatsExternalJobPostings" in item.data)
+      );
+      if (isGemGraphQL) {
+        return { drift: false, empty_no_jobs: true, observed };
+      }
+    }
+  }
   if (isExplicitEmptyJobListPayload(raw, observedPaths, payloadShapePolicy)) {
     return { drift: false, empty_no_jobs: true, observed };
   }

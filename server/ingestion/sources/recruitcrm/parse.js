@@ -314,6 +314,17 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
       extractSourceIdFromPostingUrl(itemUrl, "recruitcrm");
     const rawTitle = String(item?.name || item?.job_title || item?.jobTitle || item?.title || "").trim();
 
+    function cleanRecruitCrmDescriptionText(value) {
+      const { decodeHtmlEntities } = require("../../parsers/shared/html");
+      return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    const descHtml = String(item?.description_html || item?.description || item?.job_description || item?.about_job || "").trim() || null;
+    const descPlain = String(item?.description_plain || "").trim() || (descHtml ? cleanRecruitCrmDescriptionText(descHtml) : null);
+
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: sourceJobId,
@@ -328,6 +339,8 @@ function parseRecruitCrmPostingsFromApi(companyNameForPostings, config, response
       remote_type: remoteType || null,
       employment_type: String(item?.employment_type || item?.job_type || item?.jobType || "").trim() || null,
       department: String(item?.department?.name || item?.department || item?.team?.name || item?.team || "").trim() || null,
+      description_html: descHtml,
+      description_plain: descPlain,
       source_evidence: {
         route_kind: "recruitcrm_jobs_api",
         location_source: formattedLocation ? "list_api" : "",

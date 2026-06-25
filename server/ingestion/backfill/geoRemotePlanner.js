@@ -1205,6 +1205,34 @@ async function applySqlitePlans(db, plans, options, summary) {
         if (rowChanged) {
           appliedRows += 1;
           await updateSqliteRun(db, runId, { checkpointUrl: plan.canonical_url });
+
+          // Re-evaluate validation status for SQLite
+          const nextRows = await db.all("SELECT * FROM Postings WHERE job_posting_url = ?;", [plan.canonical_url]);
+          const nextRow = nextRows[0] || null;
+          if (nextRow) {
+            const mappedRow = {
+              ...nextRow,
+              position_name: nextRow.position_name || nextRow.title,
+              canonical_url: nextRow.job_posting_url || nextRow.canonical_url,
+              hidden: Boolean(nextRow.hidden)
+            };
+            const { evaluatePublicPosting, validationFromGate } = require("../publicPostingGate");
+            const gate = evaluatePublicPosting(mappedRow, { parserVersion: mappedRow.parser_version });
+            const validation = validationFromGate(gate);
+            
+            try {
+              await db.run(
+                "UPDATE posting_cache SET validation_status = ?, validation_error = ?, updated_at = datetime('now') WHERE canonical_url = ?;",
+                [validation.status, validation.error || "", plan.canonical_url]
+              );
+            } catch (e) {}
+
+            const nextHidden = validation.status !== "valid" ? 1 : 0;
+            await db.run(
+              "UPDATE Postings SET hidden = ? WHERE job_posting_url = ?;",
+              [nextHidden, plan.canonical_url]
+            );
+          }
         }
       }
       await db.exec("COMMIT;");
@@ -1266,6 +1294,47 @@ async function applyPostgresPlans(pool, plans, options, summary) {
         if (rowChanged) {
           appliedRows += 1;
           await updatePostgresRun(client, runId, { checkpointUrl: plan.canonical_url });
+
+          // Re-evaluate validation status for this row
+          const nextRowResult = await client.query("SELECT * FROM postings WHERE canonical_url = $1;", [plan.canonical_url]);
+          if (nextRowResult.rows.length > 0) {
+            const nextRow = nextRowResult.rows[0];
+            const { evaluatePublicPosting, validationFromGate } = require("../publicPostingGate");
+            const gate = evaluatePublicPosting(nextRow, { parserVersion: nextRow.parser_version });
+            const validation = validationFromGate(gate);
+            
+            await client.query(
+              "UPDATE posting_cache SET validation_status = $1, validation_error = $2, updated_at = now() WHERE canonical_url = $3;",
+              [validation.status, validation.error || "", plan.canonical_url]
+            );
+
+            const nextHidden = validation.status !== "valid";
+            await client.query(
+              "UPDATE postings SET hidden = $1, rejection_reason = $2, updated_at = now() WHERE canonical_url = $3;",
+              [nextHidden, validation.error || "", plan.canonical_url]
+            );
+            
+            // Insert search_index_outbox job
+            if (validation.status === "valid") {
+              const { toSearchPayload } = require("../detailRefetch/detailRefetchPlanner");
+              await client.query(
+                "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'upsert', $2::jsonb, now());",
+                [plan.canonical_url, JSON.stringify(toSearchPayload(nextRow))]
+              );
+            } else {
+              await client.query(
+                "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'delete', $2::jsonb, now());",
+                [
+                  plan.canonical_url,
+                  JSON.stringify({
+                    reason: validation.status,
+                    canonical_url: plan.canonical_url,
+                    reason_codes: gate.reason_codes || []
+                  })
+                ]
+              );
+            }
+          }
         }
       }
       await client.query("COMMIT;");

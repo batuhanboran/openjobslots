@@ -219,7 +219,7 @@ function detailUrlForRow(row) {
   if (atsKey === "applitrack") {
     return buildApplitrackDetailUrl(applitrackSiteRootFromUrl(url), extractSourceJobIdFromUrl(row), url);
   }
-  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect", "freshteam"].includes(atsKey)) {
+  if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect", "freshteam", "recruitcrm"].includes(atsKey)) {
     return url;
   }
   return "";
@@ -246,6 +246,7 @@ function isAllowedDetailUrl(atsKey, urlValue) {
   if (atsKey === "breezy") return hostname.endsWith(".breezy.hr");
   if (atsKey === "hrmdirect") return hostname.endsWith(".hrmdirect.com");
   if (atsKey === "freshteam") return hostname.endsWith(".freshteam.com");
+  if (atsKey === "recruitcrm") return hostname.endsWith(".recruitcrm.io") || hostname === "recruitcrm.io";
   return false;
 }
 
@@ -489,7 +490,7 @@ function extractDetailFields(row, html) {
       remote_type: explicitRemote || applitrackDetail.remote_type,
       source_job_id: extractSourceJobIdFromUrl(row)
     };
-  } else if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect"].includes(atsKey)) {
+  } else if (["taleo", "talentreef", "zoho", "greenhouse", "lever", "ashby", "bamboohr", "gem", "workday", "oracle", "rippling", "applytojob", "breezy", "hrmdirect", "freshteam", "recruitcrm"].includes(atsKey)) {
     let sourceModule = null;
     try {
       const { getSourceModule } = require("../sources");
@@ -1331,10 +1332,54 @@ async function applyPostgresPlan(client, row, fetched, plan, runId) {
     `UPDATE posting_cache SET ${fieldExpressions.join(", ")}, updated_at = now() WHERE canonical_url = $1;`,
     values
   );
-  await client.query(
-    "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'upsert', $2::jsonb, now());",
-    [canonicalUrlForRow(next), JSON.stringify(toSearchPayload(next))]
-  );
+
+  const canonicalUrl = canonicalUrlForRow(row);
+  const updatedRowResult = await client.query("SELECT * FROM postings WHERE canonical_url = $1;", [canonicalUrl]);
+  let finalRow = next;
+  let finalStatus = "quarantined";
+  let reasonCodes = [];
+  let rejectionReason = "";
+  if (updatedRowResult.rows.length > 0) {
+    const updatedRow = updatedRowResult.rows[0];
+    const { evaluatePublicPosting, validationFromGate } = require("../publicPostingGate");
+    const gate = evaluatePublicPosting(updatedRow, { parserVersion: updatedRow.parser_version });
+    const validation = validationFromGate(gate);
+    finalStatus = validation.status;
+    reasonCodes = gate.reason_codes || [];
+    rejectionReason = validation.error || "";
+
+    await client.query(
+      "UPDATE posting_cache SET validation_status = $1, validation_error = $2, updated_at = now() WHERE canonical_url = $3;",
+      [validation.status, rejectionReason, canonicalUrl]
+    );
+
+    const nextHidden = validation.status !== "valid";
+    await client.query(
+      "UPDATE postings SET hidden = $1, rejection_reason = $2, updated_at = now() WHERE canonical_url = $3;",
+      [nextHidden, rejectionReason, canonicalUrl]
+    );
+    finalRow = { ...updatedRow, hidden: nextHidden };
+  }
+
+  if (finalStatus === "valid") {
+    await client.query(
+      "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'upsert', $2::jsonb, now());",
+      [canonicalUrl, JSON.stringify(toSearchPayload(finalRow))]
+    );
+  } else {
+    await client.query(
+      "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'delete', $2::jsonb, now());",
+      [
+        canonicalUrl,
+        JSON.stringify({
+          reason: finalStatus,
+          canonical_url: canonicalUrl,
+          reason_codes: reasonCodes
+        })
+      ]
+    );
+  }
+
   for (const item of plan.changes) {
     await insertPostgresChange(client, runId, row, fetched, plan, item, true);
   }
@@ -1352,6 +1397,35 @@ async function applySqlitePlan(db, row, fetched, plan, runId) {
   if (assignments.length === 0) return { applied: false, changes: 0 };
   values.push(canonicalUrlForRow(row));
   await db.run(`UPDATE Postings SET ${assignments.join(", ")} WHERE job_posting_url = ?;`, values);
+
+  const canonicalUrl = canonicalUrlForRow(row);
+  const nextRows = await db.all("SELECT * FROM Postings WHERE job_posting_url = ?;", [canonicalUrl]);
+  const nextRow = nextRows[0] || null;
+  if (nextRow) {
+    const mappedRow = {
+      ...nextRow,
+      position_name: nextRow.position_name || nextRow.title,
+      canonical_url: nextRow.job_posting_url || nextRow.canonical_url,
+      hidden: Boolean(nextRow.hidden)
+    };
+    const { evaluatePublicPosting, validationFromGate } = require("../publicPostingGate");
+    const gate = evaluatePublicPosting(mappedRow, { parserVersion: mappedRow.parser_version });
+    const validation = validationFromGate(gate);
+    
+    try {
+      await db.run(
+        "UPDATE posting_cache SET validation_status = ?, validation_error = ?, updated_at = datetime('now') WHERE canonical_url = ?;",
+        [validation.status, validation.error || "", canonicalUrl]
+      );
+    } catch (e) {}
+
+    const nextHidden = validation.status !== "valid" ? 1 : 0;
+    await db.run(
+      "UPDATE Postings SET hidden = ? WHERE job_posting_url = ?;",
+      [nextHidden, canonicalUrl]
+    );
+  }
+
   for (const item of plan.changes) {
     await insertSqliteChange(db, runId, row, fetched, plan, item, true);
   }
@@ -1614,5 +1688,6 @@ module.exports = {
   politeDelay,
   runDetailRefetch,
   runDetailRefetchWithDb,
-  summarizeCandidates
+  summarizeCandidates,
+  toSearchPayload
 };

@@ -176,7 +176,9 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
 }
 
 function extractApplitrackDetailFields(detailHtml) {
-  const source = String(detailHtml || "");
+  const source = String(detailHtml || "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ");
   const text = decodeHtmlEntities(
     source
       .replace(/&nbsp;/gi, " ")
@@ -217,13 +219,19 @@ function extractApplitrackDetailFields(detailHtml) {
     .replace(/\s+/g, " ")
     .replace(/\s*&nbsp;\s*/gi, " ")
     .trim();
+  const escapeAndGuardLabel = (label) => {
+    const escaped = String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const startsWithWord = /^\w/.test(label);
+    const endsWithWord = /\w$/.test(label);
+    return (startsWithWord ? "\\b" : "") + escaped + (endsWithWord ? "\\b" : "");
+  };
   const pickLabel = (labels) => {
     const sortedLabels = [...labels].sort((left, right) => String(right || "").length - String(left || "").length);
-    const labelPattern = sortedLabels.map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const labelPattern = sortedLabels.map(escapeAndGuardLabel).join("|");
     if (!labelPattern) return null;
     const stopPattern = stopLabels
       .filter((label) => !labels.includes(label))
-      .map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .map(escapeAndGuardLabel)
       .join("|");
     const inlineMatch = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*([^\\n]{1,180}?)(?=\\s+(?:${stopPattern})\\s*:|\\n|$)`, "i"));
     if (inlineMatch?.[1]) return cleanDetailValue(inlineMatch[1]);
@@ -244,6 +252,31 @@ function extractApplitrackDetailFields(detailHtml) {
   const genericLocation = /^(district\s*wide|various|multiple|tbd|n\/a|to be determined)$/i.test(cleanDetailValue(rawLocation));
   const footerAddress = extractFooterAddressLocation();
 
+  function extractApplitrackDescriptionHtml(detailHtml) {
+    if (!detailHtml) return null;
+    let cleaned = detailHtml
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+
+    // Remove tags enclosing metadata labels
+    const metadataRegex = /<(div|p|tr|li|span|td)\b[^>]*>(?:[\s\S](?!<\/\1>))*?\b(?:Date Posted|Location|Position Type|Category|Department|School|Site|Campus|Closing Date)\b[\s\S]*?<\/\1>/gi;
+    cleaned = cleaned.replace(metadataRegex, "");
+
+    // Extract content inside form, article, or table if present
+    const match = cleaned.match(/<form\b[^>]*>([\s\S]*?)<\/form>/i) ||
+                  cleaned.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i) ||
+                  cleaned.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+    let content = match ? match[1] : cleaned;
+
+    content = content.trim();
+    if (content.replace(/<[^>]+>/g, "").trim().length < 20) {
+      return null;
+    }
+    return content;
+  }
+
+  const descHtml = extractApplitrackDescriptionHtml(detailHtml);
+
   return {
     posting_date:
       pickLabel(["Date Posted", "Posted", "Posting Date", "Date Available"]) ||
@@ -255,7 +288,9 @@ function extractApplitrackDetailFields(detailHtml) {
       pickLabel(["Remote", "Work Location Type", "Work Type"]) ||
       text.match(/\b(?:primarily remote|remote|hybrid|telework|work from home|wfh|on[- ]?site|onsite)\b/i)?.[0] ||
       ""
-    )
+    ),
+    description_html: descHtml,
+    description_plain: descHtml ? cleanSmartRecruitersText(descHtml) : null
   };
 }
 

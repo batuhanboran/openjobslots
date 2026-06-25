@@ -314,15 +314,17 @@ async function getPostgresQualityAudit(pool, options = {}) {
   const visibleCte = postgresVisibleCte(lastSeenCutoffEpoch);
   const cacheLastSeenFilter = lastSeenCutoffEpoch ? `AND COALESCE(last_seen_epoch, 0) >= ${lastSeenCutoffEpoch}` : "";
   const errorCreatedAtFilter = lastSeenCutoffEpoch ? `AND created_at >= to_timestamp(${lastSeenCutoffEpoch})` : "";
-  const [summaryResult, sourceResult, parserResult, sourceFlagResult, parserFlagResult, rejectionResult, errorResult] = await Promise.all([
-    pool.query(`
+  const client = await pool.connect();
+  let summaryResult, sourceResult, parserResult, sourceFlagResult, parserFlagResult, rejectionResult, errorResult;
+  try {
+    summaryResult = await client.query(`
       ${visibleCte}
       SELECT
         COUNT(*)::bigint AS total_visible_postings,
         ${COUNT_SELECT_SQL}
       FROM visible;
-    `),
-    pool.query(
+    `);
+    sourceResult = await client.query(
       `
         ${visibleCte}
         SELECT
@@ -337,8 +339,8 @@ async function getPostgresQualityAudit(pool, options = {}) {
         LIMIT $1;
       `,
       [limit]
-    ),
-    pool.query(
+    );
+    parserResult = await client.query(
       `
         ${visibleCte}
         SELECT
@@ -354,22 +356,22 @@ async function getPostgresQualityAudit(pool, options = {}) {
         LIMIT $1;
       `,
       [limit]
-    ),
-    pool.query(`
+    );
+    sourceFlagResult = await client.query(`
       ${visibleCte}
       SELECT source_ats, flag, COUNT(*)::bigint AS count
       FROM visible
       CROSS JOIN LATERAL jsonb_array_elements_text(quality_flags) AS flag
       GROUP BY source_ats, flag;
-    `),
-    pool.query(`
+    `);
+    parserFlagResult = await client.query(`
       ${visibleCte}
       SELECT source_ats, parser_version, flag, COUNT(*)::bigint AS count
       FROM visible
       CROSS JOIN LATERAL jsonb_array_elements_text(quality_flags) AS flag
       GROUP BY source_ats, parser_version, flag;
-    `),
-    pool.query(`
+    `);
+    rejectionResult = await client.query(`
       SELECT
         COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS source_ats,
         COALESCE(NULLIF(btrim(parser_version), ''), 'unknown') AS parser_version,
@@ -382,8 +384,8 @@ async function getPostgresQualityAudit(pool, options = {}) {
       )
          ${cacheLastSeenFilter}
       GROUP BY source_ats, parser_version;
-    `),
-    pool.query(`
+    `);
+    errorResult = await client.query(`
       SELECT
         COALESCE(NULLIF(btrim(ats_key), ''), 'unknown') AS source_ats,
         COUNT(*)::bigint AS count,
@@ -395,8 +397,10 @@ async function getPostgresQualityAudit(pool, options = {}) {
       )
          ${errorCreatedAtFilter}
       GROUP BY source_ats;
-    `)
-  ]);
+    `);
+  } finally {
+    client.release();
+  }
 
   const sourceFlagCounts = formatQualityFlagRows(sourceFlagResult.rows, ["source_ats"]);
   const parserFlagCounts = formatQualityFlagRows(parserFlagResult.rows, ["source_ats", "parser_version"]);
