@@ -137,5 +137,8 @@ See `docs/PROJECT_STATE.md` for the current version, deployment state, and next 
 - **Spam Company Blacklisting:** Filter out high-volume spam duplicate postings (e.g. from `fyst`/`FYST`) during post-processing by checking the company name and canonical URL.
 - **Remote Deployment via Docker Containers:** When running `docker compose` inside a helper container via `/var/run/docker.sock`, always pass `-p openjobslots` to prevent container name conflicts with the host stack. Bind-mount `/root/.ssh` (read-only) for secure git access within the container.
 
-
-
+### 15. Ingestion Pipeline & Error Diagnostics
+- **Diagnostic Protocol:** When auditing or debugging the ingestion loop or target errors, always use the `ats-audit` skill.
+- **Error Tracing:** Query the database table `ingestion_run_errors` inside `openjobslots-postgres` to extract error messages rather than relying only on worker logs.
+- **Drift Resolution:** Resolve `parser_validation` shape similarity drift by resetting the shape baseline via `scripts/reset-baseline.js` and running a dry-run to bootstrap the new payload baseline.
+- **Gate Priority:** Do not bypass `no_geo_no_remote` quarantines by loosening the global public gate. If a board should be accepted, fix the source-specific adapter `parse.js` to extract correct locations from detail pages or JSON fields.
