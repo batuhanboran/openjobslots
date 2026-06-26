@@ -25,10 +25,26 @@ function parse(rawPayload, company = {}) {
   );
 }
 
+function normalize(posting, company = {}, options = {}) {
+  const cleanLoc = String(posting.location || "").trim();
+  const fallback = company.company_name || company.companyName || company.name || posting.company_name;
+  const hasFallback = fallback &&
+                      fallback.toLowerCase() !== "www" &&
+                      fallback.toLowerCase() !== "applitrack" &&
+                      !/fixture|test|example/i.test(fallback);
+  
+  const updatedPosting = {
+    ...posting,
+    location: cleanLoc || (hasFallback ? fallback : null)
+  };
+  return baseModule.normalize(updatedPosting, company, options);
+}
+
 module.exports = {
   ...baseModule,
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  normalize
 };

@@ -96,6 +96,20 @@ function buildBrassringPostingUrl(config, item) {
   );
 }
 
+function extractLocationFromTitle(title) {
+  if (typeof title !== "string") return null;
+  const match =
+    title.match(/\b([A-Z][A-Za-z .'-]+),\s*(AL|AK|AZ|AR|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)\b/i) ||
+    title.match(
+      /\b([A-Z][A-Za-z .'-]+),\s*(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New\s+Hampshire|New\s+Jersey|New\s+Mexico|New\s+York|North\s+Carolina|North\s+Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode\s+Island|South\s+Carolina|South\s+Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West\s+Virginia|Wisconsin|Wyoming)\b/i
+    );
+
+  if (match) {
+    return `${match[1].trim()}, ${match[2].trim()}`;
+  }
+  return null;
+}
+
 function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJson) {
   const jobs = Array.isArray(responseJson?.Jobs?.Job) ? responseJson.Jobs.Job : [];
   const postings = [];
@@ -110,14 +124,23 @@ function parseBrassringPostingsFromApi(companyNameForPostings, config, responseJ
     const jobUrl = buildBrassringPostingUrl(config, item);
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
+    const positionName = extractBrassringQuestionValue(item, "jobtitle") || "Untitled Position";
+    let location = extractBrassringLocation(item);
+    if (!location || /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(location) || location === "0.0,0.0") {
+      const fromTitle = extractLocationFromTitle(positionName);
+      if (fromTitle) {
+        location = fromTitle;
+      }
+    }
+
     postings.push({
       company_name: companyNameForPostings,
       source_job_id: reqId || undefined,
       id: reqId || undefined,
-      position_name: extractBrassringQuestionValue(item, "jobtitle") || "Untitled Position",
+      position_name: positionName,
       job_posting_url: jobUrl,
       posting_date: extractBrassringQuestionValue(item, "lastupdated") || null,
-      location: extractBrassringLocation(item),
+      location: location,
       remote_type: extractBrassringWorkMode(item) || null,
       department: extractBrassringQuestionValue(item, "department") || null
     });

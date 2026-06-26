@@ -46,6 +46,23 @@ function normalizeApplitrackUrl(url) {
   return `${base}${normalizedRootPath}`;
 }
 
+function extractOrganizationName(html) {
+  if (!html || typeof html !== "string") return null;
+  const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+  if (titleMatch?.[1]) {
+    const rawTitle = decodeHtmlEntities(titleMatch[1]).trim();
+    const cleaned = rawTitle
+      .replace(/^(?:Job Opportunities|Employment Opportunities|Vacancies|Active Postings)\s*(?:-|:|at|for)\s*/i, "")
+      .replace(/\s*(?:-|:|at|for)\s*(?:Frontline Recruitment|AppliTrack|Job Opportunities|Employment Opportunities|Vacancies|Active Postings)$/i, "")
+      .replace(/ - \b(?:online application|default\.aspx|jobpostings)\b/i, "")
+      .trim();
+    if (cleaned && cleaned.toLowerCase() !== "www" && cleaned.toLowerCase() !== "applitrack" && cleaned.length > 2) {
+      return cleaned;
+    }
+  }
+  return null;
+}
+
 function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   const page = String(outputHtml || "").replace(/\\'/g, "'");
   const postings = [];
@@ -54,16 +71,23 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
   const linkPattern = /<a\b[^>]*href=["']([^"']*(?:JobPostings\/view\.asp|ApplyForJob\.aspx|_application\.aspx|default\.aspx\?[^"']*JobID=)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let match = applyPattern.exec(page);
 
+  const orgName = extractOrganizationName(outputHtml) || companyName;
+  const finalCompanyName = (companyName === "www" && orgName && orgName !== "www") ? orgName : companyName;
+
   const extractRowContext = (matchIndex) => {
     const start = page.lastIndexOf("<tr", matchIndex);
     const end = page.indexOf("</tr>", matchIndex);
     if (start >= 0 && end > start) return page.slice(start, end + "</tr>".length);
     return page.slice(Math.max(0, matchIndex - 1200), Math.min(page.length, matchIndex + 1800));
   };
-  const cleanApplitrackRowText = (rowHtml) =>
-    decodeHtmlEntities(String(rowHtml || "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " "))
+  const cleanApplitrackRowText = (rowHtml) => {
+    const withoutScripts = String(rowHtml || "")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ");
+    return decodeHtmlEntities(withoutScripts.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " "))
       .replace(/\s+/g, " ")
       .trim();
+  };
   const extractDateFromRow = (rowText) => {
     const compact = String(rowText || "");
     return compact.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/)?.[0] ||
@@ -113,19 +137,25 @@ function parseApplitrackPostings(outputHtml, siteRoot, companyName) {
     const canonicalUrl = jobUrl || new URL(`default.aspx?JobID=${encodeURIComponent(sourceJobId)}`, siteRoot).toString();
     const rowText = cleanApplitrackRowText(rowContext);
 
+    let cleanLoc = extractLocationFromRow(rowText, [sourceJobId, cleanCategory, cleanSpecialty, title]);
+    if (cleanLoc && /winLoc|replace|{|}|\(|\)|=|;/i.test(cleanLoc)) {
+      cleanLoc = null;
+    }
+
     postings.push({
-      company_name: companyName,
+      company_name: finalCompanyName,
       source_job_id: sourceJobId,
       position_name: title,
       job_posting_url: canonicalUrl,
       apply_url: canonicalUrl,
       remote_type: extractRemoteTypeFromText(rowText),
       posting_date: extractDateFromRow(rowText),
-      location: extractLocationFromRow(rowText, [sourceJobId, cleanCategory, cleanSpecialty, title]),
+      location: cleanLoc,
       department: cleanCategory || null
     });
     seenIds.add(sourceJobId);
   };
+
 
   while (match) {
     const jobId = cleanSmartRecruitersText(match[1]);

@@ -156,6 +156,80 @@ function extractWorkdayRemoteSignal(posting, jobPostingUrl) {
     .join(" ");
 }
 
+const US_STATES = {
+  "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA", "colorado": "CO",
+  "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
+  "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS", "kentucky": "KY", "louisiana": "LA",
+  "maine": "ME", "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
+  "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
+  "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC",
+  "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA",
+  "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX",
+  "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV",
+  "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC"
+};
+const US_STATE_CODES = new Set(Object.values(US_STATES));
+
+function parseLocationText(locationText) {
+  if (typeof locationText !== "string") return null;
+  const clean = locationText.replace(/__DOUBLE_DASH__/g, " ").replace(/\s+/g, " ").trim();
+  if (!clean) return null;
+
+  let parts = clean.split(/[,\/]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) {
+    parts = clean.split(/\s+-\s+/).map((p) => p.trim()).filter(Boolean);
+  }
+
+  if (parts.length >= 2) {
+    let city = "";
+    let state = "";
+    let country = "";
+
+    const lastPart = parts[parts.length - 1];
+    const lastPartLower = lastPart.toLowerCase();
+
+    const commonCountries = {
+      "united states": "United States", "usa": "United States", "united states of america": "United States",
+      "united kingdom": "United Kingdom", "uk": "United Kingdom", "england": "United Kingdom",
+      "canada": "Canada", "germany": "Germany", "deutschland": "Germany", "france": "France",
+      "netherlands": "Netherlands", "india": "India", "australia": "Australia", "japan": "Japan",
+      "turkey": "Turkey", "türkiye": "Turkey", "turkiye": "Turkey", "spain": "Spain", "italy": "Italy"
+    };
+
+    if (commonCountries[lastPartLower]) {
+      country = commonCountries[lastPartLower];
+      parts.pop();
+    }
+
+    if (parts.length > 0) {
+      const nextLast = parts[parts.length - 1];
+      const nextLastLower = nextLast.toLowerCase();
+      if (US_STATES[nextLastLower]) {
+        state = US_STATES[nextLastLower];
+        parts.pop();
+        if (!country) country = "United States";
+      } else if (US_STATE_CODES.has(nextLast.toUpperCase())) {
+        state = nextLast.toUpperCase();
+        parts.pop();
+        if (!country) country = "United States";
+      }
+    }
+
+    if (parts.length > 0) {
+      city = parts[0];
+      if (/^(?:remote|various|multiple|tbd|home based|home-based|flexible|anywhere|virtual)$/i.test(city)) {
+        city = "";
+      }
+    }
+
+    if (city || state || country) {
+      return { city, state, country };
+    }
+  }
+
+  return null;
+}
+
 function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
   const postings = Array.isArray(response?.jobPostings)
     ? response.jobPostings
@@ -174,6 +248,21 @@ function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
     const jobUrl = buildJobUrl(config?.companyBaseUrl, posting?.externalPath);
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
     const structuredLocation = extractWorkdayStructuredLocation(posting);
+    let city = structuredLocation.city || null;
+    let state = structuredLocation.state || null;
+    let country = structuredLocation.country || null;
+
+    if (!city || !country) {
+      const label = extractWorkdayLocationLabel(posting, jobUrl);
+      const parsed = parseLocationText(label);
+      if (parsed) {
+        if (!city && parsed.city) city = parsed.city;
+        if (!state && parsed.state) state = parsed.state;
+        if (!country && parsed.country) country = parsed.country;
+      }
+    }
+
+    const finalLocation = [city, state, country].filter(Boolean).join(", ") || extractWorkdayLocationLabel(posting, jobUrl);
 
     collected.push({
       company_name: companyName,
@@ -191,10 +280,10 @@ function parseWorkdayPostingsFromApi(companyNameForPostings, config, response) {
             posting?.updatedOn ||
             ""
         ).trim() || null,
-      location: extractWorkdayLocationLabel(posting, jobUrl),
-      city: structuredLocation.city || null,
-      state: structuredLocation.state || null,
-      country: structuredLocation.country || null,
+      location: finalLocation,
+      city: city || null,
+      state: state || null,
+      country: country || null,
       workplaceType: extractWorkdayRemoteSignal(posting, jobUrl)
     });
     seenUrls.add(jobUrl);
@@ -209,3 +298,4 @@ module.exports = {
   inferWorkdayLocationFromJobUrl,
   parseWorkdayPostingsFromApi
 };
+
