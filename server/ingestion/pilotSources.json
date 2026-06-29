@@ -2510,5 +2510,17 @@
   "zookeep": {
     "family": "direct-json-stable",
     "status": "enabled"
+  },
+  "remoteok": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "himalayas": {
+    "family": "direct-json-stable",
+    "status": "enabled"
+  },
+  "arbeitnow": {
+    "family": "direct-json-stable",
+    "status": "enabled"
   }
 }

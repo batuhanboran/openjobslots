@@ -54,10 +54,11 @@ module.exports = {
   atsKey: ATS_KEY,
   key: ATS_KEY,
   family: "direct-json-stable",
-  status: "disabled",
+  status: "enabled",
   parserVersion: PARSER_VERSION,
   payloadShapePolicy: Object.freeze({
-    empty_job_list_stems: Object.freeze(["jobs"])
+    empty_job_list_stems: Object.freeze(["jobs"]),
+    optional_enrichment_prefixes: Object.freeze(["__legacyParsed", "__sourceConfig"])
   }),
   discover,
   fetchList,

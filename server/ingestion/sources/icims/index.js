@@ -51,5 +51,8 @@ module.exports = {
   parserVersion,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy: Object.freeze({
+    optional_enrichment_prefixes: Object.freeze(["__legacyParsed", "__sourceConfig"])
+  })
 };

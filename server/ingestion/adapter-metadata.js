@@ -645,7 +645,7 @@ const PUBLIC_SECTOR_EDUCATION = [
 
 const BRITTLE_HIGH_RISK = ["taleo", "brassring"];
 const UNSUPPORTED_ATS = new Set([]);
-const DISABLED_BY_DEFAULT_ATS = new Set(["dayforcehcm", "personio", "workable"]);
+const DISABLED_BY_DEFAULT_ATS = new Set(["dayforcehcm"]);
 
 const SOURCE_FIXTURE_BACKED_ATS = [
   "100hires",

@@ -92,10 +92,28 @@ function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, pay
       workplaceType:
         cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
         (item.remote === true ? "remote" : null),
+      remote_type: (() => {
+        const raw = cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
+          (item.remote === true ? "remote" : "");
+        const result = normalizeRemoteType(raw);
+        return result === "unknown" ? null : result;
+      })(),
       remote: item.remote === true || item.isRemote === true,
       industry: cleanSmartRecruitersText(item.industry?.label || item.industry?.name || item.industry) || null,
       description_html: cleanSmartRecruitersText(jobAdSections.jobDescription || item.descriptionHtml) || null,
-      description_plain: cleanSmartRecruitersText(item.descriptionPlain || item.description) || null
+      description_plain: cleanSmartRecruitersText(item.descriptionPlain || item.description) || null,
+      source_evidence: Object.freeze({
+        route_kind: "smartrecruiters_search_api",
+        title_source: "api",
+        canonical_url_source: "api",
+        location_source: item.location ? "api_location" : "",
+        remote_source: (() => {
+          const raw = cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
+            (item.remote === true ? "remote" : "");
+          const result = normalizeRemoteType(raw);
+          return result !== "unknown" ? "api_workplacetype" : "";
+        })()
+      })
     });
     seenUrls.add(rawJobUrl);
   }

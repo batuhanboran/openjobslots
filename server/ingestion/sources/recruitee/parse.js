@@ -1,6 +1,7 @@
 "use strict";
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
+const { normalizeCountryName, normalizeRemoteType } = require("../../posting");
 
 function stripSearchDiacritics(value) {
   return String(value || "")
@@ -251,7 +252,7 @@ function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, res
       posting_date: postingDate,
       location: locationNames.length > 0 ? [...new Set(locationNames)].join(" / ") : null,
       city: String(offer?.city || "").trim(),
-      country: String(offer?.country || offer?.country_code || "").trim(),
+      country: normalizeCountryName(offer?.country || offer?.country_code || "") || String(offer?.country || offer?.country_code || "").trim(),
       department,
       employment_type: String(offer?.employment_type_code || offer?.contract_type || "").trim(),
       description_html: String(offer?.description || offer?.requirements || "").trim(),
@@ -260,7 +261,25 @@ function parseRecruiteePostingsFromPublicApp(companyNameForPostings, config, res
         offer?.isRemote === true ||
         offer?.location?.remote === true ||
         offer?.location?.isRemote === true,
-      workplaceType: normalizeRecruiteeWorkplaceType(offer)
+      workplaceType: normalizeRecruiteeWorkplaceType(offer),
+      remote_type: (() => {
+        const raw = normalizeRecruiteeWorkplaceType(offer);
+        if (!raw) return null;
+        const result = normalizeRemoteType(raw);
+        return result === "unknown" ? null : result;
+      })(),
+      source_evidence: Object.freeze({
+        route_kind: "recruitee_public_app",
+        title_source: "api",
+        canonical_url_source: "api",
+        location_source: (offer?.locations || offer?.location || offer?.city) ? "api_location" : "",
+        remote_source: (() => {
+          const raw = normalizeRecruiteeWorkplaceType(offer);
+          if (!raw) return "";
+          const result = normalizeRemoteType(raw);
+          return result !== "unknown" ? "api_workplacetype" : "";
+        })()
+      })
     });
     seenUrls.add(jobUrl);
   }

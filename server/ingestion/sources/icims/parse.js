@@ -148,7 +148,11 @@ function extractIcimsLocationFromHtml(sourceHtml) {
   const patterns = [
     /field-label">Location\s*<\/span>\s*<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
     /glyphicons-map-marker[^>]*>[\s\S]*?<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
-    /data-(?:field|label)=["'](?:location|job-location|primary-location)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
+    /data-(?:field|label)=["'](?:location|job-location|primary-location)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i,
+    // Additional iCIMS template patterns
+    /class=["'][^"']*(?:job-location|jobLocation|location-field)[^"']*["'][^>]*>([^<]+)/i,
+    /itemprop=["']jobLocation["'][^>]*>[\s\S]*?itemprop=["']address["'][^>]*>[\s\S]*?<span[^>]*>([^<]+)/i,
+    /data-automation=["']job-location["'][^>]*>([^<]+)/i
   ];
 
   for (const pattern of patterns) {
@@ -191,7 +195,9 @@ function extractIcimsRemoteTypeFromHtml(sourceHtml) {
 
   const patterns = [
     /field-label">Remote\s*<\/span>\s*<\/dt>\s*<dd[^>]*class=["'][^"']*iCIMS_JobHeaderData[^"']*["'][^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i,
-    /data-(?:field|label)=["'](?:remote|workplace-type|location-type)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
+    /data-(?:field|label)=["'](?:remote|workplace-type|location-type)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i,
+    // Additional remote patterns
+    /data-(?:field|label)=["'](?:telework|work-arrangement|flexible-location)["'][^>]*>([\s\S]*?)<\/(?:span|div|dd|li)>/i
   ];
 
   for (const pattern of patterns) {
@@ -258,6 +264,10 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const source = String(pageHtml || "");
   const postings = [];
   const seenUrls = new Set();
+
+  // Collect JSON-LD postings FIRST — they have richer structured location data
+  postings.push(...collectIcimsJsonLdPostings(companyNameForPostings, config, source, seenUrls));
+
   const cardPattern = /<li[^>]*class=["'][^"']*iCIMS_JobCardItem[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
 
   let cardMatch = cardPattern.exec(source);
@@ -304,8 +314,6 @@ function parseIcimsPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     seenUrls.add(absoluteUrl);
     cardMatch = cardPattern.exec(source);
   }
-
-  postings.push(...collectIcimsJsonLdPostings(companyNameForPostings, config, source, seenUrls));
 
   if (postings.length > 0) return postings;
 

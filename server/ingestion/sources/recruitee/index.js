@@ -16,7 +16,7 @@ function parse(rawPayload, company = {}) {
   const target = discover(company);
   const config = rawPayload?.__sourceConfig || target.config || {};
   const payload = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-    ? Object.fromEntries(Object.entries(rawPayload).filter(([name]) => name !== "__sourceConfig"))
+    ? Object.fromEntries(Object.entries(rawPayload).filter(([name]) => !String(name).startsWith("__")))
     : rawPayload;
   return parser.parseRecruiteePostingsFromPublicApp(
     clean(company.company_name || company.companyName || company.name || config.subdomain || "recruitee"),
@@ -30,5 +30,8 @@ module.exports = {
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy: Object.freeze({
+    optional_enrichment_prefixes: Object.freeze(['__legacyParsed', '__sourceConfig'])
+  })
 };
