@@ -54,6 +54,18 @@ const VIRTUAL_SOURCE_TARGETS = Object.freeze({
   usajobs: {
     company_name: "USAJobs (virtual)",
     url_string: "https://data.usajobs.gov/api/Search"
+  },
+  remoteok: {
+    company_name: "RemoteOK (virtual)",
+    url_string: "https://remoteok.com/api"
+  },
+  himalayas: {
+    company_name: "Himalayas (virtual)",
+    url_string: "https://himalayas.app/jobs/api"
+  },
+  arbeitnow: {
+    company_name: "Arbeitnow (virtual)",
+    url_string: "https://www.arbeitnow.com/api/job-board-api"
   }
 });
 

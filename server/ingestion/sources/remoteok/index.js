@@ -4,6 +4,7 @@ const {
   clean,
   createBasicSourceContract
 } = require("../sourceModuleHelpers");
+const { safeFetch } = require("../../safeFetch");
 const parser = require("./parse");
 
 const ATS_KEY = "remoteok";
@@ -35,6 +36,16 @@ function discover(company = {}) {
   };
 }
 
+async function fetchList(company = {}) {
+  const url = "https://remoteok.com/api";
+  const response = await safeFetch(url, {
+    headers: { accept: "application/json, text/plain, */*" }
+  });
+  const text = typeof response === "string" ? response
+    : (response?.body || response?.html || "");
+  return JSON.parse(String(text || "[]"));
+}
+
 function parse(rawPayload, company = {}) {
   return parser.parseRemoteOkPostingsFromApi("remoteok", {}, rawPayload);
 }
@@ -51,7 +62,7 @@ module.exports = {
     optional_enrichment_prefixes: Object.freeze(["__legacyParsed", "__sourceConfig"])
   }),
   discover,
-  fetchList: async () => null,
+  fetchList,
   fetchDetail: async () => null,
   parse
 };
