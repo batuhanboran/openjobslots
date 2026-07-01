@@ -42,7 +42,7 @@ async function fetchList(company = {}) {
     headers: { accept: "application/json, text/plain, */*" }
   });
   const text = typeof response === "string" ? response
-    : (response?.body || response?.html || "");
+    : (typeof response?.text === "function" ? await response.text() : String(response?.body || "[]"));
   return JSON.parse(String(text || "[]"));
 }
 
