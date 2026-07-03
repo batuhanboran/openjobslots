@@ -28,7 +28,7 @@ function parseHimalayasPostingsFromApi(companyName, config, rawPayload) {
 
     postings.push({
       company_name: company,
-      source_job_id: String(item.id || item.slug || ""),
+      source_job_id: String(item.id || item.slug || item.guid || ""),
       position_name: title,
       job_posting_url: jobUrl,
       posting_date: clean(item.pubDate || item.publishedDate || item.created_at) || null,

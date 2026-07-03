@@ -1,0 +1,100 @@
+{
+  "comments": "13/03/2026: The API has been updated to include the companySlug field in the response.",
+  "updatedAt": 1783110112,
+  "offset": 0,
+  "limit": 20,
+  "totalCount": 100631,
+  "jobs": [
+    {
+      "title": "Client Itinerary Services Assistant",
+      "excerpt": "Role Overview Our company is increasing our remote team and is looking for individuals who enjoy assisting clients while managing a variety of tasks.",
+      "companyName": "name",
+      "companySlug": "triptastic-adventures",
+      "companyLogo": "thumbnail_url",
+      "employmentType": "Full Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Entry-level"
+      ],
+      "currency": null,
+      "locationRestrictions": [
+        "United States"
+      ],
+      "timezoneRestrictions": [
+        -10,
+        -9,
+        -8,
+        -7,
+        -6,
+        -5,
+        14
+      ],
+      "categories": [
+        "Travel-Coordinator",
+        "Itinerary-Coordinator",
+        "Client-Services-Assistant",
+        "Travel-Planning",
+        "Reservation-Specialist",
+        "Itinerary-Assistant",
+        "Itinerary-Specialist",
+        "Client-Reservations-Attendant"
+      ],
+      "parentCategories": [],
+      "description": "<p><strong>Role Overview</strong><br>Our company is increasing our remote team and is looking for individuals who enjoy assisting clients while managing a variety of tasks. In this role, you will help coordinate reservations and related arrangements such as lodging, activities, transportation, and event-related services.</p><p>This opportunity is preferrable for candidates who are organized, communicate clearly, and are comfortable working independently in a remote setting while staying connected with a collaborative team.</p><p><strong>Primary Responsibilities</strong><br>Support clients by organizing and coordinating customized service arrangements<br>Research and review available options to match client needs and preferences<br>Secure and verify reservations to ensure details are accurate<br>Maintain professional communication through phone and email<br>Assist with schedule updates, adjustments, and general service inquiries<br>Keep client information and documentation organized and up to date</p><h3>Participate in training sessions</h3><h3>What We Provide</h3><h3>Fully remote capability</h3><h3>Flexible schedule</h3><p>Ongoing training and learning resources</p><h3>Supportive team setting</h3><p><strong>Qualifications</strong><br>Must be authorized to work in the United States, United Kingdom, Mexico, Australia, or Spain</p><h3>Must be at least 18 years old</h3><p>Strong written and verbal communication skills in English<br>Reliable internet access and smartphone (computer is also highly recommended)<br>Previous customer service experience is a plus</p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+      "pubDate": 1783109923,
+      "expiryDate": 1788293922,
+      "applicationLink": "https://himalayas.app/companies/triptastic-adventures/jobs/client-itinerary-services-assistant",
+      "guid": "https://himalayas.app/companies/triptastic-adventures/jobs/client-itinerary-services-assistant"
+    },
+    {
+      "title": "Customer Service Consultant",
+      "excerpt": "Customer Service Consultant (Near-shore) is accountable for providing customer service excellence to existing AccessPay salary packaging customers in handling general enquiries.",
+      "companyName": "name",
+      "companySlug": "satellite-office",
+      "companyLogo": "thumbnail_url",
+      "employmentType": "Full Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Entry-level"
+      ],
+      "currency": null,
+      "locationRestrictions": [
+        "United States"
+      ],
+      "timezoneRestrictions": [
+        -10,
+        -9,
+        -8,
+        -7,
+        -6,
+        -5,
+        14
+      ],
+      "categories": [
+        "Customer-Service",
+        "Customer-Support",
+        "Customer-Success",
+        "Service-Delivery",
+        "Customer-Service-Consultant",
+        "Customer-Care-Consultant",
+        "Customer-Support-Consultant",
+        "Customer-Experience-Consultant",
+        "Client-Service-Consultant",
+        "Customer-Service-Advisor",
+        "Contact-Centres"
+      ],
+      "parentCategories": [
+        "Customer Service"
+      ],
+      "description": "<p><strong>Customer Service Consultant (Near-shore)</strong> is accountable for providing customer service excellence to existing AccessPay salary packaging customers in handling general enquiries. Measured by customer feedback and internal reviews, it provides for quality support within agreed service levels and time frames. A critical link between AccessPay and our customers, the Service Centre is vital in driving customer satisfaction and business goals, with team members servicing over 100,000 customers.</p><h3>Responsible for</h3><ul><li>Providing timely, accurate and high-quality customer service to customers, via phone and email.</li>\n<li>Providing resolution to all generalqueries and account management information on services.</li>\n<li>Creating a positive relationship in all customer interactions, maintaining a professional and friendly manner and ensuring customer satisfaction as a priority.</li>\n<li>Ensuring accurate information is recorded within our customer relationship management system (SSAMS).</li>\n<li>Performing administrative activities to support the provision of service delivery.</li>\n<li>Achieving KPIs, agreed service levels and target Net Promoter Score (NPS).</li>\n<li>Executing on all responsibilities in a way that is consistent with Smartgroup’s vision and values.</li>\n</ul><h3>Qualifications</h3><ul><li>Strong verbal and written communication.</li>\n</ul><h3>•Customer-focus</h3><h3>•Resilience</h3><ul><li>Demonstrated accountability and follow through to see customer issues are resolved.</li>\n</ul><h3>•Attention to detail and accuracy.</h3><ul><li>Excellent time management and abilityto multi-task</li>\n</ul><h3>•Initiative and improvements orientated</h3><h3>•Self-starter</h3><ul><li>Able to work in a fast-paced environment</li>\n<li>Able to understand and articulate technical information</li>\n</ul><h3>Experience</h3><ul><li>At least 12 months + experience working in a customer service role, ideallyin a contact centre or</li>\n</ul><h3>frontline service environment.</h3><ul><li>Demonstrated working experience in a result - oriented and quality focused environment.</li>\n<li>Experience with lead generation/referral (advising customers of benefits/products) or able to demonstrate confidence or capability in lead generation.</li>\n<li>Minimum 12 months in a similar contact centre role/environment</li>\n</ul><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+      "pubDate": 1783109821,
+      "expiryDate": 1788293821,
+      "applicationLink": "https://himalayas.app/companies/satellite-office/jobs/customer-service-consultant",
+      "guid": "https://himalayas.app/companies/satellite-office/jobs/customer-service-consultant"
+    }
+  ]
+}

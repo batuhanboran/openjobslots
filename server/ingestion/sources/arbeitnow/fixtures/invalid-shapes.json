@@ -1,0 +1,32 @@
+{
+  "ats_key": "arbeitnow",
+  "description": "Invalid source-shape fixtures for aggregator source validation and quarantine.",
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name|missing title",
+      "posting": {
+        "company_name": "Fixture arbeitnow",
+        "source_job_id": "arbeitnow-missing-title",
+        "position_name": "",
+        "job_posting_url": "https://example.com/arbeitnow/missing-title",
+        "location": "Berlin, Germany",
+        "remote_type": "onsite"
+      }
+    },
+    {
+      "name": "missing canonical url",
+      "expected": "rejected",
+      "reason": "missing job_posting_url|missing canonical_url",
+      "posting": {
+        "company_name": "Fixture arbeitnow",
+        "source_job_id": "arbeitnow-missing-url",
+        "position_name": "Fixture Engineer",
+        "job_posting_url": "",
+        "location": "Berlin, Germany",
+        "remote_type": "onsite"
+      }
+    }
+  ]
+}
