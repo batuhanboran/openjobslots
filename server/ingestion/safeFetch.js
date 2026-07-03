@@ -324,7 +324,7 @@ function throwIfAborted(signal) {
 
 function isTransientDnsLookupError(error) {
   const code = String(error?.code || "").toUpperCase();
-  return ["EAI_AGAIN", "ETIMEOUT", "ESERVFAIL"].includes(code);
+  return ["EAI_AGAIN", "ETIMEOUT", "ETIMEDOUT", "ESERVFAIL"].includes(code);
 }
 
 function makeDnsLookupTimeoutError(hostname, timeoutMs) {
@@ -793,7 +793,7 @@ async function safeFetch(url, init = {}, options = {}) {
 
   try {
     const response = await safeFetchInternal(url, init, options);
-    if (![403, 503, 429].includes(response.status)) {
+    if (![403, 406, 503, 429].includes(response.status)) {
       return response;
     }
     lastResponse = response;
@@ -834,7 +834,7 @@ async function safeFetch(url, init = {}, options = {}) {
 
       try {
         const response = await safeFetchInternal(url, init, { ...options, proxy });
-        if (![403, 503, 429].includes(response.status)) {
+        if (![403, 406, 503, 429].includes(response.status)) {
           return response;
         }
         lastResponse = response;

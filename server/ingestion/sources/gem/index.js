@@ -17,7 +17,11 @@ const DEFAULT_RATE_LIMIT = Object.freeze({
   strategy: "direct-json-api-per-host-serialized"
 });
 const payloadShapePolicy = Object.freeze({
-  empty_job_list_stems: Object.freeze(["[].data.oatsExternalJobPostings.jobPostings"])
+  empty_job_list_stems: Object.freeze(["[].data.oatsExternalJobPostings.jobPostings"]),
+  optional_enrichment_prefixes: Object.freeze([
+    "__legacyParsed",
+    "__sourceConfig"
+  ])
 });
 
 function clean(value) {

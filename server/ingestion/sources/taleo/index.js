@@ -127,6 +127,15 @@ function normalize(posting, company = {}, options = {}) {
   return normalized;
 }
 
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__legacyParsed",
+    "__sourceConfig",
+    "__detailHtmlByUrl",
+    "detailHtmlByUrl"
+  ])
+});
+
 module.exports = {
   ...baseModule,
   ...parser,
@@ -134,5 +143,6 @@ module.exports = {
   fetchList,
   parse,
   normalize,
-  fetchDetail: require("./fetchDetail")
+  fetchDetail: require("./fetchDetail"),
+  payloadShapePolicy
 };

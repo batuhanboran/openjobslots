@@ -235,7 +235,9 @@ test("registry returns contract-valid pilot source modules", () => {
     "__json",
     "__detailHtmlByUrl",
     "__detailStatusByUrl",
-    "__detailFailureByUrl"
+    "__detailFailureByUrl",
+    "__legacyParsed",
+    "__sourceConfig"
   ]);
   assert.deepEqual(validateSourceContract(breezy), { ok: true, failures: [] });
 
@@ -417,7 +419,9 @@ test("registry returns contract-valid pilot source modules", () => {
     "__rssFailure",
     "__detailHtmlByUrl",
     "__detailStatusByUrl",
-    "__detailFailureByUrl"
+    "__detailFailureByUrl",
+    "__legacyParsed",
+    "__sourceConfig"
   ]);
   assert.deepEqual(validateSourceContract(hrmDirect), { ok: true, failures: [] });
 

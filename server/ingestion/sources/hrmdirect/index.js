@@ -18,7 +18,9 @@ const payloadShapePolicy = Object.freeze({
     "__rssFailure",
     "__detailHtmlByUrl",
     "__detailStatusByUrl",
-    "__detailFailureByUrl"
+    "__detailFailureByUrl",
+    "__legacyParsed",
+    "__sourceConfig"
   ])
 });
 

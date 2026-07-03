@@ -16,7 +16,9 @@ const payloadShapePolicy = Object.freeze({
     "__detailHtmlByUrl",
     "__detailStatusByUrl",
     "rss",
-    "html"
+    "html",
+    "__legacyParsed",
+    "__sourceConfig"
   ])
 });
 const TEAMTAILOR_CITY_COUNTRY_HINTS = Object.freeze({

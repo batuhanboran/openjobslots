@@ -12,7 +12,9 @@ const payloadShapePolicy = Object.freeze({
     "__json",
     "__detailHtmlByUrl",
     "__detailStatusByUrl",
-    "__detailFailureByUrl"
+    "__detailFailureByUrl",
+    "__legacyParsed",
+    "__sourceConfig"
   ])
 });
 

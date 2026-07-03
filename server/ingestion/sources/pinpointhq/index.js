@@ -24,10 +24,18 @@ function parse(rawPayload, company = {}) {
   );
 }
 
+const payloadShapePolicy = Object.freeze({
+  optional_enrichment_prefixes: Object.freeze([
+    "__legacyParsed",
+    "__sourceConfig"
+  ])
+});
+
 module.exports = {
   ...baseModule,
   ...parser,
   discover,
   fetchList,
-  parse
+  parse,
+  payloadShapePolicy
 };

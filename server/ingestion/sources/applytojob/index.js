@@ -11,7 +11,9 @@ const payloadShapePolicy = Object.freeze({
   optional_enrichment_prefixes: Object.freeze([
     "__detailHtmlByUrl",
     "__detailStatusByUrl",
-    "__detailFailureByUrl"
+    "__detailFailureByUrl",
+    "__legacyParsed",
+    "__sourceConfig"
   ])
 });
 
