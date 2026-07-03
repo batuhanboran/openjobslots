@@ -1356,3 +1356,45 @@ test("replace swap is not attempted if temp validation fails", async () => {
     mock.restore();
   }
 });
+
+test("replace validation accepts small drift within countDeltaTolerance", async () => {
+  const mock = installFetchMock((url) => {
+    if (url.endsWith("/indexes/postings_tmp")) return createResponse(200, { uid: "postings_tmp", primaryKey: "id" });
+    if (url.endsWith("/indexes/postings_tmp/settings")) return createResponse(200, expectedSettingsResponse());
+    if (url.endsWith("/indexes/postings_tmp/stats")) return createResponse(200, { numberOfDocuments: 2 });
+    if (url.endsWith("/indexes/postings_tmp/search")) {
+      return createResponse(200, { facetDistribution: { remote_type: { remote: 1, onsite: 1 } }, hits: [], estimatedTotalHits: 0 });
+    }
+    if (url.includes("/indexes/postings_tmp/documents?")) {
+      return createResponse(200, { results: [] });
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  try {
+    const pool = makePool({
+      count: 1,
+      facet: { remote: 1 },
+      rows: [posting({ canonical_url: "https://example.com/jobs/remote-00000000", remote_type: "remote" })],
+      driftRows: []
+    });
+    const strict = await validateMeiliIndexAgainstPostgres(
+      pool,
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
+      "postings_tmp",
+      { sampleLimit: 0, sampleSearches: false }
+    );
+    assert.equal(strict.ok, false);
+    assert.equal(strict.count_delta, -1);
+
+    const tolerant = await validateMeiliIndexAgainstPostgres(
+      pool,
+      { enabled: true, host: "http://meili.test", apiKey: "", indexName: "postings" },
+      "postings_tmp",
+      { sampleLimit: 0, sampleSearches: false, countDeltaTolerance: 2 }
+    );
+    assert.equal(tolerant.ok, true);
+    assert.equal(tolerant.count_delta, -1);
+  } finally {
+    mock.restore();
+  }
+});

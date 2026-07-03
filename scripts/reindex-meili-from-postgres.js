@@ -1020,10 +1020,22 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
   const sampleSearches = config.enabled && index?.uid && options.sampleSearches !== false
     ? await runSampleSearches(config, indexName)
     : [];
+  // Live ingestion keeps writing while the temp index builds, so an exact
+  // count match can never hold on a busy system; allow a small explicit
+  // tolerance (default 0 keeps strict behavior).
+  const countDeltaTolerance = Math.max(
+    0,
+    Math.floor(Number(options.countDeltaTolerance ?? process.env.OPENJOBSLOTS_REINDEX_COUNT_DELTA_TOLERANCE ?? 0) || 0)
+  );
+  const facetDeltaWithinTolerance =
+    countDeltaTolerance > 0 &&
+    Object.values(remoteFacetComparison.deltas || {}).every(
+      (delta) => Math.abs(Number(delta) || 0) <= countDeltaTolerance
+    );
   const ok =
     Boolean(settingsValidation.ok) &&
-    countDelta === 0 &&
-    remoteFacetComparison.ok &&
+    Math.abs(countDelta) <= countDeltaTolerance &&
+    (remoteFacetComparison.ok || facetDeltaWithinTolerance) &&
     samples.sample_mismatches.length === 0;
   return {
     ok,
