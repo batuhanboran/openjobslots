@@ -1,0 +1,29 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "_id": "tr-9001",
+        "_source": {
+          "jobId": "TR9001",
+          "title": "Future Start Crew Member",
+          "url": "/fixture/jobs/TR9001",
+          "address": { "city": "Austin" },
+          "stateOrProvinceFull": "Texas",
+          "startDate": "2030-07-24T00:00:00Z"
+        }
+      },
+      {
+        "_id": "tr-9002",
+        "_source": {
+          "jobId": "TR9002",
+          "title": "Created Crew Member",
+          "url": "/fixture/jobs/TR9002",
+          "address": { "city": "Boston" },
+          "stateOrProvinceFull": "Massachusetts",
+          "createdDate": "2026-05-08",
+          "startDate": "2030-07-24T00:00:00Z"
+        }
+      }
+    ]
+  }
+}

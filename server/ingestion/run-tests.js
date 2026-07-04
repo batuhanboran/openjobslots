@@ -13,4 +13,5 @@ require("./direct-parser-fixtures.test");
 require("./sources/directSourceModules.test");
 require("./sources/enterpriseSourceModules.test");
 require("./sources/htmlPublicSourceModules.test");
+require("./sources/futurePostingDates.test");
 require("./worker-concurrency.test");

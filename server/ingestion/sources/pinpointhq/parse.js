@@ -1,6 +1,7 @@
 "use strict";
 
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
+const { guardPostingDateAgainstFuture } = require("../sourceModuleHelpers");
 
 function formatPinpointHqLocation(locationValue) {
   const location = locationValue && typeof locationValue === "object" ? locationValue : {};
@@ -13,6 +14,7 @@ function formatPinpointHqLocation(locationValue) {
 
 function parsePinpointHqPostingsFromApi(companyNameForPostings, config, responseJson) {
   const data = Array.isArray(responseJson?.data) ? responseJson.data : [];
+  const nowEpoch = config?.__nowEpoch;
   const postings = [];
   const seenUrls = new Set();
 
@@ -27,9 +29,13 @@ function parsePinpointHqPostingsFromApi(companyNameForPostings, config, response
         : "";
     if (!jobUrl || seenUrls.has(jobUrl)) continue;
 
-    const postingDate =
-      String(item?.posted_at || item?.published_at || item?.created_at || item?.updated_at || item?.deadline_at || "").trim() ||
-      null;
+    // deadline_at is an application DEADLINE (JSON-LD validThrough), not a
+    // posted date; excluding it stops future deadlines from becoming the
+    // posting date. The guard is a backstop for future-valued posted fields.
+    const postingDate = guardPostingDateAgainstFuture(
+      String(item?.posted_at || item?.published_at || item?.created_at || item?.updated_at || "").trim() || null,
+      nowEpoch
+    );
     const department = String(item?.job?.department?.name || "").trim() || null;
 
     postings.push({

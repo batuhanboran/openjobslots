@@ -3,6 +3,7 @@
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
 const { isRemoteOnlyLocationValue } = require("../../parsers/shared/location");
 const { normalizeCountryFromLocation, normalizeCountryName } = require("../../posting");
+const { guardPostingDateAgainstFuture } = require("../sourceModuleHelpers");
 
 function parseUrl(urlString) {
   try {
@@ -97,6 +98,7 @@ function parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   }
 
   const listUrl = extractZohoListUrl(pageHtml, config?.careersUrl || config?.origin || "");
+  const nowEpoch = config?.__nowEpoch;
   const postings = [];
   const seenIds = new Set();
 
@@ -112,7 +114,9 @@ function parseZohoPostingsFromHtml(companyNameForPostings, config, pageHtml) {
     const state = cleanZohoText(job?.State);
     const country = cleanZohoText(job?.Country);
     const location = [city, state, country].filter(Boolean).join(", ") || null;
-    const postingDate = cleanZohoText(job?.Date_Opened);
+    // Date_Opened is the posted date, but Zoho also uses it for scheduled future
+    // openings; the guard drops values that resolve past now + 24h.
+    const postingDate = guardPostingDateAgainstFuture(cleanZohoText(job?.Date_Opened) || null, nowEpoch);
     const remoteJob = isZohoRemoteJob(job);
 
     postings.push({

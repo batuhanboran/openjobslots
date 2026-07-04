@@ -2,6 +2,7 @@
 
 const { decodeHtmlEntities } = require("../../parsers/shared/html");
 const { normalizeCountryFromLocation } = require("../../posting");
+const { guardPostingDateAgainstFuture, isFuturePostingDate } = require("../sourceModuleHelpers");
 
 function cleanTaleoText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
@@ -72,12 +73,20 @@ function isLikelyTaleoLocationValue(value) {
   return false;
 }
 
-function pickTaleoDate(columns) {
+function pickTaleoDate(columns, nowEpoch) {
+  // Taleo columns can carry both an unposting/close date (future) and the real
+  // posted date. Prefer the first date-like value that does NOT resolve to a
+  // future epoch, so a trailing "posted" date is chosen over a leading
+  // "unposting" date. Relative values ("Posted today") never resolve future.
+  let firstDate = null;
   for (const value of columns) {
     const text = String(value || "").trim();
-    if (isLikelyTaleoDateValue(text)) return text;
+    if (!isLikelyTaleoDateValue(text)) continue;
+    if (firstDate === null) firstDate = text;
+    if (!isFuturePostingDate(text, nowEpoch)) return text;
   }
-  return null;
+  // Every date-like column was future (deadline-only posting): guard nulls it.
+  return firstDate ? guardPostingDateAgainstFuture(firstDate, nowEpoch) : null;
 }
 
 function pickTaleoLocation(columns, title = "") {
@@ -134,6 +143,7 @@ function pickTaleoTitle(requisition, columns) {
 
 function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitions) {
   const items = Array.isArray(requisitions) ? requisitions : [];
+  const nowEpoch = config?.__nowEpoch;
   const postings = [];
 
   for (const requisition of items) {
@@ -144,7 +154,7 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
     const title = pickTaleoTitle(requisition, columns) || "Untitled Position";
     const location = pickTaleoLocation(columns, title);
     const remoteType = pickTaleoWorkMode(columns, title, location);
-    const postingDate = pickTaleoDate(columns);
+    const postingDate = pickTaleoDate(columns, nowEpoch);
     const contestNo = String(requisition?.contestNo || "").trim();
     const detailRef = contestNo || jobId;
     const jobUrl = detailRef
@@ -170,6 +180,7 @@ function extractTaleoPostingsFromRest(companyNameForPostings, config, requisitio
 function extractTaleoPostingsFromAjax(companyNameForPostings, config, ajaxText) {
   const source = String(ajaxText || "");
   if (!source.includes("!|!")) return [];
+  const nowEpoch = config?.__nowEpoch;
 
   const tokens = source.split("!|!");
   const applyPrefix = "Apply for this position (";
@@ -216,7 +227,9 @@ function extractTaleoPostingsFromAjax(companyNameForPostings, config, ajaxText) 
       job_posting_url: `${config.baseSectionUrl}/jobdetail.ftl?job=${encodeURIComponent(
         detailRef
       )}&lang=${encodeURIComponent(config.lang)}`,
-      posting_date: isLikelyTaleoDateValue(postedDate) ? postedDate : null,
+      posting_date: isLikelyTaleoDateValue(postedDate)
+        ? guardPostingDateAgainstFuture(postedDate, nowEpoch)
+        : null,
       remote_type: remoteType || null,
       location
     });

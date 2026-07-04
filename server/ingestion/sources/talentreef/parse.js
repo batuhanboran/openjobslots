@@ -1,6 +1,7 @@
 "use strict";
 
 const { extractSourceIdFromPostingUrl } = require("../../parsers/shared/sourceIds");
+const { guardPostingDateAgainstFuture } = require("../sourceModuleHelpers");
 
 function extractTalentreefAliasData(aliasResponse) {
   if (!Array.isArray(aliasResponse) || aliasResponse.length === 0) return { clientId: "", brand: "" };
@@ -101,6 +102,7 @@ function extractTalentreefRemoteType(source) {
 
 function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, config, responseJson) {
   const hits = Array.isArray(responseJson?.hits?.hits) ? responseJson.hits.hits : [];
+  const nowEpoch = config?.__nowEpoch;
   const postings = [];
   const seenUrls = new Set();
 
@@ -120,7 +122,12 @@ function parseTalentreefPostingsFromSearchResponse(companyNameForPostings, confi
     const state = String(source?.stateOrProvinceFull || source?.stateOrProvince || "").trim();
     const location = [city, state].filter(Boolean).join(", ");
     const department = String(source?.department?.name || source?.category || "").trim();
-    const postingDate = String(source?.createdDate || source?.startDate || source?.updatedDate || "").trim() || null;
+    // startDate is the employment START date (future), not when the job was
+    // posted; use createdDate/updatedDate and backstop with the future guard.
+    const postingDate = guardPostingDateAgainstFuture(
+      String(source?.createdDate || source?.updatedDate || "").trim() || null,
+      nowEpoch
+    );
     const remoteType = extractTalentreefRemoteType(source);
     const sourceJobId =
       String(source?.jobId || source?.id || hit?._id || "").trim() ||

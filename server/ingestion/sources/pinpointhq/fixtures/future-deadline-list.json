@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "id": 90001,
+      "title": "Deadline Only First Officer",
+      "url": "https://fixtureco.pinpointhq.com/postings/deadline-only-first-officer",
+      "deadline_at": "2030-07-24T23:59:59-05:00",
+      "location": {
+        "city": "Fort Lauderdale",
+        "province": "Florida",
+        "name": "United States"
+      },
+      "employment_type_text": "Full time",
+      "workplace_type_text": "Onsite"
+    },
+    {
+      "id": 90002,
+      "title": "Posted Revenue Analyst",
+      "url": "https://fixtureco.pinpointhq.com/postings/posted-revenue-analyst",
+      "posted_at": "2026-05-06T08:00:00+03:00",
+      "deadline_at": "2030-07-24T23:59:59-05:00",
+      "location": {
+        "city": "Remote",
+        "name": "United States"
+      },
+      "workplace_type_text": "Remote"
+    }
+  ]
+}

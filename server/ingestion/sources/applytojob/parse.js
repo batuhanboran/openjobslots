@@ -2,6 +2,7 @@
 
 const { decodeHtmlEntities, extractJsonLdObjectsFromHtml } = require("../../parsers/shared/html");
 const { normalizeCountryName } = require("../../posting");
+const { guardPostingDateAgainstFuture } = require("../sourceModuleHelpers");
 
 function cleanApplyToJobText(value) {
   return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
@@ -626,6 +627,7 @@ function enrichApplyToJobPostingFromDetail(posting, detailHtml, detailStatus) {
 
 function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtml) {
   const payload = pageHtml && typeof pageHtml === "object" && !Array.isArray(pageHtml) ? pageHtml : { html: pageHtml };
+  const nowEpoch = config?.__nowEpoch;
   const source = String(payload.html || payload.text || "");
   const listUrl = String(payload.__listUrl || config.list_url || config.applyUrl || config.baseOrigin || "").trim();
   const detailHtmlByUrl = payload.__detailHtmlByUrl || payload.detailHtmlByUrl || {};
@@ -885,7 +887,23 @@ function parseApplyToJobPostingsFromHtml(companyNameForPostings, config, pageHtm
 
   postings.push(...collectApplyToJobJsonLdPostings(companyNameForPostings, config, source, listUrl, seenUrls));
 
-  return postings;
+  // Single choke point for all emission paths (list/legacy/generic/json-ld):
+  // the list calendar icon and some JobPosting.validThrough dates are closing
+  // deadlines, not posted dates. Null any date that resolves past now + 24h and
+  // clear its evidence so we never store an invented posting date.
+  return postings.map((posting) => {
+    const guardedDate = guardPostingDateAgainstFuture(posting.posting_date, nowEpoch);
+    if (guardedDate === posting.posting_date) return posting;
+    return {
+      ...posting,
+      posting_date: guardedDate,
+      source_evidence: {
+        ...(posting.source_evidence || {}),
+        posting_date_source: guardedDate ? posting.source_evidence?.posting_date_source || "" : "",
+        posting_date_path: guardedDate ? posting.source_evidence?.posting_date_path || "" : ""
+      }
+    };
+  });
 }
 
 module.exports = {
