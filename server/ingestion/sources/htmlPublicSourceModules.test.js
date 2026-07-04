@@ -2580,12 +2580,105 @@ test("hrmdirect source module does not publish list state abbreviation as city",
   assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
   assert.equal(normalized.location_text, fixture.expected.location_text);
   assert.equal(normalized.city || "", fixture.expected.city);
+  assert.equal(normalized.region, fixture.expected.region);
   assert.equal(normalized.country, fixture.expected.country);
   assert.equal(normalized.remote_type, fixture.expected.remote_type);
   assert.equal(normalized.source_evidence.location_source, fixture.expected.location_source);
   assert.equal(normalized.source_evidence.location_path, fixture.expected.location_path);
   assert.equal(normalized.source_evidence.location_rule_name, fixture.expected.location_rule_name);
   assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module parses onclick-only table rows with city and state cells", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "onclick-row-list.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].job_posting_url, fixture.expected.job_posting_url);
+  const normalized = source.normalize(parsed[0], fixture.company);
+
+  assert.equal(normalized.source_job_id, fixture.expected.source_job_id);
+  assert.equal(normalized.position_name, fixture.expected.position_name);
+  assert.equal(normalized.location_text, fixture.expected.location_text);
+  assert.equal(normalized.city, fixture.expected.city);
+  assert.equal(normalized.region, fixture.expected.region);
+  assert.equal(normalized.country, fixture.expected.country);
+  assert.equal(normalized.department, fixture.expected.department);
+  assert.equal(normalized.source_evidence.location_path, fixture.expected.location_path);
+  assert.equal(normalized.source_evidence.canonical_url_path, fixture.expected.canonical_url_path);
+  assert.equal(normalized.source_evidence.title_path, fixture.expected.title_path);
+  assert.deepEqual(normalized.source_failure_reasons || [], []);
+  assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
+});
+
+test("hrmdirect source module keeps blank multi-location sibling rows quarantined without invented geo", async () => {
+  const source = getSourceModule("hrmdirect");
+  const sourceDir = path.join(__dirname, "hrmdirect");
+  const fixture = readJson(path.join(sourceDir, "fixtures", "live-multi-location-list.json"));
+
+  const raw = await source.fetchList(fixture.company, {
+    fetcher: async (url) => {
+      if (url === fixture.search_list_url) return { html: fixture.list_html, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const parsed = source.parse(raw, fixture.company);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, fixture.company));
+  const byId = Object.fromEntries(normalized.map((posting) => [posting.source_job_id, posting]));
+
+  const located = byId[fixture.expected.located.source_job_id];
+  assert.equal(located.location_text, fixture.expected.located.location_text);
+  assert.equal(located.city, fixture.expected.located.city);
+  assert.equal(located.region, fixture.expected.located.region);
+  assert.equal(located.country, fixture.expected.located.country);
+  assert.equal(located.source_evidence.location_path, fixture.expected.located.location_path);
+  assert.equal(evaluatePublicPosting(located, { parserVersion: source.parserVersion }).status, "accepted");
+
+  const blank = byId[fixture.expected.blank.source_job_id];
+  assert.equal(blank.location_text || "", "");
+  assert.equal(blank.city || "", "");
+  assert.equal(blank.region || "", "");
+  assert.equal(blank.country || "", "");
+  assert.ok((blank.source_failure_reasons || []).includes(fixture.expected.blank.reason));
+  assert.equal(evaluatePublicPosting(blank, { parserVersion: source.parserVersion }).status, "quarantined");
+});
+
+test("hrmdirect source module falls back to the sibling openings.php route on a 404 list route", async () => {
+  const source = getSourceModule("hrmdirect");
+  const company = {
+    company_name: "Fixture HRMDirect Alternate Route",
+    ATS_name: "hrmdirect",
+    url_string: "https://alternateroute.hrmdirect.com/employment/job-openings.php"
+  };
+  const canonicalUrl = "https://alternateroute.hrmdirect.com/employment/job-openings.php?search=true";
+  const alternateUrl = "https://alternateroute.hrmdirect.com/employment/openings.php?search=true";
+  const listHtml = "<table><tr class=\"reqitem\"><td class=\"posTitle\"><a href=\"job-opening.php?req=HRM8801&req_loc=77\">Registered Nurse</a></td><td class=\"cities\">Boston</td><td class=\"state\">MA</td></tr></table>";
+
+  const raw = await source.fetchList(company, {
+    fetcher: async (url) => {
+      if (url === canonicalUrl) return { html: "", status: 404, url };
+      if (url === alternateUrl) return { html: listHtml, status: 200, url };
+      return { html: "", status: 404, url };
+    }
+  });
+  const parsed = source.parse(raw, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].source_evidence.list_url, alternateUrl);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "HRM8801");
+  assert.equal(normalized.location_text, "Boston, MA");
+  assert.equal(normalized.region, "MA");
+  assert.equal(normalized.country, "United States");
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 

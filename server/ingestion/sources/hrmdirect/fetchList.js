@@ -107,6 +107,21 @@ function hrmDirectRssUrl(urlValue) {
   return parsed.toString();
 }
 
+function alternateHrmDirectListUrl(urlValue) {
+  const parsed = asUrl(urlValue);
+  if (!parsed) return "";
+  const host = String(parsed.hostname || "").toLowerCase();
+  if (!host.endsWith(".hrmdirect.com")) return "";
+  if (/\/employment\/job-openings\.php$/i.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/job-openings\.php$/i, "openings.php");
+  } else if (/\/employment\/openings\.php$/i.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/openings\.php$/i, "job-openings.php");
+  } else {
+    return "";
+  }
+  return parsed.toString();
+}
+
 function hrmDirectPostingNeedsDetail(posting = {}) {
   const location = clean(posting.location || posting.location_text);
   const remoteType = clean(posting.remote_type).toLowerCase();
@@ -143,26 +158,53 @@ function createFetchList(discover) {
       });
     }
 
-    const list = await fetchText(listUrl, {
+    const listFetchOptions = {
       ...options,
       target: discovered,
       sourceLabel: "HRMDirect"
-    });
+    };
+    let effectiveListUrl = listUrl;
+    let list = null;
+    let listError = null;
+    try {
+      list = await fetchText(listUrl, listFetchOptions);
+    } catch (error) {
+      listError = error;
+    }
+    // Some tenants only serve one of the two public list routes; on a 404
+    // retry the sibling route (job-openings.php <-> openings.php) before failing.
+    if (Number(listError?.status || 0) === 404 || Number(list?.status || 0) === 404) {
+      const alternateUrl = alternateHrmDirectListUrl(listUrl);
+      if (alternateUrl) {
+        try {
+          const alternate = await fetchText(alternateUrl, listFetchOptions);
+          if (Number(alternate.status) >= 200 && Number(alternate.status) < 300) {
+            list = alternate;
+            effectiveListUrl = alternateUrl;
+            listError = null;
+          }
+        } catch {
+          // keep the original route failure
+        }
+      }
+    }
+    if (listError) throw listError;
+
     const config = {
       ...(discovered.config || {}),
-      baseOrigin: asUrl(list.finalUrl || listUrl)?.origin || discovered.config?.baseOrigin || "",
-      list_url: list.finalUrl || listUrl,
-      jobsUrl: list.finalUrl || listUrl
+      baseOrigin: asUrl(list.finalUrl || effectiveListUrl)?.origin || discovered.config?.baseOrigin || "",
+      list_url: list.finalUrl || effectiveListUrl,
+      jobsUrl: list.finalUrl || effectiveListUrl
     };
-    const companyName = normalizeCompanyName(context, config.subdomainLower || hostSlug(listUrl) || "HRMDirect");
+    const companyName = normalizeCompanyName(context, config.subdomainLower || hostSlug(effectiveListUrl) || "HRMDirect");
     const parsed = parseHrmDirectPostingsFromHtml(companyName, config, {
       html: list.text,
-      __listUrl: list.finalUrl || listUrl
+      __listUrl: list.finalUrl || effectiveListUrl
     });
 
     if (parsed.length === 0) {
       throw makeSourceFetchError("portal_search_empty", "HRMDirect public job-openings table returned no parseable postings", {
-        url: listUrl
+        url: effectiveListUrl
       });
     }
 
@@ -180,7 +222,7 @@ function createFetchList(discover) {
     const detailHtmlByUrl = {};
     const detailStatusByUrl = {};
     const detailFailureByUrl = {};
-    const rssUrl = hrmDirectRssUrl(list.finalUrl || listUrl);
+    const rssUrl = hrmDirectRssUrl(list.finalUrl || effectiveListUrl);
     let rssXml = "";
     let rssStatus = 0;
     let rssFailure = "";
@@ -289,7 +331,7 @@ function createFetchList(discover) {
 
     return {
       html: list.text,
-      __listUrl: list.finalUrl || listUrl,
+      __listUrl: list.finalUrl || effectiveListUrl,
       __rssUrl: rssUrl,
       __rssXml: rssXml,
       __rssStatus: rssStatus,

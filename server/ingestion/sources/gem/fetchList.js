@@ -75,6 +75,68 @@ function assertGemHost(targetUrl, fallbackUrl) {
   );
 }
 
+function gemBoardResolved(payload) {
+  const items = Array.isArray(payload) ? payload : [];
+  return items.some((item) => {
+    const data = item && typeof item === "object" ? item.data : null;
+    if (!data || typeof data !== "object") return false;
+    if (data.jobBoardExternal) return true;
+    const external = data.oatsExternalJobPostings;
+    const postings = external && typeof external === "object" ? external.jobPostings : null;
+    return Array.isArray(postings) && postings.length > 0;
+  });
+}
+
+function rebuildGemBoardUrl(boardUrl, boardId) {
+  try {
+    const parsed = new URL(clean(boardUrl));
+    return `${parsed.protocol}//${parsed.host}/${encodeURIComponent(boardId)}`;
+  } catch {
+    return clean(boardUrl);
+  }
+}
+
+async function requestGemBoardPayload(config, boardId, discovered, options) {
+  const queryPayload = buildJobBoardPayload(boardId);
+  const target = {
+    ...discovered,
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(queryPayload)
+  };
+  const rawPayload = options.fetcher
+    ? await options.fetcher(config.apiUrl, target)
+    : await safeFetch(config.apiUrl, {
+        ...target,
+        headers: {
+          ...target.headers,
+          ...(options.headers || {})
+        }
+      });
+
+  const status = responseStatus(rawPayload);
+  if (status < 200 || status >= 300) {
+    throw buildSourceError(
+      "fetch_failed",
+      `Gem API request failed (${status})`,
+      { status, url: config.apiUrl }
+    );
+  }
+
+  assertGemHost(rawPayload?.__sourceFetchFinalUrl || rawPayload?.url || config.apiUrl);
+
+  const payload = await payloadToJson(rawPayload);
+  if (!Array.isArray(payload)) {
+    throw buildSourceError("invalid_payload", "Gem API response is not a JSON array", {
+      url: config.apiUrl
+    });
+  }
+  return payload;
+}
+
 function createFetchList(discover = createDiscover("source-gem-v1")) {
   return async function fetchGemSourceList(company = {}, options = {}) {
     const context = buildCompanyContext(company);
@@ -84,49 +146,38 @@ function createFetchList(discover = createDiscover("source-gem-v1")) {
       return { __sourceConfig: config || {} };
     }
 
-    const queryPayload = buildJobBoardPayload(config.boardId);
-    const target = {
-      ...discovered,
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(queryPayload)
-    };
-    const rawPayload = options.fetcher
-      ? await options.fetcher(config.apiUrl, target)
-      : await safeFetch(config.apiUrl, {
-          ...target,
-          headers: {
-            ...target.headers,
-            ...(options.headers || {})
-          }
-        });
-
-    const status = responseStatus(rawPayload);
-    if (status < 200 || status >= 300) {
+    // The Gem GraphQL boardId lookup is case-sensitive while stored board URLs
+    // may carry mixed case; a wrong-case boardId silently yields an empty board.
+    let boardId = config.boardId;
+    let payload = await requestGemBoardPayload(config, boardId, discovered, options);
+    if (!gemBoardResolved(payload) && config.boardIdLower && config.boardIdLower !== config.boardId) {
+      const loweredPayload = await requestGemBoardPayload(config, config.boardIdLower, discovered, options);
+      if (gemBoardResolved(loweredPayload)) {
+        payload = loweredPayload;
+        boardId = config.boardIdLower;
+      }
+    }
+    if (!gemBoardResolved(payload)) {
       throw buildSourceError(
-        "fetch_failed",
-        `Gem API request failed (${status})`,
-        { status, url: config.apiUrl }
+        "no_public_jobs_route",
+        `Gem public board not found for vanity path "${config.boardId}"`,
+        { url: config.boardUrl || config.apiUrl }
       );
     }
 
-    assertGemHost(rawPayload?.__sourceFetchFinalUrl || rawPayload?.url || config.apiUrl);
-
-    const payload = await payloadToJson(rawPayload);
-    if (!Array.isArray(payload)) {
-      throw buildSourceError("invalid_payload", "Gem API response is not a JSON array", {
-        url: config.apiUrl
-      });
-    }
-
+    const effectiveConfig = boardId === config.boardId
+      ? config
+      : {
+          ...config,
+          boardId,
+          boardIdLower: config.boardIdLower,
+          boardUrl: rebuildGemBoardUrl(config.boardUrl, boardId)
+        };
     const result = payload.slice();
-    result.__sourceConfig = config;
+    result.__sourceConfig = effectiveConfig;
     result.__sourceRequest = {
       apiUrl: config.apiUrl,
-      boardId: config.boardId,
+      boardId,
       boardIdLower: config.boardIdLower,
       rateLimitMs: GEM_RATE_LIMIT_WAIT_MS
     };

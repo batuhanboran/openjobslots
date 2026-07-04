@@ -1,0 +1,23 @@
+{
+  "company": {
+    "company_name": "Fixture HRMDirect OnClick Rows",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://onclickrows.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://onclickrows.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://onclickrows.hrmdirect.com/employment/rss.php?search=true",
+  "list_html": "<table><tr class=\"reqitem1 ReqRowClick ReqRowClick\" data-req-id=\"3746337\" data-custom-req-id=\"95\" onClick='window.location=\"job-opening.php?req=3746337&req_loc=1369955&#job \";'> <td class=\"leftBorder\">&nbsp;</td><td id='departments1' class=\"departments reqitem1 ReqRowClick\">A/V</td> <td id='posTitle1' class=\"posTitle reqitem1 ReqRowClick\">Summer Intern - Audio/Visual</td> <td id='cities1' class=\"cities reqitem1 ReqRowClick\">Alexandria</td> <td id='state1' class=\"state reqitem1 ReqRowClick\">VA</td> <td class=\"rightBorder\">&nbsp;</td></tr></table>",
+  "expected": {
+    "source_job_id": "3746337",
+    "position_name": "Summer Intern - Audio/Visual",
+    "job_posting_url": "https://onclickrows.hrmdirect.com/employment/job-opening.php?req=3746337&req_loc=1369955",
+    "location_text": "Alexandria, VA",
+    "city": "Alexandria",
+    "region": "VA",
+    "country": "United States",
+    "department": "A/V",
+    "location_path": "td.cities + td.state",
+    "canonical_url_path": "tr[onclick] window.location",
+    "title_path": "td.posTitle"
+  }
+}

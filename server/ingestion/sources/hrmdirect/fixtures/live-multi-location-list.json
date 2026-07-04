@@ -1,0 +1,25 @@
+{
+  "__comment": "Trimmed from a live alfredstreet.hrmdirect.com/employment/job-openings.php?search=true capture (2026-07). One req is listed twice with different req_loc values; the second row has empty cities/state cells and must not receive invented geo.",
+  "company": {
+    "company_name": "Fixture HRMDirect Live Multi Location",
+    "ATS_name": "hrmdirect",
+    "url_string": "https://livemultiloc.hrmdirect.com/employment/job-openings.php"
+  },
+  "search_list_url": "https://livemultiloc.hrmdirect.com/employment/job-openings.php?search=true",
+  "rss_url": "https://livemultiloc.hrmdirect.com/employment/rss.php?search=true",
+  "list_html": "<table><tr class=\"reqitem1 ReqRowClick ReqRowClick\" data-req-id=\"3708792\" data-custom-req-id=\"92\" onClick='window.location=\"job-opening.php?req=3708792&req_loc=1321471&#job \";'> <td class=\"leftBorder\">&nbsp;</td><td id='departments1' class=\"departments reqitem1 ReqRowClick\">A/V</td> <td id='posTitle1' class=\"posTitle reqitem1 ReqRowClick\"><a href=\"job-opening.php?req=3708792&req_loc=1321471&&amp;#job\">Audio Visual Manager- Worship </td> <td id='cities1' class=\"cities reqitem1 ReqRowClick\">Alexandria</td> <td id='state1' class=\"state reqitem1 ReqRowClick\">VA</td> <td class=\"rightBorder\">&nbsp;</td></tr><tr class=\"reqitem ReqRowClick ReqRowClick\" data-req-id=\"3708792\" data-custom-req-id=\"92\" onClick='window.location=\"job-opening.php?req=3708792&req_loc=1321472&#job \";'> <td class=\"leftBorder\">&nbsp;</td><td id='departments2' class=\"departments reqitem ReqRowClick\">A/V</td> <td id='posTitle2' class=\"posTitle reqitem ReqRowClick\"><a href=\"job-opening.php?req=3708792&req_loc=1321472&&amp;#job\">Audio Visual Manager- Worship </td> <td id='cities2' class=\"cities reqitem ReqRowClick\"></td> <td id='state2' class=\"state reqitem ReqRowClick\"></td> <td class=\"rightBorder\">&nbsp;</td></tr></table>",
+  "expected": {
+    "located": {
+      "source_job_id": "3708792:1321471",
+      "location_text": "Alexandria, VA",
+      "city": "Alexandria",
+      "region": "VA",
+      "country": "United States",
+      "location_path": "td.cities + td.state"
+    },
+    "blank": {
+      "source_job_id": "3708792:1321472",
+      "reason": "no_geo_no_remote"
+    }
+  }
+}

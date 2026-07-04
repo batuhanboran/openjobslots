@@ -11,6 +11,7 @@
     "source_job_id": "HRM9924",
     "location_text": "CO",
     "city": "",
+    "region": "CO",
     "country": "United States",
     "remote_type": "onsite",
     "location_source": "labeled_html",

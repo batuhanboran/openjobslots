@@ -1,6 +1,11 @@
 [
   {
     "data": {
+      "publicBrandingTheme": null
+    }
+  },
+  {
+    "data": {
       "oatsExternalJobPostings": {
         "jobPostings": [
           {
@@ -13,7 +18,8 @@
                 "name": "New York",
                 "city": "New York",
                 "isoCountry": "US",
-                "isRemote": false
+                "isRemote": false,
+                "__typename": "ExternalJobPostingLocation"
               }
             ],
             "job": {
@@ -21,11 +27,14 @@
               "department": {
                 "id": "dept-eng",
                 "name": "Engineering",
-                "extId": "eng"
+                "extId": "eng",
+                "__typename": "Department"
               },
               "locationType": "ONSITE",
-              "employmentType": "FULL_TIME"
-            }
+              "employmentType": "FULL_TIME",
+              "__typename": "Job"
+            },
+            "__typename": "ExternalJobPosting"
           },
           {
             "id": "6002",
@@ -37,7 +46,8 @@
                 "name": "Remote (US)",
                 "city": "San Francisco",
                 "isoCountry": "USA",
-                "isRemote": true
+                "isRemote": true,
+                "__typename": "ExternalJobPostingLocation"
               }
             ],
             "job": {
@@ -45,11 +55,14 @@
               "department": {
                 "id": "dept-sales",
                 "name": "Sales",
-                "extId": "sales"
+                "extId": "sales",
+                "__typename": "Department"
               },
               "locationType": "REMOTE",
-              "employmentType": "FULL_TIME"
-            }
+              "employmentType": "FULL_TIME",
+              "__typename": "Job"
+            },
+            "__typename": "ExternalJobPosting"
           },
           {
             "id": "6003",
@@ -61,14 +74,16 @@
                 "name": "Bari",
                 "city": "Bari",
                 "isoCountry": "ITA",
-                "isRemote": false
+                "isRemote": false,
+                "__typename": "ExternalJobPostingLocation"
               },
               {
                 "id": "loc-remote",
                 "name": "Remote",
                 "city": "Remote",
                 "isoCountry": "USA",
-                "isRemote": true
+                "isRemote": true,
+                "__typename": "ExternalJobPostingLocation"
               }
             ],
             "job": {
@@ -76,11 +91,14 @@
               "department": {
                 "id": "dept-training",
                 "name": "Training",
-                "extId": "training"
+                "extId": "training",
+                "__typename": "Department"
               },
               "locationType": "HYBRID",
-              "employmentType": "CONTRACT"
-            }
+              "employmentType": "CONTRACT",
+              "__typename": "Job"
+            },
+            "__typename": "ExternalJobPosting"
           },
           {
             "id": "6004",
@@ -92,7 +110,8 @@
                 "name": "Global",
                 "city": "Global",
                 "isoCountry": null,
-                "isRemote": true
+                "isRemote": true,
+                "__typename": "ExternalJobPostingLocation"
               }
             ],
             "job": {
@@ -100,13 +119,24 @@
               "department": {
                 "id": "dept-eng",
                 "name": "Engineering",
-                "extId": "eng"
+                "extId": "eng",
+                "__typename": "Department"
               },
               "locationType": "REMOTE",
-              "employmentType": "FULL_TIME"
-            }
+              "employmentType": "FULL_TIME",
+              "__typename": "Job"
+            },
+            "__typename": "ExternalJobPosting"
           }
-        ]
+        ],
+        "__typename": "ExternalJobPostingsResponse"
+      },
+      "jobBoardExternal": {
+        "id": "board-fixtureco",
+        "teamDisplayName": "Fixture Gem",
+        "descriptionHtml": "<p>Fixture Gem careers</p>",
+        "pageTitle": "Fixture Gem Careers",
+        "__typename": "JobBoardExternal"
       }
     }
   }

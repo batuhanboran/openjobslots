@@ -327,6 +327,94 @@ test("gem source module rejects empty or invalid JSON API payloads", async () =>
   );
 });
 
+test("gem source module retries with lowercase boardId when the vanity path case mismatches", async () => {
+  const source = getSourceModule("gem");
+  const company = {
+    company_name: "Fixture Gem Mixed Case",
+    ATS_name: "Gem",
+    url_string: "https://jobs.gem.com/FixtureCo"
+  };
+  const calls = [];
+  const unresolvedBatch = [
+    { data: { publicBrandingTheme: null } },
+    { data: { oatsExternalJobPostings: { jobPostings: [] }, jobBoardExternal: null } }
+  ];
+  const resolvedBatch = [
+    { data: { publicBrandingTheme: null } },
+    {
+      data: {
+        oatsExternalJobPostings: {
+          jobPostings: [
+            {
+              id: "7001",
+              extId: "fixture-7001",
+              title: "Case Sensitive Role",
+              locations: [{ id: "loc-ny", name: "New York", city: "New York", isoCountry: "US", isRemote: false }]
+            }
+          ]
+        },
+        jobBoardExternal: { id: "board-fixtureco", teamDisplayName: "Fixture Gem" }
+      }
+    }
+  ];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url, target) => {
+      const boardId = JSON.parse(target.body)[1].variables.boardId;
+      calls.push(boardId);
+      return boardId === "fixtureco" ? resolvedBatch : unresolvedBatch;
+    }
+  });
+
+  assert.deepEqual(calls, ["FixtureCo", "fixtureco"]);
+  assert.equal(payload.__sourceConfig.boardId, "fixtureco");
+  assert.equal(payload.__sourceConfig.boardUrl, "https://jobs.gem.com/fixtureco");
+  assert.equal(payload.__sourceRequest.boardId, "fixtureco");
+  const parsed = source.parse(payload, company);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].job_posting_url, "https://jobs.gem.com/fixtureco/fixture-7001");
+});
+
+test("gem source module raises no_public_jobs_route when the board vanity path does not resolve", async () => {
+  const source = getSourceModule("gem");
+  const company = readJson(path.join(__dirname, "gem", "fixtures", "company.json"));
+  const unresolvedBatch = [
+    { data: { publicBrandingTheme: null } },
+    { data: { oatsExternalJobPostings: { jobPostings: [] }, jobBoardExternal: null } }
+  ];
+
+  await assert.rejects(
+    () => source.fetchList(company, { fetcher: async () => unresolvedBatch }),
+    (error) => error.ingestionErrorType === "no_public_jobs_route" && /board not found/i.test(error.message)
+  );
+});
+
+test("gem source module keeps empty payloads for existing boards with zero postings", async () => {
+  const source = getSourceModule("gem");
+  const company = readJson(path.join(__dirname, "gem", "fixtures", "company.json"));
+  const calls = [];
+  const emptyExistingBoardBatch = [
+    { data: { publicBrandingTheme: null } },
+    {
+      data: {
+        oatsExternalJobPostings: { jobPostings: [] },
+        jobBoardExternal: { id: "board-fixtureco", teamDisplayName: "Fixture Gem" }
+      }
+    }
+  ];
+
+  const payload = await source.fetchList(company, {
+    fetcher: async () => {
+      calls.push("batch");
+      return emptyExistingBoardBatch;
+    }
+  });
+
+  assert.equal(calls.length, 1);
+  assert.ok(Array.isArray(payload), "gem fetchList payload should stay an array");
+  assert.deepEqual(source.parse(payload, company), []);
+});
+
 test("smartrecruiters source module fetches search API with source-local discovery and host guard", async () => {
   const source = getSourceModule("smartrecruiters");
   const company = readJson(path.join(__dirname, "smartrecruiters", "fixtures", "company.json"));
