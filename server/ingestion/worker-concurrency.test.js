@@ -16,6 +16,7 @@ const {
   recordSelectedTarget,
   recordSkippedTarget,
   recordTargetOutcome,
+  runPostgresIngestionOnce,
   sanitizeLogMessage,
   sanitizeUrlForLog,
   selectPostgresDueTargets,
@@ -23,6 +24,7 @@ const {
   withTransientWriteRetry,
   withWriteLock
 } = require("./worker");
+const { decideAdaptiveSourceSelection } = require("./adaptiveSourceSelection");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -159,29 +161,106 @@ test("retry backoff cools down after repeated company failures", () => {
 
 test("no-jobs failures use daily cooldown without being counted as success", () => {
   const base = 1_000_000;
-  const noJobsRetry = computeFailureRetryEpoch(base, 1, "no_jobs");
-  const normalRetry = computeFailureRetryEpoch(base, 1, "network");
+  const noJobsRetry = computeFailureRetryEpoch(base, 1, "no_jobs", { rng: () => 0 });
+  const normalRetry = computeFailureRetryEpoch(base, 1, "network", { rng: () => 0 });
 
   assert.ok(noJobsRetry >= base + 24 * 60 * 60);
-  assert.equal(normalRetry, computeRetryEpoch(base, 1));
+  assert.equal(normalRetry, computeRetryEpoch(base, 1, { rng: () => 0 }));
 });
 
 test("repeated no-jobs failures progressively back off before the long cooldown", () => {
   const base = 1_000_000;
-  const firstNoJobsRetry = computeFailureRetryEpoch(base, 1, "no_jobs");
-  const secondNoJobsRetry = computeFailureRetryEpoch(base, 2, "no_jobs");
-  const thirdNoJobsRetry = computeFailureRetryEpoch(base, 3, "no_jobs");
+  const firstNoJobsRetry = computeFailureRetryEpoch(base, 1, "no_jobs", { rng: () => 0 });
+  const secondNoJobsRetry = computeFailureRetryEpoch(base, 2, "no_jobs", { rng: () => 0 });
+  const thirdNoJobsRetry = computeFailureRetryEpoch(base, 3, "no_jobs", { rng: () => 0 });
 
   assert.equal(secondNoJobsRetry, base + 2 * (firstNoJobsRetry - base));
   assert.equal(thirdNoJobsRetry, base + 3 * (firstNoJobsRetry - base));
-  assert.ok(thirdNoJobsRetry < computeRetryEpoch(base, 8));
+  assert.ok(thirdNoJobsRetry < computeRetryEpoch(base, 8, { rng: () => 0 }));
 });
 
 test("repeated no-jobs failures enter the long failure cooldown", () => {
   const base = 1_000_000;
-  const repeatedNoJobsRetry = computeFailureRetryEpoch(base, 8, "no_jobs");
+  const repeatedNoJobsRetry = computeFailureRetryEpoch(base, 8, "no_jobs", { rng: () => 0 });
 
-  assert.equal(repeatedNoJobsRetry, computeRetryEpoch(base, 8));
+  assert.equal(repeatedNoJobsRetry, computeRetryEpoch(base, 8, { rng: () => 0 }));
+});
+
+test("retry cooldowns spread with bounded jitter to avoid a thundering herd", () => {
+  const base = 1_000_000;
+  const cooldown = computeRetryEpoch(base, 8, { rng: () => 0 }) - base;
+
+  const noJitter = computeRetryEpoch(base, 8, { rng: () => 0 });
+  const maxJitter = computeRetryEpoch(base, 8, { rng: () => 1 });
+  const midJitter = computeRetryEpoch(base, 8, { rng: () => 0.5 });
+
+  assert.equal(noJitter, base + cooldown);
+  assert.ok(noJitter >= base + cooldown && noJitter <= base + Math.floor(cooldown * 1.1));
+  assert.ok(maxJitter > noJitter, "non-zero rng must add jitter");
+  assert.ok(maxJitter <= base + Math.floor(cooldown * 1.1));
+  assert.ok(midJitter >= noJitter && midJitter <= maxJitter);
+});
+
+test("failure retry cooldowns also spread with bounded jitter", () => {
+  const base = 1_000_000;
+  const cooldown = computeFailureRetryEpoch(base, 2, "no_jobs", { rng: () => 0 }) - base;
+
+  const noJitter = computeFailureRetryEpoch(base, 2, "no_jobs", { rng: () => 0 });
+  const maxJitter = computeFailureRetryEpoch(base, 2, "no_jobs", { rng: () => 1 });
+
+  assert.ok(noJitter >= base + cooldown && noJitter <= base + Math.floor(cooldown * 1.1));
+  assert.ok(maxJitter > noJitter, "non-zero rng must add jitter");
+  assert.ok(maxJitter <= base + Math.floor(cooldown * 1.1));
+});
+
+test("adaptive selection keeps a due candidate selectable when its signal is missing", () => {
+  // Regression guard: a due candidate absent from adaptiveSignals must never be
+  // capped to 0 purely for lacking a signal entry (protected by dueCount || targetLimit).
+  const decision = decideAdaptiveSourceSelection("adpmyjobs", {
+    targetLimit: 125,
+    sourcePolicy: { mode: "normal" },
+    signal: { due_count: 0 }
+  });
+
+  assert.ok(decision.maxTargetsPerRun >= 1, "signal-miss due candidate must remain selectable");
+});
+
+test("empty target selection still runs retention and search-index maintenance", async () => {
+  const seen = { retentionRan: false, outboxRan: false };
+  const client = {
+    async query() {
+      return { rows: [], rowCount: 0 };
+    },
+    release() {}
+  };
+  const pool = {
+    async connect() {
+      seen.retentionRan = true;
+      return client;
+    },
+    async query(sql) {
+      const text = String(sql);
+      if (text.includes("search_index_outbox")) {
+        seen.outboxRan = true;
+        return { rows: [] };
+      }
+      if (text.includes("due_targets AS")) return { rows: [] };
+      if (text.includes("FROM company_sync_state")) return { rows: [] };
+      if (text.includes("sync_control") || text.includes("worker_control")) {
+        return { rows: [{ status: "requested" }] };
+      }
+      // Non-empty queue (due targets exist) but selection dropped them all.
+      if (text.toUpperCase().includes("COUNT(")) return { rows: [{ count: 7, due_count: 7 }] };
+      if (text.includes("INSERT INTO") && text.includes("run")) return { rows: [{ id: 999 }] };
+      return { rows: [] };
+    }
+  };
+
+  const result = await runPostgresIngestionOnce(pool, { automatic: true, targetLimit: 125 });
+
+  assert.equal(result.totalTargets, 0);
+  assert.equal(seen.retentionRan, true, "retention must run even when no targets were selected");
+  assert.equal(seen.outboxRan, true, "search-index outbox must run even when no targets were selected");
 });
 
 test("http status metrics are extracted and counted", () => {

@@ -486,9 +486,7 @@ async function runPostgresIngestionOnce(pool, options = {}) {
     await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 
     try {
-      if (targets.length > 0) {
-        await prunePostgresRetention(pool);
-      }
+      await prunePostgresRetention(pool);
       await processPostgresSearchIndexOutbox(pool);
       if (targets.length > 0) {
         await applyPostgresSourceQualityProtection(pool, {

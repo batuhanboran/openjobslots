@@ -170,28 +170,35 @@ function computeNextSyncEpoch(baseEpoch, ttlSeconds, targetKey) {
   return Number(baseEpoch || nowEpochSeconds()) + ttl + jitter;
 }
 
-function computeRetryEpoch(baseEpoch, consecutiveFailures) {
-  const failures = Math.max(1, Number(consecutiveFailures || 1));
-  if (failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
-    return Number(baseEpoch || nowEpochSeconds()) + FAILURE_COOLDOWN_SECONDS;
-  }
-  const backoffSeconds = Math.min(24 * 60 * 60, 60 * 60 * 2 ** Math.min(6, failures - 1));
-  return Number(baseEpoch || nowEpochSeconds()) + backoffSeconds;
+function applyRetryJitter(cooldownSeconds, rng) {
+  const draw = typeof rng === "function" ? Number(rng()) : Math.random();
+  const bounded = Number.isFinite(draw) ? Math.min(1, Math.max(0, draw)) : 0;
+  return Math.max(0, Math.floor(cooldownSeconds)) + Math.floor(Math.max(0, cooldownSeconds) * 0.1 * bounded);
 }
 
-function computeFailureRetryEpoch(baseEpoch, consecutiveFailures, failureReason = "") {
+function computeRetryEpoch(baseEpoch, consecutiveFailures, { rng = Math.random } = {}) {
+  const failures = Math.max(1, Number(consecutiveFailures || 1));
+  if (failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
+    return Number(baseEpoch || nowEpochSeconds()) + applyRetryJitter(FAILURE_COOLDOWN_SECONDS, rng);
+  }
+  const backoffSeconds = Math.min(24 * 60 * 60, 60 * 60 * 2 ** Math.min(6, failures - 1));
+  return Number(baseEpoch || nowEpochSeconds()) + applyRetryJitter(backoffSeconds, rng);
+}
+
+function computeFailureRetryEpoch(baseEpoch, consecutiveFailures, failureReason = "", { rng = Math.random } = {}) {
   const normalizedReason = normalizeFailureReason(failureReason, "");
   if (normalizedReason === "no_jobs") {
     const failures = Math.max(1, Number(consecutiveFailures || 1));
     if (failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_COOLDOWN) {
-      return computeRetryEpoch(baseEpoch, consecutiveFailures);
+      return computeRetryEpoch(baseEpoch, consecutiveFailures, { rng });
     }
-    return Number(baseEpoch || nowEpochSeconds()) + Math.min(
+    const cooldownSeconds = Math.min(
       FAILURE_COOLDOWN_SECONDS,
       NO_JOBS_COOLDOWN_SECONDS * failures
     );
+    return Number(baseEpoch || nowEpochSeconds()) + applyRetryJitter(cooldownSeconds, rng);
   }
-  return computeRetryEpoch(baseEpoch, consecutiveFailures);
+  return computeRetryEpoch(baseEpoch, consecutiveFailures, { rng });
 }
 
 function normalizeFailureReason(value, fallback = "network") {
