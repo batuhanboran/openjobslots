@@ -125,9 +125,9 @@ $env:OPENJOBSLOTS_AUTO_SYNC="0"
 
 Do not point local tests at:
 
-- production Postgres `DATABASE_URL`;
+- <PROD_HOST> Postgres `DATABASE_URL`;
 - production Meili `MEILI_HOST` and key;
-- `/app/data/jobs.db`;
+- `<app-dir>/data/jobs.db`;
 - the local repo `data/jobs.db` unless it is a disposable copy.
 
 Preferred local DB roots:
@@ -145,4 +145,4 @@ npm.cmd run search:parity
 npm.cmd run reindex:meili -- --check
 ```
 
-For live production checks, run them inside the deployed app container and record the commit hash first. Do not run write-mode backfills or full Meili replace reindexes from this baseline prompt.
+For live <PROD_HOST> checks, run them inside the deployed app container and record the commit hash first. Do not run write-mode backfills or full Meili replace reindexes from this baseline prompt.

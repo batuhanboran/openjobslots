@@ -16,19 +16,6 @@ const DEFAULT_MAX_RESPONSE_BYTES = Math.max(
 );
 const DEFAULT_MAX_REDIRECTS = 5;
 const BLOCKED_HOSTNAMES = new Set(["localhost", "localhost.localdomain"]);
-const PROXIES = [
-  "38.154.203.95:5863:REDACTED:REDACTED",
-  "198.105.121.200:6462:REDACTED:REDACTED",
-  "64.137.96.74:6641:REDACTED:REDACTED",
-  "209.127.138.10:5784:REDACTED:REDACTED",
-  "38.154.185.97:6370:REDACTED:REDACTED",
-  "84.247.60.125:6095:REDACTED:REDACTED",
-  "142.111.67.146:5611:REDACTED:REDACTED",
-  "191.96.254.138:6185:REDACTED:REDACTED",
-  "31.58.9.4:6077:REDACTED:REDACTED",
-  "104.239.107.47:5699:REDACTED:REDACTED"
-];
-
 function getActiveProxies() {
   const envProxies = process.env.OPENJOBSLOTS_PROXIES;
   if (envProxies && typeof envProxies === "string" && envProxies.trim()) {
@@ -37,7 +24,7 @@ function getActiveProxies() {
       .map((item) => item.trim())
       .filter(Boolean);
   }
-  return PROXIES;
+  return [];
 }
 
 const BROWSER_USER_AGENTS = [

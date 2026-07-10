@@ -6,7 +6,7 @@
 
 **Architecture:** Keep Postgres as source of truth and Meilisearch as derived public search. Improve parser/source quality first, then expand certified sources through inventory, canary, guarded apply, and parity checks. Treat Markdown evidence as a review artifact only; indexed fields must come from deterministic parsers.
 
-**Tech Stack:** Node.js, Express, Postgres, Meilisearch, source-runner ATS modules, Playwright, Docker Compose on production.
+**Tech Stack:** Node.js, Express, Postgres, Meilisearch, source-runner ATS modules, Playwright, Docker Compose on <PROD_HOST>.
 
 ---
 
@@ -138,10 +138,10 @@ Expected: `main` points to the same commit as the recovery branch and tag `v1.9.
 
 - [ ] **Step 1: Capture baseline before scheduler changes**
 
-Run on production:
+Run on <PROD_HOST>:
 
 ```bash
-cd /app
+cd <app-dir>
 npm run search:parity -- --json
 npm run audit:data-quality -- --json --by-source --by-parser --last-seen-days=30
 npm run audit:source-freshness -- --json --last-seen-days=30
@@ -228,7 +228,7 @@ npm.cmd run test:parsers
 npm.cmd run test:backend
 ```
 
-Run on production when code is deployed for read-only validation:
+Run on <PROD_HOST> when code is deployed for read-only validation:
 
 ```bash
 npm run ats:estimate-net-new -- --source=<source> --limit=250 --company-limit=250 --json
@@ -264,7 +264,7 @@ npm.cmd run test:parsers
 npm.cmd run test:backend
 ```
 
-Then run on production:
+Then run on <PROD_HOST>:
 
 ```bash
 npm run ats:inventory:scan -- --source=eightfold --company-limit=56 --json

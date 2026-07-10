@@ -4,50 +4,29 @@ Production source of truth is the private GitHub repository:
 
 `https://github.com/batuhanboran/openjobslots`
 
-The production host runs `/app` and deploys from `main` using a systemd timer. The timer checks GitHub every 15 minutes, rebuilds the Docker Compose stack only when `main` changes, and preserves runtime data in `.env`, `data/`, and `.deploy-backups/`.
+The production host runs the app from `<app-dir>` and deploys from the release branch. An auto-deploy watcher pulls the release branch and rebuilds the Docker Compose stack only when it changes, preserving runtime data in `.env`, `data/`, and `.deploy-backups/`.
 
-## production Services
+## Production Services
 
 - `openjobslots-app`
 - `openjobslots-worker`
 - `openjobslots-postgres`
 - `openjobslots-meilisearch`
-- `openjobslots-deploy.timer`
+- the auto-deploy watcher
 
 These four services are the intended v1 runtime. Do not add Redis, a second reverse proxy, or another database engine until measured query, queue, or cache pressure proves the need.
 
-## Deploy Key
+## Deploy Access
 
-The server uses `REDACTED` as a read-only GitHub deploy key. Add the public key to GitHub at:
-
-`Settings -> Deploy keys -> Add deploy key`
-
-Use read-only access. Write access is not needed.
-
-Recorded public key for this deployment identity:
-
-`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINaPPI85y7u/XcHIlczDKuCp6amyhbQyvE+w+4BqQxdr openjobslots-production-deploy`
+The production host pulls the release branch using a read-only GitHub deploy key scoped to this repository. Use read-only access; write access is not needed.
 
 ## Useful Commands
 
 ```bash
-systemctl status openjobslots-deploy.timer
-systemctl start openjobslots-deploy.service
-journalctl -u openjobslots-deploy.service -n 100 --no-pager
-tail -n 100 /var/log/openjobslots-deploy.log
-docker compose --project-directory /app ps
+docker compose --project-directory <app-dir> ps
 curl -fsS http://127.0.0.1:8081/health
 curl -fsS "http://127.0.0.1:8081/postings?search=Director%20United%20States&limit=5"
 curl -fsS "http://127.0.0.1:8081/postings?search=t%C3%BCrkiye&limit=5"
-```
-
-After changing the repo timer unit, apply it on production before expecting the new cadence to take effect:
-
-```bash
-install -m 0644 /app/deploy/systemd/openjobslots-deploy.timer /etc/systemd/system/openjobslots-deploy.timer
-systemctl daemon-reload
-systemctl restart openjobslots-deploy.timer
-systemctl list-timers openjobslots-deploy.timer --no-pager --all
 ```
 
 Search correctness checks are part of deployment verification. Service health alone does not prove that Postgres, Meilisearch, and hydration agree. See [Search Quality Runbook](./search-quality-runbook.md).
@@ -99,7 +78,7 @@ To disable the runtime change, set `OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS=0` fo
 
 ## Rollback
 
-Each successful deploy creates a git bundle in `/app/.deploy-backups/` before resetting to the new commit. Runtime databases and Docker volumes are not deleted by the deploy watcher.
+Each successful deploy creates a git bundle in `<app-dir>/.deploy-backups/` before resetting to the new commit. Runtime databases and Docker volumes are not deleted by the deploy watcher.
 
 ## v1.6.0 Deployment Note - May 8, 2026
 
@@ -107,7 +86,7 @@ Deployed version: `v1.6.0`.
 
 Pre-final SQLite backup:
 
-`/app/data/jobs.db.backup-v1.6.0-20260508-193325`
+`<app-dir>/data/jobs.db.backup-v1.6.0-20260508-193325`
 
 Validation run before deployment:
 
@@ -146,11 +125,11 @@ Deployed version: `v1.6.1`.
 
 Pre-deploy Postgres backup:
 
-`/app/backups/postgres-openjobslots-v1.6.1-predeploy-20260509-004527.dump`
+`<app-dir>/backups/postgres-openjobslots-v1.6.1-predeploy-20260509-004527.dump`
 
 SQLite fallback/import backup:
 
-`/app/backups/jobs.db-v1.6.1-predeploy-20260509-004527.sqlite`
+`<app-dir>/backups/jobs.db-v1.6.1-predeploy-20260509-004527.sqlite`
 
 Validation run before deployment:
 
@@ -163,11 +142,11 @@ Validation run before deployment:
 
 Production dry-run report paths for this release:
 
-- `/app/reports/data-quality-audit-v1.6.1.json`
-- `/app/reports/geo-remote-dry-run-v1.6.1.json`
-- `/app/reports/icims-detail-dry-run-v1.6.1.json`
-- `/app/reports/applitrack-detail-dry-run-v1.6.1.json`
-- `/app/reports/meili-reindex-check-v1.6.1.json`
+- `<app-dir>/reports/data-quality-audit-v1.6.1.json`
+- `<app-dir>/reports/geo-remote-dry-run-v1.6.1.json`
+- `<app-dir>/reports/icims-detail-dry-run-v1.6.1.json`
+- `<app-dir>/reports/applitrack-detail-dry-run-v1.6.1.json`
+- `<app-dir>/reports/meili-reindex-check-v1.6.1.json`
 
 Release scope:
 
@@ -186,10 +165,10 @@ Deployed version: `v1.6.2`.
 
 Production backups used during the guarded repair cycle:
 
-- `/app/backups/postgres-openjobslots-pre-safe-backfill-20260511T134757Z.dump`
-- `/app/backups/postgres-openjobslots-pre-icims-refetch-20260511T143123Z.dump`
-- `/app/backups/postgres-openjobslots-pre-applitrack-refetch-20260511T152424Z.dump`
-- `/app/backups/postgres-openjobslots-pre-ats-gap-repair-20260511T153524Z.dump`
+- `<app-dir>/backups/postgres-openjobslots-pre-safe-backfill-20260511T134757Z.dump`
+- `<app-dir>/backups/postgres-openjobslots-pre-icims-refetch-20260511T143123Z.dump`
+- `<app-dir>/backups/postgres-openjobslots-pre-applitrack-refetch-20260511T152424Z.dump`
+- `<app-dir>/backups/postgres-openjobslots-pre-ats-gap-repair-20260511T153524Z.dump`
 
 Production repair run ids:
 
@@ -200,11 +179,11 @@ Production repair run ids:
 
 Final report paths:
 
-- `/app/reports/data-quality-before-final-meili-reindex-20260511T183424Z.json`
-- `/app/reports/meili-check-before-final-reindex-20260511T183424Z.json`
-- `/app/reports/meili-replace-final-reindex-20260511T183424Z.json`
-- `/app/reports/meili-check-after-final-reindex-20260511T183424Z.json`
-- `/app/reports/data-quality-final-after-meili-reindex-20260511T183424Z.json`
+- `<app-dir>/reports/data-quality-before-final-meili-reindex-20260511T183424Z.json`
+- `<app-dir>/reports/meili-check-before-final-reindex-20260511T183424Z.json`
+- `<app-dir>/reports/meili-replace-final-reindex-20260511T183424Z.json`
+- `<app-dir>/reports/meili-check-after-final-reindex-20260511T183424Z.json`
+- `<app-dir>/reports/data-quality-final-after-meili-reindex-20260511T183424Z.json`
 
 Validation run before release metadata deployment:
 
@@ -256,18 +235,18 @@ Release scope:
 
 Backup:
 
-- `/app/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`
+- `<app-dir>/backups/postgres-openjobslots-pre-certified-rebuild-20260512-155252.dump`
 
 Final report paths:
 
-- `/app/reports/certified-rebuild-20260512-155252-final2-audit-data-quality-before-reindex.json`
-- `/app/reports/certified-rebuild-20260512-155252-final2-source-quality.json`
-- `/app/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`
-- `/app/reports/v180-final-20260512-175855-data-quality.json`
-- `/app/reports/v180-final-20260512-175855-ats-quality.json`
-- `/app/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_source-quality.json`
-- `/app/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_quarantine-summary.json`
-- `/app/reports/v180-postdeploy-20260512-181223-meili-check.json`
+- `<app-dir>/reports/certified-rebuild-20260512-155252-final2-audit-data-quality-before-reindex.json`
+- `<app-dir>/reports/certified-rebuild-20260512-155252-final2-source-quality.json`
+- `<app-dir>/reports/certified-rebuild-20260512-155252-final2-meili-replace-reindex.json`
+- `<app-dir>/reports/v180-final-20260512-175855-data-quality.json`
+- `<app-dir>/reports/v180-final-20260512-175855-ats-quality.json`
+- `<app-dir>/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_source-quality.json`
+- `<app-dir>/reports/v180-postdeploy-20260512-181223-endpoint-ingestion_quarantine-summary.json`
+- `<app-dir>/reports/v180-postdeploy-20260512-181223-meili-check.json`
 
 Final data/search state:
 
@@ -302,14 +281,14 @@ Release scope:
 
 Final report paths:
 
-- `/app/reports/final-data-quality-audit-20260512-105705.json`
-- `/app/reports/final-ats-quality-audit-20260512-105705.json`
-- `/app/reports/final-parser-stats-20260512-105705.json`
-- `/app/reports/final-quarantine-summary-20260512-105705.json`
-- `/app/reports/final-source-quality-20260512-105705.json`
-- `/app/reports/meili-check-before-v170-20260512-105758.json`
-- `/app/reports/meili-replace-v170-20260512-105758.json`
-- `/app/reports/meili-check-after-v170-20260512-105758.json`
+- `<app-dir>/reports/final-data-quality-audit-20260512-105705.json`
+- `<app-dir>/reports/final-ats-quality-audit-20260512-105705.json`
+- `<app-dir>/reports/final-parser-stats-20260512-105705.json`
+- `<app-dir>/reports/final-quarantine-summary-20260512-105705.json`
+- `<app-dir>/reports/final-source-quality-20260512-105705.json`
+- `<app-dir>/reports/meili-check-before-v170-20260512-105758.json`
+- `<app-dir>/reports/meili-replace-v170-20260512-105758.json`
+- `<app-dir>/reports/meili-check-after-v170-20260512-105758.json`
 
 Final data/search state:
 

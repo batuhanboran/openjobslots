@@ -2,7 +2,7 @@ const { createPostgresPool } = require("../server/backends/postgres");
 const { getPostgresPublicSearchReport } = require("../server/backends/postgresStore");
 const { formatReport } = require("./report-public-analytics");
 
-const DEFAULT_REPORT_TO = "maintainer@example.com";
+const DEFAULT_REPORT_TO = process.env.ANALYTICS_REPORT_TO || "";
 
 function parseBoolean(value, fallback = false) {
   const raw = String(value ?? "").trim().toLowerCase();

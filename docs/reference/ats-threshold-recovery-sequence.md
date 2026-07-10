@@ -6,7 +6,7 @@ This is the current execution order for the Workday, Manatal, Dayforce, Gem, ADP
 
 ## Current blockers
 
-- Production is still on `/app` SHA `72eac3f`; local source architecture and repair scripts are not live.
+- Production is still on `<app-dir>` SHA `72eac3f`; local source architecture and repair scripts are not live.
 - Search threshold is not clean: Postgres indexable rows `347123`, Meili documents `347117`, count delta `6`, missing Meili documents `6`, and remote facet drift remains (`onsite +57`, `remote +8`, `hybrid +1`, `unknown -60`).
 - The read-only repair plan at `docs/reference/meili-document-upsert-repair-plan-prod-readonly.json` is stale after the production Meili incident below; regenerate it after production is deployed to the current local script.
 - Source-state repair plan hash is `fe452eadb3a03192`; it is still approval-gated.

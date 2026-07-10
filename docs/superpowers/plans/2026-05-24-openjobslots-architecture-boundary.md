@@ -612,15 +612,15 @@ git push -u origin codex/openjobslots-architecture-boundary
 
 - [ ] **Step 3: Deploy only after explicit approval**
 
-Do not deploy without explicit approval. If approval is given, fast-forward production and rebuild app/worker using the deployment runbook.
+Do not deploy without explicit approval. If approval is given, fast-forward <PROD_HOST> and rebuild app/worker using the deployment runbook.
 
 - [ ] **Step 4: Verify production after approved deploy**
 
-Run on production:
+Run on <PROD_HOST>:
 
 ```bash
-git -C /app rev-parse HEAD
-docker compose --project-directory /app ps
+git -C <app-dir> rev-parse HEAD
+docker compose --project-directory <app-dir> ps
 curl -fsS http://127.0.0.1:8081/health
 docker exec openjobslots-app npm run search:reindex:check -- --json
 ```

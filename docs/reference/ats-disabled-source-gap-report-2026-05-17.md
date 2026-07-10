@@ -23,7 +23,7 @@ Source-level promotion remains stricter than row-level acceptance. The current s
 
 ## Four-Source Read-Only Estimate
 
-Command shape used on production:
+Command shape used on <PROD_HOST>:
 
 ```bash
 node scripts/ats-estimate-net-new.js --source=<source> --limit=50 --include-disabled --json --statement-timeout-ms=60000

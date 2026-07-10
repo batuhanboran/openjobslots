@@ -56,7 +56,7 @@ ATS Intelligence Overlay
 Run:
 
 ```powershell
-Start-Process "C:\Users\BaronPC\Documents\New project\OpenJobSlots\docs\demos\openjobslots-2.0\index.html"
+Start-Process "docs/demos/openjobslots-2.0/index.html"
 ```
 
 Expected: the browser opens a static OpenJobSlots 2.0 demo with switchable views and animated card/button states.

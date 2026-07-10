@@ -22,7 +22,7 @@ Do not send IPs, emails, phone numbers, full posting URLs, raw user agents, or a
 OPENJOBSLOTS_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 OPENJOBSLOTS_GSC_VERIFICATION_TOKEN=google-site-verification-token
 
-OPENJOBSLOTS_ANALYTICS_EMAIL_TO=maintainer@example.com
+OPENJOBSLOTS_ANALYTICS_EMAIL_TO=<maintainer-email>
 OPENJOBSLOTS_ANALYTICS_EMAIL_FROM=reports@openjobslots.com
 OPENJOBSLOTS_SMTP_HOST=smtp.example.com
 OPENJOBSLOTS_SMTP_PORT=465
@@ -34,7 +34,7 @@ OPENJOBSLOTS_CLOUDFLARE_ZONE_ID=bd00782a72f0341b99c4de04e7dd824b
 OPENJOBSLOTS_CLOUDFLARE_API_TOKEN=...
 ```
 
-`OPENJOBSLOTS_ANALYTICS_EMAIL_TO` defaults to `maintainer@example.com`.
+`OPENJOBSLOTS_ANALYTICS_EMAIL_TO` defaults to `<maintainer-email>`.
 The Cloudflare token needs read access for zone analytics. Cloudflare Email Routing is inbound forwarding, not SMTP.
 For API tokens, use zone `Analytics:Read` plus zone read access for `openjobslots.com`; the daily email does not require Cloudflare write permissions.
 

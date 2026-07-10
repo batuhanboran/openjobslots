@@ -75,3 +75,14 @@ reports/
 backups/
 *.dump
 *.sql.gz
+
+# Internal ops / build artifacts — never publish
+scratch/
+handoff.md
+*.aab
+*.apk
+*.tar.gz
+deploy.tar.gz
+.agents/
+audit_result.json
+/data/

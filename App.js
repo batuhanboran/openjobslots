@@ -3240,7 +3240,7 @@ Object.entries(PUBLIC_LANGUAGE_PACK_COMPLETION_COPY).forEach(([languageCode, cop
 });
 const PUBLIC_APP_VERSION = String(appMetadata?.expo?.version || packageMetadata?.version || "1.8.0");
 const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
-const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
+const PROJECT_REPO_URL = "https://github.com/batuhanboran/openjobslots";
 const PUBLIC_RELEASE_NOTES = [
   {
     version: "3.0.0",
@@ -7039,10 +7039,10 @@ export default function App() {
   );
   const handleOpenDeveloperCredit = useCallback(async () => {
     try {
-      if (!isSafeExternalHttpUrl(BATUHAN_WEBSITE_URL)) return;
-      const supported = await Linking.canOpenURL(BATUHAN_WEBSITE_URL);
+      if (!isSafeExternalHttpUrl(PROJECT_REPO_URL)) return;
+      const supported = await Linking.canOpenURL(PROJECT_REPO_URL);
       if (supported) {
-        await Linking.openURL(BATUHAN_WEBSITE_URL);
+        await Linking.openURL(PROJECT_REPO_URL);
       }
     } catch {
       // Non-critical attribution link; ignore platform/browser launch failures.
@@ -9867,15 +9867,15 @@ export default function App() {
           >
             {t("credit.deployed", "Deployed and developed by")}{" "}
             <Text
-              href={BATUHAN_WEBSITE_URL}
+              href={PROJECT_REPO_URL}
               hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }}
               onPress={handleOpenDeveloperCredit}
               style={[styles.searchCreditLink, isDarkPublicTheme ? styles.searchCreditLinkDark : null]}
               testID="search-credit-link"
               accessibilityRole="link"
-              accessibilityLabel="Batuhan Boran website"
+              accessibilityLabel="OpenJobSlots source code on GitHub"
             >
-              Batuhan Boran
+              batuhanboran/openjobslots
             </Text>
           </Text>
         ) : null}

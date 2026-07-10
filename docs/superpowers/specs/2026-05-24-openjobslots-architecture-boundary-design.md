@@ -2,7 +2,7 @@
 
 ## Status - May 24, 2026
 
-This design starts from the aligned production branch, not the older local `codex/ats-parser-modularization` checkout. The implementation worktree is based on `origin/main` at `197e8f93185e6582aea2766c6d6ffc5acb13747d`, matching the live `/app` deployment on production at the start of this thread.
+This design starts from the aligned production branch, not the older local `codex/ats-parser-modularization` checkout. The implementation worktree is based on `origin/main` at `197e8f93185e6582aea2766c6d6ffc5acb13747d`, matching the live `<app-dir>` deployment on <PROD_HOST> at the start of this thread.
 
 The GitHub repository `batuhanboran/openjobslots` is the source of truth. Third-party template repositories must not be treated as runtime dependencies, sync sources, or places to fetch code from. The public website remains public by design, so this boundary protects private source, deployment details, and server-side behavior rather than trying to hide public HTML, bundled client assets, or public API responses.
 
@@ -135,8 +135,8 @@ git diff --check
 Production verification, only after explicit deployment approval:
 
 ```bash
-git -C /app rev-parse HEAD
-docker compose --project-directory /app ps
+git -C <app-dir> rev-parse HEAD
+docker compose --project-directory <app-dir> ps
 curl -fsS http://127.0.0.1:8081/health
 docker exec openjobslots-app npm run search:reindex:check -- --json
 ```

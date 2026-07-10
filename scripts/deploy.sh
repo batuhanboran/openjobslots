@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR="${APP_DIR:-/app}"
+APP_DIR="${APP_DIR:-$(pwd)}"
 REMOTE="${REMOTE:-origin}"
 BRANCH="${BRANCH:-main}"
 LOCK_FILE="${LOCK_FILE:-/var/lock/openjobslots-deploy.lock}"
 LOG_FILE="${LOG_FILE:-/var/log/openjobslots-deploy.log}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8081/health}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:8081}"
-DEPLOY_KEY="${DEPLOY_KEY:-REDACTED}"
+DEPLOY_KEY="${DEPLOY_KEY:-}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
 FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-3}"
 ORIGIN_PORT="${OPENJOBSLOTS_ORIGIN_PORT:-8081}"

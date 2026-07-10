@@ -203,7 +203,7 @@ Every corpus test should assert:
 Run these only against OpenJobSlots services:
 
 ```bash
-docker compose --project-directory /app ps
+docker compose --project-directory <app-dir> ps
 docker stats --no-stream openjobslots-app openjobslots-worker openjobslots-postgres openjobslots-meilisearch
 curl -fsS http://127.0.0.1:8081/health
 curl -fsS http://127.0.0.1:8081/sync/status

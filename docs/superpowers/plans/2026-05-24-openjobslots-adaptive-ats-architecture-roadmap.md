@@ -14,7 +14,7 @@
 
 This roadmap was produced from a clean strategy worktree based on the current private repo mainline:
 
-- Worktree: `C:\Users\BaronPC\.config\superpowers\worktrees\OpenJobSlots\codex-openjobslots-adaptive-ats-architecture-roadmap`
+- Worktree: `<local-worktree>`
 - Branch: `codex/openjobslots-adaptive-ats-architecture-roadmap`
 - HEAD: `64a069db7232fb37325e3271396a39f75a1cccff`
 - `origin/main`: `64a069db7232fb37325e3271396a39f75a1cccff`
@@ -24,7 +24,7 @@ This roadmap was produced from a clean strategy worktree based on the current pr
 - Architecture audit warnings: known legacy bootstrap/alias debt remains in `server/index.js` for `legacy_dynamic_target_url`, `legacy_usajobs_endpoint_constant`, and `legacy_ats_alias_pattern`
 - No production write, deploy, source apply, source canary, cleanup job, backfill, worker budget change, or reindex was run.
 
-The old local checkout at `C:\Users\BaronPC\Documents\New project\OpenJobSlots` remains on dirty `codex/ats-parser-modularization` with `server/index.js` modified. This roadmap intentionally does not use that branch as its baseline.
+The old local checkout at `<local-checkout>` remains on dirty `codex/ats-parser-modularization` with `server/index.js` modified. This roadmap intentionally does not use that branch as its baseline.
 
 ## Current Architecture State
 
@@ -79,7 +79,7 @@ OpenJobSlots must continue to avoid third-party template dependencies:
 - Use upstream only as conceptual prior art for god-file risk.
 - Do not copy source code, endpoint implementations, parser behavior, or deployment assumptions.
 - Do not make upstream a runtime dependency, sync source, submodule, package dependency, or deploy source.
-- Keep production deployment tied to `batuhanboran/openjobslots` and production `/app`.
+- Keep production deployment tied to `batuhanboran/openjobslots` and the deploy host `<app-dir>`.
 
 ## Supported, Partial, And Unsupported Distinction
 

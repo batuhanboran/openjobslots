@@ -13,7 +13,7 @@ For routine Codex runs, start from only the current operating context needed for
 5. The relevant tests for the requested work.
 6. The relevant latest production report when the task depends on live state.
 
-For non-trivial OpenJobSlots work, also use the project-specific Obsidian vault at `C:\Users\BaronPC\Documents\OpenJobSlots Codex Memory`. Start with `README.md` and `Thread Start.md` after the three repo-local files above. Do not read or update the Povly vault for OpenJobSlots work; Povly is a separate project.
+For non-trivial OpenJobSlots work, you may also keep a project-specific memory vault of operating notes. Start with `README.md` and `Thread Start.md` after the three repo-local files above.
 
 Load `README.md` or `docs/reference/` only when the task needs architecture, deployment, runbook, ATS matrix, certification, quality, or search details. Do not use archived or obsolete docs as current production state.
 
@@ -22,7 +22,7 @@ Load `README.md` or `docs/reference/` only when the task needs architecture, dep
 - Public product name: `openjobslots`.
 - Public domain target: `openjobslots.com`.
 - Main repository: `https://github.com/batuhanboran/openjobslots`.
-- Production host: production / `public-services`, checkout `/app`.
+- Production host: the deploy host, checkout `<app-dir>`.
 - Expected production services: `openjobslots-app`, `openjobslots-worker`, `openjobslots-postgres`, `openjobslots-meilisearch`.
 - Current production architecture: Node API/static web app, separate ingestion worker, Postgres source-of-truth DB, Meilisearch public search index.
 - SQLite remains useful for local fallback, migration/import paths, and isolated tests. Do not treat it as the intended production source of truth unless `docs/PROJECT_STATE.md` says the backend changed.
@@ -54,10 +54,10 @@ Current production state lives in `handoff.md`, `docs/PROJECT_STATE.md`, and the
 - Use the existing branch unless the user asks for a hardening branch or the task instructions name one.
 - Do not depend on GitHub CLI. Normal `git` commands are enough unless a GitHub-specific task requires the connector.
 - After a successful push intended for production, verify production alignment with the deployment runbook:
-  - `git -C /app rev-parse HEAD`
-  - `docker compose --project-directory /app ps`
+  - `git -C <app-dir> rev-parse HEAD`
+  - `docker compose --project-directory <app-dir> ps`
   - `curl -fsS http://127.0.0.1:8081/health`
-- The production auto-deploy timer is `openjobslots-deploy.timer`; the deploy log is `/var/log/openjobslots-deploy.log`.
+- The deploy host runs an auto-deploy watcher that rebuilds the stack when the release branch changes.
 
 ## Data Safety
 
@@ -122,7 +122,7 @@ See `docs/PROJECT_STATE.md` for the current version, deployment state, and next 
 
 ## Technical Gotchas & Workarounds
 
-- **Docker multiplexing headers:** stdout from `proxmox-docker/docker_exec` may contain 8-byte binary headers (`\x01\x00\x00\x00...`) or null bytes. Clean files by slicing from the first `{` and stripping null/control bytes before parsing as JSON.
+- **Docker multiplexing headers:** stdout from a Docker exec interface may contain 8-byte binary headers (`\x01\x00\x00\x00...`) or null bytes. Clean files by slicing from the first `{` and stripping null/control bytes before parsing as JSON.
 - **SPA Crawling (Workday etc.):** Static fetch on Workday URLs (`myworkdayjobs.com`) returns empty templates. Flag these as restricted by default, or query their internal endpoints.
 - **PostgreSQL Regex boundaries:** Postgres POSIX regular expressions use `\y` instead of `\b` for word boundaries.
 
@@ -135,7 +135,7 @@ See `docs/PROJECT_STATE.md` for the current version, deployment state, and next 
 - **Zoho & Freshteam Fallback Parsing:** When scraping Zoho Recruit, search for `<script>JSON.parse('...')</script>` blocks and decode them. For Freshteam, extract the `<div class="job-details-content content">` container when standard description selectors fail.
 - **LLM Verification Priority:** Treat LLM-based subagent evaluations as the primary source of truth. Do not override `ineligible` classifications with simple regex matches, as boilerplate text triggers false positives.
 - **Spam Company Blacklisting:** Filter out high-volume spam duplicate postings (e.g. from `fyst`/`FYST`) during post-processing by checking the company name and canonical URL.
-- **Remote Deployment via Docker Containers:** When running `docker compose` inside a helper container via `/var/run/docker.sock`, always pass `-p openjobslots` to prevent container name conflicts with the host stack. Bind-mount `/root/.ssh` (read-only) for secure git access within the container.
+- **Remote Deployment via Docker Containers:** When running `docker compose` inside a helper container via `/var/run/docker.sock`, always pass `-p openjobslots` to prevent container name conflicts with the host stack. Bind-mount the host SSH key directory (read-only) for secure git access within the container.
 
 ### 15. Ingestion Pipeline & Error Diagnostics
 - **Diagnostic Protocol:** When auditing or debugging the ingestion loop or target errors, always use the `ats-audit` skill.

@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
 
+process.env.ANALYTICS_REPORT_TO = "reports@example.com";
+
 const {
   buildAnalyticsEmailMessage,
   calculateZeroResultRate,
@@ -26,7 +28,7 @@ function testReadEmailConfigUsesSafeDefaultRecipient() {
     OPENJOBSLOTS_SMTP_PASS: "secret"
   });
 
-  assert.equal(config.to, "maintainer@example.com");
+  assert.equal(config.to, "reports@example.com");
   assert.equal(config.from, "reports@openjobslots.com");
   assert.equal(config.smtp.host, "smtp.example.com");
   assert.equal(config.smtp.port, 465);
@@ -47,11 +49,11 @@ function testBuildAnalyticsEmailMessage() {
     { query: "remote jobs", count: 4 }
   ];
   const message = buildAnalyticsEmailMessage(report, {
-    to: "maintainer@example.com",
+    to: "reports@example.com",
     from: "reports@openjobslots.com"
   });
 
-  assert.equal(message.to, "maintainer@example.com");
+  assert.equal(message.to, "reports@example.com");
   assert.equal(message.from, "reports@openjobslots.com");
   assert.match(message.subject, /OpenJobSlots analytics:daily 2026-05-22/);
   assert.match(message.text, /Demand snapshot/);
@@ -86,7 +88,7 @@ function testZeroResultRateUsesKnownResultBuckets() {
   };
 
   const message = buildAnalyticsEmailMessage(report, {
-    to: "maintainer@example.com",
+    to: "reports@example.com",
     from: "reports@openjobslots.com"
   });
 

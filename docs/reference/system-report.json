@@ -7,7 +7,7 @@
   "heavy_job_active": false,
   "long_running_postgres_queries": 0,
   "meili_postgres_delta": 0,
-  "backup_path": "/app/backups/pre-repair-backup.dump",
+  "backup_path": "<app-dir>/backups/pre-repair-backup.dump",
   "backup_parent_exists": true,
   "backup_file_exists": true,
   "backup_size_bytes": 3250873682

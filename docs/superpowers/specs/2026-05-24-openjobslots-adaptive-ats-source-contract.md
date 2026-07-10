@@ -149,7 +149,7 @@ Shared contract and final integration threads may edit shared files, but must no
 No public route, UI bundle, docs site page, release note, or public status response may expose:
 
 - private repo paths
-- production private details beyond approved coarse public status
+- <PROD_HOST> private details beyond approved coarse public status
 - `.env` values
 - tokens, credentials, keys, or connection strings
 - raw parser payloads
