@@ -3243,6 +3243,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const BATUHAN_WEBSITE_URL = "https://batuhanboran.com";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "3.0.0",
+    date: "July 10, 2026",
+    title: "Full ATS registry and aggregator sources",
+    summary:
+      "Registers and configures all 628 ATS platforms in the ingestion registry, adds RemoteOK, Himalayas, and Arbeitnow aggregator sources with a certified fetch and parser chain, enables Workable and Personio, repairs location and geo extraction across Workday, BrassRing, and AppliTrack, blocks future posting dates from entering the index, and lowers database and worker pressure under load."
+  },
+  {
     version: "2.3.0",
     date: "June 9, 2026",
     title: "Intelligent CV Search and Desktop Stats Dashboard",
@@ -3518,6 +3525,11 @@ const PUBLIC_RELEASE_NOTES = [
 ];
 const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
   tr: {
+    "3.0.0": {
+      title: "Tam ATS kataloğu ve toplayıcı kaynaklar",
+      summary:
+        "Alım kayıt defterine 628 ATS platformunun tamamını kaydedip yapılandırır, sertifikalı fetch ve parser zinciriyle RemoteOK, Himalayas ve Arbeitnow toplayıcı kaynaklarını ekler, Workable ve Personio'yu etkinleştirir, Workday, BrassRing ve AppliTrack genelinde konum ve coğrafi veri çıkarımını onarır, gelecekteki ilan tarihlerinin indekse girmesini engeller ve yük altında veritabanı ile worker baskısını düşürür."
+    },
     "2.3.0": {
       title: "Akıllı CV Arama ve Masaüstü İstatistik Paneli",
       summary:
@@ -3565,6 +3577,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   de: {
+    "3.0.0": {
+      title: "Vollständiges ATS-Register und Aggregator-Quellen",
+      summary:
+        "Registriert und konfiguriert alle 628 ATS-Plattformen im Ingestion-Register, ergänzt die Aggregator-Quellen RemoteOK, Himalayas und Arbeitnow mit zertifizierter Fetch- und Parser-Kette, aktiviert Workable und Personio, repariert Standort- und Geodaten-Extraktion über Workday, BrassRing und AppliTrack, verhindert zukünftige Veröffentlichungsdaten im Index und senkt Datenbank- und Worker-Druck unter Last."
+    },
     "2.3.0": {
       title: "Intelligente CV-Suche und Desktop-Statistik-Dashboard",
       summary:
@@ -3612,6 +3629,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   fr: {
+    "3.0.0": {
+      title: "Registre ATS complet et sources agrégatrices",
+      summary:
+        "Enregistre et configure les 628 plateformes ATS dans le registre d'ingestion, ajoute les sources agrégatrices RemoteOK, Himalayas et Arbeitnow avec une chaîne fetch/parser certifiée, active Workable et Personio, répare l'extraction des lieux et des géodonnées sur Workday, BrassRing et AppliTrack, empêche les dates de publication futures d'entrer dans l'index et réduit la pression sur la base de données et les workers sous charge."
+    },
     "2.3.0": {
       title: "Recherche intelligente de CV et tableau de bord des statistiques de bureau",
       summary:
@@ -3659,6 +3681,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   es: {
+    "3.0.0": {
+      title: "Registro ATS completo y fuentes agregadoras",
+      summary:
+        "Registra y configura las 628 plataformas ATS en el registro de ingesta, añade las fuentes agregadoras RemoteOK, Himalayas y Arbeitnow con una cadena certificada de fetch y parser, habilita Workable y Personio, repara la extracción de ubicaciones y geodatos en Workday, BrassRing y AppliTrack, impide que fechas de publicación futuras entren al índice y reduce la presión sobre la base de datos y los workers bajo carga."
+    },
     "2.3.0": {
       title: "Búsqueda inteligente de CV y panel de estadísticas de escritorio",
       summary:
@@ -3706,6 +3733,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-BR": {
+    "3.0.0": {
+      title: "Registro ATS completo e fontes agregadoras",
+      summary:
+        "Registra e configura todas as 628 plataformas ATS no registro de ingestão, adiciona as fontes agregadoras RemoteOK, Himalayas e Arbeitnow com cadeia certificada de fetch e parser, habilita Workable e Personio, corrige a extração de localização e geodados em Workday, BrassRing e AppliTrack, impede que datas de publicação futuras entrem no índice e reduz a pressão sobre o banco de dados e os workers sob carga."
+    },
     "2.3.0": {
       title: "Pesquisa inteligente de CV e painel de estatísticas de desktop",
       summary:
@@ -3753,6 +3785,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-PT": {
+    "3.0.0": {
+      title: "Registo ATS completo e fontes agregadoras",
+      summary:
+        "Regista e configura as 628 plataformas ATS no registo de ingestão, adiciona as fontes agregadoras RemoteOK, Himalayas e Arbeitnow com uma cadeia certificada de fetch e parser, ativa Workable e Personio, repara a extração de localizações e geodados em Workday, BrassRing e AppliTrack, impede que datas de publicação futuras entrem no índice e reduz a pressão sobre a base de dados e os workers sob carga."
+    },
     "2.3.0": {
       title: "Pesquisa inteligente de CV e dashboard de estatísticas",
       summary:
@@ -3800,6 +3837,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   it: {
+    "3.0.0": {
+      title: "Registro ATS completo e fonti aggregatrici",
+      summary:
+        "Registra e configura tutte le 628 piattaforme ATS nel registro di ingestione, aggiunge le fonti aggregatrici RemoteOK, Himalayas e Arbeitnow con una catena certificata di fetch e parser, abilita Workable e Personio, ripara l'estrazione di località e geodati su Workday, BrassRing e AppliTrack, impedisce alle date di pubblicazione future di entrare nell'indice e riduce la pressione su database e worker sotto carico."
+    },
     "2.3.0": {
       title: "Ricerca CV intelligente e dashboard statistiche",
       summary:
@@ -3847,6 +3889,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   nl: {
+    "3.0.0": {
+      title: "Volledig ATS-register en aggregatorbronnen",
+      summary:
+        "Registreert en configureert alle 628 ATS-platforms in het ingestieregister, voegt de aggregatorbronnen RemoteOK, Himalayas en Arbeitnow toe met een gecertificeerde fetch- en parserketen, schakelt Workable en Personio in, herstelt locatie- en geodata-extractie voor Workday, BrassRing en AppliTrack, voorkomt dat toekomstige publicatiedatums de index bereiken en verlaagt de database- en workerdruk onder belasting."
+    },
     "2.3.0": {
       title: "Intelligente CV-zoekopdracht en desktop-statistiekendashboard",
       summary:
@@ -3894,6 +3941,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   pl: {
+    "3.0.0": {
+      title: "Pełny rejestr ATS i źródła agregujące",
+      summary:
+        "Rejestruje i konfiguruje wszystkie 628 platform ATS w rejestrze pozyskiwania, dodaje źródła agregujące RemoteOK, Himalayas i Arbeitnow z certyfikowanym łańcuchem fetch i parsera, włącza Workable i Personio, naprawia ekstrakcję lokalizacji i geodanych w Workday, BrassRing i AppliTrack, blokuje przyszłe daty publikacji przed trafieniem do indeksu i zmniejsza obciążenie bazy danych oraz workerów."
+    },
     "2.3.0": {
       title: "Inteligentne wyszukiwanie CV i pulpit statystyk na pulpicie",
       summary:
@@ -3941,6 +3993,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   ja: {
+    "3.0.0": {
+      title: "完全なATSレジストリとアグリゲーターソース",
+      summary:
+        "インジェスションレジストリに628のATSプラットフォームすべてを登録・設定し、認証済みのフェッチ／パーサーチェーンを備えたRemoteOK、Himalayas、Arbeitnowのアグリゲーターソースを追加し、WorkableとPersonioを有効化し、Workday、BrassRing、AppliTrackの所在地・地理データ抽出を修復し、未来の掲載日がインデックスに入るのを防ぎ、負荷時のデータベースとworkerの圧力を低減します。"
+    },
     "2.3.0": {
       title: "インテリジェントCV検索とデスクトップ統計ダッシュボード",
       summary:
@@ -3958,6 +4015,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   ko: {
+    "3.0.0": {
+      title: "전체 ATS 레지스트리와 애그리게이터 소스",
+      summary:
+        "수집 레지스트리에 628개 ATS 플랫폼 전체를 등록·구성하고, 인증된 fetch·parser 체인을 갖춘 RemoteOK, Himalayas, Arbeitnow 애그리게이터 소스를 추가하며, Workable과 Personio를 활성화하고, Workday, BrassRing, AppliTrack의 위치·지리 데이터 추출을 복구하며, 미래 게시일이 인덱스에 들어가는 것을 차단하고, 부하 상황에서 데이터베이스와 worker 압력을 낮춥니다."
+    },
     "2.3.0": {
       title: "지능형 CV 검색 및 데스크톱 통계 대시보드",
       summary:
@@ -3975,6 +4037,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "zh-CN": {
+    "3.0.0": {
+      title: "完整的ATS注册表与聚合来源",
+      summary:
+        "在采集注册表中登记并配置全部628个ATS平台，新增具备认证抓取与解析链路的RemoteOK、Himalayas和Arbeitnow聚合来源，启用Workable和Personio，修复Workday、BrassRing和AppliTrack的地点与地理数据提取，阻止未来发布日期进入索引，并降低高负载下数据库与worker的压力。"
+    },
     "2.3.0": {
       title: "智能简历搜索与桌面端数据看板",
       summary:
@@ -3992,6 +4059,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   hi: {
+    "3.0.0": {
+      title: "संपूर्ण ATS रजिस्ट्री और एग्रीगेटर स्रोत",
+      summary:
+        "इंजेशन रजिस्ट्री में सभी 628 ATS प्लेटफ़ॉर्म पंजीकृत और कॉन्फ़िगर करता है, प्रमाणित fetch और parser श्रृंखला के साथ RemoteOK, Himalayas और Arbeitnow एग्रीगेटर स्रोत जोड़ता है, Workable और Personio सक्षम करता है, Workday, BrassRing और AppliTrack में स्थान और भू-डेटा निष्कर्षण सुधारता है, भविष्य की पोस्टिंग तिथियों को इंडेक्स में जाने से रोकता है, और लोड के दौरान डेटाबेस व worker दबाव घटाता है।"
+    },
     "2.3.0": {
       title: "इंटेलिजेंट सीवी खोज और डेस्कटॉप सांख्यिकी डैशबोर्ड",
       summary:
@@ -4009,6 +4081,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   ar: {
+    "3.0.0": {
+      title: "سجل ATS كامل ومصادر مجمِّعة",
+      summary:
+        "يسجّل ويهيّئ جميع منصات ATS البالغ عددها 628 في سجل الاستيعاب، ويضيف مصادر التجميع RemoteOK وHimalayas وArbeitnow بسلسلة جلب وتحليل معتمدة، ويفعّل Workable وPersonio، ويصلح استخراج المواقع والبيانات الجغرافية عبر Workday وBrassRing وAppliTrack، ويمنع تواريخ النشر المستقبلية من دخول الفهرس، ويخفّض الضغط على قاعدة البيانات والمعالجات تحت الحمل."
+    },
     "2.3.0": {
       title: "البحث الذكي في السير الذاتية ولوحة إحصائيات سطح المكتب",
       summary:
@@ -4026,6 +4103,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   id: {
+    "3.0.0": {
+      title: "Registri ATS lengkap dan sumber agregator",
+      summary:
+        "Mendaftarkan dan mengonfigurasi seluruh 628 platform ATS di registri ingesti, menambahkan sumber agregator RemoteOK, Himalayas, dan Arbeitnow dengan rantai fetch dan parser tersertifikasi, mengaktifkan Workable dan Personio, memperbaiki ekstraksi lokasi dan geodata di Workday, BrassRing, dan AppliTrack, mencegah tanggal tayang di masa depan masuk ke indeks, serta menurunkan tekanan database dan worker saat beban tinggi."
+    },
     "2.3.0": {
       title: "Pencarian CV Pintar dan Dasbor Statistik Desktop",
       summary:
@@ -4043,6 +4125,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   sv: {
+    "3.0.0": {
+      title: "Komplett ATS-register och aggregatorkällor",
+      summary:
+        "Registrerar och konfigurerar alla 628 ATS-plattformar i inhämtningsregistret, lägger till aggregatorkällorna RemoteOK, Himalayas och Arbeitnow med certifierad fetch- och parserkedja, aktiverar Workable och Personio, reparerar plats- och geodataextraktion för Workday, BrassRing och AppliTrack, hindrar framtida publiceringsdatum från att nå indexet och sänker databas- och workertryck under belastning."
+    },
     "2.3.0": {
       title: "Intelligent CV-sökning och statistikpanel för skrivbord",
       summary:
@@ -4060,6 +4147,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   da: {
+    "3.0.0": {
+      title: "Komplet ATS-register og aggregatorkilder",
+      summary:
+        "Registrerer og konfigurerer alle 628 ATS-platforme i indtagsregistret, tilføjer aggregatorkilderne RemoteOK, Himalayas og Arbeitnow med certificeret fetch- og parserkæde, aktiverer Workable og Personio, reparerer udtræk af lokationer og geodata på tværs af Workday, BrassRing og AppliTrack, forhindrer fremtidige opslagsdatoer i at komme ind i indekset og sænker database- og workerpres under belastning."
+    },
     "2.3.0": {
       title: "Intelligent CV-søgning og desktop-statistikpanel",
       summary:
@@ -4077,6 +4169,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   no: {
+    "3.0.0": {
+      title: "Komplett ATS-register og aggregatorkilder",
+      summary:
+        "Registrerer og konfigurerer alle 628 ATS-plattformer i innhentingsregisteret, legger til aggregatorkildene RemoteOK, Himalayas og Arbeitnow med sertifisert fetch- og parserkjede, aktiverer Workable og Personio, reparerer uttrekk av steder og geodata i Workday, BrassRing og AppliTrack, hindrer fremtidige publiseringsdatoer i å nå indeksen og senker database- og workertrykk under belastning."
+    },
     "2.3.0": {
       title: "Intelligent CV-søk og statistikkpanel for skrivebord",
       summary:
@@ -4094,6 +4191,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   fi: {
+    "3.0.0": {
+      title: "Täysi ATS-rekisteri ja aggregaattorilähteet",
+      summary:
+        "Rekisteröi ja määrittää kaikki 628 ATS-alustaa tuontirekisteriin, lisää RemoteOK-, Himalayas- ja Arbeitnow-aggregaattorilähteet sertifioidulla nouto- ja jäsennysketjulla, ottaa käyttöön Workablen ja Personion, korjaa sijainti- ja geodatan poiminnan Workdayssa, BrassRingissä ja AppliTrackissa, estää tulevia julkaisupäiviä pääsemästä indeksiin ja keventää tietokannan ja workerien kuormaa."
+    },
     "2.3.0": {
       title: "Älykäs CV-haku ja työpöydän tilastojen hallintapaneeli",
       summary:
