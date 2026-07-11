@@ -1,7 +1,6 @@
 // Site-wide constants for the OpenJobSlots (Brave-skinned) frontend.
 
 export const APP_VERSION = "3.0.0";
-export const VERSION_LABEL = `Genel v${APP_VERSION}`;
 
 export const REPO_URL = "https://github.com/batuhanboran/openjobslots";
 export const LINKEDIN_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";
@@ -15,44 +14,28 @@ export const WORDMARK_SEGMENTS = [
 
 export type ThemeMode = "light" | "dark" | "system";
 
-// Quick-settings: display languages (cosmetic preference store).
-export const LANGUAGE_OPTIONS = [
-  { value: "tr", label: "Türkçe" },
-  { value: "en", label: "English" },
-  { value: "de", label: "Deutsch" },
-  { value: "fr", label: "Français" },
-  { value: "es", label: "Español" },
-  { value: "pt", label: "Português" },
-  { value: "it", label: "Italiano" },
-  { value: "nl", label: "Nederlands" },
-  { value: "pl", label: "Polski" },
-  { value: "ja", label: "日本語" },
-  { value: "ko", label: "한국어" },
-  { value: "zh", label: "中文" },
-] as const;
-
 // Quick-settings: search region. Default is worldwide ("all") so the global
 // board is never silently narrowed; a filter is sent to the API only when the
 // user explicitly picks one. Backend expects continent names on `regions` and
 // FULL country names on `countries` (verified against /postings/filter-options).
 export interface RegionOption {
   value: string;
-  label: string;
+  labelKey: string; // i18n key (translated at render)
   regions?: string; // backend `regions` param (continent)
   countries?: string; // backend `countries` param (full country name)
 }
 
 export const REGION_OPTIONS: RegionOption[] = [
-  { value: "all", label: "Tüm bölgeler" },
-  { value: "na", label: "Kuzey Amerika", regions: "North America" },
-  { value: "emea", label: "EMEA (Avrupa · Orta Doğu · Afrika)", regions: "EMEA" },
-  { value: "apac", label: "APAC (Asya-Pasifik)", regions: "APAC" },
-  { value: "latam", label: "LATAM (Latin Amerika)", regions: "LATAM" },
-  { value: "us", label: "Amerika Birleşik Devletleri", countries: "United States" },
-  { value: "uk", label: "Birleşik Krallık", countries: "United Kingdom" },
-  { value: "de", label: "Almanya", countries: "Germany" },
-  { value: "ca", label: "Kanada", countries: "Canada" },
-  { value: "in", label: "Hindistan", countries: "India" },
+  { value: "all", labelKey: "region.all" },
+  { value: "na", labelKey: "region.na", regions: "North America" },
+  { value: "emea", labelKey: "region.emea", regions: "EMEA" },
+  { value: "apac", labelKey: "region.apac", regions: "APAC" },
+  { value: "latam", labelKey: "region.latam", regions: "LATAM" },
+  { value: "us", labelKey: "region.us", countries: "United States" },
+  { value: "uk", labelKey: "region.uk", countries: "United Kingdom" },
+  { value: "de", labelKey: "region.de", countries: "Germany" },
+  { value: "ca", labelKey: "region.ca", countries: "Canada" },
+  { value: "in", labelKey: "region.in", countries: "India" },
 ];
 
 /** Map a quick-settings region value to the backend filter params. */

@@ -8,6 +8,7 @@ import {
   type SearchResponse,
 } from "@/lib/api";
 import { JobCard } from "@/components/JobCard";
+import { useI18n } from "@/components/LanguageProvider";
 
 interface ResultsViewProps {
   query: string;
@@ -15,6 +16,7 @@ interface ResultsViewProps {
 }
 
 export function ResultsView({ query, region }: ResultsViewProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<PostingItem[]>([]);
   const [meta, setMeta] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,7 @@ export function ResultsView({ query, region }: ResultsViewProps) {
   if (!query) {
     return (
       <p className="py-16 text-center text-[14px]" style={{ color: "var(--ojs-muted-fg)" }}>
-        Aramaya başlamak için bir anahtar kelime girin.
+        {t("results.startHint")}
       </p>
     );
   }
@@ -91,10 +93,10 @@ export function ResultsView({ query, region }: ResultsViewProps) {
     return (
       <div className="py-16 text-center">
         <p className="text-[15px] font-semibold" style={{ color: "var(--ojs-page-fg)" }}>
-          Arama şu an kullanılamıyor
+          {t("results.errorTitle")}
         </p>
         <p className="mt-1 text-[13px]" style={{ color: "var(--ojs-muted-fg)" }}>
-          Sunucuya ulaşılamadı. Lütfen birazdan tekrar deneyin.
+          {t("results.errorSub")}
         </p>
       </div>
     );
@@ -103,7 +105,7 @@ export function ResultsView({ query, region }: ResultsViewProps) {
   if (items.length === 0) {
     return (
       <p className="py-16 text-center text-[14px]" style={{ color: "var(--ojs-muted-fg)" }}>
-        <span style={{ color: "var(--ojs-page-fg)" }}>“{query}”</span> için sonuç bulunamadı.
+        <span style={{ color: "var(--ojs-page-fg)" }}>“{query}”</span> {t("results.emptyPrefix")}
       </p>
     );
   }
@@ -114,7 +116,7 @@ export function ResultsView({ query, region }: ResultsViewProps) {
         <span className="font-semibold" style={{ color: "var(--ojs-page-fg)" }}>
           {meta ? formatCount(meta) : items.length}
         </span>{" "}
-        sonuç · “{query}”
+        {t("results.count")} · “{query}”
       </p>
 
       <div className="flex flex-col gap-3">
@@ -135,7 +137,7 @@ export function ResultsView({ query, region }: ResultsViewProps) {
               color: "var(--ojs-accent-pill-fg)",
             }}
           >
-            {loadingMore ? "Yükleniyor…" : "Daha fazla yükle"}
+            {loadingMore ? t("results.loading") : t("results.loadMore")}
           </button>
         </div>
       )}

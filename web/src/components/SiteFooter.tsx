@@ -1,5 +1,6 @@
 import { GithubIcon, LinkedinIcon } from "@/components/icons";
-import { REPO_URL, LINKEDIN_URL, VERSION_LABEL, APP_VERSION } from "@/lib/site";
+import { REPO_URL, LINKEDIN_URL, APP_VERSION } from "@/lib/site";
+import { useI18n } from "@/components/LanguageProvider";
 
 interface SiteFooterProps {
   onOpenReleaseNotes: () => void;
@@ -7,6 +8,7 @@ interface SiteFooterProps {
 }
 
 export function SiteFooter({ onOpenReleaseNotes, hasUnseenRelease }: SiteFooterProps) {
+  const { t } = useI18n();
   return (
     <footer
       className="relative z-[1] flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t px-4 py-2 text-center text-[12px] leading-[18px]"
@@ -33,7 +35,7 @@ export function SiteFooter({ onOpenReleaseNotes, hasUnseenRelease }: SiteFooterP
             color: "var(--ojs-accent-pill-fg)",
           }}
         >
-          Public Repo
+          {t("footer.publicRepo")}
         </span>
       </a>
 
@@ -51,9 +53,9 @@ export function SiteFooter({ onOpenReleaseNotes, hasUnseenRelease }: SiteFooterP
         type="button"
         onClick={onOpenReleaseNotes}
         className="ojs-footer-link inline-flex items-center gap-1.5"
-        aria-label={`Sürüm ${APP_VERSION} için sürüm notlarını aç`}
+        aria-label={`${t("release.version")} ${APP_VERSION} — ${t("release.title")}`}
       >
-        <span>{VERSION_LABEL}</span>
+        <span>{`${t("version.public")} v${APP_VERSION}`}</span>
         {hasUnseenRelease && (
           <span className="relative inline-flex h-2 w-2">
             <span
