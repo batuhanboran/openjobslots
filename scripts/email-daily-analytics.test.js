@@ -8,7 +8,8 @@ const {
   createSampleAnalyticsReport,
   fetchCloudflareTrafficSummary,
   parseArgs,
-  readEmailConfig
+  readEmailConfig,
+  readPublicFeedback
 } = require("./email-daily-analytics");
 
 function testParseArgsDefaultsToDryRunFalseAndIstanbul() {
@@ -72,6 +73,66 @@ function testBuildAnalyticsEmailMessage() {
   assert.match(message.html, /<h2>Demand snapshot<\/h2>/);
   assert.match(message.html, /Cloudflare edge/);
   assert.doesNotMatch(message.text, /secret/);
+}
+
+function testFeedbackSectionInEmailBodies() {
+  const report = createSampleAnalyticsReport({
+    date: "2026-05-22",
+    timezone: "Europe/Istanbul"
+  });
+  const message = buildAnalyticsEmailMessage(report, {
+    to: "reports@example.com",
+    from: "reports@openjobslots.com"
+  });
+
+  assert.match(message.text, /User feedback \(2\)/);
+  assert.match(message.text, /Helpful — "Great search, found a job in minutes" \(\/ara\)/);
+  assert.match(message.html, /<h2>User feedback \(2\)<\/h2>/);
+  assert.match(message.html, /Something&#39;s wrong|Something's wrong/);
+
+  report.public_feedback = { ok: true, count: 0, items: [] };
+  const empty = buildAnalyticsEmailMessage(report, {
+    to: "reports@example.com",
+    from: "reports@openjobslots.com"
+  });
+  assert.match(empty.text, /User feedback \(0\)\n- none today/);
+}
+
+function testReadPublicFeedbackFiltersEventAndWindow() {
+  const now = new Date("2026-05-22T12:00:00.000Z");
+  // Istanbul day 2026-05-22 = 2026-05-21T21:00Z .. now (today report).
+  const lines = [
+    JSON.stringify({ timestamp: "2026-05-22T09:00:00.000Z", level: "info", event: "public_feedback", message: "in window", context: { rating: "feedback.r1", path: "/ara" } }),
+    JSON.stringify({ timestamp: "2026-05-22T09:05:00.000Z", level: "info", event: "public_feedback", message: "legacy rating", context: { rating: "Yardımcı oldu" } }),
+    JSON.stringify({ timestamp: "2026-05-20T09:00:00.000Z", level: "info", event: "public_feedback", message: "too old", context: { rating: "feedback.r2" } }),
+    JSON.stringify({ timestamp: "2026-05-22T09:10:00.000Z", level: "info", event: "search_error", message: "not feedback", context: {} }),
+    "{not json"
+  ].join("\n");
+  const fakeFs = { readFileSync: () => lines };
+
+  const feedback = readPublicFeedback(
+    { date: "today", timezone: "Europe/Istanbul" },
+    { DB_PATH: "/data/jobs.db" },
+    fakeFs,
+    now
+  );
+
+  assert.equal(feedback.ok, true);
+  assert.equal(feedback.count, 2);
+  assert.equal(feedback.items[0].rating, "Helpful");
+  assert.equal(feedback.items[0].message, "in window");
+  assert.equal(feedback.items[0].path, "/ara");
+  assert.equal(feedback.items[1].rating, "Yardımcı oldu");
+  assert.equal(feedback.log_path.replace(/\\/g, "/"), "/data/logs/frontend-client.log");
+
+  const missing = readPublicFeedback(
+    { date: "today", timezone: "Europe/Istanbul" },
+    { DB_PATH: "/data/jobs.db" },
+    { readFileSync: () => { const e = new Error("gone"); e.code = "ENOENT"; throw e; } },
+    now
+  );
+  assert.equal(missing.ok, true);
+  assert.equal(missing.count, 0);
 }
 
 function testZeroResultRateUsesKnownResultBuckets() {
@@ -148,6 +209,8 @@ async function main() {
   testParseArgsDefaultsToDryRunFalseAndIstanbul();
   testReadEmailConfigUsesSafeDefaultRecipient();
   testBuildAnalyticsEmailMessage();
+  testFeedbackSectionInEmailBodies();
+  testReadPublicFeedbackFiltersEventAndWindow();
   testZeroResultRateUsesKnownResultBuckets();
   await testFetchCloudflareTrafficSummaryUsesReadOnlyGraphql();
   console.log("email-daily-analytics tests passed");

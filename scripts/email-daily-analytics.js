@@ -1,8 +1,20 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const { createPostgresPool } = require("../server/backends/postgres");
 const { getPostgresPublicSearchReport } = require("../server/backends/postgresStore");
 const { formatReport } = require("./report-public-analytics");
 
 const DEFAULT_REPORT_TO = process.env.ANALYTICS_REPORT_TO || "";
+
+// Ratings arrive either as i18n keys (new web frontend) or as already
+// translated labels (legacy App.js) — map the keys, pass labels through.
+const FEEDBACK_RATING_LABELS = {
+  "feedback.r1": "Helpful",
+  "feedback.r2": "Not relevant",
+  "feedback.r3": "Something's wrong",
+  "feedback.r4": "Not useful"
+};
+const FEEDBACK_MAX_ITEMS = 50;
 
 function parseBoolean(value, fallback = false) {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -179,6 +191,82 @@ function getReportDateUtcRange(date, timezone, now = new Date()) {
     since: start.toISOString(),
     until: rawDate === today ? 0 : end.toISOString()
   };
+}
+
+function resolveFrontendLogPath(env = process.env) {
+  // Mirrors server/index.js: BACKEND_DATA_ROOT = dirname(DB_PATH),
+  // frontend log lives at <data root>/logs/frontend-client.log.
+  const dbPath = String(env.DB_PATH || "").trim() || path.resolve(__dirname, "..", "jobs.db");
+  return path.join(path.dirname(dbPath), "logs", "frontend-client.log");
+}
+
+function resolveFeedbackWindowMs(options, now = new Date()) {
+  const range = getReportDateUtcRange(options.date, options.timezone, now);
+  const nowMs = (now instanceof Date ? now : new Date(now)).getTime();
+  const sinceMs = Number.isFinite(Number(range.since))
+    ? nowMs + Number(range.since) * 60 * 1000
+    : Date.parse(range.since);
+  const untilMs = range.until === 0 ? nowMs : Date.parse(range.until);
+  return { sinceMs, untilMs };
+}
+
+function readPublicFeedback(options, env = process.env, fsImpl = fs, now = new Date()) {
+  const logPath = resolveFrontendLogPath(env);
+  let raw = "";
+  try {
+    raw = fsImpl.readFileSync(logPath, "utf8");
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return { ok: true, count: 0, items: [], log_path: logPath };
+    }
+    return { ok: false, count: 0, items: [], unavailable_reason: String(error?.message || error) };
+  }
+
+  const { sinceMs, untilMs } = resolveFeedbackWindowMs(options, now);
+  const items = [];
+  let count = 0;
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry;
+    try {
+      entry = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (String(entry?.event || "") !== "public_feedback") continue;
+    const ts = Date.parse(entry?.timestamp || "");
+    if (!Number.isFinite(ts) || ts < sinceMs || ts > untilMs) continue;
+    count += 1;
+    const ratingRaw = String(entry?.context?.rating || "").trim();
+    items.push({
+      timestamp: entry.timestamp,
+      rating: FEEDBACK_RATING_LABELS[ratingRaw] || ratingRaw || "unrated",
+      message: String(entry?.message || "").trim(),
+      path: String(entry?.context?.path || "").trim()
+    });
+  }
+  // Newest last in the file — keep the most recent entries when capping.
+  return { ok: true, count, items: items.slice(-FEEDBACK_MAX_ITEMS), log_path: logPath };
+}
+
+function formatFeedbackLine(item) {
+  const time = String(item.timestamp || "").replace("T", " ").slice(0, 16);
+  const message = item.message ? ` — "${item.message}"` : "";
+  const where = item.path ? ` (${item.path})` : "";
+  return `- [${time}] ${item.rating}${message}${where}`;
+}
+
+function formatPublicFeedbackText(feedback = {}) {
+  if (feedback.ok === false) {
+    return `- unavailable (${feedback.unavailable_reason || "unknown error"})`;
+  }
+  if (!feedback.count) return "- none today";
+  const lines = (feedback.items || []).map(formatFeedbackLine);
+  if (feedback.count > (feedback.items || []).length) {
+    lines.push(`- (+${feedback.count - feedback.items.length} earlier entries not shown)`);
+  }
+  return lines.join("\n");
 }
 
 function toCloudflareTime(value, now = new Date()) {
@@ -393,6 +481,24 @@ function createSampleAnalyticsReport(options = {}) {
       { family: "Safari", count: 276 },
       { family: "Firefox", count: 93 }
     ],
+    public_feedback: {
+      ok: true,
+      count: 2,
+      items: [
+        {
+          timestamp: "2026-05-22T09:14:03.000Z",
+          rating: "Helpful",
+          message: "Great search, found a job in minutes",
+          path: "/ara"
+        },
+        {
+          timestamp: "2026-05-22T18:40:11.000Z",
+          rating: "Something's wrong",
+          message: "Dates look off on some German postings",
+          path: "/ara"
+        }
+      ]
+    },
     cloudflare_traffic: {
       ok: true,
       source: "cloudflare_graphql_http_requests_adaptive",
@@ -476,6 +582,9 @@ function buildAnalyticsEmailText(report) {
     `- Zero-result queries: ${formatQueryList(report.top_zero_result_queries)}`,
     `- Low-result queries: ${formatQueryList(report.top_low_result_queries)}`,
     "",
+    `User feedback (${formatCount(report.public_feedback?.count || 0)})`,
+    formatPublicFeedbackText(report.public_feedback || {}),
+    "",
     "Traffic snapshot",
     formatCloudflareTrafficText(report.cloudflare_traffic),
     `Backend referrers: ${formatQueryList(report.top_referrers || [], "host")}`,
@@ -502,6 +611,25 @@ function metricCard(label, value) {
 function listItems(items = [], key = "query") {
   if (!Array.isArray(items) || items.length === 0) return "<li>none</li>";
   return items.map((item) => `<li><strong>${escapeHtml(item[key])}</strong> <span style="color:#52616b">(${formatCount(item.count)})</span></li>`).join("");
+}
+
+function buildFeedbackHtml(feedback = {}) {
+  if (feedback.ok === false) {
+    return `<p style="color:#52616b">Unavailable: ${escapeHtml(feedback.unavailable_reason || "unknown error")}</p>`;
+  }
+  if (!feedback.count) return '<p style="color:#52616b">None today.</p>';
+  const rows = (feedback.items || []).map((item) => {
+    const time = String(item.timestamp || "").replace("T", " ").slice(0, 16);
+    const message = item.message
+      ? `<div style="margin-top:2px">&ldquo;${escapeHtml(item.message)}&rdquo;</div>`
+      : "";
+    const where = item.path ? ` <span style="color:#52616b">(${escapeHtml(item.path)})</span>` : "";
+    return `<li style="margin-bottom:8px"><strong>${escapeHtml(item.rating)}</strong> <span style="color:#52616b">[${escapeHtml(time)}]</span>${where}${message}</li>`;
+  });
+  if (feedback.count > (feedback.items || []).length) {
+    rows.push(`<li style="color:#52616b">(+${formatCount(feedback.count - feedback.items.length)} earlier entries not shown)</li>`);
+  }
+  return `<ul>${rows.join("")}</ul>`;
 }
 
 function buildAnalyticsEmailHtml(report) {
@@ -549,6 +677,8 @@ function buildAnalyticsEmailHtml(report) {
     '<h2>Search gaps</h2>',
     `<p><strong>Zero-result queries:</strong> ${escapeHtml(formatQueryList(report.top_zero_result_queries))}</p>`,
     `<p><strong>Low-result queries:</strong> ${escapeHtml(formatQueryList(report.top_low_result_queries))}</p>`,
+    `<h2>User feedback (${formatCount(report.public_feedback?.count || 0)})</h2>`,
+    buildFeedbackHtml(report.public_feedback || {}),
     '<h2>Traffic snapshot</h2>',
     `<p><strong>Cloudflare edge:</strong> ${escapeHtml(cloudflareSummary)}</p>`,
     `<p><strong>Top edge paths:</strong> ${escapeHtml(formatQueryList(traffic.top_paths || [], "path"))}</p>`,
@@ -599,6 +729,7 @@ async function loadReport(options) {
   try {
     const report = await getPostgresPublicSearchReport(pool, options);
     report.cloudflare_traffic = await fetchCloudflareTrafficSummary(report);
+    report.public_feedback = readPublicFeedback(options);
     return report;
   } finally {
     if (pool && typeof pool.end === "function") await pool.end();
@@ -640,6 +771,7 @@ module.exports = {
   parseArgs,
   readCloudflareConfig,
   readEmailConfig,
+  readPublicFeedback,
   sendAnalyticsEmailMessage,
   validateEmailConfig
 };
