@@ -31,6 +31,33 @@ export interface SearchParams {
   sort?: string;
   limit?: number;
   offset?: number;
+  /** Intent filters applied from search suggestions (legacy App.js parity). */
+  remote?: string; // remote | hybrid | non_remote
+  freshness_days?: number; // 3 | 7 | 30
+  ats?: string;
+}
+
+/** Filters portion of SearchParams, as parsed from /ara URL params. */
+export interface IntentFilters {
+  remote?: string;
+  freshness_days?: number;
+  ats?: string;
+}
+
+export interface SuggestionItem {
+  type: string; // title | company | location | intent | source | shortcut | …
+  value: string;
+  label: string;
+  count: number;
+  intent_type?: string;
+  filter?: IntentFilters;
+}
+
+export interface SuggestResponse {
+  ok?: boolean;
+  items: SuggestionItem[];
+  count: number;
+  error?: string;
 }
 
 export const PAGE_SIZE = 25;
@@ -51,9 +78,32 @@ export async function fetchPostings(
     if (f.regions) sp.set("regions", f.regions);
     if (f.countries) sp.set("countries", f.countries);
   }
+  // Intent filters (suggestion clicks) map 1:1 onto backend params.
+  if (params.remote) sp.set("remote", params.remote);
+  if (params.freshness_days) sp.set("freshness_days", String(params.freshness_days));
+  if (params.ats) sp.set("ats", params.ats);
   const res = await fetch(`/api/postings?${sp.toString()}`, { signal });
   if (!res.ok) throw new Error(`search_failed_${res.status}`);
   return (await res.json()) as SearchResponse;
+}
+
+/** Search-as-you-type suggestions via our /api/suggest proxy. */
+export async function fetchSuggestions(
+  q: string,
+  lang: string,
+  signal?: AbortSignal,
+): Promise<SuggestionItem[]> {
+  const sp = new URLSearchParams({ search: q, limit: "8", page_language: lang });
+  const res = await fetch(`/api/suggest?${sp.toString()}`, { signal });
+  if (!res.ok) return [];
+  const data = (await res.json()) as SuggestResponse;
+  // Drop plain "search" echo items (legacy parity) and server-side "intent"
+  // items: SearchBar derives intents client-side with localized labels, and
+  // the server's freshness regex false-positives on queries like "3d artist".
+  return (data.items ?? []).filter((it) => {
+    const type = (it.type || "").toLowerCase();
+    return type !== "search" && type !== "intent";
+  });
 }
 
 /** "1000+" when the backend capped the count, else the exact number. */

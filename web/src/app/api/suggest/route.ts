@@ -1,19 +1,9 @@
-// Server-side proxy to the OpenJobSlots backend search API.
-// Runs on the Node runtime; keeps the upstream origin out of the browser and
+// Server-side proxy to the OpenJobSlots backend search-suggestion API.
+// Mirrors /api/postings: keeps the upstream origin out of the browser and
 // avoids any cross-origin coupling regardless of where this app is deployed.
 
 const API_BASE = process.env.OJS_API_BASE || "https://openjobslots.com";
-const FORWARD_KEYS = [
-  "search",
-  "limit",
-  "offset",
-  "sort_by",
-  "countries",
-  "regions",
-  "freshness_days",
-  "remote",
-  "ats",
-] as const;
+const FORWARD_KEYS = ["search", "q", "limit", "page_country", "page_language"] as const;
 
 export async function GET(request: Request) {
   const inParams = new URL(request.url).searchParams;
@@ -24,9 +14,9 @@ export async function GET(request: Request) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const upstream = await fetch(`${API_BASE}/postings?${out.toString()}`, {
+    const upstream = await fetch(`${API_BASE}/search/suggest?${out.toString()}`, {
       signal: controller.signal,
       headers: { accept: "application/json" },
       cache: "no-store",
@@ -38,7 +28,7 @@ export async function GET(request: Request) {
     });
   } catch {
     return Response.json(
-      { error: "upstream_unavailable", items: [], count: 0 },
+      { ok: false, items: [], count: 0, error: "upstream_unavailable" },
       { status: 502 },
     );
   } finally {

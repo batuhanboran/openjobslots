@@ -7,8 +7,17 @@ import { SearchBar } from "@/components/SearchBar";
 import { ChevronDownIcon } from "@/components/icons";
 import { REGION_OPTIONS } from "@/lib/site";
 import { useI18n } from "@/components/LanguageProvider";
+import type { IntentFilters } from "@/lib/api";
 
-export function ResultsHeader({ query, region }: { query: string; region: string }) {
+export function ResultsHeader({
+  query,
+  region,
+  filters = {},
+}: {
+  query: string;
+  region: string;
+  filters?: IntentFilters;
+}) {
   const { t } = useI18n();
   const router = useRouter();
 
@@ -16,6 +25,9 @@ export function ResultsHeader({ query, region }: { query: string; region: string
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (value && value !== "all") params.set("region", value);
+    if (filters.remote) params.set("remote", filters.remote);
+    if (filters.freshness_days) params.set("freshness_days", String(filters.freshness_days));
+    if (filters.ats) params.set("ats", filters.ats);
     router.push(`/ara?${params.toString()}`);
   }
 
@@ -30,8 +42,10 @@ export function ResultsHeader({ query, region }: { query: string; region: string
       <Link href="/" className="shrink-0" aria-label={t("nav.home")}>
         <Wordmark size={22} />
       </Link>
-      <div className="flex w-full items-center gap-2 sm:max-w-[640px]">
-        <div className="min-w-0 flex-1">
+      {/* flex-wrap lets the region select drop below the bar on narrow
+          screens so the query input never gets squeezed unreadably. */}
+      <div className="flex w-full flex-wrap items-center gap-2 sm:min-w-0 sm:max-w-[640px] sm:flex-nowrap">
+        <div className="min-w-[280px] flex-1">
           <SearchBar initialQuery={query} region={region} />
         </div>
         <div className="relative inline-flex shrink-0 items-center">
