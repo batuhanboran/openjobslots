@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { ReleaseNotesModal } from "@/components/ReleaseNotesModal";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { BackgroundDecoration } from "@/components/BackgroundDecoration";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import { APP_VERSION, type ThemeMode } from "@/lib/site";
 
 function resolveTheme(mode: ThemeMode): "light" | "dark" {
@@ -26,7 +27,6 @@ function applyTheme(mode: ThemeMode) {
 
 export function HomeClient() {
   const [theme, setThemeState] = useState<ThemeMode>("dark");
-  const [language, setLanguageState] = useState("tr");
   const [region, setRegionState] = useState("all");
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -36,7 +36,6 @@ export function HomeClient() {
   useEffect(() => {
     const t = (localStorage.getItem("ojs-theme") as ThemeMode | null) ?? "dark";
     setThemeState(t);
-    setLanguageState(localStorage.getItem("ojs-language") ?? "tr");
     setRegionState(localStorage.getItem("ojs-region") ?? "all");
     setSeenVersion(localStorage.getItem("ojs-release-seen") ?? "");
     applyTheme(t);
@@ -57,11 +56,6 @@ export function HomeClient() {
     applyTheme(t);
   }, []);
 
-  const setLanguage = useCallback((v: string) => {
-    setLanguageState(v);
-    localStorage.setItem("ojs-language", v);
-  }, []);
-
   const setRegion = useCallback((v: string) => {
     setRegionState(v);
     localStorage.setItem("ojs-region", v);
@@ -74,31 +68,31 @@ export function HomeClient() {
   }, []);
 
   return (
-    <div className="relative flex min-h-screen flex-col">
-      <BackgroundDecoration />
+    <LanguageProvider>
+      <div className="relative flex min-h-screen flex-col">
+        <BackgroundDecoration />
 
-      <QuickSettings
-        theme={theme}
-        onThemeChange={setTheme}
-        language={language}
-        onLanguageChange={setLanguage}
-        region={region}
-        onRegionChange={setRegion}
-        onOpenFeedback={() => setFeedbackOpen(true)}
-      />
+        <QuickSettings
+          theme={theme}
+          onThemeChange={setTheme}
+          region={region}
+          onRegionChange={setRegion}
+          onOpenFeedback={() => setFeedbackOpen(true)}
+        />
 
-      <main className="relative z-[1] flex flex-1 flex-col items-center justify-center px-4 pb-24">
-        <Wordmark className="mb-8" size={46} />
-        <SearchBar region={region} />
-      </main>
+        <main className="relative z-[1] flex flex-1 flex-col items-center justify-center px-4 pb-24">
+          <Wordmark className="mb-8" size={46} />
+          <SearchBar region={region} />
+        </main>
 
-      <SiteFooter
-        onOpenReleaseNotes={openReleaseNotes}
-        hasUnseenRelease={seenVersion !== APP_VERSION}
-      />
+        <SiteFooter
+          onOpenReleaseNotes={openReleaseNotes}
+          hasUnseenRelease={seenVersion !== APP_VERSION}
+        />
 
-      <ReleaseNotesModal open={releaseOpen} onClose={() => setReleaseOpen(false)} />
-      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
-    </div>
+        <ReleaseNotesModal open={releaseOpen} onClose={() => setReleaseOpen(false)} />
+        <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      </div>
+    </LanguageProvider>
   );
 }

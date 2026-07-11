@@ -2,20 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { CloseIcon, ChatIcon } from "@/components/icons";
+import { useI18n } from "@/components/LanguageProvider";
 
 interface FeedbackModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const RATINGS = [
-  "Yardımcı oldu",
-  "Konuyla ilgili değil",
-  "Bir terslik var",
-  "Yararlı değil",
-];
+const RATING_KEYS = ["feedback.r1", "feedback.r2", "feedback.r3", "feedback.r4"];
 
 export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
+  const { t } = useI18n();
   const [rating, setRating] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
@@ -88,13 +85,13 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
               <ChatIcon className="h-5 w-5" />
             </span>
             <h2 className="text-[16px] font-semibold" style={{ color: "var(--ojs-page-fg)" }}>
-              OpenJobSlots&apos;u geliştirmemize yardımcı olun
+              {t("qs.feedbackDesc")}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Kapat"
+            aria-label={t("release.close")}
             className="shrink-0 rounded-full p-1 transition-colors hover:bg-[var(--ojs-iconbtn-hover)]"
             style={{ color: "var(--ojs-muted-fg)" }}
           >
@@ -105,10 +102,10 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
         {sent ? (
           <div className="py-8 text-center">
             <p className="text-[15px] font-semibold" style={{ color: "var(--ojs-page-fg)" }}>
-              Teşekkürler! 🎉
+              {t("feedback.thanks")}
             </p>
             <p className="mt-1 text-[13px]" style={{ color: "var(--ojs-muted-fg)" }}>
-              Geri bildiriminiz alındı.
+              {t("feedback.thanksSub")}
             </p>
             <button
               type="button"
@@ -116,7 +113,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
               className="mt-5 rounded-full px-5 py-2.5 text-[14px] font-semibold"
               style={{ backgroundColor: "var(--ojs-accent-solid-bg)", color: "var(--ojs-accent-solid-fg)" }}
             >
-              Kapat
+              {t("release.close")}
             </button>
           </div>
         ) : (
@@ -126,18 +123,18 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
               style={{ backgroundColor: "var(--ojs-card-bg)" }}
             >
               <h3 className="mb-3 text-[13px] font-semibold" style={{ color: "var(--ojs-card-title)" }}>
-                Gösterilen bilgiler hakkında ne düşünüyorsunuz?
+                {t("feedback.question")}
               </h3>
               <div className="flex flex-col gap-2.5" role="radiogroup">
-                {RATINGS.map((r) => {
-                  const active = rating === r;
+                {RATING_KEYS.map((key) => {
+                  const active = rating === key;
                   return (
                     <button
-                      key={r}
+                      key={key}
                       type="button"
                       role="radio"
                       aria-checked={active}
-                      onClick={() => setRating(r)}
+                      onClick={() => setRating(key)}
                       className="flex items-center gap-2.5 text-left text-[14px]"
                       style={{ color: "var(--ojs-page-fg)" }}
                     >
@@ -152,7 +149,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
                           />
                         )}
                       </span>
-                      {r}
+                      {t(key)}
                     </button>
                   );
                 })}
@@ -168,7 +165,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
                 className="mb-2 block text-[13px] font-semibold"
                 style={{ color: "var(--ojs-card-title)" }}
               >
-                Yorum veya önerileriniz var mı?
+                {t("feedback.commentLabel")}
               </label>
               <textarea
                 id="ojs-feedback-comment"
@@ -190,7 +187,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
                 color: "var(--ojs-accent-solid-fg)",
               }}
             >
-              {sending ? "Gönderiliyor…" : "Gönder"}
+              {sending ? t("feedback.sending") : t("feedback.send")}
             </button>
           </>
         )}

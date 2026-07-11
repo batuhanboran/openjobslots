@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SearchIcon, MicIcon } from "@/components/icons";
+import { useI18n } from "@/components/LanguageProvider";
 
 interface SearchBarProps {
   initialQuery?: string;
@@ -36,6 +37,7 @@ function createRecognition(): SpeechRecognitionLike | null {
 }
 
 export function SearchBar({ initialQuery = "", region }: SearchBarProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState(initialQuery);
   const [micState, setMicState] = useState<"idle" | "listening" | "unsupported">("idle");
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -106,8 +108,8 @@ export function SearchBar({ initialQuery = "", region }: SearchBarProps) {
         name="q"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={listening ? "Dinleniyor… konuşun" : "Açık iş ilanlarını ara…"}
-        aria-label="Açık iş ilanlarını ara"
+        placeholder={listening ? t("search.listening") : t("search.placeholder")}
+        aria-label={t("search.placeholder")}
         autoComplete="off"
         className="ojs-search-input min-w-0 flex-1 border-0 bg-transparent text-[16px] outline-none"
         style={{ color: "var(--ojs-search-fg)" }}
@@ -116,7 +118,7 @@ export function SearchBar({ initialQuery = "", region }: SearchBarProps) {
       <button
         type="button"
         onClick={toggleMic}
-        aria-label={listening ? "Ses girişini durdur" : "Ses girişini başlat"}
+        aria-label={listening ? t("search.micStop") : t("search.micStart")}
         aria-pressed={listening}
         className="relative flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[var(--ojs-iconbtn-hover)]"
         style={{ color: listening ? "#ef4444" : "var(--ojs-search-placeholder)" }}
@@ -135,7 +137,7 @@ export function SearchBar({ initialQuery = "", region }: SearchBarProps) {
         className="flex h-[36px] shrink-0 items-center rounded-full px-4 text-[13px] font-semibold transition-transform active:scale-[0.97]"
         style={{ backgroundColor: "var(--ojs-accent)", color: "#ffffff" }}
       >
-        Ara
+        {t("search.button")}
       </button>
 
       {micState === "unsupported" && (
@@ -143,7 +145,7 @@ export function SearchBar({ initialQuery = "", region }: SearchBarProps) {
           className="absolute left-1/2 top-[64px] -translate-x-1/2 rounded-lg px-3 py-1.5 text-[12px]"
           style={{ backgroundColor: "var(--ojs-card-bg)", color: "var(--ojs-muted-fg)" }}
         >
-          Tarayıcınız sesli aramayı desteklemiyor
+          {t("search.micUnsupported")}
         </div>
       )}
 

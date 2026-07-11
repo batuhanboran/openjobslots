@@ -43,7 +43,8 @@ export async function fetchPostings(
   sp.set("search", params.q);
   sp.set("limit", String(params.limit ?? PAGE_SIZE));
   sp.set("offset", String(params.offset ?? 0));
-  sp.set("sort_by", params.sort ?? "posted_date");
+  // Relevance-first so exact title matches rank at the top (backend supports it).
+  sp.set("sort_by", params.sort ?? "relevance");
   // Only constrain by region when the user explicitly chose one.
   if (params.region && params.region !== "all") {
     const f = resolveRegionFilter(params.region);

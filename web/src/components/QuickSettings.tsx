@@ -12,33 +12,32 @@ import {
   ChevronDownIcon,
   ChatIcon,
 } from "@/components/icons";
-import { LANGUAGE_OPTIONS, REGION_OPTIONS, type ThemeMode } from "@/lib/site";
+import { REGION_OPTIONS, type ThemeMode } from "@/lib/site";
+import { SUPPORTED_LANGS, LANGUAGE_NAMES } from "@/lib/i18n";
+import { useI18n } from "@/components/LanguageProvider";
 
 interface QuickSettingsProps {
   theme: ThemeMode;
   onThemeChange: (t: ThemeMode) => void;
-  language: string;
-  onLanguageChange: (v: string) => void;
   region: string;
   onRegionChange: (v: string) => void;
   onOpenFeedback: () => void;
 }
 
-const THEME_BUTTONS: { value: ThemeMode; label: string; Icon: typeof SunIcon }[] = [
-  { value: "light", label: "Aydınlık", Icon: SunIcon },
-  { value: "dark", label: "Karanlık", Icon: MoonIcon },
-  { value: "system", label: "Cihaz varsayılanı", Icon: MonitorIcon },
+const THEME_BUTTONS: { value: ThemeMode; key: string; Icon: typeof SunIcon }[] = [
+  { value: "light", key: "theme.light", Icon: SunIcon },
+  { value: "dark", key: "theme.dark", Icon: MoonIcon },
+  { value: "system", key: "theme.system", Icon: MonitorIcon },
 ];
 
 export function QuickSettings({
   theme,
   onThemeChange,
-  language,
-  onLanguageChange,
   region,
   onRegionChange,
   onOpenFeedback,
 }: QuickSettingsProps) {
+  const { t, lang, setLang } = useI18n();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -58,11 +57,14 @@ export function QuickSettings({
     };
   }, [open]);
 
+  const languageOptions = SUPPORTED_LANGS.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] }));
+  const regionOptions = REGION_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }));
+
   return (
     <div ref={wrapRef} className="absolute right-4 top-4 z-[5002] sm:right-6 sm:top-6">
       <button
         type="button"
-        aria-label="Hızlı ayarlar"
+        aria-label={t("qs.title")}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-transparent transition-colors hover:bg-[var(--ojs-iconbtn-hover)]"
@@ -74,7 +76,7 @@ export function QuickSettings({
       {open && (
         <div
           role="dialog"
-          aria-label="Hızlı ayarlar"
+          aria-label={t("qs.title")}
           className="ojs-pop-in fixed right-4 top-[60px] w-[min(462px,calc(100vw-2rem))] rounded-[24px] border p-6 sm:right-6 sm:top-[64px]"
           style={{
             backgroundColor: "var(--ojs-panel-bg)",
@@ -83,61 +85,56 @@ export function QuickSettings({
               "rgba(0,0,0,0.33) 0px 8px 10px -6px, rgba(0,0,0,0.33) 0px 25px 50px -12px",
           }}
         >
-          <h2
-            className="mb-5 text-[18px] font-semibold"
-            style={{ color: "var(--ojs-page-fg)" }}
-          >
-            Hızlı ayarlar
+          <h2 className="mb-5 text-[18px] font-semibold" style={{ color: "var(--ojs-page-fg)" }}>
+            {t("qs.title")}
           </h2>
 
           <div className="flex flex-col gap-6">
-            {/* Card 1: Language + Region */}
             <SettingsCard>
               <SettingRow
                 icon={<GlobeIcon className="h-5 w-5" />}
-                title="Görünüm dili"
-                desc="Butonlar, etiketler, ipuçları vs. için"
+                title={t("qs.language")}
+                desc={t("qs.languageDesc")}
               >
                 <SelectPill
-                  value={language}
-                  onChange={onLanguageChange}
-                  ariaLabel="Görünüm dili"
-                  options={LANGUAGE_OPTIONS}
+                  value={lang}
+                  onChange={(v) => setLang(v as (typeof SUPPORTED_LANGS)[number])}
+                  ariaLabel={t("qs.language")}
+                  options={languageOptions}
                 />
               </SettingRow>
               <RowDivider />
               <SettingRow
                 icon={<MapPinIcon className="h-5 w-5" />}
-                title="Bölge"
-                desc="Arama sonuçlarınız için"
+                title={t("qs.region")}
+                desc={t("qs.regionDesc")}
               >
                 <SelectPill
                   value={region}
                   onChange={onRegionChange}
-                  ariaLabel="Bölge"
-                  options={REGION_OPTIONS}
+                  ariaLabel={t("qs.region")}
+                  options={regionOptions}
                 />
               </SettingRow>
             </SettingsCard>
 
-            {/* Card 2: Theme */}
             <SettingsCard>
               <SettingRow
                 icon={<PaletteIcon className="h-5 w-5" />}
-                title="Tema"
-                desc="Tercih ettiğiniz temayı seçin"
+                title={t("qs.theme")}
+                desc={t("qs.themeDesc")}
               >
                 <div
                   className="flex items-center gap-1 rounded-full p-1"
                   style={{ backgroundColor: "var(--ojs-seg-bg)" }}
                 >
-                  {THEME_BUTTONS.map(({ value, label, Icon }) => {
+                  {THEME_BUTTONS.map(({ value, key, Icon }) => {
                     const active = theme === value;
                     return (
                       <button
                         key={value}
                         type="button"
-                        aria-label={label}
+                        aria-label={t(key)}
                         aria-pressed={active}
                         onClick={() => onThemeChange(value)}
                         className="flex h-7 w-7 items-center justify-center rounded-full transition-colors"
@@ -155,12 +152,11 @@ export function QuickSettings({
               </SettingRow>
             </SettingsCard>
 
-            {/* Card 3: Feedback */}
             <SettingsCard>
               <SettingRow
                 icon={<ChatIcon className="h-5 w-5" />}
-                title="Geri bildirim paylaş"
-                desc="OpenJobSlots'u geliştirmemize yardımcı olun"
+                title={t("qs.feedback")}
+                desc={t("qs.feedbackDesc")}
               >
                 <button
                   type="button"
@@ -174,7 +170,7 @@ export function QuickSettings({
                     color: "var(--ojs-accent-pill-fg)",
                   }}
                 >
-                  Paylaş
+                  {t("qs.share")}
                   <ChevronDownIcon className="h-4 w-4 -rotate-90" />
                 </button>
               </SettingRow>
@@ -231,10 +227,7 @@ function SettingRow({
           >
             {title}
           </h3>
-          <p
-            className="text-[12px] leading-[16px]"
-            style={{ color: "var(--ojs-muted-fg)" }}
-          >
+          <p className="text-[12px] leading-[16px]" style={{ color: "var(--ojs-muted-fg)" }}>
             {desc}
           </p>
         </div>

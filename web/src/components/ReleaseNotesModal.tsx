@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { CloseIcon } from "@/components/icons";
 import { RELEASE_NOTES } from "@/lib/releaseNotes";
+import { useI18n } from "@/components/LanguageProvider";
 
 interface ReleaseNotesModalProps {
   open: boolean;
@@ -23,6 +24,7 @@ const C = {
 };
 
 export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -49,7 +51,7 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Sürüm notları"
+        aria-label={t("release.title")}
         className="ojs-pop-in relative flex max-h-[82vh] w-full max-w-[760px] flex-col rounded-[18px] border p-[22px]"
         style={{
           backgroundColor: C.surface,
@@ -62,12 +64,12 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
             className="text-[28px] font-extrabold leading-[34px]"
             style={{ color: C.ink }}
           >
-            Sürüm notları
+            {t("release.title")}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Sürüm notlarını kapat"
+            aria-label={t("release.close")}
             className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-[14px] py-2 text-[12px] font-bold transition-opacity hover:opacity-80"
             style={{
               backgroundColor: C.surfaceMuted,
@@ -76,13 +78,13 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
             }}
           >
             <CloseIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
-            Kapat
+            {t("release.close")}
           </button>
         </div>
 
         <div
           className="ojs-scroll -mr-2 overflow-y-auto pr-2"
-          aria-label="Sürüm notları geçmişi"
+          aria-label={t("release.title")}
         >
           {RELEASE_NOTES.map((note) => (
             <article
@@ -95,7 +97,7 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
                   className="text-[18px] font-extrabold leading-[24px]"
                   style={{ color: C.ink }}
                 >
-                  Sürüm {note.version}
+                  {t("release.version")} {note.version}
                 </h3>
                 <span className="text-[13px] leading-[18px]" style={{ color: C.muted }}>
                   {note.date}

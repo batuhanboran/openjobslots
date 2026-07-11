@@ -1,32 +1,32 @@
 import type { PostingItem } from "@/lib/api";
 import { MapPinIcon, ArrowRightIcon } from "@/components/icons";
+import { useI18n } from "@/components/LanguageProvider";
+import type { Lang } from "@/lib/i18n";
 
-const TR_MONTHS = [
-  "Oca", "Şub", "Mar", "Nis", "May", "Haz",
-  "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara",
-];
-
-function fmt(d: Date): string {
-  return `${d.getUTCDate()} ${TR_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-}
-
-// Sources return dates in several shapes: ISO, epoch (s/ms), or a relative
-// English label. Normalize them so cards never show a raw epoch number.
-function formatDate(raw: string | null): string | null {
+// Normalize the many date shapes (ISO / epoch s|ms / relative label) and
+// localize the absolute ones to the active UI language.
+function formatDate(
+  raw: string | null,
+  lang: Lang,
+  t: (k: string) => string,
+): string | null {
   if (!raw) return null;
   const s = String(raw).trim();
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat(lang, { day: "numeric", month: "short", year: "numeric" }).format(d);
+
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (iso) return `${Number(iso[3])} ${TR_MONTHS[Number(iso[2]) - 1]} ${iso[1]}`;
+  if (iso) return fmt(new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3])));
   if (/^\d{9,10}$/.test(s)) return fmt(new Date(Number(s) * 1000));
   if (/^\d{12,13}$/.test(s)) return fmt(new Date(Number(s)));
-  if (/posted today|^today$/i.test(s)) return "Bugün";
-  if (/posted yesterday|^yesterday$/i.test(s)) return "Dün";
-  // Only surface short textual labels; hide anything else odd.
+  if (/posted today|^today$/i.test(s)) return t("date.today");
+  if (/posted yesterday|^yesterday$/i.test(s)) return t("date.yesterday");
   return /[a-zçğıöşü]/i.test(s) && s.length <= 24 ? s : null;
 }
 
 export function JobCard({ item }: { item: PostingItem }) {
-  const date = formatDate(item.posting_date);
+  const { t, lang } = useI18n();
+  const date = formatDate(item.posting_date, lang, t);
   return (
     <a
       href={item.job_posting_url}
@@ -44,7 +44,7 @@ export function JobCard({ item }: { item: PostingItem }) {
             className="truncate text-[15px] font-semibold"
             style={{ color: "var(--ojs-card-title)" }}
           >
-            {item.position_name || "İsimsiz ilan"}
+            {item.position_name || t("job.untitled")}
           </h3>
           <p className="mt-0.5 text-[13px]" style={{ color: "var(--ojs-accent-icon-fg)" }}>
             {item.company_name || "—"}
