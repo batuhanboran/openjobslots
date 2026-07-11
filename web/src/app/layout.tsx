@@ -10,7 +10,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "OpenJobSlots — Açık iş ilanlarını ara",
   description:
-    "Açık iş ilanlarını tek yerden ara. 628 ATS platformu ve toplayıcı kaynak arasından güncel ilanlar.",
+    "Açık iş ilanlarını tek yerden ara. Yüzlerce ATS platformu ve toplayıcı kaynaktan güncel ilanlar.",
 };
 
 // Resolve the persisted theme before paint to avoid a flash.

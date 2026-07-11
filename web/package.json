@@ -1,27 +1,24 @@
 {
-  "name": "ai-website-clone-template",
-  "version": "0.3.1",
+  "name": "openjobslots-web",
+  "version": "3.0.0",
   "private": true,
-  "description": "Clone any website into a clean, modern Next.js codebase using AI coding agents",
-  "author": "JCodesMore",
+  "description": "OpenJobSlots public web frontend — Next.js search UI for openjobslots.com",
+  "author": "Batuhan Boran",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JCodesMore/ai-website-cloner-template.git"
+    "url": "https://github.com/batuhanboran/openjobslots.git"
   },
-  "homepage": "https://github.com/JCodesMore/ai-website-cloner-template",
+  "homepage": "https://openjobslots.com",
   "bugs": {
-    "url": "https://github.com/JCodesMore/ai-website-cloner-template/issues"
+    "url": "https://github.com/batuhanboran/openjobslots/issues"
   },
   "keywords": [
-    "claude-code",
-    "website-clone",
-    "reverse-engineering",
+    "jobs",
+    "job-search",
+    "ats",
     "nextjs",
-    "ai",
-    "template",
-    "tailwindcss",
-    "shadcn-ui"
+    "tailwindcss"
   ],
   "engines": {
     "node": ">=24"

@@ -21,6 +21,13 @@ function formatDate(
   if (/^\d{12,13}$/.test(s)) return fmt(new Date(Number(s)));
   if (/posted today|^today$/i.test(s)) return t("date.today");
   if (/posted yesterday|^yesterday$/i.test(s)) return t("date.yesterday");
+  // Relative backend labels like "Posted 6 Days Ago" / "2 weeks ago" —
+  // localize instead of passing raw English through.
+  const rel = /(?:posted\s+)?(\d+)\+?\s+(day|week|month)s?\s+ago/i.exec(s);
+  if (rel) {
+    const unit = rel[2].toLowerCase() as "day" | "week" | "month";
+    return new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(-Number(rel[1]), unit);
+  }
   return /[a-zçğıöşü]/i.test(s) && s.length <= 24 ? s : null;
 }
 

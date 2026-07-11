@@ -307,6 +307,61 @@ const T: Record<string, Dict> = {
     tr: "Hindistan", en: "India", de: "Indien", fr: "Inde", es: "India", pt: "Índia", it: "India",
     nl: "India", pl: "Indie", ja: "インド", ko: "인도", zh: "印度",
   },
+  // Suggestion dropdown type hints
+  "suggestion.search": {
+    tr: "Arama", en: "Search", de: "Suche", fr: "Recherche", es: "Búsqueda", pt: "Busca",
+    it: "Ricerca", nl: "Zoeken", pl: "Wyszukiwanie", ja: "検索", ko: "검색", zh: "搜索",
+  },
+  "suggestion.title": {
+    tr: "Ünvan", en: "Title", de: "Titel", fr: "Titre", es: "Puesto", pt: "Cargo",
+    it: "Titolo", nl: "Functie", pl: "Stanowisko", ja: "職種", ko: "직함", zh: "职位",
+  },
+  "suggestion.company": {
+    tr: "Şirket", en: "Company", de: "Unternehmen", fr: "Entreprise", es: "Empresa", pt: "Empresa",
+    it: "Azienda", nl: "Bedrijf", pl: "Firma", ja: "企業", ko: "회사", zh: "公司",
+  },
+  "suggestion.location": {
+    tr: "Konum", en: "Location", de: "Standort", fr: "Lieu", es: "Ubicación", pt: "Local",
+    it: "Località", nl: "Locatie", pl: "Lokalizacja", ja: "勤務地", ko: "위치", zh: "地点",
+  },
+  "suggestion.ats": {
+    tr: "ATS", en: "ATS", de: "ATS", fr: "ATS", es: "ATS", pt: "ATS",
+    it: "ATS", nl: "ATS", pl: "ATS", ja: "ATS", ko: "ATS", zh: "ATS",
+  },
+  "suggestion.filter": {
+    tr: "Filtre", en: "Filter", de: "Filter", fr: "Filtre", es: "Filtro", pt: "Filtro",
+    it: "Filtro", nl: "Filter", pl: "Filtr", ja: "フィルター", ko: "필터", zh: "筛选",
+  },
+  // Active intent-filter pills on the results page
+  "filter.remote": {
+    tr: "Uzaktan", en: "Remote", de: "Remote", fr: "Télétravail", es: "Remoto", pt: "Remoto",
+    it: "Da remoto", nl: "Remote", pl: "Zdalnie", ja: "リモート", ko: "원격", zh: "远程",
+  },
+  "filter.hybrid": {
+    tr: "Hibrit", en: "Hybrid", de: "Hybrid", fr: "Hybride", es: "Híbrido", pt: "Híbrido",
+    it: "Ibrido", nl: "Hybride", pl: "Hybrydowo", ja: "ハイブリッド", ko: "하이브리드", zh: "混合",
+  },
+  "filter.onsite": {
+    tr: "Ofisten", en: "On-site", de: "Vor Ort", fr: "Sur site", es: "Presencial", pt: "Presencial",
+    it: "In sede", nl: "Op locatie", pl: "Stacjonarnie", ja: "オンサイト", ko: "현장 근무", zh: "现场办公",
+  },
+  "filter.lastDays": {
+    tr: "Son {n} gün", en: "Last {n} days", de: "Letzte {n} Tage", fr: "{n} derniers jours",
+    es: "Últimos {n} días", pt: "Últimos {n} dias", it: "Ultimi {n} giorni",
+    nl: "Laatste {n} dagen", pl: "Ostatnie {n} dni", ja: "過去{n}日", ko: "최근 {n}일", zh: "最近{n}天",
+  },
+  "filter.remove": {
+    tr: "Filtreyi kaldır", en: "Remove filter", de: "Filter entfernen", fr: "Retirer le filtre",
+    es: "Quitar filtro", pt: "Remover filtro", it: "Rimuovi filtro", nl: "Filter verwijderen",
+    pl: "Usuń filtr", ja: "フィルターを解除", ko: "필터 제거", zh: "移除筛选",
+  },
+  "results.retry": {
+    tr: "Yüklenemedi — tekrar deneyin", en: "Couldn't load — try again", de: "Laden fehlgeschlagen — erneut versuchen",
+    fr: "Échec du chargement — réessayez", es: "No se pudo cargar — reintenta", pt: "Falha ao carregar — tente novamente",
+    it: "Caricamento non riuscito — riprova", nl: "Laden mislukt — probeer opnieuw",
+    pl: "Nie udało się wczytać — spróbuj ponownie", ja: "読み込めませんでした — もう一度お試しください",
+    ko: "불러오지 못했습니다 — 다시 시도하세요", zh: "加载失败——请重试",
+  },
 };
 
 export function translate(lang: Lang, key: string): string {

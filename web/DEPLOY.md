@@ -84,9 +84,8 @@ Nothing in the backend changed, so this fully restores the previous site.
 ## Notes / current limits
 
 - Results page (`/ara`) is intentionally lean vs the old App.js surface: no
-  facets, sort controls, or search suggestions yet. Search + region filter +
-  load-more work.
-- Language selector persists a preference but the UI is Turkish-only (no
-  retranslation yet).
+  facets or sort controls yet. Search + suggestions (with intent filters) +
+  region filter + load-more work.
+- Language selector retranslates the whole UI live (12 languages).
 - This app is separate from the `OpenJobSlots/` repo and its git-push auto-deploy
   timer; deploy it with the steps above (or wire it into its own pipeline).
