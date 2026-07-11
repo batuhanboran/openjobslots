@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OJS">
+  <defs>
+    <linearGradient id="ojs-icon-bg" x1="10" x2="56" y1="8" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5F36F2"/>
+      <stop offset=".55" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#F7F5FF"/>
+  <rect x="7" y="7" width="50" height="50" rx="14" fill="url(#ojs-icon-bg)"/>
+  <text x="32" y="38" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="800" text-anchor="middle" letter-spacing="0">OJS</text>
+</svg>
