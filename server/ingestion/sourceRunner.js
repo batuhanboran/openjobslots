@@ -9,7 +9,11 @@ const { hashPayload } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
 const { classifyStoredPosting } = require("./dataQualityAudit");
 const { buildDetailEvidenceSummary, collectDetailEvidence } = require("./detailEvidence");
-const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
+const {
+  evaluatePublicPosting,
+  sourceRequiresNormalizedGeoOrRemoteFails,
+  validationFromGate
+} = require("./publicPostingGate");
 const { getAtsFilterAliasValues } = require("./atsFilters");
 const {
   FAILURE_REASONS,
@@ -1448,10 +1452,8 @@ function evaluateSourceCandidate(target, item, options = {}) {
     };
   }
   const sourceFailureReasons = postingSourceFailureReasons(normalized);
-  if (normalized?.source_requires_normalized_geo_or_remote === true) {
-    const hasNormalizedGeo = Boolean(clean(normalized.country) || clean(normalized.region) || clean(normalized.city));
-    const hasExplicitRemote = ["remote", "hybrid", "onsite"].includes(clean(normalized.remote_type).toLowerCase());
-    if (!hasNormalizedGeo && !hasExplicitRemote) sourceFailureReasons.push("no_normalized_geo_or_explicit_remote");
+  if (sourceRequiresNormalizedGeoOrRemoteFails(normalized)) {
+    sourceFailureReasons.push("no_normalized_geo_or_explicit_remote");
   }
   if (adapterValidation?.ok && status === "accepted" && sourceFailureReasons.length > 0) {
     status = "quarantined";

@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
+const { encryptSecret, decryptSecret, isEncryptedSecret } = require("./mcpSecret");
 
 function missingDependency(name) {
   return () => {
@@ -480,7 +481,7 @@ function createSqliteAppStateRuntime(dependencies = {}) {
       enabled: Boolean(Number(row?.enabled || 0)),
       preferred_agent_name: row?.preferred_agent_name,
       agent_login_email: row?.agent_login_email,
-      agent_login_password: row?.agent_login_password,
+      agent_login_password: decryptSecret(row?.agent_login_password),
       mfa_login_email: row?.mfa_login_email,
       mfa_login_notes: row?.mfa_login_notes,
       dry_run_only: Boolean(Number(row?.dry_run_only ?? 1)),
@@ -501,6 +502,25 @@ function createSqliteAppStateRuntime(dependencies = {}) {
   
   async function upsertMcpSettings(input) {
     const normalized = normalizeMcpSettingsInput(input);
+    const incomingSecret = String(normalized.agent_login_password ?? "");
+    const clearSecret = Boolean(input && input.clear_agent_login_password === true);
+    let secretToStore;
+    if (clearSecret) {
+      secretToStore = "";
+    } else if (incomingSecret) {
+      // Guard against double-encryption: an already-encrypted value (e.g. a row
+      // replayed by the DB migration path) is stored verbatim, not re-encrypted.
+      secretToStore = isEncryptedSecret(incomingSecret)
+        ? incomingSecret
+        : encryptSecret(incomingSecret);
+    } else {
+      // Empty incoming secret => preserve the existing stored value so a client
+      // round-tripping the redacted settings object cannot wipe the credential.
+      const existing = await db.get(
+        "SELECT agent_login_password FROM McpSettings WHERE id = 1 LIMIT 1;"
+      );
+      secretToStore = existing ? String(existing.agent_login_password ?? "") : "";
+    }
     await db.run(
       `
         INSERT INTO McpSettings (
@@ -549,7 +569,7 @@ function createSqliteAppStateRuntime(dependencies = {}) {
         normalized.enabled ? 1 : 0,
         normalized.preferred_agent_name,
         normalized.agent_login_email,
-        normalized.agent_login_password,
+        secretToStore,
         normalized.mfa_login_email,
         normalized.mfa_login_notes,
         normalized.dry_run_only ? 1 : 0,

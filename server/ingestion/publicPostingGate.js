@@ -197,6 +197,21 @@ function hasExplicitRemoteEvidence(posting = {}) {
   return false;
 }
 
+// Sources that flag `source_requires_normalized_geo_or_remote` must not be
+// published on free-text location alone: they require a normalized
+// country/region/city OR an explicit remote/hybrid/onsite type. Shared by both
+// ingestion paths (worker.js daemon + sourceRunner.js CLI) so the two agree.
+function sourceRequiresNormalizedGeoOrRemoteFails(posting = {}) {
+  if (posting?.source_requires_normalized_geo_or_remote !== true) return false;
+  const hasNormalizedGeo = Boolean(
+    asString(posting.country) || asString(posting.region) || asString(posting.city)
+  );
+  const remoteType = asString(posting.remote_type).toLowerCase();
+  const hasExplicitRemote =
+    remoteType === "remote" || remoteType === "hybrid" || remoteType === "onsite";
+  return !hasNormalizedGeo && !hasExplicitRemote;
+}
+
 function buildEvidenceMetadata(posting = {}, options = {}) {
   return buildFieldEvidenceMetadata(posting, {
     parserVersion: asString(options.parserVersion || getParserVersion(posting)),
@@ -305,6 +320,7 @@ module.exports = {
   getPublicThresholds,
   hasExplicitRemoteEvidence,
   hasUsefulGeoEvidence,
+  sourceRequiresNormalizedGeoOrRemoteFails,
   titleLooksPlaceholder,
   normalizeRemoteType,
   validationFromGate

@@ -4,6 +4,7 @@ const sqlite3 = require("sqlite3");
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const z = require("zod");
+const { decryptSecret } = require("./state/mcpSecret");
 
 const ROOT_DIR = path.resolve(__dirname, "..", "..");
 const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "..", "jobs.db");
@@ -919,7 +920,7 @@ async function getMcpSettings() {
     enabled: Boolean(Number(row?.enabled || 0)),
     preferred_agent_name: String(row?.preferred_agent_name || MCP_SETTINGS_DEFAULTS.preferred_agent_name),
     agent_login_email: agentLoginEmail,
-    agent_login_password: String(row?.agent_login_password || ""),
+    agent_login_password: decryptSecret(row?.agent_login_password),
     mfa_login_email: agentLoginEmail,
     mfa_login_notes: String(row?.mfa_login_notes || ""),
     dry_run_only: row?.dry_run_only === undefined ? true : Boolean(Number(row?.dry_run_only)),
