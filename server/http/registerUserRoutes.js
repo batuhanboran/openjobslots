@@ -1,3 +1,5 @@
+const { redactMcpSettings } = require("../state/mcpSecret");
+
 function registerUserRoutes(app, context) {
   const {
     APPLICATION_STATUS_OPTIONS,
@@ -45,14 +47,14 @@ function registerUserRoutes(app, context) {
 
   app.get("/settings/mcp", async (_req, res) => {
     const item = await getMcpSettings();
-    res.json({ item });
+    res.json({ item: redactMcpSettings(item) });
   });
 
   app.put("/settings/mcp", async (req, res) => {
     const item = await upsertMcpSettings(req.body || {});
     res.json({
       ok: true,
-      item
+      item: redactMcpSettings(item)
     });
   });
 
@@ -140,7 +142,7 @@ function registerUserRoutes(app, context) {
         summary,
         item: {
           personal_information: personalInformation,
-          mcp_settings: mcpSettings,
+          mcp_settings: redactMcpSettings(mcpSettings),
           sync_settings: syncServiceSettings,
           blocked_companies_count: blockedCompanies.length,
           applications_count: Number(applications?.count || 0)
@@ -240,9 +242,9 @@ function registerUserRoutes(app, context) {
       count: candidates.length,
       limit,
       filters: result.filters,
-      settings,
+      settings: redactMcpSettings(settings),
       personal_information: personalInformation,
-      runbook,
+      runbook: redactMcpSettings(runbook),
       candidates
     });
   });
