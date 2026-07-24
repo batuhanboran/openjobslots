@@ -4104,5 +4104,6 @@ module.exports = {
   recordPostgresPublicSearchEvent,
   requestSyncStart,
   requestSyncStop,
+  resolvePublicPostingsPage,
   upsertPostgresPostings
 };

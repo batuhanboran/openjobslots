@@ -5,6 +5,23 @@ const {
   normalizePublicSeoLanguageCode
 } = require("../../src/publicSeoRoutes");
 const { parseSemanticQuery } = require("../search/config");
+const { resolvePublicPostingsPage } = require("../backends/postgresStore");
+
+// Cap on the number of " OR "-separated sub-queries a single /postings request
+// may fan out into. Prevents one unauthenticated request from spawning an
+// unbounded number of parallel DB/Meili queries (amplification/DoS).
+const MAX_OR_SEARCH_TERMS = Math.max(
+  1,
+  Math.min(64, Number(process.env.OPENJOBSLOTS_MAX_OR_SEARCH_TERMS) || 8)
+);
+
+function capOrSubQueries(rawSearch, max = MAX_OR_SEARCH_TERMS) {
+  const raw = String(rawSearch || "");
+  if (!/\bOR\b/i.test(raw)) return [];
+  const parts = raw.split(/\s+OR\s+/i).map((q) => q.trim()).filter(Boolean);
+  if (parts.length <= 1) return [];
+  return parts.slice(0, Math.max(1, max));
+}
 
 const PUBLIC_ANALYTICS_SESSION_COOKIE = "ojs_anon_session";
 const PUBLIC_ANALYTICS_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -1005,7 +1022,7 @@ function registerPublicRoutes(app, context) {
       const rawSearch = options.search || "";
       let result;
       if (/\bOR\b/i.test(rawSearch)) {
-        const subQueries = rawSearch.split(/\s+OR\s+/i).map(q => q.trim()).filter(Boolean);
+        const subQueries = capOrSubQueries(rawSearch);
         if (subQueries.length > 1) {
           const promises = subQueries.map(async (subQ) => {
             const subOptions = { ...options, search: subQ };
@@ -1086,8 +1103,10 @@ function registerPublicRoutes(app, context) {
             });
           }
 
-          const limit = Math.max(1, Number(options.limit || 500));
-          const offset = Math.max(0, Number(options.offset || 0));
+          // Clamp the merged page to the same ceiling the non-OR path enforces
+          // (resolvePublicPostingsPage: maxLimit 500, maxOffset 2000) so the OR
+          // path cannot bypass the public page-size limit.
+          const { limit, offset } = resolvePublicPostingsPage(options);
           const paginatedItems = mergedItems.slice(offset, offset + limit);
 
           const sortedFacets = Array.from(sourceFacetsMap.values())
@@ -1236,6 +1255,7 @@ function registerPublicRoutes(app, context) {
 }
 
 module.exports = {
+  capOrSubQueries,
   getCanonicalPublicHostRedirectTarget,
   isInternalPublicAnalyticsProbe,
   registerPublicRoutes
