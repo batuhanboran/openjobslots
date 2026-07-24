@@ -219,3 +219,65 @@ test("public posting gate normalizes remote aliases and detects useful geo", () 
   assert.equal(hasUsefulGeoEvidence({ location_text: "Remote" }), false);
   assert.equal(hasUsefulGeoEvidence({ location_text: "Istanbul, Turkey" }), true);
 });
+
+// --- ambiguous-geo: shared source-requires-normalized-geo/remote gate ------
+// Regression: worker.js daemon and sourceRunner.js CLI must agree. A flagged
+// source with only free-text location (no normalized geo, no explicit remote)
+// must be quarantined, not published.
+const {
+  sourceRequiresNormalizedGeoOrRemoteFails
+} = require("./publicPostingGate");
+
+test("flag absent -> never fails (unaffected sources)", () => {
+  assert.equal(sourceRequiresNormalizedGeoOrRemoteFails({ location: "New York, NY" }), false);
+  assert.equal(
+    sourceRequiresNormalizedGeoOrRemoteFails({ source_requires_normalized_geo_or_remote: false }),
+    false
+  );
+});
+
+test("flagged + only free-text location -> FAILS (the worker/CLI divergence)", () => {
+  const posting = {
+    source_requires_normalized_geo_or_remote: true,
+    location: "New York, NY",
+    country: "",
+    region: "",
+    city: "",
+    remote_type: null
+  };
+  assert.equal(sourceRequiresNormalizedGeoOrRemoteFails(posting), true);
+});
+
+test("flagged + normalized geo present -> passes", () => {
+  for (const geo of [{ country: "United States" }, { region: "EMEA" }, { city: "Austin" }]) {
+    assert.equal(
+      sourceRequiresNormalizedGeoOrRemoteFails({
+        source_requires_normalized_geo_or_remote: true,
+        ...geo
+      }),
+      false
+    );
+  }
+});
+
+test("flagged + explicit remote/hybrid/onsite -> passes", () => {
+  for (const remote_type of ["remote", "hybrid", "onsite", "REMOTE", " Hybrid "]) {
+    assert.equal(
+      sourceRequiresNormalizedGeoOrRemoteFails({
+        source_requires_normalized_geo_or_remote: true,
+        remote_type
+      }),
+      false
+    );
+  }
+});
+
+test("flagged + unknown remote + no geo -> FAILS", () => {
+  assert.equal(
+    sourceRequiresNormalizedGeoOrRemoteFails({
+      source_requires_normalized_geo_or_remote: true,
+      remote_type: "unknown"
+    }),
+    true
+  );
+});

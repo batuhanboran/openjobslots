@@ -11,7 +11,11 @@ const {
 } = require("./atsFilters");
 const { getAdapterForCompany } = require("./adapters");
 const { hashPayload, writePostingCache } = require("./cache");
-const { evaluatePublicPosting, validationFromGate } = require("./publicPostingGate");
+const {
+  evaluatePublicPosting,
+  sourceRequiresNormalizedGeoOrRemoteFails,
+  validationFromGate
+} = require("./publicPostingGate");
 const { DEFAULT_TTL_SECONDS, ensureIngestionTables, seedAtsSources } = require("./schema");
 const { createAtsRateLimitStateStore } = require("./atsRateLimitStore");
 const {
@@ -145,6 +149,23 @@ function evaluateIngestionVisibility(posting, validation, parserVersion) {
     },
     { parserVersion }
   );
+  // Match sourceRunner.js: sources requiring normalized geo/remote are not
+  // published on free-text location alone. Without this the continuous worker
+  // daemon would publish rows the CLI path quarantines.
+  if (gate.status === "accepted" && sourceRequiresNormalizedGeoOrRemoteFails(posting)) {
+    return {
+      gate,
+      validation: {
+        ok: false,
+        status: "quarantined",
+        error: "no_normalized_geo_or_explicit_remote",
+        reason_codes: ["no_normalized_geo_or_explicit_remote"],
+        evidence: gate.evidence,
+        retry_detail_refetch_eligible: false
+      },
+      publicPosting: false
+    };
+  }
   return {
     gate,
     validation: validationFromGate(gate),
