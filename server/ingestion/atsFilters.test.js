@@ -54,6 +54,6 @@ test("default sync ATS excludes sources that are not enabled by default", () => 
   assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("workable"), false);
   assert.equal(SYNC_DEFAULT_ENABLED_ATS.includes("greenhouse"), true);
   assert.equal(normalizeSyncEnabledAts(["dayforcehcm"]).length, 0);
-  assert.deepEqual(normalizeSyncEnabledAts(["personio", "workable"]), []);
+  assert.deepEqual(normalizeSyncEnabledAts(["personio", "workable"]), ["personio", "workable"]);
   assert.deepEqual(normalizeSyncEnabledAts("[\"greenhouse.io\",\"lever.co\"]"), ["greenhouse", "lever"]);
 });

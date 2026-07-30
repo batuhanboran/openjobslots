@@ -81,10 +81,9 @@ test("buildRepairPlan separates seed, protection reset, alias, and canary proof 
   const personioActions = byKey.get("personio").actions.map((action) => action.type);
   assert.deepEqual(personioActions, [
     "seed_source_row",
-    "keep_canary_excluded_from_default_sync",
     "prove_inventory_and_batch_quality"
   ]);
-  assert.match(byKey.get("personio").actions[1].next_commands.at(-1), /--include-disabled/);
+  assert.doesNotMatch(byKey.get("personio").actions[1].next_commands.at(-1), /--include-disabled/);
 });
 
 test("buildMarkdown renders source-state repair summary", () => {
