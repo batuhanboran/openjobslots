@@ -103,6 +103,8 @@ test("reindex check mode is explicit and non-mutating", () => {
     assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).json, true);
     assert.equal(parseReindexArgs(["--json", "--output=reports/meili.json"], {}).output, "reports/meili.json");
     assert.equal(parseReindexArgs(["--facet-drift-max-inspected=250"], {}).facetDriftMaxInspectedHits, 250);
+    assert.equal(parseReindexArgs(["--bounded"], {}).bounded, true);
+    assert.equal(parseReindexArgs(["--max-runtime-ms=120000"], {}).maxRuntimeMs, 120000);
     assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).apply, true);
     assert.equal(parseReindexArgs(["--apply", "--confirm-production"], {}).confirmProduction, true);
     assert.equal(parseReindexArgs(["--repair-extra-documents"], {}).repairExtraDocuments, true);

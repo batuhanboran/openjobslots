@@ -6,12 +6,16 @@ REMOTE="${REMOTE:-origin}"
 BRANCH="${BRANCH:-main}"
 LOCK_FILE="${LOCK_FILE:-/var/lock/openjobslots-deploy.lock}"
 LOG_FILE="${LOG_FILE:-/var/log/openjobslots-deploy.log}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8081/health}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8081/health/ready}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:8081}"
 DEPLOY_KEY="${DEPLOY_KEY:-}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
 FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-3}"
 ORIGIN_PORT="${OPENJOBSLOTS_ORIGIN_PORT:-8081}"
+BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
+POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-openjobslots-postgres}"
+CURL_CONNECT_TIMEOUT_SECONDS="${CURL_CONNECT_TIMEOUT_SECONDS:-3}"
+CURL_MAX_TIME_SECONDS="${CURL_MAX_TIME_SECONDS:-15}"
 
 if [[ -f "$DEPLOY_KEY" && -z "${GIT_SSH_COMMAND:-}" ]]; then
   export GIT_SSH_COMMAND="ssh -i ${DEPLOY_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
@@ -141,12 +145,31 @@ if [[ "$LOCAL_SHA" == "$REMOTE_SHA" && "$FORCE_DEPLOY" != "1" ]]; then
   exit 0
 fi
 
+DIRTY_STATE="$(git status --porcelain --untracked-files=all -- . \
+  ':(exclude).env' \
+  ':(exclude)data/**' \
+  ':(exclude).deploy-backups/**' \
+  ':(exclude)backups/**' \
+  ':(exclude)reports/**' \
+  ':(exclude)docker-compose.yml.bak*')"
+if [[ -n "$DIRTY_STATE" ]]; then
+  log "refusing deploy because the application worktree is dirty"
+  printf '%s\n' "$DIRTY_STATE" >> "$LOG_FILE"
+  exit 2
+fi
+
 mkdir -p .deploy-backups
 git bundle create ".deploy-backups/pre-deploy-${LOCAL_SHA}-$(date +%Y%m%d%H%M%S).bundle" HEAD
 
+mkdir -p "$BACKUP_DIR"
+POSTGRES_BACKUP="$BACKUP_DIR/postgres-openjobslots-predeploy-$(date +%Y%m%d%H%M%S).dump"
+docker exec "$POSTGRES_CONTAINER" pg_dump -U openjobslots -d openjobslots -Fc > "$POSTGRES_BACKUP"
+test -s "$POSTGRES_BACKUP"
+log "fresh Postgres backup created at $POSTGRES_BACKUP ($(wc -c < "$POSTGRES_BACKUP") bytes)"
+
 log "deploying $REMOTE_SHA"
 git reset --hard "$REMOTE_SHA"
-git clean -fd -e .env -e data -e .deploy-backups -e "docker-compose.yml.bak*"
+git clean -fd -e .env -e data -e .deploy-backups -e backups -e reports -e "docker-compose.yml.bak*"
 
 if ! docker compose up -d --build --remove-orphans; then
   log "compose --remove-orphans unsupported or failed; retrying without it"
@@ -154,20 +177,20 @@ if ! docker compose up -d --build --remove-orphans; then
 fi
 
 verify_deploy() {
-  curl -fsS "$HEALTH_URL" | grep -q '"ok":true'
-  curl -fsS "$BASE_URL/sync/status" | grep -q '"ok":true'
-  curl -fsS "$BASE_URL/ingestion/status" | grep -q '"ok":true'
-  curl -fsS "$BASE_URL/postings?search=Director%20United%20States&limit=5" | grep -q '"ok":true'
-  curl -fsS "$BASE_URL/postings?search=remote%20engineer&limit=5" | grep -q '"ok":true'
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$HEALTH_URL" | grep -q '"ok":true'
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=Director%20United%20States&limit=5" | grep -q '"ok":true'
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=remote%20engineer&limit=5" | grep -q '"ok":true'
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-app)" == "healthy" ]]
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-worker)" == "healthy" ]]
   [[ "$(git rev-parse HEAD)" == "$REMOTE_SHA" ]]
 }
 
-for attempt in $(seq 1 30); do
+for attempt in $(seq 1 60); do
   if verify_deploy; then
     log "post-deploy checks passed at $REMOTE_SHA"
     exit 0
   fi
-  sleep 2
+  sleep 3
 done
 
 log "health check failed after deploy to $REMOTE_SHA"

@@ -1,10 +1,10 @@
 # OpenJobSlots Deployment
 
-Production source of truth is the private GitHub repository:
+Production source of truth is the public GitHub repository:
 
 `https://github.com/batuhanboran/openjobslots`
 
-The production host runs the app from `<app-dir>` and deploys from the release branch. An auto-deploy watcher pulls the release branch and rebuilds the Docker Compose stack only when it changes, preserving runtime data in `.env`, `data/`, and `.deploy-backups/`.
+The production host runs the app from `/root/OpenJobSlots` and deploys from `main`. An auto-deploy watcher pulls that branch and rebuilds the Docker Compose stack only when it changes, preserving runtime data in `.env`, `data/`, `.deploy-backups/`, `backups/`, and `reports/`.
 
 ## Production Services
 
@@ -24,7 +24,7 @@ The production host pulls the release branch using a read-only GitHub deploy key
 
 ```bash
 docker compose --project-directory <app-dir> ps
-curl -fsS http://127.0.0.1:8081/health
+curl -fsS --connect-timeout 3 --max-time 15 http://127.0.0.1:8081/health/ready
 curl -fsS "http://127.0.0.1:8081/postings?search=Director%20United%20States&limit=5"
 curl -fsS "http://127.0.0.1:8081/postings?search=t%C3%BCrkiye&limit=5"
 ```
@@ -46,6 +46,8 @@ The worker keeps manual sync controls available, but automatic Postgres syncs ar
 - `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY`: HRMDirect detail-page cap per company. Compose defaults to `35` so large sparse HRMDirect boards cannot stall an automatic worker run; raise only during targeted HRMDirect recovery windows.
 - `INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER`: over-select factor for due target candidates before source budget and protection filtering. Worker code defaults to `8`.
 - `INGESTION_DUE_TARGET_CANDIDATE_MAX`: hard ceiling for due-target candidate selection. Compose defaults to `2500`.
+
+The worker heartbeat is written to a dedicated file every 30 seconds. Docker marks the worker unhealthy only when that heartbeat is stale, and `scripts/worker-watchdog.sh` restarts only an unhealthy container. It does not use the age of an `auto run summary`, so a long but progressing ATS run is not interrupted.
 
 The daily budget is conservative and restart-safe because the worker counts targets already recorded in `ingestion_runs` since UTC midnight before starting another automatic run. Manual requested syncs are not blocked by the budget, but their recorded targets count against later automatic work for the same day.
 To temporarily return to the May 27 high-throughput stage, override `INGESTION_WORKER_CONCURRENCY=3`, `INGESTION_WORKER_INTERVAL_MS=600000`, `INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=18000`, `INGESTION_AUTO_SYNC_TARGETS_PER_RUN=300`, and `INGESTION_SOURCE_DAILY_TARGET_BUDGET=1000` in the production environment only after worker health, Meili/Postgres parity, and host memory pressure are clean.
@@ -78,7 +80,7 @@ To disable the runtime change, set `OPENJOBSLOTS_ENABLE_PG_STAT_STATEMENTS=0` fo
 
 ## Rollback
 
-Each successful deploy creates a git bundle in `<app-dir>/.deploy-backups/` before resetting to the new commit. Runtime databases and Docker volumes are not deleted by the deploy watcher.
+Every changed-commit deploy refuses a dirty application worktree, creates a git bundle in `/root/OpenJobSlots/.deploy-backups/`, and creates a fresh Postgres backup in `/root/OpenJobSlots/backups/` before resetting to the new commit. The deploy stops if that backup is missing or empty. Runtime databases and Docker volumes are not deleted by the deploy watcher.
 
 ## v1.6.0 Deployment Note - May 8, 2026
 

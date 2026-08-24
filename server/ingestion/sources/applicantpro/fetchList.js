@@ -23,6 +23,15 @@ async function readTextResponse(response, url) {
   return String(response || "");
 }
 
+function isDisabledBoardRedirect(response) {
+  try {
+    const finalUrl = new URL(clean(response?.url));
+    return finalUrl.pathname.toLowerCase().endsWith("/notset.php") || finalUrl.searchParams.get("disabled") === "1";
+  } catch {
+    return false;
+  }
+}
+
 async function readJsonResponse(response, url) {
   if (response && typeof response === "object" && typeof response.json !== "function" && typeof response.text !== "function") {
     const status = Number(response.status || 200);
@@ -53,7 +62,13 @@ async function readJsonResponse(response, url) {
 
 async function fetchApplicantProJobsPage(url, target, options = {}) {
   if (options.fetcher) {
-    return readTextResponse(await options.fetcher(url, { ...target, method: "GET" }), url);
+    const response = await options.fetcher(url, { ...target, method: "GET" });
+    if (isDisabledBoardRedirect(response)) {
+      throw makeSourceFetchError("no_jobs", "ApplicantPro disabled board redirect returned no jobs", {
+        url: response.url || url
+      });
+    }
+    return readTextResponse(response, url);
   }
   const response = await safeFetch(url, {
     method: "GET",
@@ -66,6 +81,11 @@ async function fetchApplicantProJobsPage(url, target, options = {}) {
     throw makeSourceFetchError("fetch_failed", `ApplicantPro page request failed with HTTP ${response.status}`, {
       status: response.status,
       url
+    });
+  }
+  if (isDisabledBoardRedirect(response)) {
+    throw makeSourceFetchError("no_jobs", "ApplicantPro disabled board redirect returned no jobs", {
+      url: response.url || url
     });
   }
   return readLimitedResponseText(response, { sourceUrl: response.url || url });

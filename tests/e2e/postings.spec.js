@@ -233,9 +233,9 @@ async function expectSearchEngineVisualContract(page) {
     await expect(footer).toBeVisible();
     const footerBox = await footer.boundingBox();
     expect(footerBox.y).toBeGreaterThan(viewport.height * 0.82);
-    const attributionLink = page.getByRole("link", { name: "Batuhan Boran website" });
+    const attributionLink = page.getByRole("link", { name: "OpenJobSlots source code on GitHub" });
     await expect(attributionLink).toBeVisible();
-    await expect(attributionLink).toHaveAttribute("href", "https://batuhanboran.com");
+    await expect(attributionLink).toHaveAttribute("href", "https://github.com/batuhanboran/openjobslots");
     await page.getByTestId("public-version-button").click();
     await expect(page.getByTestId("release-notes-modal")).toBeVisible();
     await expect(page.getByText("Version 2.1.0")).toBeVisible();

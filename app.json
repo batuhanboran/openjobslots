@@ -2,7 +2,7 @@
   "expo": {
     "name": "OJS",
     "slug": "openjobslots",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "scheme": "openjobslots",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -17,7 +17,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.openjobslots.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.openjobslots.app",
-      "versionCode": 10,
+      "versionCode": 11,
       "permissions": [],
       "blockedPermissions": [
         "android.permission.ACCESS_WIFI_STATE",

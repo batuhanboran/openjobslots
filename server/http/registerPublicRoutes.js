@@ -555,6 +555,20 @@ function registerPublicRoutes(app, context) {
     });
   });
 
+  app.get("/health/live", (_req, res) => res.json({
+    ok: true,
+    service: "openjobslots-app"
+  }));
+
+  app.get("/health/ready", async (_req, res) => {
+    if (DB_BACKEND === "postgres") await postgresPool.query("SELECT 1 AS ok;");
+    return res.json({
+      ok: true,
+      db_backend: DB_BACKEND,
+      search_backend: SEARCH_BACKEND
+    });
+  });
+
   app.get("/public/preferences", (req, res) => {
     res.setHeader("Vary", "Accept-Language, CF-IPCountry");
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -565,11 +579,11 @@ function registerPublicRoutes(app, context) {
     return sendCachedPublicJson(req, res, publicReadCache, async () => {
       const includeAdminDiagnostics = hasAdminAccess(req);
       if (DB_BACKEND === "postgres") {
-        const [status, parserAttentionByAts, counts] = await Promise.all([
+        const [status, parserAttentionByAts] = await Promise.all([
           getPostgresSyncStatus(postgresPool, { includeWorkerDiagnostics: includeAdminDiagnostics }),
-          getPostgresParserAttentionByAts(postgresPool),
-          getPostgresCounts(postgresPool)
+          getPostgresParserAttentionByAts(postgresPool)
         ]);
+        const counts = status;
         return sanitizeFrontendValue({
           running: Boolean(status.running),
           queued: Boolean(status.queued),

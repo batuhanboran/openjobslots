@@ -37,6 +37,8 @@ for (const serviceName of [
 const appBlock = serviceBlock("openjobslots-app");
 assertContains(appBlock, "NODE_OPTIONS=--max-old-space-size=${OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB:-384}");
 assertContains(appBlock, "OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS=${OPENJOBSLOTS_PUBLIC_READ_CACHE_TTL_MS:-120000}");
+assertContains(appBlock, "healthcheck:");
+assertContains(appBlock, "scripts/healthcheck-app.js");
 
 const workerBlock = serviceBlock("openjobslots-worker");
 assertContains(workerBlock, "INGESTION_WORKER_CONCURRENCY=${INGESTION_WORKER_CONCURRENCY:-2}");
@@ -46,5 +48,11 @@ assertContains(workerBlock, "INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=${INGESTION
 assertContains(workerBlock, "INGESTION_AUTO_SYNC_TARGETS_PER_RUN=${INGESTION_AUTO_SYNC_TARGETS_PER_RUN:-50}");
 assertContains(workerBlock, "INGESTION_SOURCE_DAILY_TARGET_BUDGET=${INGESTION_SOURCE_DAILY_TARGET_BUDGET:-250}");
 assertContains(workerBlock, "NODE_OPTIONS=--max-old-space-size=${OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB:-512}");
+assertContains(workerBlock, "healthcheck:");
+assertContains(workerBlock, "scripts/healthcheck-worker.js");
+
+const meiliBlock = serviceBlock("openjobslots-meilisearch");
+assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEM_LIMIT:-4096m");
+assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-4096m");
 
 console.log("docker runtime policy tests passed");

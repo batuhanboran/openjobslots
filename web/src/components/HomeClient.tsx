@@ -35,10 +35,19 @@ export function HomeClient() {
   // Hydrate persisted preferences after mount.
   useEffect(() => {
     const t = (localStorage.getItem("ojs-theme") as ThemeMode | null) ?? "dark";
-    setThemeState(t);
-    setRegionState(localStorage.getItem("ojs-region") ?? "all");
-    setSeenVersion(localStorage.getItem("ojs-release-seen") ?? "");
+    const persistedRegion = localStorage.getItem("ojs-region") ?? "all";
+    const persistedSeenVersion = localStorage.getItem("ojs-release-seen") ?? "";
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setThemeState(t);
+      setRegionState(persistedRegion);
+      setSeenVersion(persistedSeenVersion);
+    });
     applyTheme(t);
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Keep "system" in sync with OS changes.

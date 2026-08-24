@@ -38,6 +38,7 @@ const { evaluatePublicPosting } = require("../ingestion/publicPostingGate");
 const DAY_SECONDS = 24 * 60 * 60;
 const DEFAULT_POSTGRES_COUNTS_CACHE_TTL_MS = 30_000;
 const postgresCountsCache = new WeakMap();
+const postgresCountsPending = new WeakMap();
 const POSTING_SORT_OPTIONS = new Set(["relevance", "last_seen", "posted_date", "ats_source", "confidence"]);
 const POSTING_FRESHNESS_DAY_OPTIONS = new Set([3, 7, 30]);
 const PUBLIC_SOURCE_FACET_LIMIT = 8;
@@ -161,7 +162,9 @@ function clonePostgresCounts(counts = {}) {
     configured_ats_count: Number(counts.configured_ats_count || 0),
     visible_ats_count: Number(counts.visible_ats_count || 0),
     postings_seen_24h_count: Number(counts.postings_seen_24h_count || 0),
-    company_count_by_ats: { ...(counts.company_count_by_ats || {}) }
+    company_count_by_ats: { ...(counts.company_count_by_ats || {}) },
+    counts_snapshot_epoch: Number(counts.counts_snapshot_epoch || 0),
+    counts_snapshot_stale: Boolean(counts.counts_snapshot_stale)
   };
 }
 
@@ -838,7 +841,8 @@ async function listPostgresPostings(pool, options = {}) {
   const meiliConfig = getMeiliConfig();
   const sortBy = normalizePostingSort(options.sort_by);
   const meiliSortable = sortBy === "relevance" || sortBy === "last_seen" || sortBy === "posted_date";
-  const useMeili = meiliConfig.enabled && meiliSortable && offset + limit <= 2000 && (String(options.search || "").trim() || parseCsv(options.ats).length || parseCsv(options.countries).length || parseCsv(options.regions).length || parseCsv(options.industries).length || String(options.remote || "all") !== "all" || normalizeFreshnessDays(options.freshness_days));
+  const hasSearchConstraints = Boolean(String(options.search || "").trim() || parseCsv(options.ats).length || parseCsv(options.countries).length || parseCsv(options.regions).length || parseCsv(options.industries).length || String(options.remote || "all") !== "all" || normalizeFreshnessDays(options.freshness_days));
+  const useMeili = meiliConfig.enabled && meiliSortable && offset + limit <= 2000;
 
   if (useMeili) {
     try {
@@ -855,6 +859,13 @@ async function listPostgresPostings(pool, options = {}) {
       const urls = (searchResult.hits || []).map((hit) => hit.canonical_url);
       const estimatedTotalHits = getMeiliEstimatedTotalHits(searchResult, urls.length);
       if (urls.length === 0 && estimatedTotalHits === 0) {
+        if (!hasSearchConstraints) {
+          const fallback = await listPostgresPostingsApproximateSql(pool, options, limit, offset, sortBy);
+          return {
+            ...fallback,
+            page_capped: page.limit_capped || page.offset_capped
+          };
+        }
         const exactSummary = await getPostgresPostingResultSummary(pool, options);
         if (exactSummary.count > 0) {
           logSearchFallback("meili_zero_postgres_exact_positive", {
@@ -922,7 +933,9 @@ async function listPostgresPostings(pool, options = {}) {
             hide_no_date: Boolean(options.hide_no_date)
           }
         });
-        return listPostgresPostingsSql(pool, options, limit, offset, sortBy);
+        return hasSearchConstraints
+          ? listPostgresPostingsSql(pool, options, limit, offset, sortBy)
+          : listPostgresPostingsApproximateSql(pool, options, limit, offset, sortBy);
       }
       const sourceFacets = buildMeiliSourceFacets(searchResult);
       return {
@@ -967,13 +980,8 @@ async function listPostgresPostings(pool, options = {}) {
   };
 }
 
-async function getPostgresCounts(pool, options = {}) {
+async function queryPostgresCounts(pool, options = {}) {
   const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
-  const cacheTtlMs = resolvePostgresCountsCacheTtlMs(options);
-  const cached = postgresCountsCache.get(pool);
-  if (!options.force && cacheTtlMs > 0 && cached && cached.expiresAtMs > nowMs) {
-    return clonePostgresCounts(cached.counts);
-  }
   const [
     companyRow,
     syncCompanyRow,
@@ -1056,13 +1064,92 @@ async function getPostgresCounts(pool, options = {}) {
     postings_seen_24h_count: Number(seenRow.rows[0]?.count || 0),
     company_count_by_ats
   };
-  if (!options.force && cacheTtlMs > 0) {
-    postgresCountsCache.set(pool, {
-      counts: clonePostgresCounts(counts),
-      expiresAtMs: nowMs + cacheTtlMs
-    });
-  }
   return clonePostgresCounts(counts);
+}
+
+async function readPostgresCountsSnapshot(pool, options = {}) {
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  const result = await pool.query(`
+    SELECT counts, EXTRACT(EPOCH FROM refreshed_at)::bigint AS refreshed_at_epoch
+    FROM public_stats_snapshot
+    WHERE id = 1;
+  `);
+  const row = result.rows?.[0];
+  if (!row?.counts) return null;
+  const snapshotEpoch = Number(row.refreshed_at_epoch || 0);
+  return clonePostgresCounts({
+    ...row.counts,
+    counts_snapshot_epoch: snapshotEpoch,
+    counts_snapshot_stale: snapshotEpoch <= 0 || Math.floor(nowMs / 1000) - snapshotEpoch > 60 * 60
+  });
+}
+
+async function refreshPostgresPublicStatsSnapshot(pool, options = {}) {
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  const counts = await queryPostgresCounts(pool, { nowMs });
+  await pool.query(
+    `
+      INSERT INTO public_stats_snapshot (id, counts, refreshed_at)
+      VALUES (1, $1::jsonb, now())
+      ON CONFLICT (id) DO UPDATE SET
+        counts = EXCLUDED.counts,
+        refreshed_at = now();
+    `,
+    [JSON.stringify(counts)]
+  );
+  const snapshotted = clonePostgresCounts({
+    ...counts,
+    counts_snapshot_epoch: Math.floor(nowMs / 1000),
+    counts_snapshot_stale: false
+  });
+  postgresCountsCache.set(pool, {
+    counts: snapshotted,
+    expiresAtMs: nowMs + resolvePostgresCountsCacheTtlMs(options)
+  });
+  return snapshotted;
+}
+
+async function getPostgresCounts(pool, options = {}) {
+  const nowMs = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
+  const cacheTtlMs = resolvePostgresCountsCacheTtlMs(options);
+  const cached = postgresCountsCache.get(pool);
+  if (!options.force && cacheTtlMs > 0 && cached && cached.expiresAtMs > nowMs) {
+    return clonePostgresCounts(cached.counts);
+  }
+  if (!options.force && postgresCountsPending.has(pool)) {
+    return clonePostgresCounts(await postgresCountsPending.get(pool));
+  }
+
+  const shouldUseSnapshot = options.useSnapshot === true || (
+    options.useSnapshot !== false &&
+    !options.force &&
+    !Object.prototype.hasOwnProperty.call(options, "nowMs")
+  );
+  const load = async () => {
+    if (shouldUseSnapshot) {
+      try {
+        const snapshot = await readPostgresCountsSnapshot(pool, { nowMs });
+        if (snapshot) return snapshot;
+      } catch (error) {
+        if (options.useSnapshot === true) throw error;
+      }
+    }
+    return queryPostgresCounts(pool, { nowMs });
+  };
+  const pending = load();
+  if (!options.force) postgresCountsPending.set(pool, pending);
+  try {
+    const counts = clonePostgresCounts(await pending);
+    if (!options.force && cacheTtlMs > 0) {
+      postgresCountsCache.set(pool, {
+        counts,
+        expiresAtMs: nowMs + cacheTtlMs
+      });
+    }
+    return clonePostgresCounts(counts);
+  } finally {
+    if (postgresCountsPending.get(pool) === pending) postgresCountsPending.delete(pool);
+  }
 }
 
 async function getPostgresFilterOptions(pool, atsItems = [], options = {}) {
@@ -4102,6 +4189,7 @@ module.exports = {
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
   recordPostgresPublicSearchEvent,
+  refreshPostgresPublicStatsSnapshot,
   requestSyncStart,
   requestSyncStop,
   resolvePublicPostingsPage,

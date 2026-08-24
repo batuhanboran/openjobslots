@@ -3243,6 +3243,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const PROJECT_REPO_URL = "https://github.com/batuhanboran/openjobslots";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "3.0.1",
+    date: "August 24, 2026",
+    title: "Infrastructure stability and faster public search",
+    summary:
+      "Fixes worker scheduling and heartbeat-based health, removes false restarts during long ATS runs, moves expensive public counts behind a worker-refreshed snapshot and Meilisearch, adds pre-deploy backups and dirty-worktree protection, and bounds parity verification with explicit proof scope."
+  },
+  {
     version: "3.0.0",
     date: "July 10, 2026",
     title: "Full ATS registry and aggregator sources",
@@ -3525,6 +3532,11 @@ const PUBLIC_RELEASE_NOTES = [
 ];
 const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
   tr: {
+    "3.0.1": {
+      title: "Altyapı kararlılığı ve hızlı genel arama",
+      summary:
+        "Worker zamanlamasını ve heartbeat tabanlı sağlık denetimini düzeltir, uzun ATS çalıştırmalarındaki hatalı restart döngüsünü kaldırır, genel arama ve durum uçlarındaki pahalı Postgres sayımlarını snapshot ve Meilisearch yoluna taşır, deploy öncesi yedekleme ile kirli worktree koruması ekler ve parity kontrollerini süre sınırlı hale getirir."
+    },
     "3.0.0": {
       title: "Tam ATS kataloğu ve toplayıcı kaynaklar",
       summary:
@@ -3577,6 +3589,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   de: {
+    "3.0.1": {
+      title: "Stabile Infrastruktur und schnellere öffentliche Suche",
+      summary:
+        "Korrigiert Worker-Zeitplanung und heartbeat-basierte Zustandsprüfung, verhindert Fehlneustarts bei langen ATS-Läufen, verlagert teure öffentliche Zählungen hinter Snapshots und Meilisearch, sichert Deployments vorab ab und begrenzt Paritätsprüfungen zeitlich mit eindeutigem Prüfumfang."
+    },
     "3.0.0": {
       title: "Vollständiges ATS-Register und Aggregator-Quellen",
       summary:
@@ -3629,6 +3646,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   fr: {
+    "3.0.1": {
+      title: "Infrastructure stable et recherche publique plus rapide",
+      summary:
+        "Corrige la planification du worker et son contrôle de santé par heartbeat, élimine les redémarrages erronés pendant les longs traitements ATS, place les comptages publics coûteux derrière un snapshot et Meilisearch, sécurise les déploiements par sauvegarde et borne les contrôles de parité avec une portée explicite."
+    },
     "3.0.0": {
       title: "Registre ATS complet et sources agrégatrices",
       summary:
@@ -3681,6 +3703,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   es: {
+    "3.0.1": {
+      title: "Infraestructura estable y búsqueda pública más rápida",
+      summary:
+        "Corrige la programación y la salud por heartbeat del worker, elimina reinicios erróneos durante ejecuciones ATS largas, traslada los conteos públicos costosos a un snapshot y Meilisearch, protege los despliegues con copias previas y acota las comprobaciones de paridad con un alcance explícito."
+    },
     "3.0.0": {
       title: "Registro ATS completo y fuentes agregadoras",
       summary:
@@ -3733,6 +3760,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-BR": {
+    "3.0.1": {
+      title: "Infraestrutura estável e busca pública mais rápida",
+      summary:
+        "Corrige o agendamento e a verificação de saúde por heartbeat do worker, elimina reinícios indevidos em execuções ATS longas, move contagens públicas caras para snapshot e Meilisearch, protege o deploy com backup prévio e limita as verificações de paridade com escopo explícito."
+    },
     "3.0.0": {
       title: "Registro ATS completo e fontes agregadoras",
       summary:
@@ -3785,6 +3817,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   "pt-PT": {
+    "3.0.1": {
+      title: "Infraestrutura estável e pesquisa pública mais rápida",
+      summary:
+        "Corrige o agendamento e a verificação de saúde por heartbeat do worker, elimina reinícios indevidos em execuções ATS longas, move contagens públicas dispendiosas para snapshot e Meilisearch, protege o deploy com cópia prévia e limita as verificações de paridade com âmbito explícito."
+    },
     "3.0.0": {
       title: "Registo ATS completo e fontes agregadoras",
       summary:
@@ -3837,6 +3874,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   it: {
+    "3.0.1": {
+      title: "Infrastruttura stabile e ricerca pubblica più veloce",
+      summary:
+        "Corregge la pianificazione e il controllo heartbeat del worker, elimina i riavvii errati durante le lunghe esecuzioni ATS, sposta i conteggi pubblici costosi dietro snapshot e Meilisearch, protegge i deploy con backup preventivi e limita le verifiche di parità con un ambito esplicito."
+    },
     "3.0.0": {
       title: "Registro ATS completo e fonti aggregatrici",
       summary:
@@ -3889,6 +3931,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   nl: {
+    "3.0.1": {
+      title: "Stabiele infrastructuur en sneller openbaar zoeken",
+      summary:
+        "Herstelt workerplanning en heartbeat-gezondheidscontrole, voorkomt foutieve herstarts tijdens lange ATS-runs, verplaatst dure openbare tellingen naar een snapshot en Meilisearch, beschermt deployments met voorafgaande back-ups en begrenst pariteitscontroles met een expliciete bewijsomvang."
+    },
     "3.0.0": {
       title: "Volledig ATS-register en aggregatorbronnen",
       summary:
@@ -3941,6 +3988,11 @@ const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
     }
   },
   pl: {
+    "3.0.1": {
+      title: "Stabilna infrastruktura i szybsze wyszukiwanie publiczne",
+      summary:
+        "Naprawia harmonogram workera i kontrolę zdrowia opartą na heartbeat, usuwa błędne restarty podczas długich przebiegów ATS, przenosi kosztowne publiczne zliczenia do snapshotu i Meilisearch, zabezpiecza wdrożenia kopią zapasową oraz ogranicza czas kontroli zgodności z jednoznacznym zakresem dowodu."
+    },
     "3.0.0": {
       title: "Pełny rejestr ATS i źródła agregujące",
       summary:
@@ -9529,6 +9581,8 @@ export default function App() {
       const compact = mode === "results";
       const showAttachedSuggestions = suggestionsVisible && searchSuggestions.length > 0;
       const showResultsMobileSuggestions = compact && !isDesktopViewport && showAttachedSuggestions;
+      const showMobileSuggestionsInFlow = !isDesktopViewport && showAttachedSuggestions;
+      const showMobileHomeUpload = !compact && !isDesktopViewport;
       const emptySearchPlaceholder = compact ? compactSearchPlaceholder : exampleSearchPlaceholder;
       const searchLength = String(search || "").trim().length;
       const searchLengthStyle =
@@ -9549,7 +9603,8 @@ export default function App() {
             style={[
               styles.searchBoxAutocomplete,
               compact ? styles.searchBoxAutocompleteResults : null,
-              showResultsMobileSuggestions ? styles.searchBoxAutocompleteResultsWithSuggestions : null
+              showResultsMobileSuggestions ? styles.searchBoxAutocompleteResultsWithSuggestions : null,
+              showMobileSuggestionsInFlow ? styles.searchBoxAutocompleteMobileWithSuggestions : null
             ]}
             testID="search-box-autocomplete"
           >
@@ -9571,6 +9626,7 @@ export default function App() {
                   styles.search,
                   isDarkPublicTheme ? styles.searchDark : null,
                   styles.yahooSearchInput,
+                  showMobileHomeUpload ? styles.yahooSearchInputMobileWithUpload : null,
                   searchLengthStyle,
                   isDarkPublicTheme ? styles.yahooSearchInputDark : null
                 ]}
@@ -9611,6 +9667,7 @@ export default function App() {
                   onPress={triggerFileSelect}
                   style={({ pressed }) => [
                     styles.cvUploadButton,
+                    showMobileHomeUpload ? styles.cvUploadButtonMobile : null,
                     pressed ? styles.cvUploadButtonPressed : null
                   ]}
                   testID="cv-upload-button"
@@ -9637,7 +9694,7 @@ export default function App() {
                 style={[
                   styles.searchSuggestionsPanel,
                   compact ? styles.searchSuggestionsPanelResults : null,
-                  showResultsMobileSuggestions ? styles.searchSuggestionsPanelResultsMobileInFlow : null,
+                  showMobileSuggestionsInFlow ? styles.searchSuggestionsPanelMobileInFlow : null,
                   isDarkPublicTheme ? styles.searchSuggestionsPanelDark : null,
                   suggestionsMotionStyle
                 ]}
@@ -11769,8 +11826,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   publicFooterVersionButtonDark: {
-    borderColor: "rgba(216, 204, 255, 0.24)",
-    backgroundColor: "rgba(183, 158, 255, 0.14)"
+    borderColor: "#6D5B8F",
+    backgroundColor: "#201A2F"
   },
   publicFooterCredit: {
     maxWidth: 360,
@@ -11855,6 +11912,10 @@ const styles = StyleSheet.create({
     zIndex: 120,
     elevation: 14
   },
+  searchBoxAutocompleteMobileWithSuggestions: {
+    height: "auto",
+    minHeight: 52
+  },
   yahooSearchBoxFrame: {
     width: 614,
     maxWidth: "100%",
@@ -11931,6 +11992,9 @@ const styles = StyleSheet.create({
           outlineWidth: 0
         }
       : {})
+  },
+  yahooSearchInputMobileWithUpload: {
+    paddingRight: 44
   },
   yahooSearchInputDark: {
     color: OJS_DARK_COLORS.ink,
@@ -12110,7 +12174,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   },
   publicVersionLabelDark: {
-    color: OJS_DARK_COLORS.muted
+    color: "#F0EBFF"
   },
   searchCreditText: {
     flexShrink: 1,
@@ -12805,7 +12869,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20
   },
-  searchSuggestionsPanelResultsMobileInFlow: {
+  searchSuggestionsPanelMobileInFlow: {
     position: "relative",
     top: 0,
     left: 0,
@@ -14834,6 +14898,12 @@ const styles = StyleSheet.create({
           transition: "transform 0.15s ease, opacity 0.15s ease"
         }
       : {})
+  },
+  cvUploadButtonMobile: {
+    position: "absolute",
+    right: 8,
+    marginRight: 0,
+    zIndex: 2
   },
   cvUploadButtonPressed: {
     transform: [{ scale: 0.96 }],

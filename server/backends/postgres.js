@@ -535,6 +535,12 @@ async function ensurePostgresSchema(pool) {
     VALUES (1, 'idle')
     ON CONFLICT(id) DO NOTHING;
 
+    CREATE TABLE IF NOT EXISTS public_stats_snapshot (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      counts JSONB NOT NULL DEFAULT '{}'::jsonb,
+      refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
       INSERT INTO schema_migrations (version)
       VALUES ('${POSTGRES_SCHEMA_VERSION}')
       ON CONFLICT(version) DO NOTHING;

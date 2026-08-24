@@ -29,10 +29,16 @@ const {
   normalizeAtsKey,
   processPostgresSearchIndexOutbox,
   prunePostgresRetention,
+  refreshPostgresPublicStatsSnapshot,
   upsertPostgresPostings
 } = require("../backends/postgresStore");
 const { ensureMeiliPostingsIndex } = require("../search/meili");
 const { readWorkerBudgetConfig } = require("./workerConfig");
+const {
+  createSourceQualityProtectionScheduler,
+  shouldStartAutomaticSync
+} = require("./workerRuntime");
+const { startWorkerHeartbeat } = require("./workerHeartbeat");
 
 // Import Store Operations
 const {
@@ -125,6 +131,16 @@ const PER_HOST_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(
 )));
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
+const SOURCE_QUALITY_PROTECTION_INTERVAL_MS = positiveNumber(
+  process.env.OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS,
+  15 * 60 * 1000
+);
+const sourceQualityProtectionScheduler = createSourceQualityProtectionScheduler({
+  intervalMs: SOURCE_QUALITY_PROTECTION_INTERVAL_MS
+});
+const publicStatsRefreshScheduler = createSourceQualityProtectionScheduler({
+  intervalMs: SOURCE_QUALITY_PROTECTION_INTERVAL_MS
+});
 
 function sourceHost(value) {
   try {
@@ -509,11 +525,15 @@ async function runPostgresIngestionOnce(pool, options = {}) {
     try {
       await prunePostgresRetention(pool);
       await processPostgresSearchIndexOutbox(pool);
-      if (targets.length > 0) {
-        await applyPostgresSourceQualityProtection(pool, {
-          atsKeys: Array.from(new Set(targets.map((target) => target.atsKey)))
-        });
-      }
+      await sourceQualityProtectionScheduler.schedule(
+        Array.from(new Set(targets.map((target) => target.atsKey))),
+        {
+          apply: (atsKeys) => applyPostgresSourceQualityProtection(pool, { atsKeys })
+        }
+      );
+      await publicStatsRefreshScheduler.schedule(["public-stats"], {
+        apply: () => refreshPostgresPublicStatsSnapshot(pool)
+      });
     } catch (maintenanceError) {
       console.warn(`[ingestion] retention/search-index maintenance failed: ${maintenanceError.message}`);
     }
@@ -625,6 +645,9 @@ async function runIngestionOnce() {
 
 async function startWorker() {
   await initDb();
+  startWorkerHeartbeat({
+    intervalMs: positiveNumber(process.env.OPENJOBSLOTS_WORKER_HEARTBEAT_INTERVAL_MS, 30000)
+  });
 
   if (DB_BACKEND === "postgres") {
     const pool = createPostgresPool();
@@ -688,10 +711,14 @@ async function startWorker() {
         const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
         const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
         const backlogCheckCoolingDown = nowEpoch - lastBacklogCheckEmptyEpoch < 300;
-        const hasBudgetAndBacklog = dueTargets > 0 && remainingBudget > 0 && !backlogCheckCoolingDown;
-        const timeForIntervalCheck = nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds;
-
-        if (hasBudgetAndBacklog || timeForIntervalCheck) {
+        if (shouldStartAutomaticSync({
+          nowEpoch,
+          lastAutomaticSyncEpoch,
+          autoSyncIntervalSeconds,
+          dueTargets,
+          remainingBudget,
+          backlogCheckCoolingDown
+        })) {
           if (dueTargets > 0 && remainingBudget > 0 && !backlogCheckCoolingDown) {
             const targetLimit = Math.min(AUTO_SYNC_TARGETS_PER_RUN, remainingBudget);
             const summary = await runPostgresIngestionOnce(pool, {
@@ -789,6 +816,7 @@ module.exports = {
   sanitizeUrlForLog,
   selectDueTargets,
   selectPostgresDueTargets,
+  shouldStartAutomaticSync,
   sortDueTargetCandidates,
   startWorker,
   startWorkerWithBackoff,

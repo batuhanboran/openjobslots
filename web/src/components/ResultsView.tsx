@@ -36,20 +36,22 @@ export function ResultsView({ query, region, filters = {} }: ResultsViewProps) {
 
   useEffect(() => {
     // A filter-only search (e.g. landing on /ara?remote=remote) is valid too.
+    const generation = ++genRef.current;
     if (!query && !remote && !freshness_days && !ats) {
-      setLoading(false);
-      setItems([]);
-      setMeta(null);
       return;
     }
     const ctrl = new AbortController();
-    genRef.current += 1;
-    setLoading(true);
-    setError(false);
-    setLoadMoreError(false);
     offsetRef.current = 0;
-    fetchPostings({ q: query, region, remote, freshness_days, ats, offset: 0 }, ctrl.signal)
+    Promise.resolve()
+      .then(() => {
+        if (ctrl.signal.aborted || generation !== genRef.current) return null;
+        setLoading(true);
+        setError(false);
+        setLoadMoreError(false);
+        return fetchPostings({ q: query, region, remote, freshness_days, ats, offset: 0 }, ctrl.signal);
+      })
       .then((data) => {
+        if (!data || generation !== genRef.current) return;
         if (data.error) {
           setError(true);
           setItems([]);
@@ -61,9 +63,13 @@ export function ResultsView({ query, region, filters = {} }: ResultsViewProps) {
         offsetRef.current = data.items?.length ?? 0;
       })
       .catch((e: unknown) => {
-        if (!(e instanceof DOMException && e.name === "AbortError")) setError(true);
+        if (generation === genRef.current && !(e instanceof DOMException && e.name === "AbortError")) {
+          setError(true);
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (generation === genRef.current) setLoading(false);
+      });
     return () => ctrl.abort();
   }, [query, region, remote, freshness_days, ats]);
 

@@ -8,6 +8,9 @@ const API_BASE = process.env.OJS_API_BASE || "https://openjobslots.com";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {
+    root: process.cwd(),
+  },
   async rewrites() {
     // Next.js owns /, /ara, /api/*, /_next/*, and its static files.
     // Every other path — backend API, mobile endpoints and SEO

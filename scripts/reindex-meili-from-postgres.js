@@ -38,6 +38,7 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
     apply: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_APPLY),
     batchSize: parseNumberOption(env.OPENJOBSLOTS_REINDEX_BATCH_SIZE || 1000, 1000, 100, 5000),
+    bounded: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_BOUNDED),
     check: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_CHECK),
     confirmProduction: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_CONFIRM_PRODUCTION),
     dryRun: parseBooleanEnv(env.OPENJOBSLOTS_REINDEX_DRY_RUN),
@@ -63,6 +64,12 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
       0,
       100
     ),
+    maxRuntimeMs: parseNumberOption(
+      env.OPENJOBSLOTS_REINDEX_MAX_RUNTIME_MS || 900000,
+      900000,
+      10000,
+      3600000
+    ),
     facetDriftMaxInspectedHits: parseNumberOption(
       env.OPENJOBSLOTS_REINDEX_FACET_DRIFT_MAX_INSPECTED_HITS || DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
       DEFAULT_FACET_DRIFT_MAX_INSPECTED_HITS,
@@ -85,6 +92,11 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
     }
     if (arg === "--check") {
       options.check = true;
+      handled = true;
+    }
+    if (arg === "--bounded") {
+      options.check = true;
+      options.bounded = true;
       handled = true;
     }
     if (arg === "--confirm-production") {
@@ -177,6 +189,15 @@ function parseReindexArgs(argv = process.argv.slice(2), env = process.env) {
       );
       handled = true;
     }
+    if (arg.startsWith("--max-runtime-ms=")) {
+      options.maxRuntimeMs = parseNumberOption(
+        arg.slice("--max-runtime-ms=".length),
+        options.maxRuntimeMs,
+        10000,
+        3600000
+      );
+      handled = true;
+    }
     if (arg.startsWith("--temp-index-suffix=")) {
       options.tempIndexSuffix = String(arg.slice("--temp-index-suffix=".length) || "").trim();
       handled = true;
@@ -205,8 +226,15 @@ function writeResultOutput(result, options = {}) {
 }
 
 async function meiliRequest(config, requestPath, options = {}) {
+  const requestTimeoutMs = parseNumberOption(
+    config.requestTimeoutMs || process.env.OPENJOBSLOTS_MEILI_REQUEST_TIMEOUT_MS || 30000,
+    30000,
+    1000,
+    120000
+  );
   const response = await fetch(`${config.host}${requestPath}`, {
     ...options,
+    signal: options.signal || AbortSignal.timeout(requestTimeoutMs),
     headers: {
       "Content-Type": "application/json",
       ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
@@ -220,6 +248,15 @@ async function meiliRequest(config, requestPath, options = {}) {
   }
   if (response.status === 204) return {};
   return response.json();
+}
+
+function assertParityDeadline(options = {}, stage = "unknown") {
+  const deadlineAtMs = Number(options.deadlineAtMs || 0);
+  if (deadlineAtMs > 0 && Date.now() > deadlineAtMs) {
+    const error = new Error(`Meili parity check exceeded max runtime during ${stage}`);
+    error.code = "PARITY_MAX_RUNTIME_EXCEEDED";
+    throw error;
+  }
 }
 
 async function waitForMeiliTask(config, task, timeoutMs = 60000) {
@@ -421,29 +458,37 @@ async function getPostgresIndexableCount(pool) {
 }
 
 async function getPostgresRemoteFacet(pool, options = {}) {
+  const result = await pool.query(`
+    /* meili_remote_facet */
+    SELECT normalized_remote_type, COUNT(*)::int AS count
+    FROM (
+      SELECT CASE
+        WHEN lower(btrim(coalesce(remote_type, ''))) IN ('remote', 'hybrid', 'onsite')
+          THEN lower(btrim(remote_type))
+        WHEN lower(coalesce(location_text, '')) ~ '\\mhybrid\\M'
+          THEN 'hybrid'
+        WHEN lower(coalesce(location_text, '')) ~ '\\m(remote|fully remote|work from home|work from anywhere|wfh|anywhere|home based|home office|telecommute|telework|virtual|distributed)\\M'
+          THEN 'remote'
+        WHEN lower(coalesce(location_text, '')) ~ '\\m(on[- ]?site|onsite|office based|in office|work from office)\\M'
+          THEN 'onsite'
+        ELSE 'unknown'
+      END AS normalized_remote_type
+      FROM postings
+      WHERE ${indexablePostingsWhereClause()}
+    ) normalized
+    GROUP BY normalized_remote_type;
+  `);
+  const rows = result.rows || [];
+  if (rows.every((row) => Object.prototype.hasOwnProperty.call(row, "normalized_remote_type"))) {
+    return Object.fromEntries(rows.map((row) => [
+      remoteFacetKey(row.normalized_remote_type),
+      Number(row.count || 0)
+    ]));
+  }
   const facet = {};
-  let lastCanonicalUrl = "";
-  const batchSize = Math.max(100, Math.min(10000, Number(options.batchSize || 5000)));
-  while (true) {
-    const result = await pool.query(
-      `
-        /* meili_remote_facet */
-        SELECT ${postingSelectColumns()}
-        FROM postings
-        WHERE ${indexablePostingsWhereClause()}
-          AND canonical_url > $1
-        ORDER BY canonical_url ASC
-        LIMIT $2;
-      `,
-      [lastCanonicalUrl, batchSize]
-    );
-    if (result.rows.length === 0) break;
-    for (const row of result.rows) {
-      const document = toMeiliPostingDocument(row);
-      const key = remoteFacetKey(document.remote_type);
-      facet[key] = (facet[key] || 0) + 1;
-    }
-    lastCanonicalUrl = String(result.rows[result.rows.length - 1].canonical_url || "");
+  for (const row of rows) {
+    const key = remoteFacetKey(toMeiliPostingDocument(row).remote_type);
+    facet[key] = Number(facet[key] || 0) + 1;
   }
   return facet;
 }
@@ -597,6 +642,7 @@ async function getPostgresIndexableDocumentRefs(pool, options = {}) {
   let lastCanonicalUrl = "";
   const batchSize = Math.max(100, Math.min(10000, Number(options.batchSize || 5000)));
   while (true) {
+    assertParityDeadline(options, "postgres_document_refs");
     const result = await pool.query(
       `
         SELECT canonical_url
@@ -614,6 +660,9 @@ async function getPostgresIndexableDocumentRefs(pool, options = {}) {
       const id = toMeiliDocumentId(canonicalUrl);
       ids.add(id);
       urlsById.set(id, canonicalUrl);
+    }
+    if (typeof options.onProgress === "function") {
+      options.onProgress({ stage: "postgres_document_refs", processed: ids.size });
     }
     lastCanonicalUrl = String(result.rows[result.rows.length - 1].canonical_url || "");
   }
@@ -641,6 +690,7 @@ async function getMeiliDocumentDrift(pool, config, indexName, options = {}) {
   let offset = 0;
   const limit = Math.max(100, Math.min(1000, Number(options.pageSize || 1000)));
   while (true) {
+    assertParityDeadline(options, "meili_document_refs");
     const page = await meiliRequest(
       config,
       `/indexes/${encodeIndex(indexName)}/documents?limit=${limit}&offset=${offset}&fields=id,canonical_url,title,company,remote_type,hidden`
@@ -660,6 +710,9 @@ async function getMeiliDocumentDrift(pool, config, indexName, options = {}) {
       }
     }
     offset += documents.length;
+    if (typeof options.onProgress === "function") {
+      options.onProgress({ stage: "meili_document_refs", processed: meiliDocumentCount });
+    }
     if (documents.length < limit) break;
   }
 
@@ -990,13 +1043,18 @@ async function runSampleSearches(config, indexName, queries = DEFAULT_SAMPLE_QUE
 }
 
 async function validateMeiliIndexAgainstPostgres(pool, config, indexName, options = {}) {
+  assertParityDeadline(options, "postgres_count");
   const postgresCount = await getPostgresIndexableCount(pool);
+  assertParityDeadline(options, "postgres_bad_rows");
   const postgresBadVisibleRows = await getPostgresBadVisibleRows(pool);
+  assertParityDeadline(options, "postgres_required_fields");
   const postgresMissingRequiredFields = await getPostgresMissingRequiredFields(pool);
+  assertParityDeadline(options, "meili_metadata");
   const index = config.enabled ? await getMeiliIndex(config, indexName) : { skipped: true };
   const settings = config.enabled ? await getMeiliSettings(config, indexName) : { skipped: true };
   const settingsValidation = config.enabled ? validateMeiliSettings(index, settings) : { ok: false, skipped: true, mismatches: [] };
   const stats = config.enabled ? await getMeiliStats(config, indexName) : { skipped: true, numberOfDocuments: 0 };
+  assertParityDeadline(options, "remote_facets");
   const postgresRemoteFacet = await getPostgresRemoteFacet(pool, options);
   const meiliRemoteFacet = config.enabled && index?.uid ? await getMeiliRemoteFacet(config, indexName) : {};
   const remoteFacetComparison = compareFacetDistributions(postgresRemoteFacet, meiliRemoteFacet);
@@ -1004,10 +1062,13 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
   const samples = config.enabled && index?.uid
     ? await getSampleDocumentMismatches(pool, config, indexName, options.sampleLimit)
     : { sampled: 0, sample_mismatches: [] };
-  const documentDrift = config.enabled && index?.uid && countDelta !== 0
+  assertParityDeadline(options, "document_drift");
+  const documentDrift = config.enabled && index?.uid && countDelta !== 0 && options.skipFullDocumentDrift !== true
     ? await getMeiliDocumentDrift(pool, config, indexName, {
       batchSize: options.batchSize,
-      sampleLimit: options.driftSampleLimit ?? 20
+      sampleLimit: options.driftSampleLimit ?? 20,
+      onProgress: options.onProgress,
+      deadlineAtMs: options.deadlineAtMs
     })
     : { extra_meili_documents: [], missing_meili_documents: [] };
   const remoteFacetMismatchInspection = config.enabled && index?.uid && remoteFacetComparison.ok === false
@@ -1016,6 +1077,7 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
       maxInspectedHits: options.facetDriftMaxInspectedHits
     })
     : { sampled: 0, samples: [] };
+  assertParityDeadline(options, "sample_searches");
   const sampleMismatchSummary = summarizeSampleMismatches(samples.sample_mismatches);
   const sampleSearches = config.enabled && index?.uid && options.sampleSearches !== false
     ? await runSampleSearches(config, indexName)
@@ -1069,16 +1131,45 @@ async function validateMeiliIndexAgainstPostgres(pool, config, indexName, option
 }
 
 async function checkMeiliParity(pool, config, options) {
+  const startedAtMs = Date.now();
+  const maxRuntimeMs = Math.max(10000, Number(options.maxRuntimeMs || 900000));
+  const deadlineAtMs = startedAtMs + maxRuntimeMs;
+  const progress = (event) => {
+    if (!options.silent) console.error(`[meili-parity] ${event.stage} processed=${event.processed}`);
+  };
   const result = await validateMeiliIndexAgainstPostgres(pool, config, config.indexName, {
     sampleLimit: options.sampleLimit,
     driftSampleLimit: options.driftSampleLimit,
     facetDriftSampleLimit: options.facetDriftSampleLimit,
     facetDriftMaxInspectedHits: options.facetDriftMaxInspectedHits,
-    sampleSearches: true
+    sampleSearches: options.bounded !== true,
+    skipFullDocumentDrift: options.bounded === true,
+    onProgress: progress,
+    deadlineAtMs
   });
-  return {
+  assertParityDeadline({ deadlineAtMs }, "result_finalize");
+  return decorateParityProof({
     ...result,
     check: true
+  }, options);
+}
+
+function decorateParityProof(result = {}, options = {}) {
+  if (options.bounded === true) {
+    return {
+      ...result,
+      ok: false,
+      bounded_ok: Boolean(result.ok),
+      validation_complete: false,
+      proof_scope: "bounded",
+      release_proof: false
+    };
+  }
+  return {
+    ...result,
+    validation_complete: true,
+    proof_scope: "full",
+    release_proof: Boolean(result.ok)
   };
 }
 
@@ -1889,13 +1980,15 @@ async function runReindex(pool, options = parseReindexArgs(), env = process.env)
         options.validateOnly ? "meili-validate-only" : "meili-reindex-check",
         () => checkMeiliParity(pool, config, options)
       );
-      writeStatusSafe({
-        ok: checkResult.ok,
-        current_index_uid: config.indexName,
-        last_count_delta: checkResult.count_delta,
-        last_facet_delta: latestFacetDeltaSummary(checkResult.remote_facet_delta),
-        last_task_error: checkResult.ok ? "" : "Meili/Postgres validation mismatch."
-      }, options, env);
+      if (!options.bounded) {
+        writeStatusSafe({
+          ok: checkResult.ok,
+          current_index_uid: config.indexName,
+          last_count_delta: checkResult.count_delta,
+          last_facet_delta: latestFacetDeltaSummary(checkResult.remote_facet_delta),
+          last_task_error: checkResult.ok ? "" : "Meili/Postgres validation mismatch."
+        }, options, env);
+      }
       return writeResultOutput(checkResult, options);
     }
 
@@ -1927,6 +2020,7 @@ module.exports = {
   compareFacetDistributions,
   compareMeiliDocument,
   compareSettingList,
+  decorateParityProof,
   ensureMeiliIndex,
   getExtraDocumentRepairSafetyGate,
   getDocumentUpsertRepairSafetyGate,

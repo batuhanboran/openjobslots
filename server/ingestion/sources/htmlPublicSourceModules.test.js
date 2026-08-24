@@ -1002,6 +1002,27 @@ test("applicantpro source module discovers domain id and fetches core jobs JSON"
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: source.parserVersion }).status, "accepted");
 });
 
+test("applicantpro source module classifies disabled-board redirects as no jobs", async () => {
+  const source = getSourceModule("applicantpro");
+  const company = {
+    company_name: "Disabled ApplicantPro",
+    ATS_name: "applicantpro",
+    url_string: "https://disabled.applicantpro.com/jobs/"
+  };
+
+  await assert.rejects(
+    () => source.fetchList(company, {
+      fetcher: async (url) => ({
+        html: "<html><body>Account disabled</body></html>",
+        status: 200,
+        url: "https://disabled.applicantpro.com/notset.php?disabled=1",
+        requestedUrl: url
+      })
+    }),
+    (error) => error?.ingestionErrorType === "no_jobs" && /disabled board redirect/i.test(error.message)
+  );
+});
+
 test("careerplug source module enriches list rows from deterministic detail JSON-LD", async () => {
   const source = getSourceModule("careerplug");
   const fixture = readJson(path.join(__dirname, "careerplug", "fixtures", "route-detection.json"));

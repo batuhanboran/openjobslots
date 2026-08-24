@@ -10,6 +10,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: "3.0.1",
+    date: "24 Ağu 2026",
+    title: "Altyapı kararlılığı ve hızlı genel arama",
+    summary:
+      "Worker zamanlamasını ve heartbeat tabanlı sağlık denetimini düzeltir, uzun ATS çalıştırmalarındaki hatalı restart döngüsünü kaldırır, genel arama ve durum uçlarındaki pahalı Postgres sayımlarını snapshot ve Meilisearch yoluna taşır, deploy öncesi yedekleme ile kirli worktree koruması ekler ve parity kontrollerini süre sınırlı hale getirir.",
+  },
+  {
     version: "3.0.0",
     date: "10 Tem 2026",
     title: "Tam ATS kataloğu ve toplayıcı kaynaklar",

@@ -24,8 +24,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem("ojs-language");
     if (stored && (SUPPORTED_LANGS as readonly string[]).includes(stored)) {
-      setLangState(stored as Lang);
       document.documentElement.lang = stored;
+      let active = true;
+      queueMicrotask(() => {
+        if (active) setLangState(stored as Lang);
+      });
+      return () => {
+        active = false;
+      };
     }
   }, []);
 
