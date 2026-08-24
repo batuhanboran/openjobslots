@@ -52,7 +52,7 @@ assertContains(workerBlock, "healthcheck:");
 assertContains(workerBlock, "scripts/healthcheck-worker.js");
 
 const meiliBlock = serviceBlock("openjobslots-meilisearch");
-assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEM_LIMIT:-4096m");
-assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-4096m");
+assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEM_LIMIT:-6144m");
+assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-8192m");
 
 console.log("docker runtime policy tests passed");

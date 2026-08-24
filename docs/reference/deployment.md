@@ -57,11 +57,11 @@ To temporarily return to the May 27 high-throughput stage, override `INGESTION_W
 Compose sets memory and swap ceilings for the four production services. Defaults are:
 
 - `OPENJOBSLOTS_POSTGRES_MEM_LIMIT=1536m` and `OPENJOBSLOTS_POSTGRES_MEMSWAP_LIMIT=1536m`.
-- `OPENJOBSLOTS_MEILI_MEM_LIMIT=4096m` and `OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=4096m`.
+- `OPENJOBSLOTS_MEILI_MEM_LIMIT=6144m` and `OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=8192m`.
 - `OPENJOBSLOTS_APP_MEM_LIMIT=768m` and `OPENJOBSLOTS_APP_MEMSWAP_LIMIT=768m`.
 - `OPENJOBSLOTS_WORKER_MEM_LIMIT=768m` and `OPENJOBSLOTS_WORKER_MEMSWAP_LIMIT=768m`.
 
-App and worker Node heaps are separately bounded with `OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB=384` and `OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB=512`. Keep `memswap_limit` equal to `mem_limit` unless you intentionally want a service to use host swap.
+App and worker Node heaps are separately bounded with `OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB=384` and `OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB=512`. Meilisearch intentionally has a 2 GiB swap allowance: a full temp-index rebuild briefly holds the live and replacement indexes together, while steady-state search remains well below the ceiling. Keep the worker isolated during a replacement reindex and monitor container restarts, cgroup OOM events, and host swap.
 
 Public `/postings` requests are also clamped before query execution with `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT=500` and `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET=2000`. Responses include `page_capped=true` when a caller asks beyond those bounds.
 

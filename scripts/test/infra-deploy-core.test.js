@@ -22,7 +22,8 @@ assert.match(service, /ExecStart=\/bin\/bash \/root\/OpenJobSlots\/scripts\/depl
 assert.match(service, /HEALTH_URL=http:\/\/127\.0\.0\.1:8081\/health\/ready/);
 
 assert.match(deploymentDoc, /public GitHub repository/i);
-assert.match(deploymentDoc, /OPENJOBSLOTS_MEILI_MEM_LIMIT=4096m/);
+assert.match(deploymentDoc, /OPENJOBSLOTS_MEILI_MEM_LIMIT=6144m/);
+assert.match(deploymentDoc, /OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=8192m/);
 assert.match(deploymentDoc, /worker heartbeat/i);
 assert.match(deploymentDoc, /fresh Postgres backup/i);
 
