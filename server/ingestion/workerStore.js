@@ -1024,11 +1024,10 @@ async function writePostgresPostingCache(pool, postingInput, options = {}) {
   const validation = options.validation || { ok: true, error: "" };
   const canonicalUrl = String(postingInput?.canonical_url || postingInput?.job_posting_url || "").trim();
 
-  const fallbackDate = new Date(nowEpoch * 1000).toISOString().split('T')[0];
   const posting = {
     ...postingInput,
-    posted_at_epoch: postingInput?.posted_at_epoch || postingInput?.posting_date_epoch || nowEpoch,
-    posting_date: postingInput?.posting_date || fallbackDate
+    posted_at_epoch: postingInput?.posted_at_epoch ?? postingInput?.posting_date_epoch ?? null,
+    posting_date: postingInput?.posting_date || null
   };
 
   const rawPayloadHash = hashPayload(posting || {});
@@ -1180,6 +1179,7 @@ async function writePostgresPostingCache(pool, postingInput, options = {}) {
         visibility_status: validationStatus,
         reason_codes: Array.isArray(validation.reason_codes) ? validation.reason_codes : [],
         retry_detail_refetch_eligible: Boolean(validation.retry_detail_refetch_eligible),
+        derived_dedupe_id: String(posting?.derived_dedupe_id || ""),
         evidence: validation.evidence || options.evidence || null
       })
     ]

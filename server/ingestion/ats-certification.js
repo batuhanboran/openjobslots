@@ -11,7 +11,7 @@ const {
   getParserFixtureStatus
 } = require("./adapter-metadata");
 
-const CERTIFICATION_VERSION = "ats-field-certification-v1.5.22";
+const CERTIFICATION_VERSION = "ats-field-certification-v1.5.23";
 
 const CERTIFICATION_STATUSES = new Set([
   "parser-fixture-backed",
@@ -104,6 +104,35 @@ function baseFieldDecisions(key) {
 }
 
 const ATS_CERTIFICATION_OVERRIDES = {
+  jobicy: {
+    priority: "P2",
+    sourcePattern: "Jobicy public remote-jobs JSON API.",
+    parserPath: "server/ingestion/sources/jobicy/parse.js parseJobicyPostingsFromApi",
+    requiredFixtures: ["jobs[] API fixture", "URL-shaped id rejection fixture", "expected normalized fixture"],
+    fieldDecisions: {
+      sourceId: decision("list-payload", "Use only the explicit non-URL Jobicy id/guid; canonical URLs are never promoted to source identity.")
+    }
+  },
+  remotejobsorg: {
+    priority: "P1",
+    sourcePattern: "RemoteJobs.org public JSON API with visible source attribution.",
+    parserPath: "server/ingestion/sources/remotejobsorg/parse.js parseRemoteJobsOrgPostingsFromApi",
+    requiredFixtures: ["data[] API fixture", "URL-shaped id rejection fixture", "negative remote-language fixture"],
+    fieldDecisions: {
+      remote: decision("list-payload", "Negative work-mode text overrides the remote-jobs catalog; otherwise the official API catalog is explicit remote evidence."),
+      sourceId: decision("list-payload", "Use only the explicit non-URL RemoteJobs.org API id; canonical URLs are never promoted to source identity.")
+    }
+  },
+  remoteok: {
+    priority: "P1",
+    sourcePattern: "Remote OK public JSON API with mandatory source attribution.",
+    parserPath: "server/ingestion/sources/remoteok/parse.js parseRemoteOkPostingsFromApi",
+    requiredFixtures: ["API legal notice", "explicit source id rows", "negative remote-language fixture"],
+    fieldDecisions: {
+      remote: decision("list-payload", "Explicit negative work-mode text overrides the board label; unproven rows are never forced remote."),
+      sourceId: decision("list-payload", "Use only the explicit Remote OK API id; slug and canonical URL are not source identity evidence.")
+    }
+  },
   icims: {
     priority: "P0",
     sourcePattern: "iCIMS public wrapper page, iframe/list pages, next-page links, and job detail pages.",

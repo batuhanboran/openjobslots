@@ -49,10 +49,10 @@ function testScoreboardIncludesConfiguredAtsWithoutRows() {
 
 function testHighGapEmbeddedSourceNeedsDetailRefetchAndHoldRecommendation() {
   const rows = buildAtsScoreboard({
-    atsItems: [{ value: "theapplicantmanager", label: "The Applicant Manager" }],
+    atsItems: [{ value: "icims", label: "iCIMS" }],
     qualitySummary: {
       by_source: [{
-        source_ats: "theapplicantmanager",
+        source_ats: "icims",
         total_visible_rows: 5000,
         missing_country_pct: 98,
         missing_city_pct: 100,

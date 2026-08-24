@@ -44,6 +44,18 @@ test("normalizePosting fills company fallback and required fields", () => {
   assert.equal(posting.job_posting_url, "https://example.com/job/1");
   assert.equal(posting.location, "Remote");
   assert.equal(posting.ats_key, "exampleats");
+  assert.equal(posting.source_job_id, "");
+  assert.match(posting.derived_dedupe_id, /^url-[a-f0-9]{8}$/);
+});
+
+test("normalizePosting never promotes a URL-derived identity to source evidence", () => {
+  const posting = normalizePosting({
+    title: "Engineer",
+    url: "https://example.com/jobs/12345"
+  }, { company_name: "Evidence Co" }, "evidenceats");
+
+  assert.equal(posting.source_job_id, "");
+  assert.match(posting.derived_dedupe_id, /^url-/);
 });
 
 test("normalizePosting preserves common ATS source id, location, and remote aliases", () => {

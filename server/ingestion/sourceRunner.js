@@ -5,6 +5,7 @@ const { createPostgresPool, ensurePostgresSchema } = require("../backends/postgr
 const { acquireHeavyJobLock } = require("../backends/heavyJobLock");
 const { upsertPostgresPostings, normalizeAtsKey } = require("../backends/postgresStore");
 const { getAdapterForCompany } = require("./adapters");
+const { createAtsRateLimitStateStore } = require("./atsRateLimitStore");
 const { hashPayload } = require("./cache");
 const { buildStoredQualityFields, parseQualityFlags } = require("./dataQuality");
 const { classifyStoredPosting } = require("./dataQualityAudit");
@@ -24,6 +25,8 @@ const { SOURCE_STATUSES, validateSourceRecoveryContract } = require("./sourceCon
 const { getSourceSyncPolicy, SOURCE_QUALITY_STATES } = require("./sourceQualityPolicy");
 const { getRegistrySourceModule } = require("./sourceRegistry");
 const { recordSourceRunPostingChanges, snapshotRows } = require("./sourceRollback");
+const { runWithSourceFetchBroker } = require("./safeFetch");
+const { createSourceFetchBroker, createSourceFetchRuntime } = require("./sourceFetch");
 
 const DEFAULT_SOURCE_RUN_LIMIT = 25;
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
@@ -1496,7 +1499,12 @@ async function processTarget(pool, target, options, summary, runId) {
   const nowEpoch = nowEpochSeconds();
   let raw;
   try {
-    raw = await target.adapter.fetch(target.company);
+    const rateLimit = typeof target.adapter.rateLimit === "function" ? target.adapter.rateLimit() : {};
+    const broker = createSourceFetchBroker(options.sourceFetchRuntime, {
+      rateLimitKey: target.atsKey,
+      rateLimit
+    });
+    raw = await runWithSourceFetchBroker(broker, () => target.adapter.fetch(target.company));
     summary.fetch_count += 1;
   } catch (error) {
     const httpStatus = extractHttpStatus(error);
@@ -1720,6 +1728,13 @@ async function runSourceJob(options = parseArgs(), env = process.env) {
     connectionString: env.DATABASE_URL || env.POSTGRES_URL || "",
     env: poolEnv
   });
+  const rateLimitStore = createAtsRateLimitStateStore({ pool });
+  const sourceFetchRuntime = createSourceFetchRuntime({
+    atsRateLimitStore: rateLimitStore,
+    fetchTimeoutMs: asInt(env.OPENJOBSLOTS_SOURCE_FETCH_TIMEOUT_MS, 12_000, 1_000, 120_000),
+    getAtsRequestQueueConcurrency: () => 1
+  });
+  const runOptions = { ...options, sourceFetchRuntime };
   let lock = null;
   let sourceRunId = 0;
 
@@ -1760,7 +1775,7 @@ async function runSourceJob(options = parseArgs(), env = process.env) {
       targets,
       (target) => {
         if (summary.stop_reason === "max_updates_reached") return null;
-        return processTarget(pool, target, options, summary, sourceRunId);
+        return processTarget(pool, target, runOptions, summary, sourceRunId);
       },
       options
     );

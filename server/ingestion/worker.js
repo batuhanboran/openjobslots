@@ -18,6 +18,8 @@ const {
 } = require("./publicPostingGate");
 const { DEFAULT_TTL_SECONDS, ensureIngestionTables, seedAtsSources } = require("./schema");
 const { createAtsRateLimitStateStore } = require("./atsRateLimitStore");
+const { runWithSourceFetchBroker } = require("./safeFetch");
+const { createSourceFetchBroker, createSourceFetchRuntime } = require("./sourceFetch");
 const {
   createPostgresPool,
   ensurePostgresSchema,
@@ -36,6 +38,7 @@ const { ensureMeiliPostingsIndex } = require("../search/meili");
 const { readWorkerBudgetConfig } = require("./workerConfig");
 const {
   createSourceQualityProtectionScheduler,
+  resolveAutomaticSyncIntervalSeconds,
   shouldStartAutomaticSync
 } = require("./workerRuntime");
 const { startWorkerHeartbeat } = require("./workerHeartbeat");
@@ -115,6 +118,7 @@ function positiveNumber(value, fallback) {
 }
 
 const WORKER_INTERVAL_MS = positiveNumber(process.env.INGESTION_WORKER_INTERVAL_MS, 30 * 60 * 1000);
+const BACKLOG_DRAIN_INTERVAL_MS = positiveNumber(process.env.INGESTION_BACKLOG_DRAIN_INTERVAL_MS, 15 * 1000);
 const WORKER_POLL_MS = positiveNumber(process.env.INGESTION_WORKER_POLL_MS, 5000);
 const WORKER_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_WORKER_CONCURRENCY, 2)));
 const MAX_TARGETS_PER_RUN = Math.max(1, Math.floor(positiveNumber(process.env.INGESTION_MAX_TARGETS_PER_RUN, 125)));
@@ -304,7 +308,12 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
 
     let raw;
     try {
-      raw = await target.adapter.fetch(target.company);
+      const rateLimit = typeof target.adapter.rateLimit === "function" ? target.adapter.rateLimit() : {};
+      const broker = createSourceFetchBroker(options.sourceFetchRuntime, {
+        rateLimitKey: target.atsKey,
+        rateLimit
+      });
+      raw = await runWithSourceFetchBroker(broker, () => target.adapter.fetch(target.company));
     } catch (error) {
       error.ingestionErrorType = classifyIngestionError(error, "fetch");
       throw error;
@@ -471,6 +480,11 @@ async function runPostgresIngestionOnce(pool, options = {}) {
   const targets = await selectPostgresDueTargets(pool, targetLimit, { counters, dueByAtsRows });
   const runId = await createPostgresRun(pool, targets);
   const rateLimitStore = createAtsRateLimitStateStore({ pool });
+  const sourceFetchRuntime = createSourceFetchRuntime({
+    atsRateLimitStore: rateLimitStore,
+    fetchTimeoutMs: positiveNumber(process.env.OPENJOBSLOTS_SOURCE_FETCH_TIMEOUT_MS, 12_000),
+    getAtsRequestQueueConcurrency: () => 1
+  });
   let cancelled = false;
 
   try {
@@ -506,7 +520,10 @@ async function runPostgresIngestionOnce(pool, options = {}) {
         try {
           if (cancelled) return;
           await updatePostgresRunCurrentTarget(pool, runId, target, counters);
-          const result = await processPostgresTarget(pool, runId, target, counters, { rateLimitStore });
+          const result = await processPostgresTarget(pool, runId, target, counters, {
+            rateLimitStore,
+            sourceFetchRuntime
+          });
           if (result === "cancelled") {
             cancelled = true;
             return;
@@ -660,6 +677,7 @@ async function startWorker() {
 
     let lastAutomaticSyncEpoch = 0;
     let lastBacklogCheckEmptyEpoch = 0;
+    let backlogDrainPending = false;
     while (true) {
       const control = await postgresGetSyncControl(pool);
       const status = String(control?.status || "idle");
@@ -697,6 +715,8 @@ async function startWorker() {
         }
         if (!summary?.skipped) {
           lastAutomaticSyncEpoch = nowEpochSeconds();
+          backlogDrainPending = Number(summary?.remainingDueTargets || 0) > 0
+            && Number(summary?.totalTargets || 0) > 0;
         }
         console.log(`[${WORKER_NAME}] postgres run summary: ${JSON.stringify(summary)}`);
         if (RUN_ONCE) return;
@@ -706,19 +726,28 @@ async function startWorker() {
       } else if (AUTO_SYNC_ENABLED && status === "idle") {
         const nowEpoch = nowEpochSeconds();
         const autoSyncIntervalSeconds = Math.max(60, Math.floor(WORKER_INTERVAL_MS / 1000));
-        const dueTargets = await countPostgresDueTargets(pool);
-        const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
-        const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
-        const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
-        const backlogCheckCoolingDown = nowEpoch - lastBacklogCheckEmptyEpoch < 300;
-        if (shouldStartAutomaticSync({
+        const backlogDrainIntervalSeconds = Math.max(1, Math.floor(BACKLOG_DRAIN_INTERVAL_MS / 1000));
+        const effectiveIntervalSeconds = resolveAutomaticSyncIntervalSeconds({
+          autoSyncIntervalSeconds,
+          backlogDrainIntervalSeconds,
+          backlogDrainPending
+        });
+        if (nowEpoch - lastAutomaticSyncEpoch >= effectiveIntervalSeconds) {
+          const dueTargets = await countPostgresDueTargets(pool);
+          const dayStartEpoch = startOfUtcDayEpoch(nowEpoch);
+          const targetsStartedToday = await countPostgresRunTargetsSince(pool, dayStartEpoch);
+          const remainingBudget = Math.max(0, AUTO_SYNC_DAILY_TARGET_BUDGET - targetsStartedToday);
+          const backlogCheckCoolingDown = nowEpoch - lastBacklogCheckEmptyEpoch < 300;
+          if (shouldStartAutomaticSync({
           nowEpoch,
           lastAutomaticSyncEpoch,
           autoSyncIntervalSeconds,
+          backlogDrainIntervalSeconds,
+          backlogDrainPending,
           dueTargets,
           remainingBudget,
           backlogCheckCoolingDown
-        })) {
+          })) {
           if (dueTargets > 0 && remainingBudget > 0 && !backlogCheckCoolingDown) {
             const targetLimit = Math.min(AUTO_SYNC_TARGETS_PER_RUN, remainingBudget);
             const summary = await runPostgresIngestionOnce(pool, {
@@ -730,13 +759,17 @@ async function startWorker() {
               dailyBudget: AUTO_SYNC_DAILY_TARGET_BUDGET,
               remainingBudgetBeforeRun: remainingBudget
             })}`);
-            lastAutomaticSyncEpoch = nowEpoch;
+            lastAutomaticSyncEpoch = nowEpochSeconds();
+            backlogDrainPending = Number(summary?.remainingDueTargets || 0) > 0
+              && Number(summary?.totalTargets || 0) > 0;
             if (Number(summary?.totalTargets || 0) === 0) {
               lastBacklogCheckEmptyEpoch = nowEpoch;
+              backlogDrainPending = false;
               console.log(`[${WORKER_NAME}] backlog run processed 0 targets; cooling down backlog checks for 5 minutes.`);
             }
           } else if (dueTargets > 0 && AUTO_SYNC_DAILY_TARGET_BUDGET === 0) {
             lastAutomaticSyncEpoch = nowEpoch;
+            backlogDrainPending = false;
           } else if (dueTargets > 0 && remainingBudget <= 0) {
             console.log(`[${WORKER_NAME}] auto sync daily budget exhausted: ${JSON.stringify({
               dailyBudget: AUTO_SYNC_DAILY_TARGET_BUDGET,
@@ -744,7 +777,9 @@ async function startWorker() {
               dueTargets
             })}`);
             lastAutomaticSyncEpoch = nowEpoch;
+            backlogDrainPending = false;
           }
+        }
         }
       }
       await sleep(WORKER_POLL_MS);

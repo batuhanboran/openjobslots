@@ -1308,30 +1308,16 @@ async function applyPostgresPlans(pool, plans, options, summary) {
               [validation.status, validation.error || "", plan.canonical_url]
             );
 
-            const nextHidden = validation.status !== "valid";
-            await client.query(
-              "UPDATE postings SET hidden = $1, rejection_reason = $2, updated_at = now() WHERE canonical_url = $3;",
-              [nextHidden, validation.error || "", plan.canonical_url]
-            );
-            
             // Insert search_index_outbox job
             if (validation.status === "valid") {
+              await client.query(
+                "UPDATE postings SET hidden = false, rejection_reason = '', updated_at = now() WHERE canonical_url = $1;",
+                [plan.canonical_url]
+              );
               const { toSearchPayload } = require("../detailRefetch/detailRefetchPlanner");
               await client.query(
                 "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'upsert', $2::jsonb, now());",
                 [plan.canonical_url, JSON.stringify(toSearchPayload(nextRow))]
-              );
-            } else {
-              await client.query(
-                "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'delete', $2::jsonb, now());",
-                [
-                  plan.canonical_url,
-                  JSON.stringify({
-                    reason: validation.status,
-                    canonical_url: plan.canonical_url,
-                    reason_codes: gate.reason_codes || []
-                  })
-                ]
               );
             }
           }

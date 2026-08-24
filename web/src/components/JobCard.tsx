@@ -31,6 +31,10 @@ function formatDate(
   return /[a-zçğıöşü]/i.test(s) && s.length <= 24 ? s : null;
 }
 
+function formatSourceLabel(ats: string): string {
+  return ats === "remotejobsorg" ? "Powered by RemoteJobs.org" : ats;
+}
+
 export function JobCard({ item }: { item: PostingItem }) {
   const { t, lang } = useI18n();
   const date = formatDate(item.posting_date, lang, t);
@@ -82,7 +86,7 @@ export function JobCard({ item }: { item: PostingItem }) {
               color: "var(--ojs-accent-pill-fg)",
             }}
           >
-            {item.ats}
+            {formatSourceLabel(item.ats)}
           </span>
         )}
       </div>

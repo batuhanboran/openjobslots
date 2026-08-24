@@ -19,6 +19,9 @@ const PRIMARY_DIRECT_SOURCES = Object.freeze([
   "personio",
   "workable",
   "isolvisolvedhire",
+  "jobicy",
+  "remotejobsorg",
+  "remoteok",
   "talexio",
   "zoho"
 ]);
@@ -421,38 +424,63 @@ test("smartrecruiters source module fetches search API with source-local discove
   const calls = [];
 
   const payload = await source.fetchList(company, {
+    maxPages: 2,
     fetcher: async (url, target) => {
       calls.push({ url, method: target.method, headers: target.headers });
+      if (calls.length === 1) {
+        return {
+          limit: 1,
+          offset: 0,
+          totalFound: 2,
+          content: [
+            {
+              id: "743999999995",
+              name: "Runtime SmartRecruiters Role",
+              postingUrl: "https://jobs.smartrecruiters.com/FixtureCo/743999999995-runtime-role",
+              company: { name: "Fixture SmartRecruiters" },
+              location: { city: "Austin", region: "TX", country: "United States", remote: true },
+              releasedDate: "2026-05-08T08:00:00-05:00"
+            }
+          ],
+          __sourceFetchFinalUrl: url
+        };
+      }
       return {
+        limit: 1,
+        offset: 1,
+        totalFound: 2,
         content: [
           {
-            id: "743999999995",
-            name: "Runtime SmartRecruiters Role",
-            applyUrl: "https://jobs.smartrecruiters.com/FixtureCo/743999999995-runtime-role",
+            id: "743999999994",
+            name: "Hybrid SmartRecruiters Role",
+            postingUrl: "https://jobs.smartrecruiters.com/FixtureCo/743999999994-hybrid-role",
             company: { name: "Fixture SmartRecruiters" },
-            location: { city: "Austin", region: "TX", country: "United States" },
-            releasedDate: "2026-05-08T08:00:00-05:00"
+            location: { city: "Boston", region: "MA", country: "United States", hybrid: true },
+            releasedDate: "2026-05-09T08:00:00-05:00"
           }
         ],
-        __sourceFetchFinalUrl: "https://jobs.smartrecruiters.com/sr-jobs/search?company=fixtureco&limit=100"
+        __sourceFetchFinalUrl: url
       };
     }
   });
 
-  assert.deepEqual(calls, [{
-    url: "https://jobs.smartrecruiters.com/sr-jobs/search?company=fixtureco&limit=100",
-    method: "GET",
-    headers: { Accept: "application/json, text/plain, */*" }
-  }]);
+  assert.deepEqual(calls.map((call) => call.url), [
+    "https://api.smartrecruiters.com/v1/companies/fixtureco/postings?destination=PUBLIC&limit=100&offset=0",
+    "https://api.smartrecruiters.com/v1/companies/fixtureco/postings?destination=PUBLIC&limit=100&offset=1"
+  ]);
+  assert.ok(calls.every((call) => call.method === "GET"));
   assert.equal(payload.__sourceConfig.companySlugLower, "fixtureco");
   const parsed = source.parse(payload, company);
-  assert.equal(parsed.length, 1);
+  assert.equal(parsed.length, 2);
+  const normalized = parsed.map((posting) => source.normalize(posting, company));
+  assert.equal(normalized.find((posting) => posting.source_job_id === "743999999995").remote_type, "remote");
+  assert.equal(normalized.find((posting) => posting.source_job_id === "743999999994").remote_type, "hybrid");
 
   await assert.rejects(
     () => source.fetchList(company, {
       fetcher: async () => ({
         content: [],
-        __sourceFetchFinalUrl: "https://unexpected.example/sr-jobs/search?company=fixtureco"
+        __sourceFetchFinalUrl: "https://unexpected.example/v1/companies/fixtureco/postings"
       })
     }),
     /SmartRecruiters API URL redirected to unexpected host/
@@ -865,6 +893,213 @@ test("workable source module discovers the public accounts endpoint without toke
   assert.equal(discovered.ats_key, "workable");
   assert.equal(discovered.config.subdomain, "fixtureco");
   assert.equal(discovered.list_url, "https://www.workable.com/api/accounts/fixtureco?details=true");
+});
+
+test("workable source module does not mistake a geographic state for posting lifecycle", () => {
+  const source = getSourceModule("workable");
+  const company = readJson(path.join(__dirname, "workable", "fixtures", "company.json"));
+  const target = source.discover(company);
+  const parsed = source.parse({
+    jobs: [
+      {
+        id: "geo-state",
+        shortcode: "GEO123",
+        title: "Geographic State Role",
+        state: "California",
+        url: "https://fixtureco.workable.com/jobs/geo-state",
+        location: {
+          city: "San Francisco",
+          state: "California",
+          country: "United States",
+          workplace_type: "hybrid"
+        }
+      },
+      {
+        id: "closed-state",
+        shortcode: "CLOSED123",
+        title: "Closed Role",
+        state: "closed",
+        url: "https://fixtureco.workable.com/jobs/closed-state"
+      }
+    ],
+    __sourceConfig: target.config
+  }, company);
+
+  assert.equal(parsed.length, 1);
+  const normalized = source.normalize(parsed[0], company);
+  assert.equal(normalized.source_job_id, "GEO123");
+  assert.equal(normalized.remote_type, "hybrid");
+  assert.equal(normalized.state, "California");
+});
+
+test("himalayas source module follows bounded cursor pagination through public contract", async () => {
+  const source = getSourceModule("himalayas");
+  const company = { company_name: "Himalayas", url_string: "https://himalayas.app/jobs" };
+  const target = source.discover(company);
+  const calls = [];
+  const makeJob = (slug) => ({
+    title: `Remote ${slug}`,
+    companyName: "Fixture Remote Co",
+    companySlug: "fixture-remote-co",
+    locationRestrictions: [{ alpha2: "US", name: "United States", slug: "united-states" }],
+    applicationLink: `https://himalayas.app/companies/fixture-remote-co/jobs/${slug}`,
+    guid: `https://himalayas.app/companies/fixture-remote-co/jobs/${slug}`,
+    pubDate: "2026-08-20T00:00:00.000Z"
+  });
+
+  assert.equal(target.list_url, "https://himalayas.app/jobs/api?limit=20");
+  const payload = await source.fetchList(company, {
+    maxPages: 2,
+    fetcher: async (url) => {
+      calls.push(url);
+      return calls.length === 1
+        ? { jobs: [makeJob("first")], nextCursor: "cursor-2", totalCount: 2, __sourceFetchFinalUrl: url }
+        : { jobs: [makeJob("second")], nextCursor: null, totalCount: 2, __sourceFetchFinalUrl: url };
+    }
+  });
+
+  assert.deepEqual(calls, [
+    "https://himalayas.app/jobs/api?limit=20",
+    "https://himalayas.app/jobs/api?limit=20&cursor=cursor-2"
+  ]);
+  const normalized = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+  assert.equal(normalized.length, 2);
+  assert.ok(normalized.every((posting) => posting.remote_type === "remote"));
+  assert.ok(normalized.every((posting) => posting.country === "United States"));
+  assert.equal(source.rateLimit().minimumPollIntervalMinutes, 1440);
+});
+
+test("jobicy source module preserves attributed canonical URLs through public contract", async () => {
+  const source = getSourceModule("jobicy");
+  const company = { company_name: "Jobicy", url_string: "https://jobicy.com/jobs" };
+  assert.ok(source);
+  const target = source.discover(company);
+  assert.equal(target.list_url, "https://jobicy.com/api/v2/remote-jobs?count=100");
+
+  const payload = await source.fetchList(company, {
+    fetcher: async (url) => ({
+      jobs: [
+        {
+          id: 123456,
+          url: "https://jobicy.com/jobs/example-role",
+          jobTitle: "Senior Product Designer",
+          companyName: "Example Company",
+          jobIndustry: ["Creative & Design"],
+          jobType: ["full-time"],
+          jobGeo: "United States",
+          jobLevel: "Senior",
+          jobDescription: "<p>Design a remote product.</p>",
+          pubDate: "2026-08-20T12:00:00+00:00"
+        }
+      ],
+      __sourceFetchFinalUrl: url
+    })
+  });
+
+  const normalized = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].source_job_id, "123456");
+  assert.notEqual(normalized[0].source_job_id, normalized[0].canonical_url);
+  assert.equal(normalized[0].canonical_url, "https://jobicy.com/jobs/example-role");
+  assert.equal(normalized[0].remote_type, "remote");
+  assert.equal(normalized[0].country, "United States");
+  assert.equal(normalized[0].source_evidence.original_source, "Jobicy");
+  assert.equal(source.rateLimit().minimumPollIntervalMinutes, 60);
+});
+
+test("jobicy rejects rows whose only id evidence is a canonical URL", () => {
+  const source = getSourceModule("jobicy");
+  const parsed = source.parse({ jobs: [
+    {
+      url: "https://jobicy.com/jobs/url-is-not-an-id",
+      jobTitle: "Remote Engineer",
+      companyName: "Example Company",
+      jobGeo: "Anywhere"
+    },
+    {
+      id: "https://jobicy.com/jobs/url-shaped-id",
+      url: "https://jobicy.com/jobs/url-shaped-id",
+      jobTitle: "Remote Designer",
+      companyName: "Example Company",
+      jobGeo: "Anywhere"
+    },
+    {
+      guid: "https://jobicy.com/jobs/url-shaped-guid",
+      url: "https://jobicy.com/jobs/url-shaped-guid",
+      jobTitle: "Remote Analyst",
+      companyName: "Example Company",
+      jobGeo: "Anywhere"
+    }
+  ] });
+
+  assert.deepEqual(parsed, []);
+});
+
+test("remotejobsorg source module preserves API attribution and negative work-mode overrides", async () => {
+  const source = getSourceModule("remotejobsorg");
+  const company = { company_name: "RemoteJobs.org", url_string: "https://remotejobs.org/remote-jobs" };
+  const target = source.discover(company);
+  assert.equal(target.list_url, "https://remotejobs.org/api/v1/jobs?limit=50");
+  assert.equal(target.config.attribution, "Powered by RemoteJobs.org");
+
+  const payload = await source.fetchList(company, {
+    fetcher: async () => ({
+      status: 200,
+      url: target.list_url,
+      body: JSON.stringify(readJson(path.join(__dirname, "remotejobsorg", "fixtures", "list.json")))
+    })
+  });
+  const rows = source.parse(payload, company).map((posting) => source.normalize(posting, company));
+
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].source_job_id, "rjo-fixture-remote-1");
+  assert.equal(rows[0].remote_type, "remote");
+  assert.equal(rows[0].source_evidence.attribution_text, "Powered by RemoteJobs.org");
+  assert.equal(rows[1].remote_type, "onsite");
+  assert.equal(rows[1].source_evidence.remote_source, "api_negative_remote_text");
+});
+
+test("remoteok explicit negative work-mode evidence overrides the board label", () => {
+  const source = getSourceModule("remoteok");
+  const rows = source.parse([
+    {
+      id: "onsite-1",
+      slug: "onsite-role-1",
+      company: "Fixture Company",
+      position: "Operations Specialist",
+      location: "Denver, Colorado, United States",
+      description: "Work must be completed at the physical location. There is no option to work remotely."
+    },
+    {
+      id: "remote-1",
+      slug: "remote-role-1",
+      company: "Fixture Company",
+      position: "Support Engineer",
+      location: "Remote - Europe"
+    },
+    {
+      id: "unknown-1",
+      slug: "unknown-role-1",
+      company: "Fixture Company",
+      position: "Analyst",
+      location: "London, United Kingdom"
+    },
+    {
+      slug: "missing-source-id",
+      company: "Fixture Company",
+      position: "Missing source id",
+      location: "Remote"
+    }
+  ]).map((posting) => source.normalize(posting, {}));
+
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].remote_type, "onsite");
+  assert.equal(rows[0].source_evidence.remote_source, "api_negative_remote_text");
+  assert.equal(rows[1].remote_type, "remote");
+  assert.equal(rows[1].source_evidence.remote_source, "api_remote_location");
+  assert.equal(rows[2].remote_type, "onsite");
+  assert.equal(rows[2].source_evidence.remote_source, "api_work_mode_unproven");
+  assert.ok(rows.every((row) => row.source_evidence.attribution_required === true));
 });
 
 test("personio and workable source modules do not accept title-only remote evidence", () => {

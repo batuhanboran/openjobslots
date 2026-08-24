@@ -6,6 +6,13 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+function restrictionName(value) {
+  if (value && typeof value === "object") {
+    return clean(value.name || value.label || value.alpha2 || value.slug);
+  }
+  return clean(value);
+}
+
 function parseHimalayasPostingsFromApi(companyName, config, rawPayload) {
   const payload = rawPayload && typeof rawPayload === "object" ? rawPayload : {};
   const items = Array.isArray(payload.jobs) ? payload.jobs : (Array.isArray(rawPayload) ? rawPayload : []);
@@ -21,7 +28,9 @@ function parseHimalayasPostingsFromApi(companyName, config, rawPayload) {
     if (!jobUrl) continue;
 
     const company = clean(item.companyName || item.company) || companyName;
-    const restrictions = Array.isArray(item.locationRestrictions) ? item.locationRestrictions : [];
+    const restrictions = (Array.isArray(item.locationRestrictions) ? item.locationRestrictions : [])
+      .map(restrictionName)
+      .filter(Boolean);
     const country = restrictions.length > 0 ? (normalizeCountryName(restrictions[0]) || restrictions[0]) : null;
     const location = restrictions.length > 0 ? restrictions.join(", ") : "Remote";
     const categories = Array.isArray(item.categories) ? item.categories : [];

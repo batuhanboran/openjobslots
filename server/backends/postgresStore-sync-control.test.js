@@ -1195,12 +1195,14 @@ async function testPostgresUpsertRejectsInvalidPostingsBeforeStorage() {
       { canonical_url: "", company_name: "Bad Co", position_name: "Engineer" },
       { canonical_url: "ftp://example.com/jobs/1", company_name: "Bad Co", position_name: "Engineer" },
       { canonical_url: "https://example.com/jobs/2", company_name: "Bad Co", position_name: "Untitled Position" },
-      { canonical_url: "https://example.com/jobs/3", company_name: "", position_name: "Engineer" }
+      { canonical_url: "https://example.com/jobs/3", company_name: "", position_name: "Engineer" },
+      { canonical_url: "https://example.com/jobs/4", company_name: "Good Co", position_name: "Engineer", remote_type: "remote" }
     ]);
 
     assert.ok(calls.some((call) => /^BEGIN$/i.test(call.sql)));
     assert.ok(calls.some((call) => /^COMMIT$/i.test(call.sql)));
     assert.equal(calls.some((call) => /INSERT INTO postings/i.test(call.sql)), false);
+    assert.equal(calls.some((call) => /UPDATE postings[\s\S]*hidden = true/i.test(call.sql)), false);
   } finally {
     if (previousSearchBackend === undefined) {
       delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
@@ -1466,12 +1468,11 @@ async function testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes() {
   const client = {
     async query(sql, params = []) {
       calls.push({ sql, params });
-      if (/SELECT canonical_url\s+FROM postings/i.test(sql)) {
-        return { rows: [{ canonical_url: "https://example.com/old" }] };
+      if (/SELECT canonical_url, hidden\s+FROM postings/i.test(sql)) {
+        return { rows: [{ canonical_url: "https://example.com/old", hidden: false }] };
       }
-      if (/UPDATE postings\s+SET hidden = true/i.test(sql)) return { rowCount: 1, rows: [] };
       if (/INSERT INTO search_index_outbox/i.test(sql)) return { rowCount: 1, rows: [] };
-      if (/DELETE FROM postings/i.test(sql)) return { rowCount: 2, rows: [] };
+      if (/DELETE FROM postings/i.test(sql)) return { rowCount: 1, rows: [] };
       if (/DELETE FROM posting_cache/i.test(sql)) return { rowCount: 3, rows: [] };
       if (/DELETE FROM ingestion_run_errors/i.test(sql)) return { rowCount: 4, rows: [] };
       if (/DELETE FROM ingestion_runs/i.test(sql)) return { rowCount: 5, rows: [] };
@@ -1491,10 +1492,11 @@ async function testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes() {
     batchSize: 1
   });
 
-  const pruneSelect = calls.find((call) => /SELECT canonical_url\s+FROM postings/i.test(call.sql));
+  const pruneSelect = calls.find((call) => /SELECT canonical_url, hidden\s+FROM postings/i.test(call.sql));
   assert.match(pruneSelect.sql, /last_seen_epoch < \$1/);
   assert.doesNotMatch(pruneSelect.sql, /first_seen_epoch/);
-  assert.equal(result.stats.hidden_postings, 1);
+  assert.equal(result.stats.hidden_postings, 0);
+  assert.equal(result.stats.deleted_stale_postings, 1);
   assert.equal(result.stats.outbox_delete_rows, 1);
   assert.ok(calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)));
 }
@@ -1529,6 +1531,68 @@ async function testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled() {
     } else {
       process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
     }
+  }
+}
+
+async function testProcessSearchOutboxKeepsFailedMeiliTaskPending() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousHost = process.env.MEILI_HOST;
+  const previousIndex = process.env.MEILI_POSTINGS_INDEX;
+  const previousFetch = global.fetch;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  process.env.MEILI_HOST = "http://meili.test";
+  process.env.MEILI_POSTINGS_INDEX = "postings";
+  const calls = [];
+  const fetchCalls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/WITH candidates AS[\s\S]+FROM search_index_outbox/i.test(sql)) {
+        return { rows: [{ id: 9, canonical_url: "https://example.com/jobs/9", operation: "upsert", payload: {} }] };
+      }
+      if (/SELECT \*[\s\S]+FROM postings/i.test(sql)) {
+        return { rows: [{
+          canonical_url: "https://example.com/jobs/9",
+          position_name: "Engineer",
+          company_name: "Example",
+          hidden: false
+        }] };
+      }
+      if (/UPDATE search_index_outbox/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  global.fetch = async (url, options = {}) => {
+    const href = String(url);
+    const method = String(options.method || "GET").toUpperCase();
+    fetchCalls.push({ href, method });
+    if (method === "POST" && href.endsWith("/indexes/postings/documents")) {
+      return { ok: true, status: 202, async json() { return { taskUid: 77, status: "enqueued" }; } };
+    }
+    if (method === "GET" && href.endsWith("/tasks/77")) {
+      return { ok: true, status: 200, async json() { return { uid: 77, status: "failed", error: { message: "bad document" } }; } };
+    }
+    throw new Error(`Unexpected fetch: ${method} ${href}`);
+  };
+
+  try {
+    await assert.rejects(
+      processPostgresSearchIndexOutbox(pool),
+      /Meilisearch task 77 failed: bad document/
+    );
+    const claim = calls.find((call) => /FOR UPDATE SKIP LOCKED/i.test(call.sql));
+    assert.ok(claim, "outbox rows must be claimed with SKIP LOCKED");
+    assert.ok(calls.some((call) => /SET attempts = attempts \+ 1/i.test(call.sql)));
+    assert.equal(calls.some((call) => /SET processed_at = now\(\)/i.test(call.sql)), false);
+    assert.deepEqual(fetchCalls.map((call) => call.method), ["POST", "GET"]);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+    if (previousHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = previousHost;
+    if (previousIndex === undefined) delete process.env.MEILI_POSTINGS_INDEX;
+    else process.env.MEILI_POSTINGS_INDEX = previousIndex;
   }
 }
 
@@ -1918,6 +1982,57 @@ async function testPayloadDriftTreatsExplicitEmptyJobListAsNoJobs() {
   assert.equal(result.empty_no_jobs, true);
   assert.ok(calls.every((call) => !/INSERT INTO parser_drift_events/i.test(call.sql)));
   assert.ok(calls.every((call) => !/UPDATE source_payload_shapes/i.test(call.sql)));
+}
+
+async function testPostgresUpsertEnqueuesExistingVisibleProjectionChanges() {
+  const calls = [];
+  const oldRow = {
+    canonical_url: "https://example.com/jobs/1",
+    company_name: "Example",
+    position_name: "Software Engineer",
+    apply_url: "https://example.com/jobs/1",
+    location_text: "Remote",
+    remote_type: "remote",
+    ats_key: "greenhouse",
+    source_job_id: "1",
+    hidden: false,
+    last_seen_epoch: 100,
+    posted_at_epoch: 50
+  };
+  const newRow = { ...oldRow, position_name: "Senior Software Engineer", last_seen_epoch: 200 };
+  const client = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT[\s\S]+FROM postings WHERE canonical_url = \$1/i.test(sql)) {
+        return { rows: [oldRow], rowCount: 1 };
+      }
+      if (/INSERT INTO postings/i.test(sql)) return { rows: [newRow], rowCount: 1 };
+      if (/INSERT INTO search_index_outbox/i.test(sql)) return { rows: [], rowCount: 1 };
+      if (/^(BEGIN|COMMIT)$/i.test(String(sql).trim())) return { rows: [], rowCount: 0 };
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    release() {}
+  };
+  const pool = { async connect() { return client; } };
+
+  await upsertPostgresPostings(pool, [{
+    canonical_url: oldRow.canonical_url,
+    company_name: oldRow.company_name,
+    position_name: newRow.position_name,
+    location: "Remote",
+    remote_type: "remote",
+    ats_key: "greenhouse",
+    source_job_id: "1",
+    parser_version: "greenhouse-v1",
+    parser_confidence: 0.9
+  }], { nowEpoch: 200, skipMeili: true });
+
+  assert.ok(calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)));
+  assert.equal(calls.some((call) => /UPDATE postings\s+SET hidden = true/i.test(call.sql)), false);
+  assert.ok(calls.some((call) => /RETURNING/i.test(call.sql)));
+  const postingInsert = calls.find((call) => /INSERT INTO postings/i.test(call.sql));
+  assert.equal(postingInsert.params[16], null, "missing source date must stay null");
+  assert.equal(postingInsert.params[17], null, "missing source date epoch must stay null");
 }
 
 async function testPayloadDriftUsesSourceLocalEmptyJobListStems() {
@@ -2939,6 +3054,7 @@ async function main() {
   await testPublicPostingReadsDoNotWrite();
   await testPublicPostingsCapsLargeLimitAndOffset();
   await testPostgresUpsertRejectsInvalidPostingsBeforeStorage();
+  await testPostgresUpsertEnqueuesExistingVisibleProjectionChanges();
   testMeiliDocumentsCarryHiddenFlagSafely();
   await testMeiliUpsertSkipsPlaceholderTitles();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
@@ -2952,6 +3068,7 @@ async function main() {
   testRetentionDefaultsUseLastSeenPolicy();
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();
+  await testProcessSearchOutboxKeepsFailedMeiliTaskPending();
   await testPostgresSuggestionsUseMeiliWhenConfigured();
   await testPostgresSuggestionsSkipUnmatchedMeiliHitFields();
   await testPostgresSuggestionsFallbackAvoidsUnaccentSeqScanPath();

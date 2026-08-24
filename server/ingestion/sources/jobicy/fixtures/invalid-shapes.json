@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "name": "missing title",
+      "expected": "rejected",
+      "reason": "missing position_name",
+      "posting": {
+        "source_job_id": "missing-title",
+        "company_name": "Fixture Jobicy",
+        "position_name": "",
+        "job_posting_url": "https://jobicy.com/jobs/missing-title",
+        "remote_type": "remote"
+      }
+    },
+    {
+      "name": "missing geo and remote",
+      "expected": "quarantined",
+      "reason": "no_geo_no_remote",
+      "posting": {
+        "source_job_id": "no-geo",
+        "company_name": "Fixture Jobicy",
+        "position_name": "Open Role",
+        "job_posting_url": "https://jobicy.com/jobs/no-geo"
+      }
+    },
+    {
+      "name": "canonical URL is not source identity",
+      "expected": "rejected",
+      "reason": "source_job_id must be a source-issued non-URL id",
+      "posting": {
+        "source_job_id": "https://jobicy.com/jobs/url-shaped-id",
+        "company_name": "Fixture Jobicy",
+        "position_name": "Remote Engineer",
+        "job_posting_url": "https://jobicy.com/jobs/url-shaped-id",
+        "remote_type": "remote"
+      }
+    }
+  ]
+}

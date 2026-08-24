@@ -1353,30 +1353,19 @@ async function applyPostgresPlan(client, row, fetched, plan, runId) {
       [validation.status, rejectionReason, canonicalUrl]
     );
 
-    const nextHidden = validation.status !== "valid";
-    await client.query(
-      "UPDATE postings SET hidden = $1, rejection_reason = $2, updated_at = now() WHERE canonical_url = $3;",
-      [nextHidden, rejectionReason, canonicalUrl]
-    );
-    finalRow = { ...updatedRow, hidden: nextHidden };
+    if (validation.status === "valid") {
+      await client.query(
+        "UPDATE postings SET hidden = false, rejection_reason = '', updated_at = now() WHERE canonical_url = $1;",
+        [canonicalUrl]
+      );
+    }
+    finalRow = { ...updatedRow, hidden: false };
   }
 
   if (finalStatus === "valid") {
     await client.query(
       "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'upsert', $2::jsonb, now());",
       [canonicalUrl, JSON.stringify(toSearchPayload(finalRow))]
-    );
-  } else {
-    await client.query(
-      "INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at) VALUES ($1, 'delete', $2::jsonb, now());",
-      [
-        canonicalUrl,
-        JSON.stringify({
-          reason: finalStatus,
-          canonical_url: canonicalUrl,
-          reason_codes: reasonCodes
-        })
-      ]
     );
   }
 

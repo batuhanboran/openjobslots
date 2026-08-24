@@ -157,6 +157,13 @@ async function seedAtsSources(db, atsItems, options = {}) {
       [atsKey, displayName, enabledByDefault, defaultTtlSeconds, defaultRateLimitMs]
     );
   }
+  const canonicalKeys = items.map((item) => String(item?.value || "").trim()).filter(Boolean);
+  if (canonicalKeys.length > 0) {
+    await db.run(
+      `UPDATE ats_sources SET enabled = 0, updated_at = datetime('now') WHERE ats_key NOT IN (${canonicalKeys.map(() => "?").join(", ")});`,
+      canonicalKeys
+    );
+  }
 }
 
 module.exports = {

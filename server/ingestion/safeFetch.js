@@ -5,6 +5,7 @@ const net = require("node:net");
 const tls = require("node:tls");
 const { promisify } = require("node:util");
 const zlib = require("node:zlib");
+const { AsyncLocalStorage } = require("node:async_hooks");
 
 const gunzipAsync = promisify(zlib.gunzip);
 const inflateAsync = promisify(zlib.inflate);
@@ -15,6 +16,7 @@ const DEFAULT_MAX_RESPONSE_BYTES = Math.max(
   Math.min(25 * 1024 * 1024, Number(process.env.OPENJOBSLOTS_SOURCE_FETCH_MAX_BYTES || 5 * 1024 * 1024))
 );
 const DEFAULT_MAX_REDIRECTS = 5;
+const sourceFetchBrokerStorage = new AsyncLocalStorage();
 const BLOCKED_HOSTNAMES = new Set(["localhost", "localhost.localdomain"]);
 function getActiveProxies() {
   const envProxies = process.env.OPENJOBSLOTS_PROXIES;
@@ -769,7 +771,7 @@ async function readLimitedResponseText(response, options = {}) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function safeFetch(url, init = {}, options = {}) {
+async function safeFetchDirect(url, init = {}, options = {}) {
   if (options.proxy) {
     return safeFetchInternal(url, init, options);
   }
@@ -780,7 +782,7 @@ async function safeFetch(url, init = {}, options = {}) {
 
   try {
     const response = await safeFetchInternal(url, init, options);
-    if (![403, 406, 503, 429].includes(response.status)) {
+    if (![403, 406, 503].includes(response.status)) {
       return response;
     }
     lastResponse = response;
@@ -821,7 +823,7 @@ async function safeFetch(url, init = {}, options = {}) {
 
       try {
         const response = await safeFetchInternal(url, init, { ...options, proxy });
-        if (![403, 406, 503, 429].includes(response.status)) {
+        if (![403, 406, 503].includes(response.status)) {
           return response;
         }
         lastResponse = response;
@@ -842,11 +844,27 @@ async function safeFetch(url, init = {}, options = {}) {
   return lastResponse;
 }
 
+function runWithSourceFetchBroker(broker, callback) {
+  if (typeof broker !== "function") throw new Error("source fetch broker must be a function");
+  if (typeof callback !== "function") throw new Error("source fetch broker callback must be a function");
+  return sourceFetchBrokerStorage.run(broker, callback);
+}
+
+async function safeFetch(url, init = {}, options = {}) {
+  const broker = sourceFetchBrokerStorage.getStore();
+  if (typeof broker === "function" && options.bypassBroker !== true) {
+    return broker(url, init, options);
+  }
+  return safeFetchDirect(url, init, options);
+}
+
 module.exports = {
   DEFAULT_MAX_RESPONSE_BYTES,
   assertSafeFetchUrl,
   isPrivateAddress,
   makeSafeFetchError,
   readLimitedResponseText,
-  safeFetch
+  runWithSourceFetchBroker,
+  safeFetch,
+  safeFetchDirect
 };

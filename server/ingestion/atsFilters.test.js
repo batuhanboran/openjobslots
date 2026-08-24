@@ -14,6 +14,11 @@ const {
 
 test("configured ATS filter options stay in the exported lookup set", () => {
   assert.equal(ATS_FILTER_OPTIONS.size, ATS_FILTER_OPTION_ITEMS.length);
+  assert.equal(ATS_FILTER_OPTION_ITEMS.length, 67);
+  assert.equal(ATS_FILTER_OPTIONS.has("100hires"), false);
+  assert.equal(ATS_FILTER_OPTIONS.has("greenhouse"), true);
+  assert.equal(ATS_FILTER_OPTIONS.has("jobicy"), true);
+  assert.equal(ATS_FILTER_OPTIONS.has("remotejobsorg"), true);
   for (const item of ATS_FILTER_OPTION_ITEMS) {
     assert.equal(ATS_FILTER_OPTIONS.has(item.value), true);
   }

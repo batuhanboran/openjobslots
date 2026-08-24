@@ -1,7 +1,14 @@
+function resolveAutomaticSyncIntervalSeconds(options = {}) {
+  const configured = Math.max(1, Number(options.autoSyncIntervalSeconds || 1));
+  if (!options.backlogDrainPending) return configured;
+  const drain = Math.max(1, Number(options.backlogDrainIntervalSeconds || 15));
+  return Math.min(configured, drain);
+}
+
 function shouldStartAutomaticSync(options = {}) {
   const nowEpoch = Number(options.nowEpoch || 0);
   const lastAutomaticSyncEpoch = Number(options.lastAutomaticSyncEpoch || 0);
-  const autoSyncIntervalSeconds = Math.max(1, Number(options.autoSyncIntervalSeconds || 1));
+  const autoSyncIntervalSeconds = resolveAutomaticSyncIntervalSeconds(options);
   const intervalElapsed = nowEpoch - lastAutomaticSyncEpoch >= autoSyncIntervalSeconds;
   return Boolean(
     intervalElapsed &&
@@ -57,5 +64,6 @@ function createSourceQualityProtectionScheduler(options = {}) {
 
 module.exports = {
   createSourceQualityProtectionScheduler,
+  resolveAutomaticSyncIntervalSeconds,
   shouldStartAutomaticSync
 };

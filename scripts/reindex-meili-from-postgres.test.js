@@ -230,7 +230,16 @@ test("Meili document conversion preserves required normalized fields", () => {
 test("bad rows are not sent to Meili upsert", async () => {
   const calls = [];
   const originalFetch = global.fetch;
-  global.fetch = async (url, options) => {
+  global.fetch = async (url, options = {}) => {
+    if (String(url).endsWith("/tasks/1")) {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { taskUid: 1, uid: 1, status: "succeeded" };
+        }
+      };
+    }
     calls.push({ url, body: JSON.parse(options.body) });
     return {
       ok: true,

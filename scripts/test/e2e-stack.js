@@ -9,6 +9,17 @@ const usePublicApiProxy = process.env.OPENJOBSLOTS_E2E_PUBLIC_API_PROXY === "1";
 
 const children = [];
 
+function buildIsolatedApiEnv(dbPath) {
+  return {
+    DB_PATH: dbPath,
+    OPENJOBSLOTS_BUNDLED_DB_PATH: dbPath,
+    PORT: apiPort,
+    OPENJOBSLOTS_DISABLE_API_SCHEDULER: "1",
+    OPENJOBSLOTS_ADMIN_TOKEN: process.env.OPENJOBSLOTS_E2E_ADMIN_TOKEN || "openjobslots-e2e-admin-token",
+    OPENJOBSLOTS_ALLOW_LOCAL_ADMIN: "0"
+  };
+}
+
 function spawnChild(command, args, env) {
   const child = spawn(command, args, {
     cwd: repoRoot,
@@ -57,13 +68,7 @@ async function main() {
       });
     });
 
-    spawnChild(process.execPath, ["server/index.js"], {
-      DB_PATH: testDbPath,
-      PORT: apiPort,
-      OPENJOBSLOTS_DISABLE_API_SCHEDULER: "1",
-      OPENJOBSLOTS_ADMIN_TOKEN: process.env.OPENJOBSLOTS_E2E_ADMIN_TOKEN || "openjobslots-e2e-admin-token",
-      OPENJOBSLOTS_ALLOW_LOCAL_ADMIN: "0"
-    });
+    spawnChild(process.execPath, ["server/index.js"], buildIsolatedApiEnv(testDbPath));
   }
 
   spawnChild(process.execPath, ["node_modules/expo/bin/cli", "start", "--web", "--port", webPort], {
@@ -74,10 +79,16 @@ async function main() {
   });
 }
 
-process.on("SIGINT", () => shutdown(130));
-process.on("SIGTERM", () => shutdown(143));
+if (require.main === module) {
+  process.on("SIGINT", () => shutdown(130));
+  process.on("SIGTERM", () => shutdown(143));
 
-main().catch((error) => {
-  console.error(error);
-  shutdown(1);
-});
+  main().catch((error) => {
+    console.error(error);
+    shutdown(1);
+  });
+}
+
+module.exports = {
+  buildIsolatedApiEnv
+};

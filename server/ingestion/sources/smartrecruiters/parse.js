@@ -38,6 +38,42 @@ function extractSmartRecruitersLocationParts(locationObj) {
   };
 }
 
+function smartRecruitersRemoteEvidence(item) {
+  const location = item?.location && typeof item.location === "object" ? item.location : {};
+  if (location.hybrid === true || item.hybrid === true) {
+    return { remoteType: "hybrid", path: location.hybrid === true ? "content[].location.hybrid" : "content[].hybrid" };
+  }
+  if (location.remote === true || item.remote === true || item.isRemote === true) {
+    const path = location.remote === true
+      ? "content[].location.remote"
+      : item.remote === true
+        ? "content[].remote"
+        : "content[].isRemote";
+    return { remoteType: "remote", path };
+  }
+  const raw = cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus);
+  const remoteType = normalizeRemoteType(raw);
+  return remoteType === "unknown"
+    ? { remoteType: "", path: "" }
+    : { remoteType, path: "content[].workplaceType/locationType/remoteStatus" };
+}
+
+function smartRecruitersPostingUrl(item, config) {
+  for (const value of [item.postingUrl, item.applyUrl, item.jobAdUrl, item.jobUrl, item.url]) {
+    const candidate = cleanSmartRecruitersText(value);
+    if (candidate) return candidate;
+  }
+  const id = cleanSmartRecruitersText(item.id || item.uuid);
+  const company = cleanSmartRecruitersText(item.company?.identifier || config?.companySlug);
+  const slug = cleanSmartRecruitersText(item.name || item.title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return id && company
+    ? `https://jobs.smartrecruiters.com/${encodeURIComponent(company)}/${encodeURIComponent(id)}${slug ? `-${slug}` : ""}`
+    : "";
+}
+
 function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, payload) {
   const contentItems = Array.isArray(payload?.content)
     ? payload.content
@@ -52,11 +88,7 @@ function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, pay
   for (const item of contentItems) {
     if (!item || typeof item !== "object") continue;
 
-    const rawJobUrl =
-      cleanSmartRecruitersText(item.applyUrl) ||
-      cleanSmartRecruitersText(item.ref) ||
-      cleanSmartRecruitersText(item.jobUrl) ||
-      cleanSmartRecruitersText(item.url);
+    const rawJobUrl = smartRecruitersPostingUrl(item, config);
     if (!rawJobUrl || seenUrls.has(rawJobUrl)) continue;
 
     const company = item.company && typeof item.company === "object" ? item.company : {};
@@ -73,6 +105,7 @@ function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, pay
     const employmentType =
       cleanSmartRecruitersText(item.typeOfEmployment?.label || item.typeOfEmployment?.name || item.typeOfEmployment || item.employmentType) || null;
     const jobAdSections = item.jobAd?.sections && typeof item.jobAd.sections === "object" ? item.jobAd.sections : {};
+    const remoteEvidence = smartRecruitersRemoteEvidence(item);
 
     postings.push({
       company_name: companyName,
@@ -82,6 +115,7 @@ function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, pay
       id: String(item?.id ?? "").trim() || undefined,
       position_name: title,
       job_posting_url: rawJobUrl,
+      apply_url: cleanSmartRecruitersText(item.applyUrl) || rawJobUrl,
       posting_date: postedDate,
       location,
       city: locationParts.city || null,
@@ -89,16 +123,9 @@ function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, pay
       country: locationParts.country || null,
       department,
       employment_type: employmentType,
-      workplaceType:
-        cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
-        (item.remote === true ? "remote" : null),
-      remote_type: (() => {
-        const raw = cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
-          (item.remote === true ? "remote" : "");
-        const result = normalizeRemoteType(raw);
-        return result === "unknown" ? null : result;
-      })(),
-      remote: item.remote === true || item.isRemote === true,
+      workplaceType: remoteEvidence.remoteType || null,
+      remote_type: remoteEvidence.remoteType || null,
+      remote: remoteEvidence.remoteType === "remote",
       industry: cleanSmartRecruitersText(item.industry?.label || item.industry?.name || item.industry) || null,
       description_html: cleanSmartRecruitersText(jobAdSections.jobDescription || item.descriptionHtml) || null,
       description_plain: cleanSmartRecruitersText(item.descriptionPlain || item.description) || null,
@@ -107,12 +134,8 @@ function parseSmartRecruitersPostingsFromApi(companyNameForPostings, config, pay
         title_source: "api",
         canonical_url_source: "api",
         location_source: item.location ? "api_location" : "",
-        remote_source: (() => {
-          const raw = cleanSmartRecruitersText(item.workplaceType || item.locationType || item.remoteStatus) ||
-            (item.remote === true ? "remote" : "");
-          const result = normalizeRemoteType(raw);
-          return result !== "unknown" ? "api_workplacetype" : "";
-        })()
+        remote_source: remoteEvidence.remoteType ? "api_location_type" : "",
+        remote_path: remoteEvidence.path
       })
     });
     seenUrls.add(rawJobUrl);

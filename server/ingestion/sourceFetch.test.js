@@ -34,6 +34,7 @@ async function testRateLimitedFetchRetriesAndPersistsCooldown() {
     },
     fetchTimeoutMs: 1000,
     getAtsRequestQueueConcurrency: () => 1,
+    sleepFn: async () => {},
     safeFetch: async (url, init) => {
       safeFetchCalls.push({ url, init });
       return responses.shift();
@@ -52,6 +53,30 @@ async function testRateLimitedFetchRetriesAndPersistsCooldown() {
   assert.ok(safeFetchCalls.every((call) => call.init.signal instanceof AbortSignal));
 }
 
+async function testRateLimitRetriesAreBounded() {
+  const state = { active: 0, blockedUntilEpochMs: 0, queue: [] };
+  let calls = 0;
+  const runtime = createSourceFetchRuntime({
+    atsRateLimitStore: {
+      getState() { return state; },
+      async hydrateCooldown() {},
+      async markRateLimited() {}
+    },
+    maxRateLimitRetries: 1,
+    sleepFn: async () => {},
+    safeFetch: async () => {
+      calls += 1;
+      return { status: 429, headers: createHeaders({ "retry-after": "0" }) };
+    }
+  });
+
+  await assert.rejects(
+    runtime.fetchWithAtsRateLimit("jobicy", 0, "https://example.com/jobs"),
+    (error) => error.ingestionErrorType === "source_rate_limited" && error.status === 429
+  );
+  assert.equal(calls, 2);
+}
+
 function testRetryAfterFallsBackToMinimumWait() {
   const waitMs = getAtsRateLimitWaitMs(
     { headers: createHeaders({ "retry-after": "0" }) },
@@ -63,6 +88,7 @@ function testRetryAfterFallsBackToMinimumWait() {
 
 async function main() {
   await testRateLimitedFetchRetriesAndPersistsCooldown();
+  await testRateLimitRetriesAreBounded();
   testRetryAfterFallsBackToMinimumWait();
   console.log("source fetch tests passed");
 }

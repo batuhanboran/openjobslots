@@ -1,0 +1,16 @@
+{
+  "jobs": [
+    {
+      "id": 123456,
+      "url": "https://jobicy.com/jobs/example-role",
+      "jobTitle": "Senior Product Designer",
+      "companyName": "Example Company",
+      "jobIndustry": ["Creative & Design"],
+      "jobType": ["full-time"],
+      "jobGeo": "United States",
+      "jobLevel": "Senior",
+      "jobDescription": "<p>Design a remote product.</p>",
+      "pubDate": "2026-08-20T12:00:00+00:00"
+    }
+  ]
+}

@@ -101,6 +101,9 @@ async function ensurePostgresSchema(pool) {
       PRIMARY KEY (ats_key, company_url)
     );
 
+    CREATE INDEX IF NOT EXISTS idx_company_sync_state_due
+      ON company_sync_state(next_sync_epoch, ats_key, company_url);
+
 
 
     CREATE TABLE IF NOT EXISTS posting_cache (
@@ -268,6 +271,10 @@ async function ensurePostgresSchema(pool) {
       ADD COLUMN IF NOT EXISTS current_company_url TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS current_company_name TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS http_status_counts JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+    CREATE INDEX IF NOT EXISTS idx_ingestion_runs_started_targets
+      ON ingestion_runs(started_at_epoch)
+      INCLUDE (total_targets);
 
     CREATE TABLE IF NOT EXISTS ingestion_run_errors (
       id BIGSERIAL PRIMARY KEY,
@@ -448,15 +455,26 @@ async function ensurePostgresSchema(pool) {
       attempts INTEGER NOT NULL DEFAULT 0,
       available_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       processed_at TIMESTAMPTZ,
+      claim_token TEXT,
+      claimed_at TIMESTAMPTZ,
       last_error TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    ALTER TABLE search_index_outbox
+      ADD COLUMN IF NOT EXISTS claim_token TEXT;
+    ALTER TABLE search_index_outbox
+      ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
 
     CREATE INDEX IF NOT EXISTS idx_search_index_outbox_due
       ON search_index_outbox(processed_at, available_at);
 
     CREATE INDEX IF NOT EXISTS idx_search_index_outbox_unprocessed
       ON search_index_outbox(available_at)
+      WHERE processed_at IS NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_search_index_outbox_claim_due
+      ON search_index_outbox(available_at, claimed_at, id)
       WHERE processed_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS public_search_events (
@@ -572,7 +590,151 @@ async function seedPostgresAtsSources(pool, atsItems) {
     );
     count += 1;
   }
-  return { ok: true, count };
+  const reconciliation = await reconcilePostgresAtsSources(pool, items.map((item) => String(item?.value || "").trim()).filter(Boolean));
+  return { ok: true, count, reconciliation };
+}
+
+async function reconcilePostgresAtsSources(pool, canonicalKeys = []) {
+  if (!pool || typeof pool.connect !== "function") return { ok: true, skipped: true, retired: 0 };
+  const keys = Array.from(new Set(canonicalKeys.map((key) => String(key || "").trim()).filter(Boolean))).sort();
+  const canonicalAdpKey = "adp_myjobs";
+  const legacyAdpKey = "adpmyjobs";
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Copy legacy companies first, then repoint every live company reference.
+    await client.query(
+      `
+        INSERT INTO companies (company_name, normalized_company_name, url_string, ats_key, created_at, updated_at)
+        SELECT company_name, normalized_company_name, url_string, $1, created_at, now()
+        FROM companies
+        WHERE ats_key = $2
+        ON CONFLICT (ats_key, url_string) DO UPDATE SET
+          company_name = EXCLUDED.company_name,
+          normalized_company_name = EXCLUDED.normalized_company_name,
+          updated_at = now();
+      `,
+      [canonicalAdpKey, legacyAdpKey]
+    );
+    for (const table of ["posting_cache", "postings"]) {
+      await client.query(
+        `
+          UPDATE ${table} AS target
+          SET company_id = canonical.id,
+              ats_key = $1
+          FROM companies AS legacy
+          JOIN companies AS canonical
+            ON canonical.ats_key = $1
+           AND canonical.url_string = legacy.url_string
+          WHERE legacy.ats_key = $2
+            AND target.company_id = legacy.id;
+        `,
+        [canonicalAdpKey, legacyAdpKey]
+      );
+      await client.query(`UPDATE ${table} SET ats_key = $1 WHERE ats_key = $2;`, [canonicalAdpKey, legacyAdpKey]);
+    }
+
+    await client.query(
+      `
+        INSERT INTO company_sync_state (
+          ats_key, company_url, company_id, company_name, last_success_epoch, last_failure_epoch,
+          next_sync_epoch, etag, last_modified, consecutive_failures, last_http_status, last_error, updated_at
+        )
+        SELECT $1, state.company_url, canonical.id, state.company_name, state.last_success_epoch,
+          state.last_failure_epoch, state.next_sync_epoch, state.etag, state.last_modified,
+          state.consecutive_failures, state.last_http_status, state.last_error, now()
+        FROM company_sync_state AS state
+        LEFT JOIN companies AS canonical
+          ON canonical.ats_key = $1
+         AND canonical.url_string = state.company_url
+        WHERE state.ats_key = $2
+        ON CONFLICT (ats_key, company_url) DO UPDATE SET
+          company_id = COALESCE(EXCLUDED.company_id, company_sync_state.company_id),
+          company_name = COALESCE(NULLIF(EXCLUDED.company_name, ''), company_sync_state.company_name),
+          last_success_epoch = NULLIF(GREATEST(COALESCE(company_sync_state.last_success_epoch, 0), COALESCE(EXCLUDED.last_success_epoch, 0)), 0),
+          last_failure_epoch = NULLIF(GREATEST(COALESCE(company_sync_state.last_failure_epoch, 0), COALESCE(EXCLUDED.last_failure_epoch, 0)), 0),
+          next_sync_epoch = LEAST(company_sync_state.next_sync_epoch, EXCLUDED.next_sync_epoch),
+          consecutive_failures = LEAST(company_sync_state.consecutive_failures, EXCLUDED.consecutive_failures),
+          updated_at = now();
+      `,
+      [canonicalAdpKey, legacyAdpKey]
+    );
+    await client.query("DELETE FROM company_sync_state WHERE ats_key = $1;", [legacyAdpKey]);
+
+    await client.query(
+      `
+        INSERT INTO source_payload_shapes (
+          ats_key, parser_version, shape_hash, shape_paths, observed_count, first_seen_at, last_seen_at
+        )
+        SELECT $1, parser_version, shape_hash, shape_paths, observed_count, first_seen_at, last_seen_at
+        FROM source_payload_shapes
+        WHERE ats_key = $2
+        ON CONFLICT (ats_key, parser_version) DO UPDATE SET
+          shape_hash = CASE WHEN EXCLUDED.last_seen_at >= source_payload_shapes.last_seen_at THEN EXCLUDED.shape_hash ELSE source_payload_shapes.shape_hash END,
+          shape_paths = CASE WHEN EXCLUDED.last_seen_at >= source_payload_shapes.last_seen_at THEN EXCLUDED.shape_paths ELSE source_payload_shapes.shape_paths END,
+          observed_count = source_payload_shapes.observed_count + EXCLUDED.observed_count,
+          first_seen_at = LEAST(source_payload_shapes.first_seen_at, EXCLUDED.first_seen_at),
+          last_seen_at = GREATEST(source_payload_shapes.last_seen_at, EXCLUDED.last_seen_at);
+      `,
+      [canonicalAdpKey, legacyAdpKey]
+    );
+    await client.query("DELETE FROM source_payload_shapes WHERE ats_key = $1;", [legacyAdpKey]);
+
+    for (const table of [
+      "source_quality_events",
+      "parser_drift_events",
+      "ats_source_runs",
+      "ats_source_run_errors",
+      "ats_source_run_metrics",
+      "ats_source_run_rollbacks",
+      "ats_source_run_posting_changes"
+    ]) {
+      await client.query(`UPDATE ${table} SET ats_key = $1 WHERE ats_key = $2;`, [canonicalAdpKey, legacyAdpKey]);
+    }
+    await client.query(
+      `
+        INSERT INTO ats_rate_limits (rate_limit_key, blocked_until_epoch_ms, updated_at)
+        SELECT $1, blocked_until_epoch_ms, now()
+        FROM ats_rate_limits
+        WHERE rate_limit_key = $2
+        ON CONFLICT (rate_limit_key) DO UPDATE SET
+          blocked_until_epoch_ms = GREATEST(ats_rate_limits.blocked_until_epoch_ms, EXCLUDED.blocked_until_epoch_ms),
+          updated_at = now();
+      `,
+      [canonicalAdpKey, legacyAdpKey]
+    );
+    await client.query("DELETE FROM ats_rate_limits WHERE rate_limit_key = $1;", [legacyAdpKey]);
+    await client.query("DELETE FROM companies WHERE ats_key = $1;", [legacyAdpKey]);
+
+    const retired = await client.query(
+      `
+        UPDATE ats_sources
+        SET enabled = false,
+            protection_status = 'disabled',
+            disabled_reason = CASE
+              WHEN ats_key = $2 THEN 'retired_alias_migrated_to_adp_myjobs'
+              ELSE 'retired_not_in_runtime_registry'
+            END,
+            disabled_at = COALESCE(disabled_at, now()),
+            updated_at = now()
+        WHERE NOT (ats_key = ANY($1::text[]))
+          AND (
+            enabled = true
+            OR protection_status <> 'disabled'
+            OR disabled_reason NOT IN ('retired_not_in_runtime_registry', 'retired_alias_migrated_to_adp_myjobs')
+          );
+      `,
+      [keys, legacyAdpKey]
+    );
+    await client.query("COMMIT");
+    return { ok: true, retired: Number(retired.rowCount || 0), canonicalCount: keys.length };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = {
@@ -580,5 +742,6 @@ module.exports = {
   createPostgresPool,
   ensurePostgresSchema,
   getPostgresConfig,
+  reconcilePostgresAtsSources,
   seedPostgresAtsSources
 };

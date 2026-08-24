@@ -116,6 +116,27 @@ harden_origin_port() {
   log "origin firewall hardening ensured for docker-published port $port"
 }
 
+validate_postings_response() {
+  node -e '
+    let raw = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => { raw += chunk; });
+    process.stdin.on("end", () => {
+      try {
+        const payload = JSON.parse(raw);
+        const valid = payload && typeof payload === "object"
+          && Array.isArray(payload.items)
+          && Number.isFinite(Number(payload.count))
+          && Number.isFinite(Number(payload.limit))
+          && Number.isFinite(Number(payload.offset));
+        process.exit(valid ? 0 : 1);
+      } catch (_error) {
+        process.exit(1);
+      }
+    });
+  '
+}
+
 cd "$APP_DIR"
 harden_origin_port "$ORIGIN_PORT"
 harden_origin_port "$WEB_ORIGIN_PORT"
@@ -183,8 +204,8 @@ verify_deploy() {
   local web_version
   web_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' web/package.json | head -n 1)"
   curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$HEALTH_URL" | grep -q '"ok":true'
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=Director%20United%20States&limit=5" | grep -q '"ok":true'
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=remote%20engineer&limit=5" | grep -q '"ok":true'
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=Director%20United%20States&limit=5" | validate_postings_response
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=remote%20engineer&limit=5" | validate_postings_response
   curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/" | grep -q "v${web_version}"
   curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/health/ready" | grep -q '"ok":true'
   [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-app)" == "healthy" ]]

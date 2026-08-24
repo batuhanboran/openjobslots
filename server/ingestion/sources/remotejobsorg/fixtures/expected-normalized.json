@@ -1,0 +1,18 @@
+[
+  {
+    "source_job_id": "rjo-fixture-remote-1",
+    "company_name": "Fixture Cloud",
+    "position_name": "Remote Platform Engineer",
+    "country": "Turkey",
+    "remote_type": "remote",
+    "job_posting_url": "https://remotejobs.org/remote-jobs/remote-platform-engineer-fixture"
+  },
+  {
+    "source_job_id": "rjo-fixture-onsite-2",
+    "company_name": "Fixture Office",
+    "position_name": "Office Operations Manager",
+    "country": "United States",
+    "remote_type": "onsite",
+    "job_posting_url": "https://remotejobs.org/remote-jobs/office-operations-manager-fixture"
+  }
+]

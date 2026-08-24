@@ -3,7 +3,8 @@ const test = require("node:test");
 
 const {
   ensureMeiliPostingsIndex,
-  resolveMeiliTaskTimeoutMs
+  resolveMeiliTaskTimeoutMs,
+  upsertMeiliPostings
 } = require("./meili");
 
 function jsonResponse(body, status = 200) {
@@ -58,6 +59,41 @@ test("existing Meili index does not block API startup when settings task is stil
     assert.equal(result.ok, true);
     assert.equal(result.settings_pending, true);
     assert.ok(calls.some((call) => call.href === "http://meili.test/indexes/postings/settings"));
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("document upsert waits for the Meili task to succeed", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    const href = String(url);
+    const method = String(options.method || "GET").toUpperCase();
+    calls.push({ href, method });
+    if (href === "http://meili.test/indexes/postings/documents" && method === "POST") {
+      return jsonResponse({ taskUid: 42, status: "enqueued" });
+    }
+    if (href === "http://meili.test/tasks/42" && method === "GET") {
+      return jsonResponse({ uid: 42, status: "succeeded" });
+    }
+    throw new Error(`unexpected request ${method} ${href}`);
+  };
+
+  try {
+    const result = await upsertMeiliPostings([{
+      canonical_url: "https://example.com/jobs/42",
+      position_name: "Platform Engineer",
+      company_name: "Example"
+    }], {
+      enabled: true,
+      host: "http://meili.test",
+      apiKey: "",
+      indexName: "postings",
+      taskTimeoutMs: 5000
+    });
+    assert.equal(result.status, "succeeded");
+    assert.deepEqual(calls.map((call) => call.method), ["POST", "GET"]);
   } finally {
     global.fetch = originalFetch;
   }

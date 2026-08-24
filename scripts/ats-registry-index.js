@@ -16,6 +16,7 @@ const {
   SOURCE_STATUSES,
   validateSourceRecoveryContract
 } = require("../server/ingestion/sourceContracts");
+const { inspectCertificationEvidence } = require("../server/ingestion/sourceCertification");
 const {
   getRegistrySourceModule,
   isRegistryPilotSource
@@ -250,6 +251,7 @@ function fixtureEvidence(sourceModule) {
     if (fs.existsSync(path.resolve(normalizedPath))) result.present.push(normalizedPath);
     else result.missing.push(normalizedPath);
   }
+  result.certification = inspectCertificationEvidence(sourceModule);
   return result;
 }
 
@@ -285,6 +287,7 @@ function recoveryReadinessForTarget(atsKey, registryStatus, future = false) {
   const fixtures = fixtureEvidence(sourceModule);
   const blockers = [...recoveryContract.failures, ...fixtures.errors];
   if (fixtures.missing.length > 0) blockers.push(`missing fixture files: ${fixtures.missing.join(", ")}`);
+  blockers.push(...(fixtures.certification?.blockers || []));
   if (registryStatus === "unsupported") blockers.push("unsupported source");
 
   return {

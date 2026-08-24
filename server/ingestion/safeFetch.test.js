@@ -190,3 +190,23 @@ test("safeFetch response text and json methods enforce response size limits", as
   });
   assert.deepEqual(await jsonResponse.json(), { ok: true });
 });
+
+test("safeFetch returns 429 directly without proxy rotation", async () => {
+  const previousProxies = process.env.OPENJOBSLOTS_PROXIES;
+  process.env.OPENJOBSLOTS_PROXIES = "proxy.example:8080:user:pass";
+  const calls = [];
+  try {
+    const response = await safeFetch("https://example.com/jobs", {}, {
+      lookup: publicLookup(),
+      requester: async (_target, _init, options) => {
+        calls.push(options.proxy || "direct");
+        return new Response("rate limited", { status: 429 });
+      }
+    });
+    assert.equal(response.status, 429);
+    assert.deepEqual(calls, ["direct"]);
+  } finally {
+    if (previousProxies === undefined) delete process.env.OPENJOBSLOTS_PROXIES;
+    else process.env.OPENJOBSLOTS_PROXIES = previousProxies;
+  }
+});

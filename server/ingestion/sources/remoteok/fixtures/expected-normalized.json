@@ -7,15 +7,17 @@
     "posting_date": "2026-07-01T15:23:32+00:00",
     "location": "Mathura,",
     "country": "",
-    "remote_type": "remote",
+    "remote_type": "unknown",
     "department": "finance",
     "description_html": "Engineering, Commerce, Finance etc. all have a role to play<br/><br/>Please mention the word **THOUGHTFULNESS** and tag RMTg4LjExOS4yNy40Nw== when applying to show you read the job post completely (#RMTg4LjExOS4yNy40Nw==). This is a beta feature to avoid spam applicants. Companies can search these words to find applicants that read this and see they're human.",
     "source_evidence": {
       "route_kind": "remoteok_public_api",
+      "original_source": "Remote OK",
+      "attribution_required": true,
       "title_source": "api",
       "canonical_url_source": "api_slug",
       "location_source": "api_location",
-      "remote_source": "board_is_remote_only"
+      "remote_source": "api_work_mode_unproven"
     },
     "ats_key": "remoteok",
     "canonical_url": "https://remoteok.com/remote-jobs/remote-resource-mobiliser-vrindavan-chandrodaya-mandir-1134372",
@@ -39,7 +41,7 @@
     "raw_hash": "7a4659d8",
     "confidence": 0.8,
     "parser_confidence": 0.8,
-    "is_remote": true,
+    "is_remote": false,
     "parser_key": "remoteok",
     "confidence_score": 0.8,
     "source_family": "direct_json",
@@ -135,7 +137,7 @@
       },
       "remote_type": {
         "present": true,
-        "value": "remote",
+        "value": "unknown",
         "source": "unknown",
         "evidence_source": "unknown",
         "evidence_path": "remote_type",
@@ -143,8 +145,8 @@
         "rule_name": "source_remote_type",
         "source_url": "",
         "detail_url": "",
-        "normalized": "remote",
-        "explicit": true
+        "normalized": "unknown",
+        "explicit": false
       },
       "posting_date": {
         "present": true,
@@ -231,15 +233,17 @@
     "posting_date": "2026-06-30T00:00:00+00:00",
     "location": "Petersburg,",
     "country": "",
-    "remote_type": "remote",
+    "remote_type": "unknown",
     "department": "testing",
     "description_html": "This page intentionally left blank.<br><br>Test Role<br><br>Salary: $50000 - $100000 per year<br/><br/>Please mention the word **ASPIRATION** and tag RMTg4LjExOS4yNy40Nw== when applying to show you read the job post completely (#RMTg4LjExOS4yNy40Nw==). This is a beta feature to avoid spam applicants. Companies can search these words to find applicants that read this and see they're human.",
     "source_evidence": {
       "route_kind": "remoteok_public_api",
+      "original_source": "Remote OK",
+      "attribution_required": true,
       "title_source": "api",
       "canonical_url_source": "api_slug",
       "location_source": "api_location",
-      "remote_source": "board_is_remote_only"
+      "remote_source": "api_work_mode_unproven"
     },
     "ats_key": "remoteok",
     "canonical_url": "https://remoteok.com/remote-jobs/remote-test-role-atlantic-strategic-minerals-1134383",
@@ -263,7 +267,7 @@
     "raw_hash": "f211b8ad",
     "confidence": 0.8,
     "parser_confidence": 0.8,
-    "is_remote": true,
+    "is_remote": false,
     "parser_key": "remoteok",
     "confidence_score": 0.8,
     "source_family": "direct_json",
@@ -359,7 +363,7 @@
       },
       "remote_type": {
         "present": true,
-        "value": "remote",
+        "value": "unknown",
         "source": "unknown",
         "evidence_source": "unknown",
         "evidence_path": "remote_type",
@@ -367,8 +371,8 @@
         "rule_name": "source_remote_type",
         "source_url": "",
         "detail_url": "",
-        "normalized": "remote",
-        "explicit": true
+        "normalized": "unknown",
+        "explicit": false
       },
       "posting_date": {
         "present": true,

@@ -24,6 +24,14 @@ assert.match(deploy, /--max-time/);
 assert.match(deploy, /\/health\/ready/);
 assert.match(deploy, /openjobslots-web/);
 assert.doesNotMatch(deploy, /curl -fsS "\$HEALTH_URL"/);
+assert.match(deploy, /validate_postings_response/);
+assert.match(deploy, /Array\.isArray\(payload\.items\)/);
+assert.match(deploy, /Number\.isFinite\(Number\(payload\.count\)\)/);
+assert.doesNotMatch(
+  deploy,
+  /\/postings\?[^\n]*\|\s*grep\s+-q\s+'"ok":true'/,
+  "the postings API has no ok field; deploy smoke tests must validate its actual payload"
+);
 
 assert.match(service, /APP_DIR=\/root\/OpenJobSlots/);
 assert.match(service, /ExecStart=\/bin\/bash \/root\/OpenJobSlots\/scripts\/deploy\.sh/);

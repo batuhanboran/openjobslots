@@ -102,6 +102,7 @@ function runNpmScript(scriptName) {
         BROWSER: "none",
         NODE_ENV: "test",
         DB_PATH: testDbPath,
+        OPENJOBSLOTS_BUNDLED_DB_PATH: testDbPath,
         OPENJOBSLOTS_TEST_ROOT: testRoot,
         OPENJOBSLOTS_E2E_API_PORT: process.env.OPENJOBSLOTS_E2E_API_PORT || "18877",
         OPENJOBSLOTS_E2E_WEB_PORT: process.env.OPENJOBSLOTS_E2E_WEB_PORT || "19076",

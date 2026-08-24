@@ -19,10 +19,12 @@ function testBuildRegistryIndex() {
   assert.equal(payload.ok, true);
   assert.equal(payload.generated_at, "2026-05-24T00:00:00.000Z");
   assert.equal(payload.families.length, 7);
-  assert.ok(payload.summary.configured_ats_count >= 60);
+  assert.equal(payload.summary.configured_ats_count, 67);
   assert.ok(payload.summary.future_candidate_count >= 20);
 
   const byKey = new Map(payload.targets.map((target) => [target.ats_key, target]));
+  assert.equal(byKey.has("100hires"), false);
+  assert.equal(byKey.has("sendoutsnowbullhorn"), false);
   assert.equal(byKey.get("greenhouse").family, "direct-json-stable");
   assert.equal(byKey.get("greenhouse").registry_status, "registry-backed-enabled");
   assert.equal(byKey.get("greenhouse").source_module.path, "server/ingestion/sources/greenhouse/index.js");
@@ -45,7 +47,7 @@ function testBuildRegistryIndex() {
   assert.equal(byKey.get("icims").registry_status, "registry-backed-enabled");
 
   assert.equal(byKey.get("dayforcehcm").family, "enterprise-direct");
-  assert.equal(byKey.get("dayforcehcm").registry_status, "registry-backed-enabled");
+  assert.equal(byKey.get("dayforcehcm").registry_status, "registry-backed-disabled");
   assert.equal(byKey.get("dayforcehcm").recovery_readiness.status, "ready-for-read-only-recovery");
   assert.deepEqual(byKey.get("dayforcehcm").recovery_readiness.blockers, []);
 

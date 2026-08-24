@@ -25,6 +25,7 @@ const {
   withWriteLock
 } = require("./worker");
 const { decideAdaptiveSourceSelection } = require("./adaptiveSourceSelection");
+const { writePostgresPostingCache } = require("./workerStore");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,6 +64,34 @@ test("worker write lock serializes concurrent sqlite transactions", async () => 
   } finally {
     await db.close();
   }
+});
+
+test("posting cache preserves a missing source date as null", async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT raw_payload_hash/i.test(sql)) return { rows: [] };
+      if (/INSERT INTO posting_cache/i.test(sql)) return { rows: [], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  await writePostgresPostingCache(pool, {
+    canonical_url: "https://example.com/jobs/no-date",
+    ats_key: "greenhouse",
+    company_name: "Example",
+    source_job_id: "no-date",
+    position_name: "Engineer",
+    remote_type: "remote"
+  }, {
+    nowEpoch: 1770000000,
+    parserVersion: "greenhouse-v1",
+    validation: { ok: true, status: "accepted" }
+  });
+
+  const insert = calls.find((call) => /INSERT INTO posting_cache/i.test(call.sql));
+  assert.equal(insert.params[15], null);
+  assert.equal(insert.params[16], null);
 });
 
 test("ingestion error classifier separates parser attention from fetch failures", () => {

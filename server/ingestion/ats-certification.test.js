@@ -15,7 +15,7 @@ test("ATS field certification registry covers every configured ATS", () => {
   const atsKeys = ATS_FILTER_OPTION_ITEMS.map((item) => item.value).sort();
   const records = buildAtsCertificationRecords(atsKeys);
   assert.deepEqual(Object.keys(records).sort(), atsKeys);
-  assert.equal(Object.keys(records).length, 631);
+  assert.equal(Object.keys(records).length, 67);
 
   const errors = [];
   for (const atsKey of atsKeys) {
@@ -69,6 +69,25 @@ test("configured-disabled direct sources document title-only remote quarantine",
     assert.equal(records[atsKey].fieldDecisions.remote.status, "list-payload");
     assert.match(records[atsKey].fieldDecisions.remote.evidence, /title-only remote text is quarantined/i);
   }
+});
+
+test("jobicy certification forbids canonical URL source identity", () => {
+  const records = buildAtsCertificationRecords(["jobicy"]);
+  assert.equal(records.jobicy.fieldDecisions.sourceId.status, "list-payload");
+  assert.match(records.jobicy.fieldDecisions.sourceId.evidence, /non-URL Jobicy id\/guid/i);
+  assert.match(records.jobicy.fieldDecisions.sourceId.evidence, /never promoted/i);
+});
+
+test("remoteok certification requires negative remote evidence to override the board label", () => {
+  const records = buildAtsCertificationRecords(["remoteok"]);
+  assert.match(records.remoteok.fieldDecisions.remote.evidence, /negative work-mode text overrides/i);
+  assert.match(records.remoteok.fieldDecisions.sourceId.evidence, /explicit Remote OK API id/i);
+});
+
+test("remotejobsorg certification preserves explicit source identity and negative remote evidence", () => {
+  const records = buildAtsCertificationRecords(["remotejobsorg"]);
+  assert.match(records.remotejobsorg.fieldDecisions.remote.evidence, /Negative work-mode text overrides/i);
+  assert.match(records.remotejobsorg.fieldDecisions.sourceId.evidence, /explicit non-URL RemoteJobs\.org API id/i);
 });
 
 test("lane documentation exists for the configured-source certification program", () => {

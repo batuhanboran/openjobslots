@@ -1,7 +1,7 @@
 "use strict";
 
 const SMARTRECRUITERS_DOCS_URL = "https://developers.smartrecruiters.com/docs/endpoints";
-const SMARTRECRUITERS_SEARCH_URL = "https://jobs.smartrecruiters.com/sr-jobs/search";
+const SMARTRECRUITERS_API_ORIGIN = "https://api.smartrecruiters.com";
 
 function clean(value) {
   return String(value || "").trim();
@@ -20,7 +20,13 @@ function parseSmartRecruitersCompany(urlString) {
   if (!parsed) return null;
 
   const host = String(parsed.hostname || "").toLowerCase();
-  if (host !== "jobs.smartrecruiters.com" && host !== "www.jobs.smartrecruiters.com") return null;
+  const supportedHosts = new Set([
+    "careers.smartrecruiters.com",
+    "jobs.smartrecruiters.com",
+    "www.careers.smartrecruiters.com",
+    "www.jobs.smartrecruiters.com"
+  ]);
+  if (!supportedHosts.has(host)) return null;
 
   const pathParts = parsed.pathname
     .split("/")
@@ -30,15 +36,20 @@ function parseSmartRecruitersCompany(urlString) {
   const companySlug = queryCompany || (pathParts[0]?.toLowerCase() === "sr-jobs" ? "" : pathParts[0] || "");
   if (!companySlug) return null;
 
-  const searchUrl = new URL(SMARTRECRUITERS_SEARCH_URL);
-  searchUrl.searchParams.set("company", companySlug);
-  searchUrl.searchParams.set("limit", "100");
+  const postingsUrl = new URL(
+    `/v1/companies/${encodeURIComponent(companySlug)}/postings`,
+    SMARTRECRUITERS_API_ORIGIN
+  );
+  postingsUrl.searchParams.set("destination", "PUBLIC");
+  postingsUrl.searchParams.set("limit", "100");
+  postingsUrl.searchParams.set("offset", "0");
 
   return {
     host,
     companySlug,
     companySlugLower: companySlug.toLowerCase(),
-    searchUrl: searchUrl.toString()
+    postingsUrl: postingsUrl.toString(),
+    searchUrl: postingsUrl.toString()
   };
 }
 
@@ -50,7 +61,7 @@ function createDiscover(parserVersion) {
       source_family: "direct_json",
       docs_url: SMARTRECRUITERS_DOCS_URL,
       company,
-      list_url: config.searchUrl || "",
+      list_url: config.postingsUrl || "",
       config,
       parser_version: parserVersion
     };
@@ -59,7 +70,7 @@ function createDiscover(parserVersion) {
 
 module.exports = {
   SMARTRECRUITERS_DOCS_URL,
-  SMARTRECRUITERS_SEARCH_URL,
+  SMARTRECRUITERS_API_ORIGIN,
   createDiscover,
   parseSmartRecruitersCompany
 };

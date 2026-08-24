@@ -86,8 +86,17 @@ function parseWorkablePostingsFromApi(companyNameForPostings, config, responseJs
 
   for (const job of jobs) {
     const item = job && typeof job === "object" ? job : {};
-    const state = clean(item.state || "");
-    if (state && state !== "published") continue;
+    const lifecycleState = clean(item.status || item.job_state || item.lifecycle_state || item.state || "").toLowerCase();
+    const knownLifecycleStates = new Set([
+      "archived",
+      "closed",
+      "confidential",
+      "draft",
+      "internal",
+      "published",
+      "unpublished"
+    ]);
+    if (knownLifecycleStates.has(lifecycleState) && lifecycleState !== "published") continue;
     const title = clean(item.title || item.full_title || "");
     const jobUrl = buildWorkableJobUrl(config, item);
     if (!title || !jobUrl || seenUrls.has(jobUrl)) continue;

@@ -11,8 +11,10 @@ const ATS_KEY = "remoteok";
 const SOURCE_FAMILY = "direct_json";
 const PARSER_VERSION = "source-remoteok-v1";
 const FIXTURE_PATHS = Object.freeze([
+  `server/ingestion/sources/${ATS_KEY}/fixtures/company.json`,
   `server/ingestion/sources/${ATS_KEY}/fixtures/list.json`,
-  `server/ingestion/sources/${ATS_KEY}/fixtures/expected-normalized.json`
+  `server/ingestion/sources/${ATS_KEY}/fixtures/expected-normalized.json`,
+  `server/ingestion/sources/${ATS_KEY}/fixtures/invalid-shapes.json`
 ]);
 
 const sourceContract = createBasicSourceContract({

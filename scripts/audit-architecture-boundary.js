@@ -90,7 +90,10 @@ function git(args) {
 }
 
 function listTrackedFiles(paths) {
-  return git(["ls-files", ...paths]).split(/\r?\n/).filter(Boolean);
+  return git(["ls-files", ...paths])
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .filter((relativePath) => fs.existsSync(path.join(ROOT, relativePath)));
 }
 
 function scanFiles(files, patterns) {

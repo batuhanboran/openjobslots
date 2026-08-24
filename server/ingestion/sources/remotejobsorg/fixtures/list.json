@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "id": "rjo-fixture-remote-1",
+      "title": "Remote Platform Engineer",
+      "url": "https://remotejobs.org/remote-jobs/remote-platform-engineer-fixture",
+      "apply_url": "https://remotejobs.org/remote-jobs/remote-platform-engineer-fixture",
+      "company": {
+        "name": "Fixture Cloud"
+      },
+      "category": {
+        "name": "Programming",
+        "slug": "programming"
+      },
+      "location": "Remote - Türkiye",
+      "type": "Full-time",
+      "description": "<p>This role is part of the RemoteJobs.org remote jobs catalog.</p>",
+      "posted_at": "2026-08-24T12:00:00+00:00"
+    },
+    {
+      "id": "rjo-fixture-onsite-2",
+      "title": "Office Operations Manager",
+      "url": "https://remotejobs.org/remote-jobs/office-operations-manager-fixture",
+      "apply_url": "https://remotejobs.org/remote-jobs/office-operations-manager-fixture",
+      "company": {
+        "name": "Fixture Office"
+      },
+      "category": {
+        "name": "Operations",
+        "slug": "operations"
+      },
+      "location": "Austin, Texas",
+      "type": "Full-time",
+      "description": "<p>This is not a remote role and must be performed at the physical office.</p>",
+      "posted_at": "2026-08-23T12:00:00+00:00"
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "limit": 50,
+    "offset": 0,
+    "has_more": false
+  },
+  "meta": {
+    "powered_by": "RemoteJobs.org",
+    "url": "https://remotejobs.org",
+    "docs": "https://remotejobs.org/api/v1/docs"
+  }
+}

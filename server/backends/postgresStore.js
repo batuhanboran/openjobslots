@@ -1,7 +1,9 @@
+const { randomUUID } = require("node:crypto");
 const {
   deleteMeiliPostingsByCanonicalUrls,
   getMeiliConfig,
   searchMeiliPostings,
+  toMeiliPostingDocument,
   upsertMeiliPostings
 } = require("../search/meili");
 const searchConfig = require("../search/config");
@@ -62,6 +64,13 @@ const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "ats_source", label: "ATS/source" },
   { value: "confidence", label: "Confidence" }
 ]);
+
+function searchProjectionChanged(beforePosting, afterPosting) {
+  if (!beforePosting) return true;
+  if (!afterPosting) return false;
+  return JSON.stringify(toMeiliPostingDocument(beforePosting))
+    !== JSON.stringify(toMeiliPostingDocument(afterPosting));
+}
 
 function getRetentionConfig(env = process.env) {
   return {
@@ -2999,7 +3008,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         description_html: String(posting?.description_html || ""),
         ats_key: atsKey,
         last_seen_epoch: nowEpoch,
-        posted_at_epoch: posting?.posted_at_epoch || posting?.posting_date_epoch || nowEpoch,
+        posted_at_epoch: posting?.posted_at_epoch ?? posting?.posting_date_epoch ?? null,
         hidden: false
       };
       if (!validatePosting(normalizedPosting).ok) continue;
@@ -3012,55 +3021,8 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         { parserVersion: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1") }
       );
       if (gate.status !== "accepted") {
-        const quarantineQuality = buildStoredQualityFields(
-          {
-            ...normalizedPosting,
-            validation_status: gate.status,
-            validation_error: gate.reason,
-            parser_version: String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
-            confidence: Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
-            raw_payload_hash: String(posting?.raw_hash || posting?.raw_payload_hash || "")
-          },
-          { nowEpoch }
-        );
-        const hidden = await client.query(
-          `
-            UPDATE postings
-            SET hidden = true,
-                parser_version = $2,
-                confidence = $3,
-                quality_score = $4,
-                quality_flags = $5::jsonb,
-                rejection_reason = $6,
-                updated_at = now()
-            WHERE canonical_url = $1 AND hidden = false;
-          `,
-          [
-            canonicalUrl,
-            String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
-            Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
-            quarantineQuality.quality_score,
-            quarantineQuality.quality_flags,
-            gate.reason
-          ]
-        );
-        if (Number(hidden.rowCount || 0) > 0) {
-          // Only enqueue a Meili delete when the row actually transitioned visible→hidden
-          await client.query(
-            `
-              INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
-              VALUES ($1, 'delete', $2::jsonb, now());
-            `,
-            [
-              canonicalUrl,
-              JSON.stringify({
-                reason: "quarantined",
-                canonical_url: canonicalUrl,
-                reason_codes: gate.reason_codes || []
-              })
-            ]
-          );
-        }
+        // Parser regressions belong in posting_cache/quarantine evidence. Never
+        // hide or overwrite the last known-good public row from this path.
         continue;
       }
       const quality = buildStoredQualityFields(
@@ -3077,7 +3039,7 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
       // Dirty-check: check the old hidden state before the upsert so we can
       // detect hidden→visible transitions after the upsert completes.
       const oldRow = await client.query(
-        `SELECT hidden FROM postings WHERE canonical_url = $1;`,
+        `SELECT * FROM postings WHERE canonical_url = $1;`,
         [canonicalUrl]
       );
       const wasHidden = oldRow.rows.length > 0 && oldRow.rows[0].hidden === true;
@@ -3119,7 +3081,8 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
             quality_score = EXCLUDED.quality_score,
             quality_flags = EXCLUDED.quality_flags,
             rejection_reason = EXCLUDED.rejection_reason,
-            updated_at = now();
+            updated_at = now()
+          RETURNING *;
         `,
         [
           canonicalUrl,
@@ -3138,8 +3101,8 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           String(posting?.description_html || ""),
           atsKey,
           String(posting?.source_job_id || ""),
-          posting?.posting_date || new Date(nowEpoch * 1000).toISOString().split('T')[0],
-          posting?.posted_at_epoch || posting?.posting_date_epoch || nowEpoch,
+          posting?.posting_date || null,
+          posting?.posted_at_epoch ?? posting?.posting_date_epoch ?? null,
           nowEpoch,
           nowEpoch,
           String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
@@ -3149,14 +3112,12 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           quality.rejection_reason
         ]
       );
-      // Dirty-check: only write to search_index_outbox when:
-      // (1) The posting is newly inserted (no pre-existing row), OR
-      // (2) The posting was previously hidden/quarantined and is now being un-hidden.
-      // For existing visible rows being re-scraped with the same data, the upsert
-      // only touches last_seen_epoch, confidence, quality fields — none of which
-      // are indexed in Meilisearch. This prevents ~95% of redundant reindexing.
-      const isNewRow = oldRow.rows.length === 0;
-      if (isNewRow || wasHidden) {
+      // Enqueue whenever the canonical Meili projection changes. This includes
+      // updates to an already-visible row (title, geo, remote mode, date, etc.),
+      // not only inserts and hidden→visible transitions.
+      const previousPosting = oldRow.rows[0] || null;
+      const storedPosting = upsertResult.rows?.[0] || normalizedPosting;
+      if (wasHidden || searchProjectionChanged(previousPosting, storedPosting)) {
         await client.query(
           `
             INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
@@ -3190,6 +3151,7 @@ async function prunePostgresRetention(pool, options = {}) {
   const client = await pool.connect();
   const stats = {
     hidden_postings: 0,
+    deleted_stale_postings: 0,
     deleted_hidden_postings: 0,
     deleted_cache_rows: 0,
     deleted_error_rows: 0,
@@ -3202,10 +3164,10 @@ async function prunePostgresRetention(pool, options = {}) {
     await client.query("BEGIN");
     const stale = await client.query(
       `
-        SELECT canonical_url
+        SELECT canonical_url, hidden
         FROM postings
-        WHERE hidden = false
-          AND last_seen_epoch < $1
+        WHERE hidden = true
+           OR last_seen_epoch < $1
         ORDER BY last_seen_epoch ASC
         LIMIT $2;
       `,
@@ -3213,16 +3175,15 @@ async function prunePostgresRetention(pool, options = {}) {
     );
     const staleUrls = stale.rows.map((row) => String(row.canonical_url || "")).filter(Boolean);
     if (staleUrls.length > 0) {
-      const hidden = await client.query(
+      const deleted = await client.query(
         `
-          UPDATE postings
-          SET hidden = true,
-              updated_at = now()
+          DELETE FROM postings
           WHERE canonical_url = ANY($1::text[]);
         `,
         [staleUrls]
       );
-      stats.hidden_postings = Number(hidden.rowCount || 0);
+      stats.deleted_stale_postings = Number(deleted.rowCount || 0);
+      stats.deleted_hidden_postings = stale.rows.filter((row) => row.hidden === true).length;
       for (const canonicalUrl of staleUrls) {
         await client.query(
           `
@@ -3234,23 +3195,6 @@ async function prunePostgresRetention(pool, options = {}) {
         stats.outbox_delete_rows += 1;
       }
     }
-
-    const deletedHidden = await client.query(
-      `
-        WITH doomed AS (
-          SELECT canonical_url
-          FROM postings
-          WHERE hidden = true
-            AND last_seen_epoch < $1
-          ORDER BY last_seen_epoch ASC
-          LIMIT $2
-        )
-        DELETE FROM postings
-        WHERE canonical_url IN (SELECT canonical_url FROM doomed);
-      `,
-      [cutoffs.hiddenArchiveEpoch, batchSize]
-    );
-    stats.deleted_hidden_postings = Number(deletedHidden.rowCount || 0);
 
     const deletedCache = await client.query(
       `
@@ -3331,22 +3275,34 @@ async function prunePostgresRetention(pool, options = {}) {
 
 async function processPostgresSearchIndexOutbox(pool, options = {}) {
   const limit = Math.max(1, Math.min(1000, Number(options.limit || 250)));
+  const leaseSeconds = Math.max(30, Math.min(3600, Number(options.leaseSeconds || 300)));
   let totalProcessed = 0;
   let totalDeleted = 0;
   let totalUpserted = 0;
   const maxIterations = 20;
 
   for (let iter = 0; iter < maxIterations; iter++) {
+    const claimToken = randomUUID();
     const result = await pool.query(
       `
-        SELECT id, canonical_url, operation, payload
-        FROM search_index_outbox
-        WHERE processed_at IS NULL
-          AND available_at <= now()
-        ORDER BY id ASC
-        LIMIT $1;
+        WITH candidates AS (
+          SELECT id
+          FROM search_index_outbox
+          WHERE processed_at IS NULL
+            AND available_at <= now()
+            AND (claimed_at IS NULL OR claimed_at <= now() - ($2::int * interval '1 second'))
+          ORDER BY id ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $1
+        )
+        UPDATE search_index_outbox AS outbox
+        SET claim_token = $3,
+            claimed_at = now()
+        FROM candidates
+        WHERE outbox.id = candidates.id
+        RETURNING outbox.id, outbox.canonical_url, outbox.operation, outbox.payload;
       `,
-      [limit]
+      [limit, leaseSeconds, claimToken]
     );
     const rows = result.rows || [];
     if (rows.length === 0) break;
@@ -3386,16 +3342,26 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
           await upsertMeiliPostings(dbPostings, getMeiliConfig());
           totalUpserted += dbPostings.length;
         }
+        const foundUrls = new Set(dbPostings.map((posting) => String(posting.canonical_url || "").trim()));
+        const missingUrls = upsertUrls.filter((url) => !foundUrls.has(url));
+        if (missingUrls.length > 0) {
+          await deleteMeiliPostingsByCanonicalUrls(missingUrls, getMeiliConfig());
+          totalDeleted += missingUrls.length;
+        }
       }
 
       const rowIds = rows.map((row) => Number(row.id)).filter(Boolean);
       await pool.query(
         `
           UPDATE search_index_outbox
-          SET processed_at = now()
-          WHERE id = ANY($1::bigint[]);
+          SET processed_at = now(),
+              claim_token = NULL,
+              claimed_at = NULL,
+              last_error = ''
+          WHERE id = ANY($1::bigint[])
+            AND claim_token = $2;
         `,
-        [rowIds]
+        [rowIds, claimToken]
       );
       totalProcessed += rows.length;
     } catch (batchError) {
@@ -3406,10 +3372,13 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
           UPDATE search_index_outbox
           SET attempts = attempts + 1,
               last_error = $2,
-              available_at = now() + ( (attempts + 1) * interval '1 minute' )
-          WHERE id = ANY($1::bigint[]);
+              available_at = now() + ( (attempts + 1) * interval '1 minute' ),
+              claim_token = NULL,
+              claimed_at = NULL
+          WHERE id = ANY($1::bigint[])
+            AND claim_token = $3;
         `,
-        [rowIds, batchError.message || "Unknown error"]
+        [rowIds, batchError.message || "Unknown error", claimToken]
       );
       throw batchError;
     }

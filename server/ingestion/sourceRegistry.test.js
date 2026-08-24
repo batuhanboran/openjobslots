@@ -12,6 +12,7 @@ const {
   listRegistrySourceModules,
   resolveRegistrySourceKey
 } = require("./sourceRegistry");
+const { getSourceModule } = require("./sources");
 
 const DETAIL_ENRICHMENT_PREFIXES = [
   "__detailHtmlByUrl",
@@ -70,6 +71,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.equal(isRegistryPilotSource("icims"), true);
   assert.equal(isRegistryPilotSource("isolvisolvedhire"), true);
   assert.equal(isRegistryPilotSource("jobaps"), true);
+  assert.equal(isRegistryPilotSource("jobicy"), true);
   assert.equal(isRegistryPilotSource("jobvite"), true);
   assert.equal(isRegistryPilotSource("join"), true);
   assert.equal(isRegistryPilotSource("k12jobspot"), true);
@@ -89,6 +91,7 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.equal(isRegistryPilotSource("smartrecruiters"), true);
   assert.equal(isRegistryPilotSource("statejobsny"), true);
   assert.equal(isRegistryPilotSource("recruitee"), true);
+  assert.equal(isRegistryPilotSource("remotejobsorg"), true);
   assert.equal(isRegistryPilotSource("rippling"), true);
   assert.equal(isRegistryPilotSource("sagehr"), true);
   assert.equal(isRegistryPilotSource("taleo"), true);
@@ -108,6 +111,17 @@ test("registry exposes source-owned pilot sources including legacy collector mig
   assert.ok(pilotKeys.length >= 60);
   assert.ok(pilotKeys.includes("adp_workforcenow"));
   assert.ok(pilotKeys.includes("zoho"));
+});
+
+test("operational registry excludes generated no-op sources", () => {
+  const operationalKeys = listRegistrySourceModules().map((item) => item.atsKey).sort();
+
+  assert.equal(operationalKeys.length, 67);
+  assert.equal(isRegistryPilotSource("100hires"), false);
+  assert.equal(getRegistrySourceModule("100hires").status, SOURCE_STATUSES.unsupported);
+  assert.equal(getSourceModule("100hires"), null);
+  assert.ok(operationalKeys.includes("greenhouse"));
+  assert.equal(getRegistrySourceModule("greenhouse").status, SOURCE_STATUSES.enabled);
 });
 
 test("detail-fetching source modules declare detail sidecar payload policy", () => {
@@ -154,7 +168,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const applicantAi = getRegistrySourceModule("applicantai");
   assert.equal(applicantAi.atsKey, "applicantai");
   assert.equal(applicantAi.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(applicantAi.status, SOURCE_STATUSES.enabled);
+  assert.equal(applicantAi.status, SOURCE_STATUSES.disabled);
   assert.equal(applicantAi.collectWhenDisabled, true);
   assert.equal(typeof applicantAi.discover, "function");
   assert.equal(typeof applicantAi.fetchList, "function");
@@ -266,7 +280,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const dayforceHcm = getRegistrySourceModule("dayforcehcm");
   assert.equal(dayforceHcm.atsKey, "dayforcehcm");
   assert.equal(dayforceHcm.family, SOURCE_FAMILIES.enterpriseDirect);
-  assert.equal(dayforceHcm.status, SOURCE_STATUSES.enabled);
+  assert.equal(dayforceHcm.status, SOURCE_STATUSES.disabled);
   assert.equal(dayforceHcm.collectWhenDisabled, true);
   assert.equal(typeof dayforceHcm.discover, "function");
   assert.equal(typeof dayforceHcm.fetchList, "function");
@@ -313,7 +327,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const hibob = getRegistrySourceModule("hibob");
   assert.equal(hibob.atsKey, "hibob");
   assert.equal(hibob.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(hibob.status, SOURCE_STATUSES.enabled);
+  assert.equal(hibob.status, SOURCE_STATUSES.disabled);
   assert.equal(hibob.collectWhenDisabled, true);
   assert.equal(typeof hibob.discover, "function");
   assert.equal(typeof hibob.fetchList, "function");
@@ -337,7 +351,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const usajobs = getRegistrySourceModule("usajobs");
   assert.equal(usajobs.atsKey, "usajobs");
   assert.equal(usajobs.family, SOURCE_FAMILIES.publicSectorEducation);
-  assert.equal(usajobs.status, SOURCE_STATUSES.enabled);
+  assert.equal(usajobs.status, SOURCE_STATUSES.disabled);
   assert.equal(usajobs.collectWhenDisabled, true);
   assert.equal(typeof usajobs.discover, "function");
   assert.equal(typeof usajobs.fetchList, "function");
@@ -361,7 +375,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const theApplicantManager = getRegistrySourceModule("theapplicantmanager");
   assert.equal(theApplicantManager.atsKey, "theapplicantmanager");
   assert.equal(theApplicantManager.family, SOURCE_FAMILIES.embeddedOrSemiStructured);
-  assert.equal(theApplicantManager.status, SOURCE_STATUSES.enabled);
+  assert.equal(theApplicantManager.status, SOURCE_STATUSES.disabled);
   assert.equal(theApplicantManager.collectWhenDisabled, true);
   assert.equal(typeof theApplicantManager.discover, "function");
   assert.equal(typeof theApplicantManager.fetchList, "function");
@@ -384,7 +398,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const freshteam = getRegistrySourceModule("freshteam");
   assert.equal(freshteam.atsKey, "freshteam");
   assert.equal(freshteam.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(freshteam.status, SOURCE_STATUSES.enabled);
+  assert.equal(freshteam.status, SOURCE_STATUSES.disabled);
   assert.equal(typeof freshteam.discover, "function");
   assert.equal(typeof freshteam.fetchList, "function");
   assert.equal(typeof freshteam.parse, "function");
@@ -472,7 +486,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const join = getRegistrySourceModule("join");
   assert.equal(join.atsKey, "join");
   assert.equal(join.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(join.status, SOURCE_STATUSES.enabled);
+  assert.equal(join.status, SOURCE_STATUSES.disabled);
   assert.equal(typeof join.discover, "function");
   assert.equal(typeof join.fetchList, "function");
   assert.equal(typeof join.parse, "function");
@@ -494,7 +508,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const teamtailor = getRegistrySourceModule("teamtailor");
   assert.equal(teamtailor.atsKey, "teamtailor");
   assert.equal(teamtailor.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(teamtailor.status, SOURCE_STATUSES.enabled);
+  assert.equal(teamtailor.status, SOURCE_STATUSES.disabled);
   assert.equal(typeof teamtailor.discover, "function");
   assert.equal(typeof teamtailor.fetchList, "function");
   assert.equal(typeof teamtailor.parse, "function");
@@ -664,7 +678,7 @@ test("registry returns contract-valid pilot source modules", () => {
   const rippling = getRegistrySourceModule("rippling");
   assert.equal(rippling.atsKey, "rippling");
   assert.equal(rippling.family, SOURCE_FAMILIES.vendorSpecific);
-  assert.equal(rippling.status, SOURCE_STATUSES.enabled);
+  assert.equal(rippling.status, SOURCE_STATUSES.disabled);
   assert.equal(typeof rippling.discover, "function");
   assert.equal(typeof rippling.fetchList, "function");
   assert.equal(typeof rippling.parse, "function");
@@ -765,22 +779,28 @@ test("registry returns contract-valid pilot source modules", () => {
   assert.deepEqual(validateSourceContract(zoho), { ok: true, failures: [] });
 });
 
-test("target disabled-source recovery modules stay canary-runnable until production proof", () => {
-  const canaryRecoveryTargets = [
+test("registry metadata is the single authority for disabled recovery modules", () => {
+  const enabledRecoveryTargets = [
     "workday",
     "manatal",
-    "dayforcehcm",
     "gem",
     "personio",
     "workable"
   ];
 
-  for (const atsKey of canaryRecoveryTargets) {
+  for (const atsKey of enabledRecoveryTargets) {
     assert.equal(
       getRegistrySourceModule(atsKey).status,
       SOURCE_STATUSES.enabled,
       `${atsKey} should be enabled`
     );
+  }
+
+  for (const atsKey of [
+    "applicantai", "dayforcehcm", "freshteam", "hibob", "join",
+    "rippling", "teamtailor", "theapplicantmanager", "usajobs"
+  ]) {
+    assert.equal(getRegistrySourceModule(atsKey).status, SOURCE_STATUSES.disabled);
   }
 
   assert.equal(

@@ -365,10 +365,11 @@ async function upsertMeiliPostings(postings, config = getMeiliConfig()) {
     .map(toMeiliPostingDocument)
     .filter((item) => /^https?:\/\//i.test(item.canonical_url) && item.title && item.company && !PLACEHOLDER_TITLE_PATTERN.test(item.title));
   if (documents.length === 0) return { ok: true, count: 0 };
-  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents`, {
+  const task = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents`, {
     method: "POST",
     body: JSON.stringify(documents)
   });
+  return waitForMeiliTask(config, task, config.taskTimeoutMs || resolveMeiliTaskTimeoutMs());
 }
 
 async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMeiliConfig()) {
@@ -378,10 +379,11 @@ async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMei
     .filter(Boolean)
     .map(toMeiliDocumentId);
   if (ids.length === 0) return { ok: true, count: 0 };
-  return meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents/delete-batch`, {
+  const task = await meiliRequest(config, `/indexes/${encodeURIComponent(config.indexName)}/documents/delete-batch`, {
     method: "POST",
     body: JSON.stringify(ids)
   });
+  return waitForMeiliTask(config, task, config.taskTimeoutMs || resolveMeiliTaskTimeoutMs());
 }
 
 async function searchMeiliPostings(options = {}, config = getMeiliConfig()) {

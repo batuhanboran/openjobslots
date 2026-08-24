@@ -1011,29 +1011,12 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     normalizePostingValue(posting?.requisition_id) ||
     normalizePostingValue(posting?.requisitionId);
 
-  if (!sourceJobId && jobPostingUrl) {
-    const isTestEnv = process.argv.some((arg) => arg.includes("test") || arg.includes("run-tests") || arg.includes("fixture") || arg.includes("spec"));
-    if (!isTestEnv) {
-      try {
-        const urlObj = new URL(jobPostingUrl);
-        const pathParts = urlObj.pathname.split("/").filter(Boolean);
-        const idPart = pathParts.find((p) => /\d+/.test(p));
-        if (idPart) {
-          sourceJobId = idPart.replace(/[^a-zA-Z0-9-_]/g, "");
-        } else {
-          let hash = 0;
-          const str = urlObj.pathname + urlObj.search;
-          for (let i = 0; i < str.length; i++) {
-            hash = (hash << 5) - hash + str.charCodeAt(i);
-            hash |= 0;
-          }
-          sourceJobId = "url-" + Math.abs(hash).toString(36);
-        }
-      } catch (e) {
-        // ignore URL parse errors
-      }
-    }
-  }
+  // A canonical URL/hash can deduplicate observations, but it is not source
+  // evidence. Keep it separate so the public gate can still detect a missing
+  // source-owned job identifier.
+  const derivedDedupeId = !sourceJobId && jobPostingUrl
+    ? `url-${stablePayloadHash(jobPostingUrl)}`
+    : "";
   const seenEpoch = Number(options?.nowEpoch || options?.lastSeenEpoch || 0) || null;
   const firstSeenEpoch = Number(options?.firstSeenEpoch || seenEpoch || 0) || null;
   const lastSeenEpoch = Number(options?.lastSeenEpoch || seenEpoch || 0) || null;
@@ -1041,6 +1024,7 @@ function normalizePosting(posting, company, atsKey, options = {}) {
     ...posting,
     ats_key: atsKey,
     source_job_id: sourceJobId,
+    derived_dedupe_id: derivedDedupeId,
     canonical_url: jobPostingUrl,
     apply_url: applyUrl || jobPostingUrl,
     title: positionName,
