@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -6,6 +7,12 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const deploy = fs.readFileSync(path.join(repoRoot, "scripts", "deploy.sh"), "utf8");
 const service = fs.readFileSync(path.join(repoRoot, "deploy", "systemd", "openjobslots-deploy.service"), "utf8");
 const deploymentDoc = fs.readFileSync(path.join(repoRoot, "docs", "reference", "deployment.md"), "utf8");
+const watchdogIndexMode = execFileSync("git", ["ls-files", "--stage", "scripts/worker-watchdog.sh"], {
+  cwd: repoRoot,
+  encoding: "utf8"
+}).trim().split(/\s+/)[0];
+
+assert.equal(watchdogIndexMode, "100755", "worker watchdog must be executable for the production cron entry");
 
 assert.match(deploy, /git status --porcelain/);
 assert.match(deploy, /refusing deploy.*dirty/i);
