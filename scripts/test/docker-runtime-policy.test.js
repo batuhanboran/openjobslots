@@ -27,7 +27,8 @@ for (const serviceName of [
   "openjobslots-postgres",
   "openjobslots-meilisearch",
   "openjobslots-app",
-  "openjobslots-worker"
+  "openjobslots-worker",
+  "openjobslots-web"
 ]) {
   const block = serviceBlock(serviceName);
   assertContains(block, "mem_limit:", `${serviceName} must have a memory limit`);
@@ -54,5 +55,13 @@ assertContains(workerBlock, "scripts/healthcheck-worker.js");
 const meiliBlock = serviceBlock("openjobslots-meilisearch");
 assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEM_LIMIT:-6144m");
 assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-8192m");
+
+const webBlock = serviceBlock("openjobslots-web");
+assertContains(webBlock, "context: ./web");
+assertContains(webBlock, "image: openjobslots-web:${OPENJOBSLOTS_WEB_IMAGE_TAG:-3.0.1}");
+assertContains(webBlock, '"${OPENJOBSLOTS_WEB_ORIGIN_PORT:-8090}:3000"');
+assertContains(webBlock, "OJS_API_BASE=http://openjobslots-app:8787");
+assertContains(webBlock, "condition: service_healthy");
+assertContains(webBlock, "healthcheck:");
 
 console.log("docker runtime policy tests passed");

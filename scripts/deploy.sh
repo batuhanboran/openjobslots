@@ -12,6 +12,8 @@ DEPLOY_KEY="${DEPLOY_KEY:-}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
 FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-3}"
 ORIGIN_PORT="${OPENJOBSLOTS_ORIGIN_PORT:-8081}"
+WEB_ORIGIN_PORT="${OPENJOBSLOTS_WEB_ORIGIN_PORT:-8090}"
+WEB_BASE_URL="${WEB_BASE_URL:-http://127.0.0.1:${WEB_ORIGIN_PORT}}"
 BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-openjobslots-postgres}"
 CURL_CONNECT_TIMEOUT_SECONDS="${CURL_CONNECT_TIMEOUT_SECONDS:-3}"
@@ -116,6 +118,7 @@ harden_origin_port() {
 
 cd "$APP_DIR"
 harden_origin_port "$ORIGIN_PORT"
+harden_origin_port "$WEB_ORIGIN_PORT"
 
 LOCAL_SHA="$(git rev-parse HEAD)"
 log "checking $REMOTE/$BRANCH from $LOCAL_SHA"
@@ -177,11 +180,16 @@ if ! docker compose up -d --build --remove-orphans; then
 fi
 
 verify_deploy() {
+  local web_version
+  web_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' web/package.json | head -n 1)"
   curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$HEALTH_URL" | grep -q '"ok":true'
   curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=Director%20United%20States&limit=5" | grep -q '"ok":true'
   curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=remote%20engineer&limit=5" | grep -q '"ok":true'
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/" | grep -q "v${web_version}"
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/health/ready" | grep -q '"ok":true'
   [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-app)" == "healthy" ]]
   [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-worker)" == "healthy" ]]
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-web)" == "healthy" ]]
   [[ "$(git rev-parse HEAD)" == "$REMOTE_SHA" ]]
 }
 
@@ -196,7 +204,8 @@ done
 log "health check failed after deploy to $REMOTE_SHA"
 docker compose ps >> "$LOG_FILE" 2>&1 || true
 docker compose logs --tail=80 openjobslots-app >> "$LOG_FILE" 2>&1 || true
+docker compose logs --tail=80 openjobslots-web >> "$LOG_FILE" 2>&1 || true
 log "rolling back to $LOCAL_SHA"
 git reset --hard "$LOCAL_SHA"
-docker compose up -d --build openjobslots-app openjobslots-worker >> "$LOG_FILE" 2>&1 || true
+docker compose up -d --build openjobslots-app openjobslots-worker openjobslots-web >> "$LOG_FILE" 2>&1 || true
 exit 1

@@ -196,6 +196,37 @@ services:
       - ./backups:/backups:ro
     command: npm run ingestion:worker
 
+  openjobslots-web:
+    build:
+      context: ./web
+      args:
+        OJS_API_BASE: http://openjobslots-app:8787
+    image: openjobslots-web:${OPENJOBSLOTS_WEB_IMAGE_TAG:-3.0.1}
+    container_name: openjobslots-web
+    restart: unless-stopped
+    mem_limit: ${OPENJOBSLOTS_WEB_MEM_LIMIT:-512m}
+    memswap_limit: ${OPENJOBSLOTS_WEB_MEMSWAP_LIMIT:-512m}
+    cpus: ${OPENJOBSLOTS_WEB_CPUS:-1.0}
+    depends_on:
+      openjobslots-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)throw new Error(String(r.status))}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 7s
+      retries: 5
+      start_period: 45s
+    environment:
+      - NODE_ENV=production
+      - OJS_API_BASE=http://openjobslots-app:8787
+    ports:
+      - "${OPENJOBSLOTS_WEB_ORIGIN_PORT:-8090}:3000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
 volumes:
   postgres-data:
   meili-data:

@@ -15,6 +15,7 @@ assert.match(deploy, /-e backups/);
 assert.match(deploy, /--connect-timeout/);
 assert.match(deploy, /--max-time/);
 assert.match(deploy, /\/health\/ready/);
+assert.match(deploy, /openjobslots-web/);
 assert.doesNotMatch(deploy, /curl -fsS "\$HEALTH_URL"/);
 
 assert.match(service, /APP_DIR=\/root\/OpenJobSlots/);
@@ -26,5 +27,6 @@ assert.match(deploymentDoc, /OPENJOBSLOTS_MEILI_MEM_LIMIT=6144m/);
 assert.match(deploymentDoc, /OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=8192m/);
 assert.match(deploymentDoc, /worker heartbeat/i);
 assert.match(deploymentDoc, /fresh Postgres backup/i);
+assert.match(deploymentDoc, /web frontend.*same Compose deploy/i);
 
 console.log("infra deploy core tests passed");

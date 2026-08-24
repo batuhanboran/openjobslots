@@ -31,22 +31,11 @@ docker build \
 8787). It is baked into the fallback proxy at build time — never use the public
 domain here or the root will proxy to itself.
 
-## 2. Add the service to docker-compose.yml (same network as the app)
+## 2. Compose service
 
-```yaml
-  openjobslots-web:
-    image: openjobslots-web:3.0.1
-    container_name: openjobslots-web
-    restart: unless-stopped
-    environment:
-      - OJS_API_BASE=http://openjobslots-app:8787
-    depends_on:
-      - openjobslots-app
-    # expose to the reverse proxy the same way openjobslots-app was exposed,
-    # e.g. host port 8090 → container 3000 (pick a free host port):
-    ports:
-      - "8090:3000"
-```
+The repository root `docker-compose.yml` owns `openjobslots-web`, builds it from
+`web/`, waits for the backend healthcheck, exposes host port 8090, and checks the
+rendered root page. Do not create this container separately with `docker run`.
 
 ```bash
 docker compose up -d openjobslots-web
@@ -87,5 +76,6 @@ Nothing in the backend changed, so this fully restores the previous site.
   facets or sort controls yet. Search + suggestions (with intent filters) +
   region filter + load-more work.
 - Language selector retranslates the whole UI live (12 languages).
-- This app is separate from the `OpenJobSlots/` repo and its git-push auto-deploy
-  timer; deploy it with the steps above (or wire it into its own pipeline).
+- This app is part of the `OpenJobSlots/` repo and the same git-push auto-deploy
+  timer as the backend. The deploy fails and rolls back when the web container is
+  unhealthy or its rendered version does not match `web/package.json`.

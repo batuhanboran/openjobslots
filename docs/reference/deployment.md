@@ -12,9 +12,10 @@ The production host runs the app from `/root/OpenJobSlots` and deploys from `mai
 - `openjobslots-worker`
 - `openjobslots-postgres`
 - `openjobslots-meilisearch`
+- `openjobslots-web`
 - the auto-deploy watcher
 
-These four services are the intended v1 runtime. Do not add Redis, a second reverse proxy, or another database engine until measured query, queue, or cache pressure proves the need.
+These five services are the intended runtime. The web frontend is built from `web/` by the same Compose deploy as the backend, so the public UI cannot remain on an older release after `main` advances. Do not add Redis, a second reverse proxy, or another database engine until measured query, queue, or cache pressure proves the need.
 
 ## Deploy Access
 
@@ -60,6 +61,7 @@ Compose sets memory and swap ceilings for the four production services. Defaults
 - `OPENJOBSLOTS_MEILI_MEM_LIMIT=6144m` and `OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=8192m`.
 - `OPENJOBSLOTS_APP_MEM_LIMIT=768m` and `OPENJOBSLOTS_APP_MEMSWAP_LIMIT=768m`.
 - `OPENJOBSLOTS_WORKER_MEM_LIMIT=768m` and `OPENJOBSLOTS_WORKER_MEMSWAP_LIMIT=768m`.
+- `OPENJOBSLOTS_WEB_MEM_LIMIT=512m` and `OPENJOBSLOTS_WEB_MEMSWAP_LIMIT=512m`.
 
 App and worker Node heaps are separately bounded with `OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB=384` and `OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB=512`. Meilisearch intentionally has a 2 GiB swap allowance: a full temp-index rebuild briefly holds the live and replacement indexes together, while steady-state search remains well below the ceiling. Keep the worker isolated during a replacement reindex and monitor container restarts, cgroup OOM events, and host swap.
 
