@@ -705,7 +705,11 @@ async function reconcilePostgresAtsSources(pool, canonicalKeys = []) {
       [canonicalAdpKey, legacyAdpKey]
     );
     await client.query("DELETE FROM ats_rate_limits WHERE rate_limit_key = $1;", [legacyAdpKey]);
-    await client.query("DELETE FROM companies WHERE ats_key = $1;", [legacyAdpKey]);
+    // Keep the retired alias company rows as inert history. Deleting them makes
+    // PostgreSQL run foreign-key checks for every company row; on production
+    // posting tables that turns startup reconciliation into repeated full-table
+    // scans. All live references were repointed above and the legacy ATS source
+    // is disabled below, so physical deletion is neither required nor safe here.
 
     const retired = await client.query(
       `

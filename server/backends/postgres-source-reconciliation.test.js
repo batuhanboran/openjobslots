@@ -54,5 +54,6 @@ test("ADP legacy identity migration is conflict-safe and preserves history", asy
   assert.match(sql, /UPDATE posting_cache AS target[\s\S]+target\.company_id = legacy\.id/i);
   assert.match(sql, /UPDATE postings AS target[\s\S]+target\.company_id = legacy\.id/i);
   assert.match(sql, /UPDATE ats_source_runs SET ats_key = \$1 WHERE ats_key = \$2/i);
+  assert.doesNotMatch(sql, /DELETE FROM companies/i);
   assert.ok(pool.calls.some((call) => call.params[0] === "adp_myjobs" && call.params[1] === "adpmyjobs"));
 });
