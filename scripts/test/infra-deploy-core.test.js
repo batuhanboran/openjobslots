@@ -27,6 +27,9 @@ assert.doesNotMatch(deploy, /curl -fsS "\$HEALTH_URL"/);
 assert.match(deploy, /validate_postings_response/);
 assert.match(deploy, /Array\.isArray\(payload\.items\)/);
 assert.match(deploy, /Number\.isFinite\(Number\(payload\.count\)\)/);
+assert.match(deploy, /rollback_deploy\(\)/);
+assert.match(deploy, /compose startup failed after retry/);
+assert.match(deploy, /if ! docker compose up -d --build; then[\s\S]*rollback_deploy[\s\S]*exit 1/);
 assert.doesNotMatch(
   deploy,
   /\/postings\?[^\n]*\|\s*grep\s+-q\s+'"ok":true'/,

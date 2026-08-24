@@ -1,6 +1,6 @@
 {
   "name": "openjobslots-web",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "private": true,
   "description": "OpenJobSlots public web frontend — Next.js search UI for openjobslots.com",
   "author": "Batuhan Boran",

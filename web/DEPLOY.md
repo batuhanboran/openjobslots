@@ -24,7 +24,7 @@ serves internally and the web frontend proxies to it.
 # in the brave-clone project directory on the host
 docker build \
   --build-arg OJS_API_BASE=http://openjobslots-app:8787 \
-  -t openjobslots-web:3.0.1 .
+  -t openjobslots-web:3.0.2 .
 ```
 
 `OJS_API_BASE` is the **internal** backend (compose service name + internal port

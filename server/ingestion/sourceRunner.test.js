@@ -693,6 +693,47 @@ test("source runner exposes virtual targets for public aggregate boards in inclu
   assert.equal(queries.length, 2);
 });
 
+test("source runner exposes Jobicy and RemoteJobs.org as disabled virtual canary targets", async () => {
+  const expectedTargets = [
+    ["jobicy", "Jobicy (virtual)", "https://jobicy.com/api/v2/remote-jobs"],
+    ["remotejobsorg", "RemoteJobs.org (virtual)", "https://remotejobs.org/api/v1/jobs?limit=50"]
+  ];
+
+  for (const [source, companyName, url] of expectedTargets) {
+    const pool = {
+      async query(sql) {
+        if (/FROM companies c/i.test(sql)) return { rows: [] };
+        if (/FROM ats_sources s/i.test(sql)) {
+          return {
+            rows: [{
+              ats_key: source,
+              enabled: false,
+              protection_status: "normal",
+              disabled_reason: "",
+              rate_limit_ms: 0
+            }]
+          };
+        }
+        throw new Error(`unexpected query: ${sql}`);
+      }
+    };
+
+    const targets = await discoverSourceTargets(pool, {
+      source,
+      includeDisabled: true,
+      limit: 1,
+      offset: 0
+    });
+
+    assert.equal(targets.length, 1);
+    assert.equal(targets[0].company.company_name, companyName);
+    assert.equal(targets[0].company.url_string, url);
+    assert.equal(targets[0].atsKey, source);
+    assert.equal(targets[0].source.enabled, false);
+    assert.ok(targets[0].adapter);
+  }
+});
+
 test("source runner canonicalizes legacy source target aliases through canonical source settings", async () => {
   const queries = [];
   const pool = {

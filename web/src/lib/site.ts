@@ -1,6 +1,6 @@
 // Site-wide constants for the OpenJobSlots (Brave-skinned) frontend.
 
-export const APP_VERSION = "3.0.1";
+export const APP_VERSION = "3.0.2";
 
 export const REPO_URL = "https://github.com/batuhanboran/openjobslots";
 export const LINKEDIN_URL = "https://www.linkedin.com/in/batuhan-boran-320b311b7/";

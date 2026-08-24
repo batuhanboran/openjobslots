@@ -73,6 +73,14 @@ const VIRTUAL_SOURCE_TARGETS = Object.freeze({
   arbeitnow: {
     company_name: "Arbeitnow (virtual)",
     url_string: "https://www.arbeitnow.com/api/job-board-api"
+  },
+  jobicy: {
+    company_name: "Jobicy (virtual)",
+    url_string: "https://jobicy.com/api/v2/remote-jobs"
+  },
+  remotejobsorg: {
+    company_name: "RemoteJobs.org (virtual)",
+    url_string: "https://remotejobs.org/api/v1/jobs?limit=50"
   }
 });
 

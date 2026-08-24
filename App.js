@@ -3243,6 +3243,13 @@ const PUBLIC_VERSION_LABEL = `Public v${PUBLIC_APP_VERSION}`;
 const PROJECT_REPO_URL = "https://github.com/batuhanboran/openjobslots";
 const PUBLIC_RELEASE_NOTES = [
   {
+    version: "3.0.2",
+    date: "August 24, 2026",
+    title: "Guarded remote-source canaries and safer deploys",
+    summary:
+      "Adds controlled RemoteJobs.org and Jobicy canaries through their public APIs, centralizes ATS rate limits and retries, serializes app/worker source reconciliation at startup, hardens outbox and hidden-record maintenance, and guarantees rollback after a failed Compose startup."
+  },
+  {
     version: "3.0.1",
     date: "August 24, 2026",
     title: "Infrastructure stability and faster public search",
@@ -3532,6 +3539,11 @@ const PUBLIC_RELEASE_NOTES = [
 ];
 const PUBLIC_RELEASE_NOTE_TRANSLATIONS = {
   tr: {
+    "3.0.2": {
+      title: "Güvenli remote kaynak canary'leri ve kararlı deploy",
+      summary:
+        "RemoteJobs.org ve Jobicy kaynaklarını açık API'leri üzerinden kontrollü canary akışına ekler, ATS isteklerinde ortak hız sınırı ve yeniden deneme kurallarını uygular, başlangıçtaki kaynak uzlaştırmasını kilitleyerek app/worker çakışmasını önler, outbox ve gizli kayıt bakımını güçlendirir ve başarısız Compose başlangıcında otomatik rollback sağlar."
+    },
     "3.0.1": {
       title: "Altyapı kararlılığı ve hızlı genel arama",
       summary:

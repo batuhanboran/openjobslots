@@ -602,6 +602,10 @@ async function reconcilePostgresAtsSources(pool, canonicalKeys = []) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // App and worker both seed/reconcile sources during startup. Share the
+    // schema-migration lock so DDL and source retirement cannot deadlock when
+    // the two containers start at the same time.
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('openjobslots_schema_migration'));");
 
     // Copy legacy companies first, then repoint every live company reference.
     await client.query(

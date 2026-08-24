@@ -201,7 +201,7 @@ services:
       context: ./web
       args:
         OJS_API_BASE: http://openjobslots-app:8787
-    image: openjobslots-web:${OPENJOBSLOTS_WEB_IMAGE_TAG:-3.0.1}
+    image: openjobslots-web:${OPENJOBSLOTS_WEB_IMAGE_TAG:-3.0.2}
     container_name: openjobslots-web
     restart: unless-stopped
     mem_limit: ${OPENJOBSLOTS_WEB_MEM_LIMIT:-512m}

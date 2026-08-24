@@ -50,6 +50,7 @@ test("ADP legacy identity migration is conflict-safe and preserves history", asy
   const sql = pool.calls.map((call) => call.sql).join("\n");
 
   assert.match(sql, /INSERT INTO companies[\s\S]+ON CONFLICT \(ats_key, url_string\) DO UPDATE/i);
+  assert.match(sql, /pg_advisory_xact_lock\(hashtext\('openjobslots_schema_migration'\)\)/i);
   assert.match(sql, /INSERT INTO company_sync_state[\s\S]+ON CONFLICT \(ats_key, company_url\) DO UPDATE/i);
   assert.match(sql, /UPDATE posting_cache AS target[\s\S]+target\.company_id = legacy\.id/i);
   assert.match(sql, /UPDATE postings AS target[\s\S]+target\.company_id = legacy\.id/i);

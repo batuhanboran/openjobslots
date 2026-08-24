@@ -10,6 +10,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: "3.0.2",
+    date: "24 Ağu 2026",
+    title: "Güvenli remote kaynak canary'leri ve kararlı deploy",
+    summary:
+      "RemoteJobs.org ve Jobicy kaynaklarını açık API'leri üzerinden kontrollü canary akışına ekler, ATS isteklerinde ortak hız sınırı ve yeniden deneme kurallarını uygular, başlangıçtaki kaynak uzlaştırmasını kilitleyerek app/worker çakışmasını önler, outbox ve gizli kayıt bakımını güçlendirir ve başarısız Compose başlangıcında otomatik rollback sağlar.",
+  },
+  {
     version: "3.0.1",
     date: "24 Ağu 2026",
     title: "Altyapı kararlılığı ve hızlı genel arama",

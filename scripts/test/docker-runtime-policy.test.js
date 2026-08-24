@@ -58,7 +58,7 @@ assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-8192m");
 
 const webBlock = serviceBlock("openjobslots-web");
 assertContains(webBlock, "context: ./web");
-assertContains(webBlock, "image: openjobslots-web:${OPENJOBSLOTS_WEB_IMAGE_TAG:-3.0.1}");
+assertContains(webBlock, "image: openjobslots-web:${OPENJOBSLOTS_WEB_IMAGE_TAG:-3.0.2}");
 assertContains(webBlock, '"${OPENJOBSLOTS_WEB_ORIGIN_PORT:-8090}:3000"');
 assertContains(webBlock, "OJS_API_BASE=http://openjobslots-app:8787");
 assertContains(webBlock, "condition: service_healthy");

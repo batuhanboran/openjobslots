@@ -195,9 +195,19 @@ log "deploying $REMOTE_SHA"
 git reset --hard "$REMOTE_SHA"
 git clean -fd -e .env -e data -e .deploy-backups -e backups -e reports -e "docker-compose.yml.bak*"
 
+rollback_deploy() {
+  log "rolling back to $LOCAL_SHA"
+  git reset --hard "$LOCAL_SHA"
+  docker compose up -d --build openjobslots-app openjobslots-worker openjobslots-web >> "$LOG_FILE" 2>&1 || true
+}
+
 if ! docker compose up -d --build --remove-orphans; then
   log "compose --remove-orphans unsupported or failed; retrying without it"
-  docker compose up -d --build
+  if ! docker compose up -d --build; then
+    log "compose startup failed after retry"
+    rollback_deploy
+    exit 1
+  fi
 fi
 
 verify_deploy() {
@@ -226,7 +236,5 @@ log "health check failed after deploy to $REMOTE_SHA"
 docker compose ps >> "$LOG_FILE" 2>&1 || true
 docker compose logs --tail=80 openjobslots-app >> "$LOG_FILE" 2>&1 || true
 docker compose logs --tail=80 openjobslots-web >> "$LOG_FILE" 2>&1 || true
-log "rolling back to $LOCAL_SHA"
-git reset --hard "$LOCAL_SHA"
-docker compose up -d --build openjobslots-app openjobslots-worker openjobslots-web >> "$LOG_FILE" 2>&1 || true
+rollback_deploy
 exit 1
