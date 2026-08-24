@@ -117,7 +117,7 @@ harden_origin_port() {
 }
 
 validate_postings_response() {
-  node -e '
+  docker exec -i openjobslots-app node -e '
     let raw = "";
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => { raw += chunk; });
@@ -213,15 +213,16 @@ fi
 verify_deploy() {
   local web_version
   web_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' web/package.json | head -n 1)"
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$HEALTH_URL" | grep -q '"ok":true'
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=Director%20United%20States&limit=5" | validate_postings_response
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=remote%20engineer&limit=5" | validate_postings_response
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/" | grep -q "v${web_version}"
-  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/health/ready" | grep -q '"ok":true'
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-app)" == "healthy" ]]
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-worker)" == "healthy" ]]
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-web)" == "healthy" ]]
-  [[ "$(git rev-parse HEAD)" == "$REMOTE_SHA" ]]
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$HEALTH_URL" | grep -q '"ok":true' || return 1
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=Director%20United%20States&limit=5" | validate_postings_response || return 1
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$BASE_URL/postings?search=remote%20engineer&limit=5" | validate_postings_response || return 1
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/" | grep -q "v${web_version}" || return 1
+  curl -fsS --connect-timeout "$CURL_CONNECT_TIMEOUT_SECONDS" --max-time "$CURL_MAX_TIME_SECONDS" "$WEB_BASE_URL/health/ready" | grep -q '"ok":true' || return 1
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-app)" == "healthy" ]] || return 1
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-worker)" == "healthy" ]] || return 1
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' openjobslots-web)" == "healthy" ]] || return 1
+  [[ "$(git rev-parse HEAD)" == "$REMOTE_SHA" ]] || return 1
+  return 0
 }
 
 for attempt in $(seq 1 60); do
