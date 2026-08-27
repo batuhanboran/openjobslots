@@ -590,8 +590,8 @@ async function recoverPostgresStaleRuns(pool) {
       UPDATE company_sync_state st
       SET
         consecutive_failures = COALESCE(st.consecutive_failures, 0) + 1,
-        last_failure_epoch = $1,
-        next_sync_epoch = GREATEST(COALESCE(st.next_sync_epoch, 0), $1 + 3600),
+        last_failure_epoch = $1::bigint,
+        next_sync_epoch = GREATEST(COALESCE(st.next_sync_epoch, 0), $1::bigint + 3600),
         last_error = 'Worker restarted while processing this target',
         updated_at = now()
       FROM ingestion_runs r

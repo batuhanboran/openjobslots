@@ -668,8 +668,17 @@ test("stale run recovery penalises the in-flight target before flipping run stat
 
   assert.ok(/UPDATE company_sync_state/i.test(calls[0].sql), "target penalty must run before the ingestion_runs flip");
   assert.match(calls[0].sql, /consecutive_failures = COALESCE\(st\.consecutive_failures, 0\) \+ 1/);
-  assert.match(calls[0].sql, /next_sync_epoch = GREATEST\(COALESCE\(st\.next_sync_epoch, 0\), \$1 \+ 3600\)/);
+  assert.match(calls[0].sql, /next_sync_epoch = GREATEST\(COALESCE\(st\.next_sync_epoch, 0\), \$1::bigint \+ 3600\)/);
   assert.match(calls[0].sql, /r\.status IN \('running', 'stopping'\)/);
+  // Postgres deduces $1 as bigint from last_failure_epoch and as integer from "$1 + 3600".
+  // Without an explicit cast on every reference it rejects the statement with 42P08
+  // and the worker cannot start at all.
+  assert.match(calls[0].sql, /last_failure_epoch = \$1::bigint/);
+  assert.equal(
+    /\$1(?!::bigint)/.test(calls[0].sql),
+    false,
+    "every $1 reference in the recovery update must carry an explicit ::bigint cast"
+  );
   assert.ok(/UPDATE ingestion_runs/i.test(calls[1].sql));
   assert.equal(calls[0].params[0], calls[1].params[0], "both updates must share one recovery timestamp");
 });
