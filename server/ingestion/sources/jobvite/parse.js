@@ -401,8 +401,12 @@ function parseJobvitePostingsFromHtml(companyNameForPostings, config, pagePayloa
   const detailHtmlByUrl = payload.__detailHtmlByUrl || {};
   const tablePattern =
     /<h3[^>]*>([\s\S]*?)<\/h3>\s*<table[^>]*class=["'][^"']*\bjv-job-list\b[^"']*["'][^>]*>([\s\S]*?)<\/table>/gi;
-  const rowPattern =
-    /<tr[^>]*>[\s\S]*?<td[^>]*class=["'][^"']*\bjv-job-list-name\b[^"']*["'][^>]*>[\s\S]*?<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/td>[\s\S]*?<td[^>]*class=["'][^"']*\bjv-job-list-location\b[^"']*["'][^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
+  const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rowNamePattern =
+    /<td[^>]*class=["'][^"']*\bjv-job-list-name\b[^"']*["'][^>]*>[\s\S]{0,2000}?<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,2000}?)<\/a>/i;
+  const rowTitlePattern = /<div[^>]*class=["'][^"']*\btitle\b[^"']*["'][^>]*>([\s\S]{0,300}?)<\/div>/i;
+  const rowLocationPattern =
+    /<(?:td|div|span)[^>]*class=["'][^"']*\bjv-job-list-location\b[^"']*["'][^>]*>([\s\S]{0,400}?)<\/(?:td|div|span)>/i;
 
   const postings = [];
   const seenUrls = new Set();
@@ -410,16 +414,21 @@ function parseJobvitePostingsFromHtml(companyNameForPostings, config, pagePayloa
   const pushRows = (rowsHtml, department = "") => {
     let rowMatch = rowPattern.exec(rowsHtml);
     while (rowMatch) {
-      const href = String(rowMatch[1] || "").trim();
+      const rowHtml = String(rowMatch[1] || "");
+      const nameMatch = rowNamePattern.exec(rowHtml);
+      const href = String(nameMatch?.[1] || "").trim();
       const absoluteUrl = href ? new URL(href, `${config.baseOrigin}/`).toString() : "";
       if (!absoluteUrl || seenUrls.has(absoluteUrl)) {
         rowMatch = rowPattern.exec(rowsHtml);
         continue;
       }
 
+      const anchorHtml = String(nameMatch?.[2] || "");
+      const titleMatch = rowTitlePattern.exec(anchorHtml);
+      const locationMatch = rowLocationPattern.exec(rowHtml);
       const detailHtml = lookupJobviteDetailHtml(detailHtmlByUrl, absoluteUrl);
       const detailFields = extractJobviteDetailFields(detailHtml);
-      const listLocation = cleanJobviteText(rowMatch[3]) || null;
+      const listLocation = cleanJobviteText(locationMatch?.[1] || "") || null;
       const listLocationFields = extractJobviteListLocationFields(listLocation);
       const detailLocation = detailFields.location || "";
       const mergedLocation = mergeJobviteListAndDetailLocation(listLocation, detailFields);
@@ -442,7 +451,7 @@ function parseJobvitePostingsFromHtml(companyNameForPostings, config, pagePayloa
       postings.push({
         company_name: companyNameForPostings,
         source_job_id: extractSourceIdFromPostingUrl(absoluteUrl, "jobvite"),
-        position_name: cleanJobviteText(rowMatch[2]) || "Untitled Position",
+        position_name: cleanJobviteText(titleMatch ? titleMatch[1] : anchorHtml) || "Untitled Position",
         job_posting_url: absoluteUrl,
         posting_date: detailFields.postingDate || null,
         location: mergedLocation,

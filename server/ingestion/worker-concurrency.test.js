@@ -25,7 +25,7 @@ const {
   withWriteLock
 } = require("./worker");
 const { decideAdaptiveSourceSelection } = require("./adaptiveSourceSelection");
-const { writePostgresPostingCache } = require("./workerStore");
+const { recoverPostgresStaleRuns, writePostgresPostingCache } = require("./workerStore");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -653,4 +653,23 @@ test("postgres due target sorting prioritizes healthy targets before failure-pre
     "Healthy Breezy",
     "Old Failing Breezy"
   ]);
+});
+
+test("stale run recovery penalises the in-flight target before flipping run status", async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      return { rows: [], rowCount: 1 };
+    }
+  };
+
+  await recoverPostgresStaleRuns(pool);
+
+  assert.ok(/UPDATE company_sync_state/i.test(calls[0].sql), "target penalty must run before the ingestion_runs flip");
+  assert.match(calls[0].sql, /consecutive_failures = COALESCE\(st\.consecutive_failures, 0\) \+ 1/);
+  assert.match(calls[0].sql, /next_sync_epoch = GREATEST\(COALESCE\(st\.next_sync_epoch, 0\), \$1 \+ 3600\)/);
+  assert.match(calls[0].sql, /r\.status IN \('running', 'stopping'\)/);
+  assert.ok(/UPDATE ingestion_runs/i.test(calls[1].sql));
+  assert.equal(calls[0].params[0], calls[1].params[0], "both updates must share one recovery timestamp");
 });

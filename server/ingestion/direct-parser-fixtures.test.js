@@ -833,6 +833,76 @@ test("careerplug parser reads detail JSON-LD and skips localized apply links", (
   assert.equal(evaluatePublicPosting(normalized, { parserVersion: adapter.parserVersion }).status, "accepted");
 });
 
+test("jobvite parses rows whose location is a nested div inside the name cell", () => {
+  const parsed = parseJobvitePostingsFromHtml(
+    "fieldcore-review",
+    { baseOrigin: "https://jobs.jobvite.com" },
+    `
+      <h3 class="h2">Business Operations</h3>
+      <table class="jv-job-list m0">
+        <tbody>
+          <tr>
+            <td class="jv-job-list-name">
+              <a href="/fieldcore-review/job/o3FFAfwH">
+                <div class="title">Buyer</div>
+                <div class="jv-job-list-location">Remote, Mexico</div>
+                <div class="arrow"><img src="//careers.jobvite.com/icon-next-hover.svg" /></div>
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `
+  );
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].position_name, "Buyer");
+  assert.equal(parsed[0].source_list_location, "Remote, Mexico");
+  assert.equal(parsed[0].department, "Business Operations");
+  assert.equal(parsed[0].job_posting_url, "https://jobs.jobvite.com/fieldcore-review/job/o3FFAfwH");
+});
+
+test("jobvite keeps a row whose location cell is missing entirely", () => {
+  const parsed = parseJobvitePostingsFromHtml(
+    "fieldcore-review",
+    { baseOrigin: "https://jobs.jobvite.com" },
+    `
+      <table class="jv-job-list">
+        <tr>
+          <td class="jv-job-list-name"><a href="/fieldcore-review/job/o0W5zfw8"><div class="title">Buyer</div></a></td>
+        </tr>
+      </table>
+    `
+  );
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].position_name, "Buyer");
+  assert.equal(parsed[0].source_list_location, null);
+});
+
+test("jobvite row extraction stays linear on a large document it cannot match", () => {
+  // Real fieldcore-review shape: the name cell matches, but the location lives in a
+  // nested div so no jv-job-list-location <td> exists. The previous row pattern
+  // committed past the name cell and then explored the cross-product of its lazy
+  // wildcards looking for that <td>: 3.6s at 10KB, over 60s at 20KB, and it never
+  // returned on the 90KB production page.
+  const rows = Array.from({ length: 400 }, (_unused, index) =>
+    `<tr><td class="jv-job-list-name"><a href="/fixture/job/o${index}Afw">` +
+    `<div class="title">Buyer ${index}</div>` +
+    `<div class="jv-job-list-location">Remote, Mexico</div>` +
+    `<div class="arrow"><img src="//careers.jobvite.com/icon.svg" /></div>` +
+    `</a></td></tr>`
+  ).join("");
+  const html = `<h3>Ops</h3><table class="jv-job-list">${rows}</table>`;
+  assert.ok(html.length > 80000, `fixture should exceed 80KB, got ${html.length}`);
+
+  const startedMs = Date.now();
+  const parsed = parseJobvitePostingsFromHtml("fixture", { baseOrigin: "https://jobs.jobvite.com" }, html);
+  const elapsedMs = Date.now() - startedMs;
+
+  assert.equal(parsed.length, 400);
+  assert.equal(parsed[0].position_name, "Buyer 0");
+  assert.ok(elapsedMs < 2000, `row extraction took ${elapsedMs}ms; catastrophic backtracking has been reintroduced`);
+});
+
 test("implemented HTML/API parsers preserve source ids from source payloads and URLs", () => {
   const jobvite = normalizeParsed(
     "jobvite",
