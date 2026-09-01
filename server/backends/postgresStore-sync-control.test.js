@@ -1636,7 +1636,7 @@ async function testProcessSearchOutboxUsesPartialFreshnessDocuments() {
     const href = String(url);
     const method = String(options.method || "GET").toUpperCase();
     fetchCalls.push({ href, method, body: options.body ? JSON.parse(String(options.body)) : null });
-    if (href === "http://meili.test/indexes/postings/documents?skipCreation=true" && method === "PUT") {
+    if (href === "http://meili.test/indexes/postings/documents" && method === "PUT") {
       return response({ taskUid: 78, status: "enqueued" });
     }
     if (href === "http://meili.test/tasks/78" && method === "GET") {

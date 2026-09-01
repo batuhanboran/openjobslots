@@ -100,14 +100,14 @@ test("document upsert waits for the Meili task to succeed", async () => {
   }
 });
 
-test("freshness updates use partial PUT documents without replacing search content", async () => {
+test("freshness updates use the Meilisearch v1.16-compatible partial PUT endpoint", async () => {
   const originalFetch = global.fetch;
   const calls = [];
   global.fetch = async (url, options = {}) => {
     const href = String(url);
     const method = String(options.method || "GET").toUpperCase();
     calls.push({ href, method, body: options.body ? JSON.parse(String(options.body)) : null });
-    if (href === "http://meili.test/indexes/postings/documents?skipCreation=true" && method === "PUT") {
+    if (href === "http://meili.test/indexes/postings/documents" && method === "PUT") {
       return jsonResponse({ taskUid: 43, status: "enqueued" });
     }
     if (href === "http://meili.test/tasks/43" && method === "GET") {

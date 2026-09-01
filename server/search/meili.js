@@ -385,11 +385,13 @@ async function updateMeiliPostingFreshness(postings, config = getMeiliConfig()) 
     })
     .filter((item) => /^https?:\/\//i.test(item.canonical_url) && item.last_seen_epoch > 0);
   if (documents.length === 0) return { ok: true, count: 0 };
-  // PUT is Meilisearch's partial-document update API. skipCreation prevents a
-  // parity gap from creating a freshness-only document with no search fields.
+  // PUT merges these fields into existing documents. Meilisearch v1.16 does
+  // not accept the newer skipCreation query parameter. If a parity gap exists,
+  // a newly created partial remains outside public results because it has no
+  // `hidden = false` field and is repaired by the normal full-document path.
   const task = await meiliRequest(
     config,
-    `/indexes/${encodeURIComponent(config.indexName)}/documents?skipCreation=true`,
+    `/indexes/${encodeURIComponent(config.indexName)}/documents`,
     {
       method: "PUT",
       body: JSON.stringify(documents)
