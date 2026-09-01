@@ -2238,7 +2238,7 @@ async function testPostgresUpsertUsesNarrowFreshnessUpdateForUnchangedVisiblePos
     source_job_id: oldRow.source_job_id,
     parser_version: oldRow.parser_version,
     parser_confidence: oldRow.confidence
-  }], { nowEpoch: 200, skipMeili: true });
+  }], { nowEpoch: 200, skipMeili: true, freshnessWriteIntervalSeconds: 1 });
 
   assert.equal(calls.some((call) => /INSERT INTO postings/i.test(call.sql)), false);
   assert.ok(calls.some((call) => /UPDATE postings[\s\S]+last_seen_epoch/i.test(call.sql)));
@@ -2246,6 +2246,76 @@ async function testPostgresUpsertUsesNarrowFreshnessUpdateForUnchangedVisiblePos
   const payload = JSON.parse(outboxInsert.params[1]);
   assert.equal(payload.update_type, "freshness");
   assert.equal(payload.last_seen_epoch, 200);
+}
+
+async function testPostgresUpsertSkipsRedundantFreshnessWriteInsideCheckpointWindow() {
+  const calls = [];
+  const oldRow = {
+    canonical_url: "https://example.com/jobs/3",
+    company_name: "Example",
+    position_name: "Software Engineer",
+    apply_url: "https://example.com/jobs/3",
+    location_text: "Remote",
+    city: "",
+    country: "",
+    region: "",
+    remote_type: "remote",
+    industry: "",
+    department: "Engineering",
+    employment_type: "Full-time",
+    description_plain: "Build reliable systems.",
+    description_html: "<p>Build reliable systems.</p>",
+    ats_key: "greenhouse",
+    source_job_id: "3",
+    posting_date: null,
+    posted_at_epoch: null,
+    first_seen_epoch: 100,
+    last_seen_epoch: 100,
+    hidden: false,
+    parser_version: "greenhouse-v1",
+    confidence: 0.86,
+    quality_score: 74,
+    quality_flags: ["missing_country", "missing_posted_at", "missing_region"],
+    rejection_reason: ""
+  };
+  const client = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT[\s\S]+FROM postings WHERE canonical_url = \$1/i.test(sql)) {
+        return { rows: [oldRow], rowCount: 1 };
+      }
+      if (/^(BEGIN|COMMIT|ROLLBACK)$/i.test(String(sql).trim())) return { rows: [], rowCount: 0 };
+      if (/^(UPDATE|INSERT)/i.test(String(sql).trim())) {
+        throw new Error(`fresh checkpoint must skip redundant write: ${sql}`);
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    release() {}
+  };
+  const pool = { async connect() { return client; } };
+
+  await upsertPostgresPostings(pool, [{
+    canonical_url: oldRow.canonical_url,
+    company_name: oldRow.company_name,
+    position_name: oldRow.position_name,
+    apply_url: oldRow.apply_url,
+    location: oldRow.location_text,
+    city: oldRow.city,
+    country: oldRow.country,
+    region: oldRow.region,
+    remote_type: oldRow.remote_type,
+    industry: oldRow.industry,
+    department: oldRow.department,
+    employment_type: oldRow.employment_type,
+    description_plain: oldRow.description_plain,
+    description_html: oldRow.description_html,
+    ats_key: oldRow.ats_key,
+    source_job_id: oldRow.source_job_id,
+    parser_version: oldRow.parser_version,
+    parser_confidence: 0.9
+  }], { nowEpoch: 200, skipMeili: true, freshnessWriteIntervalSeconds: 6 * 60 * 60 });
+
+  assert.equal(calls.some((call) => /^\s*(UPDATE|INSERT)/i.test(call.sql)), false);
 }
 
 async function testPayloadDriftUsesSourceLocalEmptyJobListStems() {
@@ -3269,6 +3339,7 @@ async function main() {
   await testPostgresUpsertRejectsInvalidPostingsBeforeStorage();
   await testPostgresUpsertEnqueuesExistingVisibleProjectionChanges();
   await testPostgresUpsertUsesNarrowFreshnessUpdateForUnchangedVisiblePosting();
+  await testPostgresUpsertSkipsRedundantFreshnessWriteInsideCheckpointWindow();
   testMeiliDocumentsCarryHiddenFlagSafely();
   await testMeiliUpsertSkipsPlaceholderTitles();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();

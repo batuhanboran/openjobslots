@@ -65,6 +65,16 @@ const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "ats_source", label: "ATS/source" },
   { value: "confidence", label: "Confidence" }
 ]);
+const DEFAULT_POSTING_FRESHNESS_WRITE_INTERVAL_SECONDS = 6 * 60 * 60;
+
+function resolvePostingFreshnessWriteIntervalSeconds(options = {}) {
+  const configured = options.freshnessWriteIntervalSeconds
+    ?? process.env.OPENJOBSLOTS_POSTING_FRESHNESS_WRITE_INTERVAL_SECONDS
+    ?? DEFAULT_POSTING_FRESHNESS_WRITE_INTERVAL_SECONDS;
+  const parsed = Number(configured);
+  if (!Number.isFinite(parsed)) return DEFAULT_POSTING_FRESHNESS_WRITE_INTERVAL_SECONDS;
+  return Math.max(0, Math.min(7 * 24 * 60 * 60, Math.floor(parsed)));
+}
 
 function classifySearchProjectionChange(beforePosting, afterPosting) {
   if (!beforePosting) return "full";
@@ -3088,9 +3098,19 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
       const previousPosting = oldRow.rows[0] || null;
       const parserVersion = String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1");
       const confidence = Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5);
+      const freshnessWriteIntervalSeconds = resolvePostingFreshnessWriteIntervalSeconds(options);
+      const previousLastSeenEpoch = Number(previousPosting?.last_seen_epoch || 0);
+      const shouldAdvanceFreshness = !previousPosting
+        || wasHidden
+        || freshnessWriteIntervalSeconds === 0
+        || previousLastSeenEpoch <= 0
+        || nowEpoch - previousLastSeenEpoch >= freshnessWriteIntervalSeconds;
+      const normalizedForStorage = shouldAdvanceFreshness
+        ? normalizedPosting
+        : { ...normalizedPosting, last_seen_epoch: previousLastSeenEpoch };
       const prospectivePosting = prospectiveStoredPosting(
         previousPosting,
-        normalizedPosting,
+        normalizedForStorage,
         posting,
         quality,
         { parserVersion, confidence }
@@ -3100,34 +3120,45 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         String(previousPosting.apply_url || "") !== String(prospectivePosting.apply_url || "") ||
         String(previousPosting.description_html || "") !== String(prospectivePosting.description_html || "")
       );
+      const storageMetadataChanged = previousPosting && (
+        String(previousPosting.parser_version || "") !== parserVersion
+        || Number(previousPosting.confidence || 0) !== confidence
+        || Number(previousPosting.quality_score || 0) !== Number(quality.quality_score || 0)
+        || JSON.stringify(parseQualityFlags(previousPosting.quality_flags)) !== JSON.stringify(parseQualityFlags(quality.quality_flags))
+        || String(previousPosting.rejection_reason || "") !== String(quality.rejection_reason || "")
+      );
 
       let storedPosting = null;
       if (previousPosting && !wasHidden && prospectiveSearchChange !== "full" && !nonSearchContentChanged) {
-        const freshnessResult = await client.query(
-          `
-            UPDATE postings
-            SET last_seen_epoch = $2,
-                parser_version = $3,
-                confidence = $4,
-                quality_score = $5,
-                quality_flags = $6::jsonb,
-                rejection_reason = $7,
-                updated_at = now()
-            WHERE canonical_url = $1
-              AND hidden = false
-            RETURNING *;
-          `,
-          [
-            canonicalUrl,
-            nowEpoch,
-            parserVersion,
-            confidence,
-            quality.quality_score,
-            quality.quality_flags,
-            quality.rejection_reason
-          ]
-        );
-        storedPosting = freshnessResult.rows?.[0] || null;
+        if (prospectiveSearchChange === "none" && !storageMetadataChanged) {
+          storedPosting = previousPosting;
+        } else {
+          const freshnessResult = await client.query(
+            `
+              UPDATE postings
+              SET last_seen_epoch = $2,
+                  parser_version = $3,
+                  confidence = $4,
+                  quality_score = $5,
+                  quality_flags = $6::jsonb,
+                  rejection_reason = $7,
+                  updated_at = now()
+              WHERE canonical_url = $1
+                AND hidden = false
+              RETURNING *;
+            `,
+            [
+              canonicalUrl,
+              prospectivePosting.last_seen_epoch,
+              parserVersion,
+              confidence,
+              quality.quality_score,
+              quality.quality_flags,
+              quality.rejection_reason
+            ]
+          );
+          storedPosting = freshnessResult.rows?.[0] || null;
+        }
       }
 
       if (!storedPosting) {
