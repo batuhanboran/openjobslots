@@ -607,8 +607,23 @@ async function reconcilePostgresAtsSources(pool, canonicalKeys = []) {
     // the two containers start at the same time.
     await client.query("SELECT pg_advisory_xact_lock(hashtext('openjobslots_schema_migration'));");
 
-    // Copy legacy companies first, then repoint every live company reference.
-    await client.query(
+    const legacySourceState = await client.query(
+      `
+        SELECT enabled, protection_status, disabled_reason
+        FROM ats_sources
+        WHERE ats_key = $1;
+      `,
+      [legacyAdpKey]
+    );
+    const legacySource = legacySourceState.rows?.[0] || null;
+    const legacyMigrationComplete = legacySource
+      && legacySource.enabled === false
+      && String(legacySource.protection_status || "") === "disabled"
+      && String(legacySource.disabled_reason || "") === "retired_alias_migrated_to_adp_myjobs";
+
+    if (!legacyMigrationComplete) {
+      // Copy legacy companies first, then repoint every live company reference.
+      await client.query(
       `
         INSERT INTO companies (company_name, normalized_company_name, url_string, ats_key, created_at, updated_at)
         SELECT company_name, normalized_company_name, url_string, $1, created_at, now()
@@ -708,7 +723,8 @@ async function reconcilePostgresAtsSources(pool, canonicalKeys = []) {
       `,
       [canonicalAdpKey, legacyAdpKey]
     );
-    await client.query("DELETE FROM ats_rate_limits WHERE rate_limit_key = $1;", [legacyAdpKey]);
+      await client.query("DELETE FROM ats_rate_limits WHERE rate_limit_key = $1;", [legacyAdpKey]);
+    }
     // Keep the retired alias company rows as inert history. Deleting them makes
     // PostgreSQL run foreign-key checks for every company row; on production
     // posting tables that turns startup reconciliation into repeated full-table

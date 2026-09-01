@@ -58,3 +58,35 @@ test("ADP legacy identity migration is conflict-safe and preserves history", asy
   assert.doesNotMatch(sql, /DELETE FROM companies/i);
   assert.ok(pool.calls.some((call) => call.params[0] === "adp_myjobs" && call.params[1] === "adpmyjobs"));
 });
+
+test("completed ADP legacy identity migration skips startup-wide table rewrites", async () => {
+  const pool = createPool();
+  const originalConnect = pool.connect;
+  pool.connect = async () => {
+    const client = await originalConnect();
+    const originalQuery = client.query;
+    client.query = async (sql, params = []) => {
+      if (/SELECT enabled, protection_status, disabled_reason[\s\S]+FROM ats_sources[\s\S]+WHERE ats_key = \$1/i.test(sql)) {
+        pool.calls.push({ scope: "client", sql: String(sql), params });
+        return {
+          rows: [{
+            enabled: false,
+            protection_status: "disabled",
+            disabled_reason: "retired_alias_migrated_to_adp_myjobs"
+          }],
+          rowCount: 1
+        };
+      }
+      return originalQuery(sql, params);
+    };
+    return client;
+  };
+
+  await reconcilePostgresAtsSources(pool, ["adp_myjobs"]);
+  const sql = pool.calls.map((call) => call.sql).join("\n");
+
+  assert.doesNotMatch(sql, /UPDATE posting_cache AS target/i);
+  assert.doesNotMatch(sql, /UPDATE postings AS target/i);
+  assert.doesNotMatch(sql, /INSERT INTO companies[\s\S]+FROM companies[\s\S]+WHERE ats_key = \$2/i);
+  assert.match(sql, /UPDATE ats_sources[\s\S]+retired_not_in_runtime_registry/i);
+});
