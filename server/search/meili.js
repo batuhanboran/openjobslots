@@ -372,6 +372,32 @@ async function upsertMeiliPostings(postings, config = getMeiliConfig()) {
   return waitForMeiliTask(config, task, config.taskTimeoutMs || resolveMeiliTaskTimeoutMs());
 }
 
+async function updateMeiliPostingFreshness(postings, config = getMeiliConfig()) {
+  if (!config.enabled) return { ok: true, skipped: true, count: 0 };
+  const documents = (Array.isArray(postings) ? postings : [])
+    .map((posting) => {
+      const canonicalUrl = String(posting?.canonical_url || posting?.job_posting_url || "").trim();
+      return {
+        id: toMeiliDocumentId(canonicalUrl),
+        canonical_url: canonicalUrl,
+        last_seen_epoch: Number(posting?.last_seen_epoch || 0)
+      };
+    })
+    .filter((item) => /^https?:\/\//i.test(item.canonical_url) && item.last_seen_epoch > 0);
+  if (documents.length === 0) return { ok: true, count: 0 };
+  // PUT is Meilisearch's partial-document update API. skipCreation prevents a
+  // parity gap from creating a freshness-only document with no search fields.
+  const task = await meiliRequest(
+    config,
+    `/indexes/${encodeURIComponent(config.indexName)}/documents?skipCreation=true`,
+    {
+      method: "PUT",
+      body: JSON.stringify(documents)
+    }
+  );
+  return waitForMeiliTask(config, task, config.taskTimeoutMs || resolveMeiliTaskTimeoutMs());
+}
+
 async function deleteMeiliPostingsByCanonicalUrls(canonicalUrls, config = getMeiliConfig()) {
   if (!config.enabled) return { ok: true, skipped: true, count: 0 };
   const ids = (Array.isArray(canonicalUrls) ? canonicalUrls : [])
@@ -478,6 +504,7 @@ module.exports = {
   searchMeiliPostings,
   toMeiliDocumentId,
   toMeiliPostingDocument,
+  updateMeiliPostingFreshness,
   upsertMeiliPostings,
   waitForMeiliTask
 };

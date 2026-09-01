@@ -11,9 +11,9 @@ const {
 test("worker maintenance policy batches derived-index writes and throttles scan-heavy work", () => {
   assert.deepEqual(resolveWorkerMaintenancePolicy({}), {
     searchIndexOutboxBatchSize: 1000,
-    retentionIntervalMs: 60 * 60 * 1000,
-    sourceQualityProtectionIntervalMs: 30 * 60 * 1000,
-    publicStatsRefreshIntervalMs: 30 * 60 * 1000
+    retentionIntervalMs: 6 * 60 * 60 * 1000,
+    sourceQualityProtectionIntervalMs: 6 * 60 * 60 * 1000,
+    publicStatsRefreshIntervalMs: 6 * 60 * 60 * 1000
   });
 
   assert.deepEqual(resolveWorkerMaintenancePolicy({
@@ -25,7 +25,7 @@ test("worker maintenance policy batches derived-index writes and throttles scan-
     searchIndexOutboxBatchSize: 250,
     retentionIntervalMs: 60 * 1000,
     sourceQualityProtectionIntervalMs: 24 * 60 * 60 * 1000,
-    publicStatsRefreshIntervalMs: 30 * 60 * 1000
+    publicStatsRefreshIntervalMs: 6 * 60 * 60 * 1000
   });
 });
 
@@ -86,4 +86,27 @@ test("source-quality protection aggregates ATS keys and runs at most once per in
     atsKeys: ["greenhouse", "lever"]
   });
   assert.deepEqual(applied, [["bamboohr"], ["greenhouse", "lever"]]);
+});
+
+test("maintenance scheduler can defer its first expensive scan after worker startup", async () => {
+  const applied = [];
+  const scheduler = createSourceQualityProtectionScheduler({
+    intervalMs: 6 * 60 * 60 * 1000,
+    initialLastAppliedMs: 1000
+  });
+  const apply = async (atsKeys) => applied.push([...atsKeys]);
+
+  assert.deepEqual(await scheduler.schedule(["bamboohr"], { nowMs: 2000, apply }), {
+    applied: false,
+    reason: "interval",
+    pendingAtsKeys: ["bamboohr"]
+  });
+  assert.deepEqual(await scheduler.schedule(["lever"], {
+    nowMs: 1000 + 6 * 60 * 60 * 1000,
+    apply
+  }), {
+    applied: true,
+    atsKeys: ["bamboohr", "lever"]
+  });
+  assert.deepEqual(applied, [["bamboohr", "lever"]]);
 });

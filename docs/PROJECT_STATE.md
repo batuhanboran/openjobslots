@@ -2,12 +2,14 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
-## Service I/O Stabilization - September 1, 2026 (Local, Not Deployed)
+## Service I/O Stabilization - September 1, 2026
 
 - Fresh production read-only evidence at SHA `5507c42bd58dea40971e2ea2d1af82e192081636` isolated the dominant write path to continuous worker refreshes, Postgres WAL/table churn, and extremely small Meilisearch update tasks—not the Unlicensed crawler.
 - Latest-hour evidence: `12,599` distinct search-outbox URLs, at least `191` Meili addition tasks, and a median of `16` documents per task in the latest `1,000` tasks. PostgreSQL repeatedly hit its `1.5 GiB` memory ceiling without an OOM kill, forcing cache reclaim even though the host had substantial available memory.
-- Local runtime policy now defers per-target Meili flushes, drains the durable outbox once per run in batches of up to `1,000`, schedules retention hourly, schedules source-quality/public-stat scans every `30m`, and raises the Postgres container/cache defaults to `2560m` / `512MB` with a `6GB` planner cache estimate.
-- These changes are local only. Production must not be described as optimized until an explicitly approved deploy recreates worker/Postgres and fresh before/after I/O, health, outbox, task, and search-parity checks pass.
+- Commit `e9dbeb95` was deployed to production and validated with five healthy services. It raised the Postgres container/cache defaults to `2560m` / `512MB` with a `6GB` planner cache estimate and moved durable-outbox draining from every company target to run-level batches.
+- The first live run at `e9dbeb95` completed `50/50` targets and reduced `1,410` Meili document upserts to two addition tasks (`1,000 + 410`) plus one delete task, with pending outbox returning to zero. This removed tiny-task amplification but made full-document batch I/O bursts too large (`255 MiB/s` cgroup-summed read and `75 MiB/s` write), while immediate source-quality/public-stat scans produced `700+ MiB/s` cgroup-summed Postgres reads. Those cgroup totals double/triple-count virtual and backing devices, but the before/after method was held constant and the burst regression was treated as real.
+- The follow-up revision uses a narrow Postgres freshness update for unchanged visible postings and a Meilisearch `PUT` partial update containing only `id`, `canonical_url`, and `last_seen_epoch`; full documents remain mandatory for actual search-projection changes. It also defers expensive maintenance on worker startup and changes retention, source-quality protection, and public-stat snapshot defaults to every `6h`. Search-outbox draining still runs after every worker run.
+- Do not call the 10x I/O target achieved until the follow-up revision is deployed and a complete live ingestion run, cgroup I/O sample, outbox drain, task payload shape, health, and search parity all pass.
 
 ## ATS Local/Production Divergence - June 5, 2026
 

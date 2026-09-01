@@ -34,19 +34,19 @@ function resolveWorkerMaintenancePolicy(env = process.env) {
     ),
     retentionIntervalMs: boundedNumber(
       env.OPENJOBSLOTS_RETENTION_INTERVAL_MS,
-      60 * 60 * 1000,
+      6 * 60 * 60 * 1000,
       60 * 1000,
       24 * 60 * 60 * 1000
     ),
     sourceQualityProtectionIntervalMs: boundedNumber(
       env.OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS,
-      30 * 60 * 1000,
+      6 * 60 * 60 * 1000,
       60 * 1000,
       24 * 60 * 60 * 1000
     ),
     publicStatsRefreshIntervalMs: boundedNumber(
       env.OPENJOBSLOTS_PUBLIC_STATS_REFRESH_INTERVAL_MS,
-      30 * 60 * 1000,
+      6 * 60 * 60 * 1000,
       60 * 1000,
       24 * 60 * 60 * 1000
     )
@@ -66,7 +66,7 @@ function buildPostgresTargetUpsertOptions(options = {}) {
 function createSourceQualityProtectionScheduler(options = {}) {
   const intervalMs = Math.max(1000, Number(options.intervalMs || 15 * 60 * 1000));
   const pendingAtsKeys = new Set();
-  let lastAppliedMs = 0;
+  let lastAppliedMs = Math.max(0, Number(options.initialLastAppliedMs || 0));
   let inFlight = null;
 
   async function schedule(atsKeys, runOptions = {}) {

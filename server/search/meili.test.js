@@ -4,6 +4,7 @@ const test = require("node:test");
 const {
   ensureMeiliPostingsIndex,
   resolveMeiliTaskTimeoutMs,
+  updateMeiliPostingFreshness,
   upsertMeiliPostings
 } = require("./meili");
 
@@ -94,6 +95,46 @@ test("document upsert waits for the Meili task to succeed", async () => {
     });
     assert.equal(result.status, "succeeded");
     assert.deepEqual(calls.map((call) => call.method), ["POST", "GET"]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("freshness updates use partial PUT documents without replacing search content", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    const href = String(url);
+    const method = String(options.method || "GET").toUpperCase();
+    calls.push({ href, method, body: options.body ? JSON.parse(String(options.body)) : null });
+    if (href === "http://meili.test/indexes/postings/documents?skipCreation=true" && method === "PUT") {
+      return jsonResponse({ taskUid: 43, status: "enqueued" });
+    }
+    if (href === "http://meili.test/tasks/43" && method === "GET") {
+      return jsonResponse({ uid: 43, status: "succeeded" });
+    }
+    throw new Error(`unexpected request ${method} ${href}`);
+  };
+
+  try {
+    const result = await updateMeiliPostingFreshness([{
+      canonical_url: "https://example.com/jobs/43",
+      last_seen_epoch: 1770000043
+    }], {
+      enabled: true,
+      host: "http://meili.test",
+      apiKey: "",
+      indexName: "postings",
+      taskTimeoutMs: 5000
+    });
+    assert.equal(result.status, "succeeded");
+    assert.deepEqual(calls.map((call) => call.method), ["PUT", "GET"]);
+    assert.equal(calls[0].body.length, 1);
+    assert.equal(calls[0].body[0].last_seen_epoch, 1770000043);
+    assert.equal(calls[0].body[0].canonical_url, "https://example.com/jobs/43");
+    assert.ok(calls[0].body[0].id);
+    assert.equal(Object.hasOwn(calls[0].body[0], "title"), false);
+    assert.equal(Object.hasOwn(calls[0].body[0], "description_plain"), false);
   } finally {
     global.fetch = originalFetch;
   }

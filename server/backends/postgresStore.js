@@ -4,6 +4,7 @@ const {
   getMeiliConfig,
   searchMeiliPostings,
   toMeiliPostingDocument,
+  updateMeiliPostingFreshness,
   upsertMeiliPostings
 } = require("../search/meili");
 const searchConfig = require("../search/config");
@@ -65,11 +66,55 @@ const POSTING_SORT_OPTION_ITEMS = Object.freeze([
   { value: "confidence", label: "Confidence" }
 ]);
 
-function searchProjectionChanged(beforePosting, afterPosting) {
-  if (!beforePosting) return true;
-  if (!afterPosting) return false;
-  return JSON.stringify(toMeiliPostingDocument(beforePosting))
-    !== JSON.stringify(toMeiliPostingDocument(afterPosting));
+function classifySearchProjectionChange(beforePosting, afterPosting) {
+  if (!beforePosting) return "full";
+  if (!afterPosting) return "none";
+  const beforeDocument = toMeiliPostingDocument(beforePosting);
+  const afterDocument = toMeiliPostingDocument(afterPosting);
+  const beforeFreshness = Number(beforeDocument.last_seen_epoch || 0);
+  const afterFreshness = Number(afterDocument.last_seen_epoch || 0);
+  delete beforeDocument.last_seen_epoch;
+  delete afterDocument.last_seen_epoch;
+  if (JSON.stringify(beforeDocument) !== JSON.stringify(afterDocument)) return "full";
+  return beforeFreshness !== afterFreshness ? "freshness" : "none";
+}
+
+function prospectiveStoredPosting(previousPosting, normalizedPosting, posting, quality, options = {}) {
+  const previous = previousPosting || {};
+  const keepNonEmpty = (value, fallback = "") => {
+    const incoming = String(value || "");
+    return incoming.trim() ? incoming : String(fallback || "");
+  };
+  const incomingRemote = String(normalizedPosting.remote_type || "unknown");
+  const previousRemote = String(previous.remote_type || "unknown");
+  const parserVersion = String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1");
+  const confidence = Number(options.confidence ?? 0.5);
+  return {
+    ...previous,
+    ...normalizedPosting,
+    apply_url: String(normalizedPosting.apply_url || normalizedPosting.canonical_url),
+    location_text: keepNonEmpty(normalizedPosting.location_text, previous.location_text),
+    city: keepNonEmpty(normalizedPosting.city, previous.city),
+    country: keepNonEmpty(normalizedPosting.country, previous.country),
+    region: keepNonEmpty(normalizedPosting.region, previous.region),
+    remote_type: incomingRemote === "unknown" && previousRemote !== "unknown" ? previousRemote : incomingRemote,
+    industry: String(posting?.industry || ""),
+    department: keepNonEmpty(posting?.department, previous.department),
+    employment_type: keepNonEmpty(posting?.employment_type, previous.employment_type),
+    description_plain: keepNonEmpty(posting?.description_plain, previous.description_plain),
+    description_html: keepNonEmpty(posting?.description_html, previous.description_html),
+    source_job_id: keepNonEmpty(posting?.source_job_id, previous.source_job_id),
+    posting_date: posting?.posting_date ?? previous.posting_date ?? null,
+    posted_at_epoch: posting?.posted_at_epoch ?? posting?.posting_date_epoch ?? previous.posted_at_epoch ?? null,
+    first_seen_epoch: previous.first_seen_epoch ?? normalizedPosting.last_seen_epoch,
+    last_seen_epoch: normalizedPosting.last_seen_epoch,
+    hidden: false,
+    parser_version: parserVersion,
+    confidence,
+    quality_score: quality.quality_score,
+    quality_flags: quality.quality_flags,
+    rejection_reason: quality.rejection_reason
+  };
 }
 
 function getRetentionConfig(env = process.env) {
@@ -2965,7 +3010,6 @@ async function getPostgresSyncStatus(pool, options = {}) {
 
 async function upsertPostgresPostings(pool, postings, options = {}) {
   const nowEpoch = Number(options.nowEpoch || Math.floor(Date.now() / 1000));
-  const normalizedForSearchIndex = [];
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -3034,17 +3078,60 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
         },
         { nowEpoch }
       );
-      normalizedForSearchIndex.push(normalizedPosting);
-
       // Dirty-check: check the old hidden state before the upsert so we can
       // detect hidden→visible transitions after the upsert completes.
       const oldRow = await client.query(
-        `SELECT * FROM postings WHERE canonical_url = $1;`,
+        `SELECT * FROM postings WHERE canonical_url = $1 FOR UPDATE;`,
         [canonicalUrl]
       );
       const wasHidden = oldRow.rows.length > 0 && oldRow.rows[0].hidden === true;
+      const previousPosting = oldRow.rows[0] || null;
+      const parserVersion = String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1");
+      const confidence = Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5);
+      const prospectivePosting = prospectiveStoredPosting(
+        previousPosting,
+        normalizedPosting,
+        posting,
+        quality,
+        { parserVersion, confidence }
+      );
+      const prospectiveSearchChange = classifySearchProjectionChange(previousPosting, prospectivePosting);
+      const nonSearchContentChanged = previousPosting && (
+        String(previousPosting.apply_url || "") !== String(prospectivePosting.apply_url || "") ||
+        String(previousPosting.description_html || "") !== String(prospectivePosting.description_html || "")
+      );
 
-      const upsertResult = await client.query(
+      let storedPosting = null;
+      if (previousPosting && !wasHidden && prospectiveSearchChange !== "full" && !nonSearchContentChanged) {
+        const freshnessResult = await client.query(
+          `
+            UPDATE postings
+            SET last_seen_epoch = $2,
+                parser_version = $3,
+                confidence = $4,
+                quality_score = $5,
+                quality_flags = $6::jsonb,
+                rejection_reason = $7,
+                updated_at = now()
+            WHERE canonical_url = $1
+              AND hidden = false
+            RETURNING *;
+          `,
+          [
+            canonicalUrl,
+            nowEpoch,
+            parserVersion,
+            confidence,
+            quality.quality_score,
+            quality.quality_flags,
+            quality.rejection_reason
+          ]
+        );
+        storedPosting = freshnessResult.rows?.[0] || null;
+      }
+
+      if (!storedPosting) {
+        const upsertResult = await client.query(
         `
           INSERT INTO postings (
             canonical_url, company_name, position_name, apply_url, location_text, city, country, region,
@@ -3105,25 +3192,29 @@ async function upsertPostgresPostings(pool, postings, options = {}) {
           posting?.posted_at_epoch ?? posting?.posting_date_epoch ?? null,
           nowEpoch,
           nowEpoch,
-          String(posting?.parser_version || options.parserVersion || "legacy-adapter-v1"),
-          Number(gate.confidence || posting?.confidence || posting?.parser_confidence || 0.5),
+          parserVersion,
+          confidence,
           quality.quality_score,
           quality.quality_flags,
           quality.rejection_reason
         ]
-      );
+        );
+        storedPosting = upsertResult.rows?.[0] || normalizedPosting;
+      }
       // Enqueue whenever the canonical Meili projection changes. This includes
       // updates to an already-visible row (title, geo, remote mode, date, etc.),
       // not only inserts and hidden→visible transitions.
-      const previousPosting = oldRow.rows[0] || null;
-      const storedPosting = upsertResult.rows?.[0] || normalizedPosting;
-      if (wasHidden || searchProjectionChanged(previousPosting, storedPosting)) {
+      const searchChange = wasHidden ? "full" : classifySearchProjectionChange(previousPosting, storedPosting);
+      if (searchChange !== "none") {
+        const payload = searchChange === "freshness"
+          ? { canonical_url: canonicalUrl, update_type: "freshness", last_seen_epoch: Number(storedPosting.last_seen_epoch || nowEpoch) }
+          : { canonical_url: canonicalUrl, update_type: "full" };
         await client.query(
           `
             INSERT INTO search_index_outbox (canonical_url, operation, payload, available_at)
             VALUES ($1, 'upsert', $2::jsonb, now());
           `,
-          [canonicalUrl, JSON.stringify({ canonical_url: canonicalUrl })]
+          [canonicalUrl, JSON.stringify(payload)]
         );
       }
     }
@@ -3308,18 +3399,38 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
     if (rows.length === 0) break;
 
     const latestOpsMap = new Map();
-    for (const row of rows) {
-      latestOpsMap.set(row.canonical_url, row);
+    for (const row of [...rows].sort((left, right) => Number(left.id || 0) - Number(right.id || 0))) {
+      const previous = latestOpsMap.get(row.canonical_url);
+      const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+      const previousPayload = previous?.payload && typeof previous.payload === "object" ? previous.payload : {};
+      const currentIsFreshness = String(row.operation || "") === "upsert"
+        && String(payload.update_type || "") === "freshness";
+      const previousRequiresFull = previous && (
+        String(previous.operation || "") === "delete"
+        || String(previousPayload.update_type || "") !== "freshness"
+      );
+      latestOpsMap.set(
+        row.canonical_url,
+        currentIsFreshness && previousRequiresFull
+          ? { ...row, payload: { ...payload, update_type: "full" } }
+          : row
+      );
     }
 
     const deleteUrls = [];
     const upsertUrls = [];
+    const freshnessUpdates = [];
 
     for (const [url, row] of latestOpsMap.entries()) {
       if (String(row.operation || "") === "delete") {
         deleteUrls.push(url);
       } else if (String(row.operation || "") === "upsert") {
-        upsertUrls.push(url);
+        const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+        if (String(payload.update_type || "") === "freshness" && Number(payload.last_seen_epoch || 0) > 0) {
+          freshnessUpdates.push({ canonical_url: url, last_seen_epoch: Number(payload.last_seen_epoch) });
+        } else {
+          upsertUrls.push(url);
+        }
       }
     }
 
@@ -3348,6 +3459,10 @@ async function processPostgresSearchIndexOutbox(pool, options = {}) {
           await deleteMeiliPostingsByCanonicalUrls(missingUrls, getMeiliConfig());
           totalDeleted += missingUrls.length;
         }
+      }
+      if (freshnessUpdates.length > 0) {
+        await updateMeiliPostingFreshness(freshnessUpdates, getMeiliConfig());
+        totalUpserted += freshnessUpdates.length;
       }
 
       const rowIds = rows.map((row) => Number(row.id)).filter(Boolean);

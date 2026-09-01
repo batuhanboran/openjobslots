@@ -1596,6 +1596,139 @@ async function testProcessSearchOutboxKeepsFailedMeiliTaskPending() {
   }
 }
 
+async function testProcessSearchOutboxUsesPartialFreshnessDocuments() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousHost = process.env.MEILI_HOST;
+  const previousIndex = process.env.MEILI_POSTINGS_INDEX;
+  const previousFetch = global.fetch;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  process.env.MEILI_HOST = "http://meili.test";
+  process.env.MEILI_POSTINGS_INDEX = "postings";
+  const calls = [];
+  const fetchCalls = [];
+  const response = (body) => ({
+    ok: true,
+    status: 200,
+    async json() { return body; },
+    async text() { return JSON.stringify(body); }
+  });
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/WITH candidates AS[\s\S]+FROM search_index_outbox/i.test(sql)) {
+        return {
+          rows: [{
+            id: 10,
+            canonical_url: "https://example.com/jobs/10",
+            operation: "upsert",
+            payload: {
+              update_type: "freshness",
+              last_seen_epoch: 1770000010
+            }
+          }]
+        };
+      }
+      if (/UPDATE search_index_outbox/i.test(sql)) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  global.fetch = async (url, options = {}) => {
+    const href = String(url);
+    const method = String(options.method || "GET").toUpperCase();
+    fetchCalls.push({ href, method, body: options.body ? JSON.parse(String(options.body)) : null });
+    if (href === "http://meili.test/indexes/postings/documents?skipCreation=true" && method === "PUT") {
+      return response({ taskUid: 78, status: "enqueued" });
+    }
+    if (href === "http://meili.test/tasks/78" && method === "GET") {
+      return response({ uid: 78, status: "succeeded" });
+    }
+    throw new Error(`Unexpected Meili request: ${method} ${href}`);
+  };
+
+  try {
+    const result = await processPostgresSearchIndexOutbox(pool);
+    assert.equal(result.processed, 1);
+    assert.equal(result.upserted, 1);
+    assert.equal(calls.some((call) => /SELECT \*[\s\S]+FROM postings/i.test(call.sql)), false);
+    assert.deepEqual(fetchCalls.map((call) => call.method), ["PUT", "GET"]);
+    assert.equal(fetchCalls[0].body[0].last_seen_epoch, 1770000010);
+    assert.equal(Object.hasOwn(fetchCalls[0].body[0], "title"), false);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+    if (previousHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = previousHost;
+    if (previousIndex === undefined) delete process.env.MEILI_POSTINGS_INDEX;
+    else process.env.MEILI_POSTINGS_INDEX = previousIndex;
+  }
+}
+
+async function testProcessSearchOutboxPreservesPendingFullUpdateBeforeFreshness() {
+  const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+  const previousHost = process.env.MEILI_HOST;
+  const previousIndex = process.env.MEILI_POSTINGS_INDEX;
+  const previousFetch = global.fetch;
+  process.env.OPENJOBSLOTS_SEARCH_BACKEND = "meili";
+  process.env.MEILI_HOST = "http://meili.test";
+  process.env.MEILI_POSTINGS_INDEX = "postings";
+  const calls = [];
+  const fetchCalls = [];
+  const canonicalUrl = "https://example.com/jobs/11";
+  const response = (body) => ({
+    ok: true,
+    status: 200,
+    async json() { return body; },
+    async text() { return JSON.stringify(body); }
+  });
+  const pool = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/WITH candidates AS[\s\S]+FROM search_index_outbox/i.test(sql)) {
+        return {
+          rows: [
+            { id: 12, canonical_url: canonicalUrl, operation: "upsert", payload: { update_type: "freshness", last_seen_epoch: 1770000012 } },
+            { id: 11, canonical_url: canonicalUrl, operation: "upsert", payload: { update_type: "full" } }
+          ]
+        };
+      }
+      if (/SELECT \*[\s\S]+FROM postings/i.test(sql)) {
+        return { rows: [{ canonical_url: canonicalUrl, company_name: "Example", position_name: "Engineer", last_seen_epoch: 1770000012 }] };
+      }
+      if (/UPDATE search_index_outbox/i.test(sql)) return { rowCount: 2, rows: [] };
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  global.fetch = async (url, options = {}) => {
+    const href = String(url);
+    const method = String(options.method || "GET").toUpperCase();
+    fetchCalls.push({ href, method });
+    if (href === "http://meili.test/indexes/postings/documents" && method === "POST") {
+      return response({ taskUid: 79, status: "enqueued" });
+    }
+    if (href === "http://meili.test/tasks/79" && method === "GET") {
+      return response({ uid: 79, status: "succeeded" });
+    }
+    throw new Error(`Unexpected Meili request: ${method} ${href}`);
+  };
+
+  try {
+    const result = await processPostgresSearchIndexOutbox(pool);
+    assert.equal(result.processed, 2);
+    assert.equal(result.upserted, 1);
+    assert.ok(calls.some((call) => /SELECT \*[\s\S]+FROM postings/i.test(call.sql)));
+    assert.deepEqual(fetchCalls.map((call) => call.method), ["POST", "GET"]);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBackend === undefined) delete process.env.OPENJOBSLOTS_SEARCH_BACKEND;
+    else process.env.OPENJOBSLOTS_SEARCH_BACKEND = previousBackend;
+    if (previousHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = previousHost;
+    if (previousIndex === undefined) delete process.env.MEILI_POSTINGS_INDEX;
+    else process.env.MEILI_POSTINGS_INDEX = previousIndex;
+  }
+}
+
 async function testPostgresSuggestionsUseMeiliWhenConfigured() {
   const previousBackend = process.env.OPENJOBSLOTS_SEARCH_BACKEND;
   const previousHost = process.env.MEILI_HOST;
@@ -2028,11 +2161,91 @@ async function testPostgresUpsertEnqueuesExistingVisibleProjectionChanges() {
   }], { nowEpoch: 200, skipMeili: true });
 
   assert.ok(calls.some((call) => /INSERT INTO search_index_outbox/i.test(call.sql)));
+  const outboxInsert = calls.find((call) => /INSERT INTO search_index_outbox/i.test(call.sql));
+  assert.equal(JSON.parse(outboxInsert.params[1]).update_type, "full");
   assert.equal(calls.some((call) => /UPDATE postings\s+SET hidden = true/i.test(call.sql)), false);
   assert.ok(calls.some((call) => /RETURNING/i.test(call.sql)));
   const postingInsert = calls.find((call) => /INSERT INTO postings/i.test(call.sql));
   assert.equal(postingInsert.params[16], null, "missing source date must stay null");
   assert.equal(postingInsert.params[17], null, "missing source date epoch must stay null");
+}
+
+async function testPostgresUpsertUsesNarrowFreshnessUpdateForUnchangedVisiblePosting() {
+  const calls = [];
+  const oldRow = {
+    canonical_url: "https://example.com/jobs/2",
+    company_name: "Example",
+    position_name: "Software Engineer",
+    apply_url: "https://example.com/jobs/2",
+    location_text: "Remote",
+    city: "",
+    country: "",
+    region: "",
+    remote_type: "remote",
+    industry: "",
+    department: "Engineering",
+    employment_type: "Full-time",
+    description_plain: "Build reliable systems.",
+    description_html: "<p>Build reliable systems.</p>",
+    ats_key: "greenhouse",
+    source_job_id: "2",
+    posting_date: null,
+    posted_at_epoch: null,
+    first_seen_epoch: 100,
+    last_seen_epoch: 100,
+    hidden: false,
+    parser_version: "greenhouse-v1",
+    confidence: 0.9,
+    quality_score: 0.9,
+    quality_flags: [],
+    rejection_reason: ""
+  };
+  const refreshedRow = { ...oldRow, last_seen_epoch: 200 };
+  const client = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (/SELECT[\s\S]+FROM postings WHERE canonical_url = \$1/i.test(sql)) {
+        return { rows: [oldRow], rowCount: 1 };
+      }
+      if (/UPDATE postings[\s\S]+last_seen_epoch/i.test(sql)) {
+        return { rows: [refreshedRow], rowCount: 1 };
+      }
+      if (/INSERT INTO search_index_outbox/i.test(sql)) return { rows: [], rowCount: 1 };
+      if (/INSERT INTO postings/i.test(sql)) throw new Error("unchanged posting must not use the full UPSERT");
+      if (/^(BEGIN|COMMIT)$/i.test(String(sql).trim())) return { rows: [], rowCount: 0 };
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    release() {}
+  };
+  const pool = { async connect() { return client; } };
+
+  await upsertPostgresPostings(pool, [{
+    canonical_url: oldRow.canonical_url,
+    company_name: oldRow.company_name,
+    position_name: oldRow.position_name,
+    apply_url: oldRow.apply_url,
+    location: oldRow.location_text,
+    city: oldRow.city,
+    country: oldRow.country,
+    region: oldRow.region,
+    remote_type: oldRow.remote_type,
+    industry: oldRow.industry,
+    department: oldRow.department,
+    employment_type: oldRow.employment_type,
+    description_plain: oldRow.description_plain,
+    description_html: oldRow.description_html,
+    ats_key: oldRow.ats_key,
+    source_job_id: oldRow.source_job_id,
+    parser_version: oldRow.parser_version,
+    parser_confidence: oldRow.confidence
+  }], { nowEpoch: 200, skipMeili: true });
+
+  assert.equal(calls.some((call) => /INSERT INTO postings/i.test(call.sql)), false);
+  assert.ok(calls.some((call) => /UPDATE postings[\s\S]+last_seen_epoch/i.test(call.sql)));
+  const outboxInsert = calls.find((call) => /INSERT INTO search_index_outbox/i.test(call.sql));
+  const payload = JSON.parse(outboxInsert.params[1]);
+  assert.equal(payload.update_type, "freshness");
+  assert.equal(payload.last_seen_epoch, 200);
 }
 
 async function testPayloadDriftUsesSourceLocalEmptyJobListStems() {
@@ -3055,6 +3268,7 @@ async function main() {
   await testPublicPostingsCapsLargeLimitAndOffset();
   await testPostgresUpsertRejectsInvalidPostingsBeforeStorage();
   await testPostgresUpsertEnqueuesExistingVisibleProjectionChanges();
+  await testPostgresUpsertUsesNarrowFreshnessUpdateForUnchangedVisiblePosting();
   testMeiliDocumentsCarryHiddenFlagSafely();
   await testMeiliUpsertSkipsPlaceholderTitles();
   testMeiliDocumentsInferMissingSearchFacetsFromLocation();
@@ -3069,6 +3283,8 @@ async function main() {
   await testPrunePostgresRetentionUsesLastSeenAndOutboxDeletes();
   await testProcessSearchOutboxDeletesWithoutMeiliWhenDisabled();
   await testProcessSearchOutboxKeepsFailedMeiliTaskPending();
+  await testProcessSearchOutboxUsesPartialFreshnessDocuments();
+  await testProcessSearchOutboxPreservesPendingFullUpdateBeforeFreshness();
   await testPostgresSuggestionsUseMeiliWhenConfigured();
   await testPostgresSuggestionsSkipUnmatchedMeiliHitFields();
   await testPostgresSuggestionsFallbackAvoidsUnaccentSeqScanPath();

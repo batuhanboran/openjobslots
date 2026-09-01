@@ -256,7 +256,7 @@ test("adaptive selection keeps a due candidate selectable when its signal is mis
   assert.ok(decision.maxTargetsPerRun >= 1, "signal-miss due candidate must remain selectable");
 });
 
-test("empty target selection still runs retention and search-index maintenance", async () => {
+test("empty target selection drains search outbox while startup defers full-table maintenance", async () => {
   const seen = { retentionRan: false, outboxRan: false };
   const client = {
     async query() {
@@ -290,7 +290,7 @@ test("empty target selection still runs retention and search-index maintenance",
   const result = await runPostgresIngestionOnce(pool, { automatic: true, targetLimit: 125 });
 
   assert.equal(result.totalTargets, 0);
-  assert.equal(seen.retentionRan, true, "retention must run even when no targets were selected");
+  assert.equal(seen.retentionRan, false, "worker startup must not trigger an immediate retention scan");
   assert.equal(seen.outboxRan, true, "search-index outbox must run even when no targets were selected");
 });
 

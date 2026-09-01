@@ -138,14 +138,18 @@ const PER_HOST_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
 const WORKER_MAINTENANCE_POLICY = resolveWorkerMaintenancePolicy(process.env);
+const WORKER_STARTED_AT_MS = Date.now();
 const retentionScheduler = createSourceQualityProtectionScheduler({
-  intervalMs: WORKER_MAINTENANCE_POLICY.retentionIntervalMs
+  intervalMs: WORKER_MAINTENANCE_POLICY.retentionIntervalMs,
+  initialLastAppliedMs: WORKER_STARTED_AT_MS
 });
 const sourceQualityProtectionScheduler = createSourceQualityProtectionScheduler({
-  intervalMs: WORKER_MAINTENANCE_POLICY.sourceQualityProtectionIntervalMs
+  intervalMs: WORKER_MAINTENANCE_POLICY.sourceQualityProtectionIntervalMs,
+  initialLastAppliedMs: WORKER_STARTED_AT_MS
 });
 const publicStatsRefreshScheduler = createSourceQualityProtectionScheduler({
-  intervalMs: WORKER_MAINTENANCE_POLICY.publicStatsRefreshIntervalMs
+  intervalMs: WORKER_MAINTENANCE_POLICY.publicStatsRefreshIntervalMs,
+  initialLastAppliedMs: WORKER_STARTED_AT_MS
 });
 
 async function runPostgresMaintenance(pool, atsKeys = [], options = {}) {
