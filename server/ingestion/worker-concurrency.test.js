@@ -16,6 +16,7 @@ const {
   recordSelectedTarget,
   recordSkippedTarget,
   recordTargetOutcome,
+  runPostgresMaintenance,
   runPostgresIngestionOnce,
   sanitizeLogMessage,
   sanitizeUrlForLog,
@@ -25,6 +26,7 @@ const {
   withWriteLock
 } = require("./worker");
 const { decideAdaptiveSourceSelection } = require("./adaptiveSourceSelection");
+const { createSourceQualityProtectionScheduler } = require("./workerRuntime");
 const { recoverPostgresStaleRuns, writePostgresPostingCache } = require("./workerStore");
 
 function sleep(ms) {
@@ -290,6 +292,43 @@ test("empty target selection still runs retention and search-index maintenance",
   assert.equal(result.totalTargets, 0);
   assert.equal(seen.retentionRan, true, "retention must run even when no targets were selected");
   assert.equal(seen.outboxRan, true, "search-index outbox must run even when no targets were selected");
+});
+
+test("postgres maintenance batches outbox work every run and throttles full-table maintenance", async () => {
+  const calls = [];
+  const schedulers = {
+    retention: createSourceQualityProtectionScheduler({ intervalMs: 60 * 60 * 1000 }),
+    sourceQuality: createSourceQualityProtectionScheduler({ intervalMs: 30 * 60 * 1000 }),
+    publicStats: createSourceQualityProtectionScheduler({ intervalMs: 30 * 60 * 1000 })
+  };
+  const dependencies = {
+    pruneRetention: async () => calls.push("retention"),
+    processSearchIndexOutbox: async (_pool, options) => calls.push(`outbox:${options.limit}`),
+    applySourceQuality: async (_pool, options) => calls.push(`source-quality:${options.atsKeys.join(",")}`),
+    refreshPublicStats: async () => calls.push("public-stats")
+  };
+  const policy = { searchIndexOutboxBatchSize: 1000 };
+
+  await runPostgresMaintenance({}, ["lever"], {
+    nowMs: 1000,
+    schedulers,
+    dependencies,
+    policy
+  });
+  await runPostgresMaintenance({}, ["greenhouse"], {
+    nowMs: 2000,
+    schedulers,
+    dependencies,
+    policy
+  });
+
+  assert.deepEqual(calls, [
+    "retention",
+    "outbox:1000",
+    "source-quality:lever",
+    "public-stats",
+    "outbox:1000"
+  ]);
 });
 
 test("http status metrics are extracted and counted", () => {

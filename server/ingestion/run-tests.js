@@ -14,4 +14,5 @@ require("./sources/directSourceModules.test");
 require("./sources/enterpriseSourceModules.test");
 require("./sources/htmlPublicSourceModules.test");
 require("./sources/futurePostingDates.test");
+require("./workerRuntime.test");
 require("./worker-concurrency.test");

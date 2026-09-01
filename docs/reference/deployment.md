@@ -47,6 +47,10 @@ The worker keeps manual sync controls available, but automatic Postgres syncs ar
 - `OPENJOBSLOTS_HRMDIRECT_DETAIL_FETCH_LIMIT_PER_COMPANY`: HRMDirect detail-page cap per company. Compose defaults to `35` so large sparse HRMDirect boards cannot stall an automatic worker run; raise only during targeted HRMDirect recovery windows.
 - `INGESTION_DUE_TARGET_CANDIDATE_MULTIPLIER`: over-select factor for due target candidates before source budget and protection filtering. Worker code defaults to `8`.
 - `INGESTION_DUE_TARGET_CANDIDATE_MAX`: hard ceiling for due-target candidate selection. Compose defaults to `2500`.
+- `OPENJOBSLOTS_SEARCH_OUTBOX_BATCH_SIZE`: Meilisearch documents per run-level durable-outbox batch. Compose defaults to `1000`; worker target writes defer indexing until run maintenance so small company boards do not create one Meili commit each.
+- `OPENJOBSLOTS_RETENTION_INTERVAL_MS`: minimum interval between retention scans. Compose defaults to `3600000` ms; search-outbox processing still runs after every worker run.
+- `OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS`: minimum interval between scan-heavy source-quality protection passes. Compose defaults to `1800000` ms.
+- `OPENJOBSLOTS_PUBLIC_STATS_REFRESH_INTERVAL_MS`: independent public-stats snapshot refresh interval. Compose defaults to `1800000` ms.
 
 The worker heartbeat is written to a dedicated file every 30 seconds. Docker marks the worker unhealthy only when that heartbeat is stale, and `scripts/worker-watchdog.sh` restarts only an unhealthy container. It does not use the age of an `auto run summary`, so a long but progressing ATS run is not interrupted.
 
@@ -57,13 +61,15 @@ To temporarily return to the May 27 high-throughput stage, override `INGESTION_W
 
 Compose sets memory and swap ceilings for the four production services. Defaults are:
 
-- `OPENJOBSLOTS_POSTGRES_MEM_LIMIT=1536m` and `OPENJOBSLOTS_POSTGRES_MEMSWAP_LIMIT=1536m`.
+- `OPENJOBSLOTS_POSTGRES_MEM_LIMIT=2560m` and `OPENJOBSLOTS_POSTGRES_MEMSWAP_LIMIT=2560m`.
 - `OPENJOBSLOTS_MEILI_MEM_LIMIT=6144m` and `OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT=8192m`.
 - `OPENJOBSLOTS_APP_MEM_LIMIT=768m` and `OPENJOBSLOTS_APP_MEMSWAP_LIMIT=768m`.
 - `OPENJOBSLOTS_WORKER_MEM_LIMIT=768m` and `OPENJOBSLOTS_WORKER_MEMSWAP_LIMIT=768m`.
 - `OPENJOBSLOTS_WEB_MEM_LIMIT=512m` and `OPENJOBSLOTS_WEB_MEMSWAP_LIMIT=512m`.
 
 App and worker Node heaps are separately bounded with `OPENJOBSLOTS_APP_NODE_OLD_SPACE_MB=384` and `OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB=512`. Meilisearch intentionally has a 2 GiB swap allowance: a full temp-index rebuild briefly holds the live and replacement indexes together, while steady-state search remains well below the ceiling. Keep the worker isolated during a replacement reindex and monitor container restarts, cgroup OOM events, and host swap.
+
+Postgres defaults to `shared_buffers=512MB` and `effective_cache_size=6GB`. The latter is a planner estimate, not an allocation. The `2560m` cgroup ceiling leaves room for Postgres processes plus filesystem cache while remaining bounded; revalidate host-wide memory headroom before raising it further.
 
 Public `/postings` requests are also clamped before query execution with `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_LIMIT=500` and `OPENJOBSLOTS_PUBLIC_POSTINGS_MAX_OFFSET=2000`. Responses include `page_capped=true` when a caller asks beyond those bounds.
 

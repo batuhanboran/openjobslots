@@ -48,6 +48,10 @@ assertContains(workerBlock, "INGESTION_MAX_TARGETS_PER_RUN=${INGESTION_MAX_TARGE
 assertContains(workerBlock, "INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET=${INGESTION_AUTO_SYNC_DAILY_TARGET_BUDGET:-3000}");
 assertContains(workerBlock, "INGESTION_AUTO_SYNC_TARGETS_PER_RUN=${INGESTION_AUTO_SYNC_TARGETS_PER_RUN:-50}");
 assertContains(workerBlock, "INGESTION_SOURCE_DAILY_TARGET_BUDGET=${INGESTION_SOURCE_DAILY_TARGET_BUDGET:-250}");
+assertContains(workerBlock, "OPENJOBSLOTS_SEARCH_OUTBOX_BATCH_SIZE=${OPENJOBSLOTS_SEARCH_OUTBOX_BATCH_SIZE:-1000}");
+assertContains(workerBlock, "OPENJOBSLOTS_RETENTION_INTERVAL_MS=${OPENJOBSLOTS_RETENTION_INTERVAL_MS:-3600000}");
+assertContains(workerBlock, "OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS=${OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS:-1800000}");
+assertContains(workerBlock, "OPENJOBSLOTS_PUBLIC_STATS_REFRESH_INTERVAL_MS=${OPENJOBSLOTS_PUBLIC_STATS_REFRESH_INTERVAL_MS:-1800000}");
 assertContains(workerBlock, "NODE_OPTIONS=--max-old-space-size=${OPENJOBSLOTS_WORKER_NODE_OLD_SPACE_MB:-512}");
 assertContains(workerBlock, "healthcheck:");
 assertContains(workerBlock, "scripts/healthcheck-worker.js");
@@ -55,6 +59,12 @@ assertContains(workerBlock, "scripts/healthcheck-worker.js");
 const meiliBlock = serviceBlock("openjobslots-meilisearch");
 assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEM_LIMIT:-6144m");
 assertContains(meiliBlock, "OPENJOBSLOTS_MEILI_MEMSWAP_LIMIT:-8192m");
+
+const postgresBlock = serviceBlock("openjobslots-postgres");
+assertContains(postgresBlock, "OPENJOBSLOTS_POSTGRES_MEM_LIMIT:-2560m");
+assertContains(postgresBlock, "OPENJOBSLOTS_POSTGRES_MEMSWAP_LIMIT:-2560m");
+assertContains(postgresBlock, "OPENJOBSLOTS_POSTGRES_SHARED_BUFFERS:-512MB");
+assertContains(postgresBlock, "OPENJOBSLOTS_POSTGRES_EFFECTIVE_CACHE_SIZE:-6GB");
 
 const webBlock = serviceBlock("openjobslots-web");
 assertContains(webBlock, "context: ./web");

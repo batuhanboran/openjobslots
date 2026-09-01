@@ -2,6 +2,13 @@
 
 This is the short current-state document for future Codex runs. Detailed runbooks live in `docs/reference/`.
 
+## Service I/O Stabilization - September 1, 2026 (Local, Not Deployed)
+
+- Fresh production read-only evidence at SHA `5507c42bd58dea40971e2ea2d1af82e192081636` isolated the dominant write path to continuous worker refreshes, Postgres WAL/table churn, and extremely small Meilisearch update tasks—not the Unlicensed crawler.
+- Latest-hour evidence: `12,599` distinct search-outbox URLs, at least `191` Meili addition tasks, and a median of `16` documents per task in the latest `1,000` tasks. PostgreSQL repeatedly hit its `1.5 GiB` memory ceiling without an OOM kill, forcing cache reclaim even though the host had substantial available memory.
+- Local runtime policy now defers per-target Meili flushes, drains the durable outbox once per run in batches of up to `1,000`, schedules retention hourly, schedules source-quality/public-stat scans every `30m`, and raises the Postgres container/cache defaults to `2560m` / `512MB` with a `6GB` planner cache estimate.
+- These changes are local only. Production must not be described as optimized until an explicitly approved deploy recreates worker/Postgres and fresh before/after I/O, health, outbox, task, and search-parity checks pass.
+
 ## ATS Local/Production Divergence - June 5, 2026
 
 - Local registry/workbench now has `62` configured, fixture-backed source modules and includes newly configured `personio` and `workable` sources. Workday, Manatal, Dayforce, Gem, Personio, and Workable are registry `canary` sources; ADP Workforce Now remains locally enabled but production-protected. Dayforce, Personio, and Workable are disabled-by-default canary sources and need explicit `--include-disabled` source-run commands until production proof promotes them. Local verification reports `read_only_recovery_ready_count=62` with no recovery-readiness blockers.

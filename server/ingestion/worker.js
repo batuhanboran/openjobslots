@@ -37,8 +37,10 @@ const {
 const { ensureMeiliPostingsIndex } = require("../search/meili");
 const { readWorkerBudgetConfig } = require("./workerConfig");
 const {
+  buildPostgresTargetUpsertOptions,
   createSourceQualityProtectionScheduler,
   resolveAutomaticSyncIntervalSeconds,
+  resolveWorkerMaintenancePolicy,
   shouldStartAutomaticSync
 } = require("./workerRuntime");
 const { startWorkerHeartbeat } = require("./workerHeartbeat");
@@ -135,16 +137,49 @@ const PER_HOST_CONCURRENCY = Math.max(1, Math.floor(positiveNumber(
 )));
 const WORKER_NAME = "openjobslots ingestion worker";
 const DB_BACKEND = String(process.env.OPENJOBSLOTS_DB_BACKEND || "sqlite").trim().toLowerCase();
-const SOURCE_QUALITY_PROTECTION_INTERVAL_MS = positiveNumber(
-  process.env.OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS,
-  15 * 60 * 1000
-);
+const WORKER_MAINTENANCE_POLICY = resolveWorkerMaintenancePolicy(process.env);
+const retentionScheduler = createSourceQualityProtectionScheduler({
+  intervalMs: WORKER_MAINTENANCE_POLICY.retentionIntervalMs
+});
 const sourceQualityProtectionScheduler = createSourceQualityProtectionScheduler({
-  intervalMs: SOURCE_QUALITY_PROTECTION_INTERVAL_MS
+  intervalMs: WORKER_MAINTENANCE_POLICY.sourceQualityProtectionIntervalMs
 });
 const publicStatsRefreshScheduler = createSourceQualityProtectionScheduler({
-  intervalMs: SOURCE_QUALITY_PROTECTION_INTERVAL_MS
+  intervalMs: WORKER_MAINTENANCE_POLICY.publicStatsRefreshIntervalMs
 });
+
+async function runPostgresMaintenance(pool, atsKeys = [], options = {}) {
+  const policy = options.policy || WORKER_MAINTENANCE_POLICY;
+  const schedulers = options.schedulers || {
+    retention: retentionScheduler,
+    sourceQuality: sourceQualityProtectionScheduler,
+    publicStats: publicStatsRefreshScheduler
+  };
+  const dependencies = options.dependencies || {};
+  const pruneRetention = dependencies.pruneRetention || prunePostgresRetention;
+  const processSearchIndexOutbox = dependencies.processSearchIndexOutbox || processPostgresSearchIndexOutbox;
+  const applySourceQuality = dependencies.applySourceQuality || applyPostgresSourceQualityProtection;
+  const refreshPublicStats = dependencies.refreshPublicStats || refreshPostgresPublicStatsSnapshot;
+  const nowMs = options.nowMs;
+
+  const retention = await schedulers.retention.schedule(["retention"], {
+    nowMs,
+    apply: () => pruneRetention(pool)
+  });
+  const outbox = await processSearchIndexOutbox(pool, {
+    limit: policy.searchIndexOutboxBatchSize
+  });
+  const sourceQuality = await schedulers.sourceQuality.schedule(atsKeys, {
+    nowMs,
+    apply: (scheduledAtsKeys) => applySourceQuality(pool, { atsKeys: scheduledAtsKeys })
+  });
+  const publicStats = await schedulers.publicStats.schedule(["public-stats"], {
+    nowMs,
+    apply: () => refreshPublicStats(pool)
+  });
+
+  return { retention, outbox, sourceQuality, publicStats };
+}
 
 function sourceHost(value) {
   try {
@@ -408,10 +443,10 @@ async function processPostgresTarget(pool, runId, target, counters, options = {}
     }
 
     if (validPostings.length > 0) {
-      await upsertPostgresPostings(pool, validPostings, {
+      await upsertPostgresPostings(pool, validPostings, buildPostgresTargetUpsertOptions({
         nowEpoch,
         parserVersion: target.adapter.parserVersion
-      });
+      }));
       counters.postingUpsertCount += validPostings.length;
     }
 
@@ -540,17 +575,10 @@ async function runPostgresIngestionOnce(pool, options = {}) {
     await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 
     try {
-      await prunePostgresRetention(pool);
-      await processPostgresSearchIndexOutbox(pool);
-      await sourceQualityProtectionScheduler.schedule(
-        Array.from(new Set(targets.map((target) => target.atsKey))),
-        {
-          apply: (atsKeys) => applyPostgresSourceQualityProtection(pool, { atsKeys })
-        }
+      await runPostgresMaintenance(
+        pool,
+        Array.from(new Set(targets.map((target) => target.atsKey)))
       );
-      await publicStatsRefreshScheduler.schedule(["public-stats"], {
-        apply: () => refreshPostgresPublicStatsSnapshot(pool)
-      });
     } catch (maintenanceError) {
       console.warn(`[ingestion] retention/search-index maintenance failed: ${maintenanceError.message}`);
     }
@@ -845,6 +873,7 @@ module.exports = {
   recordSelectedTarget,
   recordSkippedTarget,
   recordTargetOutcome,
+  runPostgresMaintenance,
   runPostgresIngestionOnce,
   runIngestionOnce,
   sanitizeLogMessage,

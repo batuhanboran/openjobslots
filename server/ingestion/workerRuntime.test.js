@@ -1,10 +1,44 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  buildPostgresTargetUpsertOptions,
   createSourceQualityProtectionScheduler,
   resolveAutomaticSyncIntervalSeconds,
+  resolveWorkerMaintenancePolicy,
   shouldStartAutomaticSync
 } = require("./workerRuntime");
+
+test("worker maintenance policy batches derived-index writes and throttles scan-heavy work", () => {
+  assert.deepEqual(resolveWorkerMaintenancePolicy({}), {
+    searchIndexOutboxBatchSize: 1000,
+    retentionIntervalMs: 60 * 60 * 1000,
+    sourceQualityProtectionIntervalMs: 30 * 60 * 1000,
+    publicStatsRefreshIntervalMs: 30 * 60 * 1000
+  });
+
+  assert.deepEqual(resolveWorkerMaintenancePolicy({
+    OPENJOBSLOTS_SEARCH_OUTBOX_BATCH_SIZE: "10",
+    OPENJOBSLOTS_RETENTION_INTERVAL_MS: "1000",
+    OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS: "999999999",
+    OPENJOBSLOTS_PUBLIC_STATS_REFRESH_INTERVAL_MS: "bad"
+  }), {
+    searchIndexOutboxBatchSize: 250,
+    retentionIntervalMs: 60 * 1000,
+    sourceQualityProtectionIntervalMs: 24 * 60 * 60 * 1000,
+    publicStatsRefreshIntervalMs: 30 * 60 * 1000
+  });
+});
+
+test("worker target writes defer Meilisearch until run-level maintenance", () => {
+  assert.deepEqual(buildPostgresTargetUpsertOptions({
+    nowEpoch: 1770000000,
+    parserVersion: "greenhouse-v1"
+  }), {
+    nowEpoch: 1770000000,
+    parserVersion: "greenhouse-v1",
+    skipMeili: true
+  });
+});
 
 test("automatic sync treats the configured interval as a minimum delay", () => {
   const base = {

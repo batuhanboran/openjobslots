@@ -18,6 +18,51 @@ function shouldStartAutomaticSync(options = {}) {
   );
 }
 
+function boundedNumber(value, fallback, min, max) {
+  const parsed = Number(value);
+  const selected = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.max(min, Math.min(max, Math.floor(selected)));
+}
+
+function resolveWorkerMaintenancePolicy(env = process.env) {
+  return {
+    searchIndexOutboxBatchSize: boundedNumber(
+      env.OPENJOBSLOTS_SEARCH_OUTBOX_BATCH_SIZE,
+      1000,
+      250,
+      1000
+    ),
+    retentionIntervalMs: boundedNumber(
+      env.OPENJOBSLOTS_RETENTION_INTERVAL_MS,
+      60 * 60 * 1000,
+      60 * 1000,
+      24 * 60 * 60 * 1000
+    ),
+    sourceQualityProtectionIntervalMs: boundedNumber(
+      env.OPENJOBSLOTS_SOURCE_QUALITY_PROTECTION_INTERVAL_MS,
+      30 * 60 * 1000,
+      60 * 1000,
+      24 * 60 * 60 * 1000
+    ),
+    publicStatsRefreshIntervalMs: boundedNumber(
+      env.OPENJOBSLOTS_PUBLIC_STATS_REFRESH_INTERVAL_MS,
+      30 * 60 * 1000,
+      60 * 1000,
+      24 * 60 * 60 * 1000
+    )
+  };
+}
+
+function buildPostgresTargetUpsertOptions(options = {}) {
+  return {
+    nowEpoch: Number(options.nowEpoch || 0),
+    parserVersion: String(options.parserVersion || ""),
+    // The worker flushes the durable outbox once per run. Per-target Meili
+    // tasks turn small company boards into hundreds of tiny index commits.
+    skipMeili: true
+  };
+}
+
 function createSourceQualityProtectionScheduler(options = {}) {
   const intervalMs = Math.max(1000, Number(options.intervalMs || 15 * 60 * 1000));
   const pendingAtsKeys = new Set();
@@ -63,7 +108,9 @@ function createSourceQualityProtectionScheduler(options = {}) {
 }
 
 module.exports = {
+  buildPostgresTargetUpsertOptions,
   createSourceQualityProtectionScheduler,
   resolveAutomaticSyncIntervalSeconds,
+  resolveWorkerMaintenancePolicy,
   shouldStartAutomaticSync
 };
